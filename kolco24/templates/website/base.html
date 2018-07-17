@@ -71,9 +71,21 @@
                         </ul>
 
                         <ul class="navbar-nav">
-                            <li class="nav-item">
-                                <a href="#">Войти</a>
+                            {% if user.is_active %}
+                            <li class="nav-item dropdown">
+                                <a class="nav-link dropdown-toggle" href="#" id="usersDropdown" role="button" data-toggle="dropdown">{{ user.username }}</a>
+                                <div class="dropdown-menu" aria-labelledby="usersDropdown">
+
+                                        <a class="dropdown-item" href="#">Выход</a>
+    
+                                </div>
+                                
                             </li>
+                            {% else %}
+                            <li class="nav-item"></li>
+                                <a href="/login">Войти</a>
+                            </li>
+                            {% endif %}                        
                         </ul>
 
                     </div>
