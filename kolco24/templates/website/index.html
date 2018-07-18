@@ -4,3 +4,93 @@
 
 
 {% block pagetitle %} Кольцо 24 - Главная {% endblock %}
+
+{% block content %}
+        <section class="bg-dark">
+            <img alt="Image" src="/static/images/backgrounds/header2.jpg" class="bg-image" />
+            <div class="container">
+                <div class="row align-items-center justify-content-between">
+                    <div class="col-12 col-md-6 col-lg-5">
+                        <img class="mx-auto d-none d-sm-block" style="width: 80%" src="/static/images/logo_big.png" alt="Кольцо 24 2018">
+                        <h2>13-14 октября 2018</br>  Белорецкий район, хр. Крака</h2>
+                    </div>
+                    <!--end of col-->
+                    <div class="col-12 col-md-6 col-lg-5">
+                        <div class="card">
+                            <div class="card-body">
+                                <div class="row mb-2">
+                                    <div class="col-sm-6 col-md-6 mb-1">
+                                        <ul class="nav nav-tabs">
+                                            <li class="nav-item">
+                                                <a class="nav-link active" href="#">6ч</a>
+                                            </li>
+                                            <li class="nav-item">
+                                                <a class="nav-link" href="#">12ч</a>
+                                            </li>
+                                            <li class="nav-item">
+                                                <a class="nav-link" href="#">24ч</a>
+                                            </li>
+                                        </ul>
+                                    </div>
+                                    <div class="col-sm-6 col-md-6">
+                                            <div class="form-group">
+                                                <select class="form-control" name="ucount" id="ucount" required="">
+                                                    <option value="1" selected="" disabled="">* Кол-во участников</option>
+                                                    <option value="2">2 человека</option>
+                                                    <option value="3">3 человека</option>
+                                                    <option value="4">4 человека</option>
+                                                    <option value="5">5 человек</option>
+                                                    <option value="6">6 человек</option>
+                                                </select>
+                                            </div>
+                                        </div>
+                                </div>
+                                <form>
+                                    <div class="form-row form-group">
+                                        <div class="col">
+                                            <input class="form-control" name="surname" type="text" id="surname" placeholder="Фамилия">
+                                        </div>
+                                        <div class="col">
+                                            <input class="form-control" name="firstname" type="text" id="firstname" placeholder="Имя">
+                                        </div>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="InputEmail">Адрес email</label>
+                                        <input type="email" name="phone" class="form-control" id="InputEmail" aria-describedby="emailHelp" placeholder="Адрес email">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="InputPhone">Телефон</label>
+                                        <input type="phone" name="phone" class="form-control" id="InputPhone" placeholder="Телефон">
+                                    </div>
+                                    <div class="mb-2">
+                                        <div class="custom-control custom-checkbox">
+                                            <input type="checkbox" class="custom-control-input" value="agree" name="agree-terms" id="check-agree" checked>
+                                            <label class="custom-control-label text-small" for="check-agree">Я прочитал <a href="#">Положение соревнований</a>
+                                            </label>
+                                        </div>
+                                    </div>
+                                    <div class="row">
+                                        <div class="col-sm-6"><p>Стартовый взнос</p></div>
+                                        <div class="col-sm-6"><p class="text-right">500 руб с человека</p></div>
+                                    </div>
+                                    <div class="row mb-2 justify-content-between">
+                                        <div class="col-6"><p>Итого за 3 чел.</p></div>
+                                        <div class="col-6"><p class="text-right">1500 руб</p></div>
+                                    </div>
+                                    <button type="submit" class="btn btn-lg btn-success btn-block">Зарегистрироваться</button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-12 col-md-12 col-lg-10">
+                        
+                    </div>
+                </div>
+                <!--end of row-->
+            </div>
+            <!--end of container-->
+        </section>
+        <!--end of section-->
+{% endblock %}
