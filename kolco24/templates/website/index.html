@@ -22,13 +22,13 @@
                                     <div class="col-sm-6 col-md-6 mb-1">
                                         <ul class="nav nav-tabs">
                                             <li class="nav-item">
-                                                <a class="nav-link active" href="#">6ч</a>
+                                                <a class="nav-link active" id="reg_6h" href="#">6ч</a>
                                             </li>
                                             <li class="nav-item">
-                                                <a class="nav-link" href="#">12ч</a>
+                                                <a class="nav-link" id="reg_12h" href="#">12ч</a>
                                             </li>
                                             <li class="nav-item">
-                                                <a class="nav-link" href="#">24ч</a>
+                                                <a class="nav-link" id="reg_24h" href="#">24ч</a>
                                             </li>
                                         </ul>
                                     </div>
@@ -323,4 +323,7 @@
                         <!--end of container-->
                     </section>
                     <!--end of section-->
+{% endblock %}
+{% block footer_js_include %}
+    <script type="text/javascript" src="/static/js/index_reg.js"></script>
 {% endblock %}

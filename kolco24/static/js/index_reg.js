@@ -1,0 +1,15 @@
+$('#reg_6h').click(function(){
+    $('#reg_6h').addClass("active");
+    $('#reg_12h').removeClass("active");
+    $('#reg_24h').removeClass("active");
+});
+$('#reg_12h').click(function(){
+    $('#reg_6h').removeClass("active");
+    $('#reg_12h').addClass("active");
+    $('#reg_24h').removeClass("active");
+});
+$('#reg_24h').click(function(){
+    $('#reg_6h').removeClass("active");
+    $('#reg_12h').removeClass("active");
+    $('#reg_24h').addClass("active");
+});
