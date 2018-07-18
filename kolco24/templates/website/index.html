@@ -93,4 +93,234 @@
             <!--end of container-->
         </section>
         <!--end of section-->
+
+        <section id="about" class="section about">
+                <div class="container">
+                    <div class="row">
+                        <div class="col-sm-6">
+        
+                            <h3 class="section-title">Что это?</h3>
+                            <p>Есть такая традиция: каждый год в конце лета собраться с друзьями, погулять по горам и лесам, сделать много фоточек и вообще чудно провести время.</p>
+                            <p>XIX соревнования по пешеходному туризму в дисциплине рогейн "КОЛЬЦО 24" приглашают тебя поучаствовать!</p>
+        
+                            <figure>
+                                <img alt="" class="img-fluid" src="/static/images/about-us.jpg">
+                            </figure>
+        
+                        </div><!-- /.col-sm-6 -->
+        
+                        <div class="col-sm-6">
+        
+                            <h3 class="section-title multiple-title">Что такое Рогейн?</h3>
+        
+                            <p>Ориентирование на местности с определенным контрольным временем. После старта каждая команда, используя карту с обозначенными контрольными пунктами, старается собрать наибольшее число баллов. Последовательность и количество взятия КП команда определяет сама.</p>
+                            <p>Выигрывает команда, собравшая максимальное количество баллов</p>
+        
+                            <h3 class="section-title multiple-title">Как будет?</h3>
+                            <p>Азарт и радость, усталость и преодоление, теплая компания и живописнейший хребет Крака.
+        Представители из множества разных городов и регионов, самые активные турклубы Урала, более трехсот участников самых разных возрастов. Всех объединяет одно - неравнодушие к туризму и желание испытать себя.</p>
+                            <h3 class="section-title multiple-title">Какие дистанции?</h3>
+                            <ul class="list-arrow-right">
+        
+                                <li>«Всё сложно» - КВ 24 часа (4-6 человек)</li>
+                                <li>«Всё серьезно» - КВ 12 часов (4-6 человек или 2 человека ММ/МЖ/ЖЖ)</li>
+                                <li>«Первое свидание» - КВ 6 часа (2-3 человека)</li>
+        
+                            </ul>
+        
+                        </div><!-- /.col-sm-6 -->
+                    </div><!-- /.row -->
+                </div><!-- /.container -->
+            </section>
+            <section class="text-white space-sm">
+                    <div class="container">
+                        <img class="bg-image" src="http://kolco24.ru/static/images/backgrounds/bg-1.jpg">
+                        <div class="row justify-content-center">
+                                <div class="col-sm-3 text-center">
+
+                                        <i class="ion-ios-calendar"></i>
+                                        <h3>2018<br>13-14 октября</h3>
+                    
+                                    </div>
+                                    <div class="col-sm-3 text-center">
+                    
+                                        <i class="ion-ios-location"></i>
+                                        <h3>Белорецкий район<br>хр. Крака</h3>
+                    
+                                    </div>
+                                    <div class="col-sm-3 text-center">
+                    
+                                      <i class="ion-ios-people"></i>
+                                      <h3>Участников:<br> {{ people_number }}</h3>
+                    
+                                    </div>
+                                    <div class="col-sm-3 text-center">
+                                      <i class="ion-trophy"></i>
+                                      <h3>Команд:<br> {{ team_number }}</h3>
+                    
+                                    </div>
+                            <!--end of col-->
+                        </div>
+                        <!--end of row-->
+                    </div>
+                    <!--end of container-->
+                </section>
+                <section>
+                    <div class="container">
+                        <div class="row justify-content-center text-center section-intro">
+                            <div class="col-12 col-md-9 col-lg-8">
+                                <h2 class="display-4">Дистанции</h2>
+                                <span class="lead">Выбери подходящую для себя</span>
+    
+                            </div>
+                            <!--end of col-->
+                        </div>
+                        <!--end of row-->
+                        <div class="row justify-content-around align-items-center">
+                            <div class="col-12 col-md-6 col-lg-5 order-md-2">
+                                <ul class="nav" id="myTab" role="tablist">
+                                    <li>
+                                        <div class="active card" id="tab-1" data-toggle="tab" href="#home" role="tab" aria-controls="home" aria-selected="true">
+                                            <div class="card-body">
+                                                <h3>«Первое свидание» 6ч</h3>
+                                                <p>
+                                                    Легкий забег по красивым местам.
+                                                </p>
+                                                    <ul>
+                                                            <li>Вес рюкзака не регламентирован</li>
+                                                            <li>2-3 человека, состав не регламентирован</li>
+                                                        </ul>
+                                                
+                                            </div>
+                                        </div>
+                                    </li>
+                                    <li>
+                                        <div class="card" id="tab-2" data-toggle="tab" href="#profile" role="tab" aria-controls="profile" aria-selected="false">
+                                            <div class="card-body">
+                                                    <h3>«Всё серьезно» 12ч</h3>
+                                                <p>
+                                                    Прогулка по красивым местам. Сочетание скорости и насыщенности. Заявится можно в две категории: Двойка и команда.
+                                                </p>
+                                                <ul>
+                                                    <li>Вес рюкзака: 6кг на человека</li>
+                                                    <li>2 человека (Зачеты в ММ, МЖ и ЖЖ)</li>
+                                                    <li>4-6 человек (минимум 1 девушка, минимум 1 мужчина)</li>
+                                                </ul>
+                                            </div>
+                                        </div>
+                                    </li>
+                                    <li>
+                                        <div class="card" id="tab-3" data-toggle="tab" href="#contact" role="tab" aria-controls="contact" aria-selected="false">
+                                            <div class="card-body">
+                                                <h3>«Всё сложно» 24ч</h3>
+                                                <p>
+                                                    Дистанция для проверки своих сил выносиливости. Команда 4-6 человек.
+                                                </p>
+                                                <ul>
+                                                        <li>Вес рюкзака: 6кг на человека</li>
+                                                        <li>4-6 человек (минимум 1 девушка, минимум 1 мужчина)</li>
+                                                    </ul>
+                                            </div>
+                                        </div>
+                                    </li>
+                                </ul>
+                            </div>
+                            <!--end of col-->
+                            <div class="col-12 col-md-6 order-md-1">
+                                <div class="tab-content" id="myTabContent">
+                                    <div class="tab-pane fade show active" id="home" role="tabpanel" aria-labelledby="tab-1">
+                                        <img alt="Image" class="img-fluid box-shadow" src="/static/images/backgrounds/header.jpg" />
+                                    </div>
+                                    <div class="tab-pane fade" id="profile" role="tabpanel" aria-labelledby="tab-2">
+                                        <img alt="Image" class="img-fluid box-shadow" src="assets/img/graphic-intro-code.png" />
+                                        456
+                                    </div>
+                                    <div class="tab-pane fade" id="contact" role="tabpanel" aria-labelledby="tab-3">
+                                        <img alt="Image" class="img-fluid box-shadow" src="assets/img/graphic-intro-plugins.png" />
+                                        789
+                                    </div>
+                                </div>
+                            </div>
+                            <!--end of col-->
+                        </div>
+                        <!--end of row-->
+                    </div>
+                    <!--end of container-->
+                </section>
+                <section class="bg-white">
+                        <div class="container">
+                                <div class="row">
+                                    <div class="col-sm-10">
+                                        <h3 class="h1">Программа соревнований</h3>
+                                        <hr class="short" />
+                                        <ul class="feature-list feature-list-sm">
+                                            <li>
+                                                <div class="media">
+                                                    <i class="icon-arrow-right mr-2"></i>
+                                                    <div class="media-body">
+                                                        <h6>10.10.18 Среда</h6>
+                                                        <p>
+                                                                Совещание ГСК с представителями команд в Клубе туристов «Спутник» по адресу: г. Уфа, ул. Айская, д. 75/2
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                            </li>
+                                            <li>
+                                                <div class="media">
+                                                    <i class="icon-arrow-right mr-2"></i>
+                                                    <div class="media-body">
+                                                        <h6>12.10.18 Пятница</h6>
+                                                        <p>21:30 – Заезд и размещение участников<br/>
+                                                        22:00-24:00 Начало работы мандатной комиссии (регистрация участников)</p>
+                                                    </div>
+                                                </div>
+                                            </li>
+                                            <li>
+                                                <div class="media">
+                                                    <i class="icon-arrow-right mr-2"></i>
+                                                    <div class="media-body">
+                                                        <h6>13.10.18 Суббота</h6>
+                                                        <p>07:00 – Общий подъем. Продолжение регистрации команд<br/>
+                                                        10:30 – Завершение регистрации. Совещание ГСК с представителями команд<br/>
+                                                        11:00 – Общее построение. Торжественное открытие соревнований<br/>
+                                                        11:30-12:00 – Старты на дистанции «6 часов»<br/>
+                                                        12:00-12:30 – Старты на дистанции «12 часов»<br/>
+                                                        12:30-13:00 – Старты на дистанции «24 часа»<br/>
+                                                        19:00 – Закрытие дистанции «6 часов»
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                            </li>
+                                            <li>
+                                                <div class="media">
+                                                    <i class="icon-arrow-right mr-2"></i>
+                                                    <div class="media-body">
+                                                        <h6>14.10.18 Воскресенье</h6>
+                                                        <p>01:30 – Закрытие дистанции «12 часов»<br/>
+                                                            14:00 – Закрытие дистанции «24 часов»<br/>
+                                                            15:00 – Закрытие соревнований, торжественное награждение победителей<br/>
+                                                            16:00 – Отъезд участников соревнований<br/>                                                            
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                            </li>
+                                            <li>
+                                                <div class="media">
+                                                    <i class="icon-arrow-right mr-2"></i>
+                                                    <div class="media-body">
+                                                        <h6>17.10.18 Среда</h6>
+                                                        <p>19:30 – Подведение итогов фотоконкурса, трехлетнего и клубного зачета, обсуждение соревнований, просмотр фотографий и видео в клубе туристов «Спутник» г. Уфа, ул. Айская, д. 75/2                                                          
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                            </li>
+                                        </ul>
+                                        <a href="#" class="text-small">Положение соревнований &rsaquo;</a>
+                                    </div>
+                            </div>
+                            <!--end of row-->
+                        </div>
+                        <!--end of container-->
+                    </section>
+                    <!--end of section-->
 {% endblock %}
