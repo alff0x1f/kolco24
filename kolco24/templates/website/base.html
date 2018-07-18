@@ -79,13 +79,18 @@
                                         {% if user.is_superuser %}
                                             <a class="dropdown-item" href="/admin">Админка</a>
                                         {% endif %}
-                                        <a class="dropdown-item" href="#">Выход</a>
+                                        <form action="/logout" method="POST" id="logoutForm">
+                                            <input type="hidden" name="logout" value="logout">
+                                            {% csrf_token %}
+                                        </form>
+                                        <a class="dropdown-item" style="color: #495057;" onclick="document.getElementById('logoutForm').submit();">Выход</a>
+                                        
                                 </div>
                                 
                             </li>
                             {% else %}
-                            <li class="nav-item"></li>
-                                <a href="/login">Войти</a>
+                            <li class="nav-item">
+                                <a href="/login" class="nav-link">Войти</a>
                             </li>
                             {% endif %}                        
                         </ul>
@@ -194,6 +199,7 @@
     <script type="text/javascript" src="/static/js/zoom.min.js"></script>
     <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/4.0.0/js/bootstrap.min.js"></script>
     <script type="text/javascript" src="/static/js/theme.js"></script>
+    {% block footer_js_include %}{% endblock%}
 
 </body>
 
