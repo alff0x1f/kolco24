@@ -18,7 +18,7 @@
                     <div class="col-12 col-md-6 col-lg-5">
                         <div class="card">
                             <div class="card-body">
-                                <form>
+                                <form action="/" method="POST">
                                     <div class="row mb-2">
                                         <div class="col-sm-6 col-md-6 mb-1">
                                             <ul class="nav nav-tabs">
@@ -35,9 +35,9 @@
                                         </div>
                                         <div class="col-sm-6 col-md-6">
                                                 <div class="form-group">
+                                                    <label for="ucount">Кол-во участников:</label>
                                                     <select class="form-control" name="ucount" id="ucount" required="">
-                                                        <option value="1" selected="" disabled="">* Кол-во участников</option>
-                                                        <option value="2">2 человека</option>
+                                                        <option value="2" selected="">2 человека</option>
                                                         <option value="3">3 человека</option>
                                                         <option value="4">4 человека</option>
                                                         <option value="5">5 человек</option>
@@ -48,19 +48,45 @@
                                     </div>
                                     <div class="form-row form-group">
                                         <div class="col">
-                                            <input class="form-control" name="surname" type="text" id="surname" placeholder="Фамилия" value="{{ user.last_name }}">
+                                            <!-- <input class="form-control {% if reg_form.last_name.errors %}is-invalid{% endif %}" name="last_name" type="text" id="surname" placeholder="Фамилия" value="{{ user.last_name }}"> -->
+                                            {{ reg_form.last_name }}
+                                            {% if reg_form.last_name.errors %}
+                                                <div class="invalid-feedback">
+                                                    {{ reg_form.last_name.errors}}
+                                                </div>
+                                            {% endif %}
                                         </div>
                                         <div class="col">
-                                            <input class="form-control" name="firstname" type="text" id="firstname" placeholder="Имя" value="{{ user.first_name }}">
+                                            <!-- <input class="form-control {% if reg_form.first_name.errors %}is-invalid{% endif %}" name="first_name" type="text" id="first_name" placeholder="Имя" value="{{ user.first_name }}"> -->
+                                            {{ reg_form.first_name }}
+                                            {% if reg_form.first_name.errors %}
+                                                <div class="invalid-feedback">
+                                                    {{ reg_form.first_name.errors}}
+                                                </div>
+                                            {% endif %}
                                         </div>
                                     </div>
                                     <div class="form-group">
-                                        <label for="InputEmail">Адрес email</label>
-                                        <input type="email" name="phone" class="form-control" id="InputEmail" aria-describedby="emailHelp" placeholder="Адрес email" value="{{ user.email }}">
+                                        <!-- <label for="InputEmail">Адрес email</label>
+                                        <input type="email" name="email" class="form-control {% if reg_form.email.errors %}is-invalid{% endif %}" id="InputEmail" aria-describedby="emailHelp" placeholder="Адрес email" value="{{ user.email }}"> -->
+                                        {{ reg_form.email.label_tag }}
+                                        {{ reg_form.email }}
+                                        {% if reg_form.email.errors %}
+                                            <div class="invalid-feedback">
+                                                {{ reg_form.email.errors}}
+                                            </div>
+                                        {% endif %}
                                     </div>
                                     <div class="form-group">
-                                        <label for="InputPhone">Телефон</label>
-                                        <input type="phone" name="phone" class="form-control" id="InputPhone" placeholder="Телефон">
+                                        <!-- <label for="InputPhone">Телефон</label> -->
+                                        <!-- <input type="phone" name="phone" class="form-control {% if reg_form.phone.errors %}is-invalid{% endif %}" id="InputPhone" placeholder="Телефон"> -->
+                                        {{ reg_form.phone.label_tag }}
+                                        {{ reg_form.phone }}
+                                        {% if reg_form.phone.errors %}
+                                        <div class="invalid-feedback">
+                                            {{ reg_form.phone.errors}}
+                                        </div>
+                                        {% endif %}
                                     </div>
                                     <div class="mb-2">
                                         <div class="custom-control custom-checkbox">
@@ -78,6 +104,14 @@
                                         <div class="col-6"><p class="text-right"><span id="sumlabel">{% widthratio cost 1 2 %}</span> руб</p></div>
                                     </div>
                                     <input type="hidden" id="dist" name="dist" value="12h">
+                                    {% csrf_token %}
+                                    {% if reg_form.non_field_errors %}
+                                    <div class="alert alert-danger" role="alert">
+                                        {% for err in reg_form.non_field_errors %}
+                                        <p class="form-error">{{ err }}</p>
+                                        {% endfor %}
+                                    </div>
+                                    {% endif %}
                                     <button type="submit" class="btn btn-lg btn-success btn-block">Зарегистрироваться</button>
                                 </form>
                             </div>

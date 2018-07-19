@@ -2,13 +2,28 @@ from django.shortcuts import render
 from django.http import HttpResponse
 from django.contrib.auth import login as auth_login
 from django.contrib.auth import logout
-from website.forms import LoginForm
+from website.forms import LoginForm, RegForm
 from django.http import HttpResponseRedirect, Http404
 
 
 def index(request):
+    init_val = {}
+    if request.user.is_authenticated:
+        init_val = {
+            "first_name":request.user.first_name,
+            "last_name": request.user.last_name,
+            "email": request.user.email,
+            "phone": "phone"
+            }
+    reg_form = RegForm(request.POST or None, initial=init_val)
+    reg_form.set_user(request.user)
+
+    if request.method == 'POST' and reg_form.is_valid():
+        reg_form.reg_user()
+        return HttpResponseRedirect("/")
     contex = {
-        "cost": 500
+        "cost": 500,
+        "reg_form": reg_form
     }
     return render(request, 'website/index.html', contex)
 
@@ -28,5 +43,5 @@ def logout_user(request):
         if "logout" in request.POST and request.POST["logout"] == "logout":
             if request.user.is_authenticated:
                 logout(request)
-                return render(request, 'website/index.html')
+                return index(request)
     raise Http404("File not found.")
