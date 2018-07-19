@@ -13,6 +13,8 @@ def index(request):
     return render(request, 'website/index.html', contex)
 
 def login(request):
+    if request.user.is_authenticated:
+        return HttpResponseRedirect("/")
     form = LoginForm(request.POST or None)
     if request.method == 'POST' and form.is_valid():
         user = form.authenticate_user()
