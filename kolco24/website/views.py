@@ -7,9 +7,10 @@ from django.http import HttpResponseRedirect, Http404
 
 
 def index(request):
-    # return HttpResponse("Hello, world!")
-    return render(request, 'website/index.html')
-
+    contex = {
+        "cost": 500
+    }
+    return render(request, 'website/index.html', contex)
 
 def login(request):
     form = LoginForm(request.POST or None)
