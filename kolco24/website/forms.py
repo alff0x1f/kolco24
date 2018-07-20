@@ -86,6 +86,7 @@ class RegForm(forms.Form):
     def reg_user(self):
         first_name = self.cleaned_data["first_name"]
         last_name = self.cleaned_data["last_name"]
+        phone = self.cleaned_data["phone"]
         username = "%s %s" % (last_name, first_name)
 
         if self.user.is_anonymous:
@@ -96,11 +97,13 @@ class RegForm(forms.Form):
             user = User.objects.create_user(username, email, password)
             user.first_name = first_name
             user.last_name = last_name
+            user.profile.phone = phone
             user.save()
             return user
         else:
             self.user.first_name = first_name
             self.user.last_name = last_name
+            self.user.profile.phone = phone
             # self.user.username = username
             self.user.save()
         return self.user

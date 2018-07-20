@@ -13,7 +13,7 @@ def index(request):
             "first_name":request.user.first_name,
             "last_name": request.user.last_name,
             "email": request.user.email,
-            "phone": "phone"
+            "phone": request.user.profile.phone,
             }
     reg_form = RegForm(request.POST or None, initial=init_val)
     reg_form.set_user(request.user)
