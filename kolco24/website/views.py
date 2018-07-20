@@ -2,6 +2,7 @@ from django.shortcuts import render
 from django.http import HttpResponse
 from django.contrib.auth import login as auth_login
 from django.contrib.auth import logout
+from django.contrib.auth.decorators import login_required
 from website.forms import LoginForm, RegForm
 from django.http import HttpResponseRedirect, Http404
 
@@ -21,7 +22,7 @@ def index(request):
     if request.method == 'POST' and reg_form.is_valid():
         user = reg_form.reg_user()
         auth_login(request, user)
-        return HttpResponseRedirect("/")
+        return HttpResponseRedirect("/team")
     contex = {
         "cost": 500,
         "reg_form": reg_form
@@ -46,3 +47,7 @@ def logout_user(request):
                 logout(request)
                 return HttpResponseRedirect("/")
     raise Http404("File not found.")
+
+@login_required
+def my_team(request):
+    return render(request, 'website/my_team.html')

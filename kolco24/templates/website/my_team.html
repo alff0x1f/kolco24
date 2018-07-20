@@ -1,0 +1,140 @@
+{% extends "website/base.html" %}
+
+{% block content %}
+    <section class="space-sm">
+        <div class="container">
+            <div class="row flex-md-row card card-lg">
+                <div class="col-12 col-md-7 card-body bg-secondary">
+                    <div class="text-center mb-4">
+                        <h1 class="h2 mb-2">Моя команда</h1>
+                        <span>Все эти поля можно заполнить позже</span>
+                    </div>
+                    <div class="row justify-content-center">
+                        <div class="col-12 col-lg-10">
+                            <form>
+                                <div class="form-row form-group">
+                                    <div class="col">
+                                        <input class="form-control form-control-lg" type="text" id="company" placeholder="Название команды" />
+                                    </div>
+                                </div>
+                                <div class="form-row form-group">
+                                    <div class="col">
+                                        <input class="form-control form-control-lg" type="text" id="city" placeholder="Город" />
+                                    </div>
+                                    <div class="col">
+                                        <input class="form-control form-control-lg" type="text" id="organization" placeholder="Клуб(организация)" />
+                                    </div>
+                                </div>
+                                <p>Участники:</p>
+                                <div class="form-row form-group">
+                                    <div class="col-8">
+                                        <input class="form-control form-control-lg" type="text" id="u1" placeholder="1) Фамилия имя" />
+                                    </div>
+                                    <div class="col-4">
+                                        <input class="form-control form-control-lg" type="text" id="birth1" placeholder="Год рождения" />
+                                    </div>
+                                </div>
+                                <div class="form-row form-group">
+                                    <div class="col-8">
+                                        <input class="form-control form-control-lg" type="text" id="u2" placeholder="2) Фамилия имя" />
+                                    </div>
+                                    <div class="col-4">
+                                        <input class="form-control form-control-lg" type="text" id="birth2" placeholder="Год рождения" />
+                                    </div>
+                                </div>
+                                <div class="form-row form-group">
+                                    <div class="col-8">
+                                        <input class="form-control form-control-lg" type="text" id="u3" placeholder="3) Фамилия имя" />
+                                    </div>
+                                    <div class="col-4">
+                                        <input class="form-control form-control-lg" type="text" id="birth3" placeholder="Год рождения" />
+                                    </div>
+                                </div>
+                                <div class="form-row form-group">
+                                    <div class="col-8">
+                                        <input class="form-control form-control-lg" type="text" id="u4" placeholder="4) Фамилия имя" />
+                                    </div>
+                                    <div class="col-4">
+                                        <input class="form-control form-control-lg" type="text" id="birth4" placeholder="Год рождения" />
+                                    </div>
+                                </div>
+                                <div class="form-row form-group">
+                                    <div class="col-8">
+                                        <input class="form-control form-control-lg" type="text" id="u5" placeholder="5) Фамилия имя" />
+                                    </div>
+                                    <div class="col-4">
+                                        <input class="form-control form-control-lg" type="text" id="birth5" placeholder="Год рождения" />
+                                    </div>
+                                </div>
+                                <div class="form-row form-group">
+                                    <div class="col-8">
+                                        <input class="form-control form-control-lg" type="text" id="u6" placeholder="6) Фамилия имя" />
+                                    </div>
+                                    <div class="col-4">
+                                        <input class="form-control form-control-lg" type="text" id="birth6" placeholder="Год рождения" />
+                                    </div>
+                                </div>
+                                <div class="form-row form-group">
+                                    <div class="col">
+                                        <button class="btn btn-block btn-success btn-lg" type="submit">Сохранить</button>
+                                    </div>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+                <!--end of col-->
+                <div class="col-12 col-md-5 card-body">
+                    <div>
+                        <div class="mb-4 text-center">
+                            <h3 class="h2 mb-2">Стоимость</h3>
+                        </div>
+                        <ul class="list-unstyled list-spacing-sm mb-5 ">
+                            <li class="row align-items-center">
+                                <div class="col-3 col-md-3"><strong>600р</strong></div>
+                                <div class="col-9">При оплате с 26 июля по 19 августа</div>
+                            </li>
+                            <li class="row align-items-center">
+                                <div class="col-3 col-md-3"><strong>700р</strong></div>
+                                <div class="col-9">При оплате с 20 августа по 16 сентября</div>
+                            </li>
+                            <li class="row align-items-center">
+                                <div class="col-3 col-md-3"><strong>800р</strong></div>
+                                <div class="col-9">При оплате с 17 сентября по 12 октября</div>
+                            </li>
+                            <li class="row align-items-center">
+                                <div class="col-3 col-md-3"><strong>1000р</strong>
+                                </div>
+                                <div class="col-9"> Оплата наличными на месте старта</div>
+                            </li>
+                        </ul>
+                        <div class="mb-4 text-center">
+                            <h3 class="h2 mb-2">Способы оплаты</h3>
+                        </div>
+
+                        <li class="row align-items-center">
+                            <div class="col-2 col-md-1"><i class="icon-check h5 text-muted"></i>
+                            </div>
+                            <div class="col-10">Картой Visa/Mastercard</div>
+                        </li>
+                        <li class="row align-items-center">
+                            <div class="col-2 col-md-1"><i class="icon-check h5 text-muted"></i>
+                            </div>
+                            <div class="col-10">Яндекс деньги</div>
+                        </li>
+                        <li class="row align-items-center">
+                            <div class="col-2 col-md-1"><i class="icon-check h5 text-muted"></i>
+                            </div>
+                            <div class="col-10">Перевод через сбербанк-онлайн</div>
+                        </li>
+
+                    </div>
+                </div>
+                <!--end of col-->
+            </div>
+            <!--end of row-->
+        </div>
+        <!--end of container-->
+    </section>
+    <!--end of section-->
+{% endblock %}
