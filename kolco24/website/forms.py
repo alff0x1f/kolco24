@@ -91,15 +91,19 @@ class RegForm(forms.Form):
         if self.user.is_anonymous:
             password = self.id_generator()
             email = self.cleaned_data["email"]
+            while User.objects.filter(username=username).exists():
+                username = self.id_generator(12)
             user = User.objects.create_user(username, email, password)
             user.first_name = first_name
             user.last_name = last_name
             user.save()
+            return user
         else:
             self.user.first_name = first_name
             self.user.last_name = last_name
-            self.user.username = username
+            # self.user.username = username
             self.user.save()
+        return self.user
 
     def clean(self):
         # make invalid forms red:

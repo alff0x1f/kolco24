@@ -19,7 +19,8 @@ def index(request):
     reg_form.set_user(request.user)
 
     if request.method == 'POST' and reg_form.is_valid():
-        reg_form.reg_user()
+        user = reg_form.reg_user()
+        auth_login(request, user)
         return HttpResponseRedirect("/")
     contex = {
         "cost": 500,
@@ -43,5 +44,5 @@ def logout_user(request):
         if "logout" in request.POST and request.POST["logout"] == "logout":
             if request.user.is_authenticated:
                 logout(request)
-                return index(request)
+                return HttpResponseRedirect("/")
     raise Http404("File not found.")
