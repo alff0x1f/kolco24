@@ -21,7 +21,7 @@ def save_user_profile(sender, instance, **kwargs):
     instance.profile.save()
 
 
-class YandexPayment(models.Model):
+class Payments(models.Model):
     notification_type = models.CharField(max_length=20)
     operation_id = models.CharField(max_length=50)
     amount = models.CharField(max_length=10)
