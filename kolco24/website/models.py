@@ -1,3 +1,6 @@
+import datetime
+import time
+import hashlib
 from django.db import models
 from django.contrib.auth.models import User
 from django.db.models.signals import post_save
@@ -33,6 +36,65 @@ class Payments(models.Model):
     label = models.CharField(max_length=50)
     sha1_hash = models.CharField(max_length=30)
     unaccepted = models.BooleanField(default=True)
+
+    def get_cost(self, t=0):
+        s_format = "%d.%m.%Y %H:%M"
+        cost_by_date = [
+            ("12.10.2018 19:00", 800),
+            ("16.09.2018 19:00", 700),
+            ("19.08.2018 19:00", 600),
+            ("25.07.2018 19:00", 500),
+        ]
+        if not t:
+            t = time.time()
+        cost = 1000
+        for d in cost_by_date:
+            datestamp = datetime.datetime.strptime(d[0], s_format).timestamp()-time.timezone
+            if t < datestamp:
+                cost = d[1]
+        return cost
+
+    def new_payment(self, d):
+        fields = [
+            "notification_type", "operation_id", "amount", "currency",
+            "datetime", "sender", "codepro", "label", "sha1_hash",
+            "withdraw_amount" 
+            ]
+        for field in fields:
+            if field not in d:
+                return False
+
+        notification_secret = settings.YANDEX_NOTIFICATION_SECRET
+
+        s = "%s&%s&%s&%s&%s&%s&%s&%s&%s"%(d['notification_type'], 
+            d['operation_id'], d['amount'], d['currency'], d['datetime'], 
+            d['sender'], d['codepro'], notification_secret, d['label'])
+
+        hash = hashlib.sha1(s.encode('utf-8')).hexdigest()
+        if d['sha1_hash'] == hash:
+            self.notification_type = d['notification_type']
+            self.operation_id = d['operation_id']
+            self.amount = d['amount']
+            self.currency = d['currency']
+            self.datetime = d['datetime']
+            self.sender = d['sender']
+            if d['codepro'] == "false":
+                self.codepro = False
+            if d['codepro'] == "true":
+                self.codepro = True
+            self.label = d['label']
+            self.sha1_hash = d['sha1_hash']
+
+            self.withdraw_amount = d["withdraw_amount"]
+            if "unaccepted" in d:
+                if d["unaccepted"] == "false":
+                    self.unaccepted = False
+                if d["unaccepted"] == "true":
+                    self.unaccepted = True
+
+            self.save()
+            return True
+        return False
 
 
 class Team(models.Model):

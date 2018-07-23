@@ -3,7 +3,9 @@ from django.http import HttpResponse
 from django.contrib.auth import login as auth_login
 from django.contrib.auth import logout
 from django.contrib.auth.decorators import login_required
+from django.views.decorators.csrf import csrf_exempt
 from website.forms import LoginForm, RegForm
+from website.models import Payments
 from django.http import HttpResponseRedirect, Http404
 
 
@@ -51,3 +53,14 @@ def logout_user(request):
 @login_required
 def my_team(request):
     return render(request, 'website/my_team.html')
+
+@csrf_exempt
+def yandex_payment(request):
+    if request.method=='POST':
+        payment = Payments()
+        if payment.new_payment(request.POST):
+            # send_success_email(payment.label, payment.withdraw_amount, notification_type)
+            return HttpResponse("Ok")
+        else:
+            raise Http404("Wrong values")
+    raise Http404("File not found.")
