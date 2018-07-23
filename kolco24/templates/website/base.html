@@ -106,7 +106,8 @@
     <div class="main-container">
     {% block content%}{% endblock %}
 
-    <footer class="bg-gray text-light footer-long">
+    {% block footer_menu%}
+        <footer class="bg-gray text-light footer-long">
             <div class="container">
                 <div class="row">
                     <div class="col-12 col-md-3">
@@ -187,6 +188,7 @@
             </div>
             <!--end of container-->
         </footer>
+        {% endblock %}
     </div>
 
     <script type="text/javascript" src="https://code.jquery.com/jquery-3.2.1.min.js"></script>

@@ -31,6 +31,9 @@ def index(request):
     }
     return render(request, 'website/index.html', contex)
 
+def index_dummy(request):
+    return render(request, 'website/index_dummy.html')
+
 def login(request):
     if request.user.is_authenticated:
         return HttpResponseRedirect("/")
