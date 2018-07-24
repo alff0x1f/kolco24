@@ -117,8 +117,51 @@ class RegForm(forms.Form):
                     classes += ' is-invalid'
                     self.fields[f_name].widget.attrs['class'] = classes
             raise forms.ValidationError("Заполните все поля")
-        
+
         if User.objects.filter(email__iexact=self.cleaned_data["email"]).exists():
             u_email = "@@@" if self.user.is_anonymous else self.user.email.lower()
             if self.cleaned_data["email"].lower() != u_email:
                 raise forms.ValidationError("Такой email уже зарегистрирован.")
+
+
+class TeamForm(forms.Form):
+    name = forms.CharField(
+        required=False,
+        widget=forms.TextInput(
+            attrs={
+                'class': 'form-control form-control-lg',
+                'placeholder': 'Название команды'})
+    )
+    city = forms.CharField(
+        required=False,
+        widget=forms.TextInput(
+            attrs={
+                'class': 'form-control form-control-lg',
+                'placeholder': 'Город'})
+    )
+    organization = forms.CharField(
+        required=False,
+        widget=forms.TextInput(
+            attrs={
+                'class': 'form-control form-control-lg',
+                'placeholder': 'Клуб(организация)'})
+    )
+    ucount = 2
+
+    def __init__(self, *args, **kwargs):
+        super(TeamForm, self).__init__(*args, **kwargs)
+        for i in range(6):
+            self.fields['athlet%s' % (i + 1)] = forms.CharField(
+                required=False,
+                widget=forms.TextInput(
+                    attrs={
+                        'class': 'form-control form-control-lg',
+                        'placeholder': str(i + 1) + ') Фамилия имя'})
+            )
+            self.fields['birth%s' % (i+1)] = forms.CharField(
+                required=False,
+                widget=forms.TextInput(
+                    attrs={
+                        'class': 'form-control form-control-lg',
+                        'placeholder': 'Год рождения'})
+            )

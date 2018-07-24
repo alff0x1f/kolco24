@@ -4,7 +4,7 @@ from django.contrib.auth import login as auth_login
 from django.contrib.auth import logout
 from django.contrib.auth.decorators import login_required
 from django.views.decorators.csrf import csrf_exempt
-from website.forms import LoginForm, RegForm
+from website.forms import LoginForm, RegForm, TeamForm
 from website.models import Payments
 from django.http import HttpResponseRedirect, Http404
 
@@ -55,7 +55,15 @@ def logout_user(request):
 
 @login_required
 def my_team(request):
-    return render(request, 'website/my_team.html')
+    team_form = TeamForm(request.POST or None)
+
+    if request.method == 'GET':
+        context = {
+            "team_form": team_form,
+        }
+        return render(request, 'website/my_team.html', context)
+    elif request.method == 'POST':
+        raise Http404("File not found.")
 
 @csrf_exempt
 def yandex_payment(request):

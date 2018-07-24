@@ -11,69 +11,163 @@
                     </div>
                     <div class="row justify-content-center">
                         <div class="col-12 col-lg-10">
-                            <form>
+                            <form action="{% url 'my_team' %}" method="POST">
                                 <div class="form-row form-group">
                                     <div class="col">
-                                        <input class="form-control form-control-lg" type="text" id="company" placeholder="Название команды" />
+                                        {% comment %} <input class="form-control form-control-lg" type="text" id="company" placeholder="Название команды" /> {% endcomment %}
+                                        {{ team_form.name }}
+                                        {% if team_form.name.errors %}
+                                            <div class="invalid-feedback">
+                                                {{ team_form.name.errors}}
+                                            </div>
+                                        {% endif %}
                                     </div>
                                 </div>
                                 <div class="form-row form-group">
                                     <div class="col">
-                                        <input class="form-control form-control-lg" type="text" id="city" placeholder="Город" />
+                                        {% comment %} <input class="form-control form-control-lg" type="text" id="city" placeholder="Город" /> {% endcomment %}
+                                        {{ team_form.city }}
+                                        {% if team_form.city.errors %}
+                                            <div class="invalid-feedback">
+                                                {{ team_form.city.errors}}
+                                            </div>
+                                        {% endif %}
                                     </div>
                                     <div class="col">
-                                        <input class="form-control form-control-lg" type="text" id="organization" placeholder="Клуб(организация)" />
+                                        {% comment %} <input class="form-control form-control-lg" type="text" id="organization" placeholder="Клуб(организация)" /> {% endcomment %}
+                                        {{ team_form.organization }}
+                                        {% if team_form.organization.errors %}
+                                            <div class="invalid-feedback">
+                                                {{ team_form.organization.errors}}
+                                            </div>
+                                        {% endif %}
                                     </div>
                                 </div>
                                 <p>Участники:</p>
+                                
                                 <div class="form-row form-group">
                                     <div class="col-8">
-                                        <input class="form-control form-control-lg" type="text" id="u1" placeholder="1) Фамилия имя" />
+                                        {{ team_form.athlet1 }}
+                                        {% if team_form.athlet1.errors %}
+                                            <div class="invalid-feedback">
+                                                {{ team_form.athlet1.errors}}
+                                            </div>
+                                        {% endif %}
                                     </div>
                                     <div class="col-4">
-                                        <input class="form-control form-control-lg" type="text" id="birth1" placeholder="Год рождения" />
+                                        {{ team_form.birth1 }}
+                                        {% if team_form.birth1.errors %}
+                                            <div class="invalid-feedback">
+                                                {{ team_form.birth1.errors}}
+                                            </div>
+                                        {% endif %}
                                     </div>
                                 </div>
+
                                 <div class="form-row form-group">
                                     <div class="col-8">
-                                        <input class="form-control form-control-lg" type="text" id="u2" placeholder="2) Фамилия имя" />
+                                        {{ team_form.athlet2 }}
+                                        {% if team_form.athlet2.errors %}
+                                            <div class="invalid-feedback">
+                                                {{ team_form.athlet2.errors}}
+                                            </div>
+                                        {% endif %}
                                     </div>
                                     <div class="col-4">
-                                        <input class="form-control form-control-lg" type="text" id="birth2" placeholder="Год рождения" />
+                                        {{ team_form.birth2 }}
+                                        {% if team_form.birth2.errors %}
+                                            <div class="invalid-feedback">
+                                                {{ team_form.birth2.errors}}
+                                            </div>
+                                        {% endif %}
                                     </div>
                                 </div>
-                                <div class="form-row form-group">
-                                    <div class="col-8">
-                                        <input class="form-control form-control-lg" type="text" id="u3" placeholder="3) Фамилия имя" />
+
+                                {% if team_form.ucount >= 3 %}
+                                    <div class="form-row form-group">
+                                        <div class="col-8">
+                                            {{ team_form.athlet3 }}
+                                            {% if team_form.athlet3.errors %}
+                                                <div class="invalid-feedback">
+                                                    {{ team_form.athlet3.errors}}
+                                                </div>
+                                            {% endif %}
+                                        </div>
+                                        <div class="col-4">
+                                            {{ team_form.birth3 }}
+                                            {% if team_form.birth3.errors %}
+                                                <div class="invalid-feedback">
+                                                    {{ team_form.birth3.errors}}
+                                                </div>
+                                            {% endif %}
+                                        </div>
                                     </div>
-                                    <div class="col-4">
-                                        <input class="form-control form-control-lg" type="text" id="birth3" placeholder="Год рождения" />
+                                {% endif %}
+
+                                {% if team_form.ucount >= 4 %}
+                                    <div class="form-row form-group">
+                                        <div class="col-8">
+                                            {{ team_form.athlet4 }}
+                                            {% if team_form.athlet4.errors %}
+                                                <div class="invalid-feedback">
+                                                    {{ team_form.athlet4.errors}}
+                                                </div>
+                                            {% endif %}
+                                        </div>
+                                        <div class="col-4">
+                                            {{ team_form.birth4 }}
+                                            {% if team_form.birth4.errors %}
+                                                <div class="invalid-feedback">
+                                                    {{ team_form.birth4.errors}}
+                                                </div>
+                                            {% endif %}
+                                        </div>
                                     </div>
-                                </div>
-                                <div class="form-row form-group">
-                                    <div class="col-8">
-                                        <input class="form-control form-control-lg" type="text" id="u4" placeholder="4) Фамилия имя" />
+                                {% endif %}
+
+                                {% if team_form.ucount >= 5 %}
+                                    <div class="form-row form-group">
+                                        <div class="col-8">
+                                            {{ team_form.athlet5 }}
+                                            {% if team_form.athlet5.errors %}
+                                                <div class="invalid-feedback">
+                                                    {{ team_form.athlet5.errors}}
+                                                </div>
+                                            {% endif %}
+                                        </div>
+                                        <div class="col-4">
+                                            {{ team_form.birth5 }}
+                                            {% if team_form.birth5.errors %}
+                                                <div class="invalid-feedback">
+                                                    {{ team_form.birth5.errors}}
+                                                </div>
+                                            {% endif %}
+                                        </div>
                                     </div>
-                                    <div class="col-4">
-                                        <input class="form-control form-control-lg" type="text" id="birth4" placeholder="Год рождения" />
+                                {% endif %}
+
+                                {% if team_form.ucount >= 6 %}
+                                    <div class="form-row form-group">
+                                        <div class="col-8">
+                                            {{ team_form.athlet6 }}
+                                            {% if team_form.athlet6.errors %}
+                                                <div class="invalid-feedback">
+                                                    {{ team_form.athlet6.errors}}
+                                                </div>
+                                            {% endif %}
+                                        </div>
+                                        <div class="col-4">
+                                            {{ team_form.birth6 }}
+                                            {% if team_form.birth6.errors %}
+                                                <div class="invalid-feedback">
+                                                    {{ team_form.birth6.errors}}
+                                                </div>
+                                            {% endif %}
+                                        </div>
                                     </div>
-                                </div>
-                                <div class="form-row form-group">
-                                    <div class="col-8">
-                                        <input class="form-control form-control-lg" type="text" id="u5" placeholder="5) Фамилия имя" />
-                                    </div>
-                                    <div class="col-4">
-                                        <input class="form-control form-control-lg" type="text" id="birth5" placeholder="Год рождения" />
-                                    </div>
-                                </div>
-                                <div class="form-row form-group">
-                                    <div class="col-8">
-                                        <input class="form-control form-control-lg" type="text" id="u6" placeholder="6) Фамилия имя" />
-                                    </div>
-                                    <div class="col-4">
-                                        <input class="form-control form-control-lg" type="text" id="birth6" placeholder="Год рождения" />
-                                    </div>
-                                </div>
+                                {% endif %}
+
+                                {% csrf_token %}
                                 <div class="form-row form-group">
                                     <div class="col">
                                         <button class="btn btn-block btn-success btn-lg" type="submit">Сохранить</button>
