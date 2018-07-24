@@ -1,4 +1,5 @@
 import datetime
+import random
 import time
 import hashlib
 from django.db import models
@@ -122,6 +123,17 @@ class Team(models.Model):
     birth5 = models.IntegerField(default=0)
     athlet6 = models.CharField(max_length=50)
     birth6 = models.IntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):              # __str__ on Python 3
         return self.paymentid.__str__()
+
+    def new_team(self, user, dist, ucount):
+        print(user, dist)
+        if user.is_authenticated:
+            self.owner = user
+            self.dist = dist
+            self.ucount = ucount
+            self.paymentid = '%016x' % random.randrange(16**16)
+            self.save()

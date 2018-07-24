@@ -4,6 +4,7 @@ from django import forms
 from django.core.exceptions import ObjectDoesNotExist
 from django.contrib.auth.models import User
 from django.contrib.auth import authenticate
+from website.models import Team
 
 
 class LoginForm(forms.Form):
@@ -87,6 +88,8 @@ class RegForm(forms.Form):
         first_name = self.cleaned_data["first_name"]
         last_name = self.cleaned_data["last_name"]
         phone = self.cleaned_data["phone"]
+        dist = self.cleaned_data["dist"]
+        ucount = self.cleaned_data["ucount"]
         username = "%s %s" % (last_name, first_name)
 
         if self.user.is_anonymous:
@@ -99,6 +102,9 @@ class RegForm(forms.Form):
             user.last_name = last_name
             user.profile.phone = phone
             user.save()
+
+            team = Team()
+            team.new_team(user, dist, ucount)
             return user
         else:
             self.user.first_name = first_name
