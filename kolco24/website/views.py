@@ -56,11 +56,12 @@ def logout_user(request):
 @login_required
 def my_team(request):
     team_form = TeamForm(request.POST or None)
+    context = {
+        "cost": 500,
+        "team_form": team_form
+    }
 
     if request.method == 'GET':
-        context = {
-            "team_form": team_form,
-        }
         return render(request, 'website/my_team.html', context)
     elif request.method == 'POST':
         raise Http404("File not found.")
