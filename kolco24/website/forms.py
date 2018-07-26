@@ -154,6 +154,7 @@ class TeamForm(forms.Form):
     )
     ucount = forms.IntegerField()
     dist = forms.CharField()
+    paymentid = forms.CharField(widget=forms.HiddenInput())
 
     def __init__(self, *args, **kwargs):
         super(TeamForm, self).__init__(*args, **kwargs)
@@ -200,3 +201,49 @@ class TeamForm(forms.Form):
         self.initial["birth6"] = team.birth6 if team.birth6 else ""
         self.initial["dist"] = team.dist
         self.initial["ucount"] = team.ucount
+        self.initial["paymentid"] = team.paymentid
+
+    def access_possible(self, user):
+        if "paymentid" not in self.cleaned_data:
+            return False
+        paymentid = self.cleaned_data["paymentid"]
+        if user.is_superuser:
+            return True
+        team = Team.objects.filter(paymentid=paymentid)[:1]
+        if team and team.get().owner == user:
+            return True
+
+    def clean(self):
+        paymentid = self.cleaned_data["paymentid"]
+        team = Team.objects.filter(paymentid=paymentid)[:1]
+        if not team:
+            raise forms.ValidationError("Команда не найдена.")
+        return self.cleaned_data
+
+    def save(self):
+        if "paymentid" not in self.cleaned_data:
+            return False
+        paymentid = self.cleaned_data["paymentid"]
+        team = Team.objects.filter(paymentid=paymentid)[:1]
+        if team:
+            d = self.cleaned_data
+            print(d)
+            team = team.get()
+            team.dist = d["dist"] if "dist" in d else "12h"
+            team.ucount = d["ucount"] if "ucount" in d else 2
+            team.teamname = d["name"] if "name" in d else ""
+            team.city = d["city"] if "city" in d else ""
+            team.organization = d["organization"] if "organization" in d else ""
+            team.athlet1 = d["athlet1"] if "athlet1" in d else ""
+            team.athlet2 = d["athlet2"] if "athlet2" in d else ""
+            team.athlet3 = d["athlet3"] if "athlet3" in d else ""
+            team.athlet4 = d["athlet4"] if "athlet4" in d else ""
+            team.athlet5 = d["athlet5"] if "athlet5" in d else ""
+            team.athlet6 = d["athlet6"] if "athlet6" in d else ""
+            team.birth1 = d["birth1"] if d["birth1"].isdigit() else "0"
+            team.birth2 = d["birth2"] if d["birth2"].isdigit() else "0"
+            team.birth3 = d["birth3"] if d["birth3"].isdigit() else "0"
+            team.birth4 = d["birth4"] if d["birth4"].isdigit() else "0"
+            team.birth5 = d["birth5"] if d["birth5"].isdigit() else "0"
+            team.birth6 = d["birth6"] if d["birth6"].isdigit() else "0"
+            team.save()

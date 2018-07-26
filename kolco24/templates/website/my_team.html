@@ -1,6 +1,7 @@
 {% extends "website/base.html" %}
 
 {% block content %}
+
     <section class="space-sm">
         <div class="container">
             <div class="row flex-md-row card card-lg">
@@ -11,7 +12,7 @@
                     </div>
                     <div class="row justify-content-center">
                         <div class="col-12 col-lg-10">
-                            <form action="{% url 'my_team' %}" method="POST">
+                            <form id="teamform" action="{% url 'my_team' %}" method="POST" >
                                 <div class="form-row form-group">
                                     <div class="col">
                                         {% comment %} <input class="form-control form-control-lg" type="text" id="company" placeholder="Название команды" /> {% endcomment %}
@@ -167,12 +168,15 @@
                                         {% endif %}
                                     </div>
                                 </div>
-
+                                {{ team_form.paymentid }}
                                 {% csrf_token %}
                                 <div class="form-row form-group">
                                     <div class="col">
                                         <button class="btn btn-block btn-success" type="submit">Сохранить</button>
                                     </div>
+                                </div>
+                                <div id="team_form_alert" class="alert alert-success" role="alert" style="display: none;">
+                                    Text
                                 </div>
                             </form>
                         </div>
@@ -370,6 +374,7 @@
         var cost = {{ cost }};
         var ucount = {{ team_form.ucount.value }};
         var dist = "{{ team_form.dist.value }}";
+        var csrf_token = "{{ csrf_token }}";
     </script>
      <script type="text/javascript" src="/static/js/team.js"></script>
 {% endblock %}

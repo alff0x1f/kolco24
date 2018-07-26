@@ -6,7 +6,7 @@ from django.contrib.auth.decorators import login_required
 from django.views.decorators.csrf import csrf_exempt
 from website.forms import LoginForm, RegForm, TeamForm
 from website.models import Payments, Team
-from django.http import HttpResponseRedirect, Http404
+from django.http import HttpResponseRedirect, Http404, JsonResponse
 
 
 def index(request):
@@ -64,8 +64,14 @@ def my_team(request):
     }
     if request.method == 'GET':        
         return render(request, 'website/my_team.html', context)
-    elif request.method == 'POST':
-        raise Http404("File not found.")
+    elif request.method == 'POST' and team_form.is_valid():
+        # print(team_form.fields)
+        if team_form.access_possible(request.user):
+            team_form.save()
+            response_data = {}
+            response_data['success'] = 'true'
+            return JsonResponse(response_data)
+    raise Http404("Wrong values")
 
 @csrf_exempt
 def yandex_payment(request):
