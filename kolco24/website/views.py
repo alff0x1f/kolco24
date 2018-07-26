@@ -54,15 +54,23 @@ def logout_user(request):
     raise Http404("File not found.")
 
 @login_required
-def my_team(request):
+def my_team(request, teamid=""):
     team_form = TeamForm(request.POST or None)
-    team_form.init_vals(request.user)
+    paymentid = team_form.init_vals(request.user, teamid)
+    if not paymentid:
+        raise Http404("Nothing found")
 
-    context = {
-        "cost": 500,
-        "team_form": team_form,
-    }
-    if request.method == 'GET':        
+    if request.method == 'GET':
+        if teamid != paymentid:
+            return HttpResponseRedirect("/team/%s" % paymentid)
+
+        other_teams = Team.objects.filter(owner=request.user).exclude(
+            paymentid=paymentid)
+        context = {
+            "cost": 500,
+            "team_form": team_form,
+            "other_teams": other_teams,
+        }
         return render(request, 'website/my_team.html', context)
     elif request.method == 'POST' and team_form.is_valid():
         # print(team_form.fields)
@@ -79,7 +87,7 @@ def new_team(request):
         team = Team()
         team.new_team(request.user, '12h', 4)
         team.save()
-    return HttpResponseRedirect("/team")
+    return HttpResponseRedirect("/team/%s"%team.paymentid)
 
 @csrf_exempt
 def yandex_payment(request):

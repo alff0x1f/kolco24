@@ -1,8 +1,149 @@
 {% extends "website/base.html" %}
 
 {% block content %}
+    <section class="flush-with-above space-xs">
+        <div class="container">
+            <div class="row justify-content-center mb-2">
+                <!--end of col-->
+                <div class="col">
+                    <div class="float-right">
+                        <form method="POST" action="/newteam">
+                                <input type="hidden" name="newteam" value="create">
+                                {% csrf_token %}
+                                <div class="form-row form-group">
+                                    <button class="btn btn-block" type="submit">
+                                        Создать новую команду
+                                    </button>
+                                </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            <!--end of row-->
+            <ul class="feature-list feature-list-sm row {% if not other_teams%}d-none{% endif %}">
+                {% for team in other_teams %}
+                <div class="col-12 col-md-6 col-lg-4">
+                    <div class="card">
+                        <div class="card-header d-flex justify-content-between">
+                            <div>
+                                <span class="h6">{{ team.teamname|default:"Команда" }}{% if not team.teamname %}_{{ team.id }}{% endif %}</span>
+                                <span class="badge badge-secondary"> {{ team.dist }}</span>
+                            </div>
+                            <a href="/team/{{team.paymentid}}">Посмотреть ›</a>
+                        </div>
+                        <div class="card-body">
+                            <ul class="list-unstyled list-spacing-xs">
+                                <li>
+                                    1) {{ team.athlet1|default:"---" }}
+                                </li>
+                                <li>
+                                    2) {{ team.athlet2|default:"---" }}
+                                </li>
+                                {% if team.ucount >= 3 %}
+                                    <li>
+                                        3) {{ team.athlet3|default:"---" }}
+                                    </li>
+                                {% endif %}
+                                {% if team.ucount >= 4 %}
+                                    <li>
+                                        4) {{ team.athlet4|default:"---" }}
+                                    </li>
+                                {% endif %}
+                                {% if team.ucount >= 5 %}
+                                    <li>
+                                        5) {{ team.athlet5|default:"---" }}
+                                    </li>
+                                {% endif %}
+                                {% if team.ucount >= 6 %}
+                                    <li>
+                                        6) {{ team.athlet6|default:"---" }}
+                                    </li>
+                                {% endif %}
+                            </ul>
+                        </div>
+                        <div class="card-footer d-flex justify-content-between">
+                            <div>
+                                Оплатить: 1500руб
+                            </div>
+                            <div class="text-small">
+                                <ul class="list-inline">
+                                    <li class="list-inline-item"><i class="icon-user"></i> {{ team.ucount }}</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                    <!--end of card-->
+                </div>
+                <!--end of col-->
+                {% endfor %}
+            </ul>
+            <!--end of row-->
+        </div>
+        <!--end of container-->
+    </section>
+    {% comment %} <section class="space-sm">
+        <div class="container">
+            <div class="row pb-3">
+                <div class="col">
+                    <div class="float-right">
+                        <form method="POST" action="/newteam">
+                                <input type="hidden" name="newteam" value="create">
+                                {% csrf_token %}
+                                <div class="form-row form-group">
+                                    <button class="btn btn-block" type="submit">
+                                        Создать новую команду
+                                    </button>
+                                </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            <div class="row {% if not other_teams%}d-none{% endif %}">
+                    <table class="table align-items-center table-borderless">
+                        <tbody>
+                        {% for team in other_teams %}
+                            <tr class="bg-white">
+                                <th scope="row">
+                                    <div class="media align-items-center">
+                                        <div class="media-body">
+                                            <span class="h6 mb-0">{{ team.teamname|default:"Команда " }}{% if not team.teamname %}({{ team.id }}){% endif %}
+                                                <span class="badge badge-secondary">{{ team.ucount }} чел.</span>
+                                            </span>
+                                            <span class="text-muted">Оплачено</span>
+                                        </div>
+                                    </div>
+                                </th>
+                                <td><h3>{{ team.dist }}</h3></td>
+                                <td>{{ team.athlet1|default:"---" }}</br>{{ team.athlet4|default:"---" }}</td>
+                                <td>{{ team.athlet2|default:"---" }}</br>{{ team.athlet5|default:"---" }}</td>
+                                <td>{{ team.athlet3|default:"---" }}</br>{{ team.athlet6|default:"---" }}</td>
+                                <td>
+                                    <div class="dropdown">
+                                        <a class="btn btn-sm btn-outline-primary" href="/team/{{team.paymentid}}">
+                                            Изменить
+                                        </a>
+                                        <button class="btn btn-sm btn-outline-primary dropdown-toggle dropdown-toggle-no-arrow" type="button" id="dropdownMenuButton-1" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                                            <i class="icon-dots-three-horizontal"></i>
+                                        </button>
+                                        <div class="dropdown-menu dropdown-menu-sm" aria-labelledby="dropdownMenuButton">
+                                            <a class="dropdown-item" href="#">Удалить</a>
+                                            <a class="dropdown-item" href="#">Assign</a>
+                                            <a class="dropdown-item" href="#">Share</a>
+                                            <div class="dropdown-divider"></div>
+                                            <a class="dropdown-item" href="#">Remove</a>
+                                        </div>
+                                    </div>
+                                </td>
+                            </tr>
+                            <tr class="table-divider"></tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+            </div>
+            <!--end of row-->
+        </div>
+        <!--end of container--> {% endcomment %}
 
-    <section class="space-sm">
         <div class="container">
             <div class="row flex-md-row card card-lg">
                 <div class="col-12 col-md-7 card-body bg-secondary">

@@ -177,12 +177,16 @@ class TeamForm(forms.Form):
     def init_vals(self, user, paymentid=""):
         team = None
         if paymentid:
-            team = Team.objects.filter(owner=user, paymentid=paymentid)[:1].get()
-        if not team:
-            team = Team.objects.filter(owner=user)[:1].get()
+            team = Team.objects.filter(owner=user, paymentid=paymentid)[:1]
+            if not team:
+                return False
+        else:
+            team = Team.objects.filter(owner=user)[:1]
         if not team:
             team = Team()
-            team.new_team(request.user, '12h', 4)
+            team.new_team(user, '12h', 4)
+        else:
+            team = team.get()
 
         self.initial["name"] = team.teamname
         self.initial["city"] = team.city
@@ -202,6 +206,8 @@ class TeamForm(forms.Form):
         self.initial["dist"] = team.dist
         self.initial["ucount"] = team.ucount
         self.initial["paymentid"] = team.paymentid
+
+        return team.paymentid
 
     def access_possible(self, user):
         if "paymentid" not in self.cleaned_data:
