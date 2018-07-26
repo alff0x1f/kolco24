@@ -152,7 +152,8 @@ class TeamForm(forms.Form):
                 'class': 'form-control form-control-lg',
                 'placeholder': 'Клуб(организация)'})
     )
-    ucount = 2
+    ucount = forms.IntegerField()
+    dist = forms.CharField()
 
     def __init__(self, *args, **kwargs):
         super(TeamForm, self).__init__(*args, **kwargs)
@@ -171,3 +172,31 @@ class TeamForm(forms.Form):
                         'class': 'form-control form-control-lg',
                         'placeholder': 'Год рождения'})
             )
+    
+    def init_vals(self, user, paymentid=""):
+        team = None
+        if paymentid:
+            team = Team.objects.filter(owner=user, paymentid=paymentid)[:1].get()
+        if not team:
+            team = Team.objects.filter(owner=user)[:1].get()
+        if not team:
+            team = Team()
+            team.new_team(request.user, '12h', 4)
+
+        self.initial["name"] = team.teamname
+        self.initial["city"] = team.city
+        self.initial["organization"] = team.organization
+        self.initial["athlet1"] = team.athlet1
+        self.initial["athlet2"] = team.athlet2
+        self.initial["athlet3"] = team.athlet3
+        self.initial["athlet4"] = team.athlet4
+        self.initial["athlet5"] = team.athlet5
+        self.initial["athlet6"] = team.athlet6
+        self.initial["birth1"] = team.birth1 if team.birth1 else ""
+        self.initial["birth2"] = team.birth2 if team.birth2 else ""
+        self.initial["birth3"] = team.birth3 if team.birth3 else ""
+        self.initial["birth4"] = team.birth4 if team.birth4 else ""
+        self.initial["birth5"] = team.birth5 if team.birth5 else ""
+        self.initial["birth6"] = team.birth6 if team.birth6 else ""
+        self.initial["dist"] = team.dist
+        self.initial["ucount"] = team.ucount

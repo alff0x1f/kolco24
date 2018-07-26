@@ -75,4 +75,8 @@ function set_ucount(count) {
     if (count == 6){
         $("#del_member6").removeClass('d-none');
     }
-  }
+  };
+  
+$(function() {
+    set_ucount(ucount);
+});

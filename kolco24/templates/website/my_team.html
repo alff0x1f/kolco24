@@ -6,7 +6,7 @@
             <div class="row flex-md-row card card-lg">
                 <div class="col-12 col-md-7 card-body bg-secondary">
                     <div class="text-center mb-4">
-                        <h1 class="h2 mb-2">Моя команда на <a id="dist_header" href="#" style="border-bottom: 2px dashed;color:#343a40;">12ч</a></h1>
+                        <h1 class="h2 mb-2">Моя команда на <a id="dist_header" href="#" style="border-bottom: 2px dashed;color:#343a40;">{{ team_form.dist.value }}</a></h1>
                         <span>Все эти поля можно заполнить позже</span>
                     </div>
                     <div class="row justify-content-center">
@@ -75,7 +75,7 @@
                                     </div>
                                     <div class="col-4">
                                         {{ team_form.birth2 }}
-                                        <small id="add_member3" class="form-text text-right"><a href="javascript:set_ucount(3)">Добавить участника</a></small> 
+                                        <small id="add_member3" class="form-text text-right d-none"><a href="javascript:set_ucount(3)">Добавить участника</a></small> 
                                         {% if team_form.birth2.errors %}
                                             <div class="invalid-feedback">
                                                 {{ team_form.birth2.errors}}
@@ -84,10 +84,10 @@
                                     </div>
                                 </div>
                                 
-                                <div id="member3" class="form-row form-group {% if team_form.ucount < 3 %}d-none{% endif %}">
+                                <div id="member3" class="form-row form-group {% if team_form.ucount.value < 3 %}d-none{% endif %}">
                                     <div class="col-8">
                                         {{ team_form.athlet3 }}
-                                        <small id="del_member3" class="form-text"><a href="javascript:set_ucount(2)">Удалить участника</a></small> 
+                                        <small id="del_member3" class="form-text d-none"><a href="javascript:set_ucount(2)">Удалить участника</a></small> 
                                         {% if team_form.athlet3.errors %}
                                             <div class="invalid-feedback">
                                                 {{ team_form.athlet3.errors}}
@@ -96,7 +96,7 @@
                                     </div>
                                     <div class="col-4">
                                         {{ team_form.birth3 }}
-                                        <small id="add_member4" class="form-text text-right"><a href="javascript:set_ucount(4)">Добавить участника</a></small> 
+                                        <small id="add_member4" class="form-text text-right d-none"><a href="javascript:set_ucount(4)">Добавить участника</a></small> 
                                         {% if team_form.birth3.errors %}
                                             <div class="invalid-feedback">
                                                 {{ team_form.birth3.errors}}
@@ -106,10 +106,10 @@
                                     </div>
                                 </div>
     
-                                <div id="member4" class="form-row form-group {% if team_form.ucount < 4 %}d-none{% endif %}">
+                                <div id="member4" class="form-row form-group {% if team_form.ucount.value < 4 %}d-none{% endif %}">
                                     <div class="col-8">
                                         {{ team_form.athlet4 }}
-                                        <small id="del_member4" class="form-text"><a href="javascript:set_ucount(3)">Удалить участника</a></small> 
+                                        <small id="del_member4" class="form-text d-none"><a href="javascript:set_ucount(3)">Удалить участника</a></small> 
                                         {% if team_form.athlet4.errors %}
                                             <div class="invalid-feedback">
                                                 {{ team_form.athlet4.errors}}
@@ -118,7 +118,7 @@
                                     </div>
                                     <div class="col-4">
                                         {{ team_form.birth4 }}
-                                        <small id="add_member5" class="form-text text-right"><a href="javascript:set_ucount(5)">Добавить участника</a></small> 
+                                        <small id="add_member5" class="form-text text-right d-none"><a href="javascript:set_ucount(5)">Добавить участника</a></small> 
                                         {% if team_form.birth4.errors %}
                                             <div class="invalid-feedback">
                                                 {{ team_form.birth4.errors}}
@@ -127,10 +127,10 @@
                                     </div>
                                 </div>
     
-                                <div id="member5" class="form-row form-group {% if team_form.ucount < 5 %}d-none{% endif %}">
+                                <div id="member5" class="form-row form-group {% if team_form.ucount.value < 5 %}d-none{% endif %}">
                                     <div class="col-8">
                                         {{ team_form.athlet5 }}
-                                        <small  id="del_member5" class="form-text"><a href="javascript:set_ucount(4)">Удалить участника</a></small> 
+                                        <small id="del_member5" class="form-text d-none"><a href="javascript:set_ucount(4)">Удалить участника</a></small> 
                                         {% if team_form.athlet5.errors %}
                                             <div class="invalid-feedback">
                                                 {{ team_form.athlet5.errors}}
@@ -139,7 +139,7 @@
                                     </div>
                                     <div class="col-4">
                                         {{ team_form.birth5 }}
-                                        <small id="add_member6" class="form-text text-right"><a href="javascript:set_ucount(6)">Добавить участника</a></small> 
+                                        <small id="add_member6" class="form-text text-right d-none"><a href="javascript:set_ucount(6)">Добавить участника</a></small> 
                                         {% if team_form.birth5.errors %}
                                             <div class="invalid-feedback">
                                                 {{ team_form.birth5.errors}}
@@ -148,10 +148,10 @@
                                     </div>
                                 </div>
 
-                                <div id="member6" class="form-row form-group {% if team_form.ucount < 6 %}d-none{% endif %}">
+                                <div id="member6" class="form-row form-group {% if team_form.ucount.value < 6 %}d-none{% endif %}">
                                     <div class="col-8">
                                         {{ team_form.athlet6 }}
-                                        <small id="del_member6" class="form-text"><a href="javascript:set_ucount(5)">Удалить участника</a></small> 
+                                        <small id="del_member6" class="form-text d-none"><a href="javascript:set_ucount(5)">Удалить участника</a></small> 
                                         {% if team_form.athlet6.errors %}
                                             <div class="invalid-feedback">
                                                 {{ team_form.athlet6.errors}}
@@ -366,10 +366,10 @@
     <!--end of section-->
 {% endblock %}
 {% block footer_js_include %}
-    <script type="text/javascript" src="/static/js/team.js"></script>
     <script>
         var cost = {{ cost }};
-        {% comment %} var ucount = {{ ucount }}; {% endcomment %}
-        var dist = "{{ dist }}";
+        var ucount = {{ team_form.ucount.value }};
+        var dist = "{{ team_form.dist.value }}";
     </script>
+     <script type="text/javascript" src="/static/js/team.js"></script>
 {% endblock %}
