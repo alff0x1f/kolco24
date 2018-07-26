@@ -5,7 +5,7 @@ from django.contrib.auth import logout
 from django.contrib.auth.decorators import login_required
 from django.views.decorators.csrf import csrf_exempt
 from website.forms import LoginForm, RegForm, TeamForm
-from website.models import Payments
+from website.models import Payments, Team
 from django.http import HttpResponseRedirect, Http404
 
 
@@ -58,10 +58,16 @@ def my_team(request):
     team_form = TeamForm(request.POST or None)
     context = {
         "cost": 500,
-        "team_form": team_form
+        "team_form": team_form,
     }
-
     if request.method == 'GET':
+        team = Team.objects.filter(owner=request.user)[:1].get()
+        if not team:
+            team = Team()
+            team.new_team(request.user, '12h', 4)
+        context["dist"] = team.dist
+        # else:
+        #     print(team[0].paymentid)
         return render(request, 'website/my_team.html', context)
     elif request.method == 'POST':
         raise Http404("File not found.")
