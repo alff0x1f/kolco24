@@ -73,6 +73,14 @@ def my_team(request):
             return JsonResponse(response_data)
     raise Http404("Wrong values")
 
+@login_required
+def new_team(request):
+    if request.method == "POST":
+        team = Team()
+        team.new_team(request.user, '12h', 4)
+        team.save()
+    return HttpResponseRedirect("/team")
+
 @csrf_exempt
 def yandex_payment(request):
     if request.method=='POST':
