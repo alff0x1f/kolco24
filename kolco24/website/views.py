@@ -5,7 +5,7 @@ from django.contrib.auth import logout
 from django.contrib.auth.decorators import login_required
 from django.views.decorators.csrf import csrf_exempt
 from website.forms import LoginForm, RegForm, TeamForm
-from website.models import Payments, Team
+from website.models import Payments, Team, PaymentLog
 from django.http import HttpResponseRedirect, Http404, JsonResponse
 from django.conf import settings
 
@@ -87,6 +87,13 @@ def my_team(request, teamid=""):
             paymentmethod = request.POST["paymentmethod"] if \
                 "paymentmethod" in request.POST else ""
             response_data['sum'] = (team.ucount - team.paid_people) * cost_now
+
+            new_event = PaymentLog(
+                team=team,
+                payment_method=paymentmethod, 
+                paid_sum=response_data['sum']
+            )
+            new_event.save()
 
             if paymentmethod == "visamc":
                 response_data['paymentmethod'] = 'visamc'

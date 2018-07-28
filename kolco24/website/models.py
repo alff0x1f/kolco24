@@ -166,3 +166,11 @@ class Team(models.Model):
     def update_money(self):
         payment = Payments()
         payment.update_team(self.paymentid)
+
+
+class PaymentLog(models.Model):
+    team = models.ForeignKey('Team', on_delete=models.CASCADE)
+    payment_method = models.CharField(max_length=50)
+    paid_sum = models.FloatField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
