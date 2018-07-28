@@ -87,7 +87,6 @@ def my_team(request, teamid=""):
             paymentmethod = request.POST["paymentmethod"] if \
                 "paymentmethod" in request.POST else ""
             response_data['sum'] = (team.ucount - team.paid_people) * cost_now
-            response_data['sum'] = team.paymentid
 
             if paymentmethod == "visamc":
                 response_data['paymentmethod'] = 'visamc'
