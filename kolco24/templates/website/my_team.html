@@ -63,7 +63,11 @@
                         </div>
                         <div class="card-footer d-flex justify-content-between">
                             <div>
-                                Оплатить: 1500руб
+                                {% if team.ucount <= team.paid_people %}
+                                    Оплачено
+                                {% else %}
+                                    Требуется оплата
+                                {% endif %}
                             </div>
                             <div class="text-small">
                                 <ul class="list-inline">
@@ -148,7 +152,7 @@
             <div class="row flex-md-row card card-lg">
                 <div class="col-12 col-md-7 card-body bg-secondary">
                     <div class="text-center mb-4">
-                        <h1 class="h2 mb-2">Моя команда на <a id="dist_header" href="#" style="border-bottom: 2px dashed;color:#343a40;">{{ team_form.dist.value }}</a></h1>
+                        <h1 class="h2 mb-2">Моя команда на <a id="dist_header" href="javascript:void(0);" style="border-bottom: 2px dashed;color:#343a40;">{{ team_form.dist.value }}</a></h1>
                         <span>Все эти поля можно заполнить позже</span>
                     </div>
                     <div class="row justify-content-center">
@@ -313,7 +317,7 @@
                                 {% csrf_token %}
                                 <div class="form-row form-group">
                                     <div class="col">
-                                        <button class="btn btn-block btn-success" type="submit">Сохранить</button>
+                                        <button class="btn btn-block btn-success" type="submit" id="teamform_submit">Сохранить</button>
                                     </div>
                                 </div>
                                 <div id="team_form_alert" class="alert alert-success" role="alert" style="display: none;">
@@ -353,59 +357,73 @@
                                         </li>
                                     </ul>
                                     <hr class="short">
-                                    <div class="row mb-4 justify-content-between">
-                                        <div class="col-6"><p>Итого за <span id="ucountlabel">2</span> чел.</p></div>
-                                        <div class="col-6"><p class="text-right"><span id="sumlabel">{% widthratio cost 1 2 %}</span> руб</p></div>
-                                    </div>
-                                    <div class="mb-2 text-center">
-                                        <h4 class="h4 mb-2">Способы оплаты</h4>
-                                        <div class="row">
-                                            <div class="col-6 col-xs-6 col-lg-3">
-                                                <div class="card">
-                                                    <img class="card-img-top" src="/static/images/payments/visa-mastercard.jpg">
-                                                </div>
-                                            </div>
-                                            <div class="col-6 col-xs-6 col-lg-3">
-                                                <div class="card">
-                                                    <img class="card-img-top" src="/static/images/payments/sberbank_online.png">
-                                                </div>
-                                            </div>
-                                            <div class="col-6 col-xs-6 col-lg-3">
-                                                <div class="card">
-                                                    <img class="card-img-top" src="/static/images/payments/yandex_money.jpg">
-                                                </div>
-                                            </div>
-                                            <div class="col-6 col-xs-6 col-lg-3">
-                                                <a href="#">
-                                                    <div class="card">
-                                                        <img class="card-img-top" src="/static/images/payments/tinkoff.png">
-                                                    </div>
-                                                </a>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <li class="row align-items-center">
-                                        <div class="col-2 col-md-1"><i class="icon-check h5 text-muted"></i>
-                                        </div>
-                                        <div class="col-10">Картой Visa/Mastercard</div>
-                                    </li>
-                                    <li class="row align-items-center">
-                                        <div class="col-2 col-md-1"><i class="icon-check h5 text-muted"></i>
-                                        </div>
-                                        <div class="col-10">Перевод в сбербанк-онлайн</div>
-                                    </li>
-                                    <li class="row align-items-center">
-                                        <div class="col-2 col-md-1"><i class="icon-check h5 text-muted"></i>
-                                        </div>
-                                        <div class="col-10">Яндекс деньги</div>
-                                    </li>
-                                    <li class="row align-items-center">
-                                        <div class="col-2 col-md-1"><i class="icon-check h5 text-muted"></i>
-                                        </div>
-                                        <div class="col-10">Перевод через tinkoff-банк</div>
-                                    </li>
                                     
+                                    <div id="paidfor" class="row justify-content-between">
+                                        <div class="col-6"><p>Оплачено за <span id="paidfor_count">{{ main_team.paid_people }}</span> чел.</p></div>
+                                        <div class="col-6"><p class="text-right"><span>{{ main_team.paid_sum }}</span> руб</p></div>
+                                    </div>
+                                    
+                                    <div id="sidecolumn_paid">
+                                        <div class="row mb-4 justify-content-between">
+                                            <div class="col-6"><p><span id="paidfor_action">Итого</span> за <span id="ucountlabel">2</span> чел.</p></div>
+                                            <div class="col-6"><p class="text-right"><span id="sumlabel">{% widthratio cost 1 2 %}</span> руб</p></div>
+                                        </div>
+                                        <div class="mb-2 text-center">
+                                            <h4 class="h4 mb-2">Способы оплаты</h4>
+                                            <div class="row">
+                                                <div class="col-6 col-xs-6 col-lg-3">
+                                                    <div class="card">
+                                                        <a href="javascript:$('#pay_visamastercard').click();">
+                                                            <img class="card-img-top" src="/static/images/payments/visa-mastercard.jpg">
+                                                        </a>
+                                                    </div>
+                                                </div>
+                                                <div class="col-6 col-xs-6 col-lg-3">
+                                                    <div class="card">
+                                                        <img class="card-img-top" src="/static/images/payments/sberbank_online.png">
+                                                    </div>
+                                                </div>
+                                                <div class="col-6 col-xs-6 col-lg-3">
+                                                    <div class="card">
+                                                        <a href="javascript:$('#pay_yandexmoney').click();">
+                                                            <img class="card-img-top" src="/static/images/payments/yandex_money.jpg">
+                                                        </a>
+                                                    </div>
+                                                </div>
+                                                <div class="col-6 col-xs-6 col-lg-3">
+                                                    <a href="#">
+                                                        <div class="card">
+                                                            <img class="card-img-top" src="/static/images/payments/tinkoff.png">
+                                                        </div>
+                                                    </a>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <form class="d-flex flex-column" id="paymentmethod">
+                                            <div class="custom-control custom-checkbox-switch">
+                                                <input id="radio1" name="radio" type="radio" value="visamc" class="custom-control-input" checked>
+                                                <label class="custom-control-label" for="radio1">Картой Visa/Mastercard</label>
+                                            </div>
+                                            <div class="custom-control custom-checkbox-switch">
+                                                <input id="radio2" name="radio" type="radio" value="sberbank" class="custom-control-input">
+                                                <label class="custom-control-label" for="radio2">Перевод через Сбербанк.Онлайн</label>
+                                            </div>
+                                            <div class="custom-control custom-checkbox-switch">
+                                                <input id="radio3" name="radio" type="radio" value="yandexmoney" class="custom-control-input">
+                                                <label class="custom-control-label" for="radio3">Яндекс деньги</label>
+                                            </div>
+                                            <div class="custom-control custom-checkbox-switch">
+                                                <input id="radio4" name="radio" type="radio" value="tinkoff" class="custom-control-input">
+                                                <label class="custom-control-label" for="radio4">Перевод через tinkoff-банк</label>
+                                            </div>
+                                        </form>
+                                        <div class="custom-control custom-checkbox-switch">
+                                            <button type="button" class="btn btn-primary float-right mt-3" id="common_paid">
+                                                Оплатить
+                                            </button>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                             <!--end of col-->
@@ -416,8 +434,7 @@
             </div>
         </div>
         <!--end of container-->
-
-        <div class="container">
+        <div class="container" id="paid_explain">
             <div class="row justify-content-center text-center section-intro">
                 <div class="col-12 col-md-9 col-lg-8">
                     <h2 class="display-4">Оплата</h2>
@@ -425,20 +442,42 @@
                 <!--end of col-->
             </div>
             <!--end of row-->
+            <form method="POST" action="https://money.yandex.ru/quickpay/confirm.xml" id="yandexform">
+                <input type="hidden" id="yandexwallet" name="receiver" value="">
+                <input type="hidden" name="quickpay-form" value="shop">
+                <input type="hidden" id="yatargets" name="targets" value="Взнос за Кольцо-24 ({{ main_team.paymentid }})">
+                <input type="hidden" id="yasum" name="sum" value="0" data-type="number">
+                <input type="hidden" id ="paymenttype" name="paymentType" value="AC">
+                <input type="hidden" name="formcomment" value="Кольцо 24">
+                <input type="hidden" name="short-dest" value="Кольцо 24">
+                <input type="hidden" id="yalabel" name="label" value="{{ main_team.paymentid }}">
+                <input type="hidden" name="need-fio" value="false">
+                <input type="hidden" name="need-email" value="false">
+                <input type="hidden" name="need-phone" value="false">
+                <input type="hidden" name="need-address" value="false">
+                <input type="hidden" name="successURL" value="https://kolco24.ru/success">
+            </form>
+
             <ul class="row feature-list feature-list-lg">
                 <li class="col-12 col-md-6">
                     <div class="media align-items-center">
-                        <a class="d-none d-sm-block" href="#">
-                            <div class="card mr-4">
-                                <img alt="Image" class="img-fluid" style="width:7.5rem" src="/static/images/payments/visa-mastercard.jpg" />
-                            </div>
-                        </a>
                         <div class="media-body">
-                            <h5>Карта Visa/Mastercard</h5>
+                            <div class="row">
+                                <div class="col-8">
+                                    <h5 class="mt-1">Карта Visa/Mastercard</h5>
+                                </div>
+                                <div class="col-4">
+                                    <a class="d-none d-sm-block" href="javascript:$('#pay_visamastercard').click();">
+                                        <div class="card ml-2 mb-1">
+                                            <img alt="Image" class="img-fluid" style="width:7.5rem;margin: 0 auto;" src="/static/images/payments/visa-mastercard.jpg" />
+                                        </div>
+                                    </a>
+                                </div>
+                            </div>
                             <p>
-                                Платеж картой. Имейте ввиду, что платеж по некоторым зарплатным картам сбербанка не проходит. Если у вас не получилось оплатить этим способом, попробуйте перевод через Сбербанк-онлайн.
+                                Платеж картой. Имейте ввиду, что платеж по некоторым зарплатным картам сбербанка не проходит. Если у вас не получилось оплатить этим способом, попробуйте перевод через Сбербанк.Онлайн.
                             </p>
-                            <button type="button" class="btn btn-secondary">
+                            <button type="button" class="btn btn-secondary" id="pay_visamastercard">
                                 Оплатить
                             </button>
                         </div>
@@ -447,17 +486,46 @@
                 <!--end of col-->
                 <li class="col-12 col-md-6">
                     <div class="media align-items-center">
-                        <a class="d-none d-sm-block" href="#">
-                            <div class="card mr-4">
-                                <img alt="Image" class="img-fluid" style="width:7.5rem" src="/static/images/payments/sberbank_online.png" />
-                            </div>
-                        </a>
                         <div class="media-body">
-                            <h5>Перевод в сбербанк-онлайн</h5>
-                            <p class="mt-3">
+                            <div class="row">
+                                <div class="col-8">
+                                    <h5 class="mt-2">Перевод через сбербанк-онлайн</h5>
+                                </div>
+                                <div class="col-4">
+                                    <a class="d-none d-sm-block" href="javascript:$('#pay_yandexmoney').click();">
+                                        <div class="card ml-2 mb-1">
+                                            <img alt="Image" class="img-fluid" style="width:7.5rem; margin: 0 auto;" src="/static/images/payments/sberbank_online.png" />
+                                        </div>
+                                    </a>
+                                </div>
+                            </div>
+                            <p id="sberbank_initial_explanation" class="mt-3">
                                 Перевод в сбербанк онлайн или с помощью СМС на номер 900.
                             </p>
-                            <button type="button" class="btn btn-secondary">
+                            <div id="sberbank_pay_manual" class="card" style="display:none;">
+                                <div class="card-body">
+                                    <h6 class="title-decorative">Реквизиты для платежа</h6>
+                                    <dl class="row justfiy-content-between">
+                                        <dt class="col-5"><code>Телефон</code></dt>
+                                        <dd class="col-7" id="sberbank_phone"></dd>
+                                        <dt class="col-5"><code>Номер карты</code></dt>
+                                        <dd class="col-7" id="sberbank_cardnumber"></dd>
+                                        <dt class="col-5"><code>ФИО получателя</code></dt>
+                                        <dd class="col-7" id="sberbank_name"></dd>
+                                        <dt class="col-5"><code>Сумма платежа</code></dt>
+                                        <dd class="col-7" id="sberbank_sum"></dd>
+                                        <dt class="col-5"><code>Комментарий</code></dt>
+                                        <dd class="col-7" id="sberbank_comment"></dd>
+                                    </dl>
+                                </div>
+                                <div class="card-footer">
+                                <p>Укажите комментарий <code id="sberbank_comment2"></code> чтобы мы понимали от какой команды пришёл платеж. </p>
+                                <p>Перевод с помощью смс: Отправляете на номер 900 смс с текстом </br><code>перевод <span id="sberbank_phone2"></span> <span id="sberbank_sum2"></span></code></br>
+                                Затем от банка вам приходит код, например 123456. Отправляем этот код и через пробел слово "<span id="sberbank_comment3"></span>": </br> <code>12345 <span id="sberbank_comment4"></span></code></p>
+                                <p>Также можно сделать перевод через <a href="https://online.sberbank.ru/CSAFront/index.do">Сбербанк.онлайн</a> или мобильное приложение. Не забудьте указать комментарий.</p>
+                                </div>
+                            </div>
+                            <button type="button" class="btn btn-secondary" id="pay_sberbank">
                                 Показать реквизиты
                             </button>
                             
@@ -467,17 +535,23 @@
                 <!--end of col-->
                 <li class="col-12 col-md-6">
                     <div class="media align-items-center">
-                        <a class="d-none d-sm-block" href="#">
-                            <div class="card mr-4">
-                                <img alt="Image" class="img-fluid" style="width:7.5rem" src="/static/images/payments/yandex_money.jpg" />
-                            </div>
-                        </a>
                         <div class="media-body">
-                            <h5>Яндекс деньги</h5>
+                            <div class="row">
+                                <div class="col-8">
+                                    <h5 class="mt-2">Яндекс деньги</h5>
+                                </div>
+                                <div class="col-4">
+                                    <a class="d-none d-sm-block" href="javascript:$('#pay_yandexmoney').click();">
+                                        <div class="card ml-2 mb-1">
+                                            <img alt="Image" class="img-fluid" style="width:7.5rem; margin: 0 auto;" src="/static/images/payments/yandex_money.jpg" />
+                                        </div>
+                                    </a>
+                                </div>
+                            </div>
                             <p class="mt-3">
                                 Перевод с помощью платежной системы Яндекс.Деньги
                             </p>
-                            <button type="button" class="btn btn-secondary">
+                            <button type="button" class="btn btn-secondary" id="pay_yandexmoney">
                                 Оплатить
                             </button>
                         </div>
@@ -486,17 +560,43 @@
                 <!--end of col-->
                 <li class="col-12 col-md-6">
                     <div class="media align-items-center">
-                        <a class="d-none d-sm-block" href="#">
-                            <div class="card mr-4">
-                                <img alt="Image" class="img-fluid" style="width:7.5rem" src="/static/images/payments/tinkoff.png" />
-                            </div>
-                        </a>
                         <div class="media-body">
-                            <h5>Перевод на карту Tinkoff</h5>
-                            <p class="mt-3">
+                            <div class="row">
+                                <div class="col-8">
+                                    <h5 class="mt-2">Перевод на карту Tinkoff</h5>
+                                </div>
+                                <div class="col-4">
+                                    <a class="d-none d-sm-block" href="#">
+                                        <div class="card ml-2 mb-1">
+                                            <img alt="Image" class="img-fluid" style="width:7.5rem;margin: 0 auto;" src="/static/images/payments/tinkoff.png" />
+                                        </div>
+                                    </a>
+                                </div>
+                            </div>
+                            <p id="tinkoff_initial_explanation" class="mt-3">
                                 Перевод на номер карты в банке Tinkoff. Перевод быстро и легко выполняется в мобильном приложении.
                             </p>
-                            <button type="button" class="btn btn-secondary">
+                            <div id="tinkoff_pay_manual" class="card" style="display:none;">
+                                <div class="card-body">
+                                    <h6 class="title-decorative">Реквизиты для платежа</h6>
+                                    <dl class="row justfiy-content-between">
+                                        <dt class="col-5"><code>Телефон</code></dt>
+                                        <dd class="col-7" id="tinkoff_phone"></dd>
+                                        <dt class="col-5"><code>Номер карты</code></dt>
+                                        <dd class="col-7" id="tinkoff_cardnumber"></dd>
+                                        <dt class="col-5"><code>ФИО получателя</code></dt>
+                                        <dd class="col-7" id="tinkoff_name"></dd>
+                                        <dt class="col-5"><code>Сумма платежа</code></dt>
+                                        <dd class="col-7" id="tinkoff_sum"></dd>
+                                        <dt class="col-5"><code>Комментарий</code></dt>
+                                        <dd class="col-7" id="tinkoff_comment"></dd>
+                                    </dl>
+                                </div>
+                                <div class="card-footer">
+                                <p>Укажите в комментарий <code id="tinkoff_comment2"></code> чтобы мы понимали от какой команды пришёл платеж. </p>
+                                </div>
+                            </div>
+                            <button type="button" class="btn btn-secondary" id="pay_tinkoff">
                                 Показать реквизиты
                             </button>
                         </div>
@@ -514,6 +614,7 @@
     <script>
         var cost = {{ cost }};
         var ucount = {{ team_form.ucount.value }};
+        var ucount_paid = {{ main_team.paid_people | floatformat }};
         var dist = "{{ team_form.dist.value }}";
         var csrf_token = "{{ csrf_token }}";
     </script>

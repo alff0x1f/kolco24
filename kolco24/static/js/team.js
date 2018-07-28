@@ -15,13 +15,14 @@ $( "#dist_header" ).click(function() {
         default:
             break;
     }
-    // alert( "Handler for .click() called." );
 });
 
 function set_ucount(count) {
     ucount = count;
-    $("#ucountlabel").text(count);
-    $("#sumlabel").text(count * cost);
+    $("#ucountlabel").text(count - ucount_paid);
+    $("#sumlabel").text((count - ucount_paid) * cost);
+    $("#yasum").val((count - ucount_paid) * cost);
+    $("#paidfor_count").text(ucount_paid);
     // hide members:
     if (count < 6) {
         $("#member6").addClass('d-none');
@@ -75,82 +76,163 @@ function set_ucount(count) {
     if (count == 6){
         $("#del_member6").removeClass('d-none');
     }
+
+    if (ucount_paid != 0){
+        $("#paidfor").show();
+        $("#paidfor_action").text("Доплатить");
+    } else {
+        $("#paidfor").hide();
+        $("#paidfor_action").text("Итого");
+    }
+
+    if (ucount_paid >= ucount){
+        $("#sidecolumn_paid").hide();
+        $("#paid_explain").hide();
+    } else {
+        $("#sidecolumn_paid").show();
+        $("#paid_explain").show();
+    }
+    $("#pay_sberbank").show();
+    $("#sberbank_initial_explanation").show();
+    $("#sberbank_pay_manual").hide();
+    $("#pay_tinkoff").show();
+    $("#tinkoff_initial_explanation").show();
+    $("#tinkoff_pay_manual").hide();
   };
-  
+
+function save_team(payment_method) {
+    var teamForm = { //Fetch form data
+        'dist'        : dist,
+        'ucount'      : ucount,
+        'paymentid'   : $('#teamform #id_paymentid').val(),
+        'name'        : $('#teamform #id_name').val(),
+        'city'        : $('#teamform #id_city').val(),
+        'organization': $('#teamform #id_organization').val(),
+        'athlet1'     : $('#teamform #id_athlet1').val(),
+        'birth1'      : $('#teamform #id_birth1').val(),
+        'athlet2'     : $('#teamform #id_athlet2').val(),
+        'birth2'      : $('#teamform #id_birth2').val(),
+        'athlet3'     : $('#teamform #id_athlet3').val(),
+        'birth3'      : $('#teamform #id_birth3').val(),
+        'athlet4'     : $('#teamform #id_athlet4').val(),
+        'birth4'      : $('#teamform #id_birth4').val(),
+        'athlet5'     : $('#teamform #id_athlet5').val(),
+        'birth5'      : $('#teamform #id_birth5').val(),
+        'athlet6'     : $('#teamform #id_athlet6').val(),
+        'birth6'      : $('#teamform #id_birth6').val(),
+        'csrfmiddlewaretoken' : csrf_token,
+        // 'get_requisites' : get_requisites,
+        // 'paymentid'		: $('#teamform #paymentid').val(),
+        'paymentmethod': payment_method,
+    };
+    $.ajax({
+        type      : 'POST',
+        url       : '/team',
+        data      : teamForm,
+        dataType  : 'json',
+        success   : function(data) {
+            if (data.success) {
+                $('#team_form_alert').html("Данные команды сохранены");
+                $('#team_form_alert').removeClass("alert-danger");
+                $('#team_form_alert').addClass("alert-success");
+                $('#team_form_alert').show();
+                $("#team_form_alert").fadeOut(3000);
+
+                if (data.paymentmethod == "visamc"){
+                    $('#yandexform #paymenttype').val('AC');
+                    $('#yandexform #yandexwallet').val(data.yandexwallet);
+                    $('#yandexform #yasum').val(data.sum);
+                    $('#yandexform').submit();
+                };
+                if (data.paymentmethod == "yandexmoney"){
+                    $('#yandexform #paymenttype').val('PC');
+                    $('#yandexform #yandexwallet').val(data.yandexwallet);
+                    $('#yandexform #yasum').val(data.sum);
+                    $('#yandexform').submit();
+                }
+                if (data.paymentmethod == "sberbank"){
+                    $("#pay_sberbank").hide();
+                    $("#sberbank_initial_explanation").hide();
+                    $('#sberbank_phone').text(data.cardholder_phone);
+                    $('#sberbank_phone2').text(data.cardholder_phone);
+                    $('#sberbank_cardnumber').text(data.cardnumber);
+                    $('#sberbank_name').text(data.cardholder_name);
+                    $('#sberbank_sum').text(data.sum);
+                    $('#sberbank_sum2').text(data.sum);
+                    $('#sberbank_comment').text(data.payment_comment);
+                    $('#sberbank_comment2').text(data.payment_comment);
+                    $('#sberbank_comment3').text(data.payment_comment);
+                    $('#sberbank_comment4').text(data.payment_comment);
+                    $("#sberbank_pay_manual").show();
+                    $('html, body').animate({
+                        scrollTop: $("#sberbank_pay_manual").offset().top-100
+                      }, 300);
+                }
+                if (data.paymentmethod == "tinkoff"){
+                    $("#pay_tinkoff").hide();
+                    $("#tinkoff_initial_explanation").hide();
+                    $('#tinkoff_phone').text(data.cardholder_phone);
+                    $('#tinkoff_phone2').text(data.cardholder_phone);
+                    $('#tinkoff_cardnumber').text(data.cardnumber);
+                    $('#tinkoff_name').text(data.cardholder_name);
+                    $('#tinkoff_sum').text(data.sum);
+                    $('#tinkoff_comment').text(data.payment_comment);
+                    $('#tinkoff_comment2').text(data.payment_comment);
+                    $("#tinkoff_pay_manual").show();
+                    $('html, body').animate({
+                        scrollTop: $("#tinkoff_pay_manual").offset().top-100
+                      }, 300);
+                }
+            }
+            else
+            {
+                $('#team_form_alert').html("Упс, что-то пошло не так!");
+                $('#team_form_alert').removeClass("alert-success");
+                $('#team_form_alert').addClass("alert-danger");
+                $('#team_form_alert').show();
+                $("#team_form_alert").fadeOut(3000);
+            }
+        },
+        error: function(XMLHttpRequest, textStatus, errorThrown) { 
+            $('#team_form_alert').html("Упс, что-то пошло не так: " + errorThrown);
+            $('#team_form_alert').removeClass("alert-success");
+            $('#team_form_alert').addClass("alert-danger");
+            $('#team_form_alert').show();
+            $("#team_form_alert").fadeOut(3000);
+        }
+    });
+};
+
 $(function() {
     set_ucount(ucount);
 });
 
 $('#teamform').submit(function(e){
     e.preventDefault();
+    save_team("");
+});
 
-    var teamForm = { //Fetch form data
-            'dist'        : dist,
-            'ucount'      : ucount,
-            'paymentid'   : $('#teamform #id_paymentid').val(),
-            'name'        : $('#teamform #id_name').val(),
-            'city'        : $('#teamform #id_city').val(),
-            'organization': $('#teamform #id_organization').val(),
-            'athlet1'     : $('#teamform #id_athlet1').val(),
-            'birth1'      : $('#teamform #id_birth1').val(),
-            'athlet2'     : $('#teamform #id_athlet2').val(),
-            'birth2'      : $('#teamform #id_birth2').val(),
-            'athlet3'     : $('#teamform #id_athlet3').val(),
-            'birth3'      : $('#teamform #id_birth3').val(),
-            'athlet4'     : $('#teamform #id_athlet4').val(),
-            'birth4'      : $('#teamform #id_birth4').val(),
-            'athlet5'     : $('#teamform #id_athlet5').val(),
-            'birth5'      : $('#teamform #id_birth5').val(),
-            'athlet6'     : $('#teamform #id_athlet6').val(),
-            'birth6'      : $('#teamform #id_birth6').val(),
-            'csrfmiddlewaretoken' : csrf_token,
-            // 'paymentid'		: $('#teamform #paymentid').val(),
-            // 'paymentmethod': $('#teamform #paymentmethod').val(),
-    };
+$('#pay_visamastercard').on('click', function(){
+    $('#radio1').click();
+    save_team("visamc");
+});
 
-    $.ajax({
-            type      : 'POST',
-            url       : '/team',
-            data      : teamForm,
-            dataType  : 'json',
-            success   : function(data) {
-                            if (data.success) {
-                                $('#team_form_alert').hide();
-                                $('#team_form_alert').html("Данные команды сохранены");
-                                $('#team_form_alert').removeClass("alert-danger");
-                                $('#team_form_alert').addClass("alert-success");
-                                $('#team_form_alert').show();
-                                $("#team_form_alert").fadeOut(3000);
-                                // $('#teamform #paymentid').val(data.paymentid);
-                                // if (data.sum != 0){
-                                //     if (data.paymentmethod == 'yandexmoney'){
-                                //         $("#yasum").val(data.sum);
-                                //         $("#yatargets").val("Взнос за Кольцо-24 (" + data.paymentid +")");
-                                //         $("#yalabel").val(data.paymentid);
-                                //         $('#yandexform').submit();
-                                //     } else if (data.paymentmethod == 'c2c'){
-                                //         $('#cti_sumlabel').text(data.sum);
-                                //         $('#cti_sumlabel2').text(data.sum);
-                                //         $('#cti_bankname').text(data.bankname);
-                                //         $('#cti_bankname2').text(data.bankname);
-                                //         $('#cti_phone').text(data.phone);
-                                //         $('#cti_cardnumber').text(data.cardnumber);
-                                //         $('#cti_name').text(data.name);
-                                //         $('#comment').text(data.comment);
-                                //         $('#card_transfer_instructions').show();
-                                //         $('html, body').animate({
-                                //                 scrollTop: $("#paymentmethodlist").offset().top + 100
-                                //         }, 1000);
-                                //     }
-                                // }
-                            }
-                            else
-                            {
-                                $('#registration-msg .alert').html("Упс, что-то пошло не так!");
-                                $('#registration-msg .alert').removeClass("alert-success");
-                                $('#registration-msg .alert').addClass("alert-danger");
-                                $('#registration-msg').show();
-                            }
-                        }
-        });
+$('#pay_yandexmoney').on('click', function(){
+    $('#radio2').click();
+    save_team("yandexmoney");
+});
+
+$('#pay_sberbank').on('click', function(){
+    $('#radio3').click();
+    save_team("sberbank");
+});
+
+$('#pay_tinkoff').on('click', function(){
+    $('#radio4').click();
+    save_team("tinkoff");
+});
+
+$('#common_paid').on('click', function(){
+    payment_method = $('input[name=radio]:checked', '#paymentmethod').val()
+    save_team(payment_method)
 });

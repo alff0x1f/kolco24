@@ -7,6 +7,7 @@ from django.views.decorators.csrf import csrf_exempt
 from website.forms import LoginForm, RegForm, TeamForm
 from website.models import Payments, Team
 from django.http import HttpResponseRedirect, Http404, JsonResponse
+from django.conf import settings
 
 
 def index(request):
@@ -26,7 +27,7 @@ def index(request):
         auth_login(request, user)
         return HttpResponseRedirect("/team")
     contex = {
-        "cost": 500,
+        "cost": Payments().get_cost(),
         "reg_form": reg_form
     }
     return render(request, 'website/index.html', contex)
@@ -60,23 +61,54 @@ def my_team(request, teamid=""):
     if not paymentid:
         raise Http404("Nothing found")
 
+    cost_now = Payments().get_cost()
+
     if request.method == 'GET':
         if teamid != paymentid:
             return HttpResponseRedirect("/team/%s" % paymentid)
 
+        main_team = Team.objects.get(paymentid=paymentid)
         other_teams = Team.objects.filter(owner=request.user).exclude(
             paymentid=paymentid)
         context = {
-            "cost": 500,
+            "cost": cost_now,
             "team_form": team_form,
             "other_teams": other_teams,
+            "main_team": main_team,
         }
         return render(request, 'website/my_team.html', context)
     elif request.method == 'POST' and team_form.is_valid():
-        # print(team_form.fields)
         if team_form.access_possible(request.user):
-            team_form.save()
+            team = team_form.save()
+            if not team:
+                Http404("Wrong values")
             response_data = {}
+            response_data['paymentmethod'] = ""
+            paymentmethod = request.POST["paymentmethod"] if \
+                "paymentmethod" in request.POST else ""
+            response_data['sum'] = (team.ucount - team.paid_people) * cost_now
+            response_data['sum'] = team.paymentid
+
+            if paymentmethod == "visamc":
+                response_data['paymentmethod'] = 'visamc'
+                response_data['paymentmetid'] = team.paymentid
+                response_data['yandexwallet'] = settings.YANDEX_WALLET
+            if paymentmethod == "yandexmoney":
+                response_data['paymentmethod'] = 'yandexmoney'
+                response_data['paymentmetid'] = team.paymentid
+                response_data['yandexwallet'] = settings.YANDEX_WALLET
+            if paymentmethod == "sberbank":
+                response_data['paymentmethod'] = 'sberbank'
+                response_data['cardnumber'] = settings.SBERBANK_INFO["cardnumber"]
+                response_data['cardholder_phone'] = settings.SBERBANK_INFO["phone"]
+                response_data['cardholder_name'] = settings.SBERBANK_INFO["name"]
+                response_data['payment_comment'] = "команда%s" % team.id
+            if paymentmethod == "tinkoff":
+                response_data['paymentmethod'] = 'tinkoff'
+                response_data['cardnumber'] = settings.TINKOFF_INFO["cardnumber"]
+                response_data['cardholder_phone'] = settings.TINKOFF_INFO["phone"]
+                response_data['cardholder_name'] = settings.TINKOFF_INFO["name"]
+                response_data['payment_comment'] = "команда%s" % team.id
             response_data['success'] = 'true'
             return JsonResponse(response_data)
     raise Http404("Wrong values")

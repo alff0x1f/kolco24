@@ -110,8 +110,11 @@ class RegForm(forms.Form):
             self.user.first_name = first_name
             self.user.last_name = last_name
             self.user.profile.phone = phone
-            # self.user.username = username
             self.user.save()
+            team = Team.objects.filter(owner=self.user)[:1]
+            if not team:
+                team = Team()
+                team.new_team(self.user, dist, ucount)
         return self.user
 
     def clean(self):
@@ -253,3 +256,5 @@ class TeamForm(forms.Form):
             team.birth5 = d["birth5"] if d["birth5"].isdigit() else "0"
             team.birth6 = d["birth6"] if d["birth6"].isdigit() else "0"
             team.save()
+            return team
+        return False

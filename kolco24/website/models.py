@@ -44,7 +44,7 @@ class Payments(models.Model):
             ("12.10.2018 19:00", 800),
             ("16.09.2018 19:00", 700),
             ("19.08.2018 19:00", 600),
-            ("25.07.2018 19:00", 500),
+            ("31.07.2018 19:00", 500),
         ]
         if not t:
             t = time.time()
@@ -94,6 +94,31 @@ class Payments(models.Model):
                     self.unaccepted = True
 
             self.save()
+            self.update_team(self.label)
+            return True
+        return False
+    
+    def get_info(self, paymentid):
+        payments = Payments.objects.filter(label=paymentid, unaccepted=False)
+        people_paid = 0
+        withdraw_sum = 0
+        for payment in payments:
+            t = datetime.datetime.strptime(payment.datetime, "%Y-%m-%dT%H:%M:%SZ").timestamp()-time.timezone
+            cost = payment.get_cost(t)
+            withdraw = float(payment.withdraw_amount) if payment.withdraw_amount else 0
+            people_paid += withdraw / cost
+            withdraw_sum += withdraw
+        
+        return (people_paid, withdraw_sum)
+    
+    def update_team(self, paymentid):
+        people_paid, withdraw = self.get_info(paymentid)
+        team = Team.objects.filter(paymentid=paymentid)[:1]
+        if team:
+            team = team.get()
+            team.paid_sum = withdraw
+            team.paid_people = people_paid
+            team.save()
             return True
         return False
 
@@ -130,10 +155,14 @@ class Team(models.Model):
         return self.paymentid.__str__()
 
     def new_team(self, user, dist, ucount):
-        print(user, dist)
+        # print(user, dist)
         if user.is_authenticated:
             self.owner = user
             self.dist = dist
             self.ucount = ucount
             self.paymentid = '%016x' % random.randrange(16**16)
             self.save()
+    
+    def update_money(self):
+        payment = Payments()
+        payment.update_team(self.paymentid)
