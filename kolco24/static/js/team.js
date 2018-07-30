@@ -7,10 +7,14 @@ $( "#dist_header" ).click(function() {
         case "12h":
             dist = "24h";
             $("#dist_header").text("24h");
+            if (ucount < 4) { ucount = 4 }
+            set_ucount(ucount)
             break;
         case "24h":
             dist = "6h";
             $("#dist_header").text("6h");
+            if (ucount > 3) { ucount = 3; }
+            set_ucount(ucount)
             break;
         default:
             break;
@@ -58,20 +62,31 @@ function set_ucount(count) {
     }
     // show controls on last item
     if (count == 2){
-        $("#del_member2").removeClass('d-none');
         $("#add_member3").removeClass('d-none');
     }
     if (count == 3){
-        $("#del_member3").removeClass('d-none');
-        $("#add_member4").removeClass('d-none');
+        if (dist != "24h"){
+            $("#del_member3").removeClass('d-none');
+        }
+        if (dist != "6h"){
+            $("#add_member4").removeClass('d-none');
+        }
     }
     if (count == 4){
-        $("#del_member4").removeClass('d-none');
-        $("#add_member5").removeClass('d-none');
+        if (dist != "24h"){
+            $("#del_member4").removeClass('d-none');
+        } else {
+            $("#del_member4").addClass('d-none');
+        }
+        if (dist != "6h"){
+            $("#add_member5").removeClass('d-none');
+        }
     }
-    if (count == 5){
+    if (count == 5) {
         $("#del_member5").removeClass('d-none');
-        $("#add_member6").removeClass('d-none');
+        if (dist != "6h"){
+            $("#add_member6").removeClass('d-none');
+        }
     }
     if (count == 6){
         $("#del_member6").removeClass('d-none');

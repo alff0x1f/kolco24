@@ -37,11 +37,11 @@
                                                 <div class="form-group">
                                                     <label for="ucount">Кол-во участников:</label>
                                                     <select class="form-control" name="ucount" id="ucount" required="">
-                                                        <option value="2" selected="">2 человека</option>
-                                                        <option value="3">3 человека</option>
-                                                        <option value="4">4 человека</option>
-                                                        <option value="5">5 человек</option>
-                                                        <option value="6">6 человек</option>
+                                                        <option id="ucount_2p" value="2" selected="">2 человека</option>
+                                                        <option id="ucount_3p" value="3">3 человека</option>
+                                                        <option id="ucount_4p" value="4">4 человека</option>
+                                                        <option id="ucount_5p" value="5">5 человек</option>
+                                                        <option id="ucount_6p" value="6">6 человек</option>
                                                     </select>
                                                 </div>
                                             </div>
@@ -358,6 +358,6 @@
                     <!--end of section-->
 {% endblock %}
 {% block footer_js_include %}
-    <script type="text/javascript" src="/static/js/index_reg.js"></script>
+    <script type="text/javascript" src="/static/js/index_reg.js?ver=2"></script>
     <script>var cost = {{ cost }};</script>
 {% endblock %}
