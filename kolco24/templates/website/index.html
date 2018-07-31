@@ -38,7 +38,7 @@
                                                     <label for="ucount">Кол-во участников:</label>
                                                     <select class="form-control" name="ucount" id="ucount" required="">
                                                         <option id="ucount_2p" value="2" selected="">2 человека</option>
-                                                        <option id="ucount_3p" value="3">3 человека</option>
+                                                        <option id="ucount_3p" value="3" style="display:none;">3 человека</option>
                                                         <option id="ucount_4p" value="4">4 человека</option>
                                                         <option id="ucount_5p" value="5">5 человек</option>
                                                         <option id="ucount_6p" value="6">6 человек</option>
@@ -158,7 +158,7 @@
                             <ul class="list-arrow-right">
         
                                 <li>«Всё сложно» - КВ 24 часа (4-6 человек)</li>
-                                <li>«Всё серьезно» - КВ 12 часов (4-6 человек или 2 человека ММ/МЖ/ЖЖ)</li>
+                                <li>«Всё серьезно» - КВ 12 часов (4-6 человек или 2 человека ММ/МЖ)</li>
                                 <li>«Первое свидание» - КВ 6 часа (2-3 человека)</li>
         
                             </ul>
@@ -238,7 +238,7 @@
                                                 </p>
                                                 <ul>
                                                     <li>Вес рюкзака: 6кг на человека</li>
-                                                    <li>2 человека (Зачеты в ММ, МЖ и ЖЖ)</li>
+                                                    <li>2 человека (Зачеты в ММ, МЖ)</li>
                                                     <li>4-6 человек (минимум 1 девушка, минимум 1 мужчина)</li>
                                                 </ul>
                                             </div>
@@ -358,6 +358,6 @@
                     <!--end of section-->
 {% endblock %}
 {% block footer_js_include %}
-    <script type="text/javascript" src="/static/js/index_reg.js?ver=2"></script>
+    <script type="text/javascript" src="/static/js/index_reg.js?ver=3"></script>
     <script>var cost = {{ cost }};</script>
 {% endblock %}

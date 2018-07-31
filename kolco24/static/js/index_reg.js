@@ -19,7 +19,7 @@ $('#reg_12h').click(function(){
     $('#reg_24h').removeClass("active");
     $('#dist').val('12h');
     $('#ucount_2p').show();
-    $('#ucount_3p').show();
+    $('#ucount_3p').hide();
     $('#ucount_4p').show();
     $('#ucount_5p').show();
     $('#ucount_6p').show();
