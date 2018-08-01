@@ -17,16 +17,16 @@
         <meta property="article:author" content="Турклуб Спутник" />
         <meta property="article:section" content="Туризм" />
 
-        <meta property="og:title" content="Регистрация на Кольцо 24" />
+        <meta property="og:title" content="{% block og_title %}Регистрация на Кольцо 24{% endblock %}" />
         <meta property="og:type" content="website" />
-        <meta property="og:description" content="XX соревнования по пешеходному туризму в дисциплине рогейн" />
+        <meta property="og:description" content="{% block og_description %}XX соревнования по пешеходному туризму в дисциплине рогейн{% endblock %}" />
         <meta property="og:image" content="https://kolco24.ru/static/images/kolco24.jpg" />
         <meta property="og:url" content="https://kolco24.ru" />
         <meta property="og:site_name" content="Кольцо 24" />
 
         <meta name="twitter:card" content="summary">
-        <meta name="twitter:title" content="Кольцо 24">
-        <meta name="twitter:description" content="Регистрация на Кольцо 24">
+        <meta name="twitter:title" content="{% block twitter_title %}Регистрация на Кольцо 24{% endblock %}">
+        <meta name="twitter:description" content="{% block twitter_description %}XX соревнования по пешеходному туризму в дисциплине рогейн{% endblock %}">
         <meta name="twitter:image" content="https://kolco24.ru/static/images/kolco24.jpg">
         <meta name="twitter:url" content="https://kolco24.ru">
     </head>
@@ -86,7 +86,8 @@
                                 </div>
                             </li>
                             <li class="nav-item">
-                                    {% comment %} <a href="/teams" class="nav-link">Команды <span href="#" class="badge badge-primary">{{ team_number }}</span></a> {% endcomment %}
+                                    <a href="/teams" class="nav-link">Команды </a>
+                                    {% comment %} <span href="#" class="badge badge-primary">{{ team_number }}</span></a> {% endcomment %}
                             </li>
                         </ul>
 

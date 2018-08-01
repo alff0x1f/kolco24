@@ -54,6 +54,31 @@ def logout_user(request):
                 return HttpResponseRedirect("/")
     raise Http404("File not found.")
 
+def teams(request):
+    teams_6h = Team.objects.filter(dist="6h")
+    teams_12h_2 = Team.objects.filter(dist="12h", ucount=2)
+    teams_12h_4 = Team.objects.filter(dist="12h", ucount__gt=2)
+    teams_24h = Team.objects.filter(dist="24h")
+
+    # select only paid teams
+    if not request.user.is_superuser:
+        teams_6h = [team for team in teams_6h if team.paid_sum > 0]
+        teams_12h_2 = [team for team in teams_12h_2 if team.paid_sum > 0]
+        teams_12h_4 = [team for team in teams_12h_4 if team.paid_sum > 0]
+        teams_24h = [team for team in teams_24h if team.paid_sum > 0]
+    else:
+        teams_12h_2 = [team for team in teams_12h_2]
+        teams_12h_4 = [team for team in teams_12h_4]
+    teams_12h = teams_12h_2 + teams_12h_4
+        
+
+    context = {
+        "teams_6h":teams_6h,
+        "teams_12h":teams_12h,
+        "teams_24h":teams_24h,
+    }
+    return render(request, 'website/teams.html', context)
+
 @login_required
 def my_team(request, teamid=""):
     team_form = TeamForm(request.POST or None)
