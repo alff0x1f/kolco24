@@ -79,6 +79,15 @@ def teams(request):
     }
     return render(request, 'website/teams.html', context)
 
+def success(request, teamid=""):
+    team = Team.objects.filter(paymentid=teamid)[:1]
+    if team:
+        context = {
+            "team": team[0],
+        }
+        return render(request, 'website/success.html', context)
+    raise Http404("File not found.")
+
 @login_required
 def my_team(request, teamid=""):
     team_form = TeamForm(request.POST or None)
