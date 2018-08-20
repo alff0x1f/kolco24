@@ -340,20 +340,20 @@
                                             <div class="col-9"><strike>При оплате до 3 августа</strike></div>
                                         </li>
                                         <li class="row align-items-center">
-                                            <div class="col-3 col-md-3"><strong>600р</strong></div>
-                                            <div class="col-9">При оплате с 4 августа по 19 августа</div>
+                                            <div class="col-3 col-md-3"><strike>600р</strike></div>
+                                            <div class="col-9"><strike>При оплате с 4 августа по 19 августа</strike></div>
                                         </li>
                                         <li class="row align-items-center">
-                                            <div class="col-3 col-md-3 text-muted text-small">700р</div>
-                                            <div class="col-9 text-muted text-small">При оплате с 20 августа по 16 сентября</div>
+                                            <div class="col-3 col-md-3{% if cost < 700 %}  text-muted text-small{% endif %}">{% if cost == 700 %}<strong>{% elif cost > 700 %}<strike>{% endif %}700р{% if cost == 700 %}</strong>{% elif cost > 700 %}</strike>{% endif %}</div>
+                                            <div class="col-9{% if cost < 700 %} text-muted text-small{% endif %}">{% if cost > 700 %}<strike>{% endif %}При оплате с 20 августа по 16 сентября{% if cost > 700 %}</strike>{% endif %}</div>
                                         </li>
                                         <li class="row align-items-center">
-                                            <div class="col-3 col-md-3 text-muted text-small">800р</div>
-                                            <div class="col-9 text-muted text-small">При оплате с 17 сентября по 12 октября</div>
+                                            <div class="col-3 col-md-3{% if cost < 800 %} text-muted text-small{% endif %}">{% if cost == 800 %}<strong>{% elif cost > 800 %}<strike>{% endif %}800р{% if cost == 800 %}</strong>{% elif cost > 800 %}</strike>{% endif %}</div>
+                                            <div class="col-9{% if cost < 800 %} text-muted text-small{% endif %}">{% if cost > 800 %}<strike>{% endif %}При оплате с 17 сентября по 12 октября{% if cost > 800 %}</strike>{% endif %}</div>
                                         </li>
                                         <li class="row align-items-center">
-                                            <div class="col-3 col-md-3 text-muted text-small">1000р</div>
-                                            <div class="col-9 text-muted text-small"> Оплата наличными на месте старта</div>
+                                            <div class="col-3 col-md-3{% if cost < 1000 %} text-muted text-small{% endif %}">{% if cost == 800 %}<strong>{% endif %}1000р{% if cost == 1000 %}</strong>{% endif %}</div>
+                                            <div class="col-9{% if cost < 1000 %} text-muted text-small{% endif %}"> Оплата наличными на месте старта</div>
                                         </li>
                                     </ul>
                                     <hr class="short">
