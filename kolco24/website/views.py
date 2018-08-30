@@ -26,9 +26,14 @@ def index(request):
         user = reg_form.reg_user()
         auth_login(request, user)
         return HttpResponseRedirect("/team")
+
+    teams_count, members_count = Team().get_info()
+
     contex = {
         "cost": Payments().get_cost(),
-        "reg_form": reg_form
+        "reg_form": reg_form,
+        "team_count": teams_count,
+        "people_count": int(members_count),
     }
     return render(request, 'website/index.html', contex)
 

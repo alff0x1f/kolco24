@@ -166,6 +166,15 @@ class Team(models.Model):
     def update_money(self):
         payment = Payments()
         payment.update_team(self.paymentid)
+    
+    def get_info(self):
+        teams = Team.objects.filter(paid_sum__gt=0)
+        people_paid = 0
+        teams_count = 0
+        for team in teams:
+            people_paid += team.paid_people
+            teams_count += 1
+        return (teams_count, people_paid)
 
 
 class PaymentLog(models.Model):
