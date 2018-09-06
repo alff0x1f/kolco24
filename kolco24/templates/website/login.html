@@ -8,40 +8,59 @@
                     <div class="col-12 col-md-8 col-lg-7">
                         <div class="card card-lg text-center">
                             <div class="card-body">
-                                <div class="mb-3">
-                                    <h1 class="h2 mb-2">Привет</h1>
-                                    <span>Введите свои данные</span>
-                                </div>
-                                <div class="row no-gutters justify-content-center">
-                                    <form action="/login" method="POST" class="text-left col-lg-8">
-                                        <div class="form-group">
-                                            {{ form.email.label_tag }}
-                                            {{ form.email }}
-                                        </div>
-                                        <div class="form-group">
-                                            {{ form.password.label_tag }}
-                                            {{ form.password }}
-                                            <small>Забыли или не знаете пароль? <a href="#">Восстановить </a>
-                                            </small>
-                                        </div>
-                                        {% if form.non_field_errors %}
-                                        <div class="alert alert-danger" role="alert">
-                                                {{ form.non_field_errors }}
-                                        </div>
-                                        {% endif%}
-                                        <div class="text-center mt-3">
-                                            <button type="submit" class="btn btn-lg btn-primary">Войти</button>
-                                        </div>
-                                        {% csrf_token %}
-                                    </form>
-                                </div>
+                                {% if success == 'ok'%}
+                                    <div class="mb-3">
+                                        <h1 class="h2 mb-2">Успешно!</h1>
+                                        <span>Ссылка для входа отправлена на <b>{{ form.email.value }}</b></span>
+                                        <p></p>
+                                        <p>Если ссылка не приходит, проверьте папку спам. В случае проблем со входом, напишите нам на email <a href="mailto:org@kolco24.ru">org@kolco24.ru</a></p>
+                                    </div>
+                                {% elif success == 'enter'%}
+                                    <div class="mb-3">
+                                        <h1 class="h2 mb-2">Добро пожаловать, {{ username }}</h1>
+                                        <span>Нажмите "Войти" для входа в свой аккаунт</span>
+                                    </div>
+                                    <div class="row no-gutters justify-content-center">
+                                        <form action="/login/{{ login_key }}" method="POST" class="text-left col-lg-8">
+                                            <input type="hidden" name="login_key" value="{{ login_key }}">
+                                            <div class="text-center mt-3">
+                                                <button type="submit" class="btn btn-lg btn-primary">Войти</button>
+                                            </div>
+                                            {% csrf_token %}
+                                        </form>
+                                    </div>
+                                {% else %}
+                                    <div class="mb-3">
+                                        <h1 class="h2 mb-2">Привет</h1>
+                                        <span>Введите свой email и мы пришлем ссылку для входа</span>
+                                    </div>
+                                    <div class="row no-gutters justify-content-center">
+                                        <form action="/login" method="POST" class="text-left col-lg-8">
+                                            <div class="form-group">
+                                                {{ form.email.label_tag }}
+                                                {{ form.email }}
+                                            </div>
+                                            {% if form.non_field_errors %}
+                                            <div class="alert alert-danger" role="alert">
+                                                    {{ form.non_field_errors }}
+                                            </div>
+                                            {% endif%}
+                                            <div class="text-center mt-3">
+                                                <button type="submit" class="btn btn-lg btn-primary">Отправить</button>
+                                            </div>
+                                            {% csrf_token %}
+                                        </form>
+                                    </div>
+                                {% endif %}
                                 <!--end of row-->
                             </div>
                         </div>
-                        <div class="text-center">
-                            <span class="text-small">Не регистрировались? <a href="#">Зарегистрироваться</a>
-                            </span>
-                        </div>
+                        {% if not success %}
+                            <div class="text-center">
+                                <span class="text-small">Не регистрировались? <a href="/">Зарегистрироваться</a>
+                                </span>
+                            </div>
+                        {% endif %}
                     </div>
                     <!--end of col-->
                 </div>

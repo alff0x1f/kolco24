@@ -1,13 +1,15 @@
+from datetime import datetime, timezone
 from django.shortcuts import render
 from django.http import HttpResponse
 from django.contrib.auth import login as auth_login
 from django.contrib.auth import logout
 from django.contrib.auth.decorators import login_required
 from django.views.decorators.csrf import csrf_exempt
-from website.forms import LoginForm, RegForm, TeamForm
-from website.models import Payments, Team, PaymentLog
+from website.forms import LoginForm, FastLoginForm, RegForm, TeamForm
+from website.models import Payments, Team, PaymentLog, FastLogin
 from django.http import HttpResponseRedirect, Http404, JsonResponse
 from django.conf import settings
+from website.email import send_login_email
 
 
 def index(request):
@@ -40,7 +42,7 @@ def index(request):
 def index_dummy(request):
     return render(request, 'website/index_dummy.html')
 
-def login(request):
+def passlogin(request):
     if request.user.is_authenticated:
         return HttpResponseRedirect("/")
     form = LoginForm(request.POST or None)
@@ -49,7 +51,39 @@ def login(request):
         auth_login(request, user)
         return HttpResponseRedirect("/")
 
+    return render(request, 'website/passlogin.html', {'form': form})
+
+def login(request):
+    if request.user.is_authenticated:
+        return HttpResponseRedirect("/")
+    form = FastLoginForm(request.POST or None)
+    if request.method == 'POST' and form.is_valid():
+        login = FastLogin()
+        login_key = login.new_login_link(form.cleaned_data['email'])
+        send_login_email(form.cleaned_data['email'], login_key)
+        return render(request, 'website/login.html', {'success': 'ok', 
+                                                           'form': form})
+
     return render(request, 'website/login.html', {'form': form})
+
+def login_by_key(request, login_key=""):
+    keys = FastLogin.objects.filter(login_key=login_key)
+    for key in keys:
+        curr_time = datetime.now(timezone.utc)
+        delta = curr_time - key.created_at
+        if delta.seconds < 24*60*60:
+            if request.method == 'POST' and 'login_key' in request.POST \
+                    and request.POST['login_key'] == login_key:
+                user = key.user
+                auth_login(request, user)
+                return HttpResponseRedirect("/")
+            else:
+                return render(request, 'website/login.html', {
+                    'success': 'enter', 
+                    'login_key': login_key,
+                    'username': key.user.first_name + ' ' + key.user.last_name,
+                    })
+    return HttpResponseRedirect("/login")
 
 def logout_user(request):
     if request.method == "POST":
