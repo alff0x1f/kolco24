@@ -20,7 +20,7 @@
                             <div class="card-body">
                                 <form action="/" method="POST">
                                     <div class="row mb-2">
-                                        <div class="col-sm-6 col-md-6 mb-1">
+                                        <div class="col-sm-6 col-md-6 mb-1 {% if myteams %}d-none{% endif%}">
                                             <ul class="nav nav-tabs">
                                                 <li class="nav-item">
                                                     <a class="nav-link" id="reg_6h" href="#">6ч</a>
@@ -33,7 +33,7 @@
                                                 </li>
                                             </ul>
                                         </div>
-                                        <div class="col-sm-6 col-md-6">
+                                        <div class="col-sm-6 col-md-6 {% if myteams %}d-none{% endif%}">
                                                 <div class="form-group">
                                                     <label for="ucount">Кол-во участников:</label>
                                                     <select class="form-control" name="ucount" id="ucount" required="">
@@ -66,7 +66,7 @@
                                             {% endif %}
                                         </div>
                                     </div>
-                                    <div class="form-group">
+                                    <div class="form-group {% if myteams %}d-none{% endif%}">
                                         <!-- <label for="InputEmail">Адрес email</label>
                                         <input type="email" name="email" class="form-control {% if reg_form.email.errors %}is-invalid{% endif %}" id="InputEmail" aria-describedby="emailHelp" placeholder="Адрес email" value="{{ user.email }}"> -->
                                         {{ reg_form.email.label_tag }}
@@ -88,18 +88,18 @@
                                         </div>
                                         {% endif %}
                                     </div>
-                                    <div class="mb-2">
+                                    <div class="mb-2 {% if myteams %}d-none{% endif%}">
                                         <div class="custom-control custom-checkbox">
                                             <input type="checkbox" class="custom-control-input" value="agree" name="agree-terms" id="check-agree" checked>
                                             <label class="custom-control-label text-small" for="check-agree">Я прочитал <a href="https://docs.google.com/document/d/1hHHLXunk12DoAfF0FUIy4ky-KEOceKPbn5XUJ4SysM8/edit">Положение соревнований</a>
                                             </label>
                                         </div>
                                     </div>
-                                    <div class="row">
+                                    <div class="row {% if myteams %}d-none{% endif%}">
                                         <div class="col-sm-6"><p>Стартовый взнос</p></div>
                                         <div class="col-sm-6"><p class="text-right">{{ cost }} руб с человека</p></div>
                                     </div>
-                                    <div class="row mb-2 justify-content-between">
+                                    <div class="row mb-2 justify-content-between {% if myteams %}d-none{% endif%}">
                                         <div class="col-6"><p>Итого за <span id="ucountlabel">2</span> чел.</p></div>
                                         <div class="col-6"><p class="text-right"><span id="sumlabel">{% widthratio cost 1 2 %}</span> руб</p></div>
                                     </div>
@@ -112,7 +112,20 @@
                                         {% endfor %}
                                     </div>
                                     {% endif %}
-                                    <button type="submit" class="btn btn-lg btn-success btn-block">Зарегистрироваться</button>
+                                    {% if myteams %}
+                                      <hr>
+                                      <h5>{% if myteams_count == 1 %}Моя команда{% else %}Мои команды{% endif %}</h5>
+                                      {% for team in myteams %}
+                                        <div class="row mb-3">
+                                            <div class="col-12"><h5>{{ team.teamname }}</h5></div>
+                                            <div class="col-8"><p>Дистанция</p></div>
+                                            <div class="col-4"><p>{{ team.dist }}</p></div>
+                                            <div class="col-8"><p>Оплачено за </p></div>
+                                            <div class="col-4"><p>{{team.paid_people|floatformat}} из {{team.ucount}}</span> чел.</p></div>
+                                        </div>
+                                      {% endfor %}
+                                    {% endif%}
+                                    <button type="submit" class="btn btn-lg btn-success btn-block">{% if myteams %}Изменить/добавить{% else %}Зарегистрироваться{% endif%}</button>
                                 </form>
                             </div>
                         </div>

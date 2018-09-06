@@ -14,6 +14,7 @@ from website.email import send_login_email
 
 def index(request):
     init_val = {}
+    myteams = []
     if request.user.is_authenticated:
         init_val = {
             "first_name":request.user.first_name,
@@ -21,6 +22,7 @@ def index(request):
             "email": request.user.email,
             "phone": request.user.profile.phone,
             }
+        myteams = Team.objects.filter(owner=request.user)
     reg_form = RegForm(request.POST or None, initial=init_val)
     reg_form.set_user(request.user)
 
@@ -36,6 +38,8 @@ def index(request):
         "reg_form": reg_form,
         "team_count": teams_count,
         "people_count": int(members_count),
+        'myteams': myteams,
+        'myteams_count': len(myteams),
     }
     return render(request, 'website/index.html', contex)
 
