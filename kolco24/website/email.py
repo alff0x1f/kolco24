@@ -13,7 +13,7 @@ https://kolco24.ru/login/%s
     from_email = 'Кольцо 24 <org@kolco24.ru>'
 
     recepient = []
-    recepient.append('alff3one@gmail.com')
+    recepient.append(recepient_email)
 
     flogin_email = EmailMessage(
         subject,
