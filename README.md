@@ -12,7 +12,7 @@ cd kolco24
 pip install -r requirements.txt 
 ```
 
-Rename `kolco24/settings.py.example` to `kolco24/settings.py.example` and edit it (at least you set SECRET_KEY (just random string) and DIRS TEMPLATES)
+Rename `kolco24/settings.py.example` to `kolco24/settings.py.example` and edit it (at least you must set SECRET_KEY (just random string) and DIRS TEMPLATES)
 
 ##### Create DB:
 ```
