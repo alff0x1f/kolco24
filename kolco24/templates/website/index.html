@@ -215,79 +215,72 @@
                 </section>
                 <section id="distances">
                     <div class="container">
+
                         <div class="row justify-content-center text-center section-intro">
                             <div class="col-12 col-md-9 col-lg-8">
                                 <h2 class="display-4">Дистанции</h2>
                                 <span class="lead">Выбери подходящую для себя</span>
-    
                             </div>
                             <!--end of col-->
                         </div>
                         <!--end of row-->
-                        <div class="row justify-content-around align-items-center">
-                            <div class="col-12 col-md-6 col-lg-5 order-md-2">
-                                <ul class="nav" id="myTab" role="tablist">
-                                    <li>
-                                        <div class="active card" id="tab-1" data-toggle="tab" href="#home" role="tab" aria-controls="home" aria-selected="true">
-                                            <div class="card-body">
-                                                <h3>«Первое свидание» 6ч</h3>
-                                                <p>
-                                                    Легкий забег по красивым местам.
-                                                </p>
-                                                    <ul>
-                                                            <li>Вес рюкзака не регламентирован</li>
-                                                            <li>2-3 человека, состав не регламентирован</li>
-                                                        </ul>
-                                                
-                                            </div>
-                                        </div>
-                                    </li>
-                                    <li>
-                                        <div class="card" id="tab-2" data-toggle="tab" href="#profile" role="tab" aria-controls="profile" aria-selected="false">
-                                            <div class="card-body">
-                                                    <h3>«Всё серьезно» 12ч</h3>
-                                                <p>
-                                                    Прогулка по красивым местам. Сочетание скорости и насыщенности. Заявиться можно в две категории: Двойка и команда.
-                                                </p>
-                                                <ul>
-                                                    <li>Вес рюкзака: 6кг на человека</li>
-                                                    <li>2 человека (Зачеты в ММ, МЖ)</li>
-                                                    <li>4-6 человек (минимум 1 девушка, минимум 1 мужчина)</li>
-                                                </ul>
-                                            </div>
-                                        </div>
-                                    </li>
-                                    <li>
-                                        <div class="card" id="tab-3" data-toggle="tab" href="#contact" role="tab" aria-controls="contact" aria-selected="false">
-                                            <div class="card-body">
-                                                <h3>«Всё сложно» 24ч</h3>
-                                                <p>
-                                                    Дистанция для проверки своих сил и выносливости. Команда 4-6 человек.
-                                                </p>
-                                                <ul>
-                                                        <li>Вес рюкзака: 6кг на человека</li>
-                                                        <li>4-6 человек (минимум 1 девушка, минимум 1 мужчина)</li>
-                                                    </ul>
-                                            </div>
-                                        </div>
-                                    </li>
-                                </ul>
-                            </div>
-                            <!--end of col-->
-                            <div class="col-12 col-md-6 order-md-1">
-                                <div class="tab-content" id="myTabContent">
-                                    <div class="tab-pane fade show active" id="home" role="tabpanel" aria-labelledby="tab-1">
-                                        {% comment %} <img alt="Image" class="img-fluid box-shadow" src="/static/images/backgrounds/header.jpg" /> {% endcomment %}
-                                    </div>
-                                    <div class="tab-pane fade" id="profile" role="tabpanel" aria-labelledby="tab-2">
-                                        {% comment %} <img alt="Image" class="img-fluid box-shadow" src="assets/img/graphic-intro-code.png" /> {% endcomment %}
-                                    </div>
-                                    <div class="tab-pane fade" id="contact" role="tabpanel" aria-labelledby="tab-3">
-                                        {% comment %} <img alt="Image" class="img-fluid box-shadow" src="assets/img/graphic-intro-plugins.png" /> {% endcomment %}
+
+                        <div class="row">
+
+                            <div class="col-12 col-sm-6 col-md-4">
+                                <div class="card card-lg">
+                                    <a href="#">
+                                        <img class="card-img-top" src="/static/images/photo6h.jpg" alt="Pit Stop">
+                                    </a>
+                                    <div class="card-body">
+                                        <h4 class="card-title">«Первое свидание» 6ч</h4>
+                                        <p class="card-text">Легкий забег по красивым местам.</p>
+                                        <ul>
+                                            <li>Вес рюкзака не регламентирован</li>
+                                            <li>2-3 человека, состав не регламентирован</li>
+                                        </ul>
                                     </div>
                                 </div>
                             </div>
                             <!--end of col-->
+
+                            <div class="col-12 col-sm-6 col-md-4">
+                                <div class="card card-lg">
+                                    <a href="#">
+                                        <img class="card-img-top" src="/static/images/photo12h.jpg" alt="Bench">
+                                    </a>
+                                    <div class="card-body">
+                                        <h4 class="card-title">«Всё серьезно» 12ч</h4>
+                                        <p class="card-text">Прогулка по красивым местам. Сочетание скорости и насыщенности. Заявиться можно в две категории: Двойка и команда.</p>
+                                        <ul>
+                                            <li>Вес рюкзака: 6кг на человека</li>
+                                            <li>2 человека (Зачеты в ММ, МЖ)</li>
+                                            <li>4-6 человек (минимум 1 девушка, минимум 1 мужчина)</li>
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+                            <!--end of col-->
+
+                            <div class="col-12 col-sm-6 col-md-4">
+                                <div class="card card-lg">
+                                    <a href="#">
+                                        <img class="card-img-top" src="/static/images/photo24h.jpg" alt="12h">
+                                    </a>
+                                    <div class="card-body">
+                                        <h3>«Всё сложно» 24ч</h3>
+                                        <p>
+                                            Дистанция для проверки своих сил и выносливости. Команда 4-6 человек.
+                                        </p>
+                                        <ul>
+                                            <li>Вес рюкзака: 6кг на человека</li>
+                                            <li>4-6 человек (минимум 1 девушка, минимум 1 мужчина)</li>
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+                            <!--end of col-->
+
                         </div>
                         <!--end of row-->
                     </div>
