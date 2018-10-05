@@ -44,6 +44,9 @@
                             {% if team.ucount >= 2 and team.athlet5 %}<br>{{ team.athlet5 }} {% endif %}
                             {% if team.ucount >= 2 and team.athlet6 %}<br>{{ team.athlet6 }} {% endif %}
                         </td>
+                        {% if user.is_superuser %} 
+                        <td><a href="/team/{{team.paymentid}}">id{{team.id}}</a><br></td>
+                        {% endif %}
                         </tr>
                     {% endfor %}
                     </tbody>
@@ -74,6 +77,9 @@
                             {% if team.ucount >= 2 and team.athlet5 %}<br>{{ team.athlet5 }} {% endif %}
                             {% if team.ucount >= 2 and team.athlet6 %}<br>{{ team.athlet6 }} {% endif %}
                         </td>
+                        {% if user.is_superuser %} 
+                        <td><a href="/team/{{team.paymentid}}">id{{team.id}}</a><br></td>
+                        {% endif %}
                         </tr>
                     {% endfor %}
                     </tbody>
@@ -104,6 +110,9 @@
                             {% if team.ucount >= 2 and team.athlet5 %}<br>{{ team.athlet5 }} {% endif %}
                             {% if team.ucount >= 2 and team.athlet6 %}<br>{{ team.athlet6 }} {% endif %}
                         </td>
+                            {% if user.is_superuser %} 
+                            <td><a href="/team/{{team.paymentid}}">id{{team.id}}</a><br></td>
+                            {% endif %}
                         </tr>
                     {% endfor %}
                     </tbody>
