@@ -197,6 +197,8 @@ class TeamForm(forms.Form):
         team = None
         if paymentid:
             team = Team.objects.filter(owner=user, paymentid=paymentid)[:1]
+            if not team and user.is_superuser:
+                team = Team.objects.filter(paymentid=paymentid)[:1]
             if not team:
                 return False
         else:
