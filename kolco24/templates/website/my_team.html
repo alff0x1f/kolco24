@@ -20,7 +20,7 @@
                 </div>
             </div>
             <!--end of row-->
-            <ul class="feature-list feature-list-sm row {% if not other_teams%}d-none{% endif %}">
+            <ul class="feature-list feature-list-sm row {% if not other_teams or user.is_superuser %}d-none{% endif %}">
                 {% for team in other_teams %}
                 <div class="col-12 col-md-6 col-lg-4">
                     <div class="card">
