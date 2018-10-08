@@ -614,9 +614,10 @@
 {% endblock %}
 {% block footer_js_include %}
     <script>
+        {% load l10n %}
         var cost = {{ cost }};
         var ucount = {{ team_form.ucount.value }};
-        var ucount_paid = {{ main_team.paid_people | floatformat }};
+        var ucount_paid = {{ main_team.paid_people | unlocalize }};
         var dist = "{{ team_form.dist.value }}";
         var csrf_token = "{{ csrf_token }}";
     </script>
