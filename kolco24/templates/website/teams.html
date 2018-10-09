@@ -26,6 +26,7 @@
                         <th scope="col">#</th>
                         <th scope="col">Название</th>
                         <th scope="col">Представитель</th>
+                        <th scope="col">Город</th>
                         <th scope="col">Кол-во</th>
                         <th scope="col">Участники</th>
                         </tr>
@@ -36,6 +37,7 @@
                         <td scope="row">{{ forloop.counter }}</td>
                         <td>{{ team.teamname }}</td>
                         <td>{{ team.owner.last_name }} {{ team.owner.first_name}}</td>
+                        <td>{{ team.city }}</td>
                         <td>{{ team.paid_people |floatformat:"0" }}</td>
                         <td>{{ team.athlet1 }}
                             {% if team.ucount >= 2 and team.athlet2 %}<br>{{ team.athlet2 }} {% endif %}
@@ -59,6 +61,7 @@
                         <th scope="col">#</th>
                         <th scope="col">Название</th>
                         <th scope="col">Представитель</th>
+                        <th scope="col">Город</th>
                         <th scope="col">Кол-во</th>
                         <th scope="col">Участники</th>
                         </tr>
@@ -69,6 +72,7 @@
                         <td scope="row">{{ forloop.counter }}</td>
                         <td>{{ team.teamname }}</td>
                         <td>{{ team.owner.last_name }} {{ team.owner.first_name}}</td>
+                        <td>{{ team.city }}</td>
                         <td>{{ team.paid_people |floatformat:"0" }}</td>
                         <td>{{ team.athlet1 }}
                             {% if team.ucount >= 2 and team.athlet2 %}<br>{{ team.athlet2 }} {% endif %}
@@ -92,6 +96,7 @@
                         <th scope="col">#</th>
                         <th scope="col">Название</th>
                         <th scope="col">Представитель</th>
+                        <th scope="col">Город</th>
                         <th scope="col">Кол-во</th>
                         <th scope="col">Участники</th>
                         </tr>
@@ -102,6 +107,7 @@
                         <td scope="row">{{ forloop.counter }}</td>
                         <td>{{ team.teamname }}</td>
                         <td>{{ team.owner.last_name }} {{ team.owner.first_name }}</td>
+                        <td>{{ team.city }}</td>
                         <td>{{ team.paid_people |floatformat:"0" }}</td>
                         <td>{{ team.athlet1 }}
                             {% if team.ucount >= 2 and team.athlet2 %}<br>{{ team.athlet2 }} {% endif %}
