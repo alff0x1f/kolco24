@@ -5,7 +5,8 @@ from django.contrib.auth import login as auth_login
 from django.contrib.auth import logout
 from django.contrib.auth.decorators import login_required
 from django.views.decorators.csrf import csrf_exempt
-from website.forms import LoginForm, FastLoginForm, RegForm, TeamForm
+from website.forms import (LoginForm, FastLoginForm, RegForm, TeamForm,
+                           TeamFormAdmin)
 from website.models import Payments, Team, PaymentLog, FastLogin
 from django.http import HttpResponseRedirect, Http404, JsonResponse
 from django.conf import settings
@@ -137,6 +138,10 @@ def my_team(request, teamid=""):
     paymentid = team_form.init_vals(request.user, teamid)
     if not paymentid:
         raise Http404("Nothing found")
+    
+    if request.user.is_superuser:
+        team_form_admin = TeamFormAdmin(None)
+        team_form_admin.init_vals(request.user, teamid)
 
     cost_now = Payments().get_cost()
 
@@ -153,6 +158,8 @@ def my_team(request, teamid=""):
             "other_teams": other_teams,
             "main_team": main_team,
         }
+        if team_form_admin:
+            context['team_form_admin'] = team_form_admin
         return render(request, 'website/my_team.html', context)
     elif request.method == 'POST' and team_form.is_valid():
         if team_form.access_possible(request.user):
@@ -192,6 +199,19 @@ def my_team(request, teamid=""):
                 response_data['cardholder_phone'] = settings.TINKOFF_INFO["phone"]
                 response_data['cardholder_name'] = settings.TINKOFF_INFO["name"]
                 response_data['payment_comment'] = "команда%s" % team.id
+            response_data['success'] = 'true'
+            return JsonResponse(response_data)
+    raise Http404("Wrong values")
+
+@login_required
+def team_admin(request, teamid=""):
+    team_form_admin = TeamFormAdmin(request.POST or None)
+    if request.method == 'POST' and team_form_admin.is_valid():
+        if request.user.is_superuser:
+            team = team_form_admin.save(request.user)
+            if not team:
+                Http404("Wrong values")
+            response_data = {}
             response_data['success'] = 'true'
             return JsonResponse(response_data)
     raise Http404("Wrong values")

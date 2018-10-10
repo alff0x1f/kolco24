@@ -4,7 +4,7 @@ from django import forms
 from django.core.exceptions import ObjectDoesNotExist
 from django.contrib.auth.models import User
 from django.contrib.auth import authenticate
-from website.models import Team
+from website.models import Team, TeamAdminLog
 
 
 class LoginForm(forms.Form):
@@ -274,5 +274,177 @@ class TeamForm(forms.Form):
             team.birth5 = d["birth5"] if d["birth5"].isdigit() else "0"
             team.birth6 = d["birth6"] if d["birth6"].isdigit() else "0"
             team.save()
+            return team
+        return False
+
+
+class TeamFormAdmin(forms.Form):
+    paymentid = forms.CharField(widget=forms.HiddenInput())
+    get_package = forms.BooleanField(
+        required=False,
+        label = 'Получили стартовый пакет',
+        widget=forms.CheckboxInput(
+            attrs = {
+                'class': 'custom-control-input',
+            })
+    )
+    get_number = forms.BooleanField(
+        required=False,
+        label = 'Получили номер',
+        widget=forms.CheckboxInput(
+            attrs = {
+                'class': 'custom-control-input',
+            })
+        )
+    give_paper = forms.BooleanField(
+        required=False,
+        label = 'Сдали заявку',
+        widget=forms.CheckboxInput(
+            attrs = {
+                'class': 'custom-control-input',
+            })
+        )
+    give_photos = forms.BooleanField(
+        required=False,
+        label = 'Сдали фото',
+        widget=forms.CheckboxInput(
+            attrs = {
+                'class': 'custom-control-input',
+            })
+        )
+    dnf = forms.BooleanField(
+        required=False,
+        label = 'Не финишировали',
+        widget=forms.CheckboxInput(
+            attrs = {
+                'class': 'custom-control-input',
+            })
+    )
+
+    category = forms.ChoiceField(
+        required = False,
+        choices = (
+            ('6h', '6 часов'),
+            ('12h_mw','12 часов МЖ'),
+            ('12h_mm', '12 часов ММ'), 
+            ('12h_team', '12 часов, команда'), 
+            ('24h', '24 часа'),
+        ),
+        label = 'Категория',
+        widget = forms.Select(
+            attrs = {
+                'class': 'form-control form-control-lg',
+                'placeholder': 'Категория'})
+    )
+    start_number = forms.CharField(
+        required = False,
+        label = 'Стартовый номер',
+        widget = forms.TextInput(
+            attrs = {
+                'class': 'form-control form-control-lg',
+                'placeholder': 'Стартовый номер'})
+    )
+    start_time = forms.DateTimeField(
+        required = False,
+        label = 'Время старта',
+        widget = forms.DateTimeInput(
+            attrs = {
+                'class': 'form-control form-control-lg',
+                'placeholder': 'Время старта'})
+    )
+    finish_time = forms.DateTimeField(
+        required = False,
+        label = 'Время финиша',
+        widget = forms.DateTimeInput(
+            attrs = {
+                'class': 'form-control form-control-lg',
+                'placeholder': 'Время финиша'})
+    )
+    penalty = forms.IntegerField(
+        required = False,
+        min_value = 0,
+        max_value = 1000,
+        label = 'Штраф',
+        widget=forms.NumberInput(
+            attrs = {
+                'class': 'form-control form-control-lg',
+                'placeholder': 'Штраф'})
+    )
+
+    def clean(self):
+        paymentid = self.cleaned_data["paymentid"]
+        team = Team.objects.filter(paymentid=paymentid)[:1]
+        if not team:
+            raise forms.ValidationError("Команда не найдена.")
+        return self.cleaned_data
+    
+    def init_vals(self, user, paymentid=""):
+        team = None
+        if paymentid and user.is_superuser:
+            team = Team.objects.filter(paymentid=paymentid)[:1]
+            if not team:
+                return False
+        else:
+            return False
+
+        team = team.get()
+        self.initial["get_package"] = team.get_package
+        self.initial["get_number"] = team.get_number
+        self.initial["give_paper"] = team.give_paper
+        self.initial["give_photos"] = team.give_photos
+        self.initial["category"] = team.category
+        self.initial["start_number"] = team.start_number
+        self.initial["start_time"] = team.start_time
+        self.initial["finish_time"] = team.finish_time
+        self.initial["penalty"] = team.penalty
+        self.initial["dnf"] = team.dnf
+    
+    def save(self, user):
+        if "paymentid" not in self.cleaned_data:
+            return False
+        paymentid = self.cleaned_data["paymentid"]
+        team = Team.objects.filter(paymentid=paymentid)[:1]
+        if team:
+            d = self.cleaned_data
+            print(d)
+            team = team.get()
+            if "get_package" in d :
+                team.get_package = d["get_package"]
+            if "get_number" in d:
+                team.get_number = d["get_number"]
+            if "give_paper" in d:
+                team.give_paper = d["give_paper"]
+            if "give_photos" in d:
+                team.give_photos = d["give_photos"]
+            if "category" in d:
+                team.category = d["category"]
+            if "start_number" in d:
+                team.start_number = d["start_number"]
+            if "start_time" in d:
+                team.start_time = d["start_time"]
+            if "finish_time" in d:
+                team.finish_time = d["finish_time"]
+            if "penalty" in d and d["penalty"] is not None:
+                team.penalty = d["penalty"]
+            if "dnf" in d:
+                team.dnf = d["dnf"]
+            team.save()
+
+            team_admin_log = TeamAdminLog()
+            if user:
+                team_admin_log.editor = user
+            team_admin_log.paymentid     = team.paymentid
+            team_admin_log.get_package   = team.get_package
+            team_admin_log.get_number    = team.get_number
+            team_admin_log.give_paper    = team.give_paper
+            team_admin_log.give_photos   = team.give_photos
+            team_admin_log.category      = team.category
+            team_admin_log.start_number  = team.start_number
+            team_admin_log.start_time    = team.start_time
+            team_admin_log.finish_time   = team.finish_time
+            team_admin_log.distance_time = team.distance_time
+            team_admin_log.penalty       = team.penalty
+            team_admin_log.dnf           = team.dnf
+            team_admin_log.save()
             return team
         return False

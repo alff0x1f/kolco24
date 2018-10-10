@@ -331,6 +331,7 @@
                             
                             <div class="col-12 col-md-5 card-body">
                                 <div>
+                                    {% if not user.is_superuser %}
                                     <div class="mb-3 text-center">
                                         <h4 class="h4">Стартовый взнос</h4>
                                     </div>
@@ -356,6 +357,134 @@
                                             <div class="col-9{% if cost < 1000 %} text-muted text-small{% endif %}"> Оплата наличными на месте старта</div>
                                         </li>
                                     </ul>
+                                    {% elif user.is_superuser %}
+                                        <div class="mb-3 text-center">
+                                            <h4 class="h4 mb-2">{{main_team.teamname}}</h4>
+                                            <span>Администрирование</span>
+                                        </div>
+                                        <form id="team_form_admin" action="{% url 'team_admin' %}" method="POST" >
+                                            <div class="form-row form-group">
+                                                <div class="col">
+                                                    {{ team_form_admin.category.label_tag }}
+                                                    {{ team_form_admin.category }}
+                                                    {% if team_form_admin.category.errors %}
+                                                        <div class="invalid-feedback">
+                                                            {{ team_form_admin.category.errors}}
+                                                        </div>
+                                                    {% endif %}
+                                                </div>
+                                            </div>
+                                            <div class="form-row form-group">
+                                                <div class="col">
+                                                    {{ team_form_admin.start_number.label_tag }}
+                                                    {{ team_form_admin.start_number }}
+                                                    {% if team_form_admin.start_number.errors %}
+                                                        <div class="invalid-feedback">
+                                                            {{ team_form_admin.start_number.errors}}
+                                                        </div>
+                                                    {% endif %}
+                                                </div>
+                                            </div>
+                                            <div class="form-row form-group">
+                                                <div class="custom-control custom-checkbox-switch">
+                                                    {{ team_form_admin.get_package }}
+                                                    <label class="custom-control-label" for="{{ team_form_admin.get_package.auto_id }}">{{ team_form_admin.get_package.label }}</label>
+                                                    {% if team_form_admin.get_package.errors %}
+                                                        <div class="invalid-feedback">
+                                                            {{ team_form_admin.get_package.errors}}
+                                                        </div>
+                                                    {% endif %}
+                                                </div>
+                                            </div>
+                                            <div class="form-row form-group">
+                                                <div class="custom-control custom-checkbox-switch">
+                                                    {{ team_form_admin.get_number }}
+                                                    <label class="custom-control-label" for="{{ team_form_admin.get_number.auto_id }}">{{ team_form_admin.get_number.label }}</label>
+                                                    {% if team_form_admin.get_number.errors %}
+                                                        <div class="invalid-feedback">
+                                                            {{ team_form_admin.get_number.errors}}
+                                                        </div>
+                                                    {% endif %}
+                                                </div>
+                                            </div>
+                                            <div class="form-row form-group">
+                                                <div class="custom-control custom-checkbox-switch">
+                                                    {{ team_form_admin.give_paper }}
+                                                    <label class="custom-control-label" for="{{ team_form_admin.give_paper.auto_id }}">{{ team_form_admin.give_paper.label }}</label>
+                                                    {% if team_form_admin.give_paper.errors %}
+                                                        <div class="invalid-feedback">
+                                                            {{ team_form_admin.give_paper.errors}}
+                                                        </div>
+                                                    {% endif %}
+                                                </div>
+                                            </div>
+                                            <div class="form-row form-group">
+                                                <div class="col">
+                                                    {{ team_form_admin.start_time.label_tag }}
+                                                    {{ team_form_admin.start_time }}
+                                                    {% if team_form_admin.start_time.errors %}
+                                                        <div class="invalid-feedback">
+                                                            {{ team_form_admin.start_time.errors}}
+                                                        </div>
+                                                    {% endif %}
+                                                </div>
+                                            </div>
+                                            <div class="form-row form-group">
+                                                <div class="col">
+                                                    {{ team_form_admin.finish_time.label_tag }}
+                                                    {{ team_form_admin.finish_time }}
+                                                    {% if team_form_admin.finish_time.errors %}
+                                                        <div class="invalid-feedback">
+                                                            {{ team_form_admin.finish_time.errors}}
+                                                        </div>
+                                                    {% endif %}
+                                                </div>
+                                            </div>
+                                            <div class="form-row form-group">
+                                                <div class="custom-control custom-checkbox-switch">
+                                                    {{ team_form_admin.give_photos }}
+                                                    <label class="custom-control-label" for="{{ team_form_admin.give_photos.auto_id }}">{{ team_form_admin.give_photos.label }}</label>
+                                                    {% if team_form_admin.give_photos.errors %}
+                                                        <div class="invalid-feedback">
+                                                            {{ team_form_admin.give_photos.errors}}
+                                                        </div>
+                                                    {% endif %}
+                                                </div>
+                                            </div>
+                                            <div class="form-row form-group">
+                                                <div class="col">
+                                                    {{ team_form_admin.penalty.label_tag }}
+                                                    {{ team_form_admin.penalty }}
+                                                    {% if team_form_admin.penalty.errors %}
+                                                        <div class="invalid-feedback">
+                                                            {{ team_form_admin.penalty.errors}}
+                                                        </div>
+                                                    {% endif %}
+                                                </div>
+                                            </div>
+                                            <div class="form-row form-group">
+                                                <div class="custom-control custom-checkbox-switch">
+                                                    {{ team_form_admin.dnf }}
+                                                    <label class="custom-control-label" for="{{ team_form_admin.dnf.auto_id }}">{{ team_form_admin.dnf.label }}</label>
+                                                    {% if team_form_admin.dnf.errors %}
+                                                        <div class="invalid-feedback">
+                                                            {{ team_form_admin.dnf.errors}}
+                                                        </div>
+                                                    {% endif %}
+                                                </div>
+                                            </div>
+                                            {{ team_form.paymentid }}
+                                            {% csrf_token %}
+                                            <div class="form-row form-group">
+                                                <div class="col">
+                                                    <button class="btn btn-block btn-success" type="submit" id="team_form_admin_submit">Сохранить</button>
+                                                </div>
+                                            </div>
+                                            <div id="team_form_admin_alert" class="alert alert-success" role="alert" style="display: none;">
+                                                Text
+                                            </div>
+                                        </form>
+                                    {% endif %}
                                     <hr class="short">
                                     
                                     <div id="paidfor" class="row justify-content-between">
@@ -622,4 +751,5 @@
         var csrf_token = "{{ csrf_token }}";
     </script>
      <script type="text/javascript" src="/static/js/team.js?ver=2"></script>
+     {% if user.is_superuser %}<script type="text/javascript" src="/static/js/team_admin.js?ver=1"></script>{% endif%}
 {% endblock %}

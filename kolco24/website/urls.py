@@ -10,6 +10,7 @@ urlpatterns = [
     re_path('^login/(?P<login_key>[0-9a-f]{16})', views.login_by_key),
     path('logout', views.logout_user, name='logout'),
     path('team', views.my_team, name='my_team'),
+    path('team_admin', views.team_admin, name='team_admin'),
     path('teams', views.teams, name='teams'),
     re_path('^team/(?P<teamid>[0-9a-f]{16})', views.my_team),
     re_path('^success/(?P<teamid>[0-9a-f]{16})', views.success),

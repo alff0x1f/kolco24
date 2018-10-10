@@ -151,6 +151,18 @@ class Team(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
+    get_package = models.BooleanField(default=False)
+    get_number = models.BooleanField(default=False)
+    give_paper = models.BooleanField(default=False)
+    give_photos = models.BooleanField(default=False)
+    category = models.CharField(max_length=50, default="")
+    start_number = models.CharField(max_length=50, default="")
+    start_time = models.DateTimeField(null=True, blank=True)
+    finish_time = models.DateTimeField(null=True, blank=True)
+    distance_time = models.DurationField(null=True, blank=True)
+    penalty = models.IntegerField(default=0)
+    dnf = models.BooleanField(default=False)
+
     def __str__(self):              # __str__ on Python 3
         return self.paymentid.__str__()
 
@@ -175,6 +187,26 @@ class Team(models.Model):
             people_paid += team.paid_people
             teams_count += 1
         return (teams_count, people_paid)
+
+
+class TeamAdminLog(models.Model):
+    editor = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+    )
+    paymentid = models.CharField(max_length=50)
+    get_package = models.BooleanField(default=False)
+    get_number = models.BooleanField(default=False)
+    give_paper = models.BooleanField(default=False)
+    give_photos = models.BooleanField(default=False)
+    category = models.CharField(max_length=50, default="")
+    start_number = models.CharField(max_length=50, default="")
+    start_time = models.DateTimeField(null=True, blank=True)
+    finish_time = models.DateTimeField(null=True, blank=True)
+    distance_time = models.DurationField(null=True, blank=True)
+    penalty = models.IntegerField(default=0)
+    dnf = models.BooleanField(default=False)
+    updated_at = models.DateTimeField(auto_now=True)
 
 
 class PaymentLog(models.Model):
