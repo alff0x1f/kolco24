@@ -329,240 +329,237 @@
                 </div>
                 <!--end of col-->
                             
-                            <div class="col-12 col-md-5 card-body">
-                                <div>
-                                    {% if not user.is_superuser %}
-                                    <div class="mb-3 text-center">
-                                        <h4 class="h4">Стартовый взнос</h4>
+                <div class="col-12 col-md-5 card-body">
+                    <div>
+                        {% if not user.is_superuser %}
+                        <div class="mb-3 text-center">
+                            <h4 class="h4">Стартовый взнос</h4>
+                        </div>
+                        <ul class="list-unstyled list-spacing-sm mb-3 ">
+                            <li class="row align-items-center">
+                                <div class="col-3 col-md-3"><strike>500р</strike></div>
+                                <div class="col-9"><strike>При оплате до 3 августа</strike></div>
+                            </li>
+                            <li class="row align-items-center">
+                                <div class="col-3 col-md-3"><strike>600р</strike></div>
+                                <div class="col-9"><strike>При оплате с 4 августа по 19 августа</strike></div>
+                            </li>
+                            <li class="row align-items-center">
+                                <div class="col-3 col-md-3{% if cost < 700 %}  text-muted text-small{% endif %}">{% if cost == 700 %}<strong>{% elif cost > 700 %}<strike>{% endif %}700р{% if cost == 700 %}</strong>{% elif cost > 700 %}</strike>{% endif %}</div>
+                                <div class="col-9{% if cost < 700 %} text-muted text-small{% endif %}">{% if cost > 700 %}<strike>{% endif %}При оплате с 20 августа по 16 сентября{% if cost > 700 %}</strike>{% endif %}</div>
+                            </li>
+                            <li class="row align-items-center">
+                                <div class="col-3 col-md-3{% if cost < 800 %} text-muted text-small{% endif %}">{% if cost == 800 %}<strong>{% elif cost > 800 %}<strike>{% endif %}800р{% if cost == 800 %}</strong>{% elif cost > 800 %}</strike>{% endif %}</div>
+                                <div class="col-9{% if cost < 800 %} text-muted text-small{% endif %}">{% if cost > 800 %}<strike>{% endif %}При оплате с 17 сентября по 11 октября{% if cost > 800 %}</strike>{% endif %}</div>
+                            </li>
+                            <li class="row align-items-center">
+                                <div class="col-3 col-md-3{% if cost < 1000 %} text-muted text-small{% endif %}">{% if cost == 800 %}<strong>1000р</strong>{% endif %}</div>
+                                <div class="col-9{% if cost < 1000 %} text-muted text-small{% endif %}"> Оплата наличными на месте старта</div>
+                            </li>
+                        </ul>
+                        {% elif user.is_superuser %}
+                            <div class="mb-3 text-center">
+                                <h4 class="h4 mb-2">{{main_team.teamname}}</h4>
+                                <span>Администрирование</span>
+                            </div>
+                            <form id="team_form_admin" action="{% url 'team_admin' %}" method="POST" >
+                                <div class="form-row form-group">
+                                    <div class="col">
+                                        {{ team_form_admin.category.label_tag }}
+                                        {{ team_form_admin.category }}
+                                        {% if team_form_admin.category.errors %}
+                                            <div class="invalid-feedback">
+                                                {{ team_form_admin.category.errors}}
+                                            </div>
+                                        {% endif %}
                                     </div>
-                                    <ul class="list-unstyled list-spacing-sm mb-3 ">
-                                        <li class="row align-items-center">
-                                            <div class="col-3 col-md-3"><strike>500р</strike></div>
-                                            <div class="col-9"><strike>При оплате до 3 августа</strike></div>
-                                        </li>
-                                        <li class="row align-items-center">
-                                            <div class="col-3 col-md-3"><strike>600р</strike></div>
-                                            <div class="col-9"><strike>При оплате с 4 августа по 19 августа</strike></div>
-                                        </li>
-                                        <li class="row align-items-center">
-                                            <div class="col-3 col-md-3{% if cost < 700 %}  text-muted text-small{% endif %}">{% if cost == 700 %}<strong>{% elif cost > 700 %}<strike>{% endif %}700р{% if cost == 700 %}</strong>{% elif cost > 700 %}</strike>{% endif %}</div>
-                                            <div class="col-9{% if cost < 700 %} text-muted text-small{% endif %}">{% if cost > 700 %}<strike>{% endif %}При оплате с 20 августа по 16 сентября{% if cost > 700 %}</strike>{% endif %}</div>
-                                        </li>
-                                        <li class="row align-items-center">
-                                            <div class="col-3 col-md-3{% if cost < 800 %} text-muted text-small{% endif %}">{% if cost == 800 %}<strong>{% elif cost > 800 %}<strike>{% endif %}800р{% if cost == 800 %}</strong>{% elif cost > 800 %}</strike>{% endif %}</div>
-                                            <div class="col-9{% if cost < 800 %} text-muted text-small{% endif %}">{% if cost > 800 %}<strike>{% endif %}При оплате с 17 сентября по 11 октября{% if cost > 800 %}</strike>{% endif %}</div>
-                                        </li>
-                                        <li class="row align-items-center">
-                                            <div class="col-3 col-md-3{% if cost < 1000 %} text-muted text-small{% endif %}">{% if cost == 800 %}<strong>1000р</strong>{% endif %}</div>
-                                            <div class="col-9{% if cost < 1000 %} text-muted text-small{% endif %}"> Оплата наличными на месте старта</div>
-                                        </li>
-                                    </ul>
-                                    {% elif user.is_superuser %}
-                                        <div class="mb-3 text-center">
-                                            <h4 class="h4 mb-2">{{main_team.teamname}}</h4>
-                                            <span>Администрирование</span>
-                                        </div>
-                                        <form id="team_form_admin" action="{% url 'team_admin' %}" method="POST" >
-                                            <div class="form-row form-group">
-                                                <div class="col">
-                                                    {{ team_form_admin.category.label_tag }}
-                                                    {{ team_form_admin.category }}
-                                                    {% if team_form_admin.category.errors %}
-                                                        <div class="invalid-feedback">
-                                                            {{ team_form_admin.category.errors}}
-                                                        </div>
-                                                    {% endif %}
-                                                </div>
+                                </div>
+                                <div class="form-row form-group">
+                                    <div class="col">
+                                        {{ team_form_admin.start_number.label_tag }}
+                                        {{ team_form_admin.start_number }}
+                                        {% if team_form_admin.start_number.errors %}
+                                            <div class="invalid-feedback">
+                                                {{ team_form_admin.start_number.errors}}
                                             </div>
-                                            <div class="form-row form-group">
-                                                <div class="col">
-                                                    {{ team_form_admin.start_number.label_tag }}
-                                                    {{ team_form_admin.start_number }}
-                                                    {% if team_form_admin.start_number.errors %}
-                                                        <div class="invalid-feedback">
-                                                            {{ team_form_admin.start_number.errors}}
-                                                        </div>
-                                                    {% endif %}
-                                                </div>
-                                            </div>
-                                            <div class="form-row form-group">
-                                                <div class="custom-control custom-checkbox-switch">
-                                                    {{ team_form_admin.get_package }}
-                                                    <label class="custom-control-label" for="{{ team_form_admin.get_package.auto_id }}">{{ team_form_admin.get_package.label }}</label>
-                                                    {% if team_form_admin.get_package.errors %}
-                                                        <div class="invalid-feedback">
-                                                            {{ team_form_admin.get_package.errors}}
-                                                        </div>
-                                                    {% endif %}
-                                                </div>
-                                            </div>
-                                            <div class="form-row form-group">
-                                                <div class="custom-control custom-checkbox-switch">
-                                                    {{ team_form_admin.get_number }}
-                                                    <label class="custom-control-label" for="{{ team_form_admin.get_number.auto_id }}">{{ team_form_admin.get_number.label }}</label>
-                                                    {% if team_form_admin.get_number.errors %}
-                                                        <div class="invalid-feedback">
-                                                            {{ team_form_admin.get_number.errors}}
-                                                        </div>
-                                                    {% endif %}
-                                                </div>
-                                            </div>
-                                            <div class="form-row form-group">
-                                                <div class="custom-control custom-checkbox-switch">
-                                                    {{ team_form_admin.give_paper }}
-                                                    <label class="custom-control-label" for="{{ team_form_admin.give_paper.auto_id }}">{{ team_form_admin.give_paper.label }}</label>
-                                                    {% if team_form_admin.give_paper.errors %}
-                                                        <div class="invalid-feedback">
-                                                            {{ team_form_admin.give_paper.errors}}
-                                                        </div>
-                                                    {% endif %}
-                                                </div>
-                                            </div>
-                                            <div class="form-row form-group">
-                                                <div class="col">
-                                                    {{ team_form_admin.start_time.label_tag }}
-                                                    {{ team_form_admin.start_time }}
-                                                    {% if team_form_admin.start_time.errors %}
-                                                        <div class="invalid-feedback">
-                                                            {{ team_form_admin.start_time.errors}}
-                                                        </div>
-                                                    {% endif %}
-                                                </div>
-                                            </div>
-                                            <div class="form-row form-group">
-                                                <div class="col">
-                                                    {{ team_form_admin.finish_time.label_tag }}
-                                                    {{ team_form_admin.finish_time }}
-                                                    {% if team_form_admin.finish_time.errors %}
-                                                        <div class="invalid-feedback">
-                                                            {{ team_form_admin.finish_time.errors}}
-                                                        </div>
-                                                    {% endif %}
-                                                </div>
-                                            </div>
-                                            <div class="form-row form-group">
-                                                <div class="custom-control custom-checkbox-switch">
-                                                    {{ team_form_admin.give_photos }}
-                                                    <label class="custom-control-label" for="{{ team_form_admin.give_photos.auto_id }}">{{ team_form_admin.give_photos.label }}</label>
-                                                    {% if team_form_admin.give_photos.errors %}
-                                                        <div class="invalid-feedback">
-                                                            {{ team_form_admin.give_photos.errors}}
-                                                        </div>
-                                                    {% endif %}
-                                                </div>
-                                            </div>
-                                            <div class="form-row form-group">
-                                                <div class="col">
-                                                    {{ team_form_admin.penalty.label_tag }}
-                                                    {{ team_form_admin.penalty }}
-                                                    {% if team_form_admin.penalty.errors %}
-                                                        <div class="invalid-feedback">
-                                                            {{ team_form_admin.penalty.errors}}
-                                                        </div>
-                                                    {% endif %}
-                                                </div>
-                                            </div>
-                                            <div class="form-row form-group">
-                                                <div class="custom-control custom-checkbox-switch">
-                                                    {{ team_form_admin.dnf }}
-                                                    <label class="custom-control-label" for="{{ team_form_admin.dnf.auto_id }}">{{ team_form_admin.dnf.label }}</label>
-                                                    {% if team_form_admin.dnf.errors %}
-                                                        <div class="invalid-feedback">
-                                                            {{ team_form_admin.dnf.errors}}
-                                                        </div>
-                                                    {% endif %}
-                                                </div>
-                                            </div>
-                                            {{ team_form.paymentid }}
-                                            {% csrf_token %}
-                                            <div class="form-row form-group">
-                                                <div class="col">
-                                                    <button class="btn btn-block btn-success" type="submit" id="team_form_admin_submit">Сохранить</button>
-                                                </div>
-                                            </div>
-                                            <div id="team_form_admin_alert" class="alert alert-success" role="alert" style="display: none;">
-                                                Text
-                                            </div>
-                                        </form>
-                                    {% endif %}
-                                    <hr class="short">
-                                    
-                                    <div id="paidfor" class="row justify-content-between">
-                                        <div class="col-6"><p>Оплачено за <span id="paidfor_count">{{ main_team.paid_people }}</span> чел.</p></div>
-                                        <div class="col-6"><p class="text-right"><span>{{ main_team.paid_sum }}</span> руб</p></div>
+                                        {% endif %}
                                     </div>
-                                    
-                                    <div id="sidecolumn_paid">
-                                        <div class="row mb-4 justify-content-between">
-                                            <div class="col-6"><p><span id="paidfor_action">Итого</span> за <span id="ucountlabel">2</span> чел.</p></div>
-                                            <div class="col-6"><p class="text-right"><span id="sumlabel">{% widthratio cost 1 2 %}</span> руб</p></div>
+                                </div>
+                                <div class="form-row form-group">
+                                    <div class="custom-control custom-checkbox-switch">
+                                        {{ team_form_admin.get_package }}
+                                        <label class="custom-control-label" for="{{ team_form_admin.get_package.auto_id }}">{{ team_form_admin.get_package.label }}</label>
+                                        {% if team_form_admin.get_package.errors %}
+                                            <div class="invalid-feedback">
+                                                {{ team_form_admin.get_package.errors}}
+                                            </div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                <div class="form-row form-group">
+                                    <div class="custom-control custom-checkbox-switch">
+                                        {{ team_form_admin.get_number }}
+                                        <label class="custom-control-label" for="{{ team_form_admin.get_number.auto_id }}">{{ team_form_admin.get_number.label }}</label>
+                                        {% if team_form_admin.get_number.errors %}
+                                            <div class="invalid-feedback">
+                                                {{ team_form_admin.get_number.errors}}
+                                            </div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                <div class="form-row form-group">
+                                    <div class="custom-control custom-checkbox-switch">
+                                        {{ team_form_admin.give_paper }}
+                                        <label class="custom-control-label" for="{{ team_form_admin.give_paper.auto_id }}">{{ team_form_admin.give_paper.label }}</label>
+                                        {% if team_form_admin.give_paper.errors %}
+                                            <div class="invalid-feedback">
+                                                {{ team_form_admin.give_paper.errors}}
+                                            </div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                <div class="form-row form-group">
+                                    <div class="col">
+                                        {{ team_form_admin.start_time.label_tag }}
+                                        {{ team_form_admin.start_time }}
+                                        {% if team_form_admin.start_time.errors %}
+                                            <div class="invalid-feedback">
+                                                {{ team_form_admin.start_time.errors}}
+                                            </div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                <div class="form-row form-group">
+                                    <div class="col">
+                                        {{ team_form_admin.finish_time.label_tag }}
+                                        {{ team_form_admin.finish_time }}
+                                        {% if team_form_admin.finish_time.errors %}
+                                            <div class="invalid-feedback">
+                                                {{ team_form_admin.finish_time.errors}}
+                                            </div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                <div class="form-row form-group">
+                                    <div class="custom-control custom-checkbox-switch">
+                                        {{ team_form_admin.give_photos }}
+                                        <label class="custom-control-label" for="{{ team_form_admin.give_photos.auto_id }}">{{ team_form_admin.give_photos.label }}</label>
+                                        {% if team_form_admin.give_photos.errors %}
+                                            <div class="invalid-feedback">
+                                                {{ team_form_admin.give_photos.errors}}
+                                            </div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                <div class="form-row form-group">
+                                    <div class="col">
+                                        {{ team_form_admin.penalty.label_tag }}
+                                        {{ team_form_admin.penalty }}
+                                        {% if team_form_admin.penalty.errors %}
+                                            <div class="invalid-feedback">
+                                                {{ team_form_admin.penalty.errors}}
+                                            </div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                <div class="form-row form-group">
+                                    <div class="custom-control custom-checkbox-switch">
+                                        {{ team_form_admin.dnf }}
+                                        <label class="custom-control-label" for="{{ team_form_admin.dnf.auto_id }}">{{ team_form_admin.dnf.label }}</label>
+                                        {% if team_form_admin.dnf.errors %}
+                                            <div class="invalid-feedback">
+                                                {{ team_form_admin.dnf.errors}}
+                                            </div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                {{ team_form.paymentid }}
+                                {% csrf_token %}
+                                <div class="form-row form-group">
+                                    <div class="col">
+                                        <button class="btn btn-block btn-success" type="submit" id="team_form_admin_submit">Сохранить</button>
+                                    </div>
+                                </div>
+                                <div id="team_form_admin_alert" class="alert alert-success" role="alert" style="display: none;">
+                                    Text
+                                </div>
+                            </form>
+                        {% endif %}
+                        <hr class="short">
+                        
+                        <div id="paidfor" class="row justify-content-between">
+                            <div class="col-6"><p>Оплачено за <span id="paidfor_count">{{ main_team.paid_people }}</span> чел.</p></div>
+                            <div class="col-6"><p class="text-right"><span>{{ main_team.paid_sum }}</span> руб</p></div>
+                        </div>
+                        
+                        <div id="sidecolumn_paid">
+                            <div class="row mb-4 justify-content-between">
+                                <div class="col-6"><p><span id="paidfor_action">Итого</span> за <span id="ucountlabel">2</span> чел.</p></div>
+                                <div class="col-6"><p class="text-right"><span id="sumlabel">{% widthratio cost 1 2 %}</span> руб</p></div>
+                            </div>
+                            <div class="mb-2 text-center">
+                                <h4 class="h4 mb-2">Способы оплаты</h4>
+                                <div class="row">
+                                    <div class="col-6 col-xs-6 col-lg-3">
+                                        <div class="card">
+                                            <a href="javascript:$('#pay_visamastercard').click();">
+                                                <img class="card-img-top" src="/static/images/payments/visa-mastercard.jpg">
+                                            </a>
                                         </div>
-                                        <div class="mb-2 text-center">
-                                            <h4 class="h4 mb-2">Способы оплаты</h4>
-                                            <div class="row">
-                                                <div class="col-6 col-xs-6 col-lg-3">
-                                                    <div class="card">
-                                                        <a href="javascript:$('#pay_visamastercard').click();">
-                                                            <img class="card-img-top" src="/static/images/payments/visa-mastercard.jpg">
-                                                        </a>
-                                                    </div>
-                                                </div>
-                                                <div class="col-6 col-xs-6 col-lg-3">
-                                                    <div class="card">
-                                                        <a href="javascript:$('#pay_sberbank').click();">
-                                                            <img class="card-img-top" src="/static/images/payments/sberbank_online.png">
-                                                        </a>
-                                                    </div>
-                                                </div>
-                                                <div class="col-6 col-xs-6 col-lg-3">
-                                                    <div class="card">
-                                                        <a href="javascript:$('#pay_yandexmoney').click();">
-                                                            <img class="card-img-top" src="/static/images/payments/yandex_money.jpg">
-                                                        </a>
-                                                    </div>
-                                                </div>
-                                                <div class="col-6 col-xs-6 col-lg-3">
-                                                    <a href="javascript:$('#pay_tinkoff').click();">
-                                                        <div class="card">
-                                                            <img class="card-img-top" src="/static/images/payments/tinkoff.png">
-                                                        </div>
-                                                    </a>
-                                                </div>
-                                            </div>
+                                    </div>
+                                    <div class="col-6 col-xs-6 col-lg-3">
+                                        <div class="card">
+                                            <a href="javascript:$('#pay_sberbank').click();">
+                                                <img class="card-img-top" src="/static/images/payments/sberbank_online.png">
+                                            </a>
                                         </div>
-
-                                        <form class="d-flex flex-column" id="paymentmethod">
-                                            <div class="custom-control custom-checkbox-switch">
-                                                <input id="radio1" name="radio" type="radio" value="visamc" class="custom-control-input" checked>
-                                                <label class="custom-control-label" for="radio1">Картой Visa/Mastercard</label>
-                                            </div>
-                                            <div class="custom-control custom-checkbox-switch">
-                                                <input id="radio2" name="radio" type="radio" value="sberbank" class="custom-control-input">
-                                                <label class="custom-control-label" for="radio2">Перевод через Сбербанк.Онлайн</label>
-                                            </div>
-                                            <div class="custom-control custom-checkbox-switch">
-                                                <input id="radio3" name="radio" type="radio" value="yandexmoney" class="custom-control-input">
-                                                <label class="custom-control-label" for="radio3">Яндекс деньги</label>
-                                            </div>
-                                            <div class="custom-control custom-checkbox-switch">
-                                                <input id="radio4" name="radio" type="radio" value="tinkoff" class="custom-control-input">
-                                                <label class="custom-control-label" for="radio4">Перевод через tinkoff-банк</label>
-                                            </div>
-                                        </form>
-                                        <div class="custom-control custom-checkbox-switch">
-                                            <button type="button" class="btn btn-primary float-right mt-3" id="common_paid">
-                                                Оплатить
-                                            </button>
+                                    </div>
+                                    <div class="col-6 col-xs-6 col-lg-3">
+                                        <div class="card">
+                                            <a href="javascript:$('#pay_yandexmoney').click();">
+                                                <img class="card-img-top" src="/static/images/payments/yandex_money.jpg">
+                                            </a>
                                         </div>
+                                    </div>
+                                    <div class="col-6 col-xs-6 col-lg-3">
+                                        <a href="javascript:$('#pay_tinkoff').click();">
+                                            <div class="card">
+                                                <img class="card-img-top" src="/static/images/payments/tinkoff.png">
+                                            </div>
+                                        </a>
                                     </div>
                                 </div>
                             </div>
-                            <!--end of col-->
+
+                            <form class="d-flex flex-column" id="paymentmethod">
+                                <div class="custom-control custom-checkbox-switch">
+                                    <input id="radio1" name="radio" type="radio" value="visamc" class="custom-control-input" checked>
+                                    <label class="custom-control-label" for="radio1">Картой Visa/Mastercard</label>
+                                </div>
+                                <div class="custom-control custom-checkbox-switch">
+                                    <input id="radio2" name="radio" type="radio" value="sberbank" class="custom-control-input">
+                                    <label class="custom-control-label" for="radio2">Перевод через Сбербанк.Онлайн</label>
+                                </div>
+                                <div class="custom-control custom-checkbox-switch">
+                                    <input id="radio3" name="radio" type="radio" value="yandexmoney" class="custom-control-input">
+                                    <label class="custom-control-label" for="radio3">Яндекс деньги</label>
+                                </div>
+                                <div class="custom-control custom-checkbox-switch">
+                                    <input id="radio4" name="radio" type="radio" value="tinkoff" class="custom-control-input">
+                                    <label class="custom-control-label" for="radio4">Перевод через tinkoff-банк</label>
+                                </div>
+                            </form>
+                            <div class="custom-control custom-checkbox-switch">
+                                <button type="button" class="btn btn-primary float-right mt-3" id="common_paid">
+                                    Оплатить
+                                </button>
+                            </div>
                         </div>
-                        <!--end of row-->
                     </div>
                 </div>
+                <!--end of col-->
             </div>
+            <!--end of row-->
         </div>
         <!--end of container-->
         <div class="container" id="paid_explain">
