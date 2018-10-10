@@ -158,7 +158,7 @@ def my_team(request, teamid=""):
             "other_teams": other_teams,
             "main_team": main_team,
         }
-        if team_form_admin:
+        if request.user.is_superuser:
             context['team_form_admin'] = team_form_admin
         return render(request, 'website/my_team.html', context)
     elif request.method == 'POST' and team_form.is_valid():
