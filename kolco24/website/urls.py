@@ -17,4 +17,6 @@ urlpatterns = [
     path('newteam', views.new_team, name='new_team'),
     path('yandexinform', views.yandex_payment, name='yandexinform'),
     path('sync_table', views.sync_table, name='sync_table'),
+    path('import_start_numbers', views.import_start_numbers, name='import_start_numbers'),
+    path('import_categories', views.import_categories, name='import_categories'),
 ]

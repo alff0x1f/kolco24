@@ -13,6 +13,50 @@ def connect_to_sheet():
     sht1 = gc.open_by_key(settings.GOOGLE_DOCS_KEY)
     return sht1.sheet1
 
+def import_start_numbers_from_sheet():
+    wks = connect_to_sheet()
+    teams_ids = wks.col_values(2)
+    start_numbers = wks.col_values(3)
+    min_col = len(teams_ids) if len(teams_ids) < len(start_numbers) else len(start_numbers)
+
+    updated_count = 0
+
+    for i in range(min_col - 1):
+        team_id = teams_ids[i + 1]
+        team_sn = start_numbers[i + 1]
+        if team_id:
+            team = Team.objects.filter(id=team_id)[:1]
+            if team and team_sn:
+                team = team.get()
+                if team.start_number != team_sn:
+                    team.start_number = team_sn
+                    team.save()
+                    updated_count += 1
+
+    return updated_count
+
+def import_category_from_sheet():
+    wks = connect_to_sheet()
+    teams_ids = wks.col_values(2)
+    categories = wks.col_values(5)
+    min_col = len(teams_ids) if len(teams_ids) < len(categories) else len(categories)
+
+    updated_count = 0
+
+    for i in range(min_col - 1):
+        team_id = teams_ids[i + 1]
+        team_cat = categories[i + 1]
+        if team_id:
+            team = Team.objects.filter(id=team_id)[:1]
+            if team and team_cat:
+                team = team.get()
+                if team.category != team_cat:
+                    team.category = team_cat
+                    team.save()
+                    updated_count += 1
+
+    return updated_count
+
 def sync_sheet():
     fields_count = 35
     wks = connect_to_sheet()

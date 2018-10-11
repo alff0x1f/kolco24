@@ -11,7 +11,7 @@ from website.models import Payments, Team, PaymentLog, FastLogin
 from django.http import HttpResponseRedirect, Http404, JsonResponse
 from django.conf import settings
 from website.email import send_login_email
-from website.googledocs import sync_sheet
+from website.googledocs import sync_sheet, import_start_numbers_from_sheet, import_category_from_sheet
 
 
 def index(request):
@@ -250,5 +250,19 @@ def sync_table(request):
     if request.user.is_superuser:
         sync_sheet()
         return HttpResponse("Ok")
+    else:
+        raise Http404("File not found.")
+    
+def import_start_numbers(request):
+    if request.user.is_superuser:
+        count = import_start_numbers_from_sheet()
+        return HttpResponse("Updated: %s" % count)
+    else:
+        raise Http404("File not found.")
+
+def import_categories(request):
+    if request.user.is_superuser:
+        count = import_category_from_sheet()
+        return HttpResponse("Updated: %s" % count)
     else:
         raise Http404("File not found.")
