@@ -12,7 +12,7 @@
             <div class="col-12 col-md-9 col-lg-8">
                 <span class="title-decorative">Кольцо24</span>
                 <h2 class="display-4">Команды</h2>
-                
+
             </div>
             <!--end of col-->
         </div>
@@ -28,18 +28,21 @@
                             <th scope="col">Название</th>
                             <th scope="col">Представитель</th>
                             <th scope="col">Город</th>
-                            <th scope="col">Кол-во</th>
                             <th scope="col">Участники</th>
+                            {% if user.is_superuser %}
+                            <th scope="col">ГР</th>
+                            <th scope="col">Правка</th>
+                            {% endif %}
                             </tr>
                         </thead>
                         <tbody>
                         {% for team in teamgroup.teams %}
                             <tr {% if team.paid_people < team.ucount %}class="table-warning"{% endif%}>
                             <td scope="row">{{ forloop.counter }}</td>
-                            <td>{{ team.teamname }}</td>
-                            <td>{{ team.owner.last_name }} {{ team.owner.first_name }}</td>
+                            <td>{{ team.teamname }}{% if user.is_superuser %}<br><span class='text-muted text-small'>{{team.owner.profile.phone}}</span>{% endif %}</td>
+                            <td>{{ team.owner.last_name }} {{ team.owner.first_name }}
+                            </td>
                             <td>{{ team.city }}</td>
-                            <td>{{ team.paid_people |floatformat:"0" }}</td>
                             <td>{{ team.athlet1 }}
                                 {% if team.ucount >= 2 and team.athlet2 %}<br>{{ team.athlet2 }} {% endif %}
                                 {% if team.ucount >= 2 and team.athlet3 %}<br>{{ team.athlet3 }} {% endif %}
@@ -47,9 +50,16 @@
                                 {% if team.ucount >= 2 and team.athlet5 %}<br>{{ team.athlet5 }} {% endif %}
                                 {% if team.ucount >= 2 and team.athlet6 %}<br>{{ team.athlet6 }} {% endif %}
                             </td>
-                                {% if user.is_superuser %} 
-                                <td><a href="/team/{{team.paymentid}}">id{{team.id}}</a><br></td>
-                                {% endif %}
+                            {% if user.is_superuser %}
+                                <td>{{ team.birth1 }}
+                                    {% if team.ucount >= 2 and team.birth2 %}<br>{{ team.birth2 }} {% endif %}
+                                    {% if team.ucount >= 2 and team.birth3 %}<br>{{ team.birth3 }} {% endif %}
+                                    {% if team.ucount >= 2 and team.birth4 %}<br>{{ team.birth4 }} {% endif %}
+                                    {% if team.ucount >= 2 and team.birth5 %}<br>{{ team.birth5 }} {% endif %}
+                                    {% if team.ucount >= 2 and team.birth6 %}<br>{{ team.birth6 }} {% endif %}
+                                </td>
+                                <td><a href="/team/{{team.paymentid}}" class="btn btn-primary" role="button">id{{team.id}}</a></td>
+                            {% endif %}
                             </tr>
                         {% endfor %}
                         </tbody>
