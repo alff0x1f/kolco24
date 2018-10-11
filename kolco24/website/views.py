@@ -100,27 +100,37 @@ def logout_user(request):
     raise Http404("File not found.")
 
 def teams(request):
-    teams_6h = Team.objects.filter(dist="6h")
-    teams_12h_2 = Team.objects.filter(dist="12h", ucount=2)
-    teams_12h_4 = Team.objects.filter(dist="12h", ucount__gt=2)
-    teams_24h = Team.objects.filter(dist="24h")
+    teams = [
+        {
+            'teams': Team.objects.filter(dist="6h"), 
+            'dist_name':'6ч'
+        },
+        {
+            'teams': Team.objects.filter(dist="12h", ucount=2), 
+            'dist_name':'12ч двойки',
+        },
+        {
+            'teams': Team.objects.filter(dist="12h", ucount__gt=2),
+            'dist_name': '12ч четверки',
+        },
+        {
+            'teams': Team.objects.filter(dist="24h"), 
+            'dist_name':'24ч четверки',
+        }
+    ]
 
     # select only paid teams
-    if not request.user.is_superuser:
-        teams_6h = [team for team in teams_6h if team.paid_sum > 0]
-        teams_12h_2 = [team for team in teams_12h_2 if team.paid_sum > 0]
-        teams_12h_4 = [team for team in teams_12h_4 if team.paid_sum > 0]
-        teams_24h = [team for team in teams_24h if team.paid_sum > 0]
-    else:
-        teams_12h_2 = [team for team in teams_12h_2]
-        teams_12h_4 = [team for team in teams_12h_4]
-    teams_12h = teams_12h_2 + teams_12h_4
-        
+    for t in teams:
+        t['teams'] = [team for team in t['teams'] if team.paid_sum > 0]
 
+    if request.user.is_superuser:
+        teams.append({
+            'teams': Team.objects.filter(paid_sum__lt=1),
+            'dist_name' : 'Неоплаченное',
+            })
+        
     context = {
-        "teams_6h":teams_6h,
-        "teams_12h":teams_12h,
-        "teams_24h":teams_24h,
+        'teams':teams,
     }
     return render(request, 'website/teams.html', context)
 
