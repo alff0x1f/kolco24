@@ -104,8 +104,8 @@ function set_ucount(count) {
         $("#sidecolumn_paid").hide();
         $("#paid_explain").hide();
     } else {
-        $("#sidecolumn_paid").show();
-        $("#paid_explain").show();
+        $("#sidecolumn_paid").hide(); //online payment closed
+        $("#paid_explain").hide(); //online payment closed
     }
     $("#pay_sberbank").show();
     $("#sberbank_initial_explanation").show();
