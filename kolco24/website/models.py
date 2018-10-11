@@ -111,6 +111,14 @@ class Payments(models.Model):
         
         return (people_paid, withdraw_sum)
     
+    def get_sum(self, paymentid):
+        payments = Payments.objects.filter(label=paymentid, unaccepted=False)
+        paid = 0
+        for payment in payments:
+            amount = float(payment.amount) if payment.amount else 0
+            paid += amount
+        return paid
+
     def update_team(self, paymentid):
         people_paid, withdraw = self.get_info(paymentid)
         team = Team.objects.filter(paymentid=paymentid)[:1]

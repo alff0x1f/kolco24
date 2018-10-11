@@ -11,6 +11,7 @@ from website.models import Payments, Team, PaymentLog, FastLogin
 from django.http import HttpResponseRedirect, Http404, JsonResponse
 from django.conf import settings
 from website.email import send_login_email
+from website.googledocs import sync_sheet
 
 
 def index(request):
@@ -234,3 +235,10 @@ def yandex_payment(request):
         else:
             raise Http404("Wrong values")
     raise Http404("File not found.")
+
+def sync_table(request):
+    if request.user.is_superuser:
+        sync_sheet()
+        return HttpResponse("Ok")
+    else:
+        raise Http404("File not found.")
