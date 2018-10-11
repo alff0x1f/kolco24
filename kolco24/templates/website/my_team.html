@@ -315,6 +315,9 @@
                                 </div>
                                 {{ team_form.paymentid }}
                                 {% csrf_token %}
+                                <div class="alert alert-danger" role="alert">
+                                    При внесении изменений в команду, данные не отразится в бумажных протоколах!
+                                </div>
                                 <div class="form-row form-group">
                                     <div class="col">
                                         <button class="btn btn-block btn-success" type="submit" id="teamform_submit">Сохранить</button>
