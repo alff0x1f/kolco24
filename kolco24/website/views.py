@@ -99,7 +99,7 @@ def logout_user(request):
                 return HttpResponseRedirect("/")
     raise Http404("File not found.")
 
-def teams(request):
+def teams(request, template=""):
     teams = [
         {
             'teams': Team.objects.filter(category="6h"), 
@@ -140,7 +140,13 @@ def teams(request):
     context = {
         'teams':teams,
     }
-    return render(request, 'website/teams.html', context)
+    return render(request, 'website/teams%s.html' % template, context)
+
+def teams_predstart(request):
+    return teams(request, template='_predstart')
+
+# def teams_start():
+# def teams_finish():
 
 def success(request, teamid=""):
     team = Team.objects.filter(paymentid=teamid)[:1]
@@ -152,7 +158,7 @@ def success(request, teamid=""):
     raise Http404("File not found.")
 
 @login_required
-def my_team(request, teamid=""):
+def my_team(request, teamid="", template="my_team"):
     team_form = TeamForm(request.POST or None)
     paymentid = team_form.init_vals(request.user, teamid)
     if not paymentid:
@@ -179,7 +185,7 @@ def my_team(request, teamid=""):
         }
         if request.user.is_superuser:
             context['team_form_admin'] = team_form_admin
-        return render(request, 'website/my_team.html', context)
+        return render(request, 'website/%s.html' % template, context)
     elif request.method == 'POST' and team_form.is_valid():
         if team_form.access_possible(request.user):
             team = team_form.save()
@@ -221,6 +227,11 @@ def my_team(request, teamid=""):
             response_data['success'] = 'true'
             return JsonResponse(response_data)
     raise Http404("Wrong values")
+
+def team_predstart(request, teamid=""):
+    if request.user.is_superuser:
+        return my_team(request, teamid, "team_predstart")
+    raise Http404("Not found")
 
 @login_required
 def team_admin(request, teamid=""):

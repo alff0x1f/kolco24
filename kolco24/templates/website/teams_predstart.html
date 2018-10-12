@@ -1,0 +1,87 @@
+{% extends "website/base.html" %}
+
+{% block title %} Команды Кольцо 24 {% endblock %}
+{% block og_title %}Зарегистрированные команды{% endblock %}
+{% block twitter_title %}Зарегистрированные команды{% endblock %}
+{% block pagetitle %} Команды Кольцо 24 {% endblock %}
+
+{% block content %}
+<section>
+    <div class="container">
+        <div class="row justify-content-center text-center section-intro">
+            <div class="col-12 col-md-9 col-lg-8">
+                <span class="title-decorative">Кольцо24</span>
+                <h2 class="display-4">Команды</h2>
+
+            </div>
+            <!--end of col-->
+        </div>
+        <!--end of row-->
+        <div class="row justify-content-center">
+            <div class="col-12 col-md-10">
+                {% for teamgroup in teams %}
+                    <h4 class="mb-4">Дистанция {{ teamgroup.dist_name }}</h4>
+                    <table class="table table-responsive" id="tableteam{{ forloop.counter }}">
+                        <thead>
+                            <tr>
+                            <th scope="col">#</th>
+                            <th scope="col">#</th>
+                            <th scope="col">Название</th>
+                            <th scope="col">Заявки</th>
+                            <th scope="col">Участники</th>
+                            {% if user.is_superuser %}
+                            <th scope="col">ГР</th>
+                            <th scope="col">Правка</th>
+                            {% endif %}
+                            </tr>
+                        </thead>
+                        <tbody>
+                        {% for team in teamgroup.teams %}
+                            <tr {% if team.paid_people < team.ucount %}class="table-warning"{% endif%}>
+                            <td scope="row">{{ forloop.counter }}</td>
+                            <td scope="row">{{ team.start_number }}</td>
+                            <td>{{ team.teamname }}<br><span class='text-muted text-small'>{{team.owner.profile.phone}}</span><br>
+                            <span class='text-muted text-small'>{{ team.owner.last_name }} {{ team.owner.first_name }}</span></td>
+                            <td>{% if not team.get_package %}Стартовый пакет{% endif %}</br>
+                                {% if not team.get_number %}Номер{% endif %}<br>
+                                {% if not team.give_paper %}Заявка{% endif %}</td>
+                            <td>{{ team.athlet1 }}
+                                {% if team.ucount >= 2 and team.athlet2 %}<br>{{ team.athlet2 }} {% endif %}
+                                {% if team.ucount >= 2 and team.athlet3 %}<br>{{ team.athlet3 }} {% endif %}
+                                {% if team.ucount >= 2 and team.athlet4 %}<br>{{ team.athlet4 }} {% endif %}
+                                {% if team.ucount >= 2 and team.athlet5 %}<br>{{ team.athlet5 }} {% endif %}
+                                {% if team.ucount >= 2 and team.athlet6 %}<br>{{ team.athlet6 }} {% endif %}
+                            </td>
+                            {% if user.is_superuser %}
+                                <td>{{ team.birth1 }}
+                                    {% if team.ucount >= 2 and team.birth2 %}<br>{{ team.birth2 }} {% endif %}
+                                    {% if team.ucount >= 2 and team.birth3 %}<br>{{ team.birth3 }} {% endif %}
+                                    {% if team.ucount >= 2 and team.birth4 %}<br>{{ team.birth4 }} {% endif %}
+                                    {% if team.ucount >= 2 and team.birth5 %}<br>{{ team.birth5 }} {% endif %}
+                                    {% if team.ucount >= 2 and team.birth6 %}<br>{{ team.birth6 }} {% endif %}
+                                </td>
+                                <td><a href="/team_predstart/{{team.paymentid}}" class="btn btn-primary" role="button">id{{team.id}}</a></td>
+                            {% endif %}
+                            </tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                {% endfor %}
+
+            </div>
+            <!--end of col-->
+        </div>
+        <!--end of row-->
+        <div class="row justify-content-center text-center section-outro">
+            <div class="col-lg-6 col-md-7">
+                <h6>Не нашли свою команду?</h6>
+                <p>Если вы платили переводом на карту (Сбербанк, Тиньков), то нам нужно немного времени чтобы проверить и отметить ваш платеж</p>
+            </div>
+            <!--end of col-->
+        </div>
+        <!--end of row-->
+    </div>
+    <!--end of container-->
+</section>
+{% endblock %}
+
