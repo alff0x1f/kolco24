@@ -102,19 +102,27 @@ def logout_user(request):
 def teams(request):
     teams = [
         {
-            'teams': Team.objects.filter(dist="6h"), 
+            'teams': Team.objects.filter(category="6h"), 
             'dist_name':'6ч'
         },
         {
-            'teams': Team.objects.filter(dist="12h", ucount=2), 
-            'dist_name':'12ч двойки',
+            'teams': Team.objects.filter(category="12h_mw"), 
+            'dist_name':'12ч двойки МЖ',
         },
         {
-            'teams': Team.objects.filter(dist="12h", ucount__gt=2),
+            'teams': Team.objects.filter(category="12h_mm"), 
+            'dist_name':'12ч двойки ММ',
+        },
+        {
+            'teams': Team.objects.filter(category="12h_ww"), 
+            'dist_name':'12ч двойки ЖЖ',
+        },
+        {
+            'teams': Team.objects.filter(category="12h_team"),
             'dist_name': '12ч четверки',
         },
         {
-            'teams': Team.objects.filter(dist="24h"), 
+            'teams': Team.objects.filter(category="24h"), 
             'dist_name':'24ч четверки',
         }
     ]
