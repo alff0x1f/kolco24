@@ -1,4 +1,5 @@
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
+from time import time
 from django.shortcuts import render
 from django.http import HttpResponse
 from django.contrib.auth import login as auth_login
@@ -119,11 +120,11 @@ def teams(request, template=""):
         },
         {
             'teams': Team.objects.filter(category="12h_team"),
-            'dist_name': '12ч четверки',
+            'dist_name': '12ч команда',
         },
         {
             'teams': Team.objects.filter(category="24h"), 
-            'dist_name':'24ч четверки',
+            'dist_name':'24ч команда',
         }
     ]
 
@@ -145,7 +146,35 @@ def teams(request, template=""):
 def teams_predstart(request):
     return teams(request, template='_predstart')
 
-# def teams_start():
+
+def teams_start(request):
+    teams = [
+        {
+            'teams': Team.objects.filter(paid_sum__gt=1, category="6h", start_time__isnull=True), 
+            'dist_name':'Дистанция 6ч'
+        },
+        {
+            'teams': Team.objects.filter(paid_sum__gt=1, category__startswith="12h", start_time__isnull=True), 
+            'dist_name':'Дистанция 12ч'
+        },
+        {
+            'teams': Team.objects.filter(paid_sum__gt=1, category="24h", start_time__isnull=True), 
+            'dist_name':'Дистанция 24ч'
+        },
+        {
+            'teams': Team.objects.filter(paid_sum__gt=1, start_time__isnull=False), 
+            'dist_name':'Стартовавшие'
+        },
+    ]
+    for teamgroup in teams:
+        for team in teamgroup['teams']:
+            if team.start_time:
+                team.start_time = team.start_time + timedelta(hours=5)
+
+    context = {
+        'teams':teams,
+    }
+    return render(request, 'website/teams_start.html', context)
 # def teams_finish():
 
 def success(request, teamid=""):
@@ -177,11 +206,17 @@ def my_team(request, teamid="", template="my_team"):
         main_team = Team.objects.get(paymentid=paymentid)
         other_teams = Team.objects.filter(owner=request.user).exclude(
             paymentid=paymentid)
+        # if main_team.start_time:
+        #     main_team.start_time += timedelta(hours=5)
+        # if main_team.finish_time:
+        #     main_team.finish_time += timedelta(hours=5)
         context = {
             "cost": cost_now,
             "team_form": team_form,
             "other_teams": other_teams,
             "main_team": main_team,
+            "curr_time": datetime.now(timezone.utc) + timedelta(hours=5),
+            "timestamp": time(),
         }
         if request.user.is_superuser:
             context['team_form_admin'] = team_form_admin
@@ -231,6 +266,11 @@ def my_team(request, teamid="", template="my_team"):
 def team_predstart(request, teamid=""):
     if request.user.is_superuser:
         return my_team(request, teamid, "team_predstart")
+    raise Http404("Not found")
+
+def team_start(request, teamid=""):
+    if request.user.is_superuser:
+        return my_team(request, teamid, "team_start")
     raise Http404("Not found")
 
 @login_required

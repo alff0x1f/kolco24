@@ -1,5 +1,6 @@
 import random
 import string
+from datetime import timedelta
 from django import forms
 from django.core.exceptions import ObjectDoesNotExist
 from django.contrib.auth.models import User
@@ -395,8 +396,8 @@ class TeamFormAdmin(forms.Form):
         self.initial["give_photos"] = team.give_photos
         self.initial["category"] = team.category
         self.initial["start_number"] = team.start_number
-        self.initial["start_time"] = team.start_time
-        self.initial["finish_time"] = team.finish_time
+        self.initial["start_time"] = team.start_time + timedelta(hours=5) if team.start_time else None
+        self.initial["finish_time"] = team.finish_time + timedelta(hours=5) if team.finish_time else None
         self.initial["penalty"] = team.penalty
         self.initial["dnf"] = team.dnf
     
@@ -422,9 +423,9 @@ class TeamFormAdmin(forms.Form):
             if "start_number" in d:
                 team.start_number = d["start_number"]
             if "start_time" in d:
-                team.start_time = d["start_time"]
+                team.start_time = d["start_time"] - timedelta(hours=5) if d["start_time"] else None
             if "finish_time" in d:
-                team.finish_time = d["finish_time"]
+                team.finish_time = d["finish_time"] - timedelta(hours=5) if d["finish_time"] else None
             if "penalty" in d and d["penalty"] is not None:
                 team.penalty = d["penalty"]
             if "dnf" in d:
