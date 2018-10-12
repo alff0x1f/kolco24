@@ -161,6 +161,7 @@ class Team(models.Model):
 
     get_package = models.BooleanField(default=False)
     get_number = models.BooleanField(default=False)
+    get_map = models.BooleanField(default=False)
     give_paper = models.BooleanField(default=False)
     give_photos = models.BooleanField(default=False)
     category = models.CharField(max_length=50, default="")
@@ -205,6 +206,7 @@ class TeamAdminLog(models.Model):
     paymentid = models.CharField(max_length=50)
     get_package = models.BooleanField(default=False)
     get_number = models.BooleanField(default=False)
+    get_map = models.BooleanField(default=False)
     give_paper = models.BooleanField(default=False)
     give_photos = models.BooleanField(default=False)
     category = models.CharField(max_length=50, default="")

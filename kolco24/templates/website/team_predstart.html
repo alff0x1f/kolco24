@@ -234,6 +234,17 @@
                             </div>
                             <div class="form-row form-group">
                                 <div class="custom-control custom-checkbox-switch">
+                                    {{ team_form_admin.get_map }}
+                                    <label class="custom-control-label" for="{{ team_form_admin.get_map.auto_id }}">{{ team_form_admin.get_map.label }}</label>
+                                    {% if team_form_admin.get_map.errors %}
+                                        <div class="invalid-feedback">
+                                            {{ team_form_admin.get_map.errors}}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <div class="form-row form-group">
+                                <div class="custom-control custom-checkbox-switch">
                                     {{ team_form_admin.give_paper }}
                                     <label class="custom-control-label" for="{{ team_form_admin.give_paper.auto_id }}">{{ team_form_admin.give_paper.label }}</label>
                                     {% if team_form_admin.give_paper.errors %}

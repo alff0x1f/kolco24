@@ -5,6 +5,7 @@ function save_team_admin() {
         'start_number': $('#team_form_admin #id_start_number').val(),
         'get_package' : $('#team_form_admin #id_get_package').is(":checked"),
         'get_number'  : $('#team_form_admin #id_get_number').is(":checked"),
+        'get_map'     : $('#team_form_admin #id_get_map').is(":checked"),
         'give_paper'  : $('#team_form_admin #id_give_paper').is(":checked"),
         'start_time'  : $('#team_form_admin #id_start_time').val(),
         'finish_time' : $('#team_form_admin #id_finish_time').val(),

@@ -44,6 +44,7 @@
                             <span class='text-muted text-small'>{{ team.owner.last_name }} {{ team.owner.first_name }}</span></td>
                             <td>{% if not team.get_package %}Стартовый пакет{% endif %}</br>
                                 {% if not team.get_number %}Номер{% endif %}<br>
+                                {% if not team.get_map %}Карта{% endif %}<br>
                                 {% if not team.give_paper %}Заявка{% endif %}</td>
                             <td>{{ team.athlet1 }}
                                 {% if team.ucount >= 2 and team.athlet2 %}<br>{{ team.athlet2 }} {% endif %}

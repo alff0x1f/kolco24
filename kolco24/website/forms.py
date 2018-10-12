@@ -297,6 +297,14 @@ class TeamFormAdmin(forms.Form):
                 'class': 'custom-control-input',
             })
         )
+    get_map = forms.BooleanField(
+        required=False,
+        label = 'Получили карту',
+        widget=forms.CheckboxInput(
+            attrs = {
+                'class': 'custom-control-input',
+            })
+        )
     give_paper = forms.BooleanField(
         required=False,
         label = 'Сдали заявку',
@@ -392,6 +400,7 @@ class TeamFormAdmin(forms.Form):
         team = team.get()
         self.initial["get_package"] = team.get_package
         self.initial["get_number"] = team.get_number
+        self.initial["get_map"] = team.get_map
         self.initial["give_paper"] = team.give_paper
         self.initial["give_photos"] = team.give_photos
         self.initial["category"] = team.category
@@ -414,6 +423,8 @@ class TeamFormAdmin(forms.Form):
                 team.get_package = d["get_package"]
             if "get_number" in d:
                 team.get_number = d["get_number"]
+            if "get_map" in d:
+                team.get_map = d["get_map"]
             if "give_paper" in d:
                 team.give_paper = d["give_paper"]
             if "give_photos" in d:
@@ -438,6 +449,7 @@ class TeamFormAdmin(forms.Form):
             team_admin_log.paymentid     = team.paymentid
             team_admin_log.get_package   = team.get_package
             team_admin_log.get_number    = team.get_number
+            team_admin_log.get_map    = team.get_map
             team_admin_log.give_paper    = team.give_paper
             team_admin_log.give_photos   = team.give_photos
             team_admin_log.category      = team.category
