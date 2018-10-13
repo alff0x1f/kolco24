@@ -7,6 +7,7 @@
                 <div class="col-12 col-md-12 card-body">
                     <div>
                         <div class="mb-3 text-center">
+                            <h2>#{{ main_team.start_number }}</h2>
                             <h4 class="h4 mb-2">{{main_team.teamname}} {{main_team.category}}</h4>
                                 {{ main_team.athlet1 }}
                                 {% if main_team.ucount >= 2 and main_team.athlet2 %}<br>{{ main_team.athlet2 }} {% endif %}
