@@ -179,15 +179,15 @@ def teams_start(request):
 def teams_finish(request):
     teams = [
         {
-            'teams': Team.objects.filter(paid_sum__gt=1, category="6h", finish_time__isnull=True), 
+            'teams': Team.objects.filter(paid_sum__gt=1, category="6h", finish_time__isnull=True).order_by('start_number'), 
             'dist_name':'Дистанция 6ч'
         },
         {
-            'teams': Team.objects.filter(paid_sum__gt=1, category__startswith="12h", finish_time__isnull=True), 
+            'teams': Team.objects.filter(paid_sum__gt=1, category__startswith="12h", finish_time__isnull=True).order_by('start_number'), 
             'dist_name':'Дистанция 12ч'
         },
         {
-            'teams': Team.objects.filter(paid_sum__gt=1, category="24h", finish_time__isnull=True), 
+            'teams': Team.objects.filter(paid_sum__gt=1, category="24h", finish_time__isnull=True).order_by('start_number'), 
             'dist_name':'Дистанция 24ч'
         },
         {
@@ -205,6 +205,30 @@ def teams_finish(request):
     }
     return render(request, 'website/teams_finish.html', context)
 
+def teams_protocol(request):
+    teams = [
+        {
+            'teams': Team.objects.filter(paid_sum__gt=1, category="6h"), 
+            'dist_name':'Дистанция 6ч'
+        },
+        {
+            'teams': Team.objects.filter(paid_sum__gt=1, category__startswith="12h"), 
+            'dist_name':'Дистанция 12ч'
+        },
+        {
+            'teams': Team.objects.filter(paid_sum__gt=1, category="24h"), 
+            'dist_name':'Дистанция 24ч'
+        },
+    ]
+    for teamgroup in teams:
+        for team in teamgroup['teams']:
+            if team.start_time:
+                team.start_time = team.start_time + timedelta(hours=5)
+
+    context = {
+        'teams':teams,
+    }
+    return render(request, 'website/teams_protocol.html', context)
 
 def success(request, teamid=""):
     team = Team.objects.filter(paymentid=teamid)[:1]

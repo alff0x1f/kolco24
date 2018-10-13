@@ -37,7 +37,7 @@
                         <tbody>
                         {% for team in teamgroup.teams %}
                             <tr {% if team.paid_people < team.ucount %}class="table-warning"{% endif%}>
-                            <td scope="row">{{ forloop.counter }}</td>
+                            <td scope="row">{{ team.start_number }}</td>
                             <td>{{ team.teamname }}{% if user.is_superuser %}<br><span class='text-muted text-small'>{{team.owner.profile.phone}}</span>{% endif %}</td>
                             {% if user.is_superuser %}
                                 <td><a href="/team_finish/{{team.paymentid}}" class="btn btn-primary" role="button">{{ team.teamname }}</a></td>
