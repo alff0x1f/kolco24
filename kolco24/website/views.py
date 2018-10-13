@@ -191,7 +191,7 @@ def teams_finish(request):
             'dist_name':'Дистанция 24ч'
         },
         {
-            'teams': Team.objects.filter(paid_sum__gt=1, finish_time__isnull=False), 
+            'teams': Team.objects.filter(paid_sum__gt=1, finish_time__isnull=False).order_by('finish_time'), 
             'dist_name':'финишировавшие'
         },
     ]
