@@ -175,7 +175,36 @@ def teams_start(request):
         'teams':teams,
     }
     return render(request, 'website/teams_start.html', context)
-# def teams_finish():
+
+def teams_finish(request):
+    teams = [
+        {
+            'teams': Team.objects.filter(paid_sum__gt=1, category="6h", finish_time__isnull=True), 
+            'dist_name':'Дистанция 6ч'
+        },
+        {
+            'teams': Team.objects.filter(paid_sum__gt=1, category__startswith="12h", finish_time__isnull=True), 
+            'dist_name':'Дистанция 12ч'
+        },
+        {
+            'teams': Team.objects.filter(paid_sum__gt=1, category="24h", finish_time__isnull=True), 
+            'dist_name':'Дистанция 24ч'
+        },
+        {
+            'teams': Team.objects.filter(paid_sum__gt=1, finish_time__isnull=False), 
+            'dist_name':'финишировавшие'
+        },
+    ]
+    for teamgroup in teams:
+        for team in teamgroup['teams']:
+            if team.start_time:
+                team.start_time = team.start_time + timedelta(hours=5)
+
+    context = {
+        'teams':teams,
+    }
+    return render(request, 'website/teams_finish.html', context)
+
 
 def success(request, teamid=""):
     team = Team.objects.filter(paymentid=teamid)[:1]
@@ -206,10 +235,10 @@ def my_team(request, teamid="", template="my_team"):
         main_team = Team.objects.get(paymentid=paymentid)
         other_teams = Team.objects.filter(owner=request.user).exclude(
             paymentid=paymentid)
-        # if main_team.start_time:
-        #     main_team.start_time += timedelta(hours=5)
-        # if main_team.finish_time:
-        #     main_team.finish_time += timedelta(hours=5)
+        if main_team.start_time:
+            main_team.start_time += timedelta(hours=5)
+        if main_team.finish_time:
+            main_team.finish_time += timedelta(hours=5)
         context = {
             "cost": cost_now,
             "team_form": team_form,
@@ -271,6 +300,11 @@ def team_predstart(request, teamid=""):
 def team_start(request, teamid=""):
     if request.user.is_superuser:
         return my_team(request, teamid, "team_start")
+    raise Http404("Not found")
+
+def team_finish(request, teamid=""):
+    if request.user.is_superuser:
+        return my_team(request, teamid, "team_finish")
     raise Http404("Not found")
 
 @login_required

@@ -433,12 +433,12 @@ class TeamFormAdmin(forms.Form):
                 team.category = d["category"]
             if "start_number" in d:
                 team.start_number = d["start_number"]
-            if "start_time" in d:
-                team.start_time = d["start_time"] - timedelta(hours=5) if d["start_time"] else None
-            if "finish_time" in d:
-                team.finish_time = d["finish_time"] - timedelta(hours=5) if d["finish_time"] else None
-            if "penalty" in d and d["penalty"] is not None:
-                team.penalty = d["penalty"]
+            if "start_time" in d and d["start_time"]:
+                team.start_time = d["start_time"] - timedelta(hours=5)
+            if "finish_time" in d and d["finish_time"]:
+                team.finish_time = d["finish_time"] - timedelta(hours=5)
+            if "penalty" in d:
+                team.penalty = d["penalty"] if d["penalty"] else 0
             if "dnf" in d:
                 team.dnf = d["dnf"]
             team.save()
