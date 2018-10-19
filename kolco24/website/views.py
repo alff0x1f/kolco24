@@ -103,27 +103,27 @@ def logout_user(request):
 def teams(request, template=""):
     teams = [
         {
-            'teams': Team.objects.filter(category="6h"), 
+            'teams': Team.objects.filter(category="6h").order_by('start_number'), 
             'dist_name':'6ч'
         },
         {
-            'teams': Team.objects.filter(category="12h_mw"), 
+            'teams': Team.objects.filter(category="12h_mw").order_by('start_number'), 
             'dist_name':'12ч двойки МЖ',
         },
         {
-            'teams': Team.objects.filter(category="12h_mm"), 
+            'teams': Team.objects.filter(category="12h_mm").order_by('start_number'), 
             'dist_name':'12ч двойки ММ',
         },
         {
-            'teams': Team.objects.filter(category="12h_ww"), 
+            'teams': Team.objects.filter(category="12h_ww").order_by('start_number'), 
             'dist_name':'12ч двойки ЖЖ',
         },
         {
-            'teams': Team.objects.filter(category="12h_team"),
+            'teams': Team.objects.filter(category="12h_team").order_by('start_number'),
             'dist_name': '12ч команда',
         },
         {
-            'teams': Team.objects.filter(category="24h"), 
+            'teams': Team.objects.filter(category="24h").order_by('start_number'), 
             'dist_name':'24ч команда',
         }
     ]
@@ -178,10 +178,6 @@ def teams_start(request):
 
 def teams_finish(request):
     teams = [
-        {
-            'teams': Team.objects.filter(paid_sum__gt=1, category="6h", finish_time__isnull=True).order_by('start_number'), 
-            'dist_name':'Дистанция 6ч'
-        },
         {
             'teams': Team.objects.filter(paid_sum__gt=1, category__startswith="12h", finish_time__isnull=True).order_by('start_number'), 
             'dist_name':'Дистанция 12ч'
