@@ -25,4 +25,5 @@ urlpatterns = [
     path('sync_table', views.sync_table, name='sync_table'),
     path('import_start_numbers', views.import_start_numbers, name='import_start_numbers'),
     path('import_categories', views.import_categories, name='import_categories'),
+    path('export_payments', views.export_payments, name='export_payments'),
 ]

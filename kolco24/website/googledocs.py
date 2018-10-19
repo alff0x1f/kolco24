@@ -4,14 +4,14 @@ from website.models import Payments, Team
 from datetime import timedelta
 from django.conf import settings
 
-def connect_to_sheet():
+def connect_to_sheet(sheet_number=0):
     scope = ['https://spreadsheets.google.com/feeds',
             'https://www.googleapis.com/auth/drive']
     credentials = ServiceAccountCredentials.from_json_keyfile_name('./kolco24/googledocs_api_key.json', scope)
 
     gc = gspread.authorize(credentials)
     sht1 = gc.open_by_key(settings.GOOGLE_DOCS_KEY)
-    return sht1.sheet1
+    return sht1.get_worksheet(sheet_number)
 
 def import_start_numbers_from_sheet():
     wks = connect_to_sheet()
@@ -54,6 +54,35 @@ def import_category_from_sheet():
                     team.category = team_cat
                     team.save()
                     updated_count += 1
+
+    return updated_count
+
+def export_payments_to_sheet():
+    wks = connect_to_sheet(1)
+    payments = Payments.objects.filter(unaccepted=False)
+    fields_count = 9
+    updated_count = 0
+
+    insert_range = wks.range(3, 1, len(payments) + 3, fields_count)
+    print(insert_range)
+    i = 0
+    for payment in payments:
+        insert_range[i].value = payment.id
+        insert_range[i + 1].value = payment.notification_type
+        insert_range[i + 2].value = payment.amount.replace('.', ',')
+        insert_range[i + 3].value = payment.withdraw_amount.replace('.', ',')
+        insert_range[i + 4].value = payment.datetime
+        insert_range[i + 5].value = payment.sender
+        team = Team.objects.filter(paymentid=payment.label)
+        if team:
+            team = team.get()
+            insert_range[i + 6].value = team.id
+            insert_range[i + 7].value = team.teamname
+            insert_range[i + 8].value = "%s %s" % (team.owner.first_name, 
+                                                   team.owner.last_name)
+        i += fields_count
+        updated_count += 1
+    wks.update_cells(insert_range)
 
     return updated_count
 
