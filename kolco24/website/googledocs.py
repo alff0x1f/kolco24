@@ -64,7 +64,6 @@ def export_payments_to_sheet():
     updated_count = 0
 
     insert_range = wks.range(3, 1, len(payments) + 3, fields_count)
-    print(insert_range)
     i = 0
     for payment in payments:
         insert_range[i].value = payment.id
