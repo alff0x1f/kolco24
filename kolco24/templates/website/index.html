@@ -7,16 +7,15 @@
 
 {% block content %}
         <section class="bg-dark">
-            <img alt="Image" src="/static/images/backgrounds/header-finish.jpg" class="bg-image" />
+            <img alt="Image" src="/static/images/backgrounds/header2.jpg" class="bg-image" />
             <div class="container">
                 <div class="row align-items-center justify-content-between">
                     <div class="col-12 col-md-6 col-lg-5">
-                        <div style="min-height:300px"></div>
-                        {% comment %} <img class="mx-auto d-none d-sm-block" style="width: 80%" src="/static/images/logo_big.png" alt="Кольцо 24 2018"> {% endcomment %}
-                        {% comment %} <h2>13-14 октября 2018</br>  Белорецкий район, хр. Крака</h2> {% endcomment %}
+                        <img class="mx-auto d-none d-sm-block" style="width: 80%" src="/static/images/logo_big.png" alt="Кольцо 24 2018">
+                        <h2>12-13 октября 2019</br>  Район вершин Ялангас и Малиновая (Белорецкий район)</h2>
                     </div>
                     <!--end of col-->
-                    <div class="col-12 col-md-6 col-lg-5 d-none">
+                    <div class="col-12 col-md-6 col-lg-5">
                         <div class="card">
                             <div class="card-body">
                                 <form action="/" method="POST">
@@ -92,7 +91,7 @@
                                     <div class="mb-2 {% if myteams %}d-none{% endif%}">
                                         <div class="custom-control custom-checkbox">
                                             <input type="checkbox" class="custom-control-input" value="agree" name="agree-terms" id="check-agree" checked>
-                                            <label class="custom-control-label text-small" for="check-agree">Я прочитал <a href="https://docs.google.com/document/d/1hHHLXunk12DoAfF0FUIy4ky-KEOceKPbn5XUJ4SysM8/edit" target="_blank">Положение соревнований</a>
+                                            <label class="custom-control-label text-small" for="check-agree">Я прочитал <a href="https://docs.google.com/document/d/1RJ4mEY_FtqUR3n5tTR9eCOhLUnkCkK2dWFPzQiMZkXg/edit" target="_blank">Положение соревнований</a>
                                             </label>
                                         </div>
                                     </div>
@@ -127,7 +126,7 @@
                                       {% endfor %}
                                     {% endif%}
                                     <div class="alert alert-danger" role="alert">
-                                    {% if myteams %} При внесении изменений в команду, данные не отразится в бумажных протоколах! {% else %} Онлайн регистрация закрыта! {% endif %}
+                                    {% comment %} {% if myteams %} При внесении изменений в команду, данные не отразится в бумажных протоколах! {% else %} Онлайн регистрация закрыта! {% endif %} {% endcomment %}
                                     </div>
                                     
                                     <button type="submit" class="btn btn-lg btn-success btn-block">{% if myteams %}Изменить/добавить{% else %}Зарегистрироваться{% endif%}</button>
@@ -147,6 +146,7 @@
             <!--end of container-->
         </section>
         <!--end of section-->
+        {% comment %} 
         <section class="space-xxs" style="background-color: #eee;">
             <div class="container">
                 <div class="row">
@@ -174,7 +174,8 @@
                 <!--end of row-->
             </div>
             <!--end of container-->
-        </section>
+        </section> 
+        {% endcomment %}
         <section id="about" class="section about">
                 <div class="container">
                     <div class="row">
@@ -220,13 +221,13 @@
                                 <div class="col-sm-3 text-center">
 
                                         <i class="ion-ios-calendar"></i>
-                                        <h3>2018<br>13-14 октября</h3>
+                                        <h3>12-13 октября<br>2019</h3>
                     
                                     </div>
                                     <div class="col-sm-3 text-center">
                     
                                         <i class="ion-ios-location"></i>
-                                        <h3>Белорецкий район<br>хр. Крака</h3>
+                                        <h3>Белорецкий район<br>г. Ялангас</h3>
                     
                                     </div>
                                     <div class="col-sm-3 text-center">
@@ -246,6 +247,7 @@
                     </div>
                     <!--end of container-->
                 </section>
+                {% comment %}
                 <section class="space-xxs" style="background-color: #eee;">
                     <div class="container">
                         <div class="row">
@@ -273,7 +275,8 @@
                         <!--end of row-->
                     </div>
                     <!--end of container-->
-                </section>
+                </section> 
+                {% endcomment %}
                 <section id="distances">
                     <div class="container">
 
@@ -358,9 +361,9 @@
                                                 <div class="media">
                                                     <i class="icon-arrow-right mr-2"></i>
                                                     <div class="media-body">
-                                                        <h6>10.10.18 Среда</h6>
+                                                        <h6>09.10.19 Среда</h6>
                                                         <p>
-                                                            19:00 Совещание ГСК с представителями команд в Республиканском детском центре туризма по адресу: г. Уфа, ул. Гоголя, д. 34
+                                                            19:00 – Совещание ГСК с представителями команд в Республиканском детском центре туризма по адресу: г. Уфа, ул. Гоголя, д. 34
                                                         </p>
                                                     </div>
                                                 </div>
@@ -369,9 +372,9 @@
                                                 <div class="media">
                                                     <i class="icon-arrow-right mr-2"></i>
                                                     <div class="media-body">
-                                                        <h6>12.10.18 Пятница</h6>
+                                                        <h6>11.10.19 Пятница</h6>
                                                         <p>
-                                                            21:30 – Заезд и размещение участников<br/>
+                                                            21:30 – Заезд и размещение участников </br>
                                                             22:00-24:00 Начало работы мандатной комиссии (регистрация участников)
                                                         </p>
                                                     </div>
@@ -381,15 +384,14 @@
                                                 <div class="media">
                                                     <i class="icon-arrow-right mr-2"></i>
                                                     <div class="media-body">
-                                                        <h6>13.10.18 Суббота</h6>
+                                                        <h6>12.10.19 Суббота</h6>
                                                         <p>
-                                                            07:00 – Общий подъем. Продолжение регистрации команд<br/>
-                                                            10:30 – Завершение регистрации. Совещание ГСК с представителями команд<br/>
-                                                            11:00 – Общее построение. Торжественное открытие соревнований<br/>
-                                                            11:30-12:00 – Старты на дистанции «6 часов»<br/>
-                                                            12:00-12:30 – Старты на дистанции «12 часов»<br/>
-                                                            12:30-13:00 – Старты на дистанции «24 часа»<br/>
-                                                            19:00 – Закрытие дистанции «6 часов»<br/>
+                                                            07:00 – Общий подъем. Продолжение регистрации команд <br/>
+                                                            10:30 – Завершение регистрации. Выдача карт. Совещание ГСК с представителями команд <br/>
+                                                            11:00 – Общее построение. Торжественное открытие фестиваля <br/>
+                                                            11:30-12:00 – Старты на дистанции «6 часов» <br/>
+                                                            12:00-13:00 – Старты на дистанции «12 часов» и «24 часа» <br/>
+                                                            19:00 – Закрытие дистанции «6 часов» <br/>
                                                             20:00 – Награждение «6 часов»
                                                         </p>
                                                     </div>
@@ -399,29 +401,31 @@
                                                 <div class="media">
                                                     <i class="icon-arrow-right mr-2"></i>
                                                     <div class="media-body">
-                                                        <h6>14.10.18 Воскресенье</h6>
+                                                        <h6>13.10.19 Воскресенье</h6>
                                                         <p>
-                                                            01:30 – Закрытие дистанции «12 часов»<br/>
-                                                            09:00 – Награждение «12 часов»<br/>
-                                                            14:00 – Закрытие дистанции «24 часов»<br/>
-                                                            15:00 – Закрытие соревнований, торжественное награждение победителей<br/>
-                                                            16:00 – Отъезд участников соревнований<br/>                                                            
+                                                            02:00 – Закрытие дистанции «12 часов» <br/>
+                                                            09:00 – Награждение «12 часов» <br/>
+                                                            14:00 – Закрытие дистанции «24 часов» <br/>
+                                                            15:00 – Закрытие соревнований, торжественное награждение победителей «24 часов» <br/>
+                                                            16:00 – Отъезд участников
                                                         </p>
                                                     </div>
                                                 </div>
                                             </li>
+
                                             <li>
                                                 <div class="media">
                                                     <i class="icon-arrow-right mr-2"></i>
                                                     <div class="media-body">
-                                                        <h6>17.10.18 Среда</h6>
-                                                        <p>19:30 – Подведение итогов фотоконкурса, трехлетнего и клубного зачета, обсуждение соревнований, просмотр фотографий и видео в клубе туристов «Спутник» г. Уфа, ул. Айская, д. 75/2                                                          
+                                                        <h6>16.10.19 Среда</h6>
+                                                        <p>
+                                                            19:30 – Подведение итогов фотоконкурса, клубного зачета, обсуждение мероприятия, просмотр фотографий и видео в клубе туристов «Спутник» г. Уфа, ул. Айская, д. 75/2
                                                         </p>
                                                     </div>
                                                 </div>
                                             </li>
                                         </ul>
-                                        <a href="https://docs.google.com/document/d/1hHHLXunk12DoAfF0FUIy4ky-KEOceKPbn5XUJ4SysM8/edit" target="_blank" class="text-small">Положение соревнований &rsaquo;</a>
+                                        <a href="https://docs.google.com/document/d/1RJ4mEY_FtqUR3n5tTR9eCOhLUnkCkK2dWFPzQiMZkXg/edit" target="_blank" class="text-small">Положение соревнований &rsaquo;</a>
                                     </div>
                             </div>
                             <!--end of row-->

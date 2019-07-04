@@ -79,7 +79,7 @@
                                 <a class="nav-link dropdown-toggle" href="#" id="componentsDropdown" role="button" data-toggle="dropdown">Инфо</a>
                                 <div class="dropdown-menu" aria-labelledby="componentsDropdown">
 
-                                    <a class="dropdown-item" href="https://docs.google.com/document/d/1hHHLXunk12DoAfF0FUIy4ky-KEOceKPbn5XUJ4SysM8/edit" target="_blank">Положение</a>
+                                    <a class="dropdown-item" href="https://docs.google.com/document/d/1RJ4mEY_FtqUR3n5tTR9eCOhLUnkCkK2dWFPzQiMZkXg/edit" target="_blank">Положение</a>
 
                                     <a class="dropdown-item" href="/#schedule">Программа</a>
 
@@ -141,20 +141,22 @@
     </div>
     {% endblock %}
     <div class="main-container">
+    {% comment %}
     <section class="space-xs text-center bg-gradient text-light">
-                <div class="container">
-                    <div class="row">
-                        <div class="col">
-                            <i class="mr-1 icon-warning"></i>
-                            <span class="mr-2">Кольцо 24 прошло. Спасибо всем за участие!</span>
-                            <a href="https://docs.google.com/spreadsheets/d/1cvJr3AmTH6y1WW2BdwRPmjTldcD4cgZAoTzzfOeAG4U/edit" class="text-white">Протоколы ›</a>
-                        </div>
-                        <!--end of col-->
-                    </div>
-                    <!--end of row-->
+        <div class="container">
+            <div class="row">
+                <div class="col">
+                    <i class="mr-1 icon-warning"></i>
+                    <span class="mr-2">Кольцо 24 прошло. Спасибо всем за участие!</span>
+                    <a href="https://docs.google.com/spreadsheets/d/1cvJr3AmTH6y1WW2BdwRPmjTldcD4cgZAoTzzfOeAG4U/edit" class="text-white">Протоколы ›</a>
                 </div>
-                <!--end of container-->
-            </section>
+                <!--end of col-->
+            </div>
+            <!--end of row-->
+        </div>
+        <!--end of container-->
+    </section> 
+    {% endcomment %}
     {% block content%}{% endblock %}
 
     {% block footer_menu%}
@@ -182,6 +184,10 @@
                                         <a href="https://vk.com/kolco24" target="_blank"><i class="icon-vk"></i>Группа в ВК</a>
                                     </li>
                                     <li>
+                                        {% comment %} <i class="icon-fingerprint"></i> {% endcomment %}
+                                        <a href="https://vk.com/kolco24y2018" target="_blank"><i class="icon-vk"></i>Кольцо-24 2018</a>
+                                    </li>
+                                    <li>
                                         <a href="https://vk.com/kolco242017" target="_blank">Кольцо-24 2017</a>
                                     </li>
                                     <li>
@@ -197,7 +203,7 @@
                                 <h6>Информация и документы</h6>
                                 <ul class="list-unstyled">
                                     <li>
-                                        <a href="https://docs.google.com/document/d/1hHHLXunk12DoAfF0FUIy4ky-KEOceKPbn5XUJ4SysM8/edit" target="_blank">Положение (google docs)</a>
+                                        <a href="https://docs.google.com/document/d/1RJ4mEY_FtqUR3n5tTR9eCOhLUnkCkK2dWFPzQiMZkXg/edit" target="_blank">Положение (google docs)</a>
                                     </li>
                                     <li>
                                         <a href="https://docs.google.com/spreadsheets/u/1/d/1rEuziDCYGFJyIGoXgDPnVE1p37cwLI-2SbCIlLPL-Tw/edit?usp=sharing" target="_blank">Командная заявка</a>
@@ -223,9 +229,6 @@
                                     </li>
                                     <li>
                                         <a href="https://vk.com/mountain_sputnik" target="_blank">Школа горного туризма</a>
-                                    </li>
-                                    <li>
-                                        <a href="https://veloufa.ru" target="_blank">Велоуфа</a> <a href="https://vk.com/veloufa" target="_blank">(Группа в VK)</a>
                                     </li>
                                 </ul>
                             </div>
