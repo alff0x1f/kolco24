@@ -7,12 +7,12 @@
 
 {% block content %}
         <section class="bg-dark">
-            <img alt="Image" src="/static/images/backgrounds/header2.jpg" class="bg-image" />
+            <img alt="Image" src="/static/images/backgrounds/header.jpg" class="bg-image" />
             <div class="container">
-                <div class="row align-items-center justify-content-between">
+                <div class="row center justify-content-between">
                     <div class="col-12 col-md-6 col-lg-5">
-                        <img class="mx-auto d-none d-sm-block" style="width: 80%" src="/static/images/logo_big.png" alt="Кольцо 24 2018">
-                        <h2>12-13 октября 2019</br>  Район вершин Ялангас и Малиновая (Белорецкий район)</h2>
+                        <img class="mx-auto d-none d-sm-block" style="width: 60%" src="/static/images/logo_big.png" alt="Кольцо 24 2018">
+                        <h2 class="text-center">12-13 октября 2019</br>  Район вершин Ялангас и Малиновая (Белорецкий район)</h2>
                     </div>
                     <!--end of col-->
                     <div class="col-12 col-md-6 col-lg-5">
@@ -125,9 +125,6 @@
                                         </div>
                                       {% endfor %}
                                     {% endif%}
-                                    <div class="alert alert-danger" role="alert">
-                                    {% comment %} {% if myteams %} При внесении изменений в команду, данные не отразится в бумажных протоколах! {% else %} Онлайн регистрация закрыта! {% endif %} {% endcomment %}
-                                    </div>
                                     
                                     <button type="submit" class="btn btn-lg btn-success btn-block">{% if myteams %}Изменить/добавить{% else %}Зарегистрироваться{% endif%}</button>
                                     
