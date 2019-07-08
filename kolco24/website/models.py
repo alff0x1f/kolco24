@@ -144,6 +144,7 @@ class Team(models.Model):
     teamname = models.CharField(max_length=50)
     city = models.CharField(max_length=50)
     organization = models.CharField(max_length=50)
+    year = models.IntegerField(default=2018)
 
     #! athlet1-athlet6 deprecated, use Athlet model instead
     athlet1 = models.CharField(max_length=50)
@@ -186,6 +187,7 @@ class Team(models.Model):
             self.dist = dist
             self.ucount = ucount
             self.paymentid = '%016x' % random.randrange(16**16)
+            self.year = 2019
             self.save()
     
     def update_money(self):
@@ -193,7 +195,7 @@ class Team(models.Model):
         payment.update_team(self.paymentid)
     
     def get_info(self):
-        teams = Team.objects.filter(paid_sum__gt=0)
+        teams = Team.objects.filter(paid_sum__gt = 0, year = 2019)
         people_paid = 0
         teams_count = 0
         for team in teams:
@@ -263,5 +265,5 @@ class Athlet(models.Model):
     )
     name = models.CharField(max_length=50)
     birth = models.IntegerField(default=0)
-    number_in_team = models.ImageField(default=0)
+    number_in_team = models.IntegerField(default=0)
     paid = models.FloatField(default=0)
