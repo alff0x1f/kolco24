@@ -50,7 +50,8 @@ class PaymentsYa(models.Model):
             t = time.time()
         cost = 1000
         for d in cost_by_date:
-            datestamp = datetime.datetime.strptime(d[0], s_format).timestamp()-time.timezone
+            datestamp = datetime.datetime.strptime(
+                d[0], s_format).timestamp()-time.timezone
             if t < datestamp:
                 cost = d[1]
         return cost
@@ -59,17 +60,19 @@ class PaymentsYa(models.Model):
         fields = [
             "notification_type", "operation_id", "amount", "currency",
             "datetime", "sender", "codepro", "label", "sha1_hash",
-            "withdraw_amount" 
-            ]
+            "withdraw_amount"
+        ]
         for field in fields:
             if field not in d:
                 return False
 
         notification_secret = settings.YANDEX_NOTIFICATION_SECRET
 
-        s = "%s&%s&%s&%s&%s&%s&%s&%s&%s"%(d['notification_type'], 
-            d['operation_id'], d['amount'], d['currency'], d['datetime'], 
-            d['sender'], d['codepro'], notification_secret, d['label'])
+        s = "%s&%s&%s&%s&%s&%s&%s&%s&%s" % (d['notification_type'],
+                                            d['operation_id'], d['amount'],
+                                            d['currency'], d['datetime'],
+                                            d['sender'], d['codepro'],
+                                            notification_secret, d['label'])
 
         hash = hashlib.sha1(s.encode('utf-8')).hexdigest()
         if d['sha1_hash'] == hash:
@@ -97,20 +100,22 @@ class PaymentsYa(models.Model):
             self.update_team(self.label)
             return True
         return False
-    
+
     def get_info(self, paymentid):
         payments = PaymentsYa.objects.filter(label=paymentid, unaccepted=False)
         people_paid = 0
         withdraw_sum = 0
         for payment in payments:
-            t = datetime.datetime.strptime(payment.datetime, "%Y-%m-%dT%H:%M:%SZ").timestamp()-time.timezone
+            t = datetime.datetime.strptime(
+                payment.datetime, "%Y-%m-%dT%H:%M:%SZ").timestamp()-time.timezone
             cost = payment.get_cost(t)
-            withdraw = float(payment.withdraw_amount) if payment.withdraw_amount else 0
+            withdraw = float(
+                payment.withdraw_amount) if payment.withdraw_amount else 0
             people_paid += withdraw / cost
             withdraw_sum += withdraw
-        
+
         return (people_paid, withdraw_sum)
-    
+
     def get_sum(self, paymentid):
         payments = PaymentsYa.objects.filter(label=paymentid, unaccepted=False)
         paid = 0
@@ -189,13 +194,13 @@ class Team(models.Model):
             self.paymentid = '%016x' % random.randrange(16**16)
             self.year = 2019
             self.save()
-    
+
     def update_money(self):
         payment = PaymentsYa()
         payment.update_team(self.paymentid)
-    
+
     def get_info(self):
-        teams = Team.objects.filter(paid_sum__gt = 0, year = 2019)
+        teams = Team.objects.filter(paid_sum__gt=0, year=2019)
         people_paid = 0
         teams_count = 0
         for team in teams:
@@ -241,7 +246,6 @@ class FastLogin(models.Model):
     login_key = models.CharField(max_length=50)
     created_at = models.DateTimeField(auto_now_add=True)
 
-
     def new_login_link(self, email):
         u = User.objects.filter(email__iexact=email)
         if u[:1]:
@@ -252,13 +256,14 @@ class FastLogin(models.Model):
             return self.login_key
         return False
 
+
 class Athlet(models.Model):
     owner = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
     )
     team = models.ForeignKey(
-        'Team', 
+        'Team',
         on_delete=models.CASCADE,
         blank=True,
         null=True,
