@@ -144,6 +144,8 @@ class Team(models.Model):
     teamname = models.CharField(max_length=50)
     city = models.CharField(max_length=50)
     organization = models.CharField(max_length=50)
+
+    #! athlet1-athlet6 deprecated, use Athlet model instead
     athlet1 = models.CharField(max_length=50)
     birth1 = models.IntegerField(default=0)
     athlet2 = models.CharField(max_length=50)
@@ -156,6 +158,8 @@ class Team(models.Model):
     birth5 = models.IntegerField(default=0)
     athlet6 = models.CharField(max_length=50)
     birth6 = models.IntegerField(default=0)
+    #! end deprecated warning
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -245,3 +249,18 @@ class FastLogin(models.Model):
             self.save()
             return self.login_key
         return False
+
+class Athlet(models.Model):
+    owner = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+    )
+    team = models.ForeignKey(
+        'Team', 
+        on_delete=models.CASCADE,
+        blank=True,
+        null=True,
+    )
+    name = models.CharField(max_length=50)
+    birth = models.IntegerField(default=0)
+    number_in_team = models.ImageField(default=0)
