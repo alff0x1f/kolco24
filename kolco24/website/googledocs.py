@@ -1,6 +1,6 @@
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
-from website.models import Payments, Team
+from website.models import PaymentsYa, Team
 from datetime import timedelta
 from django.conf import settings
 
@@ -59,7 +59,7 @@ def import_category_from_sheet():
 
 def export_payments_to_sheet():
     wks = connect_to_sheet(1)
-    payments = Payments.objects.filter(unaccepted=False)
+    payments = PaymentsYa.objects.filter(unaccepted=False)
     fields_count = 9
     updated_count = 0
 
@@ -113,7 +113,7 @@ def get_team_info(team_id, fields_count, hide_unpaid = False):
     team_info = []
     if team_id:
         team = Team.objects.filter(id=team_id)[:1]
-        payment = Payments()
+        payment = PaymentsYa()
         if team:
             team = team.get()
             if team.paid_sum or not hide_unpaid:

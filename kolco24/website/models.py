@@ -25,7 +25,7 @@ def save_user_profile(sender, instance, **kwargs):
     instance.profile.save()
 
 
-class Payments(models.Model):
+class PaymentsYa(models.Model):
     notification_type = models.CharField(max_length=20)
     operation_id = models.CharField(max_length=50)
     amount = models.CharField(max_length=10)
@@ -99,7 +99,7 @@ class Payments(models.Model):
         return False
     
     def get_info(self, paymentid):
-        payments = Payments.objects.filter(label=paymentid, unaccepted=False)
+        payments = PaymentsYa.objects.filter(label=paymentid, unaccepted=False)
         people_paid = 0
         withdraw_sum = 0
         for payment in payments:
@@ -112,7 +112,7 @@ class Payments(models.Model):
         return (people_paid, withdraw_sum)
     
     def get_sum(self, paymentid):
-        payments = Payments.objects.filter(label=paymentid, unaccepted=False)
+        payments = PaymentsYa.objects.filter(label=paymentid, unaccepted=False)
         paid = 0
         for payment in payments:
             amount = float(payment.amount) if payment.amount else 0
@@ -191,7 +191,7 @@ class Team(models.Model):
             self.save()
     
     def update_money(self):
-        payment = Payments()
+        payment = PaymentsYa()
         payment.update_team(self.paymentid)
     
     def get_info(self):

@@ -8,7 +8,7 @@ from django.contrib.auth.decorators import login_required
 from django.views.decorators.csrf import csrf_exempt
 from website.forms import (LoginForm, FastLoginForm, RegForm, TeamForm,
                            TeamFormAdmin)
-from website.models import Payments, Team, PaymentLog, FastLogin
+from website.models import PaymentsYa, Team, PaymentLog, FastLogin
 from django.http import HttpResponseRedirect, Http404, JsonResponse
 from django.conf import settings
 from website.email import send_login_email
@@ -40,7 +40,7 @@ def index(request):
     teams_count, members_count = Team().get_info()
 
     contex = {
-        "cost": Payments().get_cost(),
+        "cost": PaymentsYa().get_cost(),
         "reg_form": reg_form,
         "team_count": teams_count,
         "people_count": int(members_count),
@@ -249,7 +249,7 @@ def my_team(request, teamid="", template="my_team"):
         team_form_admin = TeamFormAdmin(None)
         team_form_admin.init_vals(request.user, teamid)
 
-    cost_now = Payments().get_cost()
+    cost_now = PaymentsYa().get_cost()
 
     if request.method == 'GET':
         if teamid != paymentid:
@@ -354,7 +354,7 @@ def new_team(request):
 @csrf_exempt
 def yandex_payment(request):
     if request.method=='POST':
-        payment = Payments()
+        payment = PaymentsYa()
         if payment.new_payment(request.POST):
             # send_success_email(payment.label, payment.withdraw_amount, notification_type)
             return HttpResponse("Ok")
