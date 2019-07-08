@@ -264,3 +264,4 @@ class Athlet(models.Model):
     name = models.CharField(max_length=50)
     birth = models.IntegerField(default=0)
     number_in_team = models.ImageField(default=0)
+    paid = models.FloatField(default=0)
