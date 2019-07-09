@@ -8,7 +8,7 @@ from django.contrib.auth.decorators import login_required
 from django.views.decorators.csrf import csrf_exempt
 from website.forms import (LoginForm, FastLoginForm, RegForm, TeamForm,
                            TeamFormAdmin)
-from website.models import PaymentsYa, Team, PaymentLog, FastLogin
+from website.models import PaymentsYa, Team, Athlet, PaymentLog, FastLogin
 from django.http import HttpResponseRedirect, Http404, JsonResponse
 from django.conf import settings
 from website.email import send_login_email
@@ -21,6 +21,7 @@ from website.googledocs import (sync_sheet,
 def index(request):
     init_val = {}
     myteams = []
+    free_athlets = 0
     if request.user.is_authenticated:
         init_val = {
             "first_name":request.user.first_name,
@@ -29,6 +30,7 @@ def index(request):
             "phone": request.user.profile.phone,
             }
         myteams = Team.objects.filter(owner=request.user)
+        free_athlets = Athlet.objects.filter(owner=request.user, team=None).count()
     reg_form = RegForm(request.POST or None, initial=init_val)
     reg_form.set_user(request.user)
 
@@ -46,6 +48,7 @@ def index(request):
         "people_count": int(members_count),
         'myteams': myteams,
         'myteams_count': len(myteams),
+        'free_athlet': free_athlets,
     }
     return render(request, 'website/index.html', contex)
 

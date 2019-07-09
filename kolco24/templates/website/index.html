@@ -20,7 +20,7 @@
                             <div class="card-body">
                                 <form action="/" method="POST">
                                     <div class="row mb-2">
-                                        <div class="col-sm-6 col-md-6 mb-1 {% if myteams %}d-none{% endif%}">
+                                        <div class="col-sm-6 col-md-6 mb-1 {% if myteams %}d-none{% endif%}" id="dist_links">
                                             <ul class="nav nav-tabs">
                                                 <li class="nav-item">
                                                     <a class="nav-link" id="reg_6h" href="#">6ч</a>
@@ -33,10 +33,11 @@
                                                 </li>
                                             </ul>
                                         </div>
-                                        <div class="col-sm-6 col-md-6 {% if myteams %}d-none{% endif%}">
+                                        <div class="col-sm-6 col-md-6 {% if myteams %}d-none{% endif%}" id="dist_select">
                                                 <div class="form-group">
                                                     <label for="ucount">Кол-во участников:</label>
                                                     <select class="form-control" name="ucount" id="ucount" required="">
+                                                        <option id="ucount_1p" value="1">1 (пока без команды)</option>
                                                         <option id="ucount_2p" value="2" selected="">2 человека</option>
                                                         <option id="ucount_3p" value="3" style="display:none;">3 человека</option>
                                                         <option id="ucount_4p" value="4">4 человека</option>
@@ -105,6 +106,9 @@
                                     </div>
                                     <input type="hidden" id="dist" name="dist" value="12h">
                                     {% csrf_token %}
+                                    <div id="warning_alone" style="display:none;" class="alert alert-warning" role="alert">
+                                        До 6 октября вам надо будет найти команду!
+                                    </div>
                                     {% if reg_form.non_field_errors %}
                                     <div class="alert alert-danger" role="alert">
                                         {% for err in reg_form.non_field_errors %}
@@ -432,6 +436,10 @@
                     <!--end of section-->
 {% endblock %}
 {% block footer_js_include %}
-    <script type="text/javascript" src="/static/js/index_reg.js?ver=3"></script>
-    <script>var cost = {{ cost }};</script>
+    <script type="text/javascript" src="/static/js/index_reg.js?ver=4"></script>
+    <script>
+        var cost = {{ cost }};
+        {% if free_athlet %}$('#ucount').val({{ free_athlet }});{% endif %}
+        $('#ucount').change();
+    </script>
 {% endblock %}

@@ -41,6 +41,15 @@ $('#reg_24h').click(function(){
 
 $('#ucount').on('change', function() {
     v = parseInt(this.value);
+    if (v === 1) {
+        $('#warning_alone').show()
+        $('#dist_links').hide();
+        $('#dist_select').removeClass('col-sm-6 col-md-6').addClass('col-sm-12 col-md-12');
+    } else {
+        $('#warning_alone').hide()
+        $('#dist_links').show();
+        $('#dist_select').removeClass('col-sm-12 col-md-12').addClass('col-sm-6 col-md-6');
+    };
     $('#ucountlabel').text(v);
     $('#sumlabel').text(v*cost);
 });

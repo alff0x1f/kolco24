@@ -311,6 +311,16 @@ class Athlet(models.Model):
     number_in_team = models.IntegerField(default=0)
     paid = models.FloatField(default=0)
 
+    def new_athlet(self, user, team, name, birth = -1):
+        if user.is_authenticated:
+            self.owner = user
+            if team:
+                self.team = team
+            self.name = name
+            if 1910 < birth < 2020:
+                self.birth = birth
+            self.save()
+
 
 class Coupons(models.Model):
     COVER_TYPE_CHOICES = [

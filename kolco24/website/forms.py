@@ -5,7 +5,7 @@ from django import forms
 from django.core.exceptions import ObjectDoesNotExist
 from django.contrib.auth.models import User
 from django.contrib.auth import authenticate
-from website.models import Team, TeamAdminLog
+from website.models import Team, Athlet, TeamAdminLog
 
 
 class LoginForm(forms.Form):
@@ -120,8 +120,12 @@ class RegForm(forms.Form):
             user.profile.phone = phone
             user.save()
 
-            team = Team()
-            team.new_team(user, dist, ucount)
+            if ucount == 1:
+                athlet = Athlet()
+                athlet.new_athlet(user, None, last_name + ' ' + first_name)
+            elif ucount > 1:
+                team = Team()
+                team.new_team(user, dist, ucount)
             return user
         else:
             self.user.first_name = first_name
@@ -129,7 +133,7 @@ class RegForm(forms.Form):
             self.user.profile.phone = phone
             self.user.save()
             team = Team.objects.filter(owner=self.user)[:1]
-            if not team:
+            if not team and ucount > 1:
                 team = Team()
                 team.new_team(self.user, dist, ucount)
         return self.user
@@ -205,6 +209,9 @@ class TeamForm(forms.Form):
         else:
             team = Team.objects.filter(owner=user)[:1]
         if not team:
+            free_athlet = Athlet.objects.filter(owner=user, team=None)[:1]
+            if free_athlet:
+                return False
             team = Team()
             team.new_team(user, '12h', 4)
         else:
