@@ -238,6 +238,44 @@ class PaymentLog(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
 
+class Payment(models.Model):
+    owner = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        blank=True,
+        null=True,
+    )
+    team = models.ForeignKey(
+        'Team',
+        on_delete=models.CASCADE,
+        blank=True,
+        null=True,
+    )
+    athlet = models.ForeignKey(
+        'Athlet',
+        on_delete=models.CASCADE,
+        blank=True,
+        null=True,
+    )
+    payment_method = models.CharField(max_length=50)
+    payment_amount = models.FloatField(default=0)
+    payment_with_discount = models.FloatField(default=0)
+    cost_per_person = models.FloatField(default=0)
+    paid_for = models.FloatField(default=0)
+    coupon = models.ForeignKey(
+        'Coupons',
+        on_delete=models.CASCADE,
+        blank=True,
+        null=True,
+    )
+    status = models.CharField(max_length=50)
+    sender_card_number = models.CharField(max_length=50)
+    payment_date = models.DateField()
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+
 class FastLogin(models.Model):
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -272,3 +310,21 @@ class Athlet(models.Model):
     birth = models.IntegerField(default=0)
     number_in_team = models.IntegerField(default=0)
     paid = models.FloatField(default=0)
+
+
+class Coupons(models.Model):
+    COVER_TYPE_CHOICES = [
+        ('TEAM', 'Coupon for team'),
+        ('ATHLET', 'Coupon for athlet')
+    ]
+    code = models.CharField(max_length=20)
+    expire_at = models.DateTimeField()
+    discount_sum = models.FloatField(default=0)
+    discount_persent = models.FloatField(default=0)
+    cover_type = models.CharField(
+        max_length=20,
+        choices=COVER_TYPE_CHOICES,
+        default='ATHLET'
+    )
+    count = models.IntegerField(default=1)
+    avail_count = models.IntegerField(default=1)
