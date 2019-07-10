@@ -315,9 +315,6 @@
                                 </div>
                                 {{ team_form.paymentid }}
                                 {% csrf_token %}
-                                <div class="alert alert-danger" role="alert">
-                                    При внесении изменений в команду, данные не отразится в бумажных протоколах!
-                                </div>
                                 <div class="form-row form-group">
                                     <div class="col">
                                         <button class="btn btn-block btn-success" type="submit" id="teamform_submit">Сохранить</button>
@@ -340,25 +337,43 @@
                         </div>
                         <ul class="list-unstyled list-spacing-sm mb-3 ">
                             <li class="row align-items-center">
-                                <div class="col-3 col-md-3"><strike>500р</strike></div>
-                                <div class="col-9"><strike>При оплате до 3 августа</strike></div>
+                                <div class="col-3 col-md-3"><strong>500 руб</strong></div>
+                                <div class="col-9"><strong>При оплате до 15 июля</strong></div>
                             </li>
                             <li class="row align-items-center">
-                                <div class="col-3 col-md-3"><strike>600р</strike></div>
-                                <div class="col-9"><strike>При оплате с 4 августа по 19 августа</strike></div>
+                                <div class="col-3 col-md-3">600 руб</div>
+                                <div class="col-9">С 16 июля по 31 июля</div>
                             </li>
+                            <li class="row align-items-center">
+                                <div class="col-3 col-md-3">700 руб</div>
+                                <div class="col-9">С 1 августа по 18 августа</div>
+                            </li>
+                            <li class="row align-items-center">
+                                <div class="col-3 col-md-3">800 руб</div>
+                                <div class="col-9">С 19 августа по 31 августа</div>
+                            </li>
+                            <li class="row align-items-center">
+                                <div class="col-3 col-md-3">900 руб</div>
+                                <div class="col-9">С 1 сентября по 30 сентября</div>
+                            </li>
+                            <li class="row align-items-center">
+                                <div class="col-3 col-md-3">1000 руб</div>
+                                <div class="col-9">С 1 октября по 10 октября</div>
+                            </li>
+                            <li class="row align-items-center">
+                                <div class="col-3 col-md-3">1200 руб</div>
+                                <div class="col-9"> Оплата наличными на месте старта</div>
+                            </li>
+                            {% comment %}
                             <li class="row align-items-center">
                                 <div class="col-3 col-md-3{% if cost < 700 %}  text-muted text-small{% endif %}">{% if cost == 700 %}<strong>{% elif cost > 700 %}<strike>{% endif %}700р{% if cost == 700 %}</strong>{% elif cost > 700 %}</strike>{% endif %}</div>
                                 <div class="col-9{% if cost < 700 %} text-muted text-small{% endif %}">{% if cost > 700 %}<strike>{% endif %}При оплате с 20 августа по 16 сентября{% if cost > 700 %}</strike>{% endif %}</div>
-                            </li>
+                            </li> 
                             <li class="row align-items-center">
                                 <div class="col-3 col-md-3{% if cost < 800 %} text-muted text-small{% endif %}">{% if cost == 800 %}<strong>{% elif cost > 800 %}<strike>{% endif %}800р{% if cost == 800 %}</strong>{% elif cost > 800 %}</strike>{% endif %}</div>
                                 <div class="col-9{% if cost < 800 %} text-muted text-small{% endif %}">{% if cost > 800 %}<strike>{% endif %}При оплате с 17 сентября по 11 октября{% if cost > 800 %}</strike>{% endif %}</div>
                             </li>
-                            <li class="row align-items-center">
-                                <div class="col-3 col-md-3{% if cost < 1000 %} text-muted text-small{% endif %}"><strong>1000р</strong></div>
-                                <div class="col-9{% if cost < 1000 %} text-muted text-small{% endif %}"> Оплата наличными на месте старта</div>
-                            </li>
+                            {% endcomment %}
                         </ul>
                         {% elif user.is_superuser %}
                             <div class="mb-3 text-center">
@@ -637,23 +652,40 @@
                                 <div class="card-body">
                                     <h6 class="title-decorative">Реквизиты для платежа</h6>
                                     <dl class="row justfiy-content-between">
-                                        <dt class="col-5"><code>Телефон</code></dt>
-                                        <dd class="col-7" id="sberbank_phone"></dd>
                                         <dt class="col-5"><code>Номер карты</code></dt>
                                         <dd class="col-7" id="sberbank_cardnumber"></dd>
                                         <dt class="col-5"><code>ФИО получателя</code></dt>
                                         <dd class="col-7" id="sberbank_name"></dd>
                                         <dt class="col-5"><code>Сумма платежа</code></dt>
                                         <dd class="col-7" id="sberbank_sum"></dd>
-                                        <dt class="col-5"><code>Комментарий</code></dt>
-                                        <dd class="col-7" id="sberbank_comment"></dd>
                                     </dl>
                                 </div>
                                 <div class="card-footer">
-                                <p>Укажите комментарий <code id="sberbank_comment2"></code> чтобы мы понимали от какой команды пришёл платеж. </p>
-                                <p>Перевод с помощью смс: Отправляете на номер 900 смс с текстом </br><code>перевод <span id="sberbank_phone2"></span> <span id="sberbank_sum2"></span></code></br>
-                                Затем от банка вам приходит код, например 123456. Отправляем этот код и через пробел слово "<span id="sberbank_comment3"></span>": </br> <code>12345 <span id="sberbank_comment4"></span></code></p>
-                                <p>Также можно сделать перевод через <a href="https://online.sberbank.ru/CSAFront/index.do">Сбербанк.онлайн</a> или мобильное приложение. Не забудьте указать комментарий.</p>
+                                    <p>Перевод можно сделать через <a href="https://online.sberbank.ru/CSAFront/index.do">Сбербанк.онлайн</a> 
+                                    или мобильное приложение. При переводе заполните форму ниже и нажмите кнопку <code>сохранить</code>.</p>
+                                    <p>Проверка перевода может занять некоторое время</p>
+                                    <hr class="short">
+                                    <form>
+                                        <div class="form-group row">
+                                            <label for="paymentCardCode" class="col-sm-6 col-form-label">Последние 4 цифры вашей карты</label>
+                                            <div class="col-sm-6">
+                                            <input type="text" class="form-control" id="sberbank_paymentCardCode" value="">
+                                            </div>
+                                        </div>
+                                        <div class="form-group row">
+                                            <label for="paymentDate" class="col-sm-6 col-form-label">Дата перевода</label>
+                                            <div class="col-sm-6">
+                                            <input type="text" class="form-control" id="sberbank_paymentDate" placeholder="Дата">
+                                            </div>
+                                        </div>
+                                        <div class="form-group row">
+                                            <label for="paymentSum" class="col-sm-6 col-form-label">Сумма перевода</label>
+                                            <div class="col-sm-6">
+                                            <input type="text" class="form-control" id="sberbank_paymentSum" placeholder="Сумма перевода">
+                                            </div>
+                                        </div>
+                                        <button type="button" class="btn btn-primary mb-2">Сохранить</button>
+                                    </form>
                                 </div>
                             </div>
                             <button type="button" class="btn btn-secondary" id="pay_sberbank">
@@ -719,12 +751,34 @@
                                         <dd class="col-7" id="tinkoff_name"></dd>
                                         <dt class="col-5"><code>Сумма платежа</code></dt>
                                         <dd class="col-7" id="tinkoff_sum"></dd>
-                                        <dt class="col-5"><code>Комментарий</code></dt>
-                                        <dd class="col-7" id="tinkoff_comment"></dd>
                                     </dl>
                                 </div>
                                 <div class="card-footer">
-                                <p>Укажите в комментарий <code id="tinkoff_comment2"></code> чтобы мы понимали от какой команды пришёл платеж. </p>
+                                    Важно! При переводе заполните форму ниже и нажмите кнопку <code>сохранить</code>.
+                                    <p>Подтверждение перевода может занять некоторое время</p>
+                                    </p>
+                                    <hr class="short">
+                                    <form>
+                                        <div class="form-group row">
+                                            <label for="paymentSenderName" class="col-sm-6 col-form-label">Имя отправителя</label>
+                                            <div class="col-sm-6">
+                                            <input type="text" class="form-control" id="tinkoff_SenderName" value="">
+                                            </div>
+                                        </div>
+                                        <div class="form-group row">
+                                            <label for="paymentDate" class="col-sm-6 col-form-label">Дата перевода</label>
+                                            <div class="col-sm-6">
+                                            <input type="text" class="form-control" id="tinkoff_paymentDate" placeholder="Дата">
+                                            </div>
+                                        </div>
+                                        <div class="form-group row">
+                                            <label for="paymentSum" class="col-sm-6 col-form-label">Сумма перевода</label>
+                                            <div class="col-sm-6">
+                                            <input type="text" class="form-control" id="tinkoff_paymentSum" placeholder="Сумма перевода">
+                                            </div>
+                                        </div>
+                                        <button type="button" class="btn btn-primary mb-2">Сохранить</button>
+                                    </form>
                                 </div>
                             </div>
                             <button type="button" class="btn btn-secondary" id="pay_tinkoff">

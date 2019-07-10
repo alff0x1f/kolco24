@@ -104,8 +104,8 @@ function set_ucount(count) {
         $("#sidecolumn_paid").hide();
         $("#paid_explain").hide();
     } else {
-        $("#sidecolumn_paid").hide(); //online payment closed
-        $("#paid_explain").hide(); //online payment closed
+        $("#sidecolumn_paid").show();
+        $("#paid_explain").show();
     }
     $("#pay_sberbank").show();
     $("#sberbank_initial_explanation").show();
@@ -168,16 +168,11 @@ function save_team(payment_method) {
                 if (data.paymentmethod == "sberbank"){
                     $("#pay_sberbank").hide();
                     $("#sberbank_initial_explanation").hide();
-                    $('#sberbank_phone').text(data.cardholder_phone);
-                    $('#sberbank_phone2').text(data.cardholder_phone);
                     $('#sberbank_cardnumber').text(data.cardnumber);
                     $('#sberbank_name').text(data.cardholder_name);
                     $('#sberbank_sum').text(data.sum);
-                    $('#sberbank_sum2').text(data.sum);
-                    $('#sberbank_comment').text(data.payment_comment);
-                    $('#sberbank_comment2').text(data.payment_comment);
-                    $('#sberbank_comment3').text(data.payment_comment);
-                    $('#sberbank_comment4').text(data.payment_comment);
+                    $('#sberbank_paymentSum').val(data.sum);
+                    $('#sberbank_paymentDate').val(data.today_date);
                     $("#sberbank_pay_manual").show();
                     $('html, body').animate({
                         scrollTop: $("#sberbank_pay_manual").offset().top-100
@@ -191,8 +186,8 @@ function save_team(payment_method) {
                     $('#tinkoff_cardnumber').text(data.cardnumber);
                     $('#tinkoff_name').text(data.cardholder_name);
                     $('#tinkoff_sum').text(data.sum);
-                    $('#tinkoff_comment').text(data.payment_comment);
-                    $('#tinkoff_comment2').text(data.payment_comment);
+                    $('#tinkoff_paymentSum').val(data.sum);
+                    $('#tinkoff_paymentDate').val(data.today_date);
                     $("#tinkoff_pay_manual").show();
                     $('html, body').animate({
                         scrollTop: $("#tinkoff_pay_manual").offset().top-100

@@ -1,5 +1,5 @@
 from datetime import datetime, timezone, timedelta
-from time import time
+from time import time, gmtime, strftime
 from django.shortcuts import render
 from django.http import HttpResponse
 from django.contrib.auth import login as auth_login
@@ -16,6 +16,7 @@ from website.googledocs import (sync_sheet,
                                 import_start_numbers_from_sheet, 
                                 import_category_from_sheet, 
                                 export_payments_to_sheet)
+                
 
 
 def index(request):
@@ -305,15 +306,15 @@ def my_team(request, teamid="", template="my_team"):
             if paymentmethod == "sberbank":
                 response_data['paymentmethod'] = 'sberbank'
                 response_data['cardnumber'] = settings.SBERBANK_INFO["cardnumber"]
-                response_data['cardholder_phone'] = settings.SBERBANK_INFO["phone"]
+                # response_data['cardholder_phone'] = settings.SBERBANK_INFO["phone"]
                 response_data['cardholder_name'] = settings.SBERBANK_INFO["name"]
-                response_data['payment_comment'] = "команда%s" % team.id
+                response_data['today_date'] = strftime("%d.%m.%Y", gmtime())
             if paymentmethod == "tinkoff":
                 response_data['paymentmethod'] = 'tinkoff'
                 response_data['cardnumber'] = settings.TINKOFF_INFO["cardnumber"]
                 response_data['cardholder_phone'] = settings.TINKOFF_INFO["phone"]
                 response_data['cardholder_name'] = settings.TINKOFF_INFO["name"]
-                response_data['payment_comment'] = "команда%s" % team.id
+                response_data['today_date'] = strftime("%d.%m.%Y", gmtime())
             response_data['success'] = 'true'
             return JsonResponse(response_data)
     raise Http404("Wrong values")
