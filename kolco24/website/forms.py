@@ -114,7 +114,12 @@ class RegForm(forms.Form):
             email = self.cleaned_data["email"]
             while User.objects.filter(username=username).exists():
                 username = self.id_generator(12)
-            user = User.objects.create_user(username, email, password)
+            
+            old_user = User.objects.filter(email__iexact=self.cleaned_data["email"])[:1]
+            if old_user:
+                user = old_user.get()
+            else:
+                user = User.objects.create_user(username, email, password)
             user.first_name = first_name
             user.last_name = last_name
             user.profile.phone = phone
@@ -148,8 +153,12 @@ class RegForm(forms.Form):
                     self.fields[f_name].widget.attrs['class'] = classes
             raise forms.ValidationError("Заполните все поля")
 
-        if User.objects.filter(email__iexact=self.cleaned_data["email"]).exists():
+        exist_user = User.objects.filter(email__iexact=self.cleaned_data["email"])[:1]
+        if exist_user:
+            team = Team.objects.filter(owner=exist_user, year=2019)
             u_email = "@@@" if self.user.is_anonymous else self.user.email.lower()
+            if not team:
+                u_email = self.cleaned_data["email"].lower()
             if self.cleaned_data["email"].lower() != u_email:
                 raise forms.ValidationError("Такой email уже зарегистрирован.")
 
