@@ -105,21 +105,6 @@ class PaymentsYa(models.Model):
             return True
         return False
 
-    def get_info(self, paymentid):
-        payments = PaymentsYa.objects.filter(label=paymentid, unaccepted=False)
-        people_paid = 0
-        withdraw_sum = 0
-        for payment in payments:
-            t = datetime.datetime.strptime(
-                payment.datetime, "%Y-%m-%dT%H:%M:%SZ").timestamp()-time.timezone
-            cost = payment.get_cost(t)
-            withdraw = float(
-                payment.withdraw_amount) if payment.withdraw_amount else 0
-            people_paid += withdraw / cost
-            withdraw_sum += withdraw
-
-        return (people_paid, withdraw_sum)
-
     def get_sum(self, paymentid):
         payments = PaymentsYa.objects.filter(label=paymentid, unaccepted=False)
         paid = 0
@@ -129,15 +114,20 @@ class PaymentsYa(models.Model):
         return paid
 
     def update_team(self, paymentid):
-        people_paid, withdraw = self.get_info(paymentid)
-        team = Team.objects.filter(paymentid=paymentid)[:1]
-        if team:
-            team = team.get()
-            team.paid_sum = withdraw
-            team.paid_people = people_paid
-            team.save()
-            return True
-        return False
+        payment = Payment.objects.filter(id=int(paymentid))[:1]
+        if not payment:
+            return False
+        payment = payment.get()
+        if payment.payment_with_discount <= self.withdraw_amount:
+            payment.status = "done"
+        if payment.payment_with_discount > self.withdraw_amount:
+            payment.stats = "partial"
+        if payment.team:
+            payment.team.ucount = payment.paid_for
+            payment.team.paid_sum = payment.payment_with_discount
+            payment.team.save()
+        payment.save()
+        return True
 
 
 class Team(models.Model):
@@ -198,10 +188,6 @@ class Team(models.Model):
             self.paymentid = '%016x' % random.randrange(16**16)
             self.year = 2019
             self.save()
-
-    def update_money(self):
-        payment = PaymentsYa()
-        payment.update_team(self.paymentid)
 
     def get_info(self):
         teams = Team.objects.filter(paid_sum__gt=0, year=2019)
