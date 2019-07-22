@@ -21,6 +21,8 @@ urlpatterns = [
     re_path('^team_finish/(?P<teamid>[0-9a-f]{16})', views.team_finish),
     re_path('^success/(?P<teamid>[0-9a-f]{16})', views.success),
     path('newteam', views.new_team, name='new_team'),
+    path('api/v1/newpayment', views.new_payment, name='new_payment'),
+    path('api/v1/paymentinfo', views.paymentinfo, name='paymentinfo'),
     path('yandexinform', views.yandex_payment, name='yandexinform'),
     path('sync_table', views.sync_table, name='sync_table'),
     path('import_start_numbers', views.import_start_numbers, name='import_start_numbers'),

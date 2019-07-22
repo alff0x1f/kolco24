@@ -8,15 +8,15 @@ from django.contrib.auth.decorators import login_required
 from django.views.decorators.csrf import csrf_exempt
 from website.forms import (LoginForm, FastLoginForm, RegForm, TeamForm,
                            TeamFormAdmin)
-from website.models import PaymentsYa, Team, Athlet, PaymentLog, FastLogin
+from website.models import (PaymentsYa, Team, Athlet, Payment, PaymentLog,
+                            FastLogin)
 from django.http import HttpResponseRedirect, Http404, JsonResponse
 from django.conf import settings
 from website.email import send_login_email
-from website.googledocs import (sync_sheet, 
-                                import_start_numbers_from_sheet, 
-                                import_category_from_sheet, 
+from website.googledocs import (sync_sheet,
+                                import_start_numbers_from_sheet,
+                                import_category_from_sheet,
                                 export_payments_to_sheet)
-                
 
 
 def index(request):
@@ -25,13 +25,14 @@ def index(request):
     free_athlets = 0
     if request.user.is_authenticated:
         init_val = {
-            "first_name":request.user.first_name,
+            "first_name": request.user.first_name,
             "last_name": request.user.last_name,
             "email": request.user.email,
             "phone": request.user.profile.phone,
-            }
+        }
         myteams = Team.objects.filter(owner=request.user)
-        free_athlets = Athlet.objects.filter(owner=request.user, team=None).count()
+        free_athlets = Athlet.objects.filter(
+            owner=request.user, team=None).count()
     reg_form = RegForm(request.POST or None, initial=init_val)
     reg_form.set_user(request.user)
 
@@ -53,8 +54,10 @@ def index(request):
     }
     return render(request, 'website/index.html', contex)
 
+
 def index_dummy(request):
     return render(request, 'website/index_dummy.html')
+
 
 def passlogin(request):
     if request.user.is_authenticated:
@@ -67,6 +70,7 @@ def passlogin(request):
 
     return render(request, 'website/passlogin.html', {'form': form})
 
+
 def login(request):
     if request.user.is_authenticated:
         return HttpResponseRedirect("/")
@@ -75,10 +79,11 @@ def login(request):
         login = FastLogin()
         login_key = login.new_login_link(form.cleaned_data['email'])
         send_login_email(form.cleaned_data['email'], login_key)
-        return render(request, 'website/login.html', {'success': 'ok', 
-                                                           'form': form})
+        return render(request, 'website/login.html', {'success': 'ok',
+                                                      'form': form})
 
     return render(request, 'website/login.html', {'form': form})
+
 
 def login_by_key(request, login_key=""):
     keys = FastLogin.objects.filter(login_key=login_key)
@@ -93,11 +98,12 @@ def login_by_key(request, login_key=""):
                 return HttpResponseRedirect("/")
             else:
                 return render(request, 'website/login.html', {
-                    'success': 'enter', 
+                    'success': 'enter',
                     'login_key': login_key,
                     'username': key.user.first_name + ' ' + key.user.last_name,
-                    })
+                })
     return HttpResponseRedirect("/login")
+
 
 def logout_user(request):
     if request.method == "POST":
@@ -107,31 +113,32 @@ def logout_user(request):
                 return HttpResponseRedirect("/")
     raise Http404("File not found.")
 
+
 def teams(request, template=""):
     teams = [
         {
-            'teams': Team.objects.filter(category="6h").order_by('start_number'), 
-            'dist_name':'6ч'
+            'teams': Team.objects.filter(category="6h").order_by('start_number'),
+            'dist_name': '6ч'
         },
         {
-            'teams': Team.objects.filter(category="12h_mw").order_by('start_number'), 
-            'dist_name':'12ч двойки МЖ',
+            'teams': Team.objects.filter(category="12h_mw").order_by('start_number'),
+            'dist_name': '12ч двойки МЖ',
         },
         {
-            'teams': Team.objects.filter(category="12h_mm").order_by('start_number'), 
-            'dist_name':'12ч двойки ММ',
+            'teams': Team.objects.filter(category="12h_mm").order_by('start_number'),
+            'dist_name': '12ч двойки ММ',
         },
         {
-            'teams': Team.objects.filter(category="12h_ww").order_by('start_number'), 
-            'dist_name':'12ч двойки ЖЖ',
+            'teams': Team.objects.filter(category="12h_ww").order_by('start_number'),
+            'dist_name': '12ч двойки ЖЖ',
         },
         {
             'teams': Team.objects.filter(category="12h_team").order_by('start_number'),
             'dist_name': '12ч команда',
         },
         {
-            'teams': Team.objects.filter(category="24h").order_by('start_number'), 
-            'dist_name':'24ч команда',
+            'teams': Team.objects.filter(category="24h").order_by('start_number'),
+            'dist_name': '24ч команда',
         }
     ]
 
@@ -142,13 +149,14 @@ def teams(request, template=""):
     if request.user.is_superuser:
         teams.append({
             'teams': Team.objects.filter(paid_sum__lt=1),
-            'dist_name' : 'Неоплаченное',
-            })
-        
+            'dist_name': 'Неоплаченное',
+        })
+
     context = {
-        'teams':teams,
+        'teams': teams,
     }
     return render(request, 'website/teams%s.html' % template, context)
+
 
 def teams_predstart(request):
     return teams(request, template='_predstart')
@@ -157,20 +165,20 @@ def teams_predstart(request):
 def teams_start(request):
     teams = [
         {
-            'teams': Team.objects.filter(paid_sum__gt=1, category="6h", start_time__isnull=True), 
-            'dist_name':'Дистанция 6ч'
+            'teams': Team.objects.filter(paid_sum__gt=1, category="6h", start_time__isnull=True),
+            'dist_name': 'Дистанция 6ч'
         },
         {
-            'teams': Team.objects.filter(paid_sum__gt=1, category__startswith="12h", start_time__isnull=True), 
-            'dist_name':'Дистанция 12ч'
+            'teams': Team.objects.filter(paid_sum__gt=1, category__startswith="12h", start_time__isnull=True),
+            'dist_name': 'Дистанция 12ч'
         },
         {
-            'teams': Team.objects.filter(paid_sum__gt=1, category="24h", start_time__isnull=True), 
-            'dist_name':'Дистанция 24ч'
+            'teams': Team.objects.filter(paid_sum__gt=1, category="24h", start_time__isnull=True),
+            'dist_name': 'Дистанция 24ч'
         },
         {
-            'teams': Team.objects.filter(paid_sum__gt=1, start_time__isnull=False), 
-            'dist_name':'Стартовавшие'
+            'teams': Team.objects.filter(paid_sum__gt=1, start_time__isnull=False),
+            'dist_name': 'Стартовавшие'
         },
     ]
     for teamgroup in teams:
@@ -179,23 +187,24 @@ def teams_start(request):
                 team.start_time = team.start_time + timedelta(hours=5)
 
     context = {
-        'teams':teams,
+        'teams': teams,
     }
     return render(request, 'website/teams_start.html', context)
+
 
 def teams_finish(request):
     teams = [
         {
-            'teams': Team.objects.filter(paid_sum__gt=1, category__startswith="12h", finish_time__isnull=True).order_by('start_number'), 
-            'dist_name':'Дистанция 12ч'
+            'teams': Team.objects.filter(paid_sum__gt=1, category__startswith="12h", finish_time__isnull=True).order_by('start_number'),
+            'dist_name': 'Дистанция 12ч'
         },
         {
-            'teams': Team.objects.filter(paid_sum__gt=1, category="24h", finish_time__isnull=True).order_by('start_number'), 
-            'dist_name':'Дистанция 24ч'
+            'teams': Team.objects.filter(paid_sum__gt=1, category="24h", finish_time__isnull=True).order_by('start_number'),
+            'dist_name': 'Дистанция 24ч'
         },
         {
-            'teams': Team.objects.filter(paid_sum__gt=1, finish_time__isnull=False).order_by('finish_time'), 
-            'dist_name':'финишировавшие'
+            'teams': Team.objects.filter(paid_sum__gt=1, finish_time__isnull=False).order_by('finish_time'),
+            'dist_name': 'финишировавшие'
         },
     ]
     for teamgroup in teams:
@@ -204,23 +213,24 @@ def teams_finish(request):
                 team.start_time = team.start_time + timedelta(hours=5)
 
     context = {
-        'teams':teams,
+        'teams': teams,
     }
     return render(request, 'website/teams_finish.html', context)
+
 
 def teams_protocol(request):
     teams = [
         {
-            'teams': Team.objects.filter(paid_sum__gt=1, category="6h"), 
-            'dist_name':'Дистанция 6ч'
+            'teams': Team.objects.filter(paid_sum__gt=1, category="6h"),
+            'dist_name': 'Дистанция 6ч'
         },
         {
-            'teams': Team.objects.filter(paid_sum__gt=1, category__startswith="12h"), 
-            'dist_name':'Дистанция 12ч'
+            'teams': Team.objects.filter(paid_sum__gt=1, category__startswith="12h"),
+            'dist_name': 'Дистанция 12ч'
         },
         {
-            'teams': Team.objects.filter(paid_sum__gt=1, category="24h"), 
-            'dist_name':'Дистанция 24ч'
+            'teams': Team.objects.filter(paid_sum__gt=1, category="24h"),
+            'dist_name': 'Дистанция 24ч'
         },
     ]
     for teamgroup in teams:
@@ -229,9 +239,10 @@ def teams_protocol(request):
                 team.start_time = team.start_time + timedelta(hours=5)
 
     context = {
-        'teams':teams,
+        'teams': teams,
     }
     return render(request, 'website/teams_protocol.html', context)
+
 
 def success(request, teamid=""):
     team = Team.objects.filter(paymentid=teamid)[:1]
@@ -242,13 +253,14 @@ def success(request, teamid=""):
         return render(request, 'website/success.html', context)
     raise Http404("File not found.")
 
+
 @login_required
 def my_team(request, teamid="", template="my_team"):
     team_form = TeamForm(request.POST or None)
     paymentid = team_form.init_vals(request.user, teamid)
     if not paymentid:
         raise Http404("Nothing found")
-    
+
     if request.user.is_superuser:
         team_form_admin = TeamFormAdmin(None)
         team_form_admin.init_vals(request.user, teamid)
@@ -283,56 +295,36 @@ def my_team(request, teamid="", template="my_team"):
             if not team:
                 Http404("Wrong values")
             response_data = {}
-            response_data['paymentmethod'] = ""
-            paymentmethod = request.POST["paymentmethod"] if \
-                "paymentmethod" in request.POST else ""
             response_data['sum'] = (team.ucount - team.paid_people) * cost_now
 
             new_event = PaymentLog(
                 team=team,
-                payment_method=paymentmethod, 
+                payment_method="save",
                 paid_sum=response_data['sum']
             )
             new_event.save()
-
-            if paymentmethod == "visamc":
-                response_data['paymentmethod'] = 'visamc'
-                response_data['paymentmetid'] = team.paymentid
-                response_data['yandexwallet'] = settings.YANDEX_WALLET
-            if paymentmethod == "yandexmoney":
-                response_data['paymentmethod'] = 'yandexmoney'
-                response_data['paymentmetid'] = team.paymentid
-                response_data['yandexwallet'] = settings.YANDEX_WALLET
-            if paymentmethod == "sberbank":
-                response_data['paymentmethod'] = 'sberbank'
-                response_data['cardnumber'] = settings.SBERBANK_INFO["cardnumber"]
-                # response_data['cardholder_phone'] = settings.SBERBANK_INFO["phone"]
-                response_data['cardholder_name'] = settings.SBERBANK_INFO["name"]
-                response_data['today_date'] = strftime("%d.%m.%Y", gmtime())
-            if paymentmethod == "tinkoff":
-                response_data['paymentmethod'] = 'tinkoff'
-                response_data['cardnumber'] = settings.TINKOFF_INFO["cardnumber"]
-                response_data['cardholder_phone'] = settings.TINKOFF_INFO["phone"]
-                response_data['cardholder_name'] = settings.TINKOFF_INFO["name"]
-                response_data['today_date'] = strftime("%d.%m.%Y", gmtime())
             response_data['success'] = 'true'
             return JsonResponse(response_data)
     raise Http404("Wrong values")
+
 
 def team_predstart(request, teamid=""):
     if request.user.is_superuser:
         return my_team(request, teamid, "team_predstart")
     raise Http404("Not found")
 
+
 def team_start(request, teamid=""):
     if request.user.is_superuser:
         return my_team(request, teamid, "team_start")
     raise Http404("Not found")
 
+
 def team_finish(request, teamid=""):
     if request.user.is_superuser:
         return my_team(request, teamid, "team_finish")
     raise Http404("Not found")
+
 
 @login_required
 def team_admin(request, teamid=""):
@@ -347,17 +339,81 @@ def team_admin(request, teamid=""):
             return JsonResponse(response_data)
     raise Http404("Wrong values")
 
+
+def new_payment(request):
+    if request.method == "POST":
+        paymentid = request.POST['paymentid'] if 'paymentid' in request.POST else ''
+        team = Team.objects.filter(paymentid=paymentid)[:1]
+        if not team:
+            raise Http404("Team not found")
+        payment_method = request.POST['payment_method'] if 'payment_method' in request.POST else ''
+        if not payment_method:
+            payment_method = 'visamc'
+
+        team = team.get()
+        payment = Payment()
+        if request.user.is_authenticated:
+            payment.owner = request.user
+        payment.team = team
+        payment.payment_method = payment_method
+
+        cost_now = PaymentsYa().get_cost()
+        cost = (team.ucount - team.paid_people) * cost_now
+        payment.payment_amount = cost
+        payment.payment_with_discount = cost  # ! FIXME: need add coupon
+        payment.cost_per_person = cost_now
+        payment.paid_for = team.ucount
+        payment.status = 'draft'
+        payment.save()
+        pid = payment.id
+        response_data = {}
+        response_data['success'] = 'true'
+        response_data['payment_id'] = str(pid)
+        response_data['sum'] = cost
+        response_data['paymentmethod'] = payment_method
+        if payment_method == "visamc":
+            response_data['yandexwallet'] = settings.YANDEX_WALLET
+        if payment_method == "yandexmoney":
+            response_data['yandexwallet'] = settings.YANDEX_WALLET
+        if payment_method == "sberbank":
+            response_data['cardnumber'] = settings.SBERBANK_INFO["cardnumber"]
+            # response_data['cardholder_phone'] = settings.SBERBANK_INFO["phone"]
+            response_data['cardholder_name'] = settings.SBERBANK_INFO["name"]
+            response_data['today_date'] = strftime("%d.%m.%Y", gmtime())
+        if payment_method == "tinkoff":
+            response_data['paymentmethod'] = 'tinkoff'
+            response_data['cardnumber'] = settings.TINKOFF_INFO["cardnumber"]
+            response_data['cardholder_phone'] = settings.TINKOFF_INFO["phone"]
+            response_data['cardholder_name'] = settings.TINKOFF_INFO["name"]
+            response_data['today_date'] = strftime("%d.%m.%Y", gmtime())
+
+        new_event = PaymentLog(
+            team=team,
+            payment_method=payment_method,
+            paid_sum=response_data['sum']
+        )
+        new_event.save()
+
+        return JsonResponse(response_data)
+    raise Http404("Wrong values")
+
+
+def paymentinfo(request):
+    raise Http404("Wrong values")
+
+
 @login_required
 def new_team(request):
     if request.method == "POST":
         team = Team()
         team.new_team(request.user, '12h', 4)
         team.save()
-    return HttpResponseRedirect("/team/%s"%team.paymentid)
+    return HttpResponseRedirect("/team/%s" % team.paymentid)
+
 
 @csrf_exempt
 def yandex_payment(request):
-    if request.method=='POST':
+    if request.method == 'POST':
         payment = PaymentsYa()
         if payment.new_payment(request.POST):
             # send_success_email(payment.label, payment.withdraw_amount, notification_type)
@@ -366,13 +422,15 @@ def yandex_payment(request):
             raise Http404("Wrong values")
     raise Http404("File not found.")
 
+
 def sync_table(request):
     if request.user.is_superuser:
         sync_sheet()
         return HttpResponse("Ok")
     else:
         raise Http404("File not found.")
-    
+
+
 def import_start_numbers(request):
     if request.user.is_superuser:
         count = import_start_numbers_from_sheet()
@@ -380,12 +438,14 @@ def import_start_numbers(request):
     else:
         raise Http404("File not found.")
 
+
 def import_categories(request):
     if request.user.is_superuser:
         count = import_category_from_sheet()
         return HttpResponse("Updated: %s" % count)
     else:
         raise Http404("File not found.")
+
 
 def export_payments(request):
     if request.user.is_superuser:

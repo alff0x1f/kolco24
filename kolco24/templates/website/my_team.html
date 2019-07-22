@@ -591,7 +591,7 @@
             <form method="POST" action="https://money.yandex.ru/quickpay/confirm.xml" id="yandexform">
                 <input type="hidden" id="yandexwallet" name="receiver" value="">
                 <input type="hidden" name="quickpay-form" value="shop">
-                <input type="hidden" id="yatargets" name="targets" value="Взнос за Кольцо-24 ({{ main_team.paymentid }})">
+                <input type="hidden" id="yatargets" name="targets" value="Взнос за Кольцо-24">
                 <input type="hidden" id="yasum" name="sum" value="0" data-type="number">
                 <input type="hidden" id ="paymenttype" name="paymentType" value="AC">
                 <input type="hidden" name="formcomment" value="Кольцо 24">
@@ -665,26 +665,26 @@
                                     или мобильное приложение. При переводе заполните форму ниже и нажмите кнопку <code>сохранить</code>.</p>
                                     <p>Проверка перевода может занять некоторое время</p>
                                     <hr class="short">
-                                    <form>
+                                    <form id="sberpaymentform">
                                         <div class="form-group row">
-                                            <label for="paymentCardCode" class="col-sm-6 col-form-label">Последние 4 цифры вашей карты</label>
+                                            <label for="sberbank_senderCardNumber" class="col-sm-6 col-form-label">Последние 4 цифры вашей карты</label>
                                             <div class="col-sm-6">
-                                            <input type="text" class="form-control" id="sberbank_paymentCardCode" value="">
+                                            <input type="text" class="form-control" id="sberbank_senderCardNumber" value="">
                                             </div>
                                         </div>
                                         <div class="form-group row">
-                                            <label for="paymentDate" class="col-sm-6 col-form-label">Дата перевода</label>
+                                            <label for="sberbank_paymentDate" class="col-sm-6 col-form-label">Дата перевода</label>
                                             <div class="col-sm-6">
                                             <input type="text" class="form-control" id="sberbank_paymentDate" placeholder="Дата">
                                             </div>
                                         </div>
                                         <div class="form-group row">
-                                            <label for="paymentSum" class="col-sm-6 col-form-label">Сумма перевода</label>
+                                            <label for="sberbank_paymentSum" class="col-sm-6 col-form-label">Сумма перевода</label>
                                             <div class="col-sm-6">
                                             <input type="text" class="form-control" id="sberbank_paymentSum" placeholder="Сумма перевода">
                                             </div>
                                         </div>
-                                        <button type="button" class="btn btn-primary mb-2">Сохранить</button>
+                                        <button type="button" class="btn btn-primary mb-2" id='sberbank_paymentinfo_btn'>Сохранить</button>
                                     </form>
                                 </div>
                             </div>
