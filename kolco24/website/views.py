@@ -51,7 +51,7 @@ def index(request):
         'myteams': myteams,
         'myteams_count': len(myteams),
         'free_athlet': free_athlets,
-        'reg_open': False,
+        'reg_open': True,
     }
     return render(request, 'website/index.html', contex)
 
@@ -417,6 +417,11 @@ def paymentinfo(request):
             return JsonResponse(response_data)
     raise Http404("Wrong values")
 
+def get_cost(request):
+    response_data = {}
+    response_data['success'] = 'true'
+    response_data["cost"] = PaymentsYa().get_cost()
+    return JsonResponse(response_data)
 
 @login_required
 def new_team(request):
