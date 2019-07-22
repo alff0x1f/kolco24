@@ -400,6 +400,21 @@ def new_payment(request):
 
 
 def paymentinfo(request):
+    if request.method == "POST":
+        new_payment_id = request.POST['paymentid']
+        # print(request.POST)
+        payment = Payment.objects.filter(id=new_payment_id)[:1]
+        if payment:
+            payment = payment.get()
+            payment.status = 'draft_with_info'
+            payment.sender_card_number = request.POST['sender_card_number'] +' ' + request.POST['payment_sum']
+            pdate = datetime.strptime(request.POST['payment_date'], '%d.%m.%Y')
+            payment.payment_date = pdate
+            payment.save()
+            response_data = {}
+            response_data['paymentmethod'] = payment.payment_method
+            response_data['success'] = 'true'
+            return JsonResponse(response_data)
     raise Http404("Wrong values")
 
 

@@ -184,24 +184,17 @@ function new_payment(payment_method) {
         dataType  : 'json',
         success   : function(data) {
             if (data.success) {
-                $('#team_form_alert').html("Данные команды сохранены");
-                $('#team_form_alert').removeClass("alert-danger");
-                $('#team_form_alert').addClass("alert-success");
-                $('#team_form_alert').show();
-                $("#team_form_alert").fadeOut(3000);
-
+                $('#yandexform #yalabel').val(data.payment_id);
                 if (data.paymentmethod == "visamc"){
                     $('#yandexform #paymenttype').val('AC');
                     $('#yandexform #yandexwallet').val(data.yandexwallet);
                     $('#yandexform #yasum').val(data.sum);
-                    $('#yandexform #yalabel').val(data.payment_id);
                     $('#yandexform').submit();
                 };
                 if (data.paymentmethod == "yandexmoney"){
-                    $('#paymenttype').val('PC');
-                    $('#yandexwallet').val(data.yandexwallet);
-                    $('#yasum').val(data.sum);
-                    $('#yalabel').val(data.payment_id);
+                    $('#yandexform #paymenttype').val('PC');
+                    $('#yandexform #yandexwallet').val(data.yandexwallet);
+                    $('#yandexform #yasum').val(data.sum);
                     $('#yandexform').submit();
                 }
                 if (data.paymentmethod == "sberbank"){
@@ -252,6 +245,70 @@ function new_payment(payment_method) {
     });
 };
 
+function additional_payment_info(payment_method) {
+    var p_info = {};
+    if (payment_method == 'sberbank'){
+        var p_info = { //Fetch form data
+            'sender_card_number' :$('#sberbank_senderCardNumber').val(),
+            'payment_date' : $('#sberbank_paymentDate').val(),
+            'payment_sum' : $('#sberbank_paymentSum').val(),
+            'paymentid'     : $('#yandexform #yalabel').val(),
+            'payment_method' : payment_method,
+            'csrfmiddlewaretoken' : csrf_token,
+        };
+    };
+    if (payment_method == 'tinkoff'){
+        var p_info = {
+            'sender_card_number' :$('#tinkoff_SenderName').val(),
+            'payment_date' : $('#tinkoff_paymentDate').val(),
+            'payment_sum' : $('#tinkoff_paymentSum').val(),
+            'paymentid'     : $('#yandexform #yalabel').val(),
+            'payment_method' : payment_method,
+            'csrfmiddlewaretoken' : csrf_token,
+        };
+    };
+    $.ajax({
+        type      : 'POST',
+        url       : '/api/v1/paymentinfo',
+        data      : p_info,
+        dataType  : 'json',
+        success   : function(data) {
+            if (data.success) {
+                if (data.paymentmethod == "sberbank"){
+                    $('#sberpaymentform_alert').html("Данные карты сохранены");
+                    $('#sberpaymentform_alert').removeClass("alert-danger");
+                    $('#sberpaymentform_alert').addClass("alert-success");
+                    $('#sberpaymentform_alert').show();
+                    $("#sberpaymentform_alert").fadeOut(3000);
+                    
+                }
+                if (data.paymentmethod == "tinkoff"){
+                    $('#tinkoffpaymentform_alert').html("Данные карты сохранены");
+                    $('#tinkoffpaymentform_alert').removeClass("alert-danger");
+                    $('#tinkoffpaymentform_alert').addClass("alert-success");
+                    $('#tinkoffpaymentform_alert').show();
+                    $("#tinkoffpaymentform_alert").fadeOut(3000);
+                }
+            }
+            else
+            {
+                $('#team_form_alert').html("Упс, что-то пошло не так!");
+                $('#team_form_alert').removeClass("alert-success");
+                $('#team_form_alert').addClass("alert-danger");
+                $('#team_form_alert').show();
+                $("#team_form_alert").fadeOut(3000);
+            }
+        },
+        error: function(XMLHttpRequest, textStatus, errorThrown) { 
+            $('#team_form_alert').html("Упс, что-то пошло не так: " + errorThrown);
+            $('#team_form_alert').removeClass("alert-success");
+            $('#team_form_alert').addClass("alert-danger");
+            $('#team_form_alert').show();
+            $("#team_form_alert").fadeOut(3000);
+        }
+    });
+};
+
 $(function() {
     set_ucount(ucount);
 });
@@ -259,6 +316,13 @@ $(function() {
 $('#teamform').submit(function(e){
     e.preventDefault();
     save_team("");
+});
+
+$('#sberbank_pay_manual').submit(function(e){
+    e.preventDefault();
+});
+$('#tinkoff_pay_manual').submit(function(e){
+    e.preventDefault();
 });
 
 $('#pay_visamastercard').on('click', function(){
@@ -286,6 +350,14 @@ $('#pay_tinkoff').on('click', function(){
 });
 
 $('#common_paid').on('click', function(){
-    payment_method = $('input[name=radio]:checked', '#paymentmethod').val()
-    new_payment(payment_method)
+    payment_method = $('input[name=radio]:checked', '#paymentmethod').val();
+    new_payment(payment_method);
+});
+
+$('#sberbank_paymentinfo_btn').on('click', function(){
+    additional_payment_info("sberbank");
+});
+
+$('#tinkoff_paymentinfo_btn').on('click', function(){
+    additional_payment_info("tinkoff");
 });
