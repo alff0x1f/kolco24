@@ -272,7 +272,7 @@ class Payment(models.Model):
     )
     status = models.CharField(max_length=50)
     sender_card_number = models.CharField(max_length=50)
-    payment_date = models.DateField()
+    payment_date = models.DateField(null=True, blank=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
