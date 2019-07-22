@@ -46,7 +46,6 @@ class PaymentsYa(models.Model):
             ("31.08.2019 19:00", 800),
             ("18.08.2019 19:00", 700),
             ("31.07.2019 19:00", 600),
-            ("15.07.2019 19:00", 500),
         ]
         if not t:
             t = time.time()
@@ -56,6 +55,9 @@ class PaymentsYa(models.Model):
                 d[0], s_format).timestamp()-time.timezone
             if t < datestamp:
                 cost = d[1]
+        teams_count, members_count = Team().get_info()
+        if teams_count < 15:
+            cost = 500
         return cost
 
     def new_payment(self, d):
