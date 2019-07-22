@@ -30,7 +30,7 @@ def index(request):
             "email": request.user.email,
             "phone": request.user.profile.phone,
         }
-        myteams = Team.objects.filter(owner=request.user)
+        myteams = Team.objects.filter(owner=request.user, year=2019)
         free_athlets = Athlet.objects.filter(
             owner=request.user, team=None).count()
     reg_form = RegForm(request.POST or None, initial=init_val)
@@ -148,7 +148,7 @@ def teams(request, template=""):
 
     if request.user.is_superuser:
         teams.append({
-            'teams': Team.objects.filter(paid_sum__lt=1),
+            'teams': Team.objects.filter(paid_sum__lt=1, year=2019),
             'dist_name': 'Неоплаченное',
         })
 
@@ -165,19 +165,19 @@ def teams_predstart(request):
 def teams_start(request):
     teams = [
         {
-            'teams': Team.objects.filter(paid_sum__gt=1, category="6h", start_time__isnull=True),
+            'teams': Team.objects.filter(paid_sum__gt=1, category="6h", start_time__isnull=True, year=2019),
             'dist_name': 'Дистанция 6ч'
         },
         {
-            'teams': Team.objects.filter(paid_sum__gt=1, category__startswith="12h", start_time__isnull=True),
+            'teams': Team.objects.filter(paid_sum__gt=1, category__startswith="12h", start_time__isnull=True, year=2019),
             'dist_name': 'Дистанция 12ч'
         },
         {
-            'teams': Team.objects.filter(paid_sum__gt=1, category="24h", start_time__isnull=True),
+            'teams': Team.objects.filter(paid_sum__gt=1, category="24h", start_time__isnull=True, year=2019),
             'dist_name': 'Дистанция 24ч'
         },
         {
-            'teams': Team.objects.filter(paid_sum__gt=1, start_time__isnull=False),
+            'teams': Team.objects.filter(paid_sum__gt=1, start_time__isnull=False, year=2019),
             'dist_name': 'Стартовавшие'
         },
     ]
@@ -195,15 +195,15 @@ def teams_start(request):
 def teams_finish(request):
     teams = [
         {
-            'teams': Team.objects.filter(paid_sum__gt=1, category__startswith="12h", finish_time__isnull=True).order_by('start_number'),
+            'teams': Team.objects.filter(paid_sum__gt=1, category__startswith="12h", finish_time__isnull=True, year=2019).order_by('start_number'),
             'dist_name': 'Дистанция 12ч'
         },
         {
-            'teams': Team.objects.filter(paid_sum__gt=1, category="24h", finish_time__isnull=True).order_by('start_number'),
+            'teams': Team.objects.filter(paid_sum__gt=1, category="24h", finish_time__isnull=True, year=2019).order_by('start_number'),
             'dist_name': 'Дистанция 24ч'
         },
         {
-            'teams': Team.objects.filter(paid_sum__gt=1, finish_time__isnull=False).order_by('finish_time'),
+            'teams': Team.objects.filter(paid_sum__gt=1, finish_time__isnull=False, year=2019).order_by('finish_time'),
             'dist_name': 'финишировавшие'
         },
     ]
@@ -221,15 +221,15 @@ def teams_finish(request):
 def teams_protocol(request):
     teams = [
         {
-            'teams': Team.objects.filter(paid_sum__gt=1, category="6h"),
+            'teams': Team.objects.filter(paid_sum__gt=1, category="6h", year=2019),
             'dist_name': 'Дистанция 6ч'
         },
         {
-            'teams': Team.objects.filter(paid_sum__gt=1, category__startswith="12h"),
+            'teams': Team.objects.filter(paid_sum__gt=1, category__startswith="12h", year=2019),
             'dist_name': 'Дистанция 12ч'
         },
         {
-            'teams': Team.objects.filter(paid_sum__gt=1, category="24h"),
+            'teams': Team.objects.filter(paid_sum__gt=1, category="24h", year=2019),
             'dist_name': 'Дистанция 24ч'
         },
     ]
@@ -245,7 +245,7 @@ def teams_protocol(request):
 
 
 def success(request, teamid=""):
-    team = Team.objects.filter(paymentid=teamid)[:1]
+    team = Team.objects.filter(paymentid=teamid, year=2019)[:1]
     if team:
         context = {
             "team": team[0],
@@ -271,8 +271,8 @@ def my_team(request, teamid="", template="my_team"):
         if teamid != paymentid:
             return HttpResponseRedirect("/team/%s" % paymentid)
 
-        main_team = Team.objects.get(paymentid=paymentid)
-        other_teams = Team.objects.filter(owner=request.user).exclude(
+        main_team = Team.objects.get(paymentid=paymentid, year=2019)
+        other_teams = Team.objects.filter(owner=request.user, year=2019).exclude(
             paymentid=paymentid)
         if main_team.start_time:
             main_team.start_time += timedelta(hours=5)
@@ -343,7 +343,7 @@ def team_admin(request, teamid=""):
 def new_payment(request):
     if request.method == "POST":
         paymentid = request.POST['paymentid'] if 'paymentid' in request.POST else ''
-        team = Team.objects.filter(paymentid=paymentid)[:1]
+        team = Team.objects.filter(paymentid=paymentid, year=2019)[:1]
         if not team:
             raise Http404("Team not found")
         payment_method = request.POST['payment_method'] if 'payment_method' in request.POST else ''
