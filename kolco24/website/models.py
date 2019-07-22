@@ -118,12 +118,13 @@ class PaymentsYa(models.Model):
         if not payment:
             return False
         payment = payment.get()
-        if payment.payment_with_discount <= self.withdraw_amount:
+        withdraw_amount = float(self.withdraw_amount)
+        if payment.payment_with_discount <= withdraw_amount:
             payment.status = "done"
-        if payment.payment_with_discount > self.withdraw_amount:
+        if payment.payment_with_discount > withdraw_amount:
             payment.stats = "partial"
         if payment.team:
-            payment.team.ucount = payment.paid_for
+            payment.team.paid_people = payment.paid_for
             payment.team.paid_sum = payment.payment_with_discount
             payment.team.save()
         payment.save()
