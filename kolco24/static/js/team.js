@@ -309,6 +309,30 @@ function additional_payment_info(payment_method) {
     });
 };
 
+function get_cost() {
+    var p_info = {'csrfmiddlewaretoken' : csrf_token,};
+    $.ajax({
+        type      : 'POST',
+        url       : '/api/v1/getcost',
+        data      : p_info,
+        dataType  : 'json',
+        success   : function(data) {
+            if (data.success) {
+                cost = data.cost;
+                console.log(cost);
+                set_ucount(ucount);
+            }
+        },
+        error: function(XMLHttpRequest, textStatus, errorThrown) { 
+        }
+    });
+};
+
+let timerId = setTimeout(function tick() {
+    get_cost();
+    timerId = setTimeout(tick, 5000); // (*)
+}, 5000);
+
 $(function() {
     set_ucount(ucount);
 });
