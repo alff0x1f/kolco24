@@ -328,11 +328,6 @@ function get_cost() {
     });
 };
 
-let timerId = setTimeout(function tick() {
-    get_cost();
-    timerId = setTimeout(tick, 5000); // (*)
-}, 5000);
-
 $(function() {
     set_ucount(ucount);
 });
