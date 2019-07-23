@@ -319,14 +319,21 @@ function get_cost() {
         success   : function(data) {
             if (data.success) {
                 cost = data.cost;
-                console.log(cost);
-                set_ucount(ucount);
+                $("#ucountlabel").text(count - ucount_paid);
+                $("#sumlabel").text((count - ucount_paid) * cost);
+                $("#yasum").val((count - ucount_paid) * cost);
+                $("#paidfor_count").text(ucount_paid);
             }
         },
         error: function(XMLHttpRequest, textStatus, errorThrown) { 
         }
     });
 };
+
+let timerId = setTimeout(function tick() {
+    get_cost();
+    timerId = setTimeout(tick, 5000); // (*)
+}, 5000);
 
 $(function() {
     set_ucount(ucount);
