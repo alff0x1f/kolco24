@@ -319,9 +319,9 @@ function get_cost() {
         success   : function(data) {
             if (data.success) {
                 cost = data.cost;
-                $("#ucountlabel").text(count - ucount_paid);
-                $("#sumlabel").text((count - ucount_paid) * cost);
-                $("#yasum").val((count - ucount_paid) * cost);
+                $("#ucountlabel").text(ucount - ucount_paid);
+                $("#sumlabel").text((ucount - ucount_paid) * cost);
+                $("#yasum").val((ucount - ucount_paid) * cost);
                 $("#paidfor_count").text(ucount_paid);
             }
         },
@@ -332,8 +332,8 @@ function get_cost() {
 
 let timerId = setTimeout(function tick() {
     get_cost();
-    timerId = setTimeout(tick, 5000); // (*)
-}, 5000);
+    timerId = setTimeout(tick, 10000); // (*)
+}, 10000);
 
 $(function() {
     set_ucount(ucount);
