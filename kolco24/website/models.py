@@ -119,13 +119,15 @@ class PaymentsYa(models.Model):
             return False
         payment = payment.get()
         withdraw_amount = float(self.withdraw_amount)
+        paid_for = payment.paid_for
         if payment.payment_with_discount <= withdraw_amount:
             payment.status = "done"
         if payment.payment_with_discount > withdraw_amount:
-            payment.stats = "partial"
+            payment.status = "partial (" + str(withdraw_amount) + ")"
+            paid_for = withdraw_amount / payment.cost_per_person
         if payment.team:
-            payment.team.paid_people = payment.paid_for
-            payment.team.paid_sum = payment.payment_with_discount
+            payment.team.paid_people += paid_for
+            payment.team.paid_sum += withdraw_amount
             payment.team.save()
         payment.save()
         return True
