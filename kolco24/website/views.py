@@ -351,7 +351,7 @@ def new_payment(request):
         payment.payment_amount = cost
         payment.payment_with_discount = cost  # ! FIXME: need add coupon
         payment.cost_per_person = cost_now
-        payment.paid_for = team.ucount
+        payment.paid_for = team.ucount - team.paid_people
         payment.status = 'draft'
         payment.save()
         pid = payment.id
