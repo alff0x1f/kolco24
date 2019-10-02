@@ -146,11 +146,11 @@ def teams(request, template=""):
             'dist_name': '"Только вперед" (12ч, ЖЖ)',
         },
         {
-            'teams': Team.objects.filter(category="24h", year='2019').order_by('start_number'),
+            'teams': Team.objects.filter(category="12h_team", year='2019').order_by('start_number'),
             'dist_name': '"Только вперед" (12ч, 4-6 человек)',
         },
         {
-            'teams': Team.objects.filter(category="12h_team", year='2019').order_by('start_number'),
+            'teams': Team.objects.filter(category="24h", year='2019').order_by('start_number'),
             'dist_name': '"Точка  невозврата" (24ч, 4-6 человек)',
         },
     ]
