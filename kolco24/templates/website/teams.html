@@ -20,7 +20,8 @@
         <div class="row justify-content-center">
             <div class="col-12 col-md-10">
                 {% for teamgroup in teams %}
-                    <h4 class="mb-4">Дистанция {{ teamgroup.dist_name }}</h4>
+                    {% if teamgroup.teams %}
+                    <h4 class="mb-4">{{ teamgroup.dist_name }}</h4>
                     <table class="table table-responsive">
                         <thead>
                             <tr>
@@ -32,13 +33,19 @@
                             {% if user.is_superuser %}
                             <th scope="col">ГР</th>
                             <th scope="col">Правка</th>
+                            <th scope="col">dist</th>
                             {% endif %}
                             </tr>
                         </thead>
                         <tbody>
                         {% for team in teamgroup.teams %}
                             <tr {% if team.paid_people < team.ucount %}class="table-warning"{% endif%}>
-                            <td scope="row">{{ team.start_number }} {{ forloop.counter }}</td>
+                            <td scope="row">
+                                {% if team.start_number %}
+                                    {{ team.start_number }} 
+                                {% else %}
+                                    {{ forloop.counter }}
+                                {% endif %}</td>
                             <td>{{ team.teamname }}{% if user.is_superuser %}<br><span class='text-muted text-small'>{{team.owner.profile.phone}}</span>{% endif %}</td>
                             <td>{{ team.owner.last_name }} {{ team.owner.first_name }}
                             </td>
@@ -59,11 +66,13 @@
                                     {% if team.ucount >= 2 and team.birth6 %}<br>{{ team.birth6 }} {% endif %}
                                 </td>
                                 <td><a href="/team/{{team.paymentid}}" class="btn btn-primary" role="button">id{{team.id}}</a></td>
+                                <th scope="col">{{ team.dist }}</th>
                             {% endif %}
                             </tr>
                         {% endfor %}
                         </tbody>
                     </table>
+                    {% endif %}
                 {% endfor %}
 
             </div>
