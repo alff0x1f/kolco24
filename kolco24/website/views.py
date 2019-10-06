@@ -51,7 +51,7 @@ def index(request):
         'myteams': myteams,
         'myteams_count': len(myteams),
         'free_athlet': free_athlets,
-        'reg_open': True,
+        'reg_open': False,
     }
     return render(request, 'website/index.html', contex)
 

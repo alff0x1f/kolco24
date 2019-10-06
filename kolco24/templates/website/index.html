@@ -15,10 +15,11 @@
                         <h2 class="text-center">12-13 октября 2019</br>  Район вершин Ялангас и Малиновая (Белорецкий район)</h2>
                     </div>
                     <!--end of col-->
-                    {% if reg_open %}
+                    
                     <div class="col-12 col-md-6 col-lg-5">
                         <div class="card">
                             <div class="card-body">
+                                {% if reg_open %}
                                 <form action="/" method="POST">
                                     <div class="row mb-2">
                                         <div class="col-sm-6 col-md-6 mb-1 {% if myteams %}d-none{% endif%}" id="dist_links">
@@ -137,10 +138,14 @@
                                     <button type="submit" class="btn btn-lg btn-success btn-block">{% if myteams %}Изменить/добавить{% else %}Зарегистрироваться{% endif%}</button>
                                     
                                 </form>
+                                {% else %}
+                                <h3>Регистрация закрыта!</h3>
+                                <h5>Команд: {{ team_count}}</h5>
+                                <h5>Участников: {{ people_count }}</h5>
+                                {% endif %}
                             </div>
                         </div>
                     </div>
-                    {% endif %}
                 </div>
                 <div class="row">
                     <div class="col-12 col-md-12 col-lg-10">
