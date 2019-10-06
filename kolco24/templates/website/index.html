@@ -139,9 +139,11 @@
                                     
                                 </form>
                                 {% else %}
-                                    <h3>Регистрация закрыта!</h3>
-                                    <h5>Команд: {{ team_count}}</h5>
-                                    <h5>Участников: {{ people_count }}</h5>
+                                    <h3>Регистрация закрыта</h3>
+                                    <h6>Команд: {{ team_count}}</h6>
+                                    <h6>Участников: {{ people_count }}</h6>
+
+                                    <a class="btn btn-lg btn-success btn-block" href="/teams" role="button">Список команд</a>
 
                                     {% if myteams %}
                                       <hr>
