@@ -341,29 +341,32 @@
                                 <div class="col-9"><strike>Первые 15 команд</strike></div>
                             </li>
                             <li class="row align-items-center">
-                                <div class="col-3 col-md-3"><strong>600 руб</strong></div>
-                                <div class="col-9"><strong>по 31 июля</strong></div>
+                                <div class="col-3 col-md-3"><strike>600 руб</strike></div>
+                                <div class="col-9"><strike>по 31 июля</strike></div>
                             </li>
                             <li class="row align-items-center">
-                                <div class="col-3 col-md-3">700 руб</div>
-                                <div class="col-9">С 1 августа по 18 августа</div>
+                                <div class="col-3 col-md-3"><strike>700 руб</strike></div>
+                                <div class="col-9"><strike>С 1 августа по 18 августа</strike></div>
                             </li>
                             <li class="row align-items-center">
-                                <div class="col-3 col-md-3">800 руб</div>
-                                <div class="col-9">С 19 августа по 1 сентября</div>
+                                <div class="col-3 col-md-3"><strike>800 руб</strike></div>
+                                <div class="col-9"><strike>С 19 августа по 1 сентября</strike></div>
                             </li>
                             <li class="row align-items-center">
-                                <div class="col-3 col-md-3">900 руб</div>
-                                <div class="col-9">С 2 сентября по 30 сентября</div>
+                                <div class="col-3 col-md-3"><strike>900 руб</strike></div>
+                                <div class="col-9"><strike>С 2 сентября по 30 сентября</strike></div>
                             </li>
                             <li class="row align-items-center">
-                                <div class="col-3 col-md-3">1000 руб</div>
-                                <div class="col-9">С 1 октября по 10 октября</div>
+                                <div class="col-3 col-md-3"><strike>1000 руб</strike></div>
+                                <div class="col-9"><strike>С 1 октября по 10 октября</strike></div>
                             </li>
                             <li class="row align-items-center">
-                                <div class="col-3 col-md-3">1200 руб</div>
-                                <div class="col-9"> Оплата наличными на месте старта</div>
+                                <div class="col-3 col-md-3"><strike>1200 руб</strike></div>
+                                <div class="col-9"><strike> Оплата наличными на месте старта</strike></div>
                             </li>
+                            {% if not reg_open %}
+                                <h4><strong>Регистрация закрыта</strong></h4>
+                            {% endif %}
                             {% comment %}
                             <li class="row align-items-center">
                                 <div class="col-3 col-md-3{% if cost < 700 %}  text-muted text-small{% endif %}">{% if cost == 700 %}<strong>{% elif cost > 700 %}<strike>{% endif %}700р{% if cost == 700 %}</strong>{% elif cost > 700 %}</strike>{% endif %}</div>

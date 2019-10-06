@@ -37,6 +37,8 @@ TINKOFF_INFO = {
     'name': 'Фамилия Имя',
 }
 
+REG_OPEN = True
+
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
