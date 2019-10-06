@@ -139,9 +139,25 @@
                                     
                                 </form>
                                 {% else %}
-                                <h3>Регистрация закрыта!</h3>
-                                <h5>Команд: {{ team_count}}</h5>
-                                <h5>Участников: {{ people_count }}</h5>
+                                    <h3>Регистрация закрыта!</h3>
+                                    <h5>Команд: {{ team_count}}</h5>
+                                    <h5>Участников: {{ people_count }}</h5>
+
+                                    {% if myteams %}
+                                      <hr>
+                                      <h5>{% if myteams_count == 1 %}Моя команда{% else %}Мои команды{% endif %}</h5>
+                                      {% for team in myteams %}
+                                        <div class="row mb-3">
+                                            <div class="col-12"><h5>{{ team.teamname }}</h5></div>
+                                            <div class="col-8"><p>Дистанция</p></div>
+                                            <div class="col-4"><p>{{ team.dist }}</p></div>
+                                            <div class="col-8"><p>Оплачено за </p></div>
+                                            <div class="col-4"><p>{{team.paid_people|floatformat}} из {{team.ucount}}</span> чел.</p></div>
+                                        </div>
+                                      {% endfor %}
+                                      <a class="btn btn-lg btn-success btn-block" href="/team" role="button">Изменить/посмотреть состав</a>
+                                    {% endif%}
+
                                 {% endif %}
                             </div>
                         </div>
