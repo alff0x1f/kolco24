@@ -487,6 +487,17 @@ class Export2GoogleDocsForm(forms.Form):
                 'class': 'form-control form-control-lg',
                 'placeholder': 'https://docs.google.com/spreadsheets/d/...'}),
         label='Введите адрес Таблицы Google Docs')
+    sync_type = forms.ChoiceField(
+        choices = (
+            ('export_team', 'Экпортировать команды'),
+            ('import_team_numbers','Импорт номеров команд'),
+        ),
+        label = 'Синхронизировать',
+        widget = forms.Select(
+            attrs = {
+                'class': 'form-control form-control-lg',
+                'placeholder': 'Синхронизация'})
+    )
 
     def clean(self):
         urladdress = self.cleaned_data['urladdress']

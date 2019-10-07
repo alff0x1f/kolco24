@@ -25,9 +25,7 @@ urlpatterns = [
     path('api/v1/paymentinfo', views.paymentinfo, name='paymentinfo'),
     path('api/v1/getcost', views.get_cost, name='getcost'),
     path('yandexinform', views.yandex_payment, name='yandexinform'),
-    # path('sync_table', views.sync_table, name='sync_table'),
-    path('export2googledocs', views.export2googledocs, name='export2googledocs'),
-    path('import_start_numbers', views.import_start_numbers, name='import_start_numbers'),
+    path('sync_googledocs', views.sync_googledocs, name='sync_googledocs'),
     path('import_categories', views.import_categories, name='import_categories'),
     path('export_payments', views.export_payments, name='export_payments'),
 ]

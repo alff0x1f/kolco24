@@ -8,9 +8,12 @@
                     <div class="col-12 col-md-8 col-lg-7">
                         <div class="card card-lg">
                             <div class="card-body">
-                                    {% if success == 'ok'%}
-                                    <h1 class="h2 mb-2 text-center">Успешно!</h1>
+                                    {% if success == 'export'%}
+                                    <h1 class="h2 mb-2 text-center">Успешный экспорт!</h1>
                                     <span>Данные успешно экпортированы в <a href="{{ form.urladdress.value }}">{{ form.urladdress.value }}</a></span>
+                                    {% elif success == 'import' %}
+                                    <h1 class="h2 mb-2 text-center">Успешный импорт!</h1>
+                                    <span>Обновлено {{ count }} записей</span>
                                     {% else %}
                                     <div class="mb-3">
                                         <h1 class="h2 mb-2 text-center">Привет</h1>
@@ -19,7 +22,7 @@
                                         <p>Перед экспортом команд нужно заполнить колонку <code>B</code> номерами ID команд</p>
                                     </div>
                                     <div class="row no-gutters justify-content-center">
-                                        <form action="/export2googledocs" method="POST" class="text-left col-lg-12">
+                                        <form action="/sync_googledocs" method="POST" class="text-left col-lg-12">
                                             <div class="form-group">
                                                 {{ form.urladdress.label_tag }}
                                                 {{ form.urladdress }}
@@ -29,6 +32,19 @@
                                                     {{ form.non_field_errors }}
                                             </div>
                                             {% endif%}
+
+                                            <div class="form-row form-group">
+                                                    <div class="col">
+                                                        {{ form.sync_type.label_tag }}
+                                                        {{ form.sync_type }}
+                                                        {% if form.sync_type.errors %}
+                                                            <div class="invalid-feedback">
+                                                                {{ form.sync_type.errors}}
+                                                            </div>
+                                                        {% endif %}
+                                                    </div>
+                                                </div>
+
                                             <div class="text-center mt-3">
                                                 <button type="submit" class="btn btn-lg btn-primary">Отправить</button>
                                             </div>

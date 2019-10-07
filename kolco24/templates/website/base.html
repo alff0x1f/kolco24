@@ -114,7 +114,7 @@
                                 <div class="dropdown-menu" aria-labelledby="usersDropdown">
                                         {% if user.is_superuser %}
                                             <a class="dropdown-item" href="/admin">Админка</a>
-                                            <a class="dropdown-item" href="/export2googledocs">Экспортировать в googledocs</a>
+                                            <a class="dropdown-item" href="/sync_googledocs">Экспортировать в googledocs</a>
                                         {% endif %}
                                         <form action="/logout" method="POST" id="logoutForm">
                                             <input type="hidden" name="logout" value="logout">

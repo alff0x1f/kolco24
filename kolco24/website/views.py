@@ -13,7 +13,7 @@ from website.models import (PaymentsYa, Team, Athlet, Payment, PaymentLog,
 from django.http import HttpResponseRedirect, Http404, JsonResponse
 from django.conf import settings
 from website.email import send_login_email
-from website.googledocs import (sync_sheet,
+from website.googledocs import (export_teams,
                                 import_start_numbers_from_sheet,
                                 import_category_from_sheet,
                                 export_payments_to_sheet)
@@ -457,22 +457,6 @@ def yandex_payment(request):
     raise Http404("File not found.")
 
 
-def sync_table(request):
-    if request.user.is_superuser:
-        sync_sheet()
-        return HttpResponse("Ok")
-    else:
-        raise Http404("File not found.")
-
-
-def import_start_numbers(request):
-    if request.user.is_superuser:
-        count = import_start_numbers_from_sheet()
-        return HttpResponse("Updated: %s" % count)
-    else:
-        raise Http404("File not found.")
-
-
 def import_categories(request):
     if request.user.is_superuser:
         count = import_category_from_sheet()
@@ -489,12 +473,27 @@ def export_payments(request):
         raise Http404("File not found.")
 
 
-def export2googledocs(request):
+def sync_googledocs(request):
     if request.user.is_superuser:
         form = Export2GoogleDocsForm(request.POST or None)
         if request.method == 'POST' and form.is_valid():
-            sync_sheet(form.googlekey)
-            return render(request, 'website/export2googledocs.html', {'success': 'ok', 'form': form})
-        return render(request, 'website/export2googledocs.html', {'form': form})
+            if form.cleaned_data['sync_type'] == 'export_team':
+                if export_teams(form.googlekey):
+                    return render(
+                        request,
+                        'website/sync_googledocs.html',
+                        {'success': 'export', 'form': form}
+                    )
+                return HttpResponse("Export failed")
+            elif form.cleaned_data['sync_type'] == 'import_team_numbers':
+                count = import_start_numbers_from_sheet(form.googlekey)
+                return render(
+                    request,
+                    'website/sync_googledocs.html',
+                    {'success': 'import', 'count': count, 'form': form}
+                )
+            else:
+                raise Http404("File not found.")
+        return render(request, 'website/sync_googledocs.html', {'form': form})
     else:
         raise Http404("File not found.")

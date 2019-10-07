@@ -13,8 +13,8 @@ def connect_to_sheet(sheet_number=0, tablekey=settings.GOOGLE_DOCS_KEY):
     sht1 = gc.open_by_key(tablekey)
     return sht1.get_worksheet(sheet_number)
 
-def import_start_numbers_from_sheet():
-    wks = connect_to_sheet()
+def import_start_numbers_from_sheet(googlekey=""):
+    wks = connect_to_sheet(tablekey=googlekey)
     teams_ids = wks.col_values(2)
     start_numbers = wks.col_values(3)
     min_col = len(teams_ids) if len(teams_ids) < len(start_numbers) else len(start_numbers)
@@ -85,7 +85,7 @@ def export_payments_to_sheet():
 
     return updated_count
 
-def sync_sheet(googlekey=""):
+def export_teams(googlekey=""):
     fields_count = 35
     wks = connect_to_sheet(tablekey=googlekey)
     colA = wks.col_values(1)
@@ -99,7 +99,7 @@ def sync_sheet(googlekey=""):
 
     teams_ids = wks.col_values(2)
     if len(teams_ids) <= 1:
-        return
+        return False
 
     insert_range = wks.range(2, 4, len(teams_ids), 3 + fields_count)
     team_info = []
@@ -108,6 +108,7 @@ def sync_sheet(googlekey=""):
     for i in range(len(team_info)):
         insert_range[i].value = team_info[i]
     wks.update_cells(insert_range)
+    return True
 
 def get_team_info(team_id, fields_count, hide_unpaid = False):
     team_info = []
