@@ -4,13 +4,13 @@ from website.models import PaymentsYa, Team
 from datetime import timedelta
 from django.conf import settings
 
-def connect_to_sheet(sheet_number=0):
+def connect_to_sheet(sheet_number=0, tablekey=settings.GOOGLE_DOCS_KEY):
     scope = ['https://spreadsheets.google.com/feeds',
             'https://www.googleapis.com/auth/drive']
     credentials = ServiceAccountCredentials.from_json_keyfile_name('./kolco24/googledocs_api_key.json', scope)
 
     gc = gspread.authorize(credentials)
-    sht1 = gc.open_by_key(settings.GOOGLE_DOCS_KEY)
+    sht1 = gc.open_by_key(tablekey)
     return sht1.get_worksheet(sheet_number)
 
 def import_start_numbers_from_sheet():
@@ -85,9 +85,9 @@ def export_payments_to_sheet():
 
     return updated_count
 
-def sync_sheet():
+def sync_sheet(googlekey=""):
     fields_count = 35
-    wks = connect_to_sheet()
+    wks = connect_to_sheet(tablekey=googlekey)
     colA = wks.col_values(1)
 
     hide_unpaid = False
@@ -98,7 +98,7 @@ def sync_sheet():
             hide_unpaid = True
 
     teams_ids = wks.col_values(2)
-    if len(teams_ids) == 1:
+    if len(teams_ids) <= 1:
         return
 
     insert_range = wks.range(2, 4, len(teams_ids), 3 + fields_count)

@@ -7,7 +7,7 @@ from django.contrib.auth import logout
 from django.contrib.auth.decorators import login_required
 from django.views.decorators.csrf import csrf_exempt
 from website.forms import (LoginForm, FastLoginForm, RegForm, TeamForm,
-                           TeamFormAdmin)
+                           TeamFormAdmin, Export2GoogleDocsForm)
 from website.models import (PaymentsYa, Team, Athlet, Payment, PaymentLog,
                             FastLogin)
 from django.http import HttpResponseRedirect, Http404, JsonResponse
@@ -485,5 +485,16 @@ def export_payments(request):
     if request.user.is_superuser:
         count = export_payments_to_sheet()
         return HttpResponse("Updated: %s" % count)
+    else:
+        raise Http404("File not found.")
+
+
+def export2googledocs(request):
+    if request.user.is_superuser:
+        form = Export2GoogleDocsForm(request.POST or None)
+        if request.method == 'POST' and form.is_valid():
+            sync_sheet(form.googlekey)
+            return render(request, 'website/export2googledocs.html', {'success': 'ok', 'form': form})
+        return render(request, 'website/export2googledocs.html', {'form': form})
     else:
         raise Http404("File not found.")
