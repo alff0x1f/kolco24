@@ -7,6 +7,7 @@
                 <!--end of col-->
                 <div class="col">
                     <div class="float-right">
+                        {% if reg_open %}
                         <form method="POST" action="/newteam">
                                 <input type="hidden" name="newteam" value="create">
                                 {% csrf_token %}
@@ -16,6 +17,7 @@
                                     </button>
                                 </div>
                         </form>
+                        {% endif %}
                     </div>
                 </div>
             </div>
@@ -85,68 +87,6 @@
         </div>
         <!--end of container-->
     </section>
-    {% comment %} <section class="space-sm">
-        <div class="container">
-            <div class="row pb-3">
-                <div class="col">
-                    <div class="float-right">
-                        <form method="POST" action="/newteam">
-                                <input type="hidden" name="newteam" value="create">
-                                {% csrf_token %}
-                                <div class="form-row form-group">
-                                    <button class="btn btn-block" type="submit">
-                                        Создать новую команду
-                                    </button>
-                                </div>
-                        </form>
-                    </div>
-                </div>
-            </div>
-            <div class="row {% if not other_teams%}d-none{% endif %}">
-                    <table class="table align-items-center table-borderless">
-                        <tbody>
-                        {% for team in other_teams %}
-                            <tr class="bg-white">
-                                <th scope="row">
-                                    <div class="media align-items-center">
-                                        <div class="media-body">
-                                            <span class="h6 mb-0">{{ team.teamname|default:"Команда " }}{% if not team.teamname %}({{ team.id }}){% endif %}
-                                                <span class="badge badge-secondary">{{ team.ucount }} чел.</span>
-                                            </span>
-                                            <span class="text-muted">Оплачено</span>
-                                        </div>
-                                    </div>
-                                </th>
-                                <td><h3>{{ team.dist }}</h3></td>
-                                <td>{{ team.athlet1|default:"---" }}</br>{{ team.athlet4|default:"---" }}</td>
-                                <td>{{ team.athlet2|default:"---" }}</br>{{ team.athlet5|default:"---" }}</td>
-                                <td>{{ team.athlet3|default:"---" }}</br>{{ team.athlet6|default:"---" }}</td>
-                                <td>
-                                    <div class="dropdown">
-                                        <a class="btn btn-sm btn-outline-primary" href="/team/{{team.paymentid}}">
-                                            Изменить
-                                        </a>
-                                        <button class="btn btn-sm btn-outline-primary dropdown-toggle dropdown-toggle-no-arrow" type="button" id="dropdownMenuButton-1" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
-                                            <i class="icon-dots-three-horizontal"></i>
-                                        </button>
-                                        <div class="dropdown-menu dropdown-menu-sm" aria-labelledby="dropdownMenuButton">
-                                            <a class="dropdown-item" href="#">Удалить</a>
-                                            <a class="dropdown-item" href="#">Assign</a>
-                                            <a class="dropdown-item" href="#">Share</a>
-                                            <div class="dropdown-divider"></div>
-                                            <a class="dropdown-item" href="#">Remove</a>
-                                        </div>
-                                    </div>
-                                </td>
-                            </tr>
-                            <tr class="table-divider"></tr>
-                        {% endfor %}
-                        </tbody>
-                    </table>
-            </div>
-            <!--end of row-->
-        </div>
-        <!--end of container--> {% endcomment %}
 
         <div class="container">
             <div class="row flex-md-row card card-lg">
