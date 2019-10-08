@@ -452,7 +452,7 @@
                             <div class="col-6"><p>Оплачено за <span id="paidfor_count">{{ main_team.paid_people }}</span> чел.</p></div>
                             <div class="col-6"><p class="text-right"><span>{{ main_team.paid_sum }}</span> руб</p></div>
                         </div>
-                        
+                        {% if reg_open %}
                         <div id="sidecolumn_paid">
                             <div class="row mb-4 justify-content-between">
                                 <div class="col-6"><p><span id="paidfor_action">Итого</span> за <span id="ucountlabel">2</span> чел.</p></div>
@@ -516,6 +516,7 @@
                                 </button>
                             </div>
                         </div>
+                        {% endif %}
                     </div>
                 </div>
                 <!--end of col-->
@@ -523,6 +524,7 @@
             <!--end of row-->
         </div>
         <!--end of container-->
+        {% if reg_open %}
         <div class="container" id="paid_explain">
             <div class="row justify-content-center text-center section-intro">
                 <div class="col-12 col-md-9 col-lg-8">
@@ -740,6 +742,7 @@
             </ul>
             <!--end of row-->
         </div>
+        {% endif %}
         <!--end of container-->
     </section>
     <!--end of section-->
