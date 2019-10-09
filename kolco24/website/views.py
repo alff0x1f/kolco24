@@ -14,6 +14,7 @@ from django.http import HttpResponseRedirect, Http404, JsonResponse
 from django.conf import settings
 from website.email import send_login_email
 from website.googledocs import (export_teams,
+                                export_teams_pretty,
                                 import_start_numbers_from_sheet,
                                 import_category_from_sheet,
                                 export_payments_to_sheet)
@@ -480,6 +481,14 @@ def sync_googledocs(request):
         if request.method == 'POST' and form.is_valid():
             if form.cleaned_data['sync_type'] == 'export_team':
                 if export_teams(form.googlekey):
+                    return render(
+                        request,
+                        'website/sync_googledocs.html',
+                        {'success': 'export', 'form': form}
+                    )
+                return HttpResponse("Export failed")
+            elif form.cleaned_data['sync_type'] == 'export_team_pretty':
+                if export_teams_pretty(form.googlekey):
                     return render(
                         request,
                         'website/sync_googledocs.html',

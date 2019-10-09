@@ -490,6 +490,7 @@ class Export2GoogleDocsForm(forms.Form):
     sync_type = forms.ChoiceField(
         choices = (
             ('export_team', 'Экпортировать команды'),
+            ('export_team_pretty', 'Экпортировать команды (для печати)'),
             ('import_team_numbers','Импорт номеров команд'),
         ),
         label = 'Синхронизировать',

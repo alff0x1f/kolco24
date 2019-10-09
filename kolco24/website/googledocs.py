@@ -110,6 +110,47 @@ def export_teams(googlekey=""):
     wks.update_cells(insert_range)
     return True
 
+
+def export_teams_pretty(googlekey=""):
+    wks = connect_to_sheet(tablekey=googlekey)
+    fields_count = 8
+    teams = Team.objects.filter(year='2019').order_by('start_number')
+    # select only paid teams
+    teams = [team for team in teams if team.paid_sum > 0]
+    _, members_count = Team().get_info()
+    insert_range = wks.range(2, 1, members_count+1, fields_count)
+    curr_line = 0
+    for team in teams:
+        members = [(team.athlet1, team.birth1),
+                   (team.athlet2, team.birth2),
+                   (team.athlet3, team.birth3),
+                   (team.athlet4, team.birth4),
+                   (team.athlet5, team.birth5),
+                   (team.athlet6, team.birth6),
+                   ]
+        members = members[:int(team.paid_people)]
+        insert_range[0+curr_line * fields_count].value = team.start_number
+        insert_range[1+curr_line * fields_count].value = team.category
+        insert_range[2+curr_line *
+                     fields_count].value = team.owner.first_name + team.owner.last_name
+        insert_range[3+curr_line * fields_count].value = team.teamname
+        insert_range[4+curr_line * fields_count].value = team.paid_people
+        insert_range[7+curr_line * fields_count].value = team.id
+
+        insert_range[2+(curr_line+1) *
+                     fields_count].value = team.owner.profile.phone
+
+        for member in members:
+            insert_range[5+curr_line *
+                         fields_count].value = member[0] if member[0] else "--"
+            insert_range[6+curr_line *
+                         fields_count].value = member[1] if member[1] else " "
+
+            curr_line += 1
+    wks.update_cells(insert_range)
+    return True
+
+
 def get_team_info(team_id, fields_count, hide_unpaid = False):
     team_info = []
     if team_id:
