@@ -42,7 +42,7 @@ def index(request):
         return HttpResponseRedirect("/team")
 
     teams_count, members_count = Team().get_info()
-    teams_count = 670
+    members_count = 670
 
     contex = {
         "cost": PaymentsYa().get_cost(),
