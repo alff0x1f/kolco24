@@ -132,7 +132,7 @@ def export_teams_pretty(googlekey=""):
         insert_range[0+curr_line * fields_count].value = team.start_number
         insert_range[1+curr_line * fields_count].value = team.category
         insert_range[2+curr_line *
-                     fields_count].value = team.owner.first_name + team.owner.last_name
+                     fields_count].value = team.owner.last_name + " " + team.owner.first_name
         insert_range[3+curr_line * fields_count].value = team.teamname
         insert_range[4+curr_line * fields_count].value = team.paid_people
         insert_range[7+curr_line * fields_count].value = team.id
