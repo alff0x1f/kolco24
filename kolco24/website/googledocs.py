@@ -86,7 +86,7 @@ def export_payments_to_sheet():
     return updated_count
 
 def export_teams(googlekey=""):
-    fields_count = 35
+    fields_count = 36
     wks = connect_to_sheet(tablekey=googlekey)
     colA = wks.col_values(1)
 
@@ -101,7 +101,7 @@ def export_teams(googlekey=""):
     if len(teams_ids) <= 1:
         return False
 
-    insert_range = wks.range(2, 4, len(teams_ids), 3 + fields_count)
+    insert_range = wks.range(2, 3, len(teams_ids), 2 + fields_count)
     team_info = []
     for team in teams_ids[1:]:
         team_info += get_team_info(team, fields_count, hide_unpaid=hide_unpaid)
@@ -159,6 +159,7 @@ def get_team_info(team_id, fields_count, hide_unpaid = False):
         if team:
             team = team.get()
             if team.paid_sum or not hide_unpaid:
+                team_info.append(team.start_number)
                 team_info.append(team.dist)
                 team_info.append(team.category)
                 team_info.append(team.ucount)
