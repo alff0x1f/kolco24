@@ -331,3 +331,14 @@ class Coupons(models.Model):
     )
     count = models.IntegerField(default=1)
     avail_count = models.IntegerField(default=1)
+
+
+class ControlPoint(models.Model):
+    number = models.CharField(max_length=10)
+    cost = models.IntegerField(default=0)
+    year = models.IntegerField(default=2019)
+
+
+class TakenKP(models.Model):
+    team = models.ForeignKey('Team', on_delete=models.CASCADE)
+    point = models.ForeignKey('ControlPoint', on_delete=models.CASCADE)
