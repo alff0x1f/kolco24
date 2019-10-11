@@ -180,7 +180,7 @@ class Team(models.Model):
     dnf = models.BooleanField(default=False)
 
     def __str__(self):              # __str__ on Python 3
-        return self.paymentid.__str__()
+        return self.start_number.__str__() + " " + self.teamname.__str__()
 
     def new_team(self, user, dist, ucount):
         # print(user, dist)
@@ -335,8 +335,12 @@ class Coupons(models.Model):
 
 class ControlPoint(models.Model):
     number = models.CharField(max_length=10)
-    cost = models.IntegerField(default=0)
+    cost = models.IntegerField(default=1)
     year = models.IntegerField(default=2019)
+    iterator = models.IntegerField(default=0) #for export
+
+    def __str__(self):              # __str__ on Python 3
+        return self.number.__str__()
 
 
 class TakenKP(models.Model):
