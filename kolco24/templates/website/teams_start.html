@@ -57,8 +57,8 @@
                                 {% if team.ucount >= 2 and team.athlet6 %}<br>{{ team.athlet6 }} {% endif %}
                             </td>
                                 <td>
-                                {% if team.start_time %}Старт: {{ team.start_time |date:'d M H:i' }}{% endif %}<br/>
-                                {% if team.finish_time %}Финиш: {{ team.finish_time |date:'d M H:i' }}{% endif %}
+                                {% if team.start_time %}Старт: {{ team.start_time |date:'d M H:i:s' }}{% endif %}<br/>
+                                {% if team.finish_time %}Финиш: {{ team.finish_time |date:'d M H:i:s' }}{% endif %}
                                 </td>
                             </tr>
                         {% endfor %}

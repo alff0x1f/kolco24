@@ -18,6 +18,7 @@ from website.googledocs import (export_teams,
                                 import_start_numbers_from_sheet,
                                 import_category_from_sheet,
                                 export_payments_to_sheet)
+from website.sync_xlsx import import_file_xlsx
 from openpyxl import load_workbook
 from django.core.files.storage import FileSystemStorage
 
@@ -517,12 +518,12 @@ def sync_googledocs(request):
     else:
         raise Http404("File not found.")
 
+
 def update_protocol(request):
     if not request.user.is_staff:
         raise Http404("File not found.")
     
     wb = load_workbook(filename = settings.PROTOCOL_DIR + 'protokol.xlsx')
-    print(settings.PROTOCOL_DIR + 'protokol.xlsx')
     # grab the active worksheet
     sheet_tabs = {'6h': '6ч', '12h_ww': '12ч_ЖЖ', '12h_mw': '12ч_МЖ',
                   '12h_mm': '12ч_ММ', '12h_team': '12ч_группа', '24h': '24ч'}
@@ -554,13 +555,33 @@ def update_protocol(request):
                   {'success': 'save', 'file_url': settings.PROTOCOL_URL + filename}
                   )
 
+
 def upload_protocol(request):
+    if not request.user.is_staff:
+        raise Http404("File not found.")
+
     if request.method == 'POST' and request.FILES['myfile']:
         myfile = request.FILES['myfile']
         fs = FileSystemStorage()
-        filename = fs.save(settings.PROTOCOL_DIR + myfile.name, myfile)
-        uploaded_file_url = fs.url(filename)
+
+        curr_time = datetime.now(timezone.utc) + timedelta(hours=5)
+        file_prefix = 'uploads/' + str(curr_time.year) + \
+            str(curr_time.month).zfill(2) + \
+            str(curr_time.day).zfill(2) + "_" + \
+            str(curr_time.hour).zfill(2) + \
+            str(curr_time.minute).zfill(2) + \
+            str(curr_time.second).zfill(2) + "_"
+
+        filename = fs.save(settings.PROTOCOL_DIR +
+                           file_prefix + myfile.name, myfile)
+
+        uploaded_file_url = fs.url(
+            settings.PROTOCOL_URL + file_prefix + myfile.name)
+
+        #read this file:
+        err, msg = import_file_xlsx(filename)
+
         return render(request, 'website/simple_upload.html', {
-            'uploaded_file_url': uploaded_file_url
+            'uploaded_file_url': uploaded_file_url, 'err': err, 'msg': msg
         })
     return render(request, 'website/simple_upload.html')

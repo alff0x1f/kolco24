@@ -1,17 +1,49 @@
 {% extends "website/base.html" %}
 
-<!-- {% load static %} -->
-
 {% block content %}
-  <form method="post" enctype="multipart/form-data">
-    {% csrf_token %}
-    <input type="file" name="myfile">
-    <button type="submit">Upload</button>
-  </form>
+        <section class="space-sm">
+            <div class="container align-self-start">
+                <!--end of row-->
+                <div class="row justify-content-center">
+                    <div class="col-12 col-md-8 col-lg-7">
+                        <div class="card card-lg">
+                            <div class="card-body">
+                                <h1 class="h2 mb-2 text-center">Загрузка файла xlsx</h1>
+                                <p>Загрузить можно три типа:</p>
+                                <ul class="list-arrow-right">
+                                    <li>Стартовое время</li>
+                                    <li>Финишное время</li>
+                                    <li>Контрольные точки</li>
+                                </ul>
 
-  {% if uploaded_file_url %}
-    <p>File uploaded at: <a href="{{ uploaded_file_url }}">{{ uploaded_file_url }}</a></p>
-  {% endif %}
-
-  <p><a href="/">Return to home</a></p>
+                                <form method="post" enctype="multipart/form-data">
+                                  {% csrf_token %}
+                                  <div class="form-group">
+                                    <input type="file" name="myfile">
+                                  </div>
+                                  <div class="form-group">
+                                    <button type="submit" class="btn btn-lg btn-success btn-block">Загрузить</button>
+                                  </div>
+                                </form>
+                                {% if uploaded_file_url %}
+                                <p>Файл загружен по адресу: <a href="{{ uploaded_file_url }}">{{ uploaded_file_url }}</a></p>
+                                {% endif %}
+                                {% if err %}
+                                  <p>Ошибка импорта:</p>
+                                  <p>{{msg}}</p>
+                                {% else %}
+                                  <p>Файл импортирован успешно</p>
+                                  <p>{{msg}}</p>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    <!--end of col-->
+                </div>
+                <!--end of row-->
+            </div>
+            <!--end of container-->
+        </section>
+        <!--end of section-->
 {% endblock %}
+{% block google_analytics %}{% endblock %}
