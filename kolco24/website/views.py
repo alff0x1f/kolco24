@@ -547,7 +547,9 @@ def update_protocol(request):
             point_column[p.number] = column
             column += 1
         # export teams
-        teams = Team.objects.filter(category=tab, year='2019').order_by('start_number')
+        Team().update_places()
+        teams = Team.objects.filter(
+            category=tab, year='2019').order_by('place', 'start_number')
         teams = [team for team in teams if team.paid_sum > 0]
         line = 10
         for team in teams:
@@ -560,15 +562,12 @@ def update_protocol(request):
             ws['D'+row] = athlets
             ws['E'+row] = team.start_time + timedelta(hours=5) if team.start_time else ''
             ws['F'+row] = team.finish_time + timedelta(hours=5) if team.finish_time else ''
-            if team.start_time and team.finish_time:
-                distance_time = team.finish_time - team.start_time
-                ws['G'+row] = distance_time
-                if distance_time > distance_max_time[tab]:
-                    ws['H'+row] = distance_time - distance_max_time[tab]
+            if team.distance_time:
+                ws['G'+row] = team.distance_time
+                if team.distance_time > distance_max_time[tab]:
+                    ws['H'+row] = team.distance_time - distance_max_time[tab]
                 else:
                     ws['H'+row] = ''
-            if team.dnf:
-                ws['K'+row] = 'снятие'
             points = TakenKP.objects.filter(team=team)
             points_sum = 0
             points_count = 0
@@ -577,9 +576,13 @@ def update_protocol(request):
                 points_count += 1
                 ws.cell(line, point_column[point.point.number] , 1)
             ws['I'+row] = points_count
-            ws['J'+row] = points_sum
+            ws['J'+row] = team.points_sum+team.penalty
             ws['K'+row] = team.penalty
-            ws['L'+row] = points_sum - team.penalty
+            ws['L'+row] = team.points_sum
+            ws['M'+row] = team.place if team.place != 10000 else 0
+            if team.dnf:
+                ws['M'+row] = 'СН'
+                ws['K'+row] = 'снятие'
             line += 1
 
     # Save the file

@@ -243,6 +243,7 @@ class Team(models.Model):
                         team.save()
                 if team.dnf and team.place != 10000:
                     team.place = 10000
+                    team.save()
 
 
 class TeamAdminLog(models.Model):
