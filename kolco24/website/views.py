@@ -192,7 +192,7 @@ def teams_start(request):
             'dist_name': 'Дистанция 24ч'
         },
         {
-            'teams': Team.objects.filter(paid_sum__gt=1, start_time__isnull=False, year=2019),
+            'teams': Team.objects.filter(paid_sum__gt=1, start_time__isnull=False, year=2019).order_by('start_time'),
             'dist_name': 'Стартовавшие'
         },
     ]
@@ -200,6 +200,8 @@ def teams_start(request):
         for team in teamgroup['teams']:
             if team.start_time:
                 team.start_time = team.start_time + timedelta(hours=5)
+            if team.finish_time:
+                team.finish_time = team.finish_time + timedelta(hours=5)
 
     context = {
         'teams': teams,
@@ -210,6 +212,10 @@ def teams_start(request):
 def teams_finish(request):
     teams = [
         {
+            'teams': Team.objects.filter(paid_sum__gt=1, category="6h", finish_time__isnull=True, year=2019).order_by('start_number'),
+            'dist_name': 'Дистанция 6ч'
+        },
+        {
             'teams': Team.objects.filter(paid_sum__gt=1, category__startswith="12h", finish_time__isnull=True, year=2019).order_by('start_number'),
             'dist_name': 'Дистанция 12ч'
         },
@@ -219,13 +225,15 @@ def teams_finish(request):
         },
         {
             'teams': Team.objects.filter(paid_sum__gt=1, finish_time__isnull=False, year=2019).order_by('finish_time'),
-            'dist_name': 'финишировавшие'
+            'dist_name': 'Финишировавшие'
         },
     ]
     for teamgroup in teams:
         for team in teamgroup['teams']:
             if team.start_time:
                 team.start_time = team.start_time + timedelta(hours=5)
+            if team.finish_time:
+                team.finish_time = team.finish_time + timedelta(hours=5)
 
     context = {
         'teams': teams,
