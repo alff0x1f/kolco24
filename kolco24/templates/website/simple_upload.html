@@ -27,13 +27,13 @@
                                 </form>
                                 {% if uploaded_file_url %}
                                 <p>Файл загружен по адресу: <a href="{{ uploaded_file_url }}">{{ uploaded_file_url }}</a></p>
-                                {% endif %}
-                                {% if err %}
-                                  <p>Ошибка импорта:</p>
-                                  <p>{{msg}}</p>
-                                {% else %}
-                                  <p>Файл импортирован успешно</p>
-                                  <p>{{msg}}</p>
+                                  {% if err %}
+                                    <p>Ошибка импорта:</p>
+                                    <p>{{msg}}</p>
+                                  {% else %}
+                                    <p>Файл импортирован успешно</p>
+                                    <p>{{msg}}</p>
+                                  {% endif %}
                                 {% endif %}
                             </div>
                         </div>
