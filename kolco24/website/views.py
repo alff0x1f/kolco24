@@ -18,7 +18,8 @@ from website.googledocs import (export_teams,
                                 import_start_numbers_from_sheet,
                                 import_category_from_sheet,
                                 export_payments_to_sheet)
-
+from openpyxl import load_workbook
+from django.core.files.storage import FileSystemStorage
 
 def index(request):
     init_val = {}
@@ -515,3 +516,51 @@ def sync_googledocs(request):
         return render(request, 'website/sync_googledocs.html', {'form': form})
     else:
         raise Http404("File not found.")
+
+def update_protocol(request):
+    if not request.user.is_staff:
+        raise Http404("File not found.")
+    
+    wb = load_workbook(filename = settings.PROTOCOL_DIR + 'protokol.xlsx')
+    print(settings.PROTOCOL_DIR + 'protokol.xlsx')
+    # grab the active worksheet
+    sheet_tabs = {'6h': '6ч', '12h_ww': '12ч_ЖЖ', '12h_mw': '12ч_МЖ',
+                  '12h_mm': '12ч_ММ', '12h_team': '12ч_группа', '24h': '24ч'}
+
+    for tab in sheet_tabs:
+        ws = wb[sheet_tabs[tab]]
+        teams = Team.objects.filter(category=tab, year='2019').order_by('start_number')
+        # select only paid teams
+        teams = [team for team in teams if team.paid_sum > 0]
+        line = 10
+        for team in teams:
+            row = str(line)
+            ws['B'+row] = team.start_number
+            ws['C'+row] = team.teamname+ ', '+ team.city
+            athlets = [team.athlet1, team.athlet2, team.athlet3,
+                    team.athlet4, team.athlet5, team.athlet6]
+            athlets = ", ".join(athlets[:int(team.paid_people)])
+            ws['D'+row] = athlets
+            ws['E'+row] = team.start_time + timedelta(hours=5) if team.start_time else ''
+            ws['F'+row] = team.finish_time + timedelta(hours=5) if team.finish_time else ''
+            if team.start_time and team.finish_time:
+                ws['G'+row] = team.finish_time - team.start_time
+            line += 1
+
+    # Save the file
+    filename = "protokol2019.xlsx"
+    wb.save(settings.PROTOCOL_DIR + filename)
+    return render(request, 'website/save_protokol.html',
+                  {'success': 'save', 'file_url': settings.PROTOCOL_URL + filename}
+                  )
+
+def upload_protocol(request):
+    if request.method == 'POST' and request.FILES['myfile']:
+        myfile = request.FILES['myfile']
+        fs = FileSystemStorage()
+        filename = fs.save(settings.PROTOCOL_DIR + myfile.name, myfile)
+        uploaded_file_url = fs.url(filename)
+        return render(request, 'website/simple_upload.html', {
+            'uploaded_file_url': uploaded_file_url
+        })
+    return render(request, 'website/simple_upload.html')

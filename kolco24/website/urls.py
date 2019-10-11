@@ -28,4 +28,6 @@ urlpatterns = [
     path('sync_googledocs', views.sync_googledocs, name='sync_googledocs'),
     path('import_categories', views.import_categories, name='import_categories'),
     path('export_payments', views.export_payments, name='export_payments'),
+    path('update_protocol', views.update_protocol, name='update_protocol'),
+    path('upload_protocol', views.upload_protocol, name='upload_protocol'),
 ]

@@ -112,6 +112,9 @@
                             <li class="nav-item dropdown">
                                 <a class="nav-link dropdown-toggle" href="#" id="usersDropdown" role="button" data-toggle="dropdown">{{ user.last_name}} {{user.first_name }}</a>
                                 <div class="dropdown-menu" aria-labelledby="usersDropdown">
+                                        {% if request.user.is_staff %}
+                                        <a class="dropdown-item" href="/update_protocol">Сохранить протоколы</a>
+                                        {% endif %}
                                         {% if user.is_superuser %}
                                             <a class="dropdown-item" href="/admin">Админка</a>
                                             <a class="dropdown-item" href="/sync_googledocs">Экспортировать в googledocs</a>
