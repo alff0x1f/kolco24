@@ -9,7 +9,7 @@ from django.views.decorators.csrf import csrf_exempt
 from website.forms import (LoginForm, FastLoginForm, RegForm, TeamForm,
                            TeamFormAdmin, Export2GoogleDocsForm)
 from website.models import (PaymentsYa, Team, Athlet, Payment, PaymentLog,
-                            FastLogin)
+                            FastLogin, ControlPoint, TakenKP)
 from django.http import HttpResponseRedirect, Http404, JsonResponse
 from django.conf import settings
 from website.email import send_login_email
@@ -527,17 +527,33 @@ def update_protocol(request):
     # grab the active worksheet
     sheet_tabs = {'6h': '6ч', '12h_ww': '12ч_ЖЖ', '12h_mw': '12ч_МЖ',
                   '12h_mm': '12ч_ММ', '12h_team': '12ч_группа', '24h': '24ч'}
+    distance_max_time = {'6h': timedelta(hours=6),
+                          '12h_ww': timedelta(hours=12),
+                          '12h_mw': timedelta(hours=12),
+                          '12h_mm': timedelta(hours=12),
+                          '12h_team': timedelta(hours=12),
+                          '24h': timedelta(hours=24),
+                          }
 
     for tab in sheet_tabs:
         ws = wb[sheet_tabs[tab]]
+        # export KP
+        cpoints = ControlPoint.objects.filter(year='2019').order_by('iterator')
+        column = 14
+        point_column = {}
+        for p in cpoints:
+            ws.cell(8, column, p.number)
+            ws.cell(9, column, p.cost)
+            point_column[p.number] = column
+            column += 1
+        # export teams
         teams = Team.objects.filter(category=tab, year='2019').order_by('start_number')
-        # select only paid teams
         teams = [team for team in teams if team.paid_sum > 0]
         line = 10
         for team in teams:
             row = str(line)
             ws['B'+row] = team.start_number
-            ws['C'+row] = team.teamname+ ', '+ team.city
+            ws['C'+row] = team.teamname
             athlets = [team.athlet1, team.athlet2, team.athlet3,
                     team.athlet4, team.athlet5, team.athlet6]
             athlets = ", ".join(athlets[:int(team.paid_people)])
@@ -545,7 +561,25 @@ def update_protocol(request):
             ws['E'+row] = team.start_time + timedelta(hours=5) if team.start_time else ''
             ws['F'+row] = team.finish_time + timedelta(hours=5) if team.finish_time else ''
             if team.start_time and team.finish_time:
-                ws['G'+row] = team.finish_time - team.start_time
+                distance_time = team.finish_time - team.start_time
+                ws['G'+row] = distance_time
+                if distance_time > distance_max_time[tab]:
+                    ws['H'+row] = distance_time - distance_max_time[tab]
+                else:
+                    ws['H'+row] = ''
+            if team.dnf:
+                ws['K'+row] = 'снятие'
+            points = TakenKP.objects.filter(team=team)
+            points_sum = 0
+            points_count = 0
+            for point in points:
+                points_sum += point.point.cost
+                points_count += 1
+                ws.cell(line, point_column[point.point.number] , 1)
+            ws['I'+row] = points_count
+            ws['J'+row] = points_sum
+            ws['K'+row] = team.penalty
+            ws['L'+row] = points_sum - team.penalty
             line += 1
 
     # Save the file
