@@ -447,7 +447,7 @@ class TeamFormAdmin(forms.Form):
                 team.give_photos = d["give_photos"]
             if "category" in d:
                 team.category = d["category"]
-            if "start_number" in d:
+            if "start_number" in d and d["start_number"]:
                 team.start_number = d["start_number"]
             if "start_time" in d and d["start_time"]:
                 team.start_time = d["start_time"] - timedelta(hours=5)
