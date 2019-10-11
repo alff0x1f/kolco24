@@ -203,6 +203,47 @@ class Team(models.Model):
             teams_count += 1
         return (teams_count, people_paid)
 
+    def update_points_sum(self):
+        teams = Team.objects.filter(paid_sum__gt=0, year=2019)
+        for team in teams:
+            points = TakenKP.objects.filter(team=team)
+            points_sum = 0
+            for point in points:
+                points_sum += point.point.cost
+            team.points_sum = points_sum - team.penalty
+            team.save()
+
+    def update_distance_time(self):
+        teams = Team.objects.filter(paid_sum__gt=0, year=2019)
+        for team in teams:
+            if team.start_time and team.finish_time:
+                team.distance_time = team.finish_time - team.start_time
+                team.save()
+            else:
+                if team.distance_time:
+                    team.distance_time = None
+                    team.save()
+
+    def update_places(self):
+        self.update_points_sum()
+        self.update_distance_time()
+        categories = ['6h', '12h_mm', '12h_mw', "12h_ww", "24h"]
+        for category in categories:
+            teams = Team.objects.filter(
+                category=category, paid_sum__gt=0, year=2019).order_by('-points_sum', 'distance_time')
+            place = 1
+            for team in teams:
+                if team.distance_time and team.points_sum:
+                    team.place = place
+                    team.save()
+                    place += 1
+                else:
+                    if team.place != 10000:
+                        team.place = 10000
+                        team.save()
+                if team.dnf and team.place != 10000:
+                    team.place = 10000
+
 
 class TeamAdminLog(models.Model):
     editor = models.ForeignKey(
