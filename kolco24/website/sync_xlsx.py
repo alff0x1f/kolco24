@@ -1,17 +1,21 @@
 from datetime import datetime, timedelta
-from website.models import Team
+from website.models import Team, ControlPoint, TakenKP
 from openpyxl import load_workbook
 from django.core.files.storage import FileSystemStorage
 
 
 def import_file_xlsx(filename):
-    wb = load_workbook(filename=filename)
+    wb = load_workbook(filename=filename, data_only=True)
     if 'start' in wb.get_sheet_names():
         err, msg = import_file_start(wb['start'])
         if err:
             return err, msg
     if 'finish' in wb.get_sheet_names():
         err, msg = import_file_start(wb['finish'], finish=True)
+        if err:
+            return err, msg
+    if 'points' in wb.get_sheet_names():
+        err, msg = import_points(wb['points'])
         if err:
             return err, msg
     return False, msg
@@ -87,4 +91,57 @@ def import_file_start(ws, finish=False):
             count_updated += 1
             team.save()
     msg = 'Обновлено %s записей (прочитано %s в файле)' % (count_updated, teams_count)
+    return False, msg
+
+
+def import_points(ws):
+    row = 3
+    team_number = ws.cell(row, 1).value
+    teams = set()
+    while team_number:
+        team_number = int(team_number)
+        if not Team.objects.filter(start_number=team_number, year="2019").exists():
+            return True, "Команда с номером %s не найдена [%s,%s]" % (team_number, row, 1)
+        if team_number in teams:
+            return True, "Команда номером %s встречается дважды [%s,%s]" % (team_number, row, 1)
+        teams.add(team_number)
+        row += 1
+        team_number = ws.cell(row, 1).value
+    teams_count = row - 3
+
+    import_point_count = 0
+    import_point_success = 0
+
+    all_points = {}
+    for i in range(teams_count):
+        row = i+3
+        points_count = int(ws.cell(row, 2).value)
+        team_number = ws.cell(row, 1).value
+        if team_number:
+            team_number = int(team_number)
+
+        all_points[team_number] = set()
+        for p in range(points_count):
+            column = p+3
+            point = ws.cell(row, column).value
+            if point:
+                point = int(point)
+                if not ControlPoint.objects.filter(number=point, year="2019").exists():
+                    return True, "КП с номером %s не найден [%s,%s]" % (point, row, column)
+                if point in all_points[team_number]:
+                    return True, "КП с номером %s встречается дважды [%s,%s]" % (point, row, column)
+                all_points[team_number].add(point)
+    for team_start_num in all_points:
+        team = Team.objects.filter(start_number=team_start_num).get()
+        for point_num in all_points[team_start_num]:
+            import_point_count += 1
+            point = ControlPoint.objects.filter(number=str(point_num)).get()
+            if not TakenKP.objects.filter(team=team, point=point).exists():
+                new_point = TakenKP(team=team, point=point)
+                new_point.save()
+                import_point_success += 1
+
+    msg = 'Обновлено %s точек (в файле найдено %s)' % (
+        import_point_success, import_point_count)
+
     return False, msg
