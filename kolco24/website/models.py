@@ -144,22 +144,22 @@ class Team(models.Model):
     dist = models.CharField(max_length=10)
     ucount = models.IntegerField(default=1)
     teamname = models.CharField(max_length=50)
-    city = models.CharField(max_length=50)
-    organization = models.CharField(max_length=50)
+    city = models.CharField(max_length=50, blank=True)
+    organization = models.CharField(max_length=50, blank=True)
     year = models.IntegerField(default=2018)
 
     #! athlet1-athlet6 deprecated, use Athlet model instead
-    athlet1 = models.CharField(max_length=50)
+    athlet1 = models.CharField(max_length=50, blank=True)
     birth1 = models.IntegerField(default=0)
-    athlet2 = models.CharField(max_length=50)
+    athlet2 = models.CharField(max_length=50, blank=True)
     birth2 = models.IntegerField(default=0)
-    athlet3 = models.CharField(max_length=50)
+    athlet3 = models.CharField(max_length=50, blank=True)
     birth3 = models.IntegerField(default=0)
-    athlet4 = models.CharField(max_length=50)
+    athlet4 = models.CharField(max_length=50, blank=True)
     birth4 = models.IntegerField(default=0)
-    athlet5 = models.CharField(max_length=50)
+    athlet5 = models.CharField(max_length=50, blank=True)
     birth5 = models.IntegerField(default=0)
-    athlet6 = models.CharField(max_length=50)
+    athlet6 = models.CharField(max_length=50, blank=True)
     birth6 = models.IntegerField(default=0)
     #! end deprecated warning
 
@@ -178,6 +178,8 @@ class Team(models.Model):
     distance_time = models.DurationField(null=True, blank=True)
     penalty = models.IntegerField(default=0)
     dnf = models.BooleanField(default=False)
+    points_sum = models.IntegerField(default=0)
+    place = models.IntegerField(default=0)
 
     def __str__(self):              # __str__ on Python 3
         return self.start_number.__str__() + " " + self.teamname.__str__()
