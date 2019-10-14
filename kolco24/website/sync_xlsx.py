@@ -18,6 +18,10 @@ def import_file_xlsx(filename):
         err, msg = import_points(wb['points'])
         if err:
             return err, msg
+    if 'Финиш' in wb.get_sheet_names():
+        err, msg = import_vova_points(wb['Финиш'])
+        if err:
+            return err, msg
     return False, msg
 
 
@@ -28,8 +32,6 @@ def import_file_start(ws, finish=False):
     while team_number:
         if not Team.objects.filter(start_number=team_number, year="2019").exists():
             return True, "Команда с номером %s не найдена [%s,%s]" %(team_number, row, 1)
-        if team_number in teams:
-            return True, "Команда номером %s встречается дважды [%s,%s]" %(team_number, row, 1)
         teams.add(team_number)
         row += 1
         team_number = ws.cell(row, 1).value
@@ -61,6 +63,8 @@ def import_file_start(ws, finish=False):
     #all good, import it
     count_updated = 0
     for team_number in start_datetime:
+        if Team.objects.filter(start_number=team_number, year="2019").count() > 1:
+            return True, "Команд с номером %s больше 2х" % team_number
         team = Team.objects.filter(start_number=team_number, year="2019").get()
         time_is_same = True
         if finish:
@@ -143,5 +147,35 @@ def import_points(ws):
 
     msg = 'Обновлено %s точек (в файле найдено %s)' % (
         import_point_success, import_point_count)
+
+    return False, msg
+
+
+def import_vova_points(ws):
+    line = 9
+    team_num = int(ws.cell(line,2).value)
+    msg = ''
+
+    import_point_success = 0
+    while team_num:
+        print("team_num", team_num)
+        team = Team.objects.filter(start_number=str(team_num)).get()
+        for p in range (7, 56):
+            point_num = int(ws.cell(8, p).value)
+            print(point_num)
+            is_point_taken = ws.cell(line, p).value
+
+            if is_point_taken:
+                print("point_num", point_num)
+                point = ControlPoint.objects.filter(number=str(point_num)).get()
+                if not TakenKP.objects.filter(team=team, point=point).exists():
+                    new_point = TakenKP(team=team, point=point)
+                    new_point.save()
+                    import_point_success += 1
+        line += 1
+        team_num = int(ws.cell(line,2).value)
+
+    msg = 'Обновлено %s точек' % (
+        import_point_success)
 
     return False, msg
