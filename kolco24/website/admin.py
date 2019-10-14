@@ -16,6 +16,7 @@ class ControlPointAdmin(admin.ModelAdmin):
 
 class TakenKPAdmin(admin.ModelAdmin):
     list_display = ('team', 'point')
+    list_filter = ('team', 'point')
 
 
 admin.site.register(Team, TeamAdmin)
