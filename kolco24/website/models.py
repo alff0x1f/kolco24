@@ -55,7 +55,7 @@ class PaymentsYa(models.Model):
                 d[0], s_format).timestamp()-time.timezone
             if t < datestamp:
                 cost = d[1]
-        teams_count, members_count = Team().get_info()
+        teams_count, members_count = Team.get_info()
         if teams_count < 15:
             cost = 500
         return cost
@@ -194,14 +194,15 @@ class Team(models.Model):
             self.year = 2019
             self.save()
 
-    def get_info(self):
+    @staticmethod
+    def get_info():
         teams = Team.objects.filter(paid_sum__gt=0, year=2019)
         people_paid = 0
         teams_count = 0
         for team in teams:
             people_paid += team.paid_people
             teams_count += 1
-        return (teams_count, people_paid)
+        return teams_count, people_paid
 
     def update_points_sum(self):
         teams = Team.objects.filter(paid_sum__gt=0, year=2019)

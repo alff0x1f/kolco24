@@ -22,6 +22,7 @@ from website.sync_xlsx import import_file_xlsx
 from openpyxl import load_workbook
 from django.core.files.storage import FileSystemStorage
 
+
 def index(request):
     init_val = {}
     myteams = []
@@ -44,7 +45,7 @@ def index(request):
         auth_login(request, user)
         return HttpResponseRedirect("/team")
 
-    teams_count, members_count = Team().get_info()
+    teams_count, members_count = Team.get_info()
     members_count = 670
 
     contex = {

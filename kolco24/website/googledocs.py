@@ -4,6 +4,7 @@ from website.models import PaymentsYa, Team
 from datetime import timedelta
 from django.conf import settings
 
+
 def connect_to_sheet(sheet_number=0, tablekey=settings.GOOGLE_DOCS_KEY):
     scope = ['https://spreadsheets.google.com/feeds',
             'https://www.googleapis.com/auth/drive']
@@ -12,6 +13,7 @@ def connect_to_sheet(sheet_number=0, tablekey=settings.GOOGLE_DOCS_KEY):
     gc = gspread.authorize(credentials)
     sht1 = gc.open_by_key(tablekey)
     return sht1.get_worksheet(sheet_number)
+
 
 def import_start_numbers_from_sheet(googlekey=""):
     wks = connect_to_sheet(tablekey=googlekey)
@@ -117,7 +119,7 @@ def export_teams_pretty(googlekey=""):
     teams = Team.objects.filter(year='2019').order_by('start_number')
     # select only paid teams
     teams = [team for team in teams if team.paid_sum > 0]
-    _, members_count = Team().get_info()
+    _, members_count = Team.get_info()
     insert_range = wks.range(2, 1, members_count+1, fields_count)
     curr_line = 0
     for team in teams:
