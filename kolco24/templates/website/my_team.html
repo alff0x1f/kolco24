@@ -455,7 +455,7 @@
                                 <div class="row">
                                     <div class="col-6 col-xs-6 col-lg-3">
                                         <div class="card">
-                                            <a href="javascript:$('#pay_visamastercard').click();">
+                                            <a href="javascript:document.getElementById('pay_visamastercard').click();">
                                                 <img class="card-img-top" src="/static/images/payments/visa-mastercard.jpg">
                                             </a>
                                         </div>
@@ -469,7 +469,7 @@
 {#                                    </div>#}
                                     <div class="col-6 col-xs-6 col-lg-3">
                                         <div class="card">
-                                            <a href="javascript:$('#pay_yandexmoney').click();">
+                                            <a href="javascript:document.getElementById('pay_yandexmoney').click();">
                                                 <img class="card-img-top" src="/static/images/payments/yandex_money.jpg">
                                             </a>
                                         </div>
@@ -550,7 +550,7 @@
                                     <h5 class="mt-1">Карта Visa/Mastercard</h5>
                                 </div>
                                 <div class="col-4">
-                                    <a class="d-none d-sm-block" href="javascript:$('#pay_visamastercard').click();">
+                                    <a class="d-none d-sm-block" href="javascript:document.getElementById('pay_visamastercard').click();">
                                         <div class="card ml-2 mb-1">
                                             <img alt="Image" class="img-fluid" style="width:7.5rem;margin: 0 auto;" src="/static/images/payments/visa-mastercard.jpg" />
                                         </div>
@@ -558,7 +558,7 @@
                                 </div>
                             </div>
                             <p>
-                                Платеж картой. Имейте ввиду, что платеж по некоторым зарплатным картам сбербанка не проходит. Если у вас не получилось оплатить этим способом, попробуйте перевод через Сбербанк.Онлайн.
+                                Платеж картой. Имейте ввиду, что платеж по некоторым зарплатным картам сбербанка не проходит.
                             </p>
                             <button type="button" class="btn btn-secondary" id="pay_visamastercard">
                                 Оплатить
@@ -567,74 +567,74 @@
                     </div>
                 </li>
                 <!--end of col-->
-{#                <li class="col-12 col-md-6">#}
-{#                    <div class="media align-items-center">#}
-{#                        <div class="media-body">#}
-{#                            <div class="row">#}
-{#                                <div class="col-8">#}
-{#                                    <h5 class="mt-2">Перевод через сбербанк-онлайн</h5>#}
-{#                                </div>#}
-{#                                <div class="col-4">#}
-{#                                    <a class="d-none d-sm-block" href="javascript:$('#pay_sberbank').click();">#}
-{#                                        <div class="card ml-2 mb-1">#}
-{#                                            <img alt="Image" class="img-fluid" style="width:7.5rem; margin: 0 auto;" src="/static/images/payments/sberbank_online.png" />#}
-{#                                        </div>#}
-{#                                    </a>#}
-{#                                </div>#}
-{#                            </div>#}
-{#                            <p id="sberbank_initial_explanation" class="mt-3">#}
-{#                                Перевод в сбербанк онлайн или с помощью СМС на номер 900.#}
-{#                            </p>#}
-{#                            <div id="sberbank_pay_manual" class="card" style="display:none;">#}
-{#                                <div class="card-body">#}
-{#                                    <h6 class="title-decorative">Реквизиты для платежа</h6>#}
-{#                                    <dl class="row justfiy-content-between">#}
-{#                                        <dt class="col-5"><code>Номер карты</code></dt>#}
-{#                                        <dd class="col-7" id="sberbank_cardnumber"></dd>#}
-{#                                        <dt class="col-5"><code>ФИО получателя</code></dt>#}
-{#                                        <dd class="col-7" id="sberbank_name"></dd>#}
-{#                                        <dt class="col-5"><code>Сумма платежа</code></dt>#}
-{#                                        <dd class="col-7" id="sberbank_sum"></dd>#}
-{#                                    </dl>#}
-{#                                </div>#}
-{#                                <div class="card-footer">#}
-{#                                    <p>Перевод можно сделать через <a href="https://online.sberbank.ru/CSAFront/index.do">Сбербанк.онлайн</a> #}
-{#                                    или мобильное приложение. При переводе заполните форму ниже и нажмите кнопку <code>сохранить</code>.</p>#}
-{#                                    <p>Проверка перевода может занять некоторое время</p>#}
-{#                                    <hr class="short">#}
-{#                                    <form id="sberpaymentform">#}
-{#                                        <div class="form-group row">#}
-{#                                            <label for="sberbank_senderCardNumber" class="col-sm-6 col-form-label">Последние 4 цифры вашей карты</label>#}
-{#                                            <div class="col-sm-6">#}
-{#                                            <input type="text" class="form-control" id="sberbank_senderCardNumber" value="">#}
-{#                                            </div>#}
-{#                                        </div>#}
-{#                                        <div class="form-group row">#}
-{#                                            <label for="sberbank_paymentDate" class="col-sm-6 col-form-label">Дата перевода</label>#}
-{#                                            <div class="col-sm-6">#}
-{#                                            <input type="text" class="form-control" id="sberbank_paymentDate" placeholder="Дата">#}
-{#                                            </div>#}
-{#                                        </div>#}
-{#                                        <div class="form-group row">#}
-{#                                            <label for="sberbank_paymentSum" class="col-sm-6 col-form-label">Сумма перевода</label>#}
-{#                                            <div class="col-sm-6">#}
-{#                                            <input type="text" class="form-control" id="sberbank_paymentSum" placeholder="Сумма перевода">#}
-{#                                            </div>#}
-{#                                        </div>#}
-{#                                        <button type="button" class="btn btn-primary mb-2" id='sberbank_paymentinfo_btn'>Сохранить</button>#}
-{#                                        <div id="sberpaymentform_alert" class="alert alert-success" role="alert" style="display: none;">#}
-{#                                            Text#}
-{#                                        </div>#}
-{#                                    </form>#}
-{#                                </div>#}
-{#                            </div>#}
-{#                            <button type="button" class="btn btn-secondary" id="pay_sberbank">#}
-{#                                Показать реквизиты#}
-{#                            </button>#}
-{#                            #}
-{#                        </div>#}
-{#                    </div>#}
-{#                </li>#}
+                <li class="col-12 col-md-6 d-none">
+                    <div class="media align-items-center">
+                        <div class="media-body">
+                            <div class="row">
+                                <div class="col-8">
+                                    <h5 class="mt-2">Перевод через сбербанк-онлайн</h5>
+                                </div>
+                                <div class="col-4">
+                                    <a class="d-none d-sm-block" href="javascript:$('#pay_sberbank').click();">
+                                        <div class="card ml-2 mb-1">
+                                            <img alt="Image" class="img-fluid" style="width:7.5rem; margin: 0 auto;" src="/static/images/payments/sberbank_online.png" />
+                                        </div>
+                                    </a>
+                                </div>
+                            </div>
+                            <p id="sberbank_initial_explanation" class="mt-3">
+                                Перевод в сбербанк онлайн или с помощью СМС на номер 900.
+                            </p>
+                            <div id="sberbank_pay_manual" class="card" style="display:none;">
+                                <div class="card-body">
+                                    <h6 class="title-decorative">Реквизиты для платежа</h6>
+                                    <dl class="row justfiy-content-between">
+                                        <dt class="col-5"><code>Номер карты</code></dt>
+                                        <dd class="col-7" id="sberbank_cardnumber"></dd>
+                                        <dt class="col-5"><code>ФИО получателя</code></dt>
+                                        <dd class="col-7" id="sberbank_name"></dd>
+                                        <dt class="col-5"><code>Сумма платежа</code></dt>
+                                        <dd class="col-7" id="sberbank_sum"></dd>
+                                    </dl>
+                                </div>
+                                <div class="card-footer">
+                                    <p>Перевод можно сделать через <a href="https://online.sberbank.ru/CSAFront/index.do">Сбербанк.онлайн</a>
+                                    или мобильное приложение. При переводе заполните форму ниже и нажмите кнопку <code>сохранить</code>.</p>
+                                    <p>Проверка перевода может занять некоторое время</p>
+                                    <hr class="short">
+                                    <form id="sberpaymentform">
+                                        <div class="form-group row">
+                                            <label for="sberbank_senderCardNumber" class="col-sm-6 col-form-label">Последние 4 цифры вашей карты</label>
+                                            <div class="col-sm-6">
+                                            <input type="text" class="form-control" id="sberbank_senderCardNumber" value="">
+                                            </div>
+                                        </div>
+                                        <div class="form-group row">
+                                            <label for="sberbank_paymentDate" class="col-sm-6 col-form-label">Дата перевода</label>
+                                            <div class="col-sm-6">
+                                            <input type="text" class="form-control" id="sberbank_paymentDate" placeholder="Дата">
+                                            </div>
+                                        </div>
+                                        <div class="form-group row">
+                                            <label for="sberbank_paymentSum" class="col-sm-6 col-form-label">Сумма перевода</label>
+                                            <div class="col-sm-6">
+                                            <input type="text" class="form-control" id="sberbank_paymentSum" placeholder="Сумма перевода">
+                                            </div>
+                                        </div>
+                                        <button type="button" class="btn btn-primary mb-2" id='sberbank_paymentinfo_btn'>Сохранить</button>
+                                        <div id="sberpaymentform_alert" class="alert alert-success" role="alert" style="display: none;">
+                                            Text
+                                        </div>
+                                    </form>
+                                </div>
+                            </div>
+                            <button type="button" class="btn btn-secondary" id="pay_sberbank">
+                                Показать реквизиты
+                            </button>
+
+                        </div>
+                    </div>
+                </li>
                 <!--end of col-->
                 <li class="col-12 col-md-6">
                     <div class="media align-items-center">
@@ -644,7 +644,7 @@
                                     <h5 class="mt-2">Яндекс деньги</h5>
                                 </div>
                                 <div class="col-4">
-                                    <a class="d-none d-sm-block" href="javascript:$('#pay_yandexmoney').click();">
+                                    <a class="d-none d-sm-block" href="javascript:document.getElementById('pay_yandexmoney').click();">
                                         <div class="card ml-2 mb-1">
                                             <img alt="Image" class="img-fluid" style="width:7.5rem; margin: 0 auto;" src="/static/images/payments/yandex_money.jpg" />
                                         </div>
@@ -661,75 +661,75 @@
                     </div>
                 </li>
                 <!--end of col-->
-{#                <li class="col-12 col-md-6">#}
-{#                    <div class="media align-items-center">#}
-{#                        <div class="media-body">#}
-{#                            <div class="row">#}
-{#                                <div class="col-8">#}
-{#                                    <h5 class="mt-2">Перевод на карту Tinkoff</h5>#}
-{#                                </div>#}
-{#                                <div class="col-4">#}
-{#                                    <a class="d-none d-sm-block" href="javascript:$('#pay_tinkoff').click();">#}
-{#                                        <div class="card ml-2 mb-1">#}
-{#                                            <img alt="Image" class="img-fluid" style="width:7.5rem;margin: 0 auto;" src="/static/images/payments/tinkoff.png" />#}
-{#                                        </div>#}
-{#                                    </a>#}
-{#                                </div>#}
-{#                            </div>#}
-{#                            <p id="tinkoff_initial_explanation" class="mt-3">#}
-{#                                Перевод на номер карты в банке Tinkoff. Перевод быстро и легко выполняется в мобильном приложении.#}
-{#                            </p>#}
-{#                            <div id="tinkoff_pay_manual" class="card" style="display:none;">#}
-{#                                <div class="card-body">#}
-{#                                    <h6 class="title-decorative">Реквизиты для платежа</h6>#}
-{#                                    <dl class="row justfiy-content-between">#}
-{#                                        <dt class="col-5"><code>Телефон</code></dt>#}
-{#                                        <dd class="col-7" id="tinkoff_phone"></dd>#}
-{#                                        <dt class="col-5"><code>Номер карты</code></dt>#}
-{#                                        <dd class="col-7" id="tinkoff_cardnumber"></dd>#}
-{#                                        <dt class="col-5"><code>ФИО получателя</code></dt>#}
-{#                                        <dd class="col-7" id="tinkoff_name"></dd>#}
-{#                                        <dt class="col-5"><code>Сумма платежа</code></dt>#}
-{#                                        <dd class="col-7" id="tinkoff_sum"></dd>#}
-{#                                    </dl>#}
-{#                                </div>#}
-{#                                <div class="card-footer">#}
-{#                                    Важно! При переводе заполните форму ниже и нажмите кнопку <code>сохранить</code>.#}
-{#                                    <p>Подтверждение перевода может занять некоторое время</p>#}
-{#                                    </p>#}
-{#                                    <hr class="short">#}
-{#                                    <form id="tinkoffpaymentform">#}
-{#                                        <div class="form-group row">#}
-{#                                            <label for="paymentSenderName" class="col-sm-6 col-form-label">Имя отправителя</label>#}
-{#                                            <div class="col-sm-6">#}
-{#                                            <input type="text" class="form-control" id="tinkoff_SenderName" value="">#}
-{#                                            </div>#}
-{#                                        </div>#}
-{#                                        <div class="form-group row">#}
-{#                                            <label for="paymentDate" class="col-sm-6 col-form-label">Дата перевода</label>#}
-{#                                            <div class="col-sm-6">#}
-{#                                            <input type="text" class="form-control" id="tinkoff_paymentDate" placeholder="Дата">#}
-{#                                            </div>#}
-{#                                        </div>#}
-{#                                        <div class="form-group row">#}
-{#                                            <label for="paymentSum" class="col-sm-6 col-form-label">Сумма перевода</label>#}
-{#                                            <div class="col-sm-6">#}
-{#                                            <input type="text" class="form-control" id="tinkoff_paymentSum" placeholder="Сумма перевода">#}
-{#                                            </div>#}
-{#                                        </div>#}
-{#                                        <button type="button" class="btn btn-primary mb-2" id='tinkoff_paymentinfo_btn'>Сохранить</button>#}
-{#                                        <div id="tinkoffpaymentform_alert" class="alert alert-success" role="alert" style="display: none;">#}
-{#                                            Text#}
-{#                                        </div>#}
-{#                                    </form>#}
-{#                                </div>#}
-{#                            </div>#}
-{#                            <button type="button" class="btn btn-secondary" id="pay_tinkoff">#}
-{#                                Показать реквизиты#}
-{#                            </button>#}
-{#                        </div>#}
-{#                    </div>#}
-{#                </li>#}
+                <li class="col-12 col-md-6 d-none">
+                    <div class="media align-items-center">
+                        <div class="media-body">
+                            <div class="row">
+                                <div class="col-8">
+                                    <h5 class="mt-2">Перевод на карту Tinkoff</h5>
+                                </div>
+                                <div class="col-4">
+
+                                        <div class="card ml-2 mb-1">
+                                            <img alt="Image" class="img-fluid" style="width:7.5rem;margin: 0 auto;" src="/static/images/payments/tinkoff.png" />
+                                        </div>
+
+                                </div>
+                            </div>
+                            <p id="tinkoff_initial_explanation" class="mt-3">
+                                Перевод на номер карты в банке Tinkoff. Перевод быстро и легко выполняется в мобильном приложении.
+                            </p>
+                            <div id="tinkoff_pay_manual" class="card" style="display:none;">
+                                <div class="card-body">
+                                    <h6 class="title-decorative">Реквизиты для платежа</h6>
+                                    <dl class="row justfiy-content-between">
+                                        <dt class="col-5"><code>Телефон</code></dt>
+                                        <dd class="col-7" id="tinkoff_phone"></dd>
+                                        <dt class="col-5"><code>Номер карты</code></dt>
+                                        <dd class="col-7" id="tinkoff_cardnumber"></dd>
+                                        <dt class="col-5"><code>ФИО получателя</code></dt>
+                                        <dd class="col-7" id="tinkoff_name"></dd>
+                                        <dt class="col-5"><code>Сумма платежа</code></dt>
+                                        <dd class="col-7" id="tinkoff_sum"></dd>
+                                    </dl>
+                                </div>
+                                <div class="card-footer">
+                                    Важно! При переводе заполните форму ниже и нажмите кнопку <code>сохранить</code>.
+                                    <p>Подтверждение перевода может занять некоторое время</p>
+                                    </p>
+                                    <hr class="short">
+                                    <form id="tinkoffpaymentform">
+                                        <div class="form-group row">
+                                            <label for="paymentSenderName" class="col-sm-6 col-form-label">Имя отправителя</label>
+                                            <div class="col-sm-6">
+                                            <input type="text" class="form-control" id="tinkoff_SenderName" value="">
+                                            </div>
+                                        </div>
+                                        <div class="form-group row">
+                                            <label for="paymentDate" class="col-sm-6 col-form-label">Дата перевода</label>
+                                            <div class="col-sm-6">
+                                            <input type="text" class="form-control" id="tinkoff_paymentDate" placeholder="Дата">
+                                            </div>
+                                        </div>
+                                        <div class="form-group row">
+                                            <label for="paymentSum" class="col-sm-6 col-form-label">Сумма перевода</label>
+                                            <div class="col-sm-6">
+                                            <input type="text" class="form-control" id="tinkoff_paymentSum" placeholder="Сумма перевода">
+                                            </div>
+                                        </div>
+                                        <button type="button" class="btn btn-primary mb-2" id='tinkoff_paymentinfo_btn'>Сохранить</button>
+                                        <div id="tinkoffpaymentform_alert" class="alert alert-success" role="alert" style="display: none;">
+                                            Text
+                                        </div>
+                                    </form>
+                                </div>
+                            </div>
+                            <button type="button" class="btn btn-secondary" id="pay_tinkoff">
+                                Показать реквизиты
+                            </button>
+                        </div>
+                    </div>
+                </li>
                 <!--end of col-->
             </ul>
             <!--end of row-->
