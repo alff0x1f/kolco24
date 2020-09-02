@@ -35,7 +35,7 @@ class PaymentsYa(models.Model):
     sender = models.CharField(max_length=50)
     codepro = models.BooleanField(default=False)
     label = models.CharField(max_length=50)
-    sha1_hash = models.CharField(max_length=30)
+    sha1_hash = models.CharField(max_length=50)
     unaccepted = models.BooleanField(default=True)
 
     def get_cost(self, t=0):
