@@ -25,8 +25,7 @@ class PaymentsYaAdmin(admin.ModelAdmin):
 
 
 class PaymentAdmin(admin.ModelAdmin):
-    list_display = ('id', 'payment_amount', 'cost_per_person', 'paid_for', 'status')
-    list_filter = ('amount')
+    list_display = ('id', 'team.teamname', 'team.id', 'payment_amount', 'cost_per_person', 'paid_for', 'status')
 
 admin.site.register(Team, TeamAdmin)
 admin.site.register(ControlPoint, ControlPointAdmin)
