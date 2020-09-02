@@ -4,7 +4,7 @@ from .models import Team, ControlPoint, TakenKP, PaymentsYa
 
 
 class TeamAdmin(admin.ModelAdmin):
-    list_display = ('id', 'start_number', 'teamname',
+    list_display = ('id', 'paymentid', 'teamname',
                     'paid_people', 'dist', 'year')
     list_filter = ('year', 'category')
 
@@ -20,7 +20,7 @@ class TakenKPAdmin(admin.ModelAdmin):
 
 
 class PaymentsYaAdmin(admin.ModelAdmin):
-    list_display = ('iterator', 'operation_id', 'amount', 'datetime')
+    list_display = ('operation_id', 'amount', 'datetime', 'unaccepted')
     list_filter = ('datetime', 'amount')
 
 admin.site.register(Team, TeamAdmin)
