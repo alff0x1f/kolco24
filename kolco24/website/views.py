@@ -21,6 +21,7 @@ from website.googledocs import (export_teams,
 from website.sync_xlsx import import_file_xlsx
 from openpyxl import load_workbook
 from django.core.files.storage import FileSystemStorage
+import json
 
 
 def index(request):
@@ -34,7 +35,7 @@ def index(request):
             "email": request.user.email,
             "phone": request.user.profile.phone,
         }
-        myteams = Team.objects.filter(owner=request.user, year=2019)
+        myteams = Team.objects.filter(owner=request.user, year=2020)
         free_athlets = Athlet.objects.filter(
             owner=request.user, team=None).count()
     reg_form = RegForm(request.POST or None, initial=init_val)
@@ -46,7 +47,6 @@ def index(request):
         return HttpResponseRedirect("/team")
 
     teams_count, members_count = Team.get_info()
-    members_count = 670
 
     contex = {
         "cost": PaymentsYa().get_cost(),
@@ -123,39 +123,39 @@ def logout_user(request):
 def teams(request, template=""):
     teams = [
         {
-            'teams': Team.objects.filter(dist="6h", year='2019', category='').order_by('start_number'),
+            'teams': Team.objects.filter(dist="6h", year='2020', category='').order_by('start_number'),
             'dist_name': '6ч'
         },
         {
-            'teams': Team.objects.filter(dist="12h", year='2019', category='').order_by('start_number'),
+            'teams': Team.objects.filter(dist="12h", year='2020', category='').order_by('start_number'),
             'dist_name': '12ч',
         },
         {
-            'teams': Team.objects.filter(dist="24h", year='2019', category='').order_by('start_number'),
+            'teams': Team.objects.filter(dist="24h", year='2020', category='').order_by('start_number'),
             'dist_name': '24ч',
         },
         {
-            'teams': Team.objects.filter(category="24h", year='2019').order_by('start_number'),
+            'teams': Team.objects.filter(category="24h", year='2020').order_by('start_number'),
             'dist_name': '"Точка невозврата" (24ч, 4-6 человек)',
         },
         {
-            'teams': Team.objects.filter(category="12h_team", year='2019').order_by('start_number'),
+            'teams': Team.objects.filter(category="12h_team", year='2020').order_by('start_number'),
             'dist_name': '"Только вперед" (12ч, 4-6 человек)',
         },
         {
-            'teams': Team.objects.filter(category="12h_mm", year='2019').order_by('start_number'),
+            'teams': Team.objects.filter(category="12h_mm", year='2020').order_by('start_number'),
             'dist_name': '"Только вперед" (12ч, ММ)',
         },
         {
-            'teams': Team.objects.filter(category="12h_mw", year='2019').order_by('start_number'),
+            'teams': Team.objects.filter(category="12h_mw", year='2020').order_by('start_number'),
             'dist_name': '"Только вперед" (12ч, МЖ)',
         },
         {
-            'teams': Team.objects.filter(category="12h_ww", year='2019').order_by('start_number'),
+            'teams': Team.objects.filter(category="12h_ww", year='2020').order_by('start_number'),
             'dist_name': '"Только вперед" (12ч, ЖЖ)',
         },
         {
-            'teams': Team.objects.filter(category="6h", year='2019').order_by('start_number'),
+            'teams': Team.objects.filter(category="6h", year='2020').order_by('start_number'),
             'dist_name': '"Первые шаги" (6ч, 2-3 человека)'
         },
     ]
@@ -166,7 +166,7 @@ def teams(request, template=""):
 
     if request.user.is_superuser:
         teams.append({
-            'teams': Team.objects.filter(paid_sum__lt=1, year=2019),
+            'teams': Team.objects.filter(paid_sum__lt=1, year=2020),
             'dist_name': 'Неоплаченное',
         })
 
@@ -183,19 +183,19 @@ def teams_predstart(request):
 def teams_start(request):
     teams = [
         {
-            'teams': Team.objects.filter(paid_sum__gt=1, category="6h", start_time__isnull=True, year=2019),
+            'teams': Team.objects.filter(paid_sum__gt=1, category="6h", start_time__isnull=True, year=2020),
             'dist_name': 'Дистанция 6ч'
         },
         {
-            'teams': Team.objects.filter(paid_sum__gt=1, category__startswith="12h", start_time__isnull=True, year=2019),
+            'teams': Team.objects.filter(paid_sum__gt=1, category__startswith="12h", start_time__isnull=True, year=2020),
             'dist_name': 'Дистанция 12ч'
         },
         {
-            'teams': Team.objects.filter(paid_sum__gt=1, category="24h", start_time__isnull=True, year=2019),
+            'teams': Team.objects.filter(paid_sum__gt=1, category="24h", start_time__isnull=True, year=2020),
             'dist_name': 'Дистанция 24ч'
         },
         {
-            'teams': Team.objects.filter(paid_sum__gt=1, start_time__isnull=False, year=2019).order_by('start_time'),
+            'teams': Team.objects.filter(paid_sum__gt=1, start_time__isnull=False, year=2020).order_by('start_time'),
             'dist_name': 'Стартовавшие'
         },
     ]
@@ -215,19 +215,19 @@ def teams_start(request):
 def teams_finish(request):
     teams = [
         {
-            'teams': Team.objects.filter(paid_sum__gt=1, category="6h", finish_time__isnull=True, year=2019).order_by('start_number'),
+            'teams': Team.objects.filter(paid_sum__gt=1, category="6h", finish_time__isnull=True, year=2020).order_by('start_number'),
             'dist_name': 'Дистанция 6ч'
         },
         {
-            'teams': Team.objects.filter(paid_sum__gt=1, category__startswith="12h", finish_time__isnull=True, year=2019).order_by('start_number'),
+            'teams': Team.objects.filter(paid_sum__gt=1, category__startswith="12h", finish_time__isnull=True, year=2020).order_by('start_number'),
             'dist_name': 'Дистанция 12ч'
         },
         {
-            'teams': Team.objects.filter(paid_sum__gt=1, category="24h", finish_time__isnull=True, year=2019).order_by('start_number'),
+            'teams': Team.objects.filter(paid_sum__gt=1, category="24h", finish_time__isnull=True, year=2020).order_by('start_number'),
             'dist_name': 'Дистанция 24ч'
         },
         {
-            'teams': Team.objects.filter(paid_sum__gt=1, finish_time__isnull=False, year=2019).order_by('finish_time'),
+            'teams': Team.objects.filter(paid_sum__gt=1, finish_time__isnull=False, year=2020).order_by('finish_time'),
             'dist_name': 'Финишировавшие'
         },
     ]
@@ -247,15 +247,15 @@ def teams_finish(request):
 def teams_protocol(request):
     teams = [
         {
-            'teams': Team.objects.filter(paid_sum__gt=1, category="6h", year=2019),
+            'teams': Team.objects.filter(paid_sum__gt=1, category="6h", year=2020),
             'dist_name': 'Дистанция 6ч'
         },
         {
-            'teams': Team.objects.filter(paid_sum__gt=1, category__startswith="12h", year=2019),
+            'teams': Team.objects.filter(paid_sum__gt=1, category__startswith="12h", year=2020),
             'dist_name': 'Дистанция 12ч'
         },
         {
-            'teams': Team.objects.filter(paid_sum__gt=1, category="24h", year=2019),
+            'teams': Team.objects.filter(paid_sum__gt=1, category="24h", year=2020),
             'dist_name': 'Дистанция 24ч'
         },
     ]
@@ -271,7 +271,7 @@ def teams_protocol(request):
 
 
 def success(request, teamid=""):
-    team = Team.objects.filter(paymentid=teamid, year=2019)[:1]
+    team = Team.objects.filter(paymentid=teamid, year=2020)[:1]
     if team:
         context = {
             "team": team[0],
@@ -297,8 +297,8 @@ def my_team(request, teamid="", template="my_team"):
         if teamid != paymentid:
             return HttpResponseRedirect("/team/%s" % paymentid)
 
-        main_team = Team.objects.get(paymentid=paymentid, year=2019)
-        other_teams = Team.objects.filter(owner=request.user, year=2019).exclude(
+        main_team = Team.objects.get(paymentid=paymentid, year=2020)
+        other_teams = Team.objects.filter(owner=request.user, year=2020).exclude(
             paymentid=paymentid)
         if main_team.start_time:
             main_team.start_time += timedelta(hours=5)
@@ -370,7 +370,7 @@ def team_admin(request, teamid=""):
 def new_payment(request):
     if request.method == "POST":
         paymentid = request.POST['paymentid'] if 'paymentid' in request.POST else ''
-        team = Team.objects.filter(paymentid=paymentid, year=2019)[:1]
+        team = Team.objects.filter(paymentid=paymentid, year=2020)[:1]
         if not team:
             raise Http404("Team not found")
         payment_method = request.POST['payment_method'] if 'payment_method' in request.POST else ''
@@ -539,7 +539,7 @@ def update_protocol(request):
     for tab in sheet_tabs:
         ws = wb[sheet_tabs[tab]]
         # export KP
-        cpoints = ControlPoint.objects.filter(year='2019').order_by('iterator')
+        cpoints = ControlPoint.objects.filter(year='2020').order_by('iterator')
         column = 14
         point_column = {}
         for p in cpoints:
@@ -550,7 +550,7 @@ def update_protocol(request):
         # export teams
         Team().update_places()
         teams = Team.objects.filter(
-            category=tab, year='2019').order_by('place', 'start_number')
+            category=tab, year='2020').order_by('place', 'start_number')
         teams = [team for team in teams if team.paid_sum > 0]
         line = 10
         for team in teams:
@@ -587,7 +587,7 @@ def update_protocol(request):
             line += 1
 
     # Save the file
-    filename = "protokol2019.xlsx"
+    filename = "protokol2020.xlsx"
     wb.save(settings.PROTOCOL_DIR + filename)
     return render(request, 'website/save_protokol.html',
                   {'success': 'save', 'file_url': settings.PROTOCOL_URL + filename}
