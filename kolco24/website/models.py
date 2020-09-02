@@ -190,10 +190,16 @@ class Team(models.Model):
         teams = Team.objects.filter(paid_sum__gt=0, year=2020)
         people_paid = 0
         teams_count = 0
+        teams_ids = set()
         for team in teams:
             people_paid += team.paid_people
+            teams_ids.add(team.id)
             teams_count += 1
-        return teams_count, people_paid
+        time_15min_ago = datetime.datetime.now() - datetime.timedelta(minutes=1)
+        payments = Payment.objects.filter(created_at__gte=time_15min_ago)
+        for p in payments:
+            teams_ids.add(p.team_id)
+        return len(teams_ids), people_paid
 
     def update_points_sum(self):
         teams = Team.objects.filter(paid_sum__gt=0, year=2020)
