@@ -20,7 +20,7 @@ class TakenKPAdmin(admin.ModelAdmin):
 
 
 class PaymentsYaAdmin(admin.ModelAdmin):
-    list_display = ('operation_id', 'amount', 'datetime', 'unaccepted')
+    list_display = ('label', 'amount', 'datetime', 'unaccepted')
     list_filter = ('datetime', 'amount')
 
 admin.site.register(Team, TeamAdmin)
