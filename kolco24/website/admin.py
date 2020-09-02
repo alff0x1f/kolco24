@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import Team, ControlPoint, TakenKP, PaymentsYa
+from .models import Team, ControlPoint, TakenKP, PaymentsYa, Payment
 
 
 class TeamAdmin(admin.ModelAdmin):
@@ -23,7 +23,12 @@ class PaymentsYaAdmin(admin.ModelAdmin):
     list_display = ('label', 'amount', 'datetime', 'unaccepted')
     list_filter = ('datetime', 'amount')
 
+class PaymentAdmin(admin.ModelAdmin):
+    list_display = ('id', 'owner', 'team', 'payment_amount', 'cost_per_person', 'paid_for', 'status')
+    list_filter = ('amount')
+
 admin.site.register(Team, TeamAdmin)
 admin.site.register(ControlPoint, ControlPointAdmin)
 admin.site.register(TakenKP, TakenKPAdmin)
 admin.site.register(PaymentsYa, PaymentsYaAdmin)
+admin.site.register(Payment, PaymentAdmin)
