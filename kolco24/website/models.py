@@ -195,7 +195,7 @@ class Team(models.Model):
             people_paid += team.paid_people
             teams_ids.add(team.id)
             teams_count += 1
-        time_15min_ago = datetime.datetime.now() - datetime.timedelta(minutes=1)
+        time_15min_ago = datetime.datetime.now() - datetime.timedelta(minutes=60)
         payments = Payment.objects.filter(created_at__gte=time_15min_ago)
         for p in payments:
             teams_ids.add(p.team_id)
