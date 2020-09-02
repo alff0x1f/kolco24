@@ -134,10 +134,10 @@ class Team(models.Model):
     paid_people = models.FloatField(default=0)
     dist = models.CharField(max_length=10)
     ucount = models.IntegerField(default=1)
-    teamname = models.CharField(max_length=50)
+    teamname = models.CharField(max_length=100)
     city = models.CharField(max_length=50, blank=True)
     organization = models.CharField(max_length=50, blank=True)
-    year = models.IntegerField(default=2018)
+    year = models.IntegerField(default=2020)
 
     #! athlet1-athlet6 deprecated, use Athlet model instead
     athlet1 = models.CharField(max_length=50, blank=True)
