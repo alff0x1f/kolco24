@@ -23,8 +23,9 @@ class PaymentsYaAdmin(admin.ModelAdmin):
     list_display = ('label', 'amount', 'datetime', 'unaccepted')
     list_filter = ('datetime', 'amount')
 
+
 class PaymentAdmin(admin.ModelAdmin):
-    list_display = ('id', 'owner', 'team', 'payment_amount', 'cost_per_person', 'paid_for', 'status')
+    list_display = ('id', 'team.teamname', 'team.id', 'payment_amount', 'cost_per_person', 'paid_for', 'status')
     list_filter = ('amount')
 
 admin.site.register(Team, TeamAdmin)
