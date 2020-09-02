@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import Team, ControlPoint, TakenKP
+from .models import Team, ControlPoint, TakenKP, PaymentsYa
 
 
 class TeamAdmin(admin.ModelAdmin):
@@ -19,6 +19,11 @@ class TakenKPAdmin(admin.ModelAdmin):
     list_filter = ('team', 'point')
 
 
+class PaymentsYaAdmin(admin.ModelAdmin):
+    list_display = ('iterator', 'operation_id', 'amount', 'datetime')
+    list_filter = ('datetime', 'amount')
+
 admin.site.register(Team, TeamAdmin)
 admin.site.register(ControlPoint, ControlPointAdmin)
 admin.site.register(TakenKP, TakenKPAdmin)
+admin.site.register(PaymentsYa, PaymentsYaAdmin)
