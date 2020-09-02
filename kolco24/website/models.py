@@ -39,25 +39,16 @@ class PaymentsYa(models.Model):
     unaccepted = models.BooleanField(default=True)
 
     def get_cost(self, t=0):
-        s_format = "%d.%m.%Y %H:%M"
-        cost_by_date = [
-            ("10.10.2019 19:00", 1000),
-            ("30.09.2019 19:00", 900),
-            ("01.09.2019 19:00", 800),
-            ("18.08.2019 19:00", 700),
-            ("31.07.2019 19:00", 600),
-        ]
-        if not t:
-            t = time.time()
-        cost = 1000
-        for d in cost_by_date:
-            datestamp = datetime.datetime.strptime(
-                d[0], s_format).timestamp()-time.timezone
-            if t < datestamp:
-                cost = d[1]
         teams_count, members_count = Team.get_info()
-        if teams_count < 15:
+        cost = 300
+        if teams_count > 10:
             cost = 500
+        if teams_count > 30:
+            cost = 700
+        if teams_count > 60:
+            cost = 900
+        if teams_count > 150:
+            cost = 1100
         return cost
 
     def new_payment(self, d):
@@ -191,12 +182,12 @@ class Team(models.Model):
             self.dist = dist
             self.ucount = ucount
             self.paymentid = '%016x' % random.randrange(16**16)
-            self.year = 2019
+            self.year = 2020
             self.save()
 
     @staticmethod
     def get_info():
-        teams = Team.objects.filter(paid_sum__gt=0, year=2019)
+        teams = Team.objects.filter(paid_sum__gt=0, year=2020)
         people_paid = 0
         teams_count = 0
         for team in teams:
@@ -205,7 +196,7 @@ class Team(models.Model):
         return teams_count, people_paid
 
     def update_points_sum(self):
-        teams = Team.objects.filter(paid_sum__gt=0, year=2019)
+        teams = Team.objects.filter(paid_sum__gt=0, year=2020)
         for team in teams:
             points = TakenKP.objects.filter(team=team)
             points_sum = 0
@@ -215,7 +206,7 @@ class Team(models.Model):
             team.save()
 
     def update_distance_time(self):
-        teams = Team.objects.filter(paid_sum__gt=0, year=2019)
+        teams = Team.objects.filter(paid_sum__gt=0, year=2020)
         for team in teams:
             if team.start_time and team.finish_time:
                 team.distance_time = team.finish_time - team.start_time
@@ -231,7 +222,7 @@ class Team(models.Model):
         categories = ['6h', '12h_mm', '12h_mw', "12h_ww", "24h"]
         for category in categories:
             teams = Team.objects.filter(
-                category=category, paid_sum__gt=0, year=2019).order_by('-points_sum', 'distance_time')
+                category=category, paid_sum__gt=0, year=2020).order_by('-points_sum', 'distance_time')
             place = 1
             for team in teams:
                 if team.distance_time and team.points_sum:
@@ -381,7 +372,7 @@ class Coupons(models.Model):
 class ControlPoint(models.Model):
     number = models.CharField(max_length=10)
     cost = models.IntegerField(default=1)
-    year = models.IntegerField(default=2019)
+    year = models.IntegerField(default=2020)
     iterator = models.IntegerField(default=0) #for export
 
     def __str__(self):              # __str__ on Python 3
