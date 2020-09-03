@@ -96,7 +96,7 @@ def login_by_key(request, login_key=""):
     for key in keys:
         curr_time = datetime.now(timezone.utc)
         delta = curr_time - key.created_at
-        if delta.seconds < 24*60*60:
+        if delta.total_seconds() < 24 * 3600:
             if request.method == 'POST' and 'login_key' in request.POST \
                     and request.POST['login_key'] == login_key:
                 user = key.user
