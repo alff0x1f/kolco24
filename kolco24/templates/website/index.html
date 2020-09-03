@@ -132,6 +132,10 @@
                                             <div class="col-4"><p>{{ team.dist }}</p></div>
                                             <div class="col-8"><p>Оплачено за </p></div>
                                             <div class="col-4"><p>{{team.paid_people|floatformat}} из {{team.ucount}}</span> чел.</p></div>
+                                            {% if team.additional_charge > 0 %}
+                                                <div class="col-8"><p>Необходимо доплатить</p></div>
+                                                <div class="col-4"><p>{{ team.additional_charge }} руб</p></div>
+                                            {% endif %}
                                         </div>
                                       {% endfor %}
                                     {% endif%}
