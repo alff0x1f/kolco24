@@ -109,7 +109,7 @@ class PaymentsYa(models.Model):
         if not payment:
             return False
         payment = payment.get()
-        withdraw_amount = float(self.withdraw_amount)
+        withdraw_amount = float(self.withdraw_amount) - payment.additional_charge
         paid_for = payment.paid_for
         if payment.payment_with_discount <= withdraw_amount:
             payment.status = "done"
@@ -118,7 +118,8 @@ class PaymentsYa(models.Model):
             paid_for = withdraw_amount / payment.cost_per_person
         if payment.team:
             payment.team.paid_people += paid_for
-            payment.team.paid_sum += withdraw_amount
+            payment.team.paid_sum += withdraw_amount + payment.additional_charge
+            payment.team.additional_charge -= payment.additional_charge
             payment.team.save()
         payment.save()
         return True
@@ -131,6 +132,7 @@ class Team(models.Model):
     )
     paymentid = models.CharField(max_length=50)
     paid_sum = models.FloatField(default=0)
+    additional_charge = models.FloatField(default=0)
     paid_people = models.FloatField(default=0)
     dist = models.CharField(max_length=10)
     ucount = models.IntegerField(default=1)
@@ -294,6 +296,7 @@ class Payment(models.Model):
     )
     payment_method = models.CharField(max_length=50)
     payment_amount = models.FloatField(default=0)
+    additional_charge = models.FloatField(default=0)
     payment_with_discount = models.FloatField(default=0)
     cost_per_person = models.FloatField(default=0)
     paid_for = models.FloatField(default=0)

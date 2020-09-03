@@ -447,7 +447,7 @@
                         {% if reg_open %}
                         <div id="sidecolumn_paid">
                             <div class="row mb-4 justify-content-between">
-                                <div class="col-6"><p><span id="paidfor_action">Итого</span> за <span id="ucountlabel">2</span> чел.</p></div>
+                                <div class="col-6"><p><span id="paidfor_action">Итого</span> <span id="ucountlabel_all">за <span id="ucountlabel">2</span> чел.</span></p></div>
                                 <div class="col-6"><p class="text-right"><span id="sumlabel">{% widthratio cost 1 2 %}</span> руб</p></div>
                             </div>
                             <div class="mb-2 text-center">
@@ -743,12 +743,13 @@
 {% block footer_js_include %}
     <script>
         {% load l10n %}
-        var cost = {{ cost }};
-        var ucount = {{ team_form.ucount.value }};
-        var ucount_paid = {{ main_team.paid_people | unlocalize }};
-        var dist = "{{ team_form.dist.value }}";
-        var csrf_token = "{{ csrf_token }}";
+        let cost = {{ cost }};
+        let ucount = {{ team_form.ucount.value }};
+        let ucount_paid = {{ main_team.paid_people | unlocalize }};
+        let dist = "{{ team_form.dist.value }}";
+        let csrf_token = "{{ csrf_token }}";
+        let additional_charge = {{ additional_charge | unlocalize }};
     </script>
-     <script type="text/javascript" src="/static/js/team.js?ver=5"></script>
+     <script type="text/javascript" src="/static/js/team.js?ver=6"></script>
      {% if user.is_superuser %}<script type="text/javascript" src="/static/js/team_admin.js?ver=1"></script>{% endif%}
 {% endblock %}

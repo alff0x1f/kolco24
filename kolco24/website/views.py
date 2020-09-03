@@ -312,6 +312,7 @@ def my_team(request, teamid="", template="my_team"):
             "curr_time": datetime.now(timezone.utc) + timedelta(hours=5),
             "timestamp": time(),
             'reg_open': settings.REG_OPEN,
+            'additional_charge': main_team.additional_charge,
         }
         if request.user.is_superuser:
             context['team_form_admin'] = team_form_admin
@@ -390,13 +391,14 @@ def new_payment(request):
         payment.payment_with_discount = cost  # ! FIXME: need add coupon
         payment.cost_per_person = cost_now
         payment.paid_for = team.ucount - team.paid_people
+        payment.additional_charge = team.additional_charge
         payment.status = 'draft'
         payment.save()
         pid = payment.id
         response_data = {}
         response_data['success'] = 'true'
         response_data['payment_id'] = str(pid)
-        response_data['sum'] = cost
+        response_data['sum'] = cost + team.additional_charge
         response_data['paymentmethod'] = payment_method
         if payment_method == "visamc":
             response_data['yandexwallet'] = settings.YANDEX_WALLET

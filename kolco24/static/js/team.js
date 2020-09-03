@@ -24,8 +24,8 @@ $( "#dist_header" ).click(function() {
 function set_ucount(count) {
     ucount = count;
     $("#ucountlabel").text(count - ucount_paid);
-    $("#sumlabel").text((count - ucount_paid) * cost);
-    $("#yasum").val((count - ucount_paid) * cost);
+    $("#sumlabel").text((count - ucount_paid) * cost + additional_charge);
+    $("#yasum").val((count - ucount_paid) * cost + additional_charge);
     $("#paidfor_count").text(ucount_paid);
     // hide members:
     if (count < 6) {
@@ -100,12 +100,18 @@ function set_ucount(count) {
         $("#paidfor_action").text("Итого");
     }
 
-    if (ucount_paid >= ucount){
+    if (ucount_paid >= ucount && additional_charge == 0){
         $("#sidecolumn_paid").hide();
         $("#paid_explain").hide();
+        $("#ucountlabel_all").hide();
     } else {
         $("#sidecolumn_paid").show();
         $("#paid_explain").show();
+        if (ucount - ucount_paid == 0){
+            $("#ucountlabel_all").hide();
+        } else {
+            $("#ucountlabel_all").show();
+        }
     }
     $("#pay_sberbank").show();
     $("#sberbank_initial_explanation").show();
@@ -320,8 +326,8 @@ function get_cost() {
             if (data.success) {
                 cost = data.cost;
                 $("#ucountlabel").text(ucount - ucount_paid);
-                $("#sumlabel").text((ucount - ucount_paid) * cost);
-                $("#yasum").val((ucount - ucount_paid) * cost);
+                $("#sumlabel").text((ucount - ucount_paid) * cost + additional_charge);
+                $("#yasum").val((ucount - ucount_paid) * cost + additional_charge);
                 $("#paidfor_count").text(ucount_paid);
             }
         },
