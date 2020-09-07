@@ -625,3 +625,7 @@ def upload_protocol(request):
             'uploaded_file_url': uploaded_file_url, 'err': err, 'msg': msg
         })
     return render(request, 'website/simple_upload.html')
+
+
+def regulations(request):
+    return render(request, 'website/regulations.html')

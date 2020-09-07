@@ -30,4 +30,5 @@ urlpatterns = [
     path('export_payments', views.export_payments, name='export_payments'),
     path('update_protocol', views.update_protocol, name='update_protocol'),
     path('upload_protocol', views.upload_protocol, name='upload_protocol'),
+    path('regulations', views.regulations, name='regulations'),
 ]
