@@ -56,7 +56,7 @@ def index(request):
         'myteams': myteams,
         'myteams_count': len(myteams),
         'free_athlet': free_athlets,
-        'reg_open': settings.REG_OPEN,
+        'reg_open': int(teams_count) < 150,
     }
     return render(request, 'website/index.html', contex)
 
@@ -304,6 +304,7 @@ def my_team(request, teamid="", template="my_team"):
             main_team.start_time += timedelta(hours=5)
         if main_team.finish_time:
             main_team.finish_time += timedelta(hours=5)
+        teams_count, _ = Team.get_info()
         context = {
             "cost": cost_now,
             "team_form": team_form,
@@ -311,7 +312,7 @@ def my_team(request, teamid="", template="my_team"):
             "main_team": main_team,
             "curr_time": datetime.now(timezone.utc) + timedelta(hours=5),
             "timestamp": time(),
-            'reg_open': settings.REG_OPEN,
+            'reg_open': int(teams_count) < 150,
             'additional_charge': main_team.additional_charge,
         }
         if request.user.is_superuser:
