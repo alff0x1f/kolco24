@@ -312,7 +312,7 @@ def my_team(request, teamid="", template="my_team"):
             "main_team": main_team,
             "curr_time": datetime.now(timezone.utc) + timedelta(hours=5),
             "timestamp": time(),
-            'reg_open': int(teams_count) < 150,
+            'reg_open': int(teams_count) < 150 or main_team.paid_people > 0,
             'additional_charge': main_team.additional_charge,
         }
         if request.user.is_superuser:
