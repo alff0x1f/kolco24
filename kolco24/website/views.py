@@ -123,39 +123,39 @@ def logout_user(request):
 def teams(request, template=""):
     teams = [
         {
-            'teams': Team.objects.filter(dist="6h", year='2020', category='').order_by('start_number'),
+            'teams': Team.objects.filter(dist="6h", year='2020', category='').order_by('start_number', 'id'),
             'dist_name': '6ч'
         },
         {
-            'teams': Team.objects.filter(dist="12h", year='2020', category='').order_by('start_number'),
+            'teams': Team.objects.filter(dist="12h", year='2020', category='').order_by('start_number', 'id'),
             'dist_name': '12ч',
         },
         {
-            'teams': Team.objects.filter(dist="24h", year='2020', category='').order_by('start_number'),
+            'teams': Team.objects.filter(dist="24h", year='2020', category='').order_by('start_number', 'id'),
             'dist_name': '24ч',
         },
         {
-            'teams': Team.objects.filter(category="24h", year='2020').order_by('start_number'),
+            'teams': Team.objects.filter(category="24h", year='2020').order_by('start_number', 'id'),
             'dist_name': '"Сказка о потерянном времени" (24ч, 4-6 человек)',
         },
         {
-            'teams': Team.objects.filter(category="12h_team", year='2020').order_by('start_number'),
+            'teams': Team.objects.filter(category="12h_team", year='2020').order_by('start_number', 'id'),
             'dist_name': '"Джентельмены удачи" (12ч, 4-6 человек)',
         },
         {
-            'teams': Team.objects.filter(category="12h_mm", year='2020').order_by('start_number'),
+            'teams': Team.objects.filter(category="12h_mm", year='2020').order_by('start_number', 'id'),
             'dist_name': '"Джентельмены удачи" (12ч, ММ)',
         },
         {
-            'teams': Team.objects.filter(category="12h_mw", year='2020').order_by('start_number'),
+            'teams': Team.objects.filter(category="12h_mw", year='2020').order_by('start_number', 'id'),
             'dist_name': '"Джентельмены удачи" (12ч, МЖ)',
         },
         {
-            'teams': Team.objects.filter(category="12h_ww", year='2020').order_by('start_number'),
+            'teams': Team.objects.filter(category="12h_ww", year='2020').order_by('start_number', 'id'),
             'dist_name': '"Джентельмены удачи" (12ч, ЖЖ)',
         },
         {
-            'teams': Team.objects.filter(category="6h", year='2020').order_by('start_number'),
+            'teams': Team.objects.filter(category="6h", year='2020').order_by('start_number', 'id'),
             'dist_name': '"Впервые замужем" (6ч, 2-3 человека)'
         },
     ]
