@@ -141,6 +141,7 @@ function save_team(payment_method) {
         'birth5'      : $('#teamform #id_birth5').val(),
         'athlet6'     : $('#teamform #id_athlet6').val(),
         'birth6'      : $('#teamform #id_birth6').val(),
+        'year'        : $('#teamform #id_year').val(),
         'csrfmiddlewaretoken' : csrf_token,
         // 'get_requisites' : get_requisites,
         // 'paymentid'		: $('#teamform #paymentid').val(),

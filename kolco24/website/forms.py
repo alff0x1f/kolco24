@@ -188,6 +188,18 @@ class TeamForm(forms.Form):
     ucount = forms.IntegerField()
     dist = forms.CharField()
     paymentid = forms.CharField(widget=forms.HiddenInput())
+    year = forms.ChoiceField(
+        required=False,
+        choices=(
+            ('2020', '2020 год'),
+            ('2021', '2021 год'),
+        ),
+        label='Год участия',
+        widget=forms.Select(
+            attrs={
+                'class': 'form-control form-control-lg',
+                'placeholder': 'Год участия'})
+    )
 
     def __init__(self, *args, **kwargs):
         super(TeamForm, self).__init__(*args, **kwargs)
@@ -229,6 +241,7 @@ class TeamForm(forms.Form):
         self.initial["name"] = team.teamname
         self.initial["city"] = team.city
         self.initial["organization"] = team.organization
+        self.initial["year"] = team.year
         self.initial["athlet1"] = team.athlet1
         self.initial["athlet2"] = team.athlet2
         self.initial["athlet3"] = team.athlet3
@@ -278,6 +291,7 @@ class TeamForm(forms.Form):
             team.teamname = d["name"] if "name" in d else ""
             team.city = d["city"] if "city" in d else ""
             team.organization = d["organization"] if "organization" in d else ""
+            team.year = d["year"] if d["year"].isdigit() else "2020"
             team.athlet1 = d["athlet1"] if "athlet1" in d else ""
             team.athlet2 = d["athlet2"] if "athlet2" in d else ""
             team.athlet3 = d["athlet3"] if "athlet3" in d else ""

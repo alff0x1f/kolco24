@@ -253,6 +253,17 @@
                                         {% endif %}
                                     </div>
                                 </div>
+                                <div class="form-row form-group">
+                                    <div class="col">
+                                        {{ team_form.year.label_tag }}
+                                        {{ team_form.year }}
+                                        {% if team_form.year.errors %}
+                                            <div class="invalid-feedback">
+                                                {{ team_form.year.errors}}
+                                            </div>
+                                        {% endif %}
+                                    </div>
+                                </div>
                                 {{ team_form.paymentid }}
                                 {% csrf_token %}
                                 <div class="form-row form-group">
@@ -746,6 +757,6 @@
         let csrf_token = "{{ csrf_token }}";
         let additional_charge = {{ additional_charge | unlocalize }};
     </script>
-     <script type="text/javascript" src="/static/js/team.js?ver=6"></script>
+     <script type="text/javascript" src="/static/js/team.js?ver=7"></script>
      {% if user.is_superuser %}<script type="text/javascript" src="/static/js/team_admin.js?ver=1"></script>{% endif%}
 {% endblock %}
