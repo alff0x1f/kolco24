@@ -158,6 +158,10 @@ def teams(request, template=""):
             'teams': Team.objects.filter(category="6h", year='2020').order_by('start_number', 'id'),
             'dist_name': '"Впервые замужем" (6ч, 2-3 человека)'
         },
+        {
+            'teams': Team.objects.filter(year='2021').order_by('id'),
+            'dist_name': 'Кольцо 2021'
+        },
     ]
 
     # select only paid teams
