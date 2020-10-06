@@ -56,7 +56,7 @@ def index(request):
         'myteams': myteams,
         'myteams_count': len(myteams),
         'free_athlet': free_athlets,
-        'reg_open': False,
+        'reg_open': settings.REG_OPEN,
     }
     return render(request, 'website/index.html', contex)
 
@@ -316,7 +316,7 @@ def my_team(request, teamid="", template="my_team"):
             "main_team": main_team,
             "curr_time": datetime.now(timezone.utc) + timedelta(hours=5),
             "timestamp": time(),
-            'reg_open': False,
+            'reg_open': settings.REG_OPEN,
             'additional_charge': main_team.additional_charge,
         }
         if request.user.is_superuser:
