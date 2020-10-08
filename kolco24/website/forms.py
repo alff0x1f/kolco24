@@ -234,6 +234,7 @@ class TeamForm(forms.Form):
             # free_athlet = Athlet.objects.filter(owner=user, team=None)[:1]
             # if free_athlet:
             #     return False
+            return False
             team = Team()
             team.new_team(user, '12h', 4)
         else:

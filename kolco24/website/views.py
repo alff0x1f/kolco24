@@ -293,7 +293,7 @@ def my_team(request, teamid="", template="my_team"):
     team_form = TeamForm(request.POST or None)
     paymentid = team_form.init_vals(request.user, teamid)
     if not paymentid:
-        raise Http404("Nothing found")
+        return HttpResponseRedirect("/teams")
 
     if request.user.is_superuser:
         team_form_admin = TeamFormAdmin(None)
