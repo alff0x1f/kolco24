@@ -191,14 +191,15 @@ class TeamForm(forms.Form):
     year = forms.ChoiceField(
         required=False,
         choices=(
-            ('2020', '2020 год'),
-            ('2021', '2021 год'),
+            ('2020', 'Участвую в 2020 году'),
+            ('2021', 'Перенос на 2021 год'),
+            ('10', 'Отказ от участия (возврат)'),
         ),
-        label='Год участия',
+        label='Участие/Перенос слота/Возврат',
         widget=forms.Select(
             attrs={
                 'class': 'form-control form-control-lg',
-                'placeholder': 'Год участия'})
+                'placeholder': 'Участие/Перенос слота/Возврат'})
     )
 
     def __init__(self, *args, **kwargs):

@@ -162,6 +162,10 @@ def teams(request, template=""):
             'teams': Team.objects.filter(year='2021').order_by('id'),
             'dist_name': 'Кольцо 2021'
         },
+        {
+            'teams': Team.objects.filter(year='10').order_by('id'),
+            'dist_name': 'Отказ от участия'
+        },
     ]
 
     # select only paid teams
@@ -309,6 +313,14 @@ def my_team(request, teamid="", template="my_team"):
         if main_team.finish_time:
             main_team.finish_time += timedelta(hours=5)
         teams_count, _ = Team.get_info()
+        # история платежей
+        payments = Payment.objects.filter(team=main_team, status='done')
+        # проверка бухалтерии
+        payments_sum = 0
+        for p in payments:
+            payments_sum += p.additional_charge + p.payment_amount
+        payments_ok = payments_sum == main_team.paid_sum
+
         context = {
             "cost": cost_now,
             "team_form": team_form,
@@ -318,6 +330,11 @@ def my_team(request, teamid="", template="my_team"):
             "timestamp": time(),
             'reg_open': settings.REG_OPEN,
             'additional_charge': main_team.additional_charge,
+            'payments': payments,
+            'payments_ok': payments_ok,
+            'a': payments_sum,
+            'b': main_team.paid_sum,
+            'payback_sum': main_team.paid_sum * 0.92,
         }
         if request.user.is_superuser:
             context['team_form_admin'] = team_form_admin

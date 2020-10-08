@@ -275,6 +275,13 @@
                                     Text
                                 </div>
                             </form>
+                            <div>
+                                <p>При выборе возврата, возврат стартового взноса будет осуществен с вычетом <b>8% комиссии</b> и составит {{payback_sum}} руб</p>
+                                {% if not payments_ok %}
+                                    <p>В вашей команде были переносы слотов, сумма возврата требует уточнения</p>
+                                {% endif %}
+                                <p>Возврат будем делать в ручном режиме, переводом через сбербанк-онлайн/тиньков и это займет некоторое время, просим отнестись с пониманием.</p>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -451,6 +458,28 @@
                             <div class="col-6"><p>Оплачено за <span id="paidfor_count">{{ main_team.paid_people }}</span> чел.</p></div>
                             <div class="col-6"><p class="text-right"><span>{{ main_team.paid_sum }}</span> руб</p></div>
                         </div>
+                        <hr class="short">
+                        <h4 class="h4 mb-2">История оплат</h4>
+                        {% for payment in payments %}
+                            {% if payment.payment_amount %}
+                                <div class="row justify-content-between">
+                                    <div class="col-6"><p>Платеж за {{ payment.paid_for | floatformat:"0" }} чел.</p></div>
+                                    <div class="col-6">
+                                        <p class="text-right mb-0"><span>{{ payment.payment_amount }}</span> руб</p>
+                                        <p class="text-right"><small>{{ payment.created_at | date:"j.m.Y" }}</small></p>
+                                    </div>
+                                </div>
+                            {% endif %}
+                            {% if payment.additional_charge %}
+                                <div class="row justify-content-between">
+                                    <div class="col-6"><p>Доплата </p></div>
+                                    <div class="col-6">
+                                        <p class="text-right mb-0">{{ payment.additional_charge }} руб</p>
+                                        <p class="text-right"><small>{{ payment.created_at | date:"j.m.Y" }}</small></p>
+                                    </div>
+                                </div>
+                            {% endif %}
+                        {% endfor %}
                         {% if reg_open %}
                         <div id="sidecolumn_paid">
                             <div class="row mb-4 justify-content-between">
