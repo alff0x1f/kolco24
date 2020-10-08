@@ -159,11 +159,11 @@ def teams(request, template=""):
             'dist_name': '"Впервые замужем" (6ч, 2-3 человека)'
         },
         {
-            'teams': Team.objects.filter(year='2021').order_by('id'),
+            'teams': Team.objects.filter(year='2021').order_by('start_number'),
             'dist_name': 'Кольцо 2021'
         },
         {
-            'teams': Team.objects.filter(year='10').order_by('id'),
+            'teams': Team.objects.filter(year='10').order_by('start_number'),
             'dist_name': 'Отказ от участия'
         },
     ]
