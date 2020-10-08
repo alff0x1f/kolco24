@@ -253,17 +253,6 @@
                                         {% endif %}
                                     </div>
                                 </div>
-                                <div class="form-row form-group">
-                                    <div class="col">
-                                        {{ team_form.year.label_tag }}
-                                        {{ team_form.year }}
-                                        {% if team_form.year.errors %}
-                                            <div class="invalid-feedback">
-                                                {{ team_form.year.errors}}
-                                            </div>
-                                        {% endif %}
-                                    </div>
-                                </div>
                                 {{ team_form.paymentid }}
                                 {% csrf_token %}
                                 <div class="form-row form-group">
@@ -275,13 +264,6 @@
                                     Text
                                 </div>
                             </form>
-                            <div>
-                                <p>При выборе возврата, возврат стартового взноса будет осуществен с вычетом <b>8% комиссии</b> и составит {{payback_sum}} руб</p>
-                                {% if not payments_ok %}
-                                    <p>В вашей команде были переносы слотов, сумма возврата требует уточнения</p>
-                                {% endif %}
-                                <p>Возврат будем делать в ручном режиме, переводом через сбербанк-онлайн/тиньков и это займет некоторое время, просим отнестись с пониманием.</p>
-                            </div>
                         </div>
                     </div>
                 </div>
@@ -786,6 +768,6 @@
         let csrf_token = "{{ csrf_token }}";
         let additional_charge = {{ additional_charge | unlocalize }};
     </script>
-     <script type="text/javascript" src="/static/js/team.js?ver=7"></script>
+     <script type="text/javascript" src="/static/js/team.js?ver=8"></script>
      {% if user.is_superuser %}<script type="text/javascript" src="/static/js/team_admin.js?ver=1"></script>{% endif%}
 {% endblock %}
