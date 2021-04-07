@@ -49,7 +49,7 @@ def index(request):
     teams_count, members_count = Team.get_info()
 
     contex = {
-        "cost": PaymentsYa().get_cost(),
+        "cost": PaymentsYa.get_cost(),
         "reg_form": reg_form,
         "team_count": teams_count,
         "people_count": int(members_count),
@@ -299,7 +299,7 @@ def my_team(request, teamid="", template="my_team"):
         team_form_admin = TeamFormAdmin(None)
         team_form_admin.init_vals(request.user, teamid)
 
-    cost_now = PaymentsYa().get_cost()
+    cost_now = PaymentsYa.get_cost()
 
     if request.method == 'GET':
         if teamid != paymentid:
@@ -407,7 +407,7 @@ def new_payment(request):
         payment.team = team
         payment.payment_method = payment_method
 
-        cost_now = PaymentsYa().get_cost()
+        cost_now = PaymentsYa.get_cost()
         cost = (team.ucount - team.paid_people) * cost_now
         payment.payment_amount = cost
         payment.payment_with_discount = cost  # ! FIXME: need add coupon
@@ -470,7 +470,7 @@ def paymentinfo(request):
 def get_cost(request):
     response_data = {}
     response_data['success'] = 'true'
-    response_data["cost"] = PaymentsYa().get_cost()
+    response_data["cost"] = PaymentsYa.get_cost()
     return JsonResponse(response_data)
 
 @login_required

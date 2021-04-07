@@ -38,7 +38,8 @@ class PaymentsYa(models.Model):
     sha1_hash = models.CharField(max_length=50)
     unaccepted = models.BooleanField(default=True)
 
-    def get_cost(self, t=0):
+    @staticmethod
+    def get_cost():
         teams_count, members_count = Team.get_info()
         if teams_count > 150:
             return 1100
