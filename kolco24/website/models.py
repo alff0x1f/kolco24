@@ -40,16 +40,15 @@ class PaymentsYa(models.Model):
 
     def get_cost(self, t=0):
         teams_count, members_count = Team.get_info()
-        cost = 300
-        if teams_count > 10:
-            cost = 500
-        if teams_count > 30:
-            cost = 700
-        if teams_count > 60:
-            cost = 900
         if teams_count > 150:
-            cost = 1100
-        return cost
+            return 1100
+        if teams_count > 60:
+            return 900
+        if teams_count > 30:
+            return 700
+        if teams_count > 10:
+            return 500
+        return 300
 
     def new_payment(self, d):
         fields = [
