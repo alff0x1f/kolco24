@@ -8,12 +8,12 @@
 {% block content %}
 
         <section class="bg-dark">
-            <img alt="Image" src="/static/images/backgrounds/header2020-2.jpg" class="bg-image opacity-70" />
+            <img alt="Image" src="/static/images/backgrounds/header2021.jpg" class="bg-image opacity-70" />
             <div class="container">
                 <div class="row center justify-content-between">
                     <div class="col-12 col-md-6 col-lg-5">
                         <img class="mx-auto d-none d-sm-block" style="width: 60%" src="/static/images/logo_big.png" alt="Кольцо 24 2020">
-                        <h2 class="text-center">9-11 октября 2020<br/> хребет Аджигардак (Ашинский район)</h2>
+                        <h2 class="text-center">8-10 октября 2021<br/> район Новоабзаково (Белорецкий район)</h2>
                     </div>
                     <!--end of col-->
                     
@@ -98,9 +98,9 @@
                                             <label class="custom-control-label text-small" for="check-agree">Я прочитал <a href="https://docs.google.com/document/d/1RJ4mEY_FtqUR3n5tTR9eCOhLUnkCkK2dWFPzQiMZkXg/edit" target="_blank">Положение</a>
                                             </label>
                                         </div>
-                                        <small>
-                                            В случае отмены и невозможности проведения соревнований возврат стартового взноса будет осуществен с вычетом <b>8% комиссии</b>
-                                        </small>
+{#                                        <small>#}
+{#                                            В случае отмены и невозможности проведения соревнований возврат стартового взноса будет осуществен с вычетом <b>8% комиссии</b>#}
+{#                                        </small>#}
                                     </div>
                                     <div class="row {% if myteams %}d-none{% endif%}">
                                         <div class="col-sm-6"><p>Стартовый взнос</p></div>
@@ -144,7 +144,7 @@
                                     
                                 </form>
                                 {% else %}
-                                    <h3>Регистрация закрыта</h3>
+                                    <h3>Регистрация на 2021 год скоро откроется!</h3>
                                     <h6>Команд: {{ team_count}}</h6>
                                     <h6>Участников: {{ people_count }}</h6>
 
@@ -226,7 +226,7 @@
                             <p>Поход выходного дня, в длительном соревновательном формате с элементами рогейна и ориентирования на местности</p>
         
                             <figure>
-                                <img alt="" class="img-fluid" src="/static/images/about-us.jpg">
+                                <img alt="" class="img-fluid" src="/static/images/about-us2.jpg">
                             </figure>
         
                         </div><!-- /.col-sm-6 -->
@@ -244,10 +244,10 @@
         Представители из множества разных городов и регионов, самые активные турклубы Урала, более трехсот участников самых разных возрастов. Всех объединяет одно - неравнодушие к туризму и желание испытать себя.</p>
                             <h3 class="section-title multiple-title">Какие дистанции?</h3>
                             <ul class="list-arrow-right">
-        
-                                <li>«Сказка о потерянном времени» - КВ 24 часа (4-6 человек)</li>
-                                <li>«Джентельмены удачи» - КВ 12 часов (4-6 человек или 2 человека ММ/МЖ/ЖЖ)</li>
-                                <li>«Впервые замужем» - КВ 6 часа (2-3 человека)</li>
+
+                                <li>«Туда и обратно» - КВ 6 часа (2-3 человека)</li>
+                                <li>«Две крепости» - КВ 12 часов (4-6 человек или 2 человека ММ/МЖ/ЖЖ)</li>
+                                <li>«Братство кольца» - КВ 24 часа (4-6 человек)</li>
         
                             </ul>
         
@@ -259,25 +259,23 @@
                     <div class="container">
                         <img class="bg-image" src="/static/images/backgrounds/bg-1.jpg">
                         <div class="row justify-content-center">
-                                <div class="col-sm-3 text-center">
+                                <div class="col-sm-4 text-center">
 
                                         <i class="ion-ios-calendar"></i>
-                                        <h3>9-11 октября<br>2020</h3>
+                                        <h3>8-10 октября<br>2021</h3>
                     
                                     </div>
-                                    <div class="col-sm-3 text-center">
+                                    <div class="col-sm-4 text-center">
                     
                                         <i class="ion-ios-location"></i>
-                                        <h3>Ашинский район<br>хр. Аджигардак</h3>
+                                        <h3>район Новоабзаково <br> Белорецкий район</h3>
                     
                                     </div>
-                                    <div class="col-sm-3 text-center">
-                    
-                                      <i class="ion-ios-people"></i>
-                                      <h3>Участников:<br> {{ people_count }}</h3>
-                    
-                                    </div>
-                                    <div class="col-sm-3 text-center">
+{#                                    <div class="col-sm-4 text-center">#}
+{#                                      <i class="ion-ios-people"></i>#}
+{#                                      <h3>Участников:<br> {{ people_count }}</h3>#}
+{#                                    </div>#}
+                                    <div class="col-sm-4 text-center">
                                       <i class="ion-trophy"></i>
                                       <h3>Команд:<br> {{ team_count }}</h3>
 
@@ -309,7 +307,7 @@
                                     </a>
                                     <div class="card-body">
                                         <h4 class="card-title">6 часов</h4>
-                                        <h6>«Впервые замужем»</h6>
+                                        <h6>«Туда и обратно»</h6>
                                         <p class="card-text">Легкий и быстрой забег.</p>
                                         <ul>
                                             <li>Вес рюкзака не регламентирован</li>
@@ -327,7 +325,7 @@
                                     </a>
                                     <div class="card-body">
                                         <h4 class="card-title">12 часов</h4>
-                                        <h6>«Джентельмены удачи»</h6>
+                                        <h6>«Две крепости»</h6>
                                         <p class="card-text">Сочетание скорости и насыщенности. Заявиться можно в две категории: Двойка и команда.</p>
                                         <ul>
                                             <li>Вес рюкзака: 6кг на человека</li>
@@ -346,7 +344,7 @@
                                     </a>
                                     <div class="card-body">
                                         <h4 class="card-title">24 часов</h4>
-                                        <h6>«Сказка о потерянном времени»</h6>
+                                        <h6>«Братство кольца»</h6>
                                         <p>
                                             Дистанция для проверки своих сил и выносливости. Команда 4-6 человек.
                                         </p>
