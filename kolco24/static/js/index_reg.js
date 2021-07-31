@@ -53,3 +53,24 @@ $('#ucount').on('change', function() {
     $('#ucountlabel').text(v);
     $('#sumlabel').text(v*cost);
 });
+
+function get_cost_index() {
+    let p_info = {'csrfmiddlewaretoken': csrf_token,};
+    $.ajax({
+        type      : 'POST',
+        url       : '/api/v1/getcost',
+        data      : p_info,
+        dataType  : 'json',
+        success   : function(data) {
+            if (data.success) {
+                cost = data.cost;
+                $('#slotcost').text((cost));
+                $('#ucount').change();
+            }
+        },
+        error: function(XMLHttpRequest, textStatus, errorThrown) {
+        }
+    });
+}
+
+let timerId = setInterval(get_cost_index, 3000);

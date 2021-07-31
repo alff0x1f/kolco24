@@ -104,7 +104,7 @@
                                     </div>
                                     <div class="row {% if myteams %}d-none{% endif%}">
                                         <div class="col-sm-6"><p>Стартовый взнос</p></div>
-                                        <div class="col-sm-6"><p class="text-right">{{ cost }} руб с человека</p></div>
+                                        <div class="col-sm-6"><p class="text-right"><span id="slotcost">{{ cost }}</span> руб с человека</p></div>
                                     </div>
                                     <div class="row mb-2 justify-content-between {% if myteams %}d-none{% endif%}">
                                         <div class="col-6"><p>Итого за <span id="ucountlabel">2</span> чел.</p></div>
@@ -366,9 +366,10 @@
                 </section>
 {% endblock %}
 {% block footer_js_include %}
-    <script type="text/javascript" src="/static/js/index_reg.js?ver=4"></script>
+    <script type="text/javascript" src="/static/js/index_reg.js?ver=5"></script>
     <script>
-        var cost = {{ cost }};
+        let cost = {{ cost }};
+        let csrf_token = "{{ csrf_token }}";
         {% if free_athlet %}$('#ucount').val({{ free_athlet }});{% endif %}
         $('#ucount').change();
     </script>

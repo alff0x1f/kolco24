@@ -336,10 +336,7 @@ function get_cost() {
     });
 };
 
-let timerId = setTimeout(function tick() {
-    get_cost();
-    timerId = setTimeout(tick, 10000); // (*)
-}, 10000);
+let timerId = setInterval(get_cost, 3000);
 
 $(function() {
     set_ucount(ucount);
