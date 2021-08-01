@@ -323,7 +323,7 @@ function get_cost() {
         data      : p_info,
         dataType  : 'json',
         success   : function(data) {
-            if (data.success) {
+            if (data.success && cost !== data.cost) {
                 cost = data.cost;
                 $("#ucountlabel").text(ucount - ucount_paid);
                 $("#sumlabel").text((ucount - ucount_paid) * cost + additional_charge);
@@ -336,7 +336,7 @@ function get_cost() {
     });
 };
 
-let timerId = setInterval(get_cost, 3000);
+let timerId = setInterval(get_cost, 5000);
 
 $(function() {
     set_ucount(ucount);

@@ -62,7 +62,7 @@ function get_cost_index() {
         data      : p_info,
         dataType  : 'json',
         success   : function(data) {
-            if (data.success) {
+            if (data.success && cost !== data.cost) {
                 cost = data.cost;
                 $('#slotcost').text((cost));
                 $('#ucount').change();
@@ -73,4 +73,4 @@ function get_cost_index() {
     });
 }
 
-let timerId = setInterval(get_cost_index, 3000);
+let timerId = setInterval(get_cost_index, 5000);
