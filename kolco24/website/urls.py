@@ -1,4 +1,9 @@
-from django.urls import path, re_path
+from django.conf import settings
+from django.conf.urls.static import static
+from django.urls import include, path, re_path
+from wagtail.admin import urls as wagtailadmin_urls
+from wagtail.core import urls as wagtail_urls
+from wagtail.documents import urls as wagtaildocs_urls
 
 from . import views
 
@@ -31,4 +36,7 @@ urlpatterns = [
     path('update_protocol', views.update_protocol, name='update_protocol'),
     path('upload_protocol', views.upload_protocol, name='upload_protocol'),
     path('regulations', views.regulations, name='regulations'),
-]
+    path('cms/', include(wagtailadmin_urls)),
+    path('documents/', include(wagtaildocs_urls)),
+    path('', include(wagtail_urls)),
+] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
