@@ -112,9 +112,11 @@
                                     </div>
                                     <input type="hidden" id="dist" name="dist" value="12h">
                                     {% csrf_token %}
-                                    <div id="warning_alone" style="display:none;" class="alert alert-warning" role="alert">
-                                        До 6 октября вам надо будет найти команду!
-                                    </div>
+                                    {% if team_count <= 150 %}
+                                        <div id="warning_alone" class="alert alert-warning" role="alert">
+                                            После 150 команд повышение цены! Уже зарегистрировано {{ team_count }}
+                                        </div>
+                                    {% endif %}
                                     {% if reg_form.non_field_errors %}
                                     <div class="alert alert-danger" role="alert">
                                         {% for err in reg_form.non_field_errors %}
