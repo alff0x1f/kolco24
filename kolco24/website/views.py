@@ -143,16 +143,17 @@ def teams(request, template=""):
             'dist_name': '"Две крепости" (12ч, 4-6 человек)',
         },
         {
-            'teams': Team.objects.filter(category="12h_mm", year='2021').order_by('start_number', 'id'),
-            'dist_name': '"Две крепости" (12ч, ММ)',
-        },
-        {
             'teams': Team.objects.filter(category="12h_mw", year='2021').order_by('start_number', 'id'),
             'dist_name': '"Две крепости" (12ч, МЖ)',
         },
         {
             'teams': Team.objects.filter(category="12h_ww", year='2021').order_by('start_number', 'id'),
             'dist_name': '"Две крепости" (12ч, ЖЖ)',
+        },
+        {
+            'teams': Team.objects.filter(category="12h_mm", year='2021').order_by(
+                'start_number', 'id'),
+            'dist_name': '"Две крепости" (12ч, ММ)',
         },
         {
             'teams': Team.objects.filter(category="6h", year='2021').order_by('start_number', 'id'),
