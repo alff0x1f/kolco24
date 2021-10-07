@@ -9,38 +9,11 @@
                         <div class="card card-lg text-center">
                             <div class="card-body">
                                 <div class="mb-3">
-                                    <h1 class="h2 mb-2">Привет</h1>
-                                    <span>Введите свои данные</span>
-                                </div>
-                                <div class="row no-gutters justify-content-center">
-                                    <form action="/passlogin" method="POST" class="text-left col-lg-8">
-                                        <div class="form-group">
-                                            {{ form.email.label_tag }}
-                                            {{ form.email }}
-                                        </div>
-                                        <div class="form-group">
-                                            {{ form.password.label_tag }}
-                                            {{ form.password }}
-                                            <small>Забыли или не знаете пароль? <a href="/login">Восстановить </a>
-                                            </small>
-                                        </div>
-                                        {% if form.non_field_errors %}
-                                        <div class="alert alert-danger" role="alert">
-                                                {{ form.non_field_errors }}
-                                        </div>
-                                        {% endif%}
-                                        <div class="text-center mt-3">
-                                            <button type="submit" class="btn btn-lg btn-primary">Войти</button>
-                                        </div>
-                                        {% csrf_token %}
-                                    </form>
+                                    <h1 class="h2 mb-2">Вход в лк закрыт</h1>
+                                    <span>Внести изменения в команду можно только на стартовой поляне</span>
                                 </div>
                                 <!--end of row-->
                             </div>
-                        </div>
-                        <div class="text-center">
-                            <span class="text-small">Не регистрировались? <a href="/">Зарегистрироваться</a>
-                            </span>
                         </div>
                     </div>
                     <!--end of col-->
