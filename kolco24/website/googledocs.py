@@ -116,7 +116,7 @@ def export_teams(googlekey=""):
 def export_teams_pretty(googlekey=""):
     wks = connect_to_sheet(tablekey=googlekey)
     fields_count = 8
-    teams = Team.objects.filter(year='2019').order_by('start_number')
+    teams = Team.objects.filter(year='2021').order_by('start_number')
     # select only paid teams
     teams = [team for team in teams if team.paid_sum > 0]
     _, members_count = Team.get_info()
