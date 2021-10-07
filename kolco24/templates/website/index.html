@@ -112,11 +112,9 @@
                                     </div>
                                     <input type="hidden" id="dist" name="dist" value="12h">
                                     {% csrf_token %}
-                                    {% if team_count <= 150 %}
-                                        <div class="alert alert-warning" role="alert">
-                                            После 150 команд повышение взноса! Сейчас зарегистрировано: {{ team_count }}
-                                        </div>
-                                    {% endif %}
+                                    <div class="alert alert-warning" role="alert">
+                                        Закрытие онлайн-регистрации 7 октября 2021
+                                    </div>
                                     {% if reg_form.non_field_errors %}
                                     <div class="alert alert-danger" role="alert">
                                         {% for err in reg_form.non_field_errors %}
