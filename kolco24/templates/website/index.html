@@ -8,166 +8,166 @@
 {% block content %}
 
         <section class="bg-dark">
-            <img alt="Image" src="/static/images/backgrounds/header2021.jpg" class="bg-image opacity-70" />
+            <img alt="Image" src="/static/images/backgrounds/itog-2021.jpg" class="bg-image opacity-70" />
             <div class="container">
                 <div class="row center justify-content-between">
-                    <div class="col-12 col-md-6 col-lg-5">
-                        <img class="mx-auto d-none d-sm-block" style="width: 60%" src="/static/images/logo_big.png" alt="Кольцо 24 2021">
-                        <h2 class="text-center">8-10 октября 2021<br/> район Новоабзаково (Абзелиловский район)</h2>
+                    <div class="col-12 col-md-6 col-lg-5" style="height: 300px">
+{#                        <img class="mx-auto d-none d-sm-block" style="width: 60%" src="/static/images/logo_big.png" alt="Кольцо 24 2021">#}
+{#                        <h2 class="text-center">8-10 октября 2021<br/> район Новоабзаково (Абзелиловский район)</h2>#}
                     </div>
                     <!--end of col-->
                     
-                    <div class="col-12 col-md-6 col-lg-5">
-                        <div class="card">
-                            <div class="card-body">
-                                {% if reg_open %}
-                                <form action="/" method="POST">
-                                    <div class="row mb-2">
-                                        <div class="col-sm-6 col-md-6 mb-1 {% if myteams %}d-none{% endif%}" id="dist_links">
-                                            <ul class="nav nav-tabs">
-                                                <li class="nav-item">
-                                                    <a class="nav-link" id="reg_6h" href="#">6ч</a>
-                                                </li>
-                                                <li class="nav-item">
-                                                    <a class="nav-link active" id="reg_12h" href="#">12ч</a>
-                                                </li>
-                                                <li class="nav-item">
-                                                    <a class="nav-link" id="reg_24h" href="#">24ч</a>
-                                                </li>
-                                            </ul>
-                                        </div>
-                                        <div class="col-sm-6 col-md-6 {% if myteams %}d-none{% endif%}" id="dist_select">
-                                                <div class="form-group">
-                                                    <label for="ucount">Кол-во участников:</label>
-                                                    <select class="form-control" name="ucount" id="ucount" required="">
-                                                        {% comment %} <option id="ucount_1p" value="1">1 (пока без команды)</option> {% endcomment %}
-                                                        <option id="ucount_2p" value="2" selected="">2 человека</option>
-                                                        <option id="ucount_3p" value="3" style="display:none;">3 человека</option>
-                                                        <option id="ucount_4p" value="4">4 человека</option>
-                                                        <option id="ucount_5p" value="5">5 человек</option>
-                                                        <option id="ucount_6p" value="6">6 человек</option>
-                                                    </select>
-                                                </div>
-                                            </div>
-                                    </div>
-                                    <div class="form-row form-group">
-                                        <div class="col">
-                                            <!-- <input class="form-control {% if reg_form.last_name.errors %}is-invalid{% endif %}" name="last_name" type="text" id="surname" placeholder="Фамилия" value="{{ user.last_name }}"> -->
-                                            {{ reg_form.last_name }}
-                                            {% if reg_form.last_name.errors %}
-                                                <div class="invalid-feedback">
-                                                    {{ reg_form.last_name.errors}}
-                                                </div>
-                                            {% endif %}
-                                        </div>
-                                        <div class="col">
-                                            <!-- <input class="form-control {% if reg_form.first_name.errors %}is-invalid{% endif %}" name="first_name" type="text" id="first_name" placeholder="Имя" value="{{ user.first_name }}"> -->
-                                            {{ reg_form.first_name }}
-                                            {% if reg_form.first_name.errors %}
-                                                <div class="invalid-feedback">
-                                                    {{ reg_form.first_name.errors}}
-                                                </div>
-                                            {% endif %}
-                                        </div>
-                                    </div>
-                                    <div class="form-group {% if myteams %}d-none{% endif%}">
-                                        <!-- <label for="InputEmail">Адрес email</label>
-                                        <input type="email" name="email" class="form-control {% if reg_form.email.errors %}is-invalid{% endif %}" id="InputEmail" aria-describedby="emailHelp" placeholder="Адрес email" value="{{ user.email }}"> -->
-                                        {{ reg_form.email.label_tag }}
-                                        {{ reg_form.email }}
-                                        {% if reg_form.email.errors %}
-                                            <div class="invalid-feedback">
-                                                {{ reg_form.email.errors}}
-                                            </div>
-                                        {% endif %}
-                                    </div>
-                                    <div class="form-group">
-                                        <!-- <label for="InputPhone">Телефон</label> -->
-                                        <!-- <input type="phone" name="phone" class="form-control {% if reg_form.phone.errors %}is-invalid{% endif %}" id="InputPhone" placeholder="Телефон"> -->
-                                        {{ reg_form.phone.label_tag }}
-                                        {{ reg_form.phone }}
-                                        {% if reg_form.phone.errors %}
-                                        <div class="invalid-feedback">
-                                            {{ reg_form.phone.errors}}
-                                        </div>
-                                        {% endif %}
-                                    </div>
-                                    <div class="mb-2 {% if myteams %}d-none{% endif%}">
-                                        <div class="custom-control custom-checkbox d-none">
-                                            <input type="checkbox" class="custom-control-input" value="agree" name="agree-terms" id="check-agree" checked>
-                                            <label class="custom-control-label text-small" for="check-agree">Я прочитал <a href="https://docs.google.com/document/d/1RJ4mEY_FtqUR3n5tTR9eCOhLUnkCkK2dWFPzQiMZkXg/edit" target="_blank">Положение</a>
-                                            </label>
-                                        </div>
+{#                    <div class="col-12 col-md-6 col-lg-5">#}
+{#                        <div class="card">#}
+{#                            <div class="card-body">#}
+{#                                {% if reg_open %}#}
+{#                                <form action="/" method="POST">#}
+{#                                    <div class="row mb-2">#}
+{#                                        <div class="col-sm-6 col-md-6 mb-1 {% if myteams %}d-none{% endif%}" id="dist_links">#}
+{#                                            <ul class="nav nav-tabs">#}
+{#                                                <li class="nav-item">#}
+{#                                                    <a class="nav-link" id="reg_6h" href="#">6ч</a>#}
+{#                                                </li>#}
+{#                                                <li class="nav-item">#}
+{#                                                    <a class="nav-link active" id="reg_12h" href="#">12ч</a>#}
+{#                                                </li>#}
+{#                                                <li class="nav-item">#}
+{#                                                    <a class="nav-link" id="reg_24h" href="#">24ч</a>#}
+{#                                                </li>#}
+{#                                            </ul>#}
+{#                                        </div>#}
+{#                                        <div class="col-sm-6 col-md-6 {% if myteams %}d-none{% endif%}" id="dist_select">#}
+{#                                                <div class="form-group">#}
+{#                                                    <label for="ucount">Кол-во участников:</label>#}
+{#                                                    <select class="form-control" name="ucount" id="ucount" required="">#}
+{#                                                        {% comment %} <option id="ucount_1p" value="1">1 (пока без команды)</option> {% endcomment %}#}
+{#                                                        <option id="ucount_2p" value="2" selected="">2 человека</option>#}
+{#                                                        <option id="ucount_3p" value="3" style="display:none;">3 человека</option>#}
+{#                                                        <option id="ucount_4p" value="4">4 человека</option>#}
+{#                                                        <option id="ucount_5p" value="5">5 человек</option>#}
+{#                                                        <option id="ucount_6p" value="6">6 человек</option>#}
+{#                                                    </select>#}
+{#                                                </div>#}
+{#                                            </div>#}
+{#                                    </div>#}
+{#                                    <div class="form-row form-group">#}
+{#                                        <div class="col">#}
+{#                                            <!-- <input class="form-control {% if reg_form.last_name.errors %}is-invalid{% endif %}" name="last_name" type="text" id="surname" placeholder="Фамилия" value="{{ user.last_name }}"> -->#}
+{#                                            {{ reg_form.last_name }}#}
+{#                                            {% if reg_form.last_name.errors %}#}
+{#                                                <div class="invalid-feedback">#}
+{#                                                    {{ reg_form.last_name.errors}}#}
+{#                                                </div>#}
+{#                                            {% endif %}#}
+{#                                        </div>#}
+{#                                        <div class="col">#}
+{#                                            <!-- <input class="form-control {% if reg_form.first_name.errors %}is-invalid{% endif %}" name="first_name" type="text" id="first_name" placeholder="Имя" value="{{ user.first_name }}"> -->#}
+{#                                            {{ reg_form.first_name }}#}
+{#                                            {% if reg_form.first_name.errors %}#}
+{#                                                <div class="invalid-feedback">#}
+{#                                                    {{ reg_form.first_name.errors}}#}
+{#                                                </div>#}
+{#                                            {% endif %}#}
+{#                                        </div>#}
+{#                                    </div>#}
+{#                                    <div class="form-group {% if myteams %}d-none{% endif%}">#}
+{#                                        <!-- <label for="InputEmail">Адрес email</label>#}
+{#                                        <input type="email" name="email" class="form-control {% if reg_form.email.errors %}is-invalid{% endif %}" id="InputEmail" aria-describedby="emailHelp" placeholder="Адрес email" value="{{ user.email }}"> -->#}
+{#                                        {{ reg_form.email.label_tag }}#}
+{#                                        {{ reg_form.email }}#}
+{#                                        {% if reg_form.email.errors %}#}
+{#                                            <div class="invalid-feedback">#}
+{#                                                {{ reg_form.email.errors}}#}
+{#                                            </div>#}
+{#                                        {% endif %}#}
+{#                                    </div>#}
+{#                                    <div class="form-group">#}
+{#                                        <!-- <label for="InputPhone">Телефон</label> -->#}
+{#                                        <!-- <input type="phone" name="phone" class="form-control {% if reg_form.phone.errors %}is-invalid{% endif %}" id="InputPhone" placeholder="Телефон"> -->#}
+{#                                        {{ reg_form.phone.label_tag }}#}
+{#                                        {{ reg_form.phone }}#}
+{#                                        {% if reg_form.phone.errors %}#}
+{#                                        <div class="invalid-feedback">#}
+{#                                            {{ reg_form.phone.errors}}#}
+{#                                        </div>#}
+{#                                        {% endif %}#}
+{#                                    </div>#}
+{#                                    <div class="mb-2 {% if myteams %}d-none{% endif%}">#}
+{#                                        <div class="custom-control custom-checkbox d-none">#}
+{#                                            <input type="checkbox" class="custom-control-input" value="agree" name="agree-terms" id="check-agree" checked>#}
+{#                                            <label class="custom-control-label text-small" for="check-agree">Я прочитал <a href="https://docs.google.com/document/d/1RJ4mEY_FtqUR3n5tTR9eCOhLUnkCkK2dWFPzQiMZkXg/edit" target="_blank">Положение</a>#}
+{#                                            </label>#}
+{#                                        </div>#}
 {#                                        <small>#}
 {#                                            В случае отмены и невозможности проведения соревнований возврат стартового взноса будет осуществен с вычетом <b>8% комиссии</b>#}
 {#                                        </small>#}
-                                    </div>
-                                    <div class="row {% if myteams %}d-none{% endif%}">
-                                        <div class="col-sm-6"><p>Стартовый взнос</p></div>
-                                        <div class="col-sm-6"><p class="text-right"><span id="slotcost">{{ cost }}</span> руб с человека</p></div>
-                                    </div>
-                                    <div class="row mb-2 justify-content-between {% if myteams %}d-none{% endif%}">
-                                        <div class="col-6"><p>Итого за <span id="ucountlabel">2</span> чел.</p></div>
-                                        <div class="col-6"><p class="text-right"><span id="sumlabel">{% widthratio cost 1 2 %}</span> руб</p></div>
-                                    </div>
-                                    <input type="hidden" id="dist" name="dist" value="12h">
-                                    {% csrf_token %}
-                                    <div class="alert alert-warning" role="alert">
-                                        Закрытие онлайн-регистрации 7 октября
-                                    </div>
-                                    {% if reg_form.non_field_errors %}
-                                    <div class="alert alert-danger" role="alert">
-                                        {% for err in reg_form.non_field_errors %}
-                                        <p class="form-error">{{ err }}</p>
-                                        {% endfor %}
-                                    </div>
-                                    {% endif %}
-                                    {% if myteams %}
-                                      <hr>
-                                      <h5>{% if myteams_count == 1 %}Моя команда{% else %}Мои команды{% endif %}</h5>
-                                      {% for team in myteams %}
-                                        <div class="row mb-3">
-                                            <div class="col-12"><h5>{{ team.teamname }}</h5></div>
-                                            <div class="col-8"><p>Дистанция</p></div>
-                                            <div class="col-4"><p>{{ team.dist }}</p></div>
-                                            <div class="col-8"><p>Оплачено за </p></div>
-                                            <div class="col-4"><p>{{team.paid_people|floatformat}} из {{team.ucount}}</span> чел.</p></div>
-                                            {% if team.additional_charge > 0 %}
-                                                <div class="col-8"><p>Необходимо доплатить</p></div>
-                                                <div class="col-4"><p>{{ team.additional_charge }} руб</p></div>
-                                            {% endif %}
-                                        </div>
-                                      {% endfor %}
-                                    {% endif%}
-                                    
-                                    <button type="submit" class="btn btn-lg btn-success btn-block">{% if myteams %}Изменить/добавить{% else %}Зарегистрироваться{% endif%}</button>
-                                    
-                                </form>
-                                {% else %}
-                                    <h3>Онлайн регистрация закрыта. До встречи на старте</h3>
-                                    <h6>Команд: {{ team_count}}</h6>
-
-                                    <a class="btn btn-lg btn-success btn-block" href="/teams" role="button">Список команд</a>
-
-                                    {% if myteams %}
-                                      <hr>
-                                      <h5>{% if myteams_count == 1 %}Моя команда{% else %}Мои команды{% endif %}</h5>
-                                      {% for team in myteams %}
-                                        <div class="row mb-3">
-                                            <div class="col-12"><h5>{{ team.teamname }}</h5></div>
-                                            <div class="col-8"><p>Дистанция</p></div>
-                                            <div class="col-4"><p>{{ team.dist }}</p></div>
-                                            <div class="col-8"><p>Оплачено за </p></div>
-                                            <div class="col-4"><p>{{team.paid_people|floatformat}} из {{team.ucount}}</span> чел.</p></div>
-                                        </div>
-                                      {% endfor %}
-                                      <a class="btn btn-lg btn-success btn-block" href="/team" role="button">Изменить/посмотреть состав</a>
-                                    {% endif%}
-
-                                {% endif %}
-                            </div>
-                        </div>
-                    </div>
+{#                                    </div>#}
+{#                                    <div class="row {% if myteams %}d-none{% endif%}">#}
+{#                                        <div class="col-sm-6"><p>Стартовый взнос</p></div>#}
+{#                                        <div class="col-sm-6"><p class="text-right"><span id="slotcost">{{ cost }}</span> руб с человека</p></div>#}
+{#                                    </div>#}
+{#                                    <div class="row mb-2 justify-content-between {% if myteams %}d-none{% endif%}">#}
+{#                                        <div class="col-6"><p>Итого за <span id="ucountlabel">2</span> чел.</p></div>#}
+{#                                        <div class="col-6"><p class="text-right"><span id="sumlabel">{% widthratio cost 1 2 %}</span> руб</p></div>#}
+{#                                    </div>#}
+{#                                    <input type="hidden" id="dist" name="dist" value="12h">#}
+{#                                    {% csrf_token %}#}
+{#                                    <div class="alert alert-warning" role="alert">#}
+{#                                        Закрытие онлайн-регистрации 7 октября#}
+{#                                    </div>#}
+{#                                    {% if reg_form.non_field_errors %}#}
+{#                                    <div class="alert alert-danger" role="alert">#}
+{#                                        {% for err in reg_form.non_field_errors %}#}
+{#                                        <p class="form-error">{{ err }}</p>#}
+{#                                        {% endfor %}#}
+{#                                    </div>#}
+{#                                    {% endif %}#}
+{#                                    {% if myteams %}#}
+{#                                      <hr>#}
+{#                                      <h5>{% if myteams_count == 1 %}Моя команда{% else %}Мои команды{% endif %}</h5>#}
+{#                                      {% for team in myteams %}#}
+{#                                        <div class="row mb-3">#}
+{#                                            <div class="col-12"><h5>{{ team.teamname }}</h5></div>#}
+{#                                            <div class="col-8"><p>Дистанция</p></div>#}
+{#                                            <div class="col-4"><p>{{ team.dist }}</p></div>#}
+{#                                            <div class="col-8"><p>Оплачено за </p></div>#}
+{#                                            <div class="col-4"><p>{{team.paid_people|floatformat}} из {{team.ucount}}</span> чел.</p></div>#}
+{#                                            {% if team.additional_charge > 0 %}#}
+{#                                                <div class="col-8"><p>Необходимо доплатить</p></div>#}
+{#                                                <div class="col-4"><p>{{ team.additional_charge }} руб</p></div>#}
+{#                                            {% endif %}#}
+{#                                        </div>#}
+{#                                      {% endfor %}#}
+{#                                    {% endif%}#}
+{#                                    #}
+{#                                    <button type="submit" class="btn btn-lg btn-success btn-block">{% if myteams %}Изменить/добавить{% else %}Зарегистрироваться{% endif%}</button>#}
+{#                                    #}
+{#                                </form>#}
+{#                                {% else %}#}
+{#                                    <h3>Онлайн регистрация закрыта. До встречи на старте</h3>#}
+{#                                    <h6>Команд: {{ team_count}}</h6>#}
+{##}
+{#                                    <a class="btn btn-lg btn-success btn-block" href="/teams" role="button">Список команд</a>#}
+{##}
+{#                                    {% if myteams %}#}
+{#                                      <hr>#}
+{#                                      <h5>{% if myteams_count == 1 %}Моя команда{% else %}Мои команды{% endif %}</h5>#}
+{#                                      {% for team in myteams %}#}
+{#                                        <div class="row mb-3">#}
+{#                                            <div class="col-12"><h5>{{ team.teamname }}</h5></div>#}
+{#                                            <div class="col-8"><p>Дистанция</p></div>#}
+{#                                            <div class="col-4"><p>{{ team.dist }}</p></div>#}
+{#                                            <div class="col-8"><p>Оплачено за </p></div>#}
+{#                                            <div class="col-4"><p>{{team.paid_people|floatformat}} из {{team.ucount}}</span> чел.</p></div>#}
+{#                                        </div>#}
+{#                                      {% endfor %}#}
+{#                                      <a class="btn btn-lg btn-success btn-block" href="/team" role="button">Изменить/посмотреть состав</a>#}
+{#                                    {% endif%}#}
+{##}
+{#                                {% endif %}#}
+{#                            </div>#}
+{#                        </div>#}
+{#                    </div>#}
                 </div>
                 <div class="row">
                     <div class="col-12 col-md-12 col-lg-10">
