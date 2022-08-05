@@ -6,9 +6,8 @@ You need python3
 git clone git@github.com:alff0x1f/kolco24.git 
 (or git clone https://github.com/alff0x1f/kolco24.git)
 cd kolco24
-virtualenv -p python3 venv
-source venv/bin/activate
-cd kolco24
+python3 -m venv .venv
+source .venv/bin/activate
 pip install -r requirements.txt 
 ```
 
