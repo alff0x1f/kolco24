@@ -6,13 +6,13 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('website', '0016_auto_20200902_0141'),
+        ("website", "0016_auto_20200902_0141"),
     ]
 
     operations = [
         migrations.AlterField(
-            model_name='paymentsya',
-            name='sha1_hash',
+            model_name="paymentsya",
+            name="sha1_hash",
             field=models.CharField(max_length=50),
         ),
     ]

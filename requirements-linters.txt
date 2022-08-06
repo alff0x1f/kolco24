@@ -1,0 +1,8 @@
+# Linters ------------------------------------------------------------------------------
+# The uncompromising code formatter
+black~=22.6.0
+# The modular source code checker: pep8, pyflakes and co
+flake8~=5.0.4
+## Sort imports
+isort~=5.10.1
+seed-isort-config~=2.2.0

@@ -6,13 +6,13 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('website', '0006_auto_20181010_0115'),
+        ("website", "0006_auto_20181010_0115"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='team',
-            name='get_map',
+            model_name="team",
+            name="get_map",
             field=models.BooleanField(default=False),
         ),
     ]

@@ -1,27 +1,34 @@
 import random
 import string
 from datetime import timedelta
+
 from django import forms
-from django.core.exceptions import ObjectDoesNotExist
-from django.contrib.auth.models import User
 from django.contrib.auth import authenticate
-from website.models import Team, Athlet, TeamAdminLog
+from django.contrib.auth.models import User
+from django.core.exceptions import ObjectDoesNotExist
+from website.models import Athlet, Team, TeamAdminLog
 
 
 class LoginForm(forms.Form):
     email = forms.EmailField(
         widget=forms.EmailInput(
             attrs={
-                'class': 'form-control form-control-lg',
-                'placeholder': 'Введите email'}),
-        label='Адрес email:')
+                "class": "form-control form-control-lg",
+                "placeholder": "Введите email",
+            }
+        ),
+        label="Адрес email:",
+    )
 
     password = forms.CharField(
         widget=forms.PasswordInput(
             attrs={
-                'class': 'form-control form-control-lg',
-                'placeholder': 'Введите пароль'}),
-        label='Пароль:')
+                "class": "form-control form-control-lg",
+                "placeholder": "Введите пароль",
+            }
+        ),
+        label="Пароль:",
+    )
 
     def clean(self):
         user = self.authenticate_via_email()
@@ -33,34 +40,38 @@ class LoginForm(forms.Form):
 
     def authenticate_user(self):
         return authenticate(
-            username=self.user.username,
-            password=self.cleaned_data['password'])
+            username=self.user.username, password=self.cleaned_data["password"]
+        )
 
     def authenticate_via_email(self):
         """
-            Authenticate user using email.
-            Returns user object if authenticated else None
+        Authenticate user using email.
+        Returns user object if authenticated else None
         """
-        email = self.cleaned_data['email']
+        email = self.cleaned_data["email"]
         if email:
             try:
                 user = User.objects.get(email__iexact=email)
-                if user.check_password(self.cleaned_data['password']):
+                if user.check_password(self.cleaned_data["password"]):
                     return user
             except ObjectDoesNotExist:
                 pass
         return None
 
+
 class FastLoginForm(forms.Form):
     email = forms.EmailField(
         widget=forms.EmailInput(
             attrs={
-                'class': 'form-control form-control-lg',
-                'placeholder': 'Введите email'}),
-        label='Адрес email:')
+                "class": "form-control form-control-lg",
+                "placeholder": "Введите email",
+            }
+        ),
+        label="Адрес email:",
+    )
 
     def clean(self):
-        email = self.cleaned_data['email']
+        email = self.cleaned_data["email"]
         user = User.objects.filter(email__iexact=email)
         if not user:
             raise forms.ValidationError("Такой email не найден.")
@@ -68,35 +79,37 @@ class FastLoginForm(forms.Form):
             self.user = user
         return self.cleaned_data
 
+
 class RegForm(forms.Form):
     first_name = forms.CharField(
-        widget=forms.TextInput(
-            attrs={
-                'class': 'form-control',
-                'placeholder': 'Имя'}))
+        widget=forms.TextInput(attrs={"class": "form-control", "placeholder": "Имя"})
+    )
     last_name = forms.CharField(
         widget=forms.TextInput(
-            attrs={
-                'class': 'form-control',
-                'placeholder': 'Фамилия'}))
+            attrs={"class": "form-control", "placeholder": "Фамилия"}
+        )
+    )
     email = forms.EmailField(
         widget=forms.EmailInput(
-            attrs={
-                'class': 'form-control',
-                'placeholder': 'Введите email'}),
-        label='Адрес email')
+            attrs={"class": "form-control", "placeholder": "Введите email"}
+        ),
+        label="Адрес email",
+    )
     phone = forms.CharField(
         widget=forms.TextInput(
-            attrs={
-                'class': 'form-control',
-                'placeholder': 'Телефон'}),
-        label='Телефон')
+            attrs={"class": "form-control", "placeholder": "Телефон"}
+        ),
+        label="Телефон",
+    )
     ucount = forms.IntegerField()
     dist = forms.CharField()
 
-    def id_generator(self, size=8, chars=string.ascii_uppercase + string.digits \
-            + string.ascii_lowercase):
-        return ''.join(random.choice(chars) for _ in range(size))
+    def id_generator(
+        self,
+        size=8,
+        chars=string.ascii_uppercase + string.digits + string.ascii_lowercase,
+    ):
+        return "".join(random.choice(chars) for _ in range(size))
 
     def set_user(self, user):
         self.user = user
@@ -114,7 +127,7 @@ class RegForm(forms.Form):
             email = self.cleaned_data["email"]
             while User.objects.filter(username=username).exists():
                 username = self.id_generator(12)
-            
+
             old_user = User.objects.filter(email__iexact=self.cleaned_data["email"])[:1]
             if old_user:
                 user = old_user.get()
@@ -127,7 +140,7 @@ class RegForm(forms.Form):
 
             if ucount == 1:
                 athlet = Athlet()
-                athlet.new_athlet(user, None, last_name + ' ' + first_name)
+                athlet.new_athlet(user, None, last_name + " " + first_name)
             elif ucount > 1:
                 team = Team()
                 team.new_team(user, dist, ucount)
@@ -148,9 +161,9 @@ class RegForm(forms.Form):
         if self.errors:
             for f_name in self.fields:
                 if f_name in self.errors:
-                    classes = self.fields[f_name].widget.attrs.get('class', '')
-                    classes += ' is-invalid'
-                    self.fields[f_name].widget.attrs['class'] = classes
+                    classes = self.fields[f_name].widget.attrs.get("class", "")
+                    classes += " is-invalid"
+                    self.fields[f_name].widget.attrs["class"] = classes
             raise forms.ValidationError("Заполните все поля")
 
         exist_user = User.objects.filter(email__iexact=self.cleaned_data["email"])[:1]
@@ -168,22 +181,25 @@ class TeamForm(forms.Form):
         required=False,
         widget=forms.TextInput(
             attrs={
-                'class': 'form-control form-control-lg',
-                'placeholder': 'Название команды'})
+                "class": "form-control form-control-lg",
+                "placeholder": "Название команды",
+            }
+        ),
     )
     city = forms.CharField(
         required=False,
         widget=forms.TextInput(
-            attrs={
-                'class': 'form-control form-control-lg',
-                'placeholder': 'Город'})
+            attrs={"class": "form-control form-control-lg", "placeholder": "Город"}
+        ),
     )
     organization = forms.CharField(
         required=False,
         widget=forms.TextInput(
             attrs={
-                'class': 'form-control form-control-lg',
-                'placeholder': 'Клуб(организация)'})
+                "class": "form-control form-control-lg",
+                "placeholder": "Клуб(организация)",
+            }
+        ),
     )
     ucount = forms.IntegerField()
     dist = forms.CharField()
@@ -192,21 +208,25 @@ class TeamForm(forms.Form):
     def __init__(self, *args, **kwargs):
         super(TeamForm, self).__init__(*args, **kwargs)
         for i in range(6):
-            self.fields['athlet%s' % (i + 1)] = forms.CharField(
+            self.fields["athlet%s" % (i + 1)] = forms.CharField(
                 required=False,
                 widget=forms.TextInput(
                     attrs={
-                        'class': 'form-control form-control-lg',
-                        'placeholder': str(i + 1) + ') Фамилия имя'})
+                        "class": "form-control form-control-lg",
+                        "placeholder": str(i + 1) + ") Фамилия имя",
+                    }
+                ),
             )
-            self.fields['birth%s' % (i+1)] = forms.CharField(
+            self.fields["birth%s" % (i + 1)] = forms.CharField(
                 required=False,
                 widget=forms.TextInput(
                     attrs={
-                        'class': 'form-control form-control-lg',
-                        'placeholder': 'Год рождения'})
+                        "class": "form-control form-control-lg",
+                        "placeholder": "Год рождения",
+                    }
+                ),
             )
-    
+
     def init_vals(self, user, paymentid=""):
         team = None
         if paymentid:
@@ -223,7 +243,7 @@ class TeamForm(forms.Form):
             #     return False
             return False
             team = Team()
-            team.new_team(user, '12h', 4)
+            team.new_team(user, "12h", 4)
         else:
             team = team.get()
 
@@ -300,102 +320,112 @@ class TeamFormAdmin(forms.Form):
     paymentid = forms.CharField(widget=forms.HiddenInput())
     get_package = forms.BooleanField(
         required=False,
-        label = 'Получили стартовый пакет',
+        label="Получили стартовый пакет",
         widget=forms.CheckboxInput(
-            attrs = {
-                'class': 'custom-control-input',
-            })
+            attrs={
+                "class": "custom-control-input",
+            }
+        ),
     )
     get_number = forms.BooleanField(
         required=False,
-        label = 'Получили номер',
+        label="Получили номер",
         widget=forms.CheckboxInput(
-            attrs = {
-                'class': 'custom-control-input',
-            })
-        )
+            attrs={
+                "class": "custom-control-input",
+            }
+        ),
+    )
     get_map = forms.BooleanField(
         required=False,
-        label = 'Получили карту',
+        label="Получили карту",
         widget=forms.CheckboxInput(
-            attrs = {
-                'class': 'custom-control-input',
-            })
-        )
+            attrs={
+                "class": "custom-control-input",
+            }
+        ),
+    )
     give_paper = forms.BooleanField(
         required=False,
-        label = 'Сдали заявку',
+        label="Сдали заявку",
         widget=forms.CheckboxInput(
-            attrs = {
-                'class': 'custom-control-input',
-            })
-        )
+            attrs={
+                "class": "custom-control-input",
+            }
+        ),
+    )
     give_photos = forms.BooleanField(
         required=False,
-        label = 'Сдали фото',
+        label="Сдали фото",
         widget=forms.CheckboxInput(
-            attrs = {
-                'class': 'custom-control-input',
-            })
-        )
+            attrs={
+                "class": "custom-control-input",
+            }
+        ),
+    )
     dnf = forms.BooleanField(
         required=False,
-        label = 'Не финишировали',
+        label="Не финишировали",
         widget=forms.CheckboxInput(
-            attrs = {
-                'class': 'custom-control-input',
-            })
+            attrs={
+                "class": "custom-control-input",
+            }
+        ),
     )
 
     category = forms.ChoiceField(
-        required = False,
-        choices = (
-            ('6h', '6 часов'),
-            ('12h_mw','12 часов МЖ'),
-            ('12h_mm', '12 часов ММ'),
-            ('12h_ww', '12 часов ЖЖ'),
-            ('12h_team', '12 часов, команда'), 
-            ('24h', '24 часа'),
+        required=False,
+        choices=(
+            ("6h", "6 часов"),
+            ("12h_mw", "12 часов МЖ"),
+            ("12h_mm", "12 часов ММ"),
+            ("12h_ww", "12 часов ЖЖ"),
+            ("12h_team", "12 часов, команда"),
+            ("24h", "24 часа"),
         ),
-        label = 'Категория',
-        widget = forms.Select(
-            attrs = {
-                'class': 'form-control form-control-lg',
-                'placeholder': 'Категория'})
+        label="Категория",
+        widget=forms.Select(
+            attrs={"class": "form-control form-control-lg", "placeholder": "Категория"}
+        ),
     )
     start_number = forms.CharField(
-        required = False,
-        label = 'Стартовый номер',
-        widget = forms.TextInput(
-            attrs = {
-                'class': 'form-control form-control-lg',
-                'placeholder': 'Стартовый номер'})
+        required=False,
+        label="Стартовый номер",
+        widget=forms.TextInput(
+            attrs={
+                "class": "form-control form-control-lg",
+                "placeholder": "Стартовый номер",
+            }
+        ),
     )
     start_time = forms.DateTimeField(
-        required = False,
-        label = 'Время старта',
-        widget = forms.DateTimeInput(
-            attrs = {
-                'class': 'form-control form-control-lg',
-                'placeholder': 'Время старта'})
+        required=False,
+        label="Время старта",
+        widget=forms.DateTimeInput(
+            attrs={
+                "class": "form-control form-control-lg",
+                "placeholder": "Время старта",
+            }
+        ),
     )
     finish_time = forms.DateTimeField(
-        required = False,
-        label = 'Время финиша',
-        widget = forms.DateTimeInput(
-            attrs = {
-                'class': 'form-control form-control-lg',
-                'placeholder': 'Время финиша'})
+        required=False,
+        label="Время финиша",
+        widget=forms.DateTimeInput(
+            attrs={
+                "class": "form-control form-control-lg",
+                "placeholder": "Время финиша",
+            }
+        ),
     )
     penalty = forms.IntegerField(
-        required = False,
-        min_value = 0,
-        max_value = 1000,
-        label = 'Штраф',
+        required=False,
+        min_value=0,
+        max_value=1000,
+        label="Штраф",
         widget=forms.NumberInput(
-            attrs = {
-                'class': 'form-control form-control-lg',
-                'placeholder': 'Штраф'})
+            attrs={"class": "form-control form-control-lg", "placeholder": "Штраф"}
+        ),
     )
 
     def clean(self):
@@ -404,7 +434,7 @@ class TeamFormAdmin(forms.Form):
         if not team:
             raise forms.ValidationError("Команда не найдена.")
         return self.cleaned_data
-    
+
     def init_vals(self, user, paymentid=""):
         team = None
         if paymentid and user.is_superuser:
@@ -422,11 +452,15 @@ class TeamFormAdmin(forms.Form):
         self.initial["give_photos"] = team.give_photos
         self.initial["category"] = team.category
         self.initial["start_number"] = team.start_number
-        self.initial["start_time"] = team.start_time + timedelta(hours=5) if team.start_time else None
-        self.initial["finish_time"] = team.finish_time + timedelta(hours=5) if team.finish_time else None
+        self.initial["start_time"] = (
+            team.start_time + timedelta(hours=5) if team.start_time else None
+        )
+        self.initial["finish_time"] = (
+            team.finish_time + timedelta(hours=5) if team.finish_time else None
+        )
         self.initial["penalty"] = team.penalty
         self.initial["dnf"] = team.dnf
-    
+
     def save(self, user):
         if "paymentid" not in self.cleaned_data:
             return False
@@ -436,7 +470,7 @@ class TeamFormAdmin(forms.Form):
             d = self.cleaned_data
             print(d)
             team = team.get()
-            if "get_package" in d :
+            if "get_package" in d:
                 team.get_package = d["get_package"]
             if "get_number" in d:
                 team.get_number = d["get_number"]
@@ -463,19 +497,19 @@ class TeamFormAdmin(forms.Form):
             team_admin_log = TeamAdminLog()
             if user:
                 team_admin_log.editor = user
-            team_admin_log.paymentid     = team.paymentid
-            team_admin_log.get_package   = team.get_package
-            team_admin_log.get_number    = team.get_number
-            team_admin_log.get_map    = team.get_map
-            team_admin_log.give_paper    = team.give_paper
-            team_admin_log.give_photos   = team.give_photos
-            team_admin_log.category      = team.category
-            team_admin_log.start_number  = team.start_number
-            team_admin_log.start_time    = team.start_time
-            team_admin_log.finish_time   = team.finish_time
+            team_admin_log.paymentid = team.paymentid
+            team_admin_log.get_package = team.get_package
+            team_admin_log.get_number = team.get_number
+            team_admin_log.get_map = team.get_map
+            team_admin_log.give_paper = team.give_paper
+            team_admin_log.give_photos = team.give_photos
+            team_admin_log.category = team.category
+            team_admin_log.start_number = team.start_number
+            team_admin_log.start_time = team.start_time
+            team_admin_log.finish_time = team.finish_time
             team_admin_log.distance_time = team.distance_time
-            team_admin_log.penalty       = team.penalty
-            team_admin_log.dnf           = team.dnf
+            team_admin_log.penalty = team.penalty
+            team_admin_log.dnf = team.dnf
             team_admin_log.save()
             return team
         return False
@@ -485,27 +519,34 @@ class Export2GoogleDocsForm(forms.Form):
     urladdress = forms.CharField(
         widget=forms.TextInput(
             attrs={
-                'class': 'form-control form-control-lg',
-                'placeholder': 'https://docs.google.com/spreadsheets/d/...'}),
-        label='Введите адрес Таблицы Google Docs')
-    sync_type = forms.ChoiceField(
-        choices = (
-            ('export_team', 'Экпортировать команды'),
-            ('export_team_pretty', 'Экпортировать команды (для печати)'),
-            ('import_team_numbers','Импорт номеров команд'),
+                "class": "form-control form-control-lg",
+                "placeholder": "https://docs.google.com/spreadsheets/d/...",
+            }
         ),
-        label = 'Синхронизировать',
-        widget = forms.Select(
-            attrs = {
-                'class': 'form-control form-control-lg',
-                'placeholder': 'Синхронизация'})
+        label="Введите адрес Таблицы Google Docs",
+    )
+    sync_type = forms.ChoiceField(
+        choices=(
+            ("export_team", "Экпортировать команды"),
+            ("export_team_pretty", "Экпортировать команды (для печати)"),
+            ("import_team_numbers", "Импорт номеров команд"),
+        ),
+        label="Синхронизировать",
+        widget=forms.Select(
+            attrs={
+                "class": "form-control form-control-lg",
+                "placeholder": "Синхронизация",
+            }
+        ),
     )
 
     def clean(self):
-        urladdress = self.cleaned_data['urladdress']
+        urladdress = self.cleaned_data["urladdress"]
         googlekey = self.extractKeyFromUrl(urladdress)
         if not googlekey:
-            raise forms.ValidationError("Необходимо ввести корректный адрес для экспорта")
+            raise forms.ValidationError(
+                "Необходимо ввести корректный адрес для экспорта"
+            )
         else:
             self.googlekey = googlekey
         return self.cleaned_data
@@ -513,6 +554,6 @@ class Export2GoogleDocsForm(forms.Form):
     def extractKeyFromUrl(self, url):
         if len(url) <= 40:
             return False
-        if url[:39] == 'https://docs.google.com/spreadsheets/d/':
+        if url[:39] == "https://docs.google.com/spreadsheets/d/":
             url = url[39:]
         return url.split("/")[0]
