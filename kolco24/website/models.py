@@ -51,9 +51,16 @@ class PaymentsYa(models.Model):
 
     def new_payment(self, d):
         fields = [
-            "notification_type", "operation_id", "amount", "currency",
-            "datetime", "sender", "codepro", "label", "sha1_hash",
-            "withdraw_amount"
+            "notification_type",
+            "operation_id",
+            "amount",
+            "currency",
+            "datetime",
+            "sender",
+            "codepro",
+            "label",
+            "sha1_hash",
+            "withdraw_amount",
         ]
         for field in fields:
             if field not in d:
@@ -61,26 +68,32 @@ class PaymentsYa(models.Model):
 
         notification_secret = settings.YANDEX_NOTIFICATION_SECRET
 
-        s = "%s&%s&%s&%s&%s&%s&%s&%s&%s" % (d['notification_type'],
-                                            d['operation_id'], d['amount'],
-                                            d['currency'], d['datetime'],
-                                            d['sender'], d['codepro'],
-                                            notification_secret, d['label'])
+        s = "%s&%s&%s&%s&%s&%s&%s&%s&%s" % (
+            d["notification_type"],
+            d["operation_id"],
+            d["amount"],
+            d["currency"],
+            d["datetime"],
+            d["sender"],
+            d["codepro"],
+            notification_secret,
+            d["label"],
+        )
 
-        hash = hashlib.sha1(s.encode('utf-8')).hexdigest()
-        if d['sha1_hash'] == hash:
-            self.notification_type = d['notification_type']
-            self.operation_id = d['operation_id']
-            self.amount = d['amount']
-            self.currency = d['currency']
-            self.datetime = d['datetime']
-            self.sender = d['sender']
-            if d['codepro'] == "false":
+        hash = hashlib.sha1(s.encode("utf-8")).hexdigest()
+        if d["sha1_hash"] == hash:
+            self.notification_type = d["notification_type"]
+            self.operation_id = d["operation_id"]
+            self.amount = d["amount"]
+            self.currency = d["currency"]
+            self.datetime = d["datetime"]
+            self.sender = d["sender"]
+            if d["codepro"] == "false":
                 self.codepro = False
-            if d['codepro'] == "true":
+            if d["codepro"] == "true":
                 self.codepro = True
-            self.label = d['label']
-            self.sha1_hash = d['sha1_hash']
+            self.label = d["label"]
+            self.sha1_hash = d["sha1_hash"]
 
             self.withdraw_amount = d["withdraw_amount"]
             if "unaccepted" in d:
@@ -172,7 +185,7 @@ class Team(models.Model):
     points_sum = models.IntegerField(default=0)
     place = models.IntegerField(default=0)
 
-    def __str__(self):              # __str__ on Python 3
+    def __str__(self):  # __str__ on Python 3
         return self.start_number.__str__() + " " + self.teamname.__str__()
 
     def new_team(self, user, dist, ucount):
@@ -181,7 +194,7 @@ class Team(models.Model):
             self.owner = user
             self.dist = dist
             self.ucount = ucount
-            self.paymentid = '%016x' % random.randrange(16**16)
+            self.paymentid = "%016x" % random.randrange(16**16)
             self.year = 2021
             self.save()
 
@@ -225,10 +238,11 @@ class Team(models.Model):
     def update_places(self):
         self.update_points_sum()
         self.update_distance_time()
-        categories = ['6h', '12h_mm', '12h_mw', "12h_ww", "24h"]
+        categories = ["6h", "12h_mm", "12h_mw", "12h_ww", "24h"]
         for category in categories:
             teams = Team.objects.filter(
-                category=category, paid_sum__gt=0, year=2021).order_by('-points_sum', 'distance_time')
+                category=category, paid_sum__gt=0, year=2021
+            ).order_by("-points_sum", "distance_time")
             place = 1
             for team in teams:
                 if team.distance_time and team.points_sum:
@@ -266,7 +280,7 @@ class TeamAdminLog(models.Model):
 
 
 class PaymentLog(models.Model):
-    team = models.ForeignKey('Team', on_delete=models.CASCADE)
+    team = models.ForeignKey("Team", on_delete=models.CASCADE)
     payment_method = models.CharField(max_length=50)
     paid_sum = models.FloatField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -281,13 +295,13 @@ class Payment(models.Model):
         null=True,
     )
     team = models.ForeignKey(
-        'Team',
+        "Team",
         on_delete=models.CASCADE,
         blank=True,
         null=True,
     )
     athlet = models.ForeignKey(
-        'Athlet',
+        "Athlet",
         on_delete=models.CASCADE,
         blank=True,
         null=True,
@@ -299,7 +313,7 @@ class Payment(models.Model):
     cost_per_person = models.FloatField(default=0)
     paid_for = models.FloatField(default=0)
     coupon = models.ForeignKey(
-        'Coupons',
+        "Coupons",
         on_delete=models.CASCADE,
         blank=True,
         null=True,
@@ -325,7 +339,7 @@ class FastLogin(models.Model):
         if u[:1]:
             u = u[0]
             self.user = u
-            self.login_key = '%016x' % random.randrange(16**16)
+            self.login_key = "%016x" % random.randrange(16**16)
             self.save()
             return self.login_key
         return False
@@ -337,7 +351,7 @@ class Athlet(models.Model):
         on_delete=models.CASCADE,
     )
     team = models.ForeignKey(
-        'Team',
+        "Team",
         on_delete=models.CASCADE,
         blank=True,
         null=True,
@@ -347,7 +361,7 @@ class Athlet(models.Model):
     number_in_team = models.IntegerField(default=0)
     paid = models.FloatField(default=0)
 
-    def new_athlet(self, user, team, name, birth = -1):
+    def new_athlet(self, user, team, name, birth=-1):
         if user.is_authenticated:
             self.owner = user
             if team:
@@ -359,18 +373,13 @@ class Athlet(models.Model):
 
 
 class Coupons(models.Model):
-    COVER_TYPE_CHOICES = [
-        ('TEAM', 'Coupon for team'),
-        ('ATHLET', 'Coupon for athlet')
-    ]
+    COVER_TYPE_CHOICES = [("TEAM", "Coupon for team"), ("ATHLET", "Coupon for athlet")]
     code = models.CharField(max_length=20)
     expire_at = models.DateTimeField()
     discount_sum = models.FloatField(default=0)
     discount_persent = models.FloatField(default=0)
     cover_type = models.CharField(
-        max_length=20,
-        choices=COVER_TYPE_CHOICES,
-        default='ATHLET'
+        max_length=20, choices=COVER_TYPE_CHOICES, default="ATHLET"
     )
     count = models.IntegerField(default=1)
     avail_count = models.IntegerField(default=1)
@@ -380,12 +389,12 @@ class ControlPoint(models.Model):
     number = models.CharField(max_length=10)
     cost = models.IntegerField(default=1)
     year = models.IntegerField(default=2021)
-    iterator = models.IntegerField(default=0) #for export
+    iterator = models.IntegerField(default=0)  # for export
 
-    def __str__(self):              # __str__ on Python 3
+    def __str__(self):  # __str__ on Python 3
         return self.number.__str__()
 
 
 class TakenKP(models.Model):
-    team = models.ForeignKey('Team', on_delete=models.CASCADE)
-    point = models.ForeignKey('ControlPoint', on_delete=models.CASCADE)
+    team = models.ForeignKey("Team", on_delete=models.CASCADE)
+    point = models.ForeignKey("ControlPoint", on_delete=models.CASCADE)
