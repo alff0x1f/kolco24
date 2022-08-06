@@ -6,18 +6,18 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('website', '0013_controlpoints_takenkp'),
+        ("website", "0013_controlpoints_takenkp"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='controlpoint',
-            name='iterator',
+            model_name="controlpoint",
+            name="iterator",
             field=models.IntegerField(default=0),
         ),
         migrations.AlterField(
-            model_name='controlpoint',
-            name='cost',
+            model_name="controlpoint",
+            name="cost",
             field=models.IntegerField(default=1),
         ),
     ]

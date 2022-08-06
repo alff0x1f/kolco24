@@ -6,58 +6,58 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('website', '0014_auto_20191011_1754'),
+        ("website", "0014_auto_20191011_1754"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='team',
-            name='place',
+            model_name="team",
+            name="place",
             field=models.IntegerField(default=0),
         ),
         migrations.AddField(
-            model_name='team',
-            name='points_sum',
+            model_name="team",
+            name="points_sum",
             field=models.IntegerField(default=0),
         ),
         migrations.AlterField(
-            model_name='team',
-            name='athlet1',
+            model_name="team",
+            name="athlet1",
             field=models.CharField(blank=True, max_length=50),
         ),
         migrations.AlterField(
-            model_name='team',
-            name='athlet2',
+            model_name="team",
+            name="athlet2",
             field=models.CharField(blank=True, max_length=50),
         ),
         migrations.AlterField(
-            model_name='team',
-            name='athlet3',
+            model_name="team",
+            name="athlet3",
             field=models.CharField(blank=True, max_length=50),
         ),
         migrations.AlterField(
-            model_name='team',
-            name='athlet4',
+            model_name="team",
+            name="athlet4",
             field=models.CharField(blank=True, max_length=50),
         ),
         migrations.AlterField(
-            model_name='team',
-            name='athlet5',
+            model_name="team",
+            name="athlet5",
             field=models.CharField(blank=True, max_length=50),
         ),
         migrations.AlterField(
-            model_name='team',
-            name='athlet6',
+            model_name="team",
+            name="athlet6",
             field=models.CharField(blank=True, max_length=50),
         ),
         migrations.AlterField(
-            model_name='team',
-            name='city',
+            model_name="team",
+            name="city",
             field=models.CharField(blank=True, max_length=50),
         ),
         migrations.AlterField(
-            model_name='team',
-            name='organization',
+            model_name="team",
+            name="organization",
             field=models.CharField(blank=True, max_length=50),
         ),
     ]

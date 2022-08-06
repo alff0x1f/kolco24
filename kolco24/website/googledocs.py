@@ -7,9 +7,13 @@ from website.models import PaymentsYa, Team
 
 
 def connect_to_sheet(sheet_number=0, tablekey=settings.GOOGLE_DOCS_KEY):
-    scope = ['https://spreadsheets.google.com/feeds',
-            'https://www.googleapis.com/auth/drive']
-    credentials = ServiceAccountCredentials.from_json_keyfile_name('./kolco24/googledocs_api_key.json', scope)
+    scope = [
+        "https://spreadsheets.google.com/feeds",
+        "https://www.googleapis.com/auth/drive",
+    ]
+    credentials = ServiceAccountCredentials.from_json_keyfile_name(
+        "./kolco24/googledocs_api_key.json", scope
+    )
 
     gc = gspread.authorize(credentials)
     sht1 = gc.open_by_key(tablekey)
@@ -20,7 +24,9 @@ def import_start_numbers_from_sheet(googlekey=""):
     wks = connect_to_sheet(tablekey=googlekey)
     teams_ids = wks.col_values(2)
     start_numbers = wks.col_values(3)
-    min_col = len(teams_ids) if len(teams_ids) < len(start_numbers) else len(start_numbers)
+    min_col = (
+        len(teams_ids) if len(teams_ids) < len(start_numbers) else len(start_numbers)
+    )
 
     updated_count = 0
 
@@ -37,6 +43,7 @@ def import_start_numbers_from_sheet(googlekey=""):
                     updated_count += 1
 
     return updated_count
+
 
 def import_category_from_sheet():
     wks = connect_to_sheet()
@@ -60,6 +67,7 @@ def import_category_from_sheet():
 
     return updated_count
 
+
 def export_payments_to_sheet():
     wks = connect_to_sheet(1)
     payments = PaymentsYa.objects.filter(unaccepted=False)
@@ -71,8 +79,8 @@ def export_payments_to_sheet():
     for payment in payments:
         insert_range[i].value = payment.id
         insert_range[i + 1].value = payment.notification_type
-        insert_range[i + 2].value = payment.amount.replace('.', ',')
-        insert_range[i + 3].value = payment.withdraw_amount.replace('.', ',')
+        insert_range[i + 2].value = payment.amount.replace(".", ",")
+        insert_range[i + 3].value = payment.withdraw_amount.replace(".", ",")
         insert_range[i + 4].value = payment.datetime
         insert_range[i + 5].value = payment.sender
         team = Team.objects.filter(paymentid=payment.label)
@@ -80,13 +88,16 @@ def export_payments_to_sheet():
             team = team.get()
             insert_range[i + 6].value = team.id
             insert_range[i + 7].value = team.teamname
-            insert_range[i + 8].value = "%s %s" % (team.owner.first_name, 
-                                                   team.owner.last_name)
+            insert_range[i + 8].value = "%s %s" % (
+                team.owner.first_name,
+                team.owner.last_name,
+            )
         i += fields_count
         updated_count += 1
     wks.update_cells(insert_range)
 
     return updated_count
+
 
 def export_teams(googlekey=""):
     fields_count = 36
@@ -97,7 +108,7 @@ def export_teams(googlekey=""):
     if len(colA) > 0:
         A1 = colA[0]
         print(A1)
-        if 'hide' in A1:
+        if "hide" in A1:
             hide_unpaid = True
 
     teams_ids = wks.col_values(2)
@@ -117,44 +128,49 @@ def export_teams(googlekey=""):
 def export_teams_pretty(googlekey=""):
     wks = connect_to_sheet(tablekey=googlekey)
     fields_count = 8
-    teams = Team.objects.filter(year='2021').order_by('start_number')
+    teams = Team.objects.filter(year="2021").order_by("start_number")
     # select only paid teams
     teams = [team for team in teams if team.paid_sum > 0]
     _, members_count = Team.get_info()
-    insert_range = wks.range(2, 1, members_count+1, fields_count)
+    insert_range = wks.range(2, 1, members_count + 1, fields_count)
     curr_line = 0
     for team in teams:
-        members = [(team.athlet1, team.birth1),
-                   (team.athlet2, team.birth2),
-                   (team.athlet3, team.birth3),
-                   (team.athlet4, team.birth4),
-                   (team.athlet5, team.birth5),
-                   (team.athlet6, team.birth6),
-                   ]
-        members = members[:int(team.paid_people)]
-        insert_range[0+curr_line * fields_count].value = team.start_number
-        insert_range[1+curr_line * fields_count].value = team.category
-        insert_range[2+curr_line *
-                     fields_count].value = team.owner.last_name + " " + team.owner.first_name
-        insert_range[3+curr_line * fields_count].value = team.teamname
-        insert_range[4+curr_line * fields_count].value = team.paid_people
-        insert_range[7+curr_line * fields_count].value = team.id
+        members = [
+            (team.athlet1, team.birth1),
+            (team.athlet2, team.birth2),
+            (team.athlet3, team.birth3),
+            (team.athlet4, team.birth4),
+            (team.athlet5, team.birth5),
+            (team.athlet6, team.birth6),
+        ]
+        members = members[: int(team.paid_people)]
+        insert_range[0 + curr_line * fields_count].value = team.start_number
+        insert_range[1 + curr_line * fields_count].value = team.category
+        insert_range[2 + curr_line * fields_count].value = (
+            team.owner.last_name + " " + team.owner.first_name
+        )
+        insert_range[3 + curr_line * fields_count].value = team.teamname
+        insert_range[4 + curr_line * fields_count].value = team.paid_people
+        insert_range[7 + curr_line * fields_count].value = team.id
 
-        insert_range[2+(curr_line+1) *
-                     fields_count].value = team.owner.profile.phone
+        insert_range[
+            2 + (curr_line + 1) * fields_count
+        ].value = team.owner.profile.phone
 
         for member in members:
-            insert_range[5+curr_line *
-                         fields_count].value = member[0] if member[0] else "--"
-            insert_range[6+curr_line *
-                         fields_count].value = member[1] if member[1] else " "
+            insert_range[5 + curr_line * fields_count].value = (
+                member[0] if member[0] else "--"
+            )
+            insert_range[6 + curr_line * fields_count].value = (
+                member[1] if member[1] else " "
+            )
 
             curr_line += 1
     wks.update_cells(insert_range)
     return True
 
 
-def get_team_info(team_id, fields_count, hide_unpaid = False):
+def get_team_info(team_id, fields_count, hide_unpaid=False):
     team_info = []
     if team_id:
         team = Team.objects.filter(id=team_id)[:1]
@@ -174,29 +190,43 @@ def get_team_info(team_id, fields_count, hide_unpaid = False):
                 team_info.append(team.city)
                 team_info.append(team.owner.profile.phone)
                 team_info.append(team.owner.email)
-                team_info.append(team.owner.last_name + ' ' + team.owner.first_name)
+                team_info.append(team.owner.last_name + " " + team.owner.first_name)
                 team_info.append(team.athlet1)
-                team_info.append(team.birth1 if team.birth1 != 0 else '')
+                team_info.append(team.birth1 if team.birth1 != 0 else "")
                 team_info.append(team.athlet2)
-                team_info.append(team.birth2 if team.birth2 != 0 else '')
+                team_info.append(team.birth2 if team.birth2 != 0 else "")
                 team_info.append(team.athlet3)
-                team_info.append(team.birth3 if team.birth3 != 0 else '')
+                team_info.append(team.birth3 if team.birth3 != 0 else "")
                 team_info.append(team.athlet4)
-                team_info.append(team.birth4 if team.birth4 != 0 else '')
+                team_info.append(team.birth4 if team.birth4 != 0 else "")
                 team_info.append(team.athlet5)
-                team_info.append(team.birth5 if team.birth5 != 0 else '')
+                team_info.append(team.birth5 if team.birth5 != 0 else "")
                 team_info.append(team.athlet6)
-                team_info.append(team.birth6 if team.birth6 != 0 else '')
-                team_info.append((team.created_at+timedelta(hours=5)).strftime('%Y-%m-%d %H:%M:%S'))
-                team_info.append((team.updated_at+timedelta(hours=5)).strftime('%Y-%m-%d %H:%M:%S'))
-                team_info.append((team.start_time+timedelta(hours=5)).strftime('%Y-%m-%d %H:%M:%S') if team.start_time else '')
-                team_info.append((team.finish_time+timedelta(hours=5)).strftime('%Y-%m-%d %H:%M:%S') if team.finish_time else '')
+                team_info.append(team.birth6 if team.birth6 != 0 else "")
+                team_info.append(
+                    (team.created_at + timedelta(hours=5)).strftime("%Y-%m-%d %H:%M:%S")
+                )
+                team_info.append(
+                    (team.updated_at + timedelta(hours=5)).strftime("%Y-%m-%d %H:%M:%S")
+                )
+                team_info.append(
+                    (team.start_time + timedelta(hours=5)).strftime("%Y-%m-%d %H:%M:%S")
+                    if team.start_time
+                    else ""
+                )
+                team_info.append(
+                    (team.finish_time + timedelta(hours=5)).strftime(
+                        "%Y-%m-%d %H:%M:%S"
+                    )
+                    if team.finish_time
+                    else ""
+                )
                 team_info.append(team.distance_time)
                 team_info.append(team.penalty)
-                team_info.append('Снятие' if team.dnf else '')
-                team_info.append('Получил пакет' if team.get_package else '')
-                team_info.append('Номер' if team.get_number else '')
-                team_info.append('Сдал завку' if team.give_paper else '')
-                team_info.append('Фото сдал' if team.give_paper else '')
+                team_info.append("Снятие" if team.dnf else "")
+                team_info.append("Получил пакет" if team.get_package else "")
+                team_info.append("Номер" if team.get_number else "")
+                team_info.append("Сдал завку" if team.give_paper else "")
+                team_info.append("Фото сдал" if team.give_paper else "")
 
-    return team_info[:fields_count] if team_info else [''] * fields_count
+    return team_info[:fields_count] if team_info else [""] * fields_count
