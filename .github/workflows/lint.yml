@@ -29,6 +29,6 @@ jobs:
 
       - name: Run linters
         run: |
-          isort kolco24 -rc --check-only
+          isort kolco24 --check-only
           black kolco24 --check
           flake8 kolco24

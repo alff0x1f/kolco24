@@ -1,27 +1,42 @@
-from datetime import datetime, timezone, timedelta
-from time import time, gmtime, strftime
-from django.shortcuts import render
-from django.http import HttpResponse
+from datetime import datetime, timedelta, timezone
+from time import gmtime, strftime, time
+
+from django.conf import settings
 from django.contrib.auth import login as auth_login
 from django.contrib.auth import logout
 from django.contrib.auth.decorators import login_required
-from django.views.decorators.csrf import csrf_exempt
-from website.forms import (LoginForm, FastLoginForm, RegForm, TeamForm,
-                           TeamFormAdmin, Export2GoogleDocsForm)
-from website.models import (PaymentsYa, Team, Athlet, Payment, PaymentLog,
-                            FastLogin, ControlPoint, TakenKP)
-from django.http import HttpResponseRedirect, Http404, JsonResponse
-from django.conf import settings
-from website.email import send_login_email
-from website.googledocs import (export_teams,
-                                export_teams_pretty,
-                                import_start_numbers_from_sheet,
-                                import_category_from_sheet,
-                                export_payments_to_sheet)
-from website.sync_xlsx import import_file_xlsx
-from openpyxl import load_workbook
 from django.core.files.storage import FileSystemStorage
-import json
+from django.http import Http404, HttpResponse, HttpResponseRedirect, JsonResponse
+from django.shortcuts import render
+from django.views.decorators.csrf import csrf_exempt
+from openpyxl import load_workbook
+from website.email import send_login_email
+from website.forms import (
+    Export2GoogleDocsForm,
+    FastLoginForm,
+    LoginForm,
+    RegForm,
+    TeamForm,
+    TeamFormAdmin,
+)
+from website.googledocs import (
+    export_payments_to_sheet,
+    export_teams,
+    export_teams_pretty,
+    import_category_from_sheet,
+    import_start_numbers_from_sheet,
+)
+from website.models import (
+    Athlet,
+    ControlPoint,
+    FastLogin,
+    Payment,
+    PaymentLog,
+    PaymentsYa,
+    TakenKP,
+    Team,
+)
+from website.sync_xlsx import import_file_xlsx
 
 
 def index(request):
@@ -548,7 +563,7 @@ def sync_googledocs(request):
 def update_protocol(request):
     if not request.user.is_staff:
         raise Http404("File not found.")
-    
+
     wb = load_workbook(filename = settings.PROTOCOL_DIR + 'protokol.xlsx')
     # grab the active worksheet
     sheet_tabs = {'6h': '6ч', '12h_ww': '12ч_ЖЖ', '12h_mw': '12ч_МЖ',

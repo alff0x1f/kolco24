@@ -1,11 +1,12 @@
 import random
 import string
 from datetime import timedelta
+
 from django import forms
-from django.core.exceptions import ObjectDoesNotExist
-from django.contrib.auth.models import User
 from django.contrib.auth import authenticate
-from website.models import Team, Athlet, TeamAdminLog
+from django.contrib.auth.models import User
+from django.core.exceptions import ObjectDoesNotExist
+from website.models import Athlet, Team, TeamAdminLog
 
 
 class LoginForm(forms.Form):

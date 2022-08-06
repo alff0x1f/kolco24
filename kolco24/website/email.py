@@ -1,8 +1,5 @@
-from django.core.mail import send_mail, BadHeaderError
 from django.core.mail import EmailMessage
-from website.models import Team, Payment, PaymentsYa
-import string
-import random
+from website.models import Payment, PaymentsYa, Team
 
 
 def send_login_email(recepient_email, flogin_key):

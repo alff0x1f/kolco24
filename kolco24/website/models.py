@@ -1,12 +1,12 @@
 import datetime
-import random
-import time
 import hashlib
-from django.db import models
+import random
+
+from django.conf import settings
 from django.contrib.auth.models import User
+from django.db import models
 from django.db.models.signals import post_save
 from django.dispatch import receiver
-from django.conf import settings
 
 
 class Profile(models.Model):
