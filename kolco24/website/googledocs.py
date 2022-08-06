@@ -1,8 +1,9 @@
+from datetime import timedelta
+
 import gspread
+from django.conf import settings
 from oauth2client.service_account import ServiceAccountCredentials
 from website.models import PaymentsYa, Team
-from datetime import timedelta
-from django.conf import settings
 
 
 def connect_to_sheet(sheet_number=0, tablekey=settings.GOOGLE_DOCS_KEY):

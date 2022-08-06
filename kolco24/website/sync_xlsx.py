@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta
-from website.models import Team, ControlPoint, TakenKP
+
 from openpyxl import load_workbook
-from django.core.files.storage import FileSystemStorage
+from website.models import ControlPoint, TakenKP, Team
 
 
 def import_file_xlsx(filename):

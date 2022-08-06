@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import Team, ControlPoint, TakenKP, PaymentsYa, Payment
+from .models import ControlPoint, Payment, PaymentsYa, TakenKP, Team
 
 
 class TeamAdmin(admin.ModelAdmin):
