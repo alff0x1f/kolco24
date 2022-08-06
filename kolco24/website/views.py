@@ -556,7 +556,9 @@ def yandex_payment(request):
     if request.method == "POST":
         payment = PaymentsYa()
         if payment.new_payment(request.POST):
-            # send_success_email(payment.label, payment.withdraw_amount, notification_type)
+            # send_success_email(
+            #     payment.label, payment.withdraw_amount, notification_type
+            # )
             return HttpResponse("Ok")
         else:
             raise Http404("Wrong values")

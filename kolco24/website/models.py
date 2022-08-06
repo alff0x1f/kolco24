@@ -152,7 +152,7 @@ class Team(models.Model):
     organization = models.CharField(max_length=50, blank=True)
     year = models.IntegerField(default=2021)
 
-    #! athlet1-athlet6 deprecated, use Athlet model instead
+    # ! athlet1-athlet6 deprecated, use Athlet model instead
     athlet1 = models.CharField(max_length=50, blank=True)
     birth1 = models.IntegerField(default=0)
     athlet2 = models.CharField(max_length=50, blank=True)
@@ -165,7 +165,7 @@ class Team(models.Model):
     birth5 = models.IntegerField(default=0)
     athlet6 = models.CharField(max_length=50, blank=True)
     birth6 = models.IntegerField(default=0)
-    #! end deprecated warning
+    # ! end deprecated warning
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
