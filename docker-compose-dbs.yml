@@ -1,0 +1,17 @@
+version: "3.8"
+
+services:
+
+  postgresql:
+    image: postgres:11-alpine
+    restart: unless-stopped
+    container_name: kolco24-psql
+    environment:
+      - POSTGRES_PORT=5432
+      - POSTGRES_DB=kolco24
+      - POSTGRES_USER=kolco24
+      - POSTGRES_PASSWORD=kolco24
+    ports:
+      - 9996:5432
+    volumes:
+      - ./db:/var/lib/postgresql/data
