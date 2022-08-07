@@ -40,14 +40,7 @@ class PaymentsYa(models.Model):
 
     @staticmethod
     def get_cost():
-        teams_count, members_count = Team.get_info()
-        if teams_count >= 150:
-            return 1500
-        if teams_count >= 100:
-            return 1300
-        if teams_count >= 50:
-            return 1000
-        return 800
+        return 900
 
     def new_payment(self, d):
         fields = [

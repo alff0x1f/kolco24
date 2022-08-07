@@ -277,20 +277,28 @@
                         </div>
                         <ul class="list-unstyled list-spacing-sm mb-3 ">
                             <li class="row align-items-center">
-                                <div class="col-3 col-md-3">800 руб</div>
-                                <div class="col-9">Первые 50 команд</div>
+                                <div class="col-3 col-md-3">900 руб</div>
+                                <div class="col-9">8 августа</div>
                             </li>
                             <li class="row align-items-center">
                                 <div class="col-3 col-md-3">1000 руб</div>
-                                <div class="col-9">С 51 по 100 команду</div>
+                                <div class="col-9">С 9 по 14 августа</div>
+                            </li>
+                            <li class="row align-items-center">
+                                <div class="col-3 col-md-3">1100 руб</div>
+                                <div class="col-9">С 15 по 21 августа</div>
+                            </li>
+                            <li class="row align-items-center">
+                                <div class="col-3 col-md-3">1200 руб</div>
+                                <div class="col-9">С 22 по 31 августа</div>
                             </li>
                             <li class="row align-items-center">
                                 <div class="col-3 col-md-3">1300 руб</div>
-                                <div class="col-9">С 101 по 150 команду</div>
+                                <div class="col-9">Сентябрь</div>
                             </li>
                             <li class="row align-items-center">
                                 <div class="col-3 col-md-3">1500 руб</div>
-                                <div class="col-9">С 151 до окончания слотов</div>
+                                <div class="col-9">Октябрь</div>
                             </li>
                             {% if not reg_open %}
                                 <h4><strong>Регистрация закрыта</strong></h4>
@@ -544,7 +552,7 @@
                 <!--end of col-->
             </div>
             <!--end of row-->
-            <form method="POST" action="https://money.yandex.ru/quickpay/confirm.xml" id="yandexform">
+            <form method="POST" action="https://yoomoney.ru/quickpay/confirm.xml" id="yandexform">
                 <input type="hidden" id="yandexwallet" name="receiver" value="">
                 <input type="hidden" name="quickpay-form" value="shop">
                 <input type="hidden" id="yatargets" name="targets" value="Взнос за Кольцо-24">
