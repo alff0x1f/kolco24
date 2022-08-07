@@ -13,7 +13,7 @@
                 <div class="row center justify-content-between">
                     <div class="col-12 col-md-6 col-lg-5">
                         <img class="mx-auto d-none d-sm-block" style="width: 60%" src="/static/images/logo_big.png" alt="Кольцо 24 2021">
-                        <h2 class="text-center">8-10 октября 2021<br/> район Новоабзаково (Белорецкий район)</h2>
+                        <h2 class="text-center">14-16 октября 2022<br/> Белорецкий район</h2>
                     </div>
                     <!--end of col-->
                     
@@ -95,7 +95,7 @@
                                     <div class="mb-2 {% if myteams %}d-none{% endif%}">
                                         <div class="custom-control custom-checkbox d-none">
                                             <input type="checkbox" class="custom-control-input" value="agree" name="agree-terms" id="check-agree" checked>
-                                            <label class="custom-control-label text-small" for="check-agree">Я прочитал <a href="https://docs.google.com/document/d/1RJ4mEY_FtqUR3n5tTR9eCOhLUnkCkK2dWFPzQiMZkXg/edit" target="_blank">Положение</a>
+                                            <label class="custom-control-label text-small" for="check-agree">Я прочитал <a href="https://docs.google.com/file/d/1s2xynpasfiynNuEO8s8KKVvtAZCZr2Nf/edit?filetype=msword" target="_blank">Положение</a>
                                             </label>
                                         </div>
 {#                                        <small>#}
@@ -112,9 +112,9 @@
                                     </div>
                                     <input type="hidden" id="dist" name="dist" value="12h">
                                     {% csrf_token %}
-                                    <div class="alert alert-warning" role="alert">
-                                        Закрытие онлайн-регистрации 7 октября
-                                    </div>
+{#                                    <div class="alert alert-warning" role="alert">#}
+{#                                        Закрытие онлайн-регистрации 7 октября#}
+{#                                    </div>#}
                                     {% if reg_form.non_field_errors %}
                                     <div class="alert alert-danger" role="alert">
                                         {% for err in reg_form.non_field_errors %}
@@ -144,7 +144,7 @@
                                     
                                 </form>
                                 {% else %}
-                                    <h3>Регистрация на 2021 год откроется в 22:00!</h3>
+                                    <h3>Регистрация на 2022 год откроется в 22:00!</h3>
                                     <h6>Команд: {{ team_count}}</h6>
 
                                     <a class="btn btn-lg btn-success btn-block" href="/teams" role="button">Список команд</a>
@@ -244,14 +244,14 @@
                             <h3 class="section-title multiple-title">Какие дистанции?</h3>
                             <ul class="list-arrow-right">
 
-                                <li>«Туда и обратно» - КВ 6 часа (2-3 человека)</li>
-                                <li>«Две крепости» - КВ 12 часов (4-6 человек или 2 человека ММ/МЖ/ЖЖ)</li>
-                                <li>«Братство кольца» - КВ 24 часа (4-6 человек)</li>
+                                <li>«Денискины рассказы» - КВ 6 часа (2-3 человека)</li>
+                                <li>«Горе от ума» - КВ 12 часов (4-6 человек или 2 человека ММ/МЖ/ЖЖ)</li>
+                                <li>«Хождение по мукам» - КВ 24 часа (4-6 человек)</li>
         
                             </ul>
-                            <h3>Регистрация</h3>
-                            <p>Онлайн регистрация до 7 октября 2021. После этого только на стартовой поляне </p>
-                            <p>Возврат взносов после 1 октября 2021 не производится. Мы уже напечатали карты и все подготовили</p>
+{#                            <h3>Регистрация</h3>#}
+{#                            <p>Онлайн регистрация до 7 октября 2021. После этого только на стартовой поляне </p>#}
+{#                            <p>Возврат взносов после 1 октября 2021 не производится. Мы уже напечатали карты и все подготовили</p>#}
         
                         </div><!-- /.col-sm-6 -->
                     </div><!-- /.row -->
@@ -264,13 +264,13 @@
                                 <div class="col-sm-4 text-center">
 
                                         <i class="ion-ios-calendar"></i>
-                                        <h3>8-10 октября<br>2021</h3>
+                                        <h3>14-16 октября<br>2022</h3>
                     
                                     </div>
                                     <div class="col-sm-4 text-center">
                     
                                         <i class="ion-ios-location"></i>
-                                        <h3>район Новоабзаково <br> Белорецкий район</h3>
+                                        <h3>Белорецкий район <br/></h3>
                     
                                     </div>
                                     {% if user.is_superuser %}
@@ -311,7 +311,7 @@
                                     </a>
                                     <div class="card-body">
                                         <h4 class="card-title">6 часов</h4>
-                                        <h6>«Туда и обратно»</h6>
+                                        <h6>«Денискины рассказы»</h6>
                                         <p class="card-text">Легкий и быстрой забег.</p>
                                         <ul>
                                             <li>Вес рюкзака не регламентирован</li>
@@ -329,7 +329,7 @@
                                     </a>
                                     <div class="card-body">
                                         <h4 class="card-title">12 часов</h4>
-                                        <h6>«Две крепости»</h6>
+                                        <h6>«Горе от ума»</h6>
                                         <p class="card-text">Сочетание скорости и насыщенности. Заявиться можно в две категории: Двойка и команда.</p>
                                         <ul>
                                             <li>Вес рюкзака: 6кг на человека</li>
@@ -348,7 +348,7 @@
                                     </a>
                                     <div class="card-body">
                                         <h4 class="card-title">24 часов</h4>
-                                        <h6>«Братство кольца»</h6>
+                                        <h6>«Хождение по мукам»</h6>
                                         <p>
                                             Дистанция для проверки своих сил и выносливости. Команда 4-6 человек.
                                         </p>
