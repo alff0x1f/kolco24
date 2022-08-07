@@ -150,7 +150,7 @@ class Team(models.Model):
     teamname = models.CharField(max_length=100)
     city = models.CharField(max_length=50, blank=True)
     organization = models.CharField(max_length=50, blank=True)
-    year = models.IntegerField(default=2021)
+    year = models.IntegerField(default=2022)
 
     # ! athlet1-athlet6 deprecated, use Athlet model instead
     athlet1 = models.CharField(max_length=50, blank=True)
@@ -195,12 +195,12 @@ class Team(models.Model):
             self.dist = dist
             self.ucount = ucount
             self.paymentid = "%016x" % random.randrange(16**16)
-            self.year = 2021
+            self.year = 2022
             self.save()
 
     @staticmethod
     def get_info():
-        teams = Team.objects.filter(paid_sum__gt=0, year=2021)
+        teams = Team.objects.filter(paid_sum__gt=0, year=2022)
         people_paid = 0
         teams_count = 0
         teams_ids = set()
@@ -215,7 +215,7 @@ class Team(models.Model):
         return len(teams_ids), people_paid
 
     def update_points_sum(self):
-        teams = Team.objects.filter(paid_sum__gt=0, year=2021)
+        teams = Team.objects.filter(paid_sum__gt=0, year=2022)
         for team in teams:
             points = TakenKP.objects.filter(team=team)
             points_sum = 0
@@ -225,7 +225,7 @@ class Team(models.Model):
             team.save()
 
     def update_distance_time(self):
-        teams = Team.objects.filter(paid_sum__gt=0, year=2021)
+        teams = Team.objects.filter(paid_sum__gt=0, year=2022)
         for team in teams:
             if team.start_time and team.finish_time:
                 team.distance_time = team.finish_time - team.start_time
@@ -241,7 +241,7 @@ class Team(models.Model):
         categories = ["6h", "12h_mm", "12h_mw", "12h_ww", "24h"]
         for category in categories:
             teams = Team.objects.filter(
-                category=category, paid_sum__gt=0, year=2021
+                category=category, paid_sum__gt=0, year=2022
             ).order_by("-points_sum", "distance_time")
             place = 1
             for team in teams:
@@ -367,7 +367,7 @@ class Athlet(models.Model):
             if team:
                 self.team = team
             self.name = name
-            if 1910 < birth < 2021:
+            if 1910 < birth < 2022:
                 self.birth = birth
             self.save()
 
@@ -388,7 +388,7 @@ class Coupons(models.Model):
 class ControlPoint(models.Model):
     number = models.CharField(max_length=10)
     cost = models.IntegerField(default=1)
-    year = models.IntegerField(default=2021)
+    year = models.IntegerField(default=2022)
     iterator = models.IntegerField(default=0)  # for export
 
     def __str__(self):  # __str__ on Python 3
