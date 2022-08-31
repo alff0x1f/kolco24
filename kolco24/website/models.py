@@ -40,7 +40,7 @@ class PaymentsYa(models.Model):
 
     @staticmethod
     def get_cost():
-        return 1200
+        return 1300
 
     def new_payment(self, d):
         fields = [
