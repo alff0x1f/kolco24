@@ -4,7 +4,15 @@ from .models import ControlPoint, Payment, PaymentsYa, TakenKP, Team
 
 
 class TeamAdmin(admin.ModelAdmin):
-    list_display = ("id", "paymentid", "teamname", "paid_people", "dist", "year")
+    list_display = (
+        "id",
+        "paymentid",
+        "owner",
+        "teamname",
+        "paid_people",
+        "dist",
+        "year",
+    )
     list_filter = ("year", "category")
 
 
