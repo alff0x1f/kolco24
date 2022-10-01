@@ -36,6 +36,7 @@ urlpatterns = [
     path("update_protocol", views.update_protocol, name="update_protocol"),
     path("upload_protocol", views.upload_protocol, name="upload_protocol"),
     path("regulations", views.regulations, name="regulations"),
+    path("api/v1/points", views.points, name="points"),
     path("cms/", include(wagtailadmin_urls)),
     path("documents/", include(wagtaildocs_urls)),
     path("", include(wagtail_urls)),

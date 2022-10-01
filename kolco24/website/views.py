@@ -747,3 +747,14 @@ def upload_protocol(request):
 
 def regulations(request):
     return render(request, "website/regulations.html")
+
+
+# API _________________________________________________________________
+def points(request):
+    """Возвращает список контрольных пунктов"""
+    control_points = (
+        ControlPoint.objects.filter(year="2022")
+        .order_by("number")
+        .values("number", "description", "cost")
+    )
+    return JsonResponse(list(control_points), safe=False)
