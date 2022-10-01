@@ -40,7 +40,7 @@ class PaymentsYa(models.Model):
 
     @staticmethod
     def get_cost():
-        return 1300
+        return 1500
 
     def new_payment(self, d):
         fields = [
@@ -379,8 +379,9 @@ class Coupons(models.Model):
 
 
 class ControlPoint(models.Model):
-    number = models.CharField(max_length=10)
+    number = models.IntegerField("Номер контрольной точки", default=1)
     cost = models.IntegerField(default=1)
+    description = models.CharField("Описание КП", max_length=200, default="")
     year = models.IntegerField(default=2022)
     iterator = models.IntegerField(default=0)  # for export
 
