@@ -193,7 +193,7 @@ class Team(models.Model):
 
     @staticmethod
     def get_info():
-        teams = Team.objects.filter(paid_sum__gt=0, year=2022)
+        teams = Team.objects.filter(paid_people__gt=0, year=2022)
         people_paid = 0
         teams_count = 0
         teams_ids = set()

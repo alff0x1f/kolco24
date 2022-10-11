@@ -143,58 +143,58 @@ def logout_user(request):
 def teams(request, template=""):
     teams = [
         {
-            "teams": Team.objects.filter(dist="6h", year="2022", category="").order_by(
-                "start_number", "id"
-            ),
+            "teams": Team.objects.filter(
+                dist="6h", year="2022", category="", paid_people__gt=0
+            ).order_by("start_number", "id"),
             "dist_name": "6ч",
         },
         {
-            "teams": Team.objects.filter(dist="12h", year="2022", category="").order_by(
-                "start_number", "id"
-            ),
+            "teams": Team.objects.filter(
+                dist="12h", year="2022", category="", paid_people__gt=0
+            ).order_by("start_number", "id"),
             "dist_name": "12ч",
         },
         {
-            "teams": Team.objects.filter(dist="24h", year="2022", category="").order_by(
-                "start_number", "id"
-            ),
+            "teams": Team.objects.filter(
+                dist="24h", year="2022", category="", paid_people__gt=0
+            ).order_by("start_number", "id"),
             "dist_name": "24ч",
         },
         {
-            "teams": Team.objects.filter(category="24h", year="2022").order_by(
-                "start_number", "id"
-            ),
-            "dist_name": '"Братство кольца" (24ч, 4-6 человек)',
+            "teams": Team.objects.filter(
+                category="24h", year="2022", paid_people__gt=0
+            ).order_by("start_number", "id"),
+            "dist_name": '"Хождение по мукам" (24ч, 4-6 человек)',
         },
         {
-            "teams": Team.objects.filter(category="12h_team", year="2022").order_by(
-                "start_number", "id"
-            ),
-            "dist_name": '"Две крепости" (12ч, 4-6 человек)',
+            "teams": Team.objects.filter(
+                category="12h_team", year="2022", paid_people__gt=0
+            ).order_by("start_number", "id"),
+            "dist_name": '"Горе от ума" (12ч, 4-6 человек)',
         },
         {
-            "teams": Team.objects.filter(category="12h_mw", year="2022").order_by(
-                "start_number", "id"
-            ),
-            "dist_name": '"Две крепости" (12ч, МЖ)',
+            "teams": Team.objects.filter(
+                category="12h_mw", year="2022", paid_people__gt=0
+            ).order_by("start_number", "id"),
+            "dist_name": '"Горе от ума" (12ч, МЖ)',
         },
         {
-            "teams": Team.objects.filter(category="12h_ww", year="2022").order_by(
-                "start_number", "id"
-            ),
-            "dist_name": '"Две крепости" (12ч, ЖЖ)',
+            "teams": Team.objects.filter(
+                category="12h_ww", year="2022", paid_people__gt=0
+            ).order_by("start_number", "id"),
+            "dist_name": '"Горе от ума" (12ч, ЖЖ)',
         },
         {
-            "teams": Team.objects.filter(category="12h_mm", year="2022").order_by(
-                "start_number", "id"
-            ),
-            "dist_name": '"Две крепости" (12ч, ММ)',
+            "teams": Team.objects.filter(
+                category="12h_mm", year="2022", paid_people__gt=0
+            ).order_by("start_number", "id"),
+            "dist_name": '"Горе от ума" (12ч, ММ)',
         },
         {
-            "teams": Team.objects.filter(category="6h", year="2022").order_by(
-                "start_number", "id"
-            ),
-            "dist_name": '"Туда и обратно" (6ч, 2-3 человека)',
+            "teams": Team.objects.filter(
+                category="6h", year="2022", paid_people__gt=0
+            ).order_by("start_number", "id"),
+            "dist_name": '"Денискины рассказы" (6ч, 2-3 человека)',
         },
         # {
         #     'teams': Team.objects.filter(year='2022').order_by('start_number'),
@@ -206,14 +206,10 @@ def teams(request, template=""):
         # },
     ]
 
-    # select only paid teams
-    for t in teams:
-        t["teams"] = [team for team in t["teams"] if team.paid_sum > 0]
-
     if request.user.is_superuser:
         teams.append(
             {
-                "teams": Team.objects.filter(paid_sum__lt=1, year=2022),
+                "teams": Team.objects.filter(paid_people=0, year=2022),
                 "dist_name": "Неоплаченное",
             }
         )
