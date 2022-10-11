@@ -760,6 +760,28 @@ def points(request):
     return JsonResponse(list(control_points), safe=False)
 
 
+def teams_api(request):
+    """Возвращает список команд"""
+    teams = (
+        Team.objects.filter(year="2022", paid_people__gt=0)
+        .order_by("id")
+        .values(
+            "id",
+            "paid_people",
+            "dist",
+            "category",
+            "teamname",
+            "start_number",
+            "teamname",
+            "city",
+            "organization",
+            "year",
+            "start_number",
+        )
+    )
+    return JsonResponse(list(teams), safe=False)
+
+
 @csrf_exempt
 def upload_photo(request):
     """save file from post request"""
