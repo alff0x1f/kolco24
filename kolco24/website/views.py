@@ -758,3 +758,17 @@ def points(request):
         .values("number", "description", "cost")
     )
     return JsonResponse(list(control_points), safe=False)
+
+
+@csrf_exempt
+def upload_photo(request):
+    """save file from post request"""
+    if request.method != "POST":
+        raise Http404("File not found.")
+
+    file = request.FILES["file"]
+    print(request.POST.get("team_id"))
+    fs = FileSystemStorage()
+    filename = fs.save("photos/" + file.name, file)
+    uploaded_file_url = fs.url("photos/" + file.name)
+    return JsonResponse({"uploaded_file_url": uploaded_file_url})
