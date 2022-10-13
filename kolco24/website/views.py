@@ -758,6 +758,7 @@ def points(request):
 
 def teams_api(request):
     """Возвращает список команд"""
+    query_params = request.GET.get("category", "")
     teams = (
         Team.objects.filter(year="2022", paid_people__gt=0)
         .order_by("id")
@@ -775,6 +776,8 @@ def teams_api(request):
             "start_number",
         )
     )
+    if query_params:
+        teams = teams.filter(category=query_params)
     return JsonResponse(list(teams), safe=False)
 
 
