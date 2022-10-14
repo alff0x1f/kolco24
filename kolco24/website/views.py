@@ -795,7 +795,7 @@ def upload_photo(request):
     if not team:
         return JsonResponse({"error": "team not found"}, status=404)
     start_number = team.start_number
-    filder_name = "photos/" + start_number + "-" + team_id + "/" + file.name
+    filder_name = "photos/" + start_number + "-" + team_id + "/" + point_number + "-" + file.name
     fs = FileSystemStorage()
     filename = fs.save(filder_name, file)
     uploaded_file_url = fs.url(filename)
