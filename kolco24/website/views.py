@@ -787,9 +787,21 @@ def upload_photo(request):
     if request.method != "POST":
         raise Http404("File not found.")
 
-    file = request.FILES["file"]
-    print(request.POST.get("team_id"))
+    file = request.FILES["photo"]
+    team_id = request.POST["team_id"]
+    point_number = request.POST["point_number"]
+
+    team = Team.objects.filter(id=team_id).first()
+    if not team:
+        return JsonResponse({"error": "team not found"}, status=404)
+    start_number = team.start_number
+    filder_name = "photos/" + start_number + "-" + team_id + "/" + file.name
     fs = FileSystemStorage()
-    filename = fs.save("photos/" + file.name, file)
-    uploaded_file_url = fs.url("photos/" + file.name)
-    return JsonResponse({"uploaded_file_url": uploaded_file_url})
+    filename = fs.save(filder_name, file)
+    uploaded_file_url = fs.url(filename)
+
+    # save to db
+    TakenKP.objects.create(
+        team=team, point_number=point_number, image_url=uploaded_file_url
+    )
+    return JsonResponse({"success": True})

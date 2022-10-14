@@ -22,8 +22,8 @@ class ControlPointAdmin(admin.ModelAdmin):
 
 
 class TakenKPAdmin(admin.ModelAdmin):
-    list_display = ("team", "point")
-    list_filter = ("team", "point")
+    list_display = ("team", "point_number", "status")
+    list_filter = ("team", "point_number", "status")
 
 
 class PaymentsYaAdmin(admin.ModelAdmin):

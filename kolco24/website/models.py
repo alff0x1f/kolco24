@@ -390,5 +390,17 @@ class ControlPoint(models.Model):
 
 
 class TakenKP(models.Model):
+    NEW = "new"
+    ACCEPTED = "accepted"
+    REJECTED = "rejected"
+    STATUS_CHOICES = (
+        (NEW, "Новая"),
+        (ACCEPTED, "Принята"),
+        (REJECTED, "Отклонена"),
+    )
+
     team = models.ForeignKey("Team", on_delete=models.CASCADE)
-    point = models.ForeignKey("ControlPoint", on_delete=models.CASCADE)
+    point_number = models.IntegerField("Номер КП", default=0)
+    image_url = models.CharField(max_length=200, default="")
+    status = models.CharField(max_length=50, default="new", choices=STATUS_CHOICES)
+    year = models.IntegerField(default=2022)
