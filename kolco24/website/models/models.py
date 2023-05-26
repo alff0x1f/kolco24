@@ -143,7 +143,7 @@ class Team(models.Model):
     teamname = models.CharField(max_length=100)
     city = models.CharField(max_length=50, blank=True)
     organization = models.CharField(max_length=50, blank=True)
-    year = models.IntegerField(default=2022)
+    year = models.IntegerField(default=23)
 
     # ! athlet1-athlet6 deprecated, use Athlet model instead
     athlet1 = models.CharField(max_length=50, blank=True)
@@ -382,7 +382,7 @@ class ControlPoint(models.Model):
     number = models.IntegerField("Номер контрольной точки", default=1)
     cost = models.IntegerField(default=1)
     description = models.CharField("Описание КП", max_length=200, default="")
-    year = models.IntegerField(default=2022)
+    year = models.IntegerField(default=23)
     iterator = models.IntegerField(default=0)  # for export
 
     def __str__(self):  # __str__ on Python 3
