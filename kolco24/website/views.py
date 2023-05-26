@@ -749,7 +749,7 @@ def regulations(request):
 def points(request):
     """Возвращает список контрольных пунктов"""
     control_points = (
-        ControlPoint.objects.filter(year="2022")
+        ControlPoint.objects.filter(year=23)
         .order_by("number")
         .values("number", "description", "cost")
     )
@@ -760,7 +760,7 @@ def teams_api(request):
     """Возвращает список команд"""
     query_params = request.GET.get("category", "")
     teams = (
-        Team.objects.filter(year="2022", paid_people__gt=0)
+        Team.objects.filter(year=23)  # paid_people__gt=0)
         .order_by("id")
         .values(
             "id",
