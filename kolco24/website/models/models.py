@@ -403,4 +403,4 @@ class TakenKP(models.Model):
     point_number = models.IntegerField("Номер КП", default=0)
     image_url = models.CharField(max_length=200, default="")
     status = models.CharField(max_length=50, default="new", choices=STATUS_CHOICES)
-    year = models.IntegerField(default=2022)
+    year = models.IntegerField(default=23)
