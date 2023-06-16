@@ -34,9 +34,9 @@ from website.models import (
     Payment,
     PaymentLog,
     PaymentsYa,
+    Race,
     TakenKP,
     Team,
-    Race,
 )
 from website.sync_xlsx import import_file_xlsx
 
