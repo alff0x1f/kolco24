@@ -8,6 +8,7 @@ from django.contrib.auth.decorators import login_required
 from django.core.files.storage import FileSystemStorage
 from django.http import Http404, HttpResponse, HttpResponseRedirect, JsonResponse
 from django.shortcuts import render
+from django.views import View
 from django.views.decorators.csrf import csrf_exempt
 from openpyxl import load_workbook
 from website.email import send_login_email
@@ -35,6 +36,7 @@ from website.models import (
     PaymentsYa,
     TakenKP,
     Team,
+    Race,
 )
 from website.sync_xlsx import import_file_xlsx
 
@@ -544,7 +546,7 @@ def new_team(request):
         team = Team()
         team.new_team(request.user, "12h", 4)
         team.save()
-    return HttpResponseRedirect("/team/%s" % team.paymentid)
+        return HttpResponseRedirect("/team/%s" % team.paymentid)
 
 
 @csrf_exempt
@@ -746,6 +748,23 @@ def regulations(request):
 
 
 # API _________________________________________________________________
+class RaceView(View):
+    def get(self, request):
+        races = Race.objects.filter(is_active=True)
+        data = []
+        for race in races:
+            data.append(
+                {
+                    "id": race.id,
+                    "name": race.name,
+                    "code": race.code,
+                    "date": race.date.strftime("%Y-%m-%d"),
+                    "is_active": race.is_active,
+                }
+            )
+        return JsonResponse(data, safe=False)
+
+
 def points(request):
     """Возвращает список контрольных пунктов"""
     control_points = (
@@ -795,7 +814,9 @@ def upload_photo(request):
     if not team:
         return JsonResponse({"error": "team not found"}, status=404)
     start_number = team.start_number
-    filder_name = "photos/" + start_number + "-" + team_id + "/" + point_number + "-" + file.name
+    filder_name = (
+        "photos/" + start_number + "-" + team_id + "/" + point_number + "-" + file.name
+    )
     fs = FileSystemStorage()
     filename = fs.save(filder_name, file)
     uploaded_file_url = fs.url(filename)

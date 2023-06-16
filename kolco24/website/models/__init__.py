@@ -9,3 +9,4 @@ from .models import (
     Team,
     TeamAdminLog,
 )
+from .race import Race
