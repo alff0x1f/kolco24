@@ -24,7 +24,10 @@ class Migration(migrations.Migration):
                     ),
                 ),
                 ("name", models.CharField(max_length=50, verbose_name="Название")),
-                ("code", models.CharField(max_length=15, verbose_name="Код")),
+                (
+                    "code",
+                    models.CharField(max_length=15, unique=True, verbose_name="Код"),
+                ),
                 (
                     "date",
                     models.DateField(
@@ -36,5 +39,10 @@ class Migration(migrations.Migration):
                     models.BooleanField(default=True, verbose_name="Активна"),
                 ),
             ],
+            options={
+                "verbose_name": "Гонка",
+                "verbose_name_plural": "Гонки",
+                "ordering": ["-date"],
+            },
         ),
     ]
