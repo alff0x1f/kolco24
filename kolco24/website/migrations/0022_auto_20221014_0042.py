@@ -6,32 +6,40 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('website', '0021_auto_20221001_0104'),
+        ("website", "0021_auto_20221001_0104"),
     ]
 
     operations = [
         migrations.RemoveField(
-            model_name='takenkp',
-            name='point',
+            model_name="takenkp",
+            name="point",
         ),
         migrations.AddField(
-            model_name='takenkp',
-            name='image_url',
-            field=models.CharField(default='', max_length=200),
+            model_name="takenkp",
+            name="image_url",
+            field=models.CharField(default="", max_length=200),
         ),
         migrations.AddField(
-            model_name='takenkp',
-            name='point_number',
-            field=models.IntegerField(default=0, verbose_name='Номер КП'),
+            model_name="takenkp",
+            name="point_number",
+            field=models.IntegerField(default=0, verbose_name="Номер КП"),
         ),
         migrations.AddField(
-            model_name='takenkp',
-            name='status',
-            field=models.CharField(choices=[('new', 'Новая'), ('accepted', 'Принята'), ('rejected', 'Отклонена')], default='new', max_length=50),
+            model_name="takenkp",
+            name="status",
+            field=models.CharField(
+                choices=[
+                    ("new", "Новая"),
+                    ("accepted", "Принята"),
+                    ("rejected", "Отклонена"),
+                ],
+                default="new",
+                max_length=50,
+            ),
         ),
         migrations.AddField(
-            model_name='takenkp',
-            name='year',
+            model_name="takenkp",
+            name="year",
             field=models.IntegerField(default=2022),
         ),
     ]

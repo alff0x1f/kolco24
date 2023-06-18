@@ -1,6 +1,6 @@
-Django<=3.2.15
+Django==4.2.2
 django-mailer>=2.2
-gspread>=3.0.0
+gspread==5.9.0
 oauth2client>=4.0.0
-psycopg2-binary
-wagtail
+psycopg2-binary==2.9.6
+wagtail==5.0.1
