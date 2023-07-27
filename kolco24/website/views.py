@@ -134,12 +134,11 @@ def login_by_key(request, login_key=""):
 
 
 def logout_user(request):
-    if request.method == "POST":
-        if "logout" in request.POST and request.POST["logout"] == "logout":
-            if request.user.is_authenticated:
-                logout(request)
-                return HttpResponseRedirect("/")
-    raise Http404("File not found.")
+    """Logout user"""
+    if request.method == "POST" and request.POST.get("logout", "") == "logout":
+        if request.user.is_authenticated:
+            logout(request)
+    return HttpResponseRedirect("/")
 
 
 def teams(request, template=""):
