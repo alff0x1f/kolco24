@@ -1,6 +1,7 @@
 from django.contrib import admin
 
 from .models import ControlPoint, Payment, PaymentsYa, Race, TakenKP, Team
+from .models.race import Category
 
 
 class TeamAdmin(admin.ModelAdmin):
@@ -48,9 +49,16 @@ class RaceAdmin(admin.ModelAdmin):
     search_fields = ("name", "code")
 
 
+class CategoryAdmin(admin.ModelAdmin):
+    list_display = ("code", "name", "description", "race", "is_active")
+    list_filter = ("race__name", "is_active")
+    search_fields = ("code", "name")
+
+
 admin.site.register(Team, TeamAdmin)
 admin.site.register(ControlPoint, ControlPointAdmin)
 admin.site.register(TakenKP, TakenKPAdmin)
 admin.site.register(PaymentsYa, PaymentsYaAdmin)
 admin.site.register(Payment, PaymentAdmin)
 admin.site.register(Race, RaceAdmin)
+admin.site.register(Category, CategoryAdmin)

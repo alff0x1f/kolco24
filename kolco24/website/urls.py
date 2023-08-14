@@ -17,6 +17,11 @@ urlpatterns = [
     path("team", views.my_team, name="my_team"),
     path("team_admin", views.team_admin, name="team_admin"),
     path("teams", views.teams, name="teams"),
+    path(
+        "race/<race_id>/category/<category_id>/teams",
+        views.TeamsView.as_view(),
+        name="teams2",
+    ),
     path("teams_predstart", views.teams_predstart, name="teams_predstart"),
     path("teams_start", views.teams_start, name="teams_start"),
     path("teams_finish", views.teams_finish, name="teams_finish"),

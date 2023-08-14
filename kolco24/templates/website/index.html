@@ -13,7 +13,7 @@
                 <div class="row center justify-content-between">
                     <div class="col-12 col-md-6 col-lg-5">
                         <img class="mx-auto d-none d-sm-block" style="width: 60%" src="/static/images/logo_big.png" alt="Кольцо 24 2021">
-                        <h2 class="text-center">14-16 октября 2022<br/> Белорецкий район</h2>
+                        <h2 class="text-center">13-15 октября 2023<br/> Республика Башкортостан</h2>
                     </div>
                     <!--end of col-->
 
@@ -129,7 +129,7 @@
                                             <div class="col-8"><p>Дистанция</p></div>
                                             <div class="col-4"><p>{{ team.dist }}</p></div>
                                             <div class="col-8"><p>Оплачено за </p></div>
-                                            <div class="col-4"><p>{{team.paid_people|floatformat}} из {{team.ucount}}</span> чел.</p></div>
+                                            <div class="col-4"><p>{{team.paid_people|floatformat}} из {{team.ucount}} чел.</p></div>
                                             {% if team.additional_charge > 0 %}
                                                 <div class="col-8"><p>Необходимо доплатить</p></div>
                                                 <div class="col-4"><p>{{ team.additional_charge }} руб</p></div>
@@ -142,10 +142,9 @@
 
                                 </form>
                                 {% else %}
-                                    <h3>К сожалению, доступные слоты закончились. Регистрация закрыта</h3>
-                                    <h6>Команд: {{ team_count}}</h6>
+                                    <h3>Скоро открытие регистрации</h3>
 
-                                    <a class="btn btn-lg btn-success btn-block" href="/teams" role="button">Список команд</a>
+{#                                    <a class="btn btn-lg btn-success btn-block" href="/teams" role="button">Список команд</a>#}
 
                                     {% if myteams %}
                                       <hr>
@@ -156,7 +155,7 @@
                                             <div class="col-8"><p>Дистанция</p></div>
                                             <div class="col-4"><p>{{ team.dist }}</p></div>
                                             <div class="col-8"><p>Оплачено за </p></div>
-                                            <div class="col-4"><p>{{team.paid_people|floatformat}} из {{team.ucount}}</span> чел.</p></div>
+                                            <div class="col-4"><p>{{team.paid_people|floatformat}} из {{team.ucount}} чел.</p></div>
                                         </div>
                                       {% endfor %}
                                       <a class="btn btn-lg btn-success btn-block" href="/team" role="button">Изменить/посмотреть состав</a>
@@ -261,11 +260,11 @@
                         <div class="row justify-content-center">
                                 <div class="col-sm-3 text-center">
                                     <i class="ion-ios-calendar"></i>
-                                    <h3>14-16 октября<br>2022</h3>
+                                    <h3>13-15 октября<br>2023</h3>
                                 </div>
                                 <div class="col-sm-3 text-center">
                                     <i class="ion-ios-location"></i>
-                                    <h3>Белорецкий район <br/></h3>
+                                    <h3>Республика Башкортостан <br/></h3>
                                 </div>
                                     <div class="col-sm-3 text-center">
                                       <i class="ion-ios-people"></i>
@@ -302,7 +301,7 @@
                                     </a>
                                     <div class="card-body">
                                         <h4 class="card-title">6 часов</h4>
-                                        <h6>«Денискины рассказы»</h6>
+                                        <h6>«Неспешная река»</h6>
                                         <p class="card-text">Легкий и быстрой забег.</p>
                                         <ul>
                                             <li>Вес рюкзака не регламентирован</li>
@@ -320,7 +319,7 @@
                                     </a>
                                     <div class="card-body">
                                         <h4 class="card-title">12 часов</h4>
-                                        <h6>«Горе от ума»</h6>
+                                        <h6>«Идущий в закат»</h6>
                                         <p class="card-text">Сочетание скорости и насыщенности. Заявиться можно в две категории: Двойка и команда.</p>
                                         <ul>
                                             <li>Вес рюкзака: 6кг на человека</li>
@@ -339,7 +338,7 @@
                                     </a>
                                     <div class="card-body">
                                         <h4 class="card-title">24 часов</h4>
-                                        <h6>«Хождение по мукам»</h6>
+                                        <h6>«Долгий рассвет»</h6>
                                         <p>
                                             Дистанция для проверки своих сил и выносливости. Команда 4-6 человек.
                                         </p>

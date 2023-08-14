@@ -6,6 +6,7 @@ from django.contrib.auth import login as auth_login
 from django.contrib.auth import logout
 from django.contrib.auth.decorators import login_required
 from django.core.files.storage import FileSystemStorage
+from django.db.models import Count, Sum
 from django.http import Http404, HttpResponse, HttpResponseRedirect, JsonResponse
 from django.shortcuts import render
 from django.views import View
@@ -38,6 +39,7 @@ from website.models import (
     TakenKP,
     Team,
 )
+from website.models.race import Category
 from website.sync_xlsx import import_file_xlsx
 
 
@@ -825,3 +827,33 @@ def upload_photo(request):
         team=team, point_number=point_number, image_url=uploaded_file_url
     )
     return JsonResponse({"success": True})
+
+
+class TeamsView(View):
+    def get(self, request, race_id, category_id, *args, **kwargs):
+        print(race_id, category_id)
+        try:
+            race = Race.objects.annotate(
+                people_count=Sum("category__team__paid_people")
+            ).get(id=race_id)
+            category = Category.active_objects.get(race_id=race_id, id=category_id)
+        except (Race.DoesNotExist, Category.DoesNotExist):
+            # page not found
+            raise Http404("File not found.")
+        categories = (
+            Category.active_objects.filter(race_id=race_id)
+            .order_by("code")
+            .annotate(team_count=Count("team"))
+        )
+        teams_ = Team.objects.filter(category2=category, paid_people__gt=0).order_by(
+            "start_number",
+            "id",
+        )
+        print(teams_, category_id)
+        context = {
+            "race": race,
+            "category": category,
+            "categories": categories,
+            "teams": teams_,
+        }
+        return render(request, "teams.html", context)

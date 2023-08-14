@@ -1,0 +1,150 @@
+{% extends "website/base.html" %}
+
+{% block content %}
+
+    <section class="flush-with-above">
+        <div class="container mb-4">
+            <h1 class="h2">Команды {{ race.name }}</h1>
+        </div>
+        <div class="container">
+            <div class="row justify-content-between">
+                <div class="col-12 col-lg-3 mb-5">
+
+                    <div class="card card-sm">
+                        <div class="card-header">
+                            <span class="h6">Категории</span>
+                        </div>
+                        <div class="list-group list-group-flush">
+
+                            <!-- Categories link-->
+                            {% for category in categories %}
+                                <a class="list-group-item d-flex justify-content-between"
+                                   href="/race/{{ race.id }}/category/{{ category.id }}/teams">
+                                    <div>
+                                        <i class="icon-dot-single mr-1"></i>
+                                        <span>{{ category.code }}</span>
+                                    </div>
+                                    {% if category.team_count %}
+                                        <div>
+                                            <span class="badge badge-secondary ml-2">{{ category.team_count }}</span>
+                                        </div>
+                                    {% endif %}
+                                </a>
+                            {% endfor %}
+                            <!-- end of categories -->
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <ul class="list-group list-group-flush">
+                            <li class="list-group-item">
+                                <div class="d-flex justify-content-between">
+                                    <div><i class="icon-magnifying-glass mr-1"></i> В поиске команды</div>
+                                    <div>
+                                        <span class="badge badge-secondary ml-2">9</span>
+                                    </div>
+                                </div>
+                            </li>
+                        </ul>
+                    </div>
+
+                    <div class="card">
+                        <ul class="list-group list-group-flush">
+                            <li class="list-group-item">
+                                <div class="d-flex justify-content-between">
+                                    <div><i class="icon-text-document mr-1"></i> Дата</div>
+                                    <span>{{ race.date }}</span>
+                                </div>
+                            </li>
+                            <li class="list-group-item">
+                                <div class="d-flex justify-content-between">
+                                    <div><i class="icon-users mr-1"></i> Участников</div>
+                                    <span>{{ race.people_count|floatformat }}</span>
+                                </div>
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+                <!--end of col-->
+
+                <div class="col-12 col-md-12 col-lg-9">
+                    <div class="col mb-2">
+                        <h3 class="mb-2">{{ category.name }}</h3>
+                        <span>{{ category.description }}</span>
+                    </div>
+                    {% if teams %}
+                        <div class="col mb-2">
+                            <table class="table align-items-center">
+                                <thead>
+                                <tr>
+                                    <th scope="col">Название</th>
+                                    <th scope="col">Город</th>
+                                    <th scope="col">Участники</th>
+                                    <th scope="col"></th>
+                                </tr>
+                                </thead>
+                                <tbody>
+                                {% for team in teams %}
+                                    <tr class="text-small">
+                                        <td>{{ team.teamname }}</td>
+                                        <td>{{ team.city|default:"-" }}</td>
+                                        <td class="text-wrap">
+                                            {{ team.athlet1 }}
+                                            {{ team.athlet2 }}
+                                            {{ team.athlet3 }}
+                                            {{ team.athlet4 }}
+                                            {{ team.athlet5 }}
+                                            {{ team.athlet6 }}
+                                        </td>
+                                        <td>
+                                            <!-- Button trigger modal -->
+                                            {#                                    <button type="button" class="btn btn-sm btn-outline-primary" data-toggle="modal"#}
+                                            {#                                            data-target="#exampleModalCenter">#}
+                                            {#                                        Подать заявку#}
+                                            {#                                    </button>#}
+                                            <!-- Modal
+                                            <div class="dropdown d-inline-block">
+                                                <button class="btn btn-sm btn-outline-primary dropdown-toggle dropdown-toggle-no-arrow"
+                                                        type="button" id="dropdownMenuButton-1" data-toggle="dropdown"
+                                                        aria-haspopup="true" aria-expanded="false">
+                                                    <i class="icon-dots-three-horizontal"></i>
+                                                </button>
+                                                <div class="dropdown-menu dropdown-menu-sm"
+                                                     aria-labelledby="dropdownMenuButton"
+                                                     x-placement="top-start"
+                                                     style="position: absolute; transform: translate3d(1202px, 412px, 0px); top: 0px; left: 0px;">
+                                                    <a class="dropdown-item"
+                                                       href="app-collection-table-alternative.html#">Download</a>
+                                                    <a class="dropdown-item"
+                                                       href="app-collection-table-alternative.html#">Share</a>
+                                                    <a class="dropdown-item"
+                                                       href="app-collection-table-alternative.html#">Comment</a>
+                                                    <div class="dropdown-divider"></div>
+                                                    <a class="dropdown-item"
+                                                       href="app-collection-table-alternative.html#">Delete</a>
+                                                </div>
+                                            </div>
+                                            -->
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <div class="col mb-2">
+                            <h4 class="mb-2">Команды не найдены</h4>
+                        </div>
+                    {% endif %}
+                </div>
+                <!--end of col-->
+            </div>
+            <!--end of row-->
+        </div>
+        <!--end of container-->
+    </section>
+
+
+
+{% endblock %}

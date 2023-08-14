@@ -168,7 +168,16 @@ class Team(models.Model):
     get_map = models.BooleanField(default=False)
     give_paper = models.BooleanField(default=False)
     give_photos = models.BooleanField(default=False)
+
+    # TODO: deprecated, use category2 instead
     category = models.CharField(max_length=50, default="", blank=True)
+    category2 = models.ForeignKey(
+        "Category",
+        on_delete=models.CASCADE,
+        blank=True,
+        null=True,
+        verbose_name="Категория",
+    )
     start_number = models.CharField(max_length=50, default="", blank=True)
     start_time = models.DateTimeField(null=True, blank=True)
     finish_time = models.DateTimeField(null=True, blank=True)
@@ -193,7 +202,7 @@ class Team(models.Model):
 
     @staticmethod
     def get_info():
-        teams = Team.objects.filter(paid_people__gt=0, year=2022)
+        teams = Team.objects.filter(paid_people__gt=0, year=2023)
         people_paid = 0
         teams_count = 0
         teams_ids = set()
