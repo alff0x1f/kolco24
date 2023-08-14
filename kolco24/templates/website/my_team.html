@@ -277,29 +277,38 @@
                         </div>
                         <ul class="list-unstyled list-spacing-sm mb-3 ">
                             <li class="row align-items-center">
-                                <div class="col-3 col-md-3">900 руб</div>
-                                <div class="col-9">8 августа</div>
-                            </li>
-                            <li class="row align-items-center">
                                 <div class="col-3 col-md-3">1000 руб</div>
-                                <div class="col-9">С 9 по 14 августа</div>
+                                <div class="col-9">15 августа</div>
                             </li>
                             <li class="row align-items-center">
                                 <div class="col-3 col-md-3">1100 руб</div>
-                                <div class="col-9">С 15 по 21 августа</div>
+                                <div class="col-9">С 16 по 20 августа</div>
                             </li>
                             <li class="row align-items-center">
                                 <div class="col-3 col-md-3">1200 руб</div>
-                                <div class="col-9">С 22 по 31 августа</div>
+                                <div class="col-9">С 21 по 24 августа</div>
                             </li>
                             <li class="row align-items-center">
                                 <div class="col-3 col-md-3">1300 руб</div>
-                                <div class="col-9">Сентябрь</div>
+                                <div class="col-9">С 25 по 28 августа</div>
+                            </li>
+                            <li class="row align-items-center">
+                                <div class="col-3 col-md-3">1400 руб</div>
+                                <div class="col-9">С 29 по 31 августа</div>
                             </li>
                             <li class="row align-items-center">
                                 <div class="col-3 col-md-3">1500 руб</div>
-                                <div class="col-9">Октябрь</div>
+                                <div class="col-9">С 1 по 31 сентября</div>
                             </li>
+                            <li class="row align-items-center">
+                                <div class="col-3 col-md-3">1600 руб</div>
+                                <div class="col-9">С 1 по 12 октября</div>
+                            </li>
+                            <li class="row align-items-center">
+                                <div class="col-3 col-md-3">1700 руб</div>
+                                <div class="col-9">На старте</div>
+                            </li>
+
                             {% if not reg_open %}
                                 <h4><strong>Регистрация закрыта</strong></h4>
                             {% endif %}
@@ -314,6 +323,7 @@
                             </li>
                             {% endcomment %}
                         </ul>
+                        <small>При достижении лимита участников, регистрация может прекратиться раньше</small>
                         {% elif user.is_superuser %}
                             <div class="mb-3 text-center">
                                 <h4 class="h4 mb-2">{{main_team.teamname}}</h4>
@@ -487,13 +497,13 @@
                                             </a>
                                         </div>
                                     </div>
-{#                                    <div class="col-6 col-xs-6 col-lg-3">#}
-{#                                        <div class="card">#}
-{#                                            <a href="javascript:$('#pay_sberbank').click();">#}
-{#                                                <img class="card-img-top" src="/static/images/payments/sberbank_online.png">#}
-{#                                            </a>#}
-{#                                        </div>#}
-{#                                    </div>#}
+                                    <div class="col-6 col-xs-6 col-lg-3">
+                                        <div class="card">
+                                            <a href="javascript:document.getElementById('pay_sberbank').click();">
+                                                <img class="card-img-top" src="/static/images/payments/sberbank_online.png">
+                                            </a>
+                                        </div>
+                                    </div>
                                     <div class="col-6 col-xs-6 col-lg-3">
                                         <div class="card">
                                             <a href="javascript:document.getElementById('pay_yandexmoney').click();">
@@ -501,13 +511,13 @@
                                             </a>
                                         </div>
                                     </div>
-{#                                    <div class="col-6 col-xs-6 col-lg-3">#}
-{#                                        <a href="javascript:$('#pay_tinkoff').click();">#}
-{#                                            <div class="card">#}
-{#                                                <img class="card-img-top" src="/static/images/payments/tinkoff.png">#}
-{#                                            </div>#}
-{#                                        </a>#}
-{#                                    </div>#}
+                                    <div class="col-6 col-xs-6 col-lg-3">
+                                        <a href="javascript:document.getElementById('#pay_tinkoff').click();">
+                                            <div class="card">
+                                                <img class="card-img-top" src="/static/images/payments/tinkoff.png">
+                                            </div>
+                                        </a>
+                                    </div>
                                 </div>
                             </div>
 
@@ -516,18 +526,18 @@
                                     <input id="radio1" name="radio" type="radio" value="visamc" class="custom-control-input" checked>
                                     <label class="custom-control-label" for="radio1">Картой Visa/Mastercard</label>
                                 </div>
-{#                                <div class="custom-control custom-checkbox-switch">#}
-{#                                    <input id="radio2" name="radio" type="radio" value="sberbank" class="custom-control-input">#}
-{#                                    <label class="custom-control-label" for="radio2">Перевод через Сбербанк.Онлайн</label>#}
-{#                                </div>#}
+                                <div class="custom-control custom-checkbox-switch">
+                                    <input id="radio2" name="radio" type="radio" value="sberbank" class="custom-control-input">
+                                    <label class="custom-control-label" for="radio2">Перевод через Сбербанк.Онлайн</label>
+                                </div>
                                 <div class="custom-control custom-checkbox-switch">
                                     <input id="radio3" name="radio" type="radio" value="yandexmoney" class="custom-control-input">
                                     <label class="custom-control-label" for="radio3">Яндекс деньги</label>
                                 </div>
-{#                                <div class="custom-control custom-checkbox-switch">#}
-{#                                    <input id="radio4" name="radio" type="radio" value="tinkoff" class="custom-control-input">#}
-{#                                    <label class="custom-control-label" for="radio4">Перевод через tinkoff-банк</label>#}
-{#                                </div>#}
+                                <div class="custom-control custom-checkbox-switch">
+                                    <input id="radio4" name="radio" type="radio" value="tinkoff" class="custom-control-input">
+                                    <label class="  custom-control-label" for="radio4">Перевод через tinkoff-банк</label>
+                                </div>
                             </form>
                             <small>После нажатия на "Оплатить" слот на команду резервируется на 15 минут. При отсутствии поступления оплаты в течении 15 мин, бронь на слот снимается.
                             </small>
@@ -600,7 +610,7 @@
                     </div>
                 </li>
                 <!--end of col-->
-                <li class="col-12 col-md-6 d-none">
+                <li class="col-12 col-md-6">
                     <div class="media align-items-center">
                         <div class="media-body">
                             <div class="row">
@@ -608,7 +618,7 @@
                                     <h5 class="mt-2">Перевод через сбербанк-онлайн</h5>
                                 </div>
                                 <div class="col-4">
-                                    <a class="d-none d-sm-block" href="javascript:$('#pay_sberbank').click();">
+                                    <a class="d-none d-sm-block" href="javascript:document.getElementById('pay_sberbank').click();">
                                         <div class="card ml-2 mb-1">
                                             <img alt="Image" class="img-fluid" style="width:7.5rem; margin: 0 auto;" src="/static/images/payments/sberbank_online.png" />
                                         </div>
@@ -694,7 +704,7 @@
                     </div>
                 </li>
                 <!--end of col-->
-                <li class="col-12 col-md-6 d-none">
+                <li class="col-12 col-md-6">
                     <div class="media align-items-center">
                         <div class="media-body">
                             <div class="row">

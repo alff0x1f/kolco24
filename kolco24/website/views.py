@@ -452,49 +452,48 @@ def team_admin(request, teamid=""):
     raise Http404("Wrong values")
 
 
-def new_payment(request):
-    if request.method == "POST":
-        paymentid = request.POST["paymentid"] if "paymentid" in request.POST else ""
-        team = Team.objects.filter(paymentid=paymentid, year=2022)[:1]
-        if not team:
+class NewPaymentView(View):
+    def post(self, request):
+        paymentid = request.POST.get("paymentid", "")
+        try:
+            team = Team.objects.get(paymentid=paymentid, year=2022)
+        except Team.DoesNotExist:
             raise Http404("Team not found")
-        payment_method = (
-            request.POST["payment_method"] if "payment_method" in request.POST else ""
-        )
-        if not payment_method:
-            payment_method = "visamc"
 
-        team = team.get()
-        payment = Payment()
-        if request.user.is_authenticated:
-            payment.owner = request.user
-        payment.team = team
-        payment.payment_method = payment_method
+        payment_method = request.POST.get("payment_method", "visamc")
 
         cost_now = PaymentsYa.get_cost()
         cost = (team.ucount - team.paid_people) * cost_now
-        payment.payment_amount = cost
-        payment.payment_with_discount = cost  # ! FIXME: need add coupon
-        payment.cost_per_person = cost_now
-        payment.paid_for = team.ucount - team.paid_people
-        payment.additional_charge = team.additional_charge
-        payment.status = "draft"
-        payment.save()
-        pid = payment.id
-        response_data = {}
-        response_data["success"] = "true"
-        response_data["payment_id"] = str(pid)
-        response_data["sum"] = cost + team.additional_charge
-        response_data["paymentmethod"] = payment_method
+
+        payment = Payment.objects.create(
+            owner=request.user if request.user.is_authenticated else None,
+            team=team,
+            payment_method=payment_method,
+            payment_amount=cost,
+            payment_with_discount=cost,
+            cost_per_person=cost_now,
+            paid_for=team.ucount - team.paid_people,
+            additional_charge=team.additional_charge,
+            status="draft",
+        )
+        response_data = {
+            "success": "true",
+            "payment_id": str(payment.id),
+            "sum": cost + team.additional_charge,
+            "paymentmethod": payment_method,
+        }
         if payment_method == "visamc":
             response_data["yandexwallet"] = settings.YANDEX_WALLET
+
         if payment_method == "yandexmoney":
             response_data["yandexwallet"] = settings.YANDEX_WALLET
+
         if payment_method == "sberbank":
             response_data["cardnumber"] = settings.SBERBANK_INFO["cardnumber"]
             # response_data['cardholder_phone'] = settings.SBERBANK_INFO["phone"]
             response_data["cardholder_name"] = settings.SBERBANK_INFO["name"]
             response_data["today_date"] = strftime("%d.%m.%Y", gmtime())
+
         if payment_method == "tinkoff":
             response_data["paymentmethod"] = "tinkoff"
             response_data["cardnumber"] = settings.TINKOFF_INFO["cardnumber"]
@@ -502,19 +501,16 @@ def new_payment(request):
             response_data["cardholder_name"] = settings.TINKOFF_INFO["name"]
             response_data["today_date"] = strftime("%d.%m.%Y", gmtime())
 
-        new_event = PaymentLog(
+        PaymentLog.objects.create(
             team=team, payment_method=payment_method, paid_sum=response_data["sum"]
         )
-        new_event.save()
 
         return JsonResponse(response_data)
-    raise Http404("Wrong values")
 
 
 def paymentinfo(request):
     if request.method == "POST":
         new_payment_id = request.POST["paymentid"]
-        # print(request.POST)
         payment = Payment.objects.filter(id=new_payment_id)[:1]
         if payment:
             payment = payment.get()
@@ -525,10 +521,13 @@ def paymentinfo(request):
             pdate = datetime.strptime(request.POST["payment_date"], "%d.%m.%Y")
             payment.payment_date = pdate
             payment.save()
-            response_data = {}
-            response_data["paymentmethod"] = payment.payment_method
-            response_data["success"] = "true"
-            return JsonResponse(response_data)
+
+            return JsonResponse(
+                {
+                    "paymentmethod": payment.payment_method,
+                    "success": "true",
+                }
+            )
     raise Http404("Wrong values")
 
 
