@@ -1,11 +1,11 @@
 from django.db.models import (
+    CASCADE,
     BooleanField,
     CharField,
     DateField,
-    Model,
     ForeignKey,
-    CASCADE,
     Manager,
+    Model,
 )
 from django.utils import timezone
 

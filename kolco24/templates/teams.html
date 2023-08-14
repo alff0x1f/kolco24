@@ -1,7 +1,6 @@
 {% extends "website/base.html" %}
 
 {% block content %}
-
     <section class="flush-with-above">
         <div class="container mb-4">
             <h1 class="h2">Команды {{ race.name }}</h1>
@@ -24,11 +23,12 @@
                                         <i class="icon-dot-single mr-1"></i>
                                         <span>{{ category.code }}</span>
                                     </div>
-                                    {% if category.team_count %}
-                                        <div>
+                                    <div>
+                                        {% if category.team_count %}
                                             <span class="badge badge-secondary ml-2">{{ category.team_count }}</span>
-                                        </div>
-                                    {% endif %}
+                                        {% endif %}
+                                        <i class="icon-chevron-right"></i>
+                                    </div>
                                 </a>
                             {% endfor %}
                             <!-- end of categories -->
