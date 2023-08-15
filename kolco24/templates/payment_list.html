@@ -36,9 +36,15 @@
                                 <td>{{ payment.payment_date }}</td>
                                 <td>
                                     {% if payment.status == "draft" or payment.status == "draft_with_info"  %}
-                                        <form method="post" action="/payments/confirm/{{ payment.id }}">
+                                        <div class="mb-2">
+                                            <form method="post" action="/payments/confirm/{{ payment.id }}">
+                                                {% csrf_token %}
+                                                <button type="submit" class="btn btn-success">Confirm</button>
+                                            </form>
+                                        </div>
+                                        <form method="post" action="/payments/cancel/{{ payment.id }}">
                                             {% csrf_token %}
-                                            <button type="submit" class="btn btn-success">Confirm</button>
+                                            <button type="submit" class="btn btn-warning">Cancel</button>
                                         </form>
                                     {% endif %}
                                 </td>
@@ -61,6 +67,15 @@
                                 <option value="draft">Draft</option>
                                 <option value="draft_with_info">Draft_with_info</option>
                                 <option value="done">Done</option>
+                                <option value="cancel">Canceled</option>
+                            </select>
+
+                            <label for="method">Method:</label>
+                            <select class="form-control" id="method" name="method">
+                                <option value="">All</option>
+                                <option value="sberbank">Сбербанк</option>
+                                <option value="sbp">СБП</option>
+                                <option value="visamc">Card</option>
                             </select>
                         </div>
                         <button type="submit" class="btn btn-primary">Apply Filters</button>

@@ -527,6 +527,18 @@ class ConfirmPaymentView(View):
         return HttpResponseRedirect("/payments?status=draft_with_info")
 
 
+class CancelPaymentView(View):
+    def post(self, request, pk):
+        if not request.user.is_superuser:
+            raise Http404("Not found")
+
+        payment = Payment.objects.get(pk=pk)
+        payment.status = "cancel"
+        payment.save(update_fields=["status"])
+
+        return HttpResponseRedirect("/payments?status=draft_with_info")
+
+
 def paymentinfo(request):
     if request.method == "POST":
         new_payment_id = request.POST["paymentid"]
@@ -890,7 +902,13 @@ def payment_list(request):
     if status_filter:
         payments = payments.filter(status=status_filter)
 
-    payments_summ = payments.aggregate(Sum("payment_amount"))["payment_amount__sum"]
+    method_filter = request.GET.get("method")
+    if method_filter:
+        payments = payments.filter(payment_method=method_filter)
+
+    payments_summ = (
+        payments.aggregate(Sum("payment_amount"))["payment_amount__sum"] or 0
+    )
 
     return render(
         request,

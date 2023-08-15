@@ -6,7 +6,7 @@ from wagtail.admin import urls as wagtailadmin_urls
 from wagtail.documents import urls as wagtaildocs_urls
 
 from . import views
-from .views import ConfirmPaymentView
+from .views import CancelPaymentView, ConfirmPaymentView
 
 urlpatterns = [
     path("", views.index, name="index"),
@@ -48,6 +48,11 @@ urlpatterns = [
         "payments/confirm/<int:pk>",
         ConfirmPaymentView.as_view(),
         name="confirm-payment",
+    ),
+    path(
+        "payments/cancel/<int:pk>",
+        CancelPaymentView.as_view(),
+        name="cancel-payment",
     ),
     # app api
     path("api/v1/races", views.RaceView.as_view(), name="api_races"),
