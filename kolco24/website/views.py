@@ -43,6 +43,10 @@ from website.models.race import Category
 from website.sync_xlsx import import_file_xlsx
 
 
+def is_admin(user):
+    return user.is_superuser
+
+
 def index(request):
     init_val = {}
     myteams = []
@@ -507,8 +511,10 @@ class NewPaymentView(View):
 
 
 class ConfirmPaymentView(View):
-    @user_passes_test(lambda u: u.is_admin)
     def post(self, request, pk):
+        if not request.user.is_superuser:
+            raise Http404("Not found")
+
         payment = Payment.objects.get(pk=pk)
         payment.status = "done"
 
@@ -871,13 +877,14 @@ class TeamsView(View):
         return render(request, "teams.html", context)
 
 
-def is_admin(user):
-    return user.is_superuser
-
-
 @user_passes_test(is_admin)
 def payment_list(request):
-    payments = Payment.objects.filter(team__year=2023).order_by("-id")
+    # select related team to avoid additional queries
+    payments = (
+        Payment.objects.select_related("team", "team__owner")
+        .filter(team__year=2023)
+        .order_by("-id")
+    )
 
     status_filter = request.GET.get("status")
     if status_filter:
