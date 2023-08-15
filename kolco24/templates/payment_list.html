@@ -4,36 +4,52 @@
     <section class="flush-with-above">
         <div class="container">
             <div class="row">
-                <div class="col-md-8">
+                <div class="col-md-10">
                     <h1>Payment List</h1>
                     <table class="table table-bordered">
                         <thead>
                         <tr>
+                            <td>Team</td>
+                            <td>Team ppl</td>
                             <th>Payment Method</th>
                             <th>Payment Amount</th>
-                            <th>Cost per Person</th>
                             <th>Paid For</th>
                             <th>Status</th>
                             <th>Sender Card Number</th>
                             <th>Payment Date</th>
+                            <th>Confirm</th>
                         </tr>
                         </thead>
                         <tbody>
                         {% for payment in payments %}
                             <tr>
+                                <td>{{ payment.team.teamname }}
+                                    <br/>{{ payment.team.owner.last_name }} {{ payment.team.owner.first_name }}
+                                </td>
+                                <td>{{ payment.team.paid_people }}/{{ payment.team.ucount }}<br/>
+                                    {{ payment.team.paid_sum }}</td>
                                 <td>{{ payment.payment_method }}</td>
                                 <td>{{ payment.payment_amount }}</td>
-                                <td>{{ payment.cost_per_person }}</td>
                                 <td>{{ payment.paid_for }}</td>
                                 <td>{{ payment.status }}</td>
                                 <td>{{ payment.sender_card_number }}</td>
                                 <td>{{ payment.payment_date }}</td>
+                                <td>
+                                    {% if payment.status == "draft" or payment.status == "draft_with_info"  %}
+                                        <form method="post" action="/payments/confirm/{{ payment.id }}">
+                                            {% csrf_token %}
+                                            <button type="submit" class="btn btn-success">Confirm</button>
+                                        </form>
+                                    {% endif %}
+                                </td>
                             </tr>
                         {% endfor %}
                         </tbody>
                     </table>
+                {#        payment_amount summ #}
+                <p>Payment Amount Summ: {{ payments_summ }}</p>
                 </div>
-                <div class="col-md-4">
+                <div class="col-md-2">
                     <h1>Filters</h1>
                     <!-- Add your filter inputs and controls here -->
                     <!-- Example: -->
@@ -42,8 +58,9 @@
                             <label for="status">Status:</label>
                             <select class="form-control" id="status" name="status">
                                 <option value="">All</option>
-                                <option value="Pending">Pending</option>
-                                <option value="Completed">Completed</option>
+                                <option value="draft">Draft</option>
+                                <option value="draft_with_info">Draft_with_info</option>
+                                <option value="done">Done</option>
                             </select>
                         </div>
                         <button type="submit" class="btn btn-primary">Apply Filters</button>

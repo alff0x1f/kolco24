@@ -506,6 +506,21 @@ class NewPaymentView(View):
         return JsonResponse(response_data)
 
 
+class ConfirmPaymentView(View):
+    @user_passes_test(lambda u: u.is_admin)
+    def post(self, request, pk):
+        payment = Payment.objects.get(pk=pk)
+        payment.status = "done"
+
+        team = payment.team
+        team.paid_people += payment.paid_for
+        team.paid_sum += payment.payment_amount
+
+        team.save(update_fields=["paid_people", "paid_sum"])
+        payment.save(update_fields=["status"])
+        return HttpResponseRedirect("/payments")
+
+
 def paymentinfo(request):
     if request.method == "POST":
         new_payment_id = request.POST["paymentid"]
@@ -862,10 +877,16 @@ def is_admin(user):
 
 @user_passes_test(is_admin)
 def payment_list(request):
-    payments = Payment.objects.filter(team__year=2023)
+    payments = Payment.objects.filter(team__year=2023).order_by("-id")
 
     status_filter = request.GET.get("status")
     if status_filter:
         payments = payments.filter(status=status_filter)
 
-    return render(request, "payment_list.html", {"payments": payments})
+    payments_summ = payments.aggregate(Sum("payment_amount"))["payment_amount__sum"]
+
+    return render(
+        request,
+        "payment_list.html",
+        {"payments": payments, "payments_summ": round(payments_summ)},
+    )

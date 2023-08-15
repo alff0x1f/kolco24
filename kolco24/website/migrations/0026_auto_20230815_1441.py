@@ -6,18 +6,18 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('website', '0025_category'),
+        ("website", "0025_category"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='team',
-            name='map_count',
+            model_name="team",
+            name="map_count",
             field=models.IntegerField(default=0),
         ),
         migrations.AddField(
-            model_name='team',
-            name='map_count_paid',
+            model_name="team",
+            name="map_count_paid",
             field=models.IntegerField(default=0),
         ),
     ]
