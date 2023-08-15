@@ -524,7 +524,7 @@ class ConfirmPaymentView(View):
 
         team.save(update_fields=["paid_people", "paid_sum"])
         payment.save(update_fields=["status"])
-        return HttpResponseRedirect("/payments")
+        return HttpResponseRedirect("/payments?status=draft_with_info")
 
 
 def paymentinfo(request):
