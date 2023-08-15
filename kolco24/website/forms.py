@@ -150,7 +150,7 @@ class RegForm(forms.Form):
             self.user.last_name = last_name
             self.user.profile.phone = phone
             self.user.save()
-            team = Team.objects.filter(owner=self.user, year=2022)[:1]
+            team = Team.objects.filter(owner=self.user, year=2023)[:1]
             if not team and ucount > 1:
                 team = Team()
                 team.new_team(self.user, dist, ucount)
@@ -168,7 +168,7 @@ class RegForm(forms.Form):
 
         exist_user = User.objects.filter(email__iexact=self.cleaned_data["email"])[:1]
         if exist_user:
-            team = Team.objects.filter(owner=exist_user, year=2022)
+            team = Team.objects.filter(owner=exist_user, year=2023)
             u_email = "@@@" if self.user.is_anonymous else self.user.email.lower()
             if not team:
                 u_email = self.cleaned_data["email"].lower()
@@ -230,13 +230,13 @@ class TeamForm(forms.Form):
     def init_vals(self, user, paymentid=""):
         team = None
         if paymentid:
-            team = Team.objects.filter(owner=user, paymentid=paymentid, year=2022)[:1]
+            team = Team.objects.filter(owner=user, paymentid=paymentid, year=2023)[:1]
             if not team and user.is_superuser:
-                team = Team.objects.filter(paymentid=paymentid, year=2022)[:1]
+                team = Team.objects.filter(paymentid=paymentid, year=2023)[:1]
             if not team:
                 return False
         else:
-            team = Team.objects.filter(owner=user, year=2022)[:1]
+            team = Team.objects.filter(owner=user, year=2023)[:1]
         if not team:
             # free_athlet = Athlet.objects.filter(owner=user, team=None)[:1]
             # if free_athlet:
@@ -274,13 +274,13 @@ class TeamForm(forms.Form):
         paymentid = self.cleaned_data["paymentid"]
         if user.is_superuser:
             return True
-        team = Team.objects.filter(paymentid=paymentid, year=2022)[:1]
+        team = Team.objects.filter(paymentid=paymentid, year=2023)[:1]
         if team and team.get().owner == user:
             return True
 
     def clean(self):
         paymentid = self.cleaned_data["paymentid"]
-        team = Team.objects.filter(paymentid=paymentid, year=2022)[:1]
+        team = Team.objects.filter(paymentid=paymentid, year=2023)[:1]
         if not team:
             raise forms.ValidationError("Команда не найдена.")
         return self.cleaned_data
@@ -289,7 +289,7 @@ class TeamForm(forms.Form):
         if "paymentid" not in self.cleaned_data:
             return False
         paymentid = self.cleaned_data["paymentid"]
-        team = Team.objects.filter(paymentid=paymentid, year=2022)[:1]
+        team = Team.objects.filter(paymentid=paymentid, year=2023)[:1]
         if team:
             d = self.cleaned_data
             print(d)
@@ -430,7 +430,7 @@ class TeamFormAdmin(forms.Form):
 
     def clean(self):
         paymentid = self.cleaned_data["paymentid"]
-        team = Team.objects.filter(paymentid=paymentid, year=2022)[:1]
+        team = Team.objects.filter(paymentid=paymentid, year=2023)[:1]
         if not team:
             raise forms.ValidationError("Команда не найдена.")
         return self.cleaned_data
@@ -438,7 +438,7 @@ class TeamFormAdmin(forms.Form):
     def init_vals(self, user, paymentid=""):
         team = None
         if paymentid and user.is_superuser:
-            team = Team.objects.filter(paymentid=paymentid, year=2022)[:1]
+            team = Team.objects.filter(paymentid=paymentid, year=2023)[:1]
             if not team:
                 return False
         else:
@@ -465,7 +465,7 @@ class TeamFormAdmin(forms.Form):
         if "paymentid" not in self.cleaned_data:
             return False
         paymentid = self.cleaned_data["paymentid"]
-        team = Team.objects.filter(paymentid=paymentid, year=2022)[:1]
+        team = Team.objects.filter(paymentid=paymentid, year=2023)[:1]
         if team:
             d = self.cleaned_data
             print(d)
