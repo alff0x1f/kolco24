@@ -205,6 +205,17 @@ class TeamForm(forms.Form):
     dist = forms.CharField()
     paymentid = forms.CharField(widget=forms.HiddenInput())
 
+    map_count = forms.IntegerField(
+        required=False,
+        initial=0,
+        widget=forms.NumberInput(
+            attrs={
+                "class": "form-control form-control-lg",
+                "placeholder": "Дополнительные карты",
+            }
+        ),
+    )
+
     def __init__(self, *args, **kwargs):
         super(TeamForm, self).__init__(*args, **kwargs)
         for i in range(6):
@@ -311,6 +322,7 @@ class TeamForm(forms.Form):
             team.birth4 = d["birth4"] if d["birth4"].isdigit() else "0"
             team.birth5 = d["birth5"] if d["birth5"].isdigit() else "0"
             team.birth6 = d["birth6"] if d["birth6"].isdigit() else "0"
+            team.map_count = d.get("map_count", 0)
             team.save()
             return team
         return False

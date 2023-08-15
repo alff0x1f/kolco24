@@ -145,10 +145,11 @@ function save_team(payment_method) {
         'athlet5': $('#teamform #id_athlet5').val(),
         'birth5': $('#teamform #id_birth5').val(),
         'athlet6': $('#teamform #id_athlet6').val(),
-        'birth6': $('#teamform #id_birth6').val(),
+        'birth6': $('#teamform #map_count').val(),
         'csrfmiddlewaretoken': csrf_token,
         // 'get_requisites' : get_requisites,
         // 'paymentid'		: $('#teamform #paymentid').val(),
+        'map_count': $('#teamform #id_map_count').val()
     };
     $.ajax({
         type: 'POST',

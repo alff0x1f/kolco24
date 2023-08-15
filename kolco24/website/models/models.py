@@ -145,6 +145,9 @@ class Team(models.Model):
     organization = models.CharField(max_length=50, blank=True)
     year = models.IntegerField(default=23)
 
+    map_count = models.IntegerField(default=0)
+    map_count_paid = models.IntegerField(default=0)
+
     # ! athlet1-athlet6 deprecated, use Athlet model instead
     athlet1 = models.CharField(max_length=50, blank=True)
     birth1 = models.IntegerField(default=0)

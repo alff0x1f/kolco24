@@ -41,6 +41,8 @@ urlpatterns = [
     path("update_protocol", views.update_protocol, name="update_protocol"),
     path("upload_protocol", views.upload_protocol, name="upload_protocol"),
     path("regulations", views.regulations, name="regulations"),
+    # admin
+    path("payments", views.payment_list, name="payment-list"),
     # app api
     path("api/v1/races", views.RaceView.as_view(), name="api_races"),
     path("api/v1/points", views.points, name="api_points"),

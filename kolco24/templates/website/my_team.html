@@ -253,6 +253,23 @@
                                         {% endif %}
                                     </div>
                                 </div>
+
+                                <div class="form-row form-group">
+                                <div class="col-8">
+                                    <p>На команду выдаются 2 карты. Если вы хотите купить дополнительные карты, отметьте количество.
+                                    <br/>Цена карты - 100 руб.
+                                </p>
+                                </div>
+                                    <div class="col-4">
+                                        {{ team_form.map_count }}
+                                        {% if team_form.map_count.errors %}
+                                            <div class="invalid-feedback">
+                                                {{ team_form.map_count.errors}}
+                                            </div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+
                                 {{ team_form.paymentid }}
                                 {% csrf_token %}
                                 <div class="form-row form-group">

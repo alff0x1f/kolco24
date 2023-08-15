@@ -1,0 +1,55 @@
+{% extends "website/base.html" %}
+
+{% block content %}
+    <section class="flush-with-above">
+        <div class="container">
+            <div class="row">
+                <div class="col-md-8">
+                    <h1>Payment List</h1>
+                    <table class="table table-bordered">
+                        <thead>
+                        <tr>
+                            <th>Payment Method</th>
+                            <th>Payment Amount</th>
+                            <th>Cost per Person</th>
+                            <th>Paid For</th>
+                            <th>Status</th>
+                            <th>Sender Card Number</th>
+                            <th>Payment Date</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        {% for payment in payments %}
+                            <tr>
+                                <td>{{ payment.payment_method }}</td>
+                                <td>{{ payment.payment_amount }}</td>
+                                <td>{{ payment.cost_per_person }}</td>
+                                <td>{{ payment.paid_for }}</td>
+                                <td>{{ payment.status }}</td>
+                                <td>{{ payment.sender_card_number }}</td>
+                                <td>{{ payment.payment_date }}</td>
+                            </tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                <div class="col-md-4">
+                    <h1>Filters</h1>
+                    <!-- Add your filter inputs and controls here -->
+                    <!-- Example: -->
+                    <form method="get" action="{% url 'payment-list' %}">
+                        <div class="form-group">
+                            <label for="status">Status:</label>
+                            <select class="form-control" id="status" name="status">
+                                <option value="">All</option>
+                                <option value="Pending">Pending</option>
+                                <option value="Completed">Completed</option>
+                            </select>
+                        </div>
+                        <button type="submit" class="btn btn-primary">Apply Filters</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </section>
+{% endblock %}

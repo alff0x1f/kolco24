@@ -4,7 +4,7 @@ from time import gmtime, strftime, time
 from django.conf import settings
 from django.contrib.auth import login as auth_login
 from django.contrib.auth import logout
-from django.contrib.auth.decorators import login_required
+from django.contrib.auth.decorators import login_required, user_passes_test
 from django.core.files.storage import FileSystemStorage
 from django.db.models import Count, Sum
 from django.http import Http404, HttpResponse, HttpResponseRedirect, JsonResponse
@@ -854,3 +854,18 @@ class TeamsView(View):
             "teams": teams_,
         }
         return render(request, "teams.html", context)
+
+
+def is_admin(user):
+    return user.is_superuser
+
+
+@user_passes_test(is_admin)
+def payment_list(request):
+    payments = Payment.objects.filter(team__year=2023)
+
+    status_filter = request.GET.get("status")
+    if status_filter:
+        payments = payments.filter(status=status_filter)
+
+    return render(request, "payment_list.html", {"payments": payments})
