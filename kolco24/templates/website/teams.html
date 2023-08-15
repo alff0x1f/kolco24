@@ -100,7 +100,6 @@
                         <tbody>
                         {% for team in teamgroup.teams %}
                             <tr {% if team.additional_charge > 0 %}class="table-warning"
-                                {% elif team.paid_people < team.ucount %}class="table-danger"
                                 {% endif%}>
                             <td scope="row">
                                 {% if team.start_number %}

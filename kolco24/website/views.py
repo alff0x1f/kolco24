@@ -146,21 +146,21 @@ def logout_user(request):
 def teams(request, template=""):
     teams = [
         {
-            "teams": Team.objects.filter(
-                dist="6h", year="2023", category="", paid_people__gt=0
-            ).order_by("start_number", "id"),
+            "teams": Team.objects.filter(dist="6h", year="2023", category="").order_by(
+                "start_number", "id"
+            ),
             "dist_name": "6ч",
         },
         {
-            "teams": Team.objects.filter(
-                dist="12h", year="2023", category="", paid_people__gt=0
-            ).order_by("start_number", "id"),
+            "teams": Team.objects.filter(dist="12h", year="2023", category="").order_by(
+                "start_number", "id"
+            ),
             "dist_name": "12ч",
         },
         {
-            "teams": Team.objects.filter(
-                dist="24h", year="2023", category="", paid_people__gt=0
-            ).order_by("start_number", "id"),
+            "teams": Team.objects.filter(dist="24h", year="2023", category="").order_by(
+                "start_number", "id"
+            ),
             "dist_name": "24ч",
         },
         {
