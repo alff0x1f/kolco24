@@ -35,7 +35,7 @@
                                 <td>{{ payment.sender_card_number }}</td>
                                 <td>{{ payment.payment_date }}</td>
                                 <td>
-                                    {% if payment.status == "draft" or payment.status == "draft_with_info"  %}
+                                    {% if payment.status == "draft" or payment.status == "draft_with_info" %}
                                         <div class="mb-2">
                                             <form method="post" action="/payments/confirm/{{ payment.id }}">
                                                 {% csrf_token %}
@@ -52,8 +52,8 @@
                         {% endfor %}
                         </tbody>
                     </table>
-                {#        payment_amount summ #}
-                <p>Payment Amount Summ: {{ payments_summ }}</p>
+                    {#        payment_amount summ #}
+                    <p>Payment Amount Summ: {{ payments_summ }}</p>
                 </div>
                 <div class="col-md-2">
                     <h1>Filters</h1>
@@ -64,18 +64,22 @@
                             <label for="status">Status:</label>
                             <select class="form-control" id="status" name="status">
                                 <option value="">All</option>
-                                <option value="draft">Draft</option>
-                                <option value="draft_with_info">Draft_with_info</option>
-                                <option value="done">Done</option>
-                                <option value="cancel">Canceled</option>
+                                <option value="draft" {% if status == "draft" %} selected {% endif %}>Draft</option>
+                                <option value="draft_with_info" {% if status == "draft_with_info" %}
+                                        selected {% endif %}>Draft_with_info
+                                </option>
+                                <option value="done" {% if status == "done" %} selected {% endif %}>Done</option>
+                                <option value="cancel" {% if status == "cancel" %} selected {% endif %}>Canceled
+                                </option>
                             </select>
 
                             <label for="method">Method:</label>
                             <select class="form-control" id="method" name="method">
                                 <option value="">All</option>
-                                <option value="sberbank">Сбербанк</option>
-                                <option value="sbp">СБП</option>
-                                <option value="visamc">Card</option>
+                                <option value="sberbank" {% if method == "sberbank" %} selected {% endif %}>Сбербанк
+                                </option>
+                                <option value="sbp" {% if method == "sbp" %} selected {% endif %}>СБП</option>
+                                <option value="visamc" {% if method == "visamc" %} selected {% endif %}>Card</option>
                             </select>
                         </div>
                         <button type="submit" class="btn btn-primary">Apply Filters</button>

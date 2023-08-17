@@ -913,5 +913,10 @@ def payment_list(request):
     return render(
         request,
         "payment_list.html",
-        {"payments": payments, "payments_summ": round(payments_summ)},
+        {
+            "payments": payments,
+            "payments_summ": round(payments_summ),
+            "status": status_filter,
+            "method": method_filter,
+        },
     )
