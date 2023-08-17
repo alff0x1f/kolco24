@@ -89,11 +89,11 @@
                                         <td>{{ team.teamname }}</td>
                                         <td>{{ team.city|default:"-" }}</td>
                                         <td class="text-wrap">
-                                            {{ team.athlet1 }}
-                                            {{ team.athlet2 }}
-                                            {{ team.athlet3 }}
-                                            {{ team.athlet4 }}
-                                            {{ team.athlet5 }}
+                                            {{ team.athlet1 }}{% if team.athlet2 %},{% endif %}
+                                            {{ team.athlet2 }}{% if team.athlet3 %},{% endif %}
+                                            {{ team.athlet3 }}{% if team.athlet4 %},{% endif %}
+                                            {{ team.athlet4 }}{% if team.athlet5 %},{% endif %}
+                                            {{ team.athlet5 }}{% if team.athlet6 %},{% endif %}
                                             {{ team.athlet6 }}
                                         </td>
                                         <td>

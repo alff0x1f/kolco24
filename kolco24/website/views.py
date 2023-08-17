@@ -876,8 +876,9 @@ class TeamsView(View):
             .annotate(
                 team_count=Subquery(
                     Team.objects.filter(category2=OuterRef("id"), paid_people__gt=0)
+                    .values("category2")
                     .annotate(count=Count("id"))
-                    .values("count")
+                    .values("count")[:1]
                 )
             )
         )
