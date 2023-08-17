@@ -18,7 +18,7 @@
                             <!-- Categories link-->
                             {% for category in categories %}
                                 <a class="list-group-item d-flex justify-content-between"
-                                   href="/race/{{ race.id }}/category/{{ category.id }}/teams">
+                                   href="/race/{{ race.id }}/category/{{ category.id }}/teams#teamlist">
                                     <div>
                                         <i class="icon-dot-single mr-1"></i>
                                         <span>{{ category.short_name }}</span>
@@ -67,7 +67,7 @@
                 </div>
                 <!--end of col-->
 
-                <div class="col-12 col-md-12 col-lg-9">
+                <div class="col-12 col-md-12 col-lg-9" id="teamlist">
                     <div class="col mb-2">
                         <h3 class="mb-2">{{ category.name }}</h3>
                         <span>{{ category.description }}</span>
