@@ -6,7 +6,7 @@ from django.contrib.auth import login as auth_login
 from django.contrib.auth import logout
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.core.files.storage import FileSystemStorage
-from django.db.models import Count, Sum
+from django.db.models import Count, OuterRef, Subquery, Sum
 from django.http import Http404, HttpResponse, HttpResponseRedirect, JsonResponse
 from django.shortcuts import render
 from django.views import View
@@ -872,14 +872,19 @@ class TeamsView(View):
             raise Http404("File not found.")
         categories = (
             Category.active_objects.filter(race_id=race_id)
-            .order_by("code")
-            .annotate(team_count=Count("team"))
+            .order_by("order", "id")
+            .annotate(
+                team_count=Subquery(
+                    Team.objects.filter(category2=OuterRef("id"), paid_people__gt=0)
+                    .annotate(count=Count("id"))
+                    .values("count")
+                )
+            )
         )
         teams_ = Team.objects.filter(category2=category, paid_people__gt=0).order_by(
             "start_number",
             "id",
         )
-        print(teams_, category_id)
         context = {
             "race": race,
             "category": category,

@@ -14,7 +14,7 @@ class TeamAdmin(admin.ModelAdmin):
         "dist",
         "year",
     )
-    list_filter = ("year", "category")
+    list_filter = ("year", "category", "category2")
 
 
 class ControlPointAdmin(admin.ModelAdmin):
@@ -50,7 +50,7 @@ class RaceAdmin(admin.ModelAdmin):
 
 
 class CategoryAdmin(admin.ModelAdmin):
-    list_display = ("code", "name", "description", "race", "is_active")
+    list_display = ("code", "name", "short_name", "order", "is_active")
     list_filter = ("race__name", "is_active")
     search_fields = ("code", "name")
 

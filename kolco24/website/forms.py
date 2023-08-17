@@ -7,6 +7,7 @@ from django.contrib.auth import authenticate
 from django.contrib.auth.models import User
 from django.core.exceptions import ObjectDoesNotExist
 from website.models import Athlet, Team, TeamAdminLog
+from website.models.race import Category, Race
 
 
 class LoginForm(forms.Form):
@@ -176,6 +177,16 @@ class RegForm(forms.Form):
                 raise forms.ValidationError("Такой email уже зарегистрирован.")
 
 
+def category2_from_dist(dist, ucount):
+    race = Race.objects.filter(code="kolco24_2023").first()
+    category = Category.objects.filter(race=race)
+    if dist == "12h":
+        if ucount == 2:
+            return category.filter(code="12h").first()
+        return category.filter(code="12h_team").first()
+    return category.filter(code=dist).first()
+
+
 class TeamForm(forms.Form):
     name = forms.CharField(
         required=False,
@@ -253,8 +264,6 @@ class TeamForm(forms.Form):
             # if free_athlet:
             #     return False
             return False
-            team = Team()
-            team.new_team(user, "12h", 4)
         else:
             team = team.get()
 
@@ -273,6 +282,7 @@ class TeamForm(forms.Form):
         self.initial["birth4"] = team.birth4 if team.birth4 else ""
         self.initial["birth5"] = team.birth5 if team.birth5 else ""
         self.initial["birth6"] = team.birth6 if team.birth6 else ""
+        self.initial["map_count"] = team.map_count
         self.initial["dist"] = team.dist
         self.initial["ucount"] = team.ucount
         self.initial["paymentid"] = team.paymentid
@@ -323,6 +333,7 @@ class TeamForm(forms.Form):
             team.birth5 = d["birth5"] if d["birth5"].isdigit() else "0"
             team.birth6 = d["birth6"] if d["birth6"].isdigit() else "0"
             team.map_count = d.get("map_count", 0)
+            team.category2 = category2_from_dist(team.dist, team.ucount)
             team.save()
             return team
         return False
