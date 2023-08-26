@@ -9,11 +9,10 @@
                     <table class="table table-bordered">
                         <thead>
                         <tr>
+                            <td>order</td>
                             <td>Team</td>
                             <td>Team ppl</td>
                             <th>Payment Method</th>
-                            <th>Payment Amount</th>
-                            <th>Paid For</th>
                             <th>Status</th>
                             <th>Sender Card Number</th>
                             <th>Payment Date</th>
@@ -23,22 +22,29 @@
                         <tbody>
                         {% for payment in payments %}
                             <tr>
-                                <td>{{ payment.team.teamname }}
+                                <td>{{ payment.order }}</td>
+                                <td><a href="/team/{{payment.team.paymentid}}">{{ payment.team.teamname }}</a>
                                     <br/>{{ payment.team.owner.last_name }} {{ payment.team.owner.first_name }}
                                 </td>
                                 <td>{{ payment.team.paid_people }}/{{ payment.team.ucount }}<br/>
                                     {{ payment.team.paid_sum }}</td>
                                 <td>{{ payment.payment_method }}</td>
-                                <td>{{ payment.payment_amount }}</td>
-                                <td>{{ payment.paid_for }}</td>
                                 <td>{{ payment.status }}</td>
-                                <td>{{ payment.sender_card_number }}</td>
-                                <td>{{ payment.payment_date }}</td>
+                                <td>{{ payment.sender_card_number }}
+                                    <br/>{{ payment.payment_amount|floatformat }} RUB
+                                        ({{ payment.paid_for|floatformat }} чел)
+                                </td>
+                                <td>{{ payment.payment_date }}<br/>
+                                    Баланс: {{ payment.balance|floatformat }}
+                                </td>
                                 <td>
                                     {% if payment.status == "draft" or payment.status == "draft_with_info" %}
                                         <div class="mb-2">
                                             <form method="post" action="/payments/confirm/{{ payment.id }}">
                                                 {% csrf_token %}
+                                                <label>
+                                                    <input class="form-control-sm" type="text" placeholder="Баланс" name="balance"/>
+                                                </label>
                                                 <button type="submit" class="btn btn-success">Confirm</button>
                                             </form>
                                         </div>
@@ -46,7 +52,10 @@
                                             {% csrf_token %}
                                             <button type="submit" class="btn btn-warning">Cancel</button>
                                         </form>
+                                    {% else %}
+                                        {{ payment.balance|floatformat }}
                                     {% endif %}
+
                                 </td>
                             </tr>
                         {% endfor %}

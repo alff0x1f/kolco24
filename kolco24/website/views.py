@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta, timezone
+from decimal import Decimal
 from time import gmtime, strftime, time
 
 from django.conf import settings
@@ -515,15 +516,19 @@ class ConfirmPaymentView(View):
         if not request.user.is_superuser:
             raise Http404("Not found")
 
+        balance = Decimal(request.POST.get("balance", 0))
+
         payment = Payment.objects.get(pk=pk)
         payment.status = "done"
+        payment.balance = balance
+        payment.order = pk
 
         team = payment.team
         team.paid_people += payment.paid_for
         team.paid_sum += payment.payment_amount
 
         team.save(update_fields=["paid_people", "paid_sum"])
-        payment.save(update_fields=["status"])
+        payment.save(update_fields=["status", "balance", "order"])
         return HttpResponseRedirect("/payments?status=draft_with_info")
 
 

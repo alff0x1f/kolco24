@@ -293,6 +293,17 @@ class PaymentLog(models.Model):
 
 
 class Payment(models.Model):
+    STATUS_DRAFT = "draft"
+    STATUS_DONE = "done"
+    STATUS_DRAFT_WITH_INFO = "draft_with_info"
+    STATUS_CANCEL = "cancel"
+
+    STATUS_CHOICES = (
+        (STATUS_DRAFT, "Черновик"),
+        (STATUS_DONE, "Оплачено"),
+        (STATUS_DRAFT_WITH_INFO, "Черновик с информацией"),
+        (STATUS_CANCEL, "Отменено"),
+    )
     owner = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
@@ -311,6 +322,8 @@ class Payment(models.Model):
         blank=True,
         null=True,
     )
+    order = models.IntegerField(default=0)
+    balance = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     payment_method = models.CharField(max_length=50)
     payment_amount = models.FloatField(default=0)
     additional_charge = models.FloatField(default=0)
@@ -323,7 +336,7 @@ class Payment(models.Model):
         blank=True,
         null=True,
     )
-    status = models.CharField(max_length=50)
+    status = models.CharField(max_length=50, default="draft", choices=STATUS_CHOICES)
     sender_card_number = models.CharField(max_length=50)
     payment_date = models.DateField(null=True, blank=True)
 
