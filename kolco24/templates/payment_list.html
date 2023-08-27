@@ -1,5 +1,7 @@
 {% extends "website/base.html" %}
 
+{% load custom_filters %}
+
 {% block content %}
     <section class="flush-with-above">
         <div class="container-fluid">
@@ -13,7 +15,6 @@
                             <td>Team</td>
                             <td>Team ppl</td>
                             <th>Payment Method</th>
-                            <th>Status</th>
                             <th>Sender Card Number</th>
                             <th>Payment Date</th>
                             <th>Confirm</th>
@@ -23,37 +24,52 @@
                         {% for payment in payments %}
                             <tr>
                                 <td>{{ payment.order }}</td>
-                                <td><a href="/team/{{payment.team.paymentid}}">{{ payment.team.teamname }}</a>
+                                <td><a href="/team/{{ payment.team.paymentid }}">{{ payment.team.teamname }}</a>
                                     <br/>{{ payment.team.owner.last_name }} {{ payment.team.owner.first_name }}
                                 </td>
-                                <td>{{ payment.team.paid_people }}/{{ payment.team.ucount }}<br/>
-                                    {{ payment.team.paid_sum }}</td>
-                                <td>{{ payment.payment_method }}</td>
-                                <td>{{ payment.status }}</td>
+                                <td>{{ payment.team.paid_people|floatformat }}/{{ payment.team.ucount }}<br/>
+                                    {{ payment.team.paid_sum|floatformat }}</td>
+                                <td>{{ payment.payment_method }}<br/>
+                                    {{ payment.status }}
+                                </td>
                                 <td>{{ payment.sender_card_number }}
                                     <br/>{{ payment.payment_amount|floatformat }} RUB
-                                        ({{ payment.paid_for|floatformat }} чел)
+                                    ({{ payment.paid_for|floatformat }} чел)
                                 </td>
-                                <td>{{ payment.payment_date }}<br/>
-                                    Баланс: {{ payment.balance|floatformat }}
-                                </td>
-                                <td>
+                                <td>{{ payment.payment_date }}</td>
+                                <td {% if payment.balance == estimate_balances|dict_key:payment.pk %}class="bg-success" {% endif %}>
                                     {% if payment.status == "draft" or payment.status == "draft_with_info" %}
-                                        <div class="mb-2">
-                                            <form method="post" action="/payments/confirm/{{ payment.id }}">
+                                        {% if payment.payment_method == "sbp" or payment.payment_method == "sberbank" %}
+                                            <div class="mb-2">
+                                                <form method="post" action="/payments/confirm/{{ payment.id }}">
+                                                    {% csrf_token %}
+                                                    <label>
+                                                        <input class="form-control-sm" type="text" placeholder="Баланс"
+                                                               name="balance"/>
+                                                    </label>
+                                                    <button type="submit" class="btn btn-success">Confirm</button>
+                                                </form>
+                                            </div>
+                                            <form method="post" action="/payments/cancel/{{ payment.id }}">
                                                 {% csrf_token %}
-                                                <label>
-                                                    <input class="form-control-sm" type="text" placeholder="Баланс" name="balance"/>
-                                                </label>
-                                                <button type="submit" class="btn btn-success">Confirm</button>
+                                                <button type="submit" class="btn btn-warning">Cancel</button>
                                             </form>
-                                        </div>
-                                        <form method="post" action="/payments/cancel/{{ payment.id }}">
-                                            {% csrf_token %}
-                                            <button type="submit" class="btn btn-warning">Cancel</button>
-                                        </form>
+                                        {% endif %}
                                     {% else %}
-                                        {{ payment.balance|floatformat }}
+                                        Баланс: {{ payment.balance|floatformat }}
+                                        <br/>Ожидаемый: {{ estimate_balances|dict_key:payment.pk|floatformat }}
+                                        {% if payment.balance == 0 and payment.status == "done" %}
+                                            {% if payment.payment_method == "sbp" or payment.payment_method == "sberbank" %}
+                                                <form method="post" action="/payments/confirm/{{ payment.id }}">
+                                                    {% csrf_token %}
+                                                    <label>
+                                                        <input class="form-control-sm" type="text" placeholder="Баланс"
+                                                               name="balance"/>
+                                                    </label>
+                                                    <button type="submit" class="btn btn-info">Confirm</button>
+                                                </form>
+                                            {% endif %}
+                                        {% endif %}
                                     {% endif %}
 
                                 </td>
@@ -85,6 +101,7 @@
                             <label for="method">Method:</label>
                             <select class="form-control" id="method" name="method">
                                 <option value="">All</option>
+
                                 <option value="sberbank" {% if method == "sberbank" %} selected {% endif %}>Сбербанк
                                 </option>
                                 <option value="sbp" {% if method == "sbp" %} selected {% endif %}>СБП</option>

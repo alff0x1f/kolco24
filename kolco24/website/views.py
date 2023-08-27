@@ -519,6 +519,9 @@ class ConfirmPaymentView(View):
         balance = Decimal(request.POST.get("balance", 0))
 
         payment = Payment.objects.get(pk=pk)
+        if payment.status == "done":
+            return self.update_only_balance(payment, balance)
+
         payment.status = "done"
         payment.balance = balance
         payment.order = pk
@@ -530,6 +533,11 @@ class ConfirmPaymentView(View):
         team.save(update_fields=["paid_people", "paid_sum"])
         payment.save(update_fields=["status", "balance", "order"])
         return HttpResponseRedirect("/payments?status=draft_with_info")
+
+    def update_only_balance(self, payment, balance):
+        payment.balance = balance
+        payment.save(update_fields=["balance"])
+        return HttpResponseRedirect("/payments?status=done&method=sbp")
 
 
 class CancelPaymentView(View):
@@ -906,7 +914,7 @@ def payment_list(request):
     payments = (
         Payment.objects.select_related("team", "team__owner")
         .filter(team__year=2023)
-        .order_by("-id")
+        .order_by("-order", "-id")
     )
 
     status_filter = request.GET.get("status")
@@ -914,18 +922,31 @@ def payment_list(request):
         payments = payments.filter(status=status_filter)
 
     method_filter = request.GET.get("method")
-    if method_filter:
+    if method_filter in ("sbp", "sberbank"):
+        payments = payments.filter(payment_method__in=("sbp", "sberbank"))
+    elif method_filter:
         payments = payments.filter(payment_method=method_filter)
 
     payments_summ = (
         payments.aggregate(Sum("payment_amount"))["payment_amount__sum"] or 0
     )
 
+    start_sum = 0
+    estimate_balances = {}
+    for p in payments:
+        if p.status == Payment.STATUS_DONE and p.payment_method in ("sbp", "sberbank"):
+            estimate_balances[p.id] = start_sum
+            start_sum -= p.payment_amount
+
+    for payment_id in estimate_balances:
+        estimate_balances[payment_id] -= start_sum
+
     return render(
         request,
         "payment_list.html",
         {
             "payments": payments,
+            "estimate_balances": estimate_balances,
             "payments_summ": round(payments_summ),
             "status": status_filter,
             "method": method_filter,
