@@ -561,7 +561,11 @@ class PaymentUp(View):
 
         payment = Payment.objects.get(pk=pk)
         next_payment = (
-            Payment.objects.filter(order__gt=payment.order, status=Payment.STATUS_DONE)
+            Payment.objects.filter(
+                order__gt=payment.order,
+                status=Payment.STATUS_DONE,
+                payment_method__in=["sberbank", "sbp"],
+            )
             .order_by("order")
             .first()
         )
@@ -582,7 +586,11 @@ class PaymentDown(View):
 
         payment = Payment.objects.get(pk=pk)
         prev_payment = (
-            Payment.objects.filter(order__lt=payment.order, status=Payment.STATUS_DONE)
+            Payment.objects.filter(
+                order__lt=payment.order,
+                status=Payment.STATUS_DONE,
+                payment_method__in=["sberbank", "sbp"],
+            )
             .order_by("-order")
             .first()
         )
