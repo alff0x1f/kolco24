@@ -537,7 +537,9 @@ class ConfirmPaymentView(View):
     def update_only_balance(self, payment, balance):
         payment.balance = balance
         payment.save(update_fields=["balance"])
-        return HttpResponseRedirect("/payments?status=done&method=sbp")
+        return HttpResponseRedirect(
+            f"/payments?status=done&method=sbp#order{payment.pk}"
+        )
 
 
 class CancelPaymentView(View):
@@ -550,6 +552,48 @@ class CancelPaymentView(View):
         payment.save(update_fields=["status"])
 
         return HttpResponseRedirect("/payments?status=draft_with_info")
+
+
+class PaymentUp(View):
+    def post(self, request, pk):
+        if not request.user.is_superuser:
+            raise Http404("Not found")
+
+        payment = Payment.objects.get(pk=pk)
+        next_payment = (
+            Payment.objects.filter(order__gt=payment.order, status=Payment.STATUS_DONE)
+            .order_by("order")
+            .first()
+        )
+
+        payment.order, next_payment.order = next_payment.order, payment.order
+        payment.save(update_fields=["order"])
+        next_payment.save(update_fields=["order"])
+
+        return HttpResponseRedirect(
+            f"/payments?status=done&method=sbp#order{payment.pk}"
+        )
+
+
+class PaymentDown(View):
+    def post(self, request, pk):
+        if not request.user.is_superuser:
+            raise Http404("Not found")
+
+        payment = Payment.objects.get(pk=pk)
+        prev_payment = (
+            Payment.objects.filter(order__lt=payment.order, status=Payment.STATUS_DONE)
+            .order_by("-order")
+            .first()
+        )
+
+        payment.order, prev_payment.order = prev_payment.order, payment.order
+        payment.save(update_fields=["order"])
+        prev_payment.save(update_fields=["order"])
+
+        return HttpResponseRedirect(
+            f"/payments?status=done&method=sbp#order{payment.pk}"
+        )
 
 
 def paymentinfo(request):

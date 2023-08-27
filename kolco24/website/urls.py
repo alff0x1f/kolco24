@@ -54,6 +54,8 @@ urlpatterns = [
         CancelPaymentView.as_view(),
         name="cancel-payment",
     ),
+    path("payments/<int:pk>/up", views.PaymentUp.as_view(), name="payment-up"),
+    path("payments/<int:pk>/down", views.PaymentDown.as_view(), name="payment-down"),
     # app api
     path("api/v1/races", views.RaceView.as_view(), name="api_races"),
     path("api/v1/points", views.points, name="api_points"),
