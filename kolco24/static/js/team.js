@@ -288,7 +288,7 @@ function additional_payment_info(payment_method) {
                     alert.fadeOut(3000);
                 }
                 if (data.paymentmethod === "sbp") {
-                    let alert = $('#tinkoffpaymentform_alert');
+                    let alert = $('#sbppaymentform_alert');
                     alert.html("Данные карты сохранены");
                     alert.classList = "alert-success alert";
                     alert.show();

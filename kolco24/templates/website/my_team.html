@@ -807,6 +807,21 @@
         let dist = "{{ team_form.dist.value }}";
         let csrf_token = "{{ csrf_token }}";
         let additional_charge = {{ additional_charge | unlocalize }};
+        {#    temporary #}
+        let dist_header = document.getElementById("dist_header");
+        switch (dist) {
+            case "6h":
+                dist_header.innerText = "6ч";
+                break;
+            case "12h":
+                dist_header.innerText = "24ч";
+                break;
+            case "24h":
+                dist_header.innerText = "25ч";
+                break;
+            default:
+                break;
+        }
     </script>
      <script type="text/javascript" src="/static/js/team.js?ver=16"></script>
      {% if user.is_superuser %}<script type="text/javascript" src="/static/js/team_admin.js?ver=1"></script>{% endif%}
