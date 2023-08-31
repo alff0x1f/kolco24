@@ -924,9 +924,48 @@ def upload_photo(request):
     return JsonResponse({"success": True})
 
 
+class AllTeamsView(View):
+    def get(self, request, race_id):
+        try:
+            race = Race.objects.annotate(
+                people_count=Sum("category__team__paid_people"),
+            ).get(id=race_id)
+        except Race.DoesNotExist:
+            # page not found
+            raise Http404("File not found.")
+
+        categories = (
+            Category.active_objects.filter(race_id=race_id)
+            .order_by("order", "id")
+            .annotate(
+                team_count=Subquery(
+                    Team.objects.filter(category2=OuterRef("id"), paid_people__gt=0)
+                    .values("category2")
+                    .annotate(count=Count("id"))
+                    .values("count")[:1]
+                )
+            )
+        )
+        teams_ = (
+            Team.objects.filter(category2__race_id=race_id, paid_people__gt=0)
+            .select_related("category2")
+            .order_by(
+                "category2__order",
+                "start_number",
+                "id",
+            )
+        )
+        context = {
+            "race": race,
+            "categories": categories,
+            "teams": teams_,
+            "show_category": True,
+        }
+        return render(request, "teams.html", context)
+
+
 class TeamsView(View):
     def get(self, request, race_id, category_id, *args, **kwargs):
-        print(race_id, category_id)
         try:
             race = Race.objects.annotate(
                 people_count=Sum("category__team__paid_people")
@@ -956,6 +995,7 @@ class TeamsView(View):
             "category": category,
             "categories": categories,
             "teams": teams_,
+            "show_category": False,
         }
         return render(request, "teams.html", context)
 

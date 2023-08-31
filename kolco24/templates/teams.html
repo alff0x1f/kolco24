@@ -10,11 +10,17 @@
                 <div class="col-12 col-lg-3 mb-5">
 
                     <div class="card card-sm">
-                        <div class="card-header">
-                            <span class="h6">Категории</span>
-                        </div>
                         <div class="list-group list-group-flush">
-
+                            <a class="list-group-item d-flex justify-content-between"
+                               href="/race/{{ race.id }}/teams#teamlist">
+                                <div>
+                                    <span>Все</span>
+                                </div>
+                                <div>
+                                    <span class="badge badge-secondary ml-2">{{ race.team_count }}</span>
+                                    <i class="icon-chevron-right"></i>
+                                </div>
+                            </a>
                             <!-- Categories link-->
                             {% for category in categories %}
                                 <a class="list-group-item d-flex justify-content-between"
@@ -35,18 +41,18 @@
                         </div>
                     </div>
 
-{#                    <div class="card">#}
-{#                        <ul class="list-group list-group-flush">#}
-{#                            <li class="list-group-item">#}
-{#                                <div class="d-flex justify-content-between">#}
-{#                                    <div><i class="icon-magnifying-glass mr-1"></i> В поиске команды</div>#}
-{#                                    <div>#}
-{#                                        <span class="badge badge-secondary ml-2">9</span>#}
-{#                                    </div>#}
-{#                                </div>#}
-{#                            </li>#}
-{#                        </ul>#}
-{#                    </div>#}
+                    {#                    <div class="card">#}
+                    {#                        <ul class="list-group list-group-flush">#}
+                    {#                            <li class="list-group-item">#}
+                    {#                                <div class="d-flex justify-content-between">#}
+                    {#                                    <div><i class="icon-magnifying-glass mr-1"></i> В поиске команды</div>#}
+                    {#                                    <div>#}
+                    {#                                        <span class="badge badge-secondary ml-2">9</span>#}
+                    {#                                    </div>#}
+                    {#                                </div>#}
+                    {#                            </li>#}
+                    {#                        </ul>#}
+                    {#                    </div>#}
 
                     <div class="card">
                         <ul class="list-group list-group-flush">
@@ -68,16 +74,19 @@
                 <!--end of col-->
 
                 <div class="col-12 col-md-12 col-lg-9" id="teamlist">
-                    <div class="col mb-2">
-                        <h3 class="mb-2">{{ category.name }}</h3>
-                        <span>{{ category.description }}</span>
-                    </div>
+                    {% if category %}
+                        <div class="col mb-2">
+                            <h3 class="mb-2">{{ category.name }}</h3>
+                            <span>{{ category.description }}</span>
+                        </div>
+                    {% endif %}
                     {% if teams %}
                         <div class="col mb-2">
-                            <table class="table align-items-center">
+                            <table class="table align-items-center table-sm">
                                 <thead>
                                 <tr>
                                     <th scope="col">Название</th>
+                                    {% if show_category %}<th scope="col">Категория</th>{% endif %}
                                     <th scope="col">Город</th>
                                     <th scope="col">Участники</th>
                                     <th scope="col"></th>
@@ -86,7 +95,10 @@
                                 <tbody>
                                 {% for team in teams %}
                                     <tr class="text-small">
-                                        <td>{{ team.teamname }}</td>
+                                        <td>{{ team.teamname }} {% if not team.teamname %}Без названия {{ team.id }} ({{ team.owner.last_name }} {{ team.owner.first_name }}) {% endif %}
+                                            {% if user.is_superuser %} <a href="/admin/website/team/{{ team.id }}/change/"><i class="icon-pencil ml-1"></i></a> {% endif %}
+                                        </td>
+                                        {% if show_category %}<td>{{ team.category2.short_name }}</td>{% endif %}
                                         <td>{{ team.city|default:"-" }}</td>
                                         <td class="text-wrap">
                                             {{ team.athlet1 }}{% if team.athlet2 %},{% endif %}

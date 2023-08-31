@@ -140,7 +140,7 @@ class Team(models.Model):
     paid_people = models.FloatField(default=0)
     dist = models.CharField(max_length=10)
     ucount = models.IntegerField(default=1)
-    teamname = models.CharField(max_length=100)
+    teamname = models.CharField(max_length=100, blank=True)
     city = models.CharField(max_length=50, blank=True)
     organization = models.CharField(max_length=50, blank=True)
     year = models.IntegerField(default=23)

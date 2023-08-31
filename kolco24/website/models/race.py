@@ -1,3 +1,4 @@
+from django.apps import apps
 from django.db.models import (
     CASCADE,
     BooleanField,
@@ -24,6 +25,10 @@ class Race(Model):
 
     def __str__(self):
         return self.name
+
+    def team_count(self):
+        Team = apps.get_model("website", "Team")
+        return len(Team.objects.filter(category2__race=self, paid_people__gt=0))
 
 
 class ActiveManager(Manager):
