@@ -1,25 +1,26 @@
-$("#dist_header").click(function () {
-    let dist_header = document.getElementById("dist_header");
+document.querySelector("#dist_header").addEventListener("click", () => {
+    distHeader = document.querySelector("#dist_header");
     switch (dist) {
         case "6h":
             dist = "12h";
-            dist_header.innerText = "12ч";
+            distHeader.innerText = "12ч";
+            if (ucount === 3) {
+                set_ucount(4)
+            }
             break;
         case "12h":
             dist = "24h";
-            dist_header.innerText = "25ч";
+            distHeader.innerText = "25ч";
             if (ucount < 4) {
-                ucount = 4
+                set_ucount(4);
             }
-            set_ucount(ucount)
             break;
         case "24h":
             dist = "6h";
-            dist_header.innerText = "6ч";
+            distHeader.innerText = "6ч";
             if (ucount > 3) {
-                ucount = 3;
+                set_ucount(3);
             }
-            set_ucount(ucount)
             break;
         default:
             break;
@@ -157,32 +158,34 @@ function save_team(payment_method) {
         data: teamForm,
         dataType: 'json',
         success: function (data) {
+            let alert = $("#team_form_alert");
             if (data.success) {
-                $('#team_form_alert').html("Данные команды сохранены");
-                $('#team_form_alert').removeClass("alert-danger");
-                $('#team_form_alert').addClass("alert-success");
-                $('#team_form_alert').show();
-                $("#team_form_alert").fadeOut(3000);
+                alert.html("Данные команды сохранены");
+                alert.removeClass("alert-danger");
+                alert.addClass("alert-success");
+                alert.show();
+                alert.fadeOut(3000);
             } else {
-                $('#team_form_alert').html("Упс, что-то пошло не так!");
-                $('#team_form_alert').removeClass("alert-success");
-                $('#team_form_alert').addClass("alert-danger");
-                $('#team_form_alert').show();
-                $("#team_form_alert").fadeOut(3000);
+                alert.html("Упс, что-то пошло не так!");
+                alert.removeClass("alert-success");
+                alert.addClass("alert-danger");
+                alert.show();
+                alert.fadeOut(3000);
             }
         },
         error: function (XMLHttpRequest, textStatus, errorThrown) {
-            $('#team_form_alert').html("Упс, что-то пошло не так: " + errorThrown);
-            $('#team_form_alert').removeClass("alert-success");
-            $('#team_form_alert').addClass("alert-danger");
-            $('#team_form_alert').show();
-            $("#team_form_alert").fadeOut(3000);
+            let alert = $("#team_form_alert");
+            alert.html("Упс, что-то пошло не так: " + errorThrown);
+            alert.removeClass("alert-success");
+            alert.addClass("alert-danger");
+            alert.show();
+            alert.fadeOut(3000);
         }
     });
-};
+}
 
 function new_payment(payment_method) {
-    var payment_info = { //Fetch form data
+    let payment_info = { //Fetch form data
         'paymentid': $('#teamform #id_paymentid').val(), //team
         'payment_method': payment_method,
         'csrfmiddlewaretoken': csrf_token,
@@ -215,9 +218,11 @@ function new_payment(payment_method) {
                     $('#sberbank_sum').text(data.sum);
                     $('#sberbank_paymentSum').val(data.sum);
                     $('#sberbank_paymentDate').val(data.today_date);
-                    $("#sberbank_pay_manual").show();
+
+                    let manual = $('#sberbank_pay_manual');
+                    manual.show();
                     $('html, body').animate({
-                        scrollTop: $("#sberbank_pay_manual").offset().top - 100
+                        scrollTop: manual.offset().top - 100
                     }, 300);
                 }
                 if (data.paymentmethod === "sbp") {
@@ -228,25 +233,29 @@ function new_payment(payment_method) {
                     $('#sbp_sum').text(data.sum);
                     $('#sbp_paymentSum').val(data.sum);
                     $('#sbp_paymentDate').val(data.today_date);
-                    $("#sbp_pay_manual").show();
+
+                    let manual = $('#sbp_pay_manual');
+                    manual.show();
                     $('html, body').animate({
-                        scrollTop: $("#sbp_pay_manual").offset().top - 100
+                        scrollTop: manual.offset().top - 100
                     }, 300);
                 }
             } else {
-                $('#team_form_alert').html("Упс, что-то пошло не так!");
-                $('#team_form_alert').removeClass("alert-success");
-                $('#team_form_alert').addClass("alert-danger");
-                $('#team_form_alert').show();
-                $("#team_form_alert").fadeOut(3000);
+                let alert = $('#team_form_alert');
+                alert.html("Упс, что-то пошло не так!");
+                alert.removeClass("alert-success");
+                alert.addClass("alert-danger");
+                alert.show();
+                alert.fadeOut(3000);
             }
         },
         error: function (XMLHttpRequest, textStatus, errorThrown) {
-            $('#team_form_alert').html("Упс, что-то пошло не так: " + errorThrown);
-            $('#team_form_alert').removeClass("alert-success");
-            $('#team_form_alert').addClass("alert-danger");
-            $('#team_form_alert').show();
-            $("#team_form_alert").fadeOut(3000);
+            let alert = $('#team_form_alert');
+            alert.html("Упс, что-то пошло не так: " + errorThrown);
+            alert.removeClass("alert-success");
+            alert.addClass("alert-danger");
+            alert.show();
+            alert.fadeOut(3000);
         }
     });
 }
@@ -331,7 +340,7 @@ function get_cost() {
         error: function (XMLHttpRequest, textStatus, errorThrown) {
         }
     });
-};
+}
 
 let timerId = setInterval(get_cost, 5000);
 
