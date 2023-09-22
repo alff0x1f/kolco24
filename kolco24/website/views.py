@@ -864,7 +864,7 @@ class RaceView(View):
 def points(request):
     """Возвращает список контрольных пунктов"""
     control_points = (
-        ControlPoint.objects.filter(year=23)
+        ControlPoint.objects.filter(year=24)
         .order_by("number")
         .values("number", "description", "cost")
     )
@@ -875,7 +875,7 @@ def teams_api(request):
     """Возвращает список команд"""
     query_params = request.GET.get("category", "")
     teams = (
-        Team.objects.filter(year=23)  # paid_people__gt=0)
+        Team.objects.filter(year=24)  # paid_people__gt=0)
         .order_by("id")
         .values(
             "id",
