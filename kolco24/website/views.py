@@ -1,3 +1,4 @@
+import json
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from time import gmtime, strftime, time
@@ -39,6 +40,7 @@ from website.models import (
     Race,
     TakenKP,
     Team,
+    PointTag,
 )
 from website.models.race import Category
 from website.sync_xlsx import import_file_xlsx
@@ -859,6 +861,42 @@ class RaceView(View):
                 }
             )
         return JsonResponse(data, safe=False)
+
+
+class PointTagsView(View):
+    def post(self, request, race_id):
+        try:
+            data = json.loads(request.body)
+
+            point_number = data.get("point_number")
+            point = self.get_point_by_number(point_number)
+            if not point:
+                return JsonResponse(
+                    {"error": f"Point with number {point_number} not found."},
+                    status=404,
+                )
+
+            tag_id = data.get("tag_id")
+            if tag_id is None:
+                return JsonResponse(
+                    {"error": "tag_id is a required field."}, status=400
+                )
+
+            PointTag.objects.create(point_id=point, tag_id=tag_id)
+
+            return JsonResponse(
+                {"message": "PointTag created successfully."}, status=201
+            )
+        except json.JSONDecodeError:
+            return JsonResponse({"error": "Invalid JSON data."}, status=400)
+        except Exception as e:
+            return JsonResponse({"error": str(e)}, status=500)
+
+    def get_point_by_number(self, point_number):
+        try:
+            return ControlPoint.objects.get(number=point_number, year=2023)
+        except ControlPoint.DoesNotExist:
+            return None
 
 
 def points(request):

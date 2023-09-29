@@ -10,3 +10,4 @@ from .models import (
     TeamAdminLog,
 )
 from .race import Race
+from .tag import PointTag

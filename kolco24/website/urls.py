@@ -62,6 +62,11 @@ urlpatterns = [
     path("api/v1/points", views.points, name="api_points"),
     path("api/v1/teams", views.teams_api, name="api_teams"),
     path("api/v1/upload_photo", views.upload_photo, name="upload_photo"),
+    path(
+        "api/v1/race/<int:race_id>/point_tags",
+        views.PointTagsView.as_view(),
+        name="point_tags",
+    ),
     path("cms/", include(wagtailadmin_urls)),
     path("documents/", include(wagtaildocs_urls)),
     path("", include(wagtail_urls)),
