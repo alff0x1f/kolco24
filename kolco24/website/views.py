@@ -37,10 +37,10 @@ from website.models import (
     Payment,
     PaymentLog,
     PaymentsYa,
+    PointTag,
     Race,
     TakenKP,
     Team,
-    PointTag,
 )
 from website.models.race import Category
 from website.sync_xlsx import import_file_xlsx
