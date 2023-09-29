@@ -11,6 +11,7 @@ from django.core.files.storage import FileSystemStorage
 from django.db.models import Count, OuterRef, Subquery, Sum
 from django.http import Http404, HttpResponse, HttpResponseRedirect, JsonResponse
 from django.shortcuts import render
+from django.utils.decorators import method_decorator
 from django.views import View
 from django.views.decorators.csrf import csrf_exempt
 from openpyxl import load_workbook
@@ -863,6 +864,7 @@ class RaceView(View):
         return JsonResponse(data, safe=False)
 
 
+@method_decorator(csrf_exempt, name="dispatch")
 class PointTagsView(View):
     def post(self, request, race_id):
         try:
