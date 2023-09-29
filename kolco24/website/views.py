@@ -884,11 +884,16 @@ class PointTagsView(View):
                     {"error": "tag_id is a required field."}, status=400
                 )
 
-            PointTag.objects.create(point_id=point, tag_id=tag_id)
-
+            _, created = PointTag.objects.update_or_create(point=point, tag_id=tag_id)
+            if created:
+                return JsonResponse(
+                    {"message": "PointTag created successfully."}, status=201
+                )
             return JsonResponse(
-                {"message": "PointTag created successfully."}, status=201
+                {"message": f"PointTag with tag_id {tag_id} updated."},
+                status=200,
             )
+
         except json.JSONDecodeError:
             return JsonResponse({"error": "Invalid JSON data."}, status=400)
         except Exception as e:
