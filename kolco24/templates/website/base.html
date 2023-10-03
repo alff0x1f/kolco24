@@ -43,7 +43,6 @@
                     </button>
                     <div class="collapse navbar-collapse justify-content-between" id="navbarNav">
                         <ul class="navbar-nav">
-                        {% if not user.is_superuser %}
                             <li class="nav-item">
                                 <a href="/#about" class="nav-link">О рогейне</a>
                             </li>
@@ -87,11 +86,10 @@
 {##}
 {#                                </div>#}
 {#                            </li>#}
-                            {% endif %}
-                            {% if user.is_superuser %}
                             <li class="nav-item">
-                                <a href="/race/1/teams" class="nav-link">Команды</a>
+                                <a href="/race/1/teams" class="nav-link">Команды </a>
                             </li>
+                        {% if user.is_superuser %}
                             <li class="nav-item">
                                 <a href="/teams_predstart" class="nav-link">Заявки</a>
                             </li>
@@ -102,10 +100,6 @@
                                 <a href="/teams_finish" class="nav-link">Финиш</a>
                             </li>
                             {% else %}
-                            <li class="nav-item">      
-                                    <a href="/race/1/teams" class="nav-link">Команды </a>
-                                    {% comment %} <span class="badge badge-primary">{{ team_number }}</span> {% endcomment %}
-                            </li>
                             {% endif %}
                         </ul>
 
