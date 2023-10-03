@@ -96,7 +96,10 @@
                                 {% for team in teams %}
                                     <tr class="text-small">
                                         <td>{{ team.teamname }} {% if not team.teamname %}Без названия {{ team.id }} ({{ team.owner.last_name }} {{ team.owner.first_name }}) {% endif %}
-                                            {% if user.is_superuser %} <a href="/admin/website/team/{{ team.id }}/change/"><i class="icon-pencil ml-1"></i></a> {% endif %}
+                                            {% if user.is_superuser %}
+                                                (<a href="/admin/website/team/{{ team.id }}/change/">id{{ team.id }}</a>)
+                                                <a href="/team/{{ team.paymentid }}"><i class="icon-pencil ml-1"></i></a>
+                                            {% endif %}
                                         </td>
                                         {% if show_category %}<td>{{ team.category2.short_name }}</td>{% endif %}
                                         <td>{{ team.city|default:"-" }}</td>
@@ -109,6 +112,9 @@
                                             {{ team.athlet6 }}
                                         </td>
                                         <td>
+                                            {% if team.paid_people != team.ucount %}
+                                            ({{ team.paid_people|floatformat }}/{{ team.ucount }})
+                                            {% endif %}
                                             <!-- Button trigger modal -->
                                             {#                                    <button type="button" class="btn btn-sm btn-outline-primary" data-toggle="modal"#}
                                             {#                                            data-target="#exampleModalCenter">#}
