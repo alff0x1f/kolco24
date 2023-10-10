@@ -1,1 +1,14 @@
 GET {{url}}/api/v1/races
+
+
+### json
+POST {{url}}/api/v1/race/1/point_tags
+Content-Type: application/json
+
+{
+    "point_number": 0,
+    "tag_id": "01"
+}
+
+###
+GET {{url}}/api/v1/points

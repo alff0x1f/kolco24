@@ -1,4 +1,5 @@
 import json
+from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from time import gmtime, strftime, time
@@ -909,10 +910,20 @@ class PointTagsView(View):
 def points(request):
     """Возвращает список контрольных пунктов"""
     control_points = (
-        ControlPoint.objects.filter(year=24)
+        ControlPoint.objects.filter(year=2023)
         .order_by("number")
-        .values("number", "description", "cost")
+        .values("id", "number", "description", "cost")
     )
+    points_ids = [point["id"] for point in control_points]
+
+    tags = PointTag.objects.filter(point_id__in=points_ids).values("point_id", "tag_id")
+    tags_by_point = defaultdict(list)
+    for tag in tags:
+        tags_by_point[tag["point_id"]].append(tag["tag_id"])
+
+    for point in control_points:
+        point["tags"] = tags_by_point[point["id"]]
+
     return JsonResponse(list(control_points), safe=False)
 
 
