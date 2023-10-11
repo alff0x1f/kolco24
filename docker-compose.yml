@@ -33,7 +33,7 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
     volumes:
-      - ./data/db:/var/lib/postgresql/data
+      - ./data/db_data:/var/lib/postgresql/data
     networks:
       - kolco24_default
 
