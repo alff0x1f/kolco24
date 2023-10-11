@@ -28,7 +28,6 @@ services:
     image: postgres:14
     container_name: kolco24_db
     restart: unless-stopped
-    user: "1000:1000"
     environment:
       POSTGRES_DB: kolco24
       POSTGRES_USER: postgres
