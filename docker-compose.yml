@@ -19,7 +19,7 @@ services:
     build: .
     command: [ "python", "manage.py", "runmailer" ]
     volumes:
-      - .:/app
+      - ./kolco24:/app
     depends_on:
       - kolco24_web
     networks:
