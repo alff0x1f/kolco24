@@ -1,6 +1,6 @@
 version: '3'
 services:
-  web:
+  kolco24_web:
     build: .
     container_name: kolco24_django
     restart: unless-stopped
@@ -15,16 +15,7 @@ services:
     networks:
       - nginx_network
       - kolco24_default
-  #  runmailer:
-  #    build: .
-  #    command: [ "python", "manage.py", "runmailer" ]
-  #    volumes:
-  #      - .:/app
-  #    depends_on:
-  #      - db
-  #    networks:
-  #      - kolco24_default
-  db:
+  kolco24_db:
     image: postgres:14
     container_name: kolco24_db
     restart: unless-stopped
