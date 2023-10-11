@@ -931,7 +931,7 @@ def teams_api(request):
     """Возвращает список команд"""
     query_params = request.GET.get("category", "")
     teams = (
-        Team.objects.filter(year=24)  # paid_people__gt=0)
+        Team.objects.filter(year=2023, paid_people__gt=0)
         .order_by("id")
         .values(
             "id",
