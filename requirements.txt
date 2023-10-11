@@ -1,4 +1,4 @@
-Django==3.2.19
+Django==3.2.20
 django-mailer>=2.2
 gspread==5.9.0
 oauth2client>=4.0.0
