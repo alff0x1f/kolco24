@@ -1,27 +1,48 @@
-version: "3.5"
-
+version: '3'
 services:
-  db:
-    image: postgres
-    restart: unless-stopped
-    volumes:
-      - ./data/db:/var/lib/postgresql/data
-    environment:
-      - POSTGRES_DB=postgres
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=postgres
-  web:
+  kolco24_web:
     build: .
-    command: python kolco24/manage.py runserver 0.0.0.0:8000
+    container_name: kolco24_django
     restart: unless-stopped
+    user: "1000:1000"
+    command: [ "gunicorn", "--bind", "0.0.0.0:8000", "kolco24.wsgi:application" ]
     volumes:
-      - .:/code
-    ports:
-      - "80:8000"
-    environment:
-      - POSTGRES_NAME=postgres
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=postgres
+      - ./kolco24:/app
     depends_on:
-      - db
+      - kolco24_db
+    networks:
+      - nginx_network
+      - kolco24_default
+  kolco24_runmailer:
+    build: .
+    container_name: kolco24_runmailer
+    restart: unless-stopped
+    command: [ "python", "manage.py", "runmailer" ]
+    volumes:
+      - ./kolco24:/app
+    depends_on:
+      - kolco24_db
+    networks:
+      - kolco24_default
+  kolco24_db:
+    image: postgres:14
+    container_name: kolco24_db
+    restart: unless-stopped
+    ports:
+      - "9995:5432"
+    environment:
+      POSTGRES_DB: kolco24
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    volumes:
+      - kolco24_db:/var/lib/postgresql/data
+    networks:
+      - kolco24_default
 
+networks:
+  kolco24_default:
+  nginx_network:
+    external: true
+
+volumes:
+  kolco24_db:

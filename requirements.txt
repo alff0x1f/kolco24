@@ -4,3 +4,7 @@ gspread==5.9.0
 oauth2client>=4.0.0
 psycopg2-binary==2.9.6
 wagtail==5.0.1
+openpyxl~=3.1.1
+crypto~=1.4.1
+gunicorn==21.2.0
+whitenoise==6.6.0
