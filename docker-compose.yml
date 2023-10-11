@@ -12,15 +12,15 @@ services:
     networks:
       - nginx_network
       - kolco24_default
-  runmailer:
-    build: .
-    command: [ "python", "manage.py", "runmailer" ]
-    volumes:
-      - .:/app
-    depends_on:
-      - db
-    networks:
-      - kolco24_default
+#  runmailer:
+#    build: .
+#    command: [ "python", "manage.py", "runmailer" ]
+#    volumes:
+#      - .:/app
+#    depends_on:
+#      - db
+#    networks:
+#      - kolco24_default
   db:
     image: postgres:14
     environment:
