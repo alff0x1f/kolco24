@@ -9,7 +9,7 @@ services:
       - "8000:8000"
     command: [ "gunicorn", "--bind", "0.0.0.0:8000", "kolco24.wsgi:application" ]
     volumes:
-      - .media.photos:/app/media.photos
+      - .kolco24:/app
     depends_on:
       - db
     networks:
