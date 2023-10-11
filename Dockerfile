@@ -13,7 +13,7 @@ COPY requirements.txt /app/
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy the website directory contents into the container at /app
-COPY ./website /app/
+COPY ./kolco24 /app/
 
 # Collect static files
 RUN python manage.py collectstatic --noinput
