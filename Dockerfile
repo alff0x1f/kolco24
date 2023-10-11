@@ -12,11 +12,11 @@ WORKDIR /app
 COPY requirements.txt /app/
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy the current directory contents into the container at /app
-COPY . /app/
+# Copy the website directory contents into the container at /app
+COPY ./website /app/
 
 # Collect static files
 RUN python manage.py collectstatic --noinput
 
 # Run the application
-CMD ["gunicorn", "--bind", "0.0.0.0:8000", "kolco24.kolco24.wsgi:application"]
+CMD ["gunicorn", "--bind", "0.0.0.0:8000", "kolco24.wsgi:application"]

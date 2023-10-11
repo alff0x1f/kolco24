@@ -6,7 +6,7 @@ services:
     restart: unless-stopped
     ports:
       - "8000:8000"
-    command: [ "gunicorn", "--bind", "0.0.0.0:8000", "kolco24.kolco24.wsgi:application" ]
+    command: [ "gunicorn", "--bind", "0.0.0.0:8000", "kolco24.wsgi:application" ]
     volumes:
       - .:/app
     depends_on:
