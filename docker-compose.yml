@@ -11,7 +11,7 @@ services:
     volumes:
       - ./kolco24:/app
     depends_on:
-      - db
+      - kolco24_db
     networks:
       - nginx_network
       - kolco24_default
