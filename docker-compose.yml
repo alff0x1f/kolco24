@@ -2,6 +2,8 @@ version: '3'
 services:
   web:
     build: .
+    container_name: kolco24_django
+    restart: unless-stopped
     ports:
       - "8000:8000"
     command: [ "gunicorn", "--bind", "0.0.0.0:8000", "kolco24.kolco24.wsgi:application" ]
@@ -12,21 +14,25 @@ services:
     networks:
       - nginx_network
       - kolco24_default
-#  runmailer:
-#    build: .
-#    command: [ "python", "manage.py", "runmailer" ]
-#    volumes:
-#      - .:/app
-#    depends_on:
-#      - db
-#    networks:
-#      - kolco24_default
+  #  runmailer:
+  #    build: .
+  #    command: [ "python", "manage.py", "runmailer" ]
+  #    volumes:
+  #      - .:/app
+  #    depends_on:
+  #      - db
+  #    networks:
+  #      - kolco24_default
   db:
     image: postgres:14
+    container_name: kolco24_db
+    restart: unless-stopped
     environment:
       POSTGRES_DB: kolco24
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
+    volumes:
+      - ./data/db:/var/lib/postgresql/data
     networks:
       - kolco24_default
 
