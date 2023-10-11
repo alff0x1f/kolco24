@@ -17,7 +17,7 @@ services:
       - kolco24_default
   kolco24_runmailer:
     build: .
-    command: [ "manage.py", "runmailer" ]
+    command: [ "python", "manage.py", "runmailer" ]
     volumes:
       - ./kolco24:/app
     depends_on:
