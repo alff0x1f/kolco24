@@ -4,7 +4,7 @@ services:
     build: .
     ports:
       - "8000:8000"
-    command: ["gunicorn", "--bind", "0.0.0.0:8000", "kolco24.kolco24.wsgi:application"]
+    command: [ "gunicorn", "--bind", "0.0.0.0:8000", "kolco24.kolco24.wsgi:application" ]
     volumes:
       - .:/app
     depends_on:
@@ -14,7 +14,7 @@ services:
       - kolco24_default
   runmailer:
     build: .
-    command: ["python", "manage.py", "runmailer"]
+    command: [ "python", "manage.py", "runmailer" ]
     volumes:
       - .:/app
     depends_on:
@@ -31,5 +31,6 @@ services:
       - kolco24_default
 
 networks:
+  kolco24_default:
   nginx_network:
     external: true
