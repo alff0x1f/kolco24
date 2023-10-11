@@ -342,7 +342,7 @@ function get_cost() {
     });
 }
 
-let timerId = setInterval(get_cost, 5000);
+// let timerId = setInterval(get_cost, 5000);
 
 $(function () {
     set_ucount(ucount);

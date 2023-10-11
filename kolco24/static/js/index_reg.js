@@ -73,4 +73,4 @@ function get_cost_index() {
     });
 }
 
-let timerId = setInterval(get_cost_index, 5000);
+// let timerId = setInterval(get_cost_index, 5000);
