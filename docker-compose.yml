@@ -16,11 +16,12 @@ services:
   kolco24_runmailer:
     build: .
     container_name: kolco24_runmailer
+    restart: unless-stopped
     command: [ "python", "manage.py", "runmailer" ]
     volumes:
       - ./kolco24:/app
     depends_on:
-      - kolco24_web
+      - kolco24_db
     networks:
       - kolco24_default
   kolco24_db:
