@@ -5,8 +5,6 @@ services:
     container_name: kolco24_django
     restart: unless-stopped
     user: "1000:1000"
-    ports:
-      - "8000:8000"
     command: [ "gunicorn", "--bind", "0.0.0.0:8000", "kolco24.wsgi:application" ]
     volumes:
       - ./kolco24:/app
@@ -17,6 +15,7 @@ services:
       - kolco24_default
   kolco24_runmailer:
     build: .
+    container_name: kolco24_runmailer
     command: [ "python", "manage.py", "runmailer" ]
     volumes:
       - ./kolco24:/app
@@ -28,6 +27,8 @@ services:
     image: postgres:14
     container_name: kolco24_db
     restart: unless-stopped
+    ports:
+      - "9995:5432"
     environment:
       POSTGRES_DB: kolco24
       POSTGRES_USER: postgres
