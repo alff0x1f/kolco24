@@ -428,7 +428,7 @@ class TakenKP(models.Model):
     point_number = models.IntegerField("Номер КП", default=0)
     image_url = models.CharField(max_length=200, default="")
     status = models.CharField(max_length=50, default="new", choices=STATUS_CHOICES)
-    timestamp = models.IntegerField(default=0)
+    timestamp = models.BigIntegerField(default=0)
     nfc = models.CharField(max_length=100, default="")
     phone_uuid = models.CharField(max_length=100, default="")
     year = models.IntegerField(default=2023)
