@@ -945,6 +945,11 @@ def teams_api(request):
             "organization",
             "year",
             "start_number",
+            "start_time",
+            "finish_time",
+            "place",
+            "dnf",
+            "penalty",
         )
     )
     if query_params:
@@ -974,7 +979,7 @@ def upload_photo(request):
         start_number = team.start_number
         folder_name = (
             "photos/"
-            + f"{start_number} - {team_id}/{phone_uuid}/{point_number}-{file.name}"
+            + f"{start_number}-{team_id}/{phone_uuid}/{point_number}-{file.name}"
         )
         fs = FileSystemStorage()
         filename = fs.save(folder_name, file)

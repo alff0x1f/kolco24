@@ -182,8 +182,8 @@ class Team(models.Model):
         verbose_name="Категория",
     )
     start_number = models.CharField(max_length=50, default="", blank=True)
-    start_time = models.DateTimeField(null=True, blank=True)
-    finish_time = models.DateTimeField(null=True, blank=True)
+    start_time = models.BigIntegerField(default=0)
+    finish_time = models.BigIntegerField(default=0)
     distance_time = models.DurationField(null=True, blank=True)
     penalty = models.IntegerField(default=0)
     dnf = models.BooleanField(default=False)
@@ -429,6 +429,6 @@ class TakenKP(models.Model):
     image_url = models.CharField(max_length=200, default="")
     status = models.CharField(max_length=50, default="new", choices=STATUS_CHOICES)
     timestamp = models.BigIntegerField(default=0)
-    nfc = models.CharField(max_length=100, default="")
+    nfc = models.CharField(max_length=300, default="")
     phone_uuid = models.CharField(max_length=100, default="")
     year = models.IntegerField(default=2023)
