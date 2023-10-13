@@ -866,6 +866,41 @@ class RaceView(View):
 
 
 @method_decorator(csrf_exempt, name="dispatch")
+class TeamsTimesView(View):
+    def post(self, request):
+        try:
+            times = json.loads(request.body)
+
+            for time_ in times:
+                try:
+                    team = Team.objects.get(id=time_.get("team_id"))
+                except Team.DoesNotExist:
+                    continue
+
+                fields = []
+                if time_.get("start_time") and not team.start_time:
+                    time_.start_time = time_.get("start_time")
+                    fields.append("start_time")
+
+                if time_.get("finish_time") and not team.finish_time:
+                    team.finish_time = time_.get("finish_time")
+                    fields.append("finish_time")
+
+                if fields:
+                    team.save(update_fields=fields)
+
+            return JsonResponse(
+                {"message": f"Teams times updated."},
+                status=200,
+            )
+
+        except json.JSONDecodeError:
+            return JsonResponse({"error": "Invalid JSON data."}, status=400)
+        except Exception as e:
+            return JsonResponse({"error": str(e)}, status=500)
+
+
+@method_decorator(csrf_exempt, name="dispatch")
 class PointTagsView(View):
     def post(self, request, race_id):
         try:
