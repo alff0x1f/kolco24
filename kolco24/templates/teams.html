@@ -85,6 +85,7 @@
                             <table class="table align-items-center table-sm">
                                 <thead>
                                 <tr>
+                                    <th scope="col">#</th>
                                     <th scope="col">Название</th>
                                     {% if show_category %}<th scope="col">Категория</th>{% endif %}
                                     <th scope="col">Город</th>
@@ -95,6 +96,7 @@
                                 <tbody>
                                 {% for team in teams %}
                                     <tr class="text-small">
+                                        <td>{{ team.start_number }}</td>
                                         <td>{{ team.teamname }} {% if not team.teamname %}Без названия {{ team.id }} ({{ team.owner.last_name }} {{ team.owner.first_name }}) {% endif %}
                                             {% if user.is_superuser %}
                                                 (<a href="/admin/website/team/{{ team.id }}/change/">id{{ team.id }}</a>)
