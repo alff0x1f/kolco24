@@ -950,10 +950,42 @@ def teams_api(request):
             "place",
             "dnf",
             "penalty",
+            "athlet1",
+            "athlet2",
+            "athlet3",
+            "athlet4",
+            "athlet5",
+            "athlet6",
         )
     )
+
     if query_params:
         teams = teams.filter(category=query_params)
+
+    teams = list(teams)
+    for team in teams:
+        paid_people = team.get("paid_people")
+        members = [team["athlet1"]]
+        if paid_people > 1 and team["athlet2"]:
+            members.append(team["athlet2"])
+
+        if paid_people > 2 and team["athlet3"]:
+            members.append(team["athlet3"])
+
+        if paid_people > 3 and team["athlet4"]:
+            members.append(team["athlet4"])
+
+        if paid_people > 4 and team["athlet5"]:
+            members.append(team["athlet5"])
+
+        if paid_people > 5 and team["athlet6"]:
+            members.append(team["athlet6"])
+        for i in range(6):
+            key = f"athlet{i+1}"
+            team.pop(key)
+        teamname_description = ", ".join(members)
+        team["teamname"] = team["teamname"] + f" ({teamname_description})"
+
     return JsonResponse(list(teams), safe=False)
 
 
