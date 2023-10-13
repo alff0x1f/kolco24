@@ -879,7 +879,7 @@ class TeamsTimesView(View):
 
                 fields = []
                 if time_.get("start_time") and not team.start_time:
-                    time_.start_time = time_.get("start_time")
+                    team.start_time = time_.get("start_time")
                     fields.append("start_time")
 
                 if time_.get("finish_time") and not team.finish_time:
