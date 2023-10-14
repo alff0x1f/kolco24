@@ -1104,6 +1104,110 @@ class AllTeamsView(View):
         return render(request, "teams.html", context)
 
 
+class AllTeamsResultView(View):
+    def get(self, request, race_id):
+        try:
+            race = Race.objects.annotate(
+                people_count=Sum("category__team__paid_people"),
+            ).get(id=race_id)
+        except Race.DoesNotExist:
+            # page not found
+            raise Http404("File not found.")
+
+        teams_ = (
+            Team.objects.filter(category2__race_id=race_id, paid_people__gt=0)
+            .select_related("category2")
+            .order_by(
+                "category2__order",
+                "start_number",
+                "id",
+            )
+        )
+
+        points = ControlPoint.objects.filter(year=2023, cost__gte=0)
+        cost = {}
+        for p in points:
+            cost[p.number] = p.cost
+
+        for team in teams_:
+            # members
+            members = [team.athlet1]
+            if team.paid_people > 1 and team.athlet2:
+                members.append(team.athlet2)
+
+            if team.paid_people > 2 and team.athlet3:
+                members.append(team.athlet3)
+            if team.paid_people > 3 and team.athlet4:
+                members.append(team.athlet4)
+            if team.paid_people > 4 and team.athlet5:
+                members.append(team.athlet5)
+            if team.paid_people > 5 and team.athlet6:
+                members.append(team.athlet6)
+            team.members = ", ".join(members)
+
+            team.points_nfc = []
+            summ_nfc = 0
+            count_nfc = 0
+            nfc_points = (
+                TakenKP.objects.filter(team=team.id, timestamp__gt=1697223600000)
+                .exclude(nfc="")
+                .distinct("point_number")
+                .order_by("point_number")
+            )
+            for p in nfc_points:
+                if cost[p.point_number]:
+                    summ_nfc += cost[p.point_number]
+                    count_nfc += 1
+                    team.points_nfc.append(p.point_number)
+            team.summ_nfc = summ_nfc
+            team.count_nfc = count_nfc
+
+            # PHOTO
+            team.points_photo = []
+            summ_photo = 0
+            count_photo = 0
+            photo_points = (
+                TakenKP.objects.filter(team=team.id, timestamp__gt=1697223600000)
+                .exclude(image_url="")
+                .distinct("point_number")
+                .order_by("point_number")
+            )
+            for p in photo_points:
+                if cost[p.point_number] and p.point_number not in team.points_nfc:
+                    summ_photo += cost[p.point_number]
+                    count_photo += 1
+                    team.points_photo.append(p.point_number)
+
+            team.summ_photo = summ_photo
+            team.count_photo = count_photo
+
+            team.summ_both = team.summ_photo + team.summ_nfc
+
+            team.time_diff = team.finish_time - team.start_time
+            if team.finish_time == 0:
+                team.time_diff = 0
+            seconds = int(team.time_diff / 1000)
+            minutes = int(seconds / 60)
+            hour = int(minutes / 60)
+            team.time = f"{hour}:{minutes%60:02d}:{seconds%60:02d}"
+
+            team.points_nfc = ", ".join(str(p) for p in team.points_nfc)
+            team.points_photo = ", ".join(str(p) for p in team.points_photo)
+
+            team.summ_after_penalty = team.summ_both - team.penalty
+
+        teams_ = sorted(
+            teams_, key=lambda x: (x.place, x.category, -x.summ_both, x.time_diff)
+        )
+
+        context = {
+            "race": race,
+            "teams": teams_,
+            "show_category": True,
+        }
+        return render(request, "teams_result.html", context)
+
+
 class TeamPointsView(View):
     def get(self, request, team_id):
         team = Team.objects.filter(id=team_id).first()
