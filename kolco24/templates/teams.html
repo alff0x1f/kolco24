@@ -102,6 +102,8 @@
                                                 (<a href="/admin/website/team/{{ team.id }}/change/">id{{ team.id }}</a>)
                                                 <a href="/team/{{ team.paymentid }}"><i class="icon-pencil ml-1"></i></a>
                                             {% endif %}
+                                            <br/>
+                                            {{ team.count }} точек, сумма {{ team.summ }}
                                         </td>
                                         {% if show_category %}<td>{{ team.category2.short_name }}</td>{% endif %}
                                         <td>{{ team.city|default:"-" }}</td>
@@ -116,6 +118,8 @@
                                         <td>
                                             {% if team.paid_people != team.ucount %}
                                             ({{ team.paid_people|floatformat }}/{{ team.ucount }})
+                                            {% else %}
+                                            {{ team.paid_people |floatformat }}
                                             {% endif %}
                                             <!-- Button trigger modal -->
                                             {#                                    <button type="button" class="btn btn-sm btn-outline-primary" data-toggle="modal"#}

@@ -1130,6 +1130,29 @@ class TeamsView(View):
             "start_number",
             "id",
         )
+        points = ControlPoint.objects.filter(year=2023, cost__gte=0)
+        cost = {}
+        for p in points:
+            cost[p.number] = p.cost
+
+        for team in teams_:
+            summ = 0
+            count = 0
+            take_points = (
+                TakenKP.objects.filter(team=team.id)
+                .exclude(nfc="")
+                .distinct("point_number")
+                .order_by("point_number")
+            )
+            for p in take_points:
+                summ += cost[p.point_number]
+                count += 1
+
+            team.summ = summ
+            team.count = count
+
+        teams_ = sorted(teams_, key=lambda x: -x.summ)
+
         context = {
             "race": race,
             "category": category,
@@ -1138,6 +1161,120 @@ class TeamsView(View):
             "show_category": False,
         }
         return render(request, "teams.html", context)
+
+
+class TeamsViewCsv(View):
+    def get(self, request, race_id, category_id, *args, **kwargs):
+        try:
+            race = Race.objects.annotate(
+                people_count=Sum("category__team__paid_people")
+            ).get(id=race_id)
+            category = Category.active_objects.get(race_id=race_id, id=category_id)
+        except (Race.DoesNotExist, Category.DoesNotExist):
+            # page not found
+            raise Http404("File not found.")
+        categories = (
+            Category.active_objects.filter(race_id=race_id)
+            .order_by("order", "id")
+            .annotate(
+                team_count=Subquery(
+                    Team.objects.filter(category2=OuterRef("id"), paid_people__gt=0)
+                    .values("category2")
+                    .annotate(count=Count("id"))
+                    .values("count")[:1]
+                )
+            )
+        )
+        teams_ = Team.objects.filter(
+            category="6h", paid_people__gt=0, year=2023
+        ).order_by(
+            "start_number",
+            "id",
+        )
+        points = ControlPoint.objects.filter(year=2023, cost__gte=0)
+        cost = {}
+        for p in points:
+            cost[p.number] = p.cost
+
+        for team in teams_:
+            team.points_nfc = []
+            summ_nfc = 0
+            count_nfc = 0
+            nfc_points = (
+                TakenKP.objects.filter(team=team.id, timestamp__gt=1697223600000)
+                .exclude(nfc="")
+                .distinct("point_number")
+                .order_by("point_number")
+            )
+            for p in nfc_points:
+                if cost[p.point_number]:
+                    summ_nfc += cost[p.point_number]
+                    count_nfc += 1
+                    team.points_nfc.append(p.point_number)
+            team.summ_nfc = summ_nfc
+            team.count_nfc = count_nfc
+
+            # PHOTO
+            team.points_photo = []
+            summ_photo = 0
+            count_photo = 0
+            photo_points = (
+                TakenKP.objects.filter(team=team.id, timestamp__gt=1697223600000)
+                .exclude(image_url="")
+                .distinct("point_number")
+                .order_by("point_number")
+            )
+            for p in photo_points:
+                if cost[p.point_number] and p.point_number not in team.points_nfc:
+                    summ_photo += cost[p.point_number]
+                    count_photo += 1
+                    team.points_photo.append(p.point_number)
+
+            team.summ_photo = summ_photo
+            team.count_photo = count_photo
+
+            # BOTH
+            team.points_both = []
+            summ_both = 0
+            count_both = 0
+            points_both = (
+                TakenKP.objects.filter(team=team.id, timestamp__gt=1697223600000)
+                .distinct("point_number")
+                .order_by("point_number")
+            )
+            for p in points_both:
+                if cost[p.point_number]:
+                    summ_both += cost[p.point_number]
+                    count_both += 1
+                    team.points_both.append(p.point_number)
+
+            team.summ_both = summ_both
+            team.count_both = count_both
+
+        teams_ = sorted(teams_, key=lambda x: -x.summ_both)
+
+        teams_csv = []
+        for team in teams_:
+            seconds = int((team.finish_time - team.start_time) / 1000)
+            minutes = int(seconds / 60)
+            hour = int(minutes / 60)
+            team_csv = [
+                str(team.start_number),
+                str(team.teamname),
+                str(team.points_nfc),
+                str(team.points_photo),
+                str(team.count_nfc),
+                str(team.count_photo),
+                str(team.summ_nfc),
+                str(team.summ_photo),
+                str(team.summ_both),
+                f"{hour}:{minutes%60:02d}:{seconds%60:02d}",
+            ]
+            team_str = ";".join(team_csv)
+            teams_csv.append(team_str)
+
+        result = "<br/>".join(teams_csv)
+        return HttpResponse(result)
 
 
 @user_passes_test(is_admin)
