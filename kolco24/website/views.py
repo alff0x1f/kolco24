@@ -1104,6 +1104,24 @@ class AllTeamsView(View):
         return render(request, "teams.html", context)
 
 
+class TeamPointsView(View):
+    def get(self, request, team_id):
+        team = Team.objects.filter(id=team_id).first()
+        nfc_points = (
+            TakenKP.objects.filter(team=team_id, timestamp__gt=1697223600000)
+            .exclude(nfc="")
+            .distinct("point_number")
+            .order_by("point_number")
+        )
+        seconds = int((team.finish_time - team.start_time) / 1000)
+        minutes = int(seconds / 60)
+        hour = int(minutes / 60)
+        time = (f"{hour}:{minutes%60:02d}:{seconds%60:02d}",)
+
+        context = {"team": team, "nfc_points": nfc_points, "time": time}
+        return render(request, "team_points.html", context)
+
+
 class TeamsView(View):
     def get(self, request, race_id, category_id, *args, **kwargs):
         try:
@@ -1165,26 +1183,6 @@ class TeamsView(View):
 
 class TeamsViewCsv(View):
     def get(self, request, race_id, category_id, *args, **kwargs):
-        try:
-            race = Race.objects.annotate(
-                people_count=Sum("category__team__paid_people")
-            ).get(id=race_id)
-            category = Category.active_objects.get(race_id=race_id, id=category_id)
-        except (Race.DoesNotExist, Category.DoesNotExist):
-            # page not found
-            raise Http404("File not found.")
-        categories = (
-            Category.active_objects.filter(race_id=race_id)
-            .order_by("order", "id")
-            .annotate(
-                team_count=Subquery(
-                    Team.objects.filter(category2=OuterRef("id"), paid_people__gt=0)
-                    .values("category2")
-                    .annotate(count=Count("id"))
-                    .values("count")[:1]
-                )
-            )
-        )
         teams_ = Team.objects.filter(
             category="6h", paid_people__gt=0, year=2023
         ).order_by(

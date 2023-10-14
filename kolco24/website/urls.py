@@ -19,6 +19,7 @@ urlpatterns = [
     path("team_admin", views.team_admin, name="team_admin"),
     path("teams", views.teams, name="teams"),
     path("race/<race_id>/teams", views.AllTeamsView.as_view(), name="all_teams"),
+    path("team/<team_id>/points", views.TeamPointsView.as_view(), name="all_teams"),
     path(
         "race/<race_id>/category/<category_id>/teams",
         views.TeamsView.as_view(),
