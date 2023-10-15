@@ -1202,13 +1202,21 @@ class AllTeamsResultView(View):
             hour = int(minutes / 60)
             team.time = f"{hour}:{minutes%60:02d}:{seconds%60:02d}"
 
+            if team.dist == "6h" and minutes > 6 * 60:
+                team.penalty = minutes - 6 * 60
+            if team.dist == "12h" and minutes > 12 * 60:
+                team.penalty = minutes - 12 * 60
+            if team.dist == "25h" and minutes > 25 * 60:
+                team.penalty = minutes - 25 * 60
+
             team.points_nfc = ", ".join(str(p) for p in team.points_nfc)
             team.points_photo = ", ".join(str(p) for p in team.points_photo)
 
             team.summ_after_penalty = team.summ_both - team.penalty
 
         teams_ = sorted(
-            teams_, key=lambda x: (x.place, x.category, -x.summ_both, x.time_diff)
+            teams_,
+            key=lambda x: (x.place, x.category, -x.summ_after_penalty, x.time_diff),
         )
 
         context = {
