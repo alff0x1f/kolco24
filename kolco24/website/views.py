@@ -367,9 +367,9 @@ def my_team(request, teamid="", template="my_team"):
     if not paymentid:
         return HttpResponseRedirect("/teams")
 
-    if request.user.is_superuser:
-        team_form_admin = TeamFormAdmin(None)
-        team_form_admin.init_vals(request.user, teamid)
+    # if request.user.is_superuser:
+    #     team_form_admin = TeamFormAdmin(None)
+    #     team_form_admin.init_vals(request.user, teamid)
 
     cost_now = PaymentsYa.get_cost()
 
@@ -381,10 +381,6 @@ def my_team(request, teamid="", template="my_team"):
         other_teams = Team.objects.filter(owner=request.user, year=2023).exclude(
             paymentid=paymentid
         )
-        if main_team.start_time:
-            main_team.start_time += timedelta(hours=5)
-        if main_team.finish_time:
-            main_team.finish_time += timedelta(hours=5)
         teams_count, _ = Team.get_info()
         # история платежей
         payments = Payment.objects.filter(team=main_team, status="done")
@@ -409,8 +405,8 @@ def my_team(request, teamid="", template="my_team"):
             "b": main_team.paid_sum,
             "payback_sum": main_team.paid_sum * 0.92,
         }
-        if request.user.is_superuser:
-            context["team_form_admin"] = team_form_admin
+        # if request.user.is_superuser:
+        #     context["team_form_admin"] = team_form_admin
         return render(request, "website/%s.html" % template, context)
     elif request.method == "POST" and team_form.is_valid():
         if team_form.access_possible(request.user):
@@ -1211,18 +1207,17 @@ class AllTeamsResultView(View):
 class TeamPointsView(View):
     def get(self, request, team_id):
         team = Team.objects.filter(id=team_id).first()
-        nfc_points = (
+        photo_points = (
             TakenKP.objects.filter(team=team_id, timestamp__gt=1697223600000)
-            .exclude(nfc="")
-            .distinct("point_number")
-            .order_by("point_number")
+            .distinct("image_url")
+            .order_by("image_url")
         )
         seconds = int((team.finish_time - team.start_time) / 1000)
         minutes = int(seconds / 60)
         hour = int(minutes / 60)
         time = (f"{hour}:{minutes%60:02d}:{seconds%60:02d}",)
 
-        context = {"team": team, "nfc_points": nfc_points, "time": time}
+        context = {"team": team, "photo_points": photo_points, "time": time}
         return render(request, "team_points.html", context)
 
 
