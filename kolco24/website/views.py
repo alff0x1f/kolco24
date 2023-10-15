@@ -1213,11 +1213,21 @@ class AllTeamsResultView(View):
             team.points_photo = ", ".join(str(p) for p in team.points_photo)
 
             team.summ_after_penalty = team.summ_both - team.penalty
+            if team.category == "6h":
+                team.category = "06h"
 
         teams_ = sorted(
             teams_,
-            key=lambda x: (x.place, x.category, -x.summ_after_penalty, x.time_diff),
+            key=lambda x: (x.category, -x.summ_after_penalty, x.time_diff),
         )
+        category = ""
+        counter = 1
+        for team in teams_:
+            if category != team.category:
+                counter = 1
+                category = team.category
+            team.place = counter
+            counter += 1
 
         context = {
             "race": race,
