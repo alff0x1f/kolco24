@@ -68,6 +68,7 @@ urlpatterns = [
     ),
     path("payments/<int:pk>/up", views.PaymentUp.as_view(), name="payment-up"),
     path("payments/<int:pk>/down", views.PaymentDown.as_view(), name="payment-down"),
+    path("newpoint/<int:pk>/", views.new_point, name="new_point"),
     # app api
     path("api/v1/races", views.RaceView.as_view(), name="api_races"),
     path("api/v1/points", views.points, name="api_points"),

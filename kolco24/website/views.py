@@ -604,6 +604,21 @@ class PaymentDown(View):
         )
 
 
+def new_point(request, pk):
+    if request.method == "POST":
+        points = request.POST.get("points")
+        for point in points.split(","):
+            TakenKP.objects.create(
+                team_id=pk,
+                point_number=point.lstrip().rstrip(),
+                image_url="manual",
+                status="new",
+                timestamp=int(datetime.now().timestamp()) * 1000,
+                year=2023,
+            )
+    return HttpResponseRedirect("/race/1/teams_result")
+
+
 def paymentinfo(request):
     if request.method == "POST":
         new_payment_id = request.POST["paymentid"]
@@ -1209,8 +1224,9 @@ class TeamPointsView(View):
         team = Team.objects.filter(id=team_id).first()
         photo_points = (
             TakenKP.objects.filter(team=team_id, timestamp__gt=1697223600000)
-            .distinct("image_url")
-            .order_by("image_url")
+            .exclude(image_url="")
+            .distinct("point_number", "image_url")
+            .order_by("point_number")
         )
         seconds = int((team.finish_time - team.start_time) / 1000)
         minutes = int(seconds / 60)
