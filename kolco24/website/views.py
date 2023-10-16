@@ -1118,12 +1118,10 @@ class AllTeamsView(View):
 class AllTeamsResultView(View):
     def get(self, request, race_id, category_id=None):
         try:
-            race = Race.objects.annotate(
-                people_count=Sum("category__team__paid_people"),
-            ).get(id=race_id)
+            race = Race.objects.get(id=race_id)
         except Race.DoesNotExist:
             # page not found
-            raise Http404("File not found.")
+            raise Http404(f"Гонка {race_id} не найдена.")
 
         teams_ = Team.objects.filter(
             category2__race_id=race_id, paid_people__gt=0

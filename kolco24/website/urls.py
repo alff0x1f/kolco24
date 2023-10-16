@@ -19,11 +19,11 @@ urlpatterns = [
     path("team_admin", views.team_admin, name="team_admin"),
     path("teams", views.teams, name="teams"),
     path("race/<race_id>/teams", views.AllTeamsView.as_view(), name="all_teams"),
-    path(
-        "race/<race_id>/teams_result",
-        views.AllTeamsResultView.as_view(),
-        name="all_teams",
-    ),
+    # path(
+    #     "race/<race_id>/teams_result",
+    #     views.AllTeamsResultView.as_view(),
+    #     name="all_teams",
+    # ),
     path("team/<team_id>/points", views.TeamPointsView.as_view(), name="all_teams"),
     path(
         "race/<race_id>/category/<category_id>/teams",
@@ -31,7 +31,7 @@ urlpatterns = [
         name="teams2",
     ),
     path(
-        "race/<race_id>/category/<category_id>/results",
+        "race/<int:race_id>/category/<int:category_id>/results",
         views.AllTeamsResultView.as_view(),
         name="all_teams",
     ),
