@@ -31,6 +31,11 @@ urlpatterns = [
         name="teams2",
     ),
     path(
+        "race/<race_id>/category/<category_id>/results",
+        views.AllTeamsResultView.as_view(),
+        name="all_teams",
+    ),
+    path(
         "race/<race_id>/category/<category_id>/teams.csv",
         views.TeamsViewCsv.as_view(),
         name="teams2",
@@ -68,7 +73,7 @@ urlpatterns = [
     ),
     path("payments/<int:pk>/up", views.PaymentUp.as_view(), name="payment-up"),
     path("payments/<int:pk>/down", views.PaymentDown.as_view(), name="payment-down"),
-    path("newpoint/<int:pk>/", views.new_point, name="new_point"),
+    # path("newpoint/<int:pk>/", views.new_point, name="new_point"),
     # app api
     path("api/v1/races", views.RaceView.as_view(), name="api_races"),
     path("api/v1/points", views.points, name="api_points"),

@@ -1116,7 +1116,7 @@ class AllTeamsView(View):
 
 
 class AllTeamsResultView(View):
-    def get(self, request, race_id):
+    def get(self, request, race_id, category_id=None):
         try:
             race = Race.objects.annotate(
                 people_count=Sum("category__team__paid_people"),
@@ -1125,15 +1125,12 @@ class AllTeamsResultView(View):
             # page not found
             raise Http404("File not found.")
 
-        teams_ = (
-            Team.objects.filter(category2__race_id=race_id, paid_people__gt=0)
-            .select_related("category2")
-            .order_by(
-                "category2__order",
-                "start_number",
-                "id",
-            )
-        )
+        teams_ = Team.objects.filter(
+            category2__race_id=race_id, paid_people__gt=0
+        ).select_related("category2")
+
+        if category_id:
+            teams_ = teams_.filter(category2_id=category_id)
 
         points = ControlPoint.objects.filter(year=2023, cost__gte=0)
         cost = {}
@@ -1229,10 +1226,15 @@ class AllTeamsResultView(View):
             team.place = counter
             counter += 1
 
+        category = None
+        if category_id:
+            category = Category.objects.filter(id=category_id).first()
+
         context = {
             "race": race,
             "teams": teams_,
             "show_category": True,
+            "category": category,
         }
         return render(request, "teams_result.html", context)
 

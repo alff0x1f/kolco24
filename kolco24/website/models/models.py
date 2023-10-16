@@ -193,6 +193,14 @@ class Team(models.Model):
     def __str__(self):  # __str__ on Python 3
         return self.start_number.__str__() + " " + self.teamname.__str__()
 
+    @property
+    def start_time_date(self):
+        return datetime.datetime.fromtimestamp(self.start_time / 1000)
+
+    @property
+    def finish_time_date(self):
+        return datetime.datetime.fromtimestamp(self.finish_time / 1000)
+
     def new_team(self, user, dist, ucount):
         # print(user, dist)
         if user.is_authenticated:
