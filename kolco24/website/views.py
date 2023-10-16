@@ -1204,7 +1204,7 @@ class AllTeamsResultView(View):
                 team.penalty = minutes - 6 * 60
             if team.dist == "12h" and minutes > 12 * 60:
                 team.penalty = minutes - 12 * 60
-            if team.dist == "25h" and minutes > 25 * 60:
+            if team.dist == "24h" and minutes > 25 * 60:
                 team.penalty = minutes - 25 * 60
 
             team.points_nfc = ", ".join(str(p) for p in team.points_nfc)

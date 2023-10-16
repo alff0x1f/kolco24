@@ -16,107 +16,111 @@
                             <span>{{ category.description }}</span>
                             <p>Предварительные результаты, могут быть скорректированы после полной проверки фотографий
                                 и состава участников по бумажным заявкам</p>
-                        </div>
+                            </div>
                     {% endif %}
                     {% if teams %}
                         <div class="col mb-2">
-                            <table class="table align-items-center table-sm">
-                                <thead>
-                                <tr>
-                                    <th scope="col">#</th>
-                                    <th scope="col">Название</th>
-                                    {% if show_category %}
-                                        <th scope="col">Категория</th>{% endif %}
-                                    <th scope="col">Кол-во</th>
-                                    <th scope="col">Метки</th>
-                                    <th scope="col">Фото</th>
-                                    <th scope="col">Балл</th>
-                                    <th scope="col">Старт/ Финиш</th>
-                                    <th scope="col">Время</th>
-                                    <th scope="col">Штраф</th>
-                                    <th scope="col">Итог</th>
-                                </tr>
-                                </thead>
-                                <tbody>
-                                {% for team in teams %}
-                                    <tr class="text-small">
-                                        <td> {% if team.place %}{{ team.place }} {% else %}-{% endif %}</td>
-                                        <td>{{ team.start_number }} {{ team.teamname }} {% if not team.teamname %}Без
-                                            названия {{ team.id }} (
-                                            {{ team.owner.last_name }} {{ team.owner.first_name }}) {% endif %}
-                                            {#                                            {% if user.is_superuser %}#}
-                                            {#                                                (<a href="/admin/website/team/{{ team.id }}/change/">id{{ team.id }}</a>#}
-                                            {#                                                )#}
-                                            {#                                            {% endif %}#}
-                                            ({{ team.members }})
-                                        </td>
+                            <div class="table-responsive">
+                                <table class="table align-items-center table-sm table-striped">
+                                    <thead>
+                                    <tr>
+                                        <th scope="col">#</th>
+                                        <th scope="col">Название</th>
                                         {% if show_category %}
-                                            <td>{{ team.category2.short_name }}</td>{% endif %}
-                                        <td>
-                                            {% if team.paid_people != team.ucount %}
-                                                ({{ team.paid_people|floatformat }}/{{ team.ucount }})
-                                            {% else %}
-                                                {{ team.paid_people |floatformat }}
-                                            {% endif %}
-                                            <!-- Button trigger modal -->
-                                            {#                                    <button type="button" class="btn btn-sm btn-outline-primary" data-toggle="modal"#}
-                                            {#                                            data-target="#exampleModalCenter">#}
-                                            {#                                        Подать заявку#}
-                                            {#                                    </button>#}
-                                            <!-- Modal
-                                            <div class="dropdown d-inline-block">
-                                                <button class="btn btn-sm btn-outline-primary dropdown-toggle dropdown-toggle-no-arrow"
-                                                        type="button" id="dropdownMenuButton-1" data-toggle="dropdown"
-                                                        aria-haspopup="true" aria-expanded="false">
-                                                    <i class="icon-dots-three-horizontal"></i>
-                                                </button>
-                                                <div class="dropdown-menu dropdown-menu-sm"
-                                                     aria-labelledby="dropdownMenuButton"
-                                                     x-placement="top-start"
-                                                     style="position: absolute; transform: translate3d(1202px, 412px, 0px); top: 0px; left: 0px;">
-                                                    <a class="dropdown-item"
-                                                       href="app-collection-table-alternative.html#">Download</a>
-                                                    <a class="dropdown-item"
-                                                       href="app-collection-table-alternative.html#">Share</a>
-                                                    <a class="dropdown-item"
-                                                       href="app-collection-table-alternative.html#">Comment</a>
-                                                    <div class="dropdown-divider"></div>
-                                                    <a class="dropdown-item"
-                                                       href="app-collection-table-alternative.html#">Delete</a>
-                                                </div>
-                                            </div>
-                                            -->
-                                        </td>
-                                        <td>
-                                            {{ team.points_nfc }}
-                                        </td>
-                                        <td>
-                                            {{ team.points_photo }}
-                                            {#                                            <a href="/team/{{ team.id }}/points"><i class="icon-pencil ml-1"></i></a>#}
-                                        </td>
-                                        <td>
-                                            {{ team.summ_both }}
-                                        </td>
-                                        <td>{{ team.start_time_date |date:"H:i:s" }}
-                                            {{ team.finish_time_date |date:"H:i:s" }}</td>
-                                        <td>
-                                            {{ team.time }}
-                                        </td>
-                                        <td>
-                                            {% if team.penalty %} {{ team.penalty }}
-                                            {% else %}
-                                                -
-                                            {% endif %}
-                                        </td>
-                                        <td>
-                                            {{ team.summ_after_penalty }}
-                                        </td>
-
+                                            <th scope="col">Категория</th>{% endif %}
+                                        <th scope="col">Человек</th>
+                                        <th scope="col" style="min-width: 120px">Метки</th>
+                                        <th scope="col" style="min-width: 120px">Фото</th>
+                                        <th scope="col">Балл</th>
+                                        <th scope="col">Старт/ Финиш</th>
+                                        <th scope="col">Время</th>
+                                        <th scope="col">Штраф</th>
+                                        <th scope="col">Итог</th>
                                     </tr>
-                                {% endfor %}
+                                    </thead>
+                                    <tbody>
+                                    {% for team in teams %}
+                                        <tr class="text-small">
+                                            <td> {% if team.place %}{{ team.place }} {% else %}-{% endif %}</td>
+                                            <td>{{ team.start_number }} {{ team.teamname }} {% if not team.teamname %}
+                                                Без
+                                                названия {{ team.id }} (
+                                                {{ team.owner.last_name }} {{ team.owner.first_name }}) {% endif %}
+                                                {#                                            {% if user.is_superuser %}#}
+                                                {#                                                (<a href="/admin/website/team/{{ team.id }}/change/">id{{ team.id }}</a>#}
+                                                {#                                                )#}
+                                                {#                                            {% endif %}#}
+                                                ({{ team.members }})
+                                            </td>
+                                            {% if show_category %}
+                                                <td>{{ team.category2.short_name }}</td>{% endif %}
+                                            <td>
+                                                {% if team.paid_people != team.ucount %}
+                                                    ({{ team.paid_people|floatformat }}/{{ team.ucount }})
+                                                {% else %}
+                                                    {{ team.paid_people |floatformat }}
+                                                {% endif %}
+                                                <!-- Button trigger modal -->
+                                                {#                                    <button type="button" class="btn btn-sm btn-outline-primary" data-toggle="modal"#}
+                                                {#                                            data-target="#exampleModalCenter">#}
+                                                {#                                        Подать заявку#}
+                                                {#                                    </button>#}
+                                                <!-- Modal
+                                                <div class="dropdown d-inline-block">
+                                                    <button class="btn btn-sm btn-outline-primary dropdown-toggle dropdown-toggle-no-arrow"
+                                                            type="button" id="dropdownMenuButton-1" data-toggle="dropdown"
+                                                            aria-haspopup="true" aria-expanded="false">
+                                                        <i class="icon-dots-three-horizontal"></i>
+                                                    </button>
+                                                    <div class="dropdown-menu dropdown-menu-sm"
+                                                         aria-labelledby="dropdownMenuButton"
+                                                         x-placement="top-start"
+                                                         style="position: absolute; transform: translate3d(1202px, 412px, 0px); top: 0px; left: 0px;">
+                                                        <a class="dropdown-item"
+                                                           href="app-collection-table-alternative.html#">Download</a>
+                                                        <a class="dropdown-item"
+                                                           href="app-collection-table-alternative.html#">Share</a>
+                                                        <a class="dropdown-item"
+                                                           href="app-collection-table-alternative.html#">Comment</a>
+                                                        <div class="dropdown-divider"></div>
+                                                        <a class="dropdown-item"
+                                                           href="app-collection-table-alternative.html#">Delete</a>
+                                                    </div>
+                                                </div>
+                                                -->
+                                            </td>
+                                            <td>
+                                                {{ team.points_nfc }}
+                                            </td>
+                                            <td>
+                                                {{ team.points_photo }}
+                                                {#                                            <a href="/team/{{ team.id }}/points"><i class="icon-pencil ml-1"></i></a>#}
+                                            </td>
+                                            <td>
+                                                {{ team.summ_both }}
+                                            </td>
+                                            <td>{{ team.start_time_date |date:"H:i:s" }}
+                                                {{ team.finish_time_date |date:"H:i:s" }}</td>
+                                            <td>
+                                                {{ team.time }}
+                                            </td>
+                                            <td>
+                                                {% if team.penalty %} {{ team.penalty }}
+                                                {% else %}
+                                                    -
+                                                {% endif %}
+                                            </td>
+                                            <td>
+                                                {{ team.summ_after_penalty }}
+                                            </td>
 
-                                </tbody>
-                            </table>
+                                        </tr>
+                                    {% endfor %}
+
+                                    </tbody>
+                                </table>
+
+                            </div>
                         </div>
                     {% else %}
                         <div class="col mb-2">
