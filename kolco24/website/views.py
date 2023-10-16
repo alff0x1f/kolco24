@@ -1197,7 +1197,10 @@ class AllTeamsResultView(View):
             seconds = int(team.time_diff / 1000)
             minutes = int(seconds / 60)
             hour = int(minutes / 60)
-            team.time = f"{hour}:{minutes%60:02d}:{seconds%60:02d}"
+            if team.time_diff:
+                team.time = f"{hour}:{minutes%60:02d}:{seconds%60:02d}"
+            else:
+                team.time = "-"
 
             if team.dist == "6h" and minutes > 6 * 60:
                 team.penalty = minutes - 6 * 60

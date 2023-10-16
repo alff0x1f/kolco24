@@ -195,10 +195,14 @@ class Team(models.Model):
 
     @property
     def start_time_date(self):
+        if not self.start_time:
+            return
         return datetime.datetime.fromtimestamp(self.start_time / 1000)
 
     @property
     def finish_time_date(self):
+        if not self.finish_time:
+            return
         return datetime.datetime.fromtimestamp(self.finish_time / 1000)
 
     def new_team(self, user, dist, ucount):
