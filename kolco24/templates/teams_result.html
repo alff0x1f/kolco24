@@ -34,7 +34,10 @@
                                         <th scope="col">#</th>
                                         <th scope="col">Название</th>
                                         {% if show_category %}
-                                            <th scope="col">Категория</th>{% endif %}
+                                            <th scope="col">Категория</th>
+                                        {% endif %}
+                                        <th>Клуб</th>
+                                        <th>Город</th>
                                         <th scope="col">Человек</th>
                                         <th scope="col" style="min-width: 120px">Метки</th>
                                         <th scope="col" style="min-width: 120px">Фото</th>
@@ -60,7 +63,10 @@
                                                 ({{ team.members }})
                                             </td>
                                             {% if show_category %}
-                                                <td>{{ team.category2.short_name }}</td>{% endif %}
+                                                <td>{{ team.category2.short_name }}</td>
+                                            {% endif %}
+                                            <td>{{ team.organization }}</td>
+                                            <td>{{ team.city }}</td>
                                             <td>
                                                 {% if team.paid_people != team.ucount %}
                                                     ({{ team.paid_people|floatformat }}/{{ team.ucount }})
