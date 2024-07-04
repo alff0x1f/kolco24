@@ -901,7 +901,7 @@ class TeamsTimesView(View):
                     team.save(update_fields=fields)
 
             return JsonResponse(
-                {"message": f"Teams times updated."},
+                {"message": "Teams times updated."},
                 status=200,
             )
 
