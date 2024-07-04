@@ -144,12 +144,12 @@ def login_by_key(request, login_key=""):
     return HttpResponseRedirect("/login")
 
 
-def logout_user(request):
-    """Logout user"""
-    if request.method == "POST" and request.POST.get("logout", "") == "logout":
-        if request.user.is_authenticated:
-            logout(request)
-    return HttpResponseRedirect("/")
+class LogoutUserView(View):
+    def post(self, request, *args, **kwargs):
+        if request.POST.get("logout", "") == "logout":
+            if request.user.is_authenticated:
+                logout(request)
+        return HttpResponseRedirect("/")
 
 
 def teams(request, template=""):

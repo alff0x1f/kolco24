@@ -1,4 +1,5 @@
 import pytest
+from django.contrib.auth.models import User
 from django.urls import reverse
 
 
@@ -16,3 +17,25 @@ def test_index_page(client):
 
     # Check the content of the index page
     assert "Кольцо24" in response.content.decode("utf-8")
+
+
+@pytest.mark.django_db
+def test_logout_user_view(client):
+    # Create a test user
+    user = User.objects.create_user(username="testuser", password="password")
+
+    # Log in the user
+    client.login(username="testuser", password="password")
+
+    # Ensure the user is authenticated
+    assert client.session["_auth_user_id"] == str(user.pk)
+
+    # Send a POST request to the logout view
+    response = client.post(reverse("logout"), {"logout": "logout"})
+
+    # Check that the response is a redirect
+    assert response.status_code == 302
+    assert response.url == "/"
+
+    # Ensure the user is logged out
+    assert "_auth_user_id" not in client.session

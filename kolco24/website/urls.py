@@ -14,7 +14,7 @@ urlpatterns = [
     path("passlogin", views.passlogin, name="passlogin"),
     path("login", views.login, name="login"),
     re_path("^login/(?P<login_key>[0-9a-f]{16})", views.login_by_key),
-    path("logout", views.logout_user, name="logout"),
+    path("logout", views.LogoutUserView.as_view(), name="logout"),
     path("team", views.my_team, name="my_team"),
     path("team_admin", views.team_admin, name="team_admin"),
     path("teams", views.teams, name="teams"),
