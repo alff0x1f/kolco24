@@ -92,16 +92,24 @@ def index_dummy(request):
     return render(request, "website/index_dummy.html")
 
 
-def passlogin(request):
-    if request.user.is_authenticated:
-        return HttpResponseRedirect("/")
-    form = LoginForm(request.POST or None)
-    if request.method == "POST" and form.is_valid():
-        user = form.authenticate_user()
-        auth_login(request, user)
-        return HttpResponseRedirect("/")
+class PassLoginView(View):
+    template = "website/passlogin.html"
 
-    return render(request, "website/passlogin.html", {"form": form})
+    def get(self, request, *args, **kwargs):
+        if request.user.is_authenticated:
+            return HttpResponseRedirect("/")
+        form = LoginForm()
+        return render(request, self.template, {"form": form})
+
+    def post(self, request, *args, **kwargs):
+        if request.user.is_authenticated:
+            return HttpResponseRedirect("/")
+        form = LoginForm(request.POST)
+        if form.is_valid():
+            user = form.authenticate_user()
+            auth_login(request, user)
+            return HttpResponseRedirect("/")
+        return render(request, self.template, {"form": form})
 
 
 def login(request):
