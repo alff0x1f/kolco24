@@ -153,9 +153,9 @@ def export_teams_pretty(googlekey=""):
         insert_range[4 + curr_line * fields_count].value = team.paid_people
         insert_range[7 + curr_line * fields_count].value = team.id
 
-        insert_range[
-            2 + (curr_line + 1) * fields_count
-        ].value = team.owner.profile.phone
+        insert_range[2 + (curr_line + 1) * fields_count].value = (
+            team.owner.profile.phone
+        )
 
         for member in members:
             insert_range[5 + curr_line * fields_count].value = (
