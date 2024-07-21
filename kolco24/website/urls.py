@@ -9,8 +9,8 @@ from . import views
 from .views import CancelPaymentView, ConfirmPaymentView
 
 urlpatterns = [
-    path("", views.index, name="index"),
-    path("index_hidden", views.index, name="index"),
+    path("", views.IndexView.as_view(), name="index"),
+    path("index_hidden", views.IndexView.as_view(), name="index"),
     path("passlogin", views.PassLoginView.as_view(), name="passlogin"),
     path("login", views.login, name="login"),
     re_path("^login/(?P<login_key>[0-9a-f]{16})", views.login_by_key),

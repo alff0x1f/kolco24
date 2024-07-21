@@ -105,6 +105,10 @@ class RegForm(forms.Form):
     ucount = forms.IntegerField()
     dist = forms.CharField()
 
+    def __init__(self, *args, **kwargs):
+        self.user = kwargs.pop("user", None)
+        super(RegForm, self).__init__(*args, **kwargs)
+
     def id_generator(
         self,
         size=8,
@@ -112,10 +116,7 @@ class RegForm(forms.Form):
     ):
         return "".join(random.choice(chars) for _ in range(size))
 
-    def set_user(self, user):
-        self.user = user
-
-    def reg_user(self):
+    def reg_user(self, request_user: User):
         first_name = self.cleaned_data["first_name"]
         last_name = self.cleaned_data["last_name"]
         phone = self.cleaned_data["phone"]
@@ -123,7 +124,7 @@ class RegForm(forms.Form):
         ucount = self.cleaned_data["ucount"]
         username = "%s %s" % (last_name, first_name)
 
-        if self.user.is_anonymous:
+        if request_user.is_anonymous:
             password = self.id_generator()
             email = self.cleaned_data["email"]
             while User.objects.filter(username=username).exists():
@@ -147,15 +148,15 @@ class RegForm(forms.Form):
                 team.new_team(user, dist, ucount)
             return user
         else:
-            self.user.first_name = first_name
-            self.user.last_name = last_name
-            self.user.profile.phone = phone
-            self.user.save()
-            team = Team.objects.filter(owner=self.user, year=2023)[:1]
+            request_user.first_name = first_name
+            request_user.last_name = last_name
+            request_user.profile.phone = phone
+            request_user.save()
+            team = Team.objects.filter(owner=request_user, year=2023)[:1]
             if not team and ucount > 1:
                 team = Team()
-                team.new_team(self.user, dist, ucount)
-        return self.user
+                team.new_team(request_user, dist, ucount)
+        return request_user
 
     def clean(self):
         # make invalid forms red:
@@ -167,14 +168,15 @@ class RegForm(forms.Form):
                     self.fields[f_name].widget.attrs["class"] = classes
             raise forms.ValidationError("Заполните все поля")
 
-        exist_user = User.objects.filter(email__iexact=self.cleaned_data["email"])[:1]
-        if exist_user:
-            team = Team.objects.filter(owner=exist_user, year=2023)
-            u_email = "@@@" if self.user.is_anonymous else self.user.email.lower()
-            if not team:
-                u_email = self.cleaned_data["email"].lower()
-            if self.cleaned_data["email"].lower() != u_email:
+        team = Team.objects.filter(
+            owner__email__iexact=self.cleaned_data["email"], year=2023
+        ).exists()
+        if team:
+            if self.user.is_anonymous:
                 raise forms.ValidationError("Такой email уже зарегистрирован.")
+            if self.cleaned_data["email"].lower() != self.user.email.lower():
+                raise forms.ValidationError("Такой email уже зарегистрирован.")
+        return super(RegForm, self).clean()
 
 
 def category2_from_dist(dist, ucount):

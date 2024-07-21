@@ -52,40 +52,51 @@ def is_admin(user):
     return user.is_superuser
 
 
-def index(request):
-    init_val = {}
-    myteams = []
-    free_athlets = 0
-    if request.user.is_authenticated:
-        init_val = {
-            "first_name": request.user.first_name,
-            "last_name": request.user.last_name,
-            "email": request.user.email,
-            "phone": request.user.profile.phone,
+class IndexView(View):
+    def get(self, request):
+        init_val = {}
+        if request.user.is_authenticated:
+            init_val = {
+                "first_name": request.user.first_name,
+                "last_name": request.user.last_name,
+                "email": request.user.email,
+                "phone": request.user.profile.phone,
+            }
+        contex = self.get_context()
+        contex["reg_form"] = RegForm(initial=init_val)
+        return render(request, "website/index.html", contex)
+
+    def post(self, request):
+        reg_form = RegForm(request.POST, user=request.user)
+        if reg_form.is_valid():
+            user = reg_form.reg_user(request.user)
+            auth_login(request, user)
+            return HttpResponseRedirect("/team")
+
+        contex = self.get_context()
+        contex["reg_form"] = reg_form
+
+        return render(request, "website/index.html", contex)
+
+    def get_context(self):
+        my_teams = []
+        free_athlets = 0
+        if self.request.user.is_authenticated:
+            my_teams = Team.objects.filter(owner=self.request.user, year=2023)
+            free_athlets = Athlet.objects.filter(
+                owner=self.request.user, team=None
+            ).count()
+
+        teams_count, members_count = Team.get_info()
+        return {
+            "cost": PaymentsYa.get_cost(),
+            "team_count": teams_count,
+            "people_count": int(members_count),
+            "myteams": my_teams,
+            "myteams_count": len(my_teams),
+            "free_athlet": free_athlets,
+            "reg_open": settings.REG_OPEN,
         }
-        myteams = Team.objects.filter(owner=request.user, year=2023)
-        free_athlets = Athlet.objects.filter(owner=request.user, team=None).count()
-    reg_form = RegForm(request.POST or None, initial=init_val)
-    reg_form.set_user(request.user)
-
-    if request.method == "POST" and reg_form.is_valid():
-        user = reg_form.reg_user()
-        auth_login(request, user)
-        return HttpResponseRedirect("/team")
-
-    teams_count, members_count = Team.get_info()
-
-    contex = {
-        "cost": PaymentsYa.get_cost(),
-        "reg_form": reg_form,
-        "team_count": teams_count,
-        "people_count": int(members_count),
-        "myteams": myteams,
-        "myteams_count": len(myteams),
-        "free_athlet": free_athlets,
-        "reg_open": settings.REG_OPEN,
-    }
-    return render(request, "website/index.html", contex)
 
 
 def index_dummy(request):
