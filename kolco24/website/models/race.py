@@ -16,6 +16,7 @@ class Race(Model):
     name = CharField("Название", max_length=50)
     code = CharField("Код", max_length=15, unique=True)
     date = DateField("Дата", default=timezone.now)
+    place = CharField("Место", max_length=50, default="")
     is_active = BooleanField("Активна", default=True)
 
     class Meta:
@@ -29,6 +30,14 @@ class Race(Model):
     def team_count(self):
         Team = apps.get_model("website", "Team")
         return len(Team.objects.filter(category2__race=self, paid_people__gt=0))
+
+    def people_count(self):
+        Team = apps.get_model("website", "Team")
+        return sum(
+            Team.objects.filter(category2__race=self).values_list(
+                "paid_people", flat=True
+            )
+        )
 
 
 class ActiveManager(Manager):
