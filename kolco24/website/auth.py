@@ -3,8 +3,9 @@ from django.contrib.auth.backends import ModelBackend
 
 
 class EmailBackend(ModelBackend):
-    """
-    Custom authentication backend that allows users to authenticate using email instead of username.
+    """Custom authentication backend that allows users to authenticate using email.
+
+    instead of username
     """
 
     def authenticate(self, request, username=None, password=None, **kwargs):
