@@ -57,25 +57,33 @@
                             </li>
                         </ul>
                     </div>
-                    <div class="card">
-                        <div class="card-body">
-                            <form>
-                                <div class="form-group">
-                                    <label for="exampleInputEmail">Адрес email</label>
-                                    <input type="email" class="form-control form-control-lg" id="exampleInputEmail"
-                                           placeholder="Введите email">
-                                </div>
-                                <div class="form-group">
-                                    <label for="exampleInputPassword">Пароль</label>
-                                    <input type="password" class="form-control form-control-lg"
-                                           id="exampleInputPassword" placeholder="Пароль">
-                                    <small>Нет пароля? <a href="#">Сбросить</a></small>
-                                </div>
-                                <button type="submit" class="btn btn-lg btn-success btn-block">Войти
-                                </button>
-                            </form>
+                    {% if not user.is_authenticated %}
+                        <div class="card">
+                            <div class="card-body">
+                                <form action="/passlogin" method="POST">
+                                    {% csrf_token %}
+                                    <div class="form-group">
+                                        {{ login_form.email.label_tag }}
+                                        {{ login_form.email }}
+                                    </div>
+                                    <div class="form-group">
+                                        {{ login_form.password.label_tag }}
+                                        {{ login_form.password }}
+                                        <small>Нет пароля? <a href="#">Сбросить</a></small>
+                                    </div>
+                                    <button type="submit" class="btn btn-lg btn-success btn-block">Войти
+                                    </button>
+                                </form>
+                                {% if messages %}
+                                    <ul class="alert alert-danger">
+                                        {% for message in messages %}
+                                            <li>{{ message }}</li>
+                                        {% endfor %}
+                                    </ul>
+                                {% endif %}
+                            </div>
                         </div>
-                    </div>
+                    {% endif %}
                     <div class="card">
                         <div class="card-header d-flex justify-content-between">
                             <div>
