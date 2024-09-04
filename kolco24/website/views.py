@@ -100,12 +100,15 @@ class IndexView(View):
         }
 
 
-class NewsView(View):
-    def get(self, request):
-        context = self.get_context()
+class RaceNewsView(View):
+    def get(self, request, race_id):
+        if not Race.objects.filter(id=race_id).exists():
+            raise Http404
+        context = self.get_context(race_id)
         return render(request, "website/news.html", context)
 
-    def get_context(self, race_id=1):
+    @staticmethod
+    def get_context(race_id):
         categories = (
             Category.active_objects.filter(race_id=race_id)
             .order_by("order", "id")
@@ -121,7 +124,7 @@ class NewsView(View):
         return {
             "race": Race.objects.filter(id=race_id).first(),
             "categories": categories,
-            "news_list": NewsPost.objects.all()[:5],
+            "news_list": NewsPost.objects.filter(race_id=race_id)[:5],
         }
 
 
