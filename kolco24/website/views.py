@@ -100,14 +100,19 @@ class IndexView(View):
         }
 
 
-class NewsView(View):
-    def get(self, request):
-        context = self.get_context()
+class RaceNewsView(View):
+    def get(self, request, race_id):
+        try:
+            race = Race.objects.get(id=race_id)
+        except Race.DoesNotExist:
+            raise Http404
+        context = self.get_context(race)
         return render(request, "website/news.html", context)
 
-    def get_context(self, race_id=1):
+    @staticmethod
+    def get_context(race: Race):
         categories = (
-            Category.active_objects.filter(race_id=race_id)
+            Category.active_objects.filter(race=race)
             .order_by("order", "id")
             .annotate(
                 team_count=Subquery(
@@ -119,9 +124,10 @@ class NewsView(View):
             )
         )
         return {
-            "race": Race.objects.filter(id=race_id).first(),
+            "race": race,
             "categories": categories,
-            "news_list": NewsPost.objects.all()[:5],
+            "links": race.links.order_by("-id"),
+            "news_list": NewsPost.objects.filter(race=race)[:10],
         }
 
 
