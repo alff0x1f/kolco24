@@ -7,10 +7,20 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ("website", "0034_add_place_to_race"),
+        ("website", "0033_alter_team"),
     ]
 
     operations = [
+        migrations.AddField(
+            model_name="race",
+            name="place",
+            field=models.CharField(default="", max_length=50, verbose_name="Место"),
+        ),
+        migrations.AlterField(
+            model_name="takenkp",
+            name="year",
+            field=models.IntegerField(default=2024),
+        ),
         migrations.CreateModel(
             name="NewsPost",
             fields=[
