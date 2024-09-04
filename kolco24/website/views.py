@@ -5,6 +5,8 @@ from decimal import Decimal
 from time import gmtime, strftime, time
 
 from django.conf import settings
+from django.contrib import messages
+from django.contrib.auth import authenticate
 from django.contrib.auth import login as auth_login
 from django.contrib.auth import logout
 from django.contrib.auth.decorators import login_required, user_passes_test
@@ -128,6 +130,7 @@ class RaceNewsView(View):
             "categories": categories,
             "links": race.links.order_by("-id"),
             "news_list": NewsPost.objects.filter(race=race)[:10],
+            "login_form": LoginForm(),
         }
 
 
@@ -149,9 +152,18 @@ class PassLoginView(View):
             return HttpResponseRedirect("/")
         form = LoginForm(request.POST)
         if form.is_valid():
-            user = form.authenticate_user()
-            auth_login(request, user)
-            return HttpResponseRedirect("/")
+            email = form.cleaned_data.get("email")
+            password = form.cleaned_data.get("password")
+
+            user = authenticate(request, username=email, password=password)
+
+            if user is not None:
+                auth_login(request, user)
+                return HttpResponseRedirect("/")
+            else:
+                messages.error(
+                    request, "Неправильный email или пароль. Попробуйте снова."
+                )
         return render(request, self.template, {"form": form})
 
 

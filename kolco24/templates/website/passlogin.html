@@ -29,6 +29,13 @@
                                                 {{ form.non_field_errors }}
                                         </div>
                                         {% endif%}
+                                        {% if messages %}
+                                            <ul class="alert alert-danger">
+                                                {% for message in messages %}
+                                                    <li>{{ message }}</li>
+                                                {% endfor %}
+                                            </ul>
+                                        {% endif %}
                                         <div class="text-center mt-3">
                                             <button type="submit" class="btn btn-lg btn-primary">Войти</button>
                                         </div>
