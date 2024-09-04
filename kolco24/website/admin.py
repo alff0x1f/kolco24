@@ -1,6 +1,8 @@
 from django.contrib import admin
+from django.utils.html import format_html
+from markdown import markdown
 
-from .models import ControlPoint, Payment, PaymentsYa, Race, TakenKP, Team
+from .models import ControlPoint, Payment, PaymentsYa, Race, TakenKP, Team, NewsPost
 from .models.race import Category
 
 
@@ -50,9 +52,39 @@ class RaceAdmin(admin.ModelAdmin):
 
 
 class CategoryAdmin(admin.ModelAdmin):
-    list_display = ("code", "name", "short_name", "order", "is_active")
+    list_display = ("id", "code", "name", "short_name", "order", "is_active")
     list_filter = ("race__name", "is_active")
     search_fields = ("code", "name")
+
+
+class NewsPostAdmin(admin.ModelAdmin):
+    list_display = ("title", "publication_date", "race", "created_at", "updated_at")
+    search_fields = ("title", "content")
+    list_filter = ("race", "publication_date")
+    readonly_fields = ("created_at", "updated_at", "content_html")
+
+    # Fieldsets for better organization in the admin form
+    fieldsets = (
+        (None, {"fields": ("title", "content", "content_html", "image", "race")}),
+        (
+            "Timestamps",
+            {
+                "fields": ("created_at", "updated_at"),
+            },
+        ),
+    )
+
+    # Customize the form to exclude content_html and show markdown preview
+    def save_model(self, request, obj, form, change):
+        # Render the markdown content to HTML before saving
+        obj.content_html = markdown(obj.content)
+        super().save_model(request, obj, form, change)
+
+    # Optionally, show the HTML content in the list view as a preview
+    def content_preview(self, obj):
+        return format_html(obj.content_html)
+
+    content_preview.short_description = "HTML Preview"
 
 
 admin.site.register(Team, TeamAdmin)
@@ -62,3 +94,4 @@ admin.site.register(PaymentsYa, PaymentsYaAdmin)
 admin.site.register(Payment, PaymentAdmin)
 admin.site.register(Race, RaceAdmin)
 admin.site.register(Category, CategoryAdmin)
+admin.site.register(NewsPost, NewsPostAdmin)

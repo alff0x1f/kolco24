@@ -9,5 +9,6 @@ from .models import (
     Team,
     TeamAdminLog,
 )
+from .news import NewsPost
 from .race import Race
 from .tag import PointTag
