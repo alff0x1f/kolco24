@@ -1,5 +1,5 @@
-from markdown import markdown
 from django.db import models
+from markdown import markdown
 
 
 class NewsPost(models.Model):

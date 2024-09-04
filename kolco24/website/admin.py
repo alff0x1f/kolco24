@@ -2,7 +2,7 @@ from django.contrib import admin
 from django.utils.html import format_html
 from markdown import markdown
 
-from .models import ControlPoint, Payment, PaymentsYa, Race, TakenKP, Team, NewsPost
+from .models import ControlPoint, NewsPost, Payment, PaymentsYa, Race, TakenKP, Team
 from .models.race import Category
 
 

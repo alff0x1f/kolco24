@@ -36,6 +36,7 @@ from website.models import (
     Athlet,
     ControlPoint,
     FastLogin,
+    NewsPost,
     Payment,
     PaymentLog,
     PaymentsYa,
@@ -43,7 +44,6 @@ from website.models import (
     Race,
     TakenKP,
     Team,
-    NewsPost,
 )
 from website.models.race import Category
 from website.sync_xlsx import import_file_xlsx
