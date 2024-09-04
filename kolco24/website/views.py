@@ -36,6 +36,7 @@ from website.models import (
     Athlet,
     ControlPoint,
     FastLogin,
+    NewsPost,
     Payment,
     PaymentLog,
     PaymentsYa,
@@ -96,6 +97,31 @@ class IndexView(View):
             "myteams_count": len(my_teams),
             "free_athlet": free_athlets,
             "reg_open": settings.REG_OPEN,
+        }
+
+
+class NewsView(View):
+    def get(self, request):
+        context = self.get_context()
+        return render(request, "website/news.html", context)
+
+    def get_context(self, race_id=1):
+        categories = (
+            Category.active_objects.filter(race_id=race_id)
+            .order_by("order", "id")
+            .annotate(
+                team_count=Subquery(
+                    Team.objects.filter(category2=OuterRef("id"), paid_people__gt=0)
+                    .values("category2")
+                    .annotate(count=Count("id"))
+                    .values("count")[:1]
+                )
+            )
+        )
+        return {
+            "race": Race.objects.filter(id=race_id).first(),
+            "categories": categories,
+            "news_list": NewsPost.objects.all()[:5],
         }
 
 

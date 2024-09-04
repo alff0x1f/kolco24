@@ -10,6 +10,7 @@ from .views import CancelPaymentView, ConfirmPaymentView
 
 urlpatterns = [
     path("", views.IndexView.as_view(), name="index"),
+    path("news", views.NewsView.as_view(), name="news"),
     path("index_hidden", views.IndexView.as_view(), name="index"),
     path("passlogin", views.PassLoginView.as_view(), name="passlogin"),
     path("login", views.login, name="login"),
