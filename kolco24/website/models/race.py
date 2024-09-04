@@ -40,6 +40,21 @@ class Race(Model):
         )
 
 
+class RaceLink(Model):
+    name = CharField("Название", max_length=50)
+    url = CharField("Ссылка", max_length=255)
+    race = ForeignKey(
+        "Race", related_name="links", verbose_name="Гонка", on_delete=CASCADE
+    )
+
+    def __str__(self):
+        return f"{self.id} - {self.name} ({self.race})"
+
+    class Meta:
+        verbose_name = "Ссылка"
+        verbose_name_plural = "Ссылки"
+
+
 class ActiveManager(Manager):
     def get_queryset(self):
         return super().get_queryset().filter(is_active=True)

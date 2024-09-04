@@ -85,10 +85,12 @@
                         </div>
                         <div class="card-body">
                             <ul class="list-unstyled list-spacing-sm">
-                                <li>
-                                    <i class="icon-text-document text-muted mr-1"></i>
-                                    <a href="https://docs.google.com/document/d/1M9_So0PvAG9ZpAPOj0rEU9gYgXDbFDic/edit">Правила</a>
-                                </li>
+                                {% for link in links %}
+                                    <li>
+                                        <i class="icon-text-document text-muted mr-1"></i>
+                                        <a href="{{ link.url }}">{{link.name}}</a>
+                                    </li>
+                                {% endfor %}
                             </ul>
                         </div>
                     </div>

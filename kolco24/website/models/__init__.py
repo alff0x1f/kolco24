@@ -10,5 +10,5 @@ from .models import (
     TeamAdminLog,
 )
 from .news import NewsPost
-from .race import Race
+from .race import Race, RaceLink
 from .tag import PointTag
