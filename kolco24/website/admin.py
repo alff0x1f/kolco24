@@ -3,7 +3,7 @@ from django.utils.html import format_html
 from markdown import markdown
 
 from .models import ControlPoint, NewsPost, Payment, PaymentsYa, Race, TakenKP, Team
-from .models.race import Category
+from .models.race import Category, RaceLink
 
 
 class TeamAdmin(admin.ModelAdmin):
@@ -51,6 +51,11 @@ class RaceAdmin(admin.ModelAdmin):
     search_fields = ("name", "code")
 
 
+class RaceLinkAdmin(admin.ModelAdmin):
+    list_display = ("id", "name", "url")
+    list_filter = ("race",)
+
+
 class CategoryAdmin(admin.ModelAdmin):
     list_display = ("id", "code", "name", "short_name", "order", "is_active")
     list_filter = ("race__name", "is_active")
@@ -95,3 +100,4 @@ admin.site.register(Payment, PaymentAdmin)
 admin.site.register(Race, RaceAdmin)
 admin.site.register(Category, CategoryAdmin)
 admin.site.register(NewsPost, NewsPostAdmin)
+admin.site.register(RaceLink, RaceLinkAdmin)
