@@ -44,63 +44,11 @@
                     <div class="collapse navbar-collapse justify-content-between" id="navbarNav">
                         <ul class="navbar-nav">
                             <li class="nav-item">
-                                <a href="/#about" class="nav-link">О рогейне</a>
-                            </li>
-                            <li class="nav-item dropdown">
-                                <a class="nav-link dropdown-toggle" href="#" id="pagesDropdown" role="button" data-toggle="dropdown">Дистанции</a>
-                                <div class="dropdown-menu" aria-labelledby="pagesDropdown">
-                                    <a class="dropdown-item" href="/#distances">
-                                        <span class="h6 mb-0">«Неспешная река»</span>
-                                        <p class="text-small text-muted">6 часов / 2-3 человека</p>
-                                    </a>
-
-                                    <div class="dropdown-divider"></div>
-
-
-                                    <a class="dropdown-item" href="/#distances">
-                                        <span class="h6 mb-0">«Идущий в закат»</span>
-                                        <p class="text-small text-muted">12 часов / 2 и 4-6 человек</p>
-                                    </a>
-
-                                    <div class="dropdown-divider"></div>
-
-
-                                    <a class="dropdown-item" href="/#distances">
-                                        <span class="h6 mb-0">«Долгий рассвет»</span>
-                                        <p class="text-small text-muted">24 часа / 4-6 человек</p>
-                                    </a>
-
-
-                                </div>
+                                <a href="https://docs.google.com/document/d/1i1-bM0YqD51ifcVXFqwtvoiILHqkLdOo/edit" class="nav-link">Правила</a>
                             </li>
                             <li class="nav-item">
-                                <a href="https://docs.google.com/document/d/1M9_So0PvAG9ZpAPOj0rEU9gYgXDbFDic/edit" class="nav-link">Правила</a>
+                                <a href="/race/2/teams" class="nav-link">Команды</a>
                             </li>
-{#                            <li class="nav-item dropdown">#}
-{#                                <a class="nav-link dropdown-toggle" href="#" id="componentsDropdown" role="button" data-toggle="dropdown">Инфо</a>#}
-{#                                <div class="dropdown-menu" aria-labelledby="componentsDropdown">#}
-{##}
-{#                                    <a class="dropdown-item" href="https://docs.google.com/document/d/1RJ4mEY_FtqUR3n5tTR9eCOhLUnkCkK2dWFPzQiMZkXg/edit" target="_blank">Положение</a>#}
-{##}
-{#                                    <a class="dropdown-item" href="/#schedule">Программа</a>#}
-{##}
-{#                                </div>#}
-{#                            </li>#}
-                            <li class="nav-item">
-                                <a href="/race/1/teams" class="nav-link">Команды </a>
-                            </li>
-                        {% if user.is_superuser %}
-                            <li class="nav-item">
-                                <a href="/teams_predstart" class="nav-link">Заявки</a>
-                            </li>
-                            <li class="nav-item">
-                                <a href="/teams_start" class="nav-link">Старты</a>
-                            </li>
-                            <li class="nav-item">
-                                <a href="/teams_finish" class="nav-link">Финиш</a>
-                            </li>
-                            {% else %}
-                            {% endif %}
                         </ul>
 
                         <ul class="navbar-nav">
