@@ -3,10 +3,10 @@ import string
 from datetime import timedelta
 
 from django import forms
+from django.contrib.auth.forms import PasswordResetForm, SetPasswordForm
 from django.contrib.auth.models import User
 from website.models import Athlet, Team, TeamAdminLog
 from website.models.race import Category, Race
-from django.contrib.auth.forms import PasswordResetForm, SetPasswordForm
 
 
 class LoginForm(forms.Form):

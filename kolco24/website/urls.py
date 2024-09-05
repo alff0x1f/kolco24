@@ -9,10 +9,10 @@ from . import views
 from .views import (
     CancelPaymentView,
     ConfirmPaymentView,
-    CustomPasswordResetView,
-    CustomPasswordResetDoneView,
-    CustomPasswordResetConfirmView,
     CustomPasswordResetCompleteView,
+    CustomPasswordResetConfirmView,
+    CustomPasswordResetDoneView,
+    CustomPasswordResetView,
 )
 
 urlpatterns = [
