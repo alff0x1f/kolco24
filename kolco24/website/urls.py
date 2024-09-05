@@ -1,5 +1,6 @@
 from django.conf import settings
 from django.conf.urls.static import static
+from django.shortcuts import redirect
 from django.urls import include, path, re_path
 from wagtail import urls as wagtail_urls
 from wagtail.admin import urls as wagtailadmin_urls
@@ -16,7 +17,7 @@ from .views import (
 )
 
 urlpatterns = [
-    path("", views.IndexView.as_view(), name="index"),
+    path("", lambda request: redirect("race", race_id=2), name="index"),
     path("index_hidden", views.IndexView.as_view(), name="index"),
     # auth
     path("password_reset/", CustomPasswordResetView.as_view(), name="password_reset"),
