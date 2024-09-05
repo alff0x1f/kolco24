@@ -84,7 +84,7 @@ def import_file_start(ws, finish=False):
                     int(start_time[4:6]),
                 )
                 start_datetime[team_number] = d - timedelta(hours=5)
-            except:
+            except Exception:
                 return True, "Неправильное время и дата '%s' '%s' в строке %s" % (
                     start_date,
                     start_time,

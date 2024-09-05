@@ -22,13 +22,14 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v1
         with:
-          python-version: 3.8
+          python-version: 3.9
 
       - name: Install Python dependencies
         run: pip install -r requirements-linters.txt
 
       - name: Run linters
         run: |
+          ruff check kolco24
           isort kolco24 --check-only
           black kolco24 --check
           flake8 kolco24
