@@ -1,3 +1,9 @@
+from .auth import (
+    CustomPasswordResetCompleteView,
+    CustomPasswordResetConfirmView,
+    CustomPasswordResetDoneView,
+    CustomPasswordResetView,
+)
 from .views_ import (
     AllTeamsResultView,
     AllTeamsView,

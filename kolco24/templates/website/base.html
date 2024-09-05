@@ -128,7 +128,7 @@
                             </li>
                             {% else %}
                             <li class="nav-item">
-                                <a href="/login" class="nav-link">Войти</a>
+                                <a href="{% url 'passlogin' %}" class="nav-link">Войти</a>
                             </li>
                             {% endif %}                        
                         </ul>
@@ -175,7 +175,7 @@
                                         <a href="/">Главная</a>
                                     </li>
                                     <li>
-                                        <a href="/login">Вход</a>
+                                        <a href="{% url 'passlogin' %}">Вход</a>
                                     </li>
                                     <li>
                                         {% comment %} <i class="icon-fingerprint"></i> {% endcomment %}

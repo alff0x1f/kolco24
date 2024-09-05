@@ -6,6 +6,7 @@ from django import forms
 from django.contrib.auth.models import User
 from website.models import Athlet, Team, TeamAdminLog
 from website.models.race import Category, Race
+from django.contrib.auth.forms import PasswordResetForm, SetPasswordForm
 
 
 class LoginForm(forms.Form):
@@ -27,6 +28,40 @@ class LoginForm(forms.Form):
             }
         ),
         label="Пароль:",
+    )
+
+
+class CustomPasswordResetForm(PasswordResetForm):
+    email = forms.EmailField(
+        widget=forms.EmailInput(
+            attrs={
+                "class": "form-control form-control-lg",
+                "placeholder": "Введите email",
+            }
+        ),
+        label="Адрес email:",
+    )
+
+
+class CustomSetPasswordForm(SetPasswordForm):
+    new_password1 = forms.CharField(
+        label="Новый пароль",
+        widget=forms.PasswordInput(
+            attrs={
+                "class": "form-control form-control-lg",
+                "placeholder": "Введите новый пароль",
+            }
+        ),
+    )
+
+    new_password2 = forms.CharField(
+        label="Подтвердите новый пароль",
+        widget=forms.PasswordInput(
+            attrs={
+                "class": "form-control form-control-lg",
+                "placeholder": "Подтвердите новый пароль",
+            }
+        ),
     )
 
 
