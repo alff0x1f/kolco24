@@ -85,7 +85,7 @@ class IndexView(View):
         my_teams = []
         free_athlets = 0
         if self.request.user.is_authenticated:
-            my_teams = Team.objects.filter(owner=self.request.user, year=2023)
+            my_teams = Team.objects.filter(owner=self.request.user, year=2024)
             free_athlets = Athlet.objects.filter(
                 owner=self.request.user, team=None
             ).count()
@@ -98,6 +98,19 @@ class IndexView(View):
             "myteams": my_teams,
             "myteams_count": len(my_teams),
             "free_athlet": free_athlets,
+            "reg_open": settings.REG_OPEN,
+        }
+
+
+class RegisterView(View):
+    def get(self, request):
+        if request.user.is_authenticated:
+            return HttpResponseRedirect("/")
+        return render(request, "website/register.html", self.get_context())
+
+    def get_context(self):
+        return {
+            "reg_form": RegForm(),
             "reg_open": settings.REG_OPEN,
         }
 
@@ -219,61 +232,61 @@ def teams(request, template=""):
     teams = [
         {
             "teams": Team.objects.filter(
-                dist="6h", year="2023", category="", paid_people__gt=0
+                dist="6h", year="2024", category="", paid_people__gt=0
             ).order_by("start_number", "id"),
             "dist_name": "6ч",
         },
         {
             "teams": Team.objects.filter(
-                dist="12h", year="2023", category="", paid_people__gt=0
+                dist="12h", year="2024", category="", paid_people__gt=0
             ).order_by("start_number", "id"),
             "dist_name": "12ч",
         },
         {
             "teams": Team.objects.filter(
-                dist="24h", year="2023", category="", paid_people__gt=0
+                dist="24h", year="2024", category="", paid_people__gt=0
             ).order_by("start_number", "id"),
             "dist_name": "25ч",
         },
         {
             "teams": Team.objects.filter(
-                category="24h", year="2023", paid_people__gt=0
+                category="24h", year="2024", paid_people__gt=0
             ).order_by("start_number", "id"),
             "dist_name": '"Хождение по мукам" (24ч, 4-6 человек)',
         },
         {
             "teams": Team.objects.filter(
-                category="12h_team", year="2023", paid_people__gt=0
+                category="12h_team", year="2024", paid_people__gt=0
             ).order_by("start_number", "id"),
             "dist_name": '"Горе от ума" (12ч, 4-6 человек)',
         },
         {
             "teams": Team.objects.filter(
-                category="12h_mw", year="2023", paid_people__gt=0
+                category="12h_mw", year="2024", paid_people__gt=0
             ).order_by("start_number", "id"),
             "dist_name": '"Горе от ума" (12ч, МЖ)',
         },
         {
             "teams": Team.objects.filter(
-                category="12h_ww", year="2023", paid_people__gt=0
+                category="12h_ww", year="2024", paid_people__gt=0
             ).order_by("start_number", "id"),
             "dist_name": '"Горе от ума" (12ч, ЖЖ)',
         },
         {
             "teams": Team.objects.filter(
-                category="12h_mm", year="2023", paid_people__gt=0
+                category="12h_mm", year="2024", paid_people__gt=0
             ).order_by("start_number", "id"),
             "dist_name": '"Горе от ума" (12ч, ММ)',
         },
         {
             "teams": Team.objects.filter(
-                category="6h", year="2023", paid_people__gt=0
+                category="6h", year="2024", paid_people__gt=0
             ).order_by("start_number", "id"),
             "dist_name": '"Денискины рассказы" (6ч, 2-3 человека)',
         },
         # {
-        #     'teams': Team.objects.filter(year='2023').order_by('start_number'),
-        #     'dist_name': 'Кольцо 2023'
+        #     'teams': Team.objects.filter(year='2024').order_by('start_number'),
+        #     'dist_name': 'Кольцо 2024'
         # },
         # {
         #     'teams': Team.objects.filter(year='10').order_by('start_number'),
@@ -284,7 +297,7 @@ def teams(request, template=""):
     if request.user.is_superuser:
         teams.append(
             {
-                "teams": Team.objects.filter(paid_people=0, year=2023),
+                "teams": Team.objects.filter(paid_people=0, year=2024),
                 "dist_name": "Неоплаченное",
             }
         )
@@ -303,7 +316,7 @@ def teams_start(request):
     teams = [
         {
             "teams": Team.objects.filter(
-                paid_sum__gt=1, category="6h", start_time__isnull=True, year=2023
+                paid_sum__gt=1, category="6h", start_time__isnull=True, year=2024
             ),
             "dist_name": "Дистанция 6ч",
         },
@@ -312,19 +325,19 @@ def teams_start(request):
                 paid_sum__gt=1,
                 category__startswith="12h",
                 start_time__isnull=True,
-                year=2023,
+                year=2024,
             ),
             "dist_name": "Дистанция 12ч",
         },
         {
             "teams": Team.objects.filter(
-                paid_sum__gt=1, category="24h", start_time__isnull=True, year=2023
+                paid_sum__gt=1, category="24h", start_time__isnull=True, year=2024
             ),
             "dist_name": "Дистанция 24ч",
         },
         {
             "teams": Team.objects.filter(
-                paid_sum__gt=1, start_time__isnull=False, year=2023
+                paid_sum__gt=1, start_time__isnull=False, year=2024
             ).order_by("start_time"),
             "dist_name": "Стартовавшие",
         },
@@ -346,7 +359,7 @@ def teams_finish(request):
     teams = [
         {
             "teams": Team.objects.filter(
-                paid_sum__gt=1, category="6h", finish_time__isnull=True, year=2023
+                paid_sum__gt=1, category="6h", finish_time__isnull=True, year=2024
             ).order_by("start_number"),
             "dist_name": "Дистанция 6ч",
         },
@@ -355,19 +368,19 @@ def teams_finish(request):
                 paid_sum__gt=1,
                 category__startswith="12h",
                 finish_time__isnull=True,
-                year=2023,
+                year=2024,
             ).order_by("start_number"),
             "dist_name": "Дистанция 12ч",
         },
         {
             "teams": Team.objects.filter(
-                paid_sum__gt=1, category="24h", finish_time__isnull=True, year=2023
+                paid_sum__gt=1, category="24h", finish_time__isnull=True, year=2024
             ).order_by("start_number"),
             "dist_name": "Дистанция 24ч",
         },
         {
             "teams": Team.objects.filter(
-                paid_sum__gt=1, finish_time__isnull=False, year=2023
+                paid_sum__gt=1, finish_time__isnull=False, year=2024
             ).order_by("finish_time"),
             "dist_name": "Финишировавшие",
         },
@@ -388,17 +401,17 @@ def teams_finish(request):
 def teams_protocol(request):
     teams = [
         {
-            "teams": Team.objects.filter(paid_sum__gt=1, category="6h", year=2023),
+            "teams": Team.objects.filter(paid_sum__gt=1, category="6h", year=2024),
             "dist_name": "Дистанция 6ч",
         },
         {
             "teams": Team.objects.filter(
-                paid_sum__gt=1, category__startswith="12h", year=2023
+                paid_sum__gt=1, category__startswith="12h", year=2024
             ),
             "dist_name": "Дистанция 12ч",
         },
         {
-            "teams": Team.objects.filter(paid_sum__gt=1, category="24h", year=2023),
+            "teams": Team.objects.filter(paid_sum__gt=1, category="24h", year=2024),
             "dist_name": "Дистанция 24ч",
         },
     ]
@@ -414,7 +427,7 @@ def teams_protocol(request):
 
 
 def success(request, teamid=""):
-    team = Team.objects.filter(paymentid=teamid, year=2023)[:1]
+    team = Team.objects.filter(paymentid=teamid, year=2024)[:1]
     if team:
         context = {
             "team": team[0],
@@ -440,8 +453,8 @@ def my_team(request, teamid="", template="my_team"):
         if teamid != paymentid:
             return HttpResponseRedirect("/team/%s" % paymentid)
 
-        main_team = Team.objects.get(paymentid=paymentid, year=2023)
-        other_teams = Team.objects.filter(owner=request.user, year=2023).exclude(
+        main_team = Team.objects.get(paymentid=paymentid, year=2024)
+        other_teams = Team.objects.filter(owner=request.user, year=2024).exclude(
             paymentid=paymentid
         )
         teams_count, _ = Team.get_info()
@@ -524,7 +537,7 @@ class NewPaymentView(View):
     def post(self, request):
         paymentid = request.POST.get("paymentid", "")
         try:
-            team = Team.objects.get(paymentid=paymentid, year=2023)
+            team = Team.objects.get(paymentid=paymentid, year=2024)
         except Team.DoesNotExist:
             raise Http404("Team not found")
 
@@ -677,7 +690,7 @@ def new_point(request, pk):
                 image_url="manual",
                 status="new",
                 timestamp=int(datetime.now().timestamp()) * 1000,
-                year=2023,
+                year=2024,
             )
     return HttpResponseRedirect("/race/1/teams_result")
 
@@ -813,7 +826,7 @@ def update_protocol(request):
     for tab in sheet_tabs:
         ws = wb[sheet_tabs[tab]]
         # export KP
-        cpoints = ControlPoint.objects.filter(year="2023").order_by("iterator")
+        cpoints = ControlPoint.objects.filter(year="2024").order_by("iterator")
         column = 14
         point_column = {}
         for p in cpoints:
@@ -823,7 +836,7 @@ def update_protocol(request):
             column += 1
         # export teams
         Team().update_places()
-        teams = Team.objects.filter(category=tab, year="2023").order_by(
+        teams = Team.objects.filter(category=tab, year="2024").order_by(
             "place", "start_number"
         )
         teams = [team for team in teams if team.paid_sum > 0]
@@ -872,7 +885,7 @@ def update_protocol(request):
             line += 1
 
     # Save the file
-    filename = "protokol2023.xlsx"
+    filename = "protokol2024.xlsx"
     wb.save(settings.PROTOCOL_DIR + filename)
     return render(
         request,
@@ -1011,7 +1024,7 @@ class PointTagsView(View):
 
     def get_point_by_number(self, point_number):
         try:
-            return ControlPoint.objects.get(number=point_number, year=2023)
+            return ControlPoint.objects.get(number=point_number, year=2024)
         except ControlPoint.DoesNotExist:
             return None
 
@@ -1019,7 +1032,7 @@ class PointTagsView(View):
 def points(request):
     """Возвращает список контрольных пунктов"""
     control_points = (
-        ControlPoint.objects.filter(year=2023)
+        ControlPoint.objects.filter(year=2024)
         .order_by("number")
         .values("id", "number", "description", "cost")
     )
@@ -1040,7 +1053,7 @@ def teams_api(request):
     """Возвращает список команд"""
     query_params = request.GET.get("category", "")
     teams = (
-        Team.objects.filter(year=2023, paid_people__gt=0)
+        Team.objects.filter(year=2024, paid_people__gt=0)
         .order_by("id")
         .values(
             "id",
@@ -1193,7 +1206,7 @@ class AllTeamsResultView(View):
         if category_id:
             teams_ = teams_.filter(category2_id=category_id)
 
-        points = ControlPoint.objects.filter(year=2023, cost__gte=0)
+        points = ControlPoint.objects.filter(year=2024, cost__gte=0)
         cost = {}
         for p in points:
             cost[p.number] = p.cost
@@ -1347,7 +1360,7 @@ class TeamsView(View):
             "start_number",
             "id",
         )
-        points = ControlPoint.objects.filter(year=2023, cost__gte=0)
+        points = ControlPoint.objects.filter(year=2024, cost__gte=0)
         cost = {}
         for p in points:
             cost[p.number] = p.cost
@@ -1383,12 +1396,12 @@ class TeamsView(View):
 class TeamsViewCsv(View):
     def get(self, request, race_id, category_id, *args, **kwargs):
         teams_ = Team.objects.filter(
-            category="6h", paid_people__gt=0, year=2023
+            category="6h", paid_people__gt=0, year=2024
         ).order_by(
             "start_number",
             "id",
         )
-        points = ControlPoint.objects.filter(year=2023, cost__gte=0)
+        points = ControlPoint.objects.filter(year=2024, cost__gte=0)
         cost = {}
         for p in points:
             cost[p.number] = p.cost
@@ -1479,7 +1492,7 @@ def payment_list(request):
     # select related team to avoid additional queries
     payments = (
         Payment.objects.select_related("team", "team__owner")
-        .filter(team__year=2023)
+        .filter(team__year=2024)
         .order_by("-order", "-id")
     )
 

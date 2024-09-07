@@ -107,6 +107,12 @@ class RegForm(forms.Form):
         ),
         label="Телефон",
     )
+    password = forms.CharField(
+        widget=forms.PasswordInput(
+            attrs={"class": "form-control", "placeholder": "Введите пароль"}
+        ),
+        label="Пароль",
+    )
     ucount = forms.IntegerField()
     dist = forms.CharField()
 
@@ -259,13 +265,13 @@ class TeamForm(forms.Form):
     def init_vals(self, user, paymentid=""):
         team = None
         if paymentid:
-            team = Team.objects.filter(owner=user, paymentid=paymentid, year=2023)[:1]
+            team = Team.objects.filter(owner=user, paymentid=paymentid, year=2024)[:1]
             if not team and user.is_superuser:
-                team = Team.objects.filter(paymentid=paymentid, year=2023)[:1]
+                team = Team.objects.filter(paymentid=paymentid, year=2024)[:1]
             if not team:
                 return False
         else:
-            team = Team.objects.filter(owner=user, year=2023)[:1]
+            team = Team.objects.filter(owner=user, year=2024)[:1]
         if not team:
             # free_athlet = Athlet.objects.filter(owner=user, team=None)[:1]
             # if free_athlet:

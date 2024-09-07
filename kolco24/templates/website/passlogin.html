@@ -13,7 +13,7 @@
                                     <span>Введите свои данные</span>
                                 </div>
                                 <div class="row no-gutters justify-content-center">
-                                    <form action="/passlogin" method="POST" class="text-left col-lg-8">
+                                    <form action="/passlogin/" method="POST" class="text-left col-lg-8">
                                         <div class="form-group">
                                             {{ form.email.label_tag }}
                                             {{ form.email }}
@@ -21,7 +21,7 @@
                                         <div class="form-group">
                                             {{ form.password.label_tag }}
                                             {{ form.password }}
-                                            <small>Забыли или не знаете пароль? <a href="/password_reset">Восстановить </a>
+                                            <small>Забыли или не знаете пароль? <a href="/password_reset/">Восстановить </a>
                                             </small>
                                         </div>
                                         {% if form.non_field_errors %}
@@ -46,7 +46,7 @@
                             </div>
                         </div>
                         <div class="text-center">
-                            <span class="text-small">Не регистрировались? <a href="/">Зарегистрироваться</a>
+                            <span class="text-small">Не регистрировались? <a href="{% url 'register' %}">Зарегистрироваться</a>
                             </span>
                         </div>
                     </div>
