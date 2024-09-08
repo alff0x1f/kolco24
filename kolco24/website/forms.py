@@ -113,15 +113,15 @@ class RegForm(forms.Form):
         ),
         label="Пароль",
     )
-    ucount = forms.IntegerField()
-    dist = forms.CharField()
+    ucount = forms.IntegerField(required=False)
+    dist = forms.CharField(required=False)
 
     def __init__(self, *args, **kwargs):
         self.user = kwargs.pop("user", None)
         super(RegForm, self).__init__(*args, **kwargs)
 
+    @staticmethod
     def id_generator(
-        self,
         size=8,
         chars=string.ascii_uppercase + string.digits + string.ascii_lowercase,
     ):
@@ -179,14 +179,10 @@ class RegForm(forms.Form):
                     self.fields[f_name].widget.attrs["class"] = classes
             raise forms.ValidationError("Заполните все поля")
 
-        team = Team.objects.filter(
-            owner__email__iexact=self.cleaned_data["email"], year=2023
-        ).exists()
-        if team:
-            if self.user.is_anonymous:
-                raise forms.ValidationError("Такой email уже зарегистрирован.")
-            if self.cleaned_data["email"].lower() != self.user.email.lower():
-                raise forms.ValidationError("Такой email уже зарегистрирован.")
+        if Team.objects.filter(
+            owner__email__iexact=self.cleaned_data["email"], year=2024
+        ).exists():
+            raise forms.ValidationError("Такой email уже зарегистрирован.")
         return super(RegForm, self).clean()
 
 

@@ -11,7 +11,7 @@
                     </div>
                     <div class="row justify-content-center">
                         <div class="col-12 col-lg-9">
-                            <form>
+                            <form action="{% url 'register' %}" method="POST">
                                 {% csrf_token %}
                                 <div class="form-row form-group">
                                     <div class="col">
@@ -44,6 +44,12 @@
                                         {{ reg_form.password }}
                                     </div>
                                 </div>
+                                <!-- Non-field form errors -->
+                                {% if reg_form.non_field_errors %}
+                                    <div class="alert alert-danger">
+                                        {{ reg_form.non_field_errors }}
+                                    </div>
+                                {% endif %}
                                 <div class="form-row form-group">
                                     <div class="col">
                                         <button class="btn btn-block btn-success btn-lg" type="submit">Создать аккаунт

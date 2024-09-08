@@ -10,6 +10,7 @@ from django.contrib.auth import authenticate
 from django.contrib.auth import login as auth_login
 from django.contrib.auth import logout
 from django.contrib.auth.decorators import login_required, user_passes_test
+from django.contrib.auth.models import User
 from django.core.files.storage import FileSystemStorage
 from django.db.models import Count, OuterRef, Subquery, Sum
 from django.http import Http404, HttpResponse, HttpResponseRedirect, JsonResponse
@@ -107,6 +108,63 @@ class RegisterView(View):
         if request.user.is_authenticated:
             return HttpResponseRedirect("/")
         return render(request, "website/register.html", self.get_context())
+
+    def post(self, request):
+        form = RegForm(request.POST)
+        if form.is_valid():
+            # Extract cleaned form data
+            first_name = form.cleaned_data["first_name"]
+            last_name = form.cleaned_data["last_name"]
+            email = form.cleaned_data["email"]
+            phone = form.cleaned_data["phone"]
+            password = form.cleaned_data["password"]
+
+            # Check if user already exists
+            if User.objects.filter(email=email).exists():
+                # update
+                if Team.objects.filter(
+                    owner__email__iexact=form.cleaned_data["email"], year=2024
+                ).exists():
+                    # по идее эта проверка лишняя, тк аналогичная есть is_valid,
+                    # но на всякий случай (рефактора)
+                    form.add_error(
+                        None, "Пользователь с таким email уже зарегистрирован"
+                    )
+                    return render(request, "website/register.html", {"reg_form": form})
+
+                user = User.objects.get(email=email)
+                user.first_name = first_name
+                user.last_name = last_name
+                user.profile.phone = phone
+                user.set_password(password)
+                user.save()
+                auth_login(request, user)
+                return HttpResponseRedirect("/")
+
+            username = f"{last_name}, {first_name}"
+            if User.objects.filter(username=username).exists():
+                username = self.get_next_username(first_name, last_name)
+
+            user = User.objects.create_user(username, email, password)
+            user.first_name = first_name
+            user.last_name = last_name
+            user.profile.phone = phone
+            user.save(update_fields=("first_name", "last_name"))
+
+            user = form.reg_user(request.user)
+            auth_login(request, user)
+            return HttpResponseRedirect("/")
+
+        return render(request, "website/register.html", {"reg_form": form})
+
+    @staticmethod
+    def get_next_username(first_name, last_name):
+        i = 2
+        new_username = f"{last_name}, {first_name} {i}"
+        while User.objects.filter(username=new_username).exists():
+            i += 1
+            new_username = f"{last_name}, {first_name} {i}"
+        return new_username
 
     def get_context(self):
         return {
