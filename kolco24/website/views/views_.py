@@ -1,4 +1,5 @@
 import json
+import random
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
@@ -1247,6 +1248,38 @@ class AllTeamsView(View):
             "show_category": True,
         }
         return render(request, "teams.html", context)
+
+
+class AddTeam(View):
+    def get(self, request, race_id):
+        form = TeamForm(race_id)
+        return render(
+            request, "website/add_team.html", {"race_id": race_id, "team_form": form}
+        )
+
+    def post(self, request, race_id):
+        category2_id = request.POST.get("category2_id")
+        category2 = Category.objects.filter(id=category2_id).first()
+        if not category2:
+            return JsonResponse({"error": "Category not found"}, status=404)
+
+        data = request.POST.copy()
+        data["dist"] = category2.code
+        data["paymentid"] = "%016x" % random.randrange(16**16)  # legacy
+        form = TeamForm(race_id, data)
+        if form.is_valid():
+            # save team
+            team = Team.objects.create(
+                year=2024,
+                owner_id=request.user.id,
+                **form.cleaned_data,
+            )
+            team.save()
+            return HttpResponseRedirect("/teams")
+
+        return render(
+            request, "website/add_team.html", {"race_id": race_id, "team_form": form}
+        )
 
 
 class AllTeamsResultView(View):

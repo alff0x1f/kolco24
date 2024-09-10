@@ -5,6 +5,7 @@ from .auth import (
     CustomPasswordResetView,
 )
 from .views_ import (
+    AddTeam,
     AllTeamsResultView,
     AllTeamsView,
     CancelPaymentView,
