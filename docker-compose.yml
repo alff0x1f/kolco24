@@ -5,7 +5,7 @@ services:
     container_name: kolco24_django
     restart: unless-stopped
     user: "1000:1000"
-    command: [ "gunicorn", "--bind", "0.0.0.0:8000", "kolco24.wsgi:application" ]
+    command: [ "gunicorn", "--bind", "0.0.0.0:8000", "kolco24.wsgi:application", "--access-logfile", "-", "--log-level", "info"]
     volumes:
       - ./kolco24:/app
     depends_on:
