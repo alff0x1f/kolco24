@@ -18,7 +18,7 @@ from .views import (
 
 urlpatterns = [
     path("", lambda request: redirect("race", race_id=2), name="index"),
-    path("index_hidden/", views.IndexView.as_view(), name="index"),
+    # path("index_hidden/", views.IndexView.as_view(), name="index"),
     # auth
     path("register/", views.RegisterView.as_view(), name="register"),
     path("password_reset/", CustomPasswordResetView.as_view(), name="password_reset"),

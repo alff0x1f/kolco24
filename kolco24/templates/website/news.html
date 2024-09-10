@@ -1,6 +1,36 @@
 {% extends "website/base.html" %}
 
 {% block content %}
+    <section class="bg-dark hide">
+        <img alt="Image" src="/static/images/backgrounds/header2024.jpg" class="bg-image opacity-70"/>
+        <div class="container">
+            <div class="row center justify-content-between">
+                <div class="col-12 col-md-6 col-lg-5">
+                    <img class="mx-auto d-none d-sm-block" style="width: 60%" src="/static/images/logo_big.png"
+                         alt="Кольцо 24 2024">
+                    <h3 class="text-center">11-13 октября 2024<br/> Белорецкий район, хр. Крака</h3>
+                </div>
+                <!--end of col-->
+
+                <div class="col-12 col-md-6 col-lg-5">
+                    <div class="card">
+                        {% if user.is_authenticated %}
+                            <div class="list-group m-3 list-group-flush">
+                                <a href="{% url 'add_team' race.id %}" class="btn btn-block btn-success">Добавить
+                                    новую команду</a>
+                            </div>
+                        {% else %}
+                            <div class="list-group m-3 list-group-flush">
+                                <a href="{% url 'register' %}" class="btn btn-block btn-success">Регистрация</a>
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            <!--end of row-->
+        </div>
+        <!--end of container-->
+    </section>
     <section>
         <div class="container">
             <div class="row justify-content-between">
@@ -137,7 +167,8 @@
                             <!-- end of categories -->
                             {% if user.is_authenticated %}
                                 <div class="list-group m-3 list-group-flush">
-                                    <a href="{% url 'add_team' race.id %}" class="btn btn-block btn-secondary">Добавить новую команду</a>
+                                    <a href="{% url 'add_team' race.id %}" class="btn btn-block btn-secondary">Добавить
+                                        новую команду</a>
                                 </div>
                             {% endif %}
                         </div>
