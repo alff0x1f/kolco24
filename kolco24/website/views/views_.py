@@ -1342,16 +1342,16 @@ class TeamPayment(View):
             raise Http404("Not found")
 
         cost_now = PaymentsYa.get_cost()
-        cost = (team.ucount - team.paid_people) * cost_now
-        if cost < 0:
-            cost = 0
+        payment_amount = (team.ucount - team.paid_people) * cost_now
+        if payment_amount < 0:
+            payment_amount = 0
 
         payment = Payment.objects.create(
             owner=request.user.is_authenticated,
             team=team,
             payment_method=payment_method,
-            payment_amount=cost,
-            payment_with_discount=cost,
+            payment_amount=payment_amount,
+            payment_with_discount=payment_amount,
             cost_per_person=cost_now,
             paid_for=int(team.ucount) - team.paid_people,
             additional_charge=team.additional_charge,
@@ -1362,7 +1362,6 @@ class TeamPayment(View):
         if not team:
             raise Http404("Team not found")
 
-        payment_amount = (team.ucount - team.paid_people) * PaymentsYa.get_cost()
         payment_method = request.GET.get("method", "visamc")
 
         if payment_method == "sberbank":
@@ -1372,7 +1371,7 @@ class TeamPayment(View):
                 context={
                     "team": team,
                     "id": payment.id,
-                    "payment_amount": cost,
+                    "payment_amount": payment_amount,
                     "phone": settings.SBERBANK_INFO["phone"],
                     "name": settings.SBERBANK_INFO["name"],
                     "today_date": strftime("%d.%m.%Y", gmtime()),
@@ -1385,12 +1384,13 @@ class TeamPayment(View):
                 context={
                     "team": team,
                     "id": payment.id,
-                    "payment_amount": cost,
+                    "payment_amount": payment_amount,
                     "phone": settings.SBERBANK_INFO["phone"],
                     "name": settings.SBERBANK_INFO["name"],
                     "today_date": strftime("%d.%m.%Y", gmtime()),
                 },
             )
+        raise Http404("Not found")
 
     def post(self, request, team_id):
         team = Team.objects.filter(id=team_id).first()
