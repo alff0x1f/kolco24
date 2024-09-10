@@ -19,6 +19,7 @@ from .views_ import (
     RaceNewsView,
     RaceView,
     RegisterView,
+    TeamPayment,
     TeamPointsView,
     TeamsTimesView,
     TeamsView,

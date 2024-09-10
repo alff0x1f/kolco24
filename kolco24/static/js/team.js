@@ -192,7 +192,7 @@ function new_payment(payment_method) {
     };
     $.ajax({
         type: 'POST',
-        url: '/api/v1/newpayment',
+        url: '/api/v1/newpayment/',
         data: payment_info,
         dataType: 'json',
         success: function (data) {

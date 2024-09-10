@@ -24,13 +24,13 @@
                         {% for payment in payments %}
                             <tr>
                                 <td id="order{{ payment.order }}">
-                                    <form id="upForm" action="/payments/{{ payment.id }}/up" method="post">
+                                    <form id="upForm" action="/payments/{{ payment.id }}/up/" method="post">
                                         {% csrf_token %}
                                         <button type="submit" class="btn btn-link p-0"><i class="icon-arrow-up"></i>
                                         </button>
                                     </form>
                                     <a href="/admin/website/payment/{{ payment.id }}/change/">{{ payment.order }}</a>
-                                    <form id="downForm" action="/payments/{{ payment.id }}/down" method="post">
+                                    <form id="downForm" action="/payments/{{ payment.id }}/down/" method="post">
                                         {% csrf_token %}
                                         <button type="submit" class="btn btn-link p-0"><i class="icon-arrow-down"></i>
                                         </button>
@@ -53,7 +53,7 @@
                                     {% if payment.status == "draft" or payment.status == "draft_with_info" %}
                                         {% if payment.payment_method == "sbp" or payment.payment_method == "sberbank" %}
                                             <div class="mb-2">
-                                                <form method="post" action="/payments/confirm/{{ payment.id }}">
+                                                <form method="post" action="/payments/confirm/{{ payment.id }}/">
                                                     {% csrf_token %}
                                                     <label>
                                                         <input class="form-control-sm" type="text" placeholder="Баланс"
@@ -62,7 +62,7 @@
                                                     <button type="submit" class="btn btn-success">Confirm</button>
                                                 </form>
                                             </div>
-                                            <form method="post" action="/payments/cancel/{{ payment.id }}">
+                                            <form method="post" action="/payments/cancel/{{ payment.id }}/">
                                                 {% csrf_token %}
                                                 <button type="submit" class="btn btn-warning">Cancel</button>
                                             </form>
@@ -72,7 +72,7 @@
                                         <br/>Ожидаемый: {{ estimate_balances|dict_key:payment.pk|floatformat }}
                                         {% if payment.balance == 0 and payment.status == "done" %}
                                             {% if payment.payment_method == "sbp" or payment.payment_method == "sberbank" %}
-                                                <form method="post" action="/payments/confirm/{{ payment.id }}">
+                                                <form method="post" action="/payments/confirm/{{ payment.id }}/">
                                                     {% csrf_token %}
                                                     <label>
                                                         <input class="form-control-sm" type="text" placeholder="Баланс"

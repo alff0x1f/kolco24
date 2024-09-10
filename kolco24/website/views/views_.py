@@ -16,6 +16,7 @@ from django.core.files.storage import FileSystemStorage
 from django.db.models import Count, OuterRef, Subquery, Sum
 from django.http import Http404, HttpResponse, HttpResponseRedirect, JsonResponse
 from django.shortcuts import render
+from django.urls import reverse
 from django.utils.decorators import method_decorator
 from django.views import View
 from django.views.decorators.csrf import csrf_exempt
@@ -1282,19 +1283,22 @@ class AddTeam(View):
             payment_method = request.GET.get("method", "visamc")
             cost_now = PaymentsYa.get_cost()
             cost = (int(team.ucount) - team.paid_people) * cost_now
+            if cost < 0:
+                cost = 0
 
-            payment = Payment.objects.create(
-                owner=request.user if request.user.is_authenticated else None,
-                team=team,
-                payment_method=payment_method,
-                payment_amount=cost,
-                payment_with_discount=cost,
-                cost_per_person=cost_now,
-                paid_for=int(team.ucount) - team.paid_people,
-                additional_charge=team.additional_charge,
-                status="draft",
-            )
             if payment_method in ("visamc", "yandexmoney"):
+                payment = Payment.objects.create(
+                    owner=request.user if request.user.is_authenticated else None,
+                    team=team,
+                    payment_method=payment_method,
+                    payment_amount=cost,
+                    payment_with_discount=cost,
+                    cost_per_person=cost_now,
+                    paid_for=int(team.ucount) - team.paid_people,
+                    additional_charge=team.additional_charge,
+                    status="draft",
+                )
+
                 paymenttype = "AC"
                 if payment_method == "yandexmoney":
                     paymenttype = "PC"
@@ -1309,11 +1313,96 @@ class AddTeam(View):
                         "sum": cost,
                     },
                 )
+            else:
+                # redirect
+                return HttpResponseRedirect(
+                    reverse("pay_team", args=[team.id]) + f"?method={payment_method}"
+                )
+
         return render(
             request,
             "website/add_team.html",
             {"race_id": race_id, "team_form": form, "cost": PaymentsYa.get_cost()},
         )
+
+
+class TeamPayment(View):
+    def get(self, request, team_id):
+        team = Team.objects.filter(id=team_id).first()
+        payment_method = request.GET.get("method")
+        if not team or payment_method not in ("sbp", "sberbank"):
+            raise Http404("Not found")
+
+        cost_now = PaymentsYa.get_cost()
+        cost = (team.ucount - team.paid_people) * cost_now
+        if cost < 0:
+            cost = 0
+
+        payment = Payment.objects.create(
+            owner=request.user if request.user.is_authenticated else None,
+            team=team,
+            payment_method=payment_method,
+            payment_amount=cost,
+            payment_with_discount=cost,
+            cost_per_person=cost_now,
+            paid_for=int(team.ucount) - team.paid_people,
+            additional_charge=team.additional_charge,
+            status="draft",
+        )
+
+        team = Team.objects.filter(id=team_id).first()
+        if not team:
+            raise Http404("Team not found")
+
+        payment_amount = (team.ucount - team.paid_people) * PaymentsYa.get_cost()
+        payment_method = request.GET.get("method", "visamc")
+
+        if payment_method == "sberbank":
+            return render(
+                request,
+                "website/sberbank.html",
+                context={
+                    "team": team,
+                    "id": payment.id,
+                    "payment_amount": cost,
+                    "phone": settings.SBERBANK_INFO["phone"],
+                    "name": settings.SBERBANK_INFO["name"],
+                    "today_date": strftime("%d.%m.%Y", gmtime()),
+                },
+            )
+        elif payment_method == "sbp":
+            return render(
+                request,
+                "website/sbp.html",
+                context={
+                    "team": team,
+                    "id": payment.id,
+                    "payment_amount": cost,
+                    "phone": settings.SBERBANK_INFO["phone"],
+                    "name": settings.SBERBANK_INFO["name"],
+                    "today_date": strftime("%d.%m.%Y", gmtime()),
+                },
+            )
+
+    def post(self, request, team_id):
+        team = Team.objects.filter(id=team_id).first()
+        if not team:
+            raise Http404("Team not found")
+
+        payment_id = request.POST.get("id")
+        payment = Payment.objects.filter(id=payment_id).first()
+
+        if payment and payment.status == "draft" and payment.owner == request.user:
+            payment.status = "draft_with_info"
+            payment.sender_card_number = (
+                request.POST["sender_card_number"] + " " + request.POST["payment_sum"]
+            )
+            pdate = datetime.strptime(request.POST["payment_date"], "%d.%m.%Y")
+            payment.payment_date = pdate
+            payment.save()
+
+            return render(request, "website/payment_process.html", {"team": team})
+        raise Http404("Not found")
 
 
 class AllTeamsResultView(View):
