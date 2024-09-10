@@ -234,7 +234,74 @@
                                 </div>
                             </li>
                         </ul>
+                        <div id="sidecolumn_paid">
+                            <div class="row mb-4 justify-content-between">
+                                <div class="col-6"><p><span id="paidfor_action">К оплате</span> <span
+                                        id="ucountlabel_all">за <span id="ucountlabel">1</span> чел.</span></p></div>
+                                <div class="col-6"><p class="text-right"><span id="sumlabel">1500</span> руб</p></div>
+                            </div>
+                            <div class="mb-2 text-center">
+                                <h4 class="h4 mb-2">Способы оплаты</h4>
+                                <div class="row">
+                                    <div class="col-6 col-xs-6 col-lg-3">
+                                        <div class="card">
+                                            <img alt="sber" class="card-img-top" src="/static/images/payments/sber.jpg">
+                                        </div>
+                                    </div>
+                                    <div class="col-6 col-xs-6 col-lg-3">
+                                        <div class="card">
+                                            <img alt="sbp" class="card-img-top" src="/static/images/payments/sbp.png">
+                                        </div>
+                                    </div>
+                                    <div class="col-6 col-xs-6 col-lg-3">
+                                        <div class="card">
+                                            <img alt="mir" class="card-img-top"
+                                                 src="/static/images/payments/visa-mastercard.jpg">
+                                        </div>
+                                    </div>
+                                    <div class="col-6 col-xs-6 col-lg-3">
+                                        <div class="card">
+                                            <img alt="yoomoney" class="card-img-top"
+                                                 src="/static/images/payments/yoomoney.png">
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
 
+                            <form class="d-flex flex-column" id="paymentmethod">
+                                <div class="custom-control custom-checkbox-switch">
+                                    <input id="radio_sber" name="radio" type="radio" value="sberbank"
+                                           class="custom-control-input" checked="">
+                                    <label class="custom-control-label" for="radio2">Перевод через
+                                        Сбербанк.Онлайн</label>
+                                </div>
+                                <div class="custom-control custom-checkbox-switch">
+                                    <input id="radio_sbp" name="radio" type="radio" value="sbp"
+                                           class="custom-control-input">
+                                    <label class="  custom-control-label" for="radio4">Перевод через систему быстрых
+                                        платежей</label>
+                                </div>
+                                <div class="custom-control custom-checkbox-switch">
+                                    <input id="radio_visamc" name="radio" type="radio" value="visamc"
+                                           class="custom-control-input">
+                                    <label class="custom-control-label" for="radio1">Картой Visa/Mastercard</label>
+                                </div>
+                                <div class="custom-control custom-checkbox-switch">
+                                    <input id="radio_yoomoney" name="radio" type="radio" value="yandexmoney"
+                                           class="custom-control-input">
+                                    <label class="custom-control-label" for="radio3">Yoomoney</label>
+                                </div>
+                            </form>
+                            <small>
+                                После нажатия на "Оплатить" слот на команду резервируется на 15 минут.
+                                При отсутствии поступления оплаты в течении 15 мин, бронь на слот снимается.
+                            </small>
+                            <div class="custom-control custom-checkbox-switch">
+                                <button type="button" class="btn btn-primary float-right mt-3" id="common_paid">
+                                    Оплатить
+                                </button>
+                            </div>
+                        </div>
                     </div>
                 </div>
                 <!--end of col-->
@@ -243,4 +310,82 @@
         </div>
         <!--end of container-->
     </section>
+{% endblock %}
+
+{% block footer_js_include %}
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            // Cache the DOM elements
+            const categorySelect = document.getElementById('id_category2_id');
+            const ucountSelect = document.getElementById('id_ucount');
+            const ucountlabel = document.getElementById('ucountlabel');
+            const sumlabel = document.getElementById('sumlabel')
+
+            // All athlete/birth field wrappers by id
+            const memberFields = {
+                3: document.getElementById('member3'),
+                4: document.getElementById('member4'),
+                5: document.getElementById('member5'),
+                6: document.getElementById('member6')
+            };
+
+            // Function to update the number of visible athlete fields based on ucount value
+            function updateAthleteFields() {
+                const ucount = parseInt(ucountSelect.value); // Get selected ucount
+                // Loop through all athlete/birth fields and hide/show based on ucount
+                for (let i = 3; i <= 6; i++) {
+                    if (i <= ucount) {
+                        memberFields[i].style.display = 'flex'; // Show the field
+                    } else {
+                        memberFields[i].style.display = 'none'; // Hide the field
+                    }
+                }
+                ucountlabel.textContent = ucount; // Update the ucount label
+                sumlabel.textContent = ({{cost  }} * ucount); // Update the sum label
+            }
+
+            // Function to update the ucount options based on the category selection
+            function updateUcountOptions() {
+                const selectedCategory = categorySelect.value;
+                ucountSelect.innerHTML = ''; // Clear current options
+
+                let ucountOptions = [];
+
+                // Set ucount options based on category
+                switch (selectedCategory) {
+                    case '8':
+                        ucountOptions = [2, 3];
+                        break;
+                    case '9':
+                    case '13':
+                        ucountOptions = [4, 5, 6];
+                        break;
+                    default:
+                        ucountOptions = [2]; // Default to 2 participants if category doesn't match
+                }
+
+                // Populate ucount options dynamically
+                ucountOptions.forEach(function (optionValue) {
+                    const option = document.createElement('option');
+                    option.value = optionValue.toString();
+                    option.textContent = optionValue.toString();
+                    ucountSelect.appendChild(option);
+                });
+
+                // Set the first option as selected and trigger the change event to update athlete fields
+                ucountSelect.value = ucountOptions[0].toString();
+                updateAthleteFields();
+            }
+
+            // Event listener for changing the category, update ucount if needed
+            categorySelect.addEventListener('change', updateUcountOptions);
+
+            // Event listener for changing ucount, hide/show athlete fields accordingly
+            ucountSelect.addEventListener('change', updateAthleteFields);
+
+            // Initial setup: Hide all athlete fields above 2 by default
+            updateUcountOptions();
+            updateAthleteFields(); // Set the initial visibility of athlete fields
+        });
+    </script>
 {% endblock %}

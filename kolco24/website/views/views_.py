@@ -1254,7 +1254,9 @@ class AddTeam(View):
     def get(self, request, race_id):
         form = TeamForm(race_id)
         return render(
-            request, "website/add_team.html", {"race_id": race_id, "team_form": form}
+            request,
+            "website/add_team.html",
+            {"race_id": race_id, "team_form": form, "cost": PaymentsYa.get_cost()},
         )
 
     def post(self, request, race_id):
@@ -1278,7 +1280,9 @@ class AddTeam(View):
             return HttpResponseRedirect("/teams")
 
         return render(
-            request, "website/add_team.html", {"race_id": race_id, "team_form": form}
+            request,
+            "website/add_team.html",
+            {"race_id": race_id, "team_form": form, "cost": PaymentsYa.get_cost()},
         )
 
 
