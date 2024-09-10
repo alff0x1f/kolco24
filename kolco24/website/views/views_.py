@@ -1253,6 +1253,8 @@ class AllTeamsView(View):
 
 class AddTeam(View):
     def get(self, request, race_id):
+        if not request.user.is_authenticated:
+            return HttpResponseRedirect(reverse("passlogin") + f"?next={request.path}")
         form = TeamForm(race_id)
         return render(
             request,
@@ -1261,6 +1263,9 @@ class AddTeam(View):
         )
 
     def post(self, request, race_id):
+        if not request.user.is_authenticated:
+            return HttpResponseRedirect(reverse("passlogin") + f"?next={request.path}")
+
         category2_id = request.POST.get("category2_id")
         category2 = Category.objects.filter(id=category2_id).first()
         if not category2:
@@ -1288,7 +1293,7 @@ class AddTeam(View):
 
             if payment_method in ("visamc", "yandexmoney"):
                 payment = Payment.objects.create(
-                    owner=request.user if request.user.is_authenticated else None,
+                    owner=request.user.is_authenticated,
                     team=team,
                     payment_method=payment_method,
                     payment_amount=cost,
@@ -1328,6 +1333,9 @@ class AddTeam(View):
 
 class TeamPayment(View):
     def get(self, request, team_id):
+        if not request.user.is_authenticated:
+            return HttpResponseRedirect(reverse("passlogin") + f"?next={request.path}")
+
         team = Team.objects.filter(id=team_id).first()
         payment_method = request.GET.get("method")
         if not team or payment_method not in ("sbp", "sberbank"):
@@ -1339,7 +1347,7 @@ class TeamPayment(View):
             cost = 0
 
         payment = Payment.objects.create(
-            owner=request.user if request.user.is_authenticated else None,
+            owner=request.user.is_authenticated,
             team=team,
             payment_method=payment_method,
             payment_amount=cost,
