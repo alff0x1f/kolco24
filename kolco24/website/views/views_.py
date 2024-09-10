@@ -1,4 +1,5 @@
 import json
+import logging
 import random
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
@@ -52,6 +53,8 @@ from website.models import (
 )
 from website.models.race import Category
 from website.sync_xlsx import import_file_xlsx
+
+logger = logging.getLogger(__name__)
 
 
 def is_admin(user):
@@ -809,6 +812,7 @@ def yandex_payment(request):
             # )
             return HttpResponse("Ok")
         else:
+            logger.warning(f"Yandex payment failed, {request.POST}")
             raise Http404("Wrong values")
     raise Http404("File not found.")
 

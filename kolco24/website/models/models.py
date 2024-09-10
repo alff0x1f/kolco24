@@ -1,5 +1,6 @@
 import datetime
 import hashlib
+import logging
 import random
 
 from django.conf import settings
@@ -7,6 +8,8 @@ from django.contrib.auth.models import User
 from django.db import models
 from django.db.models.signals import post_save
 from django.dispatch import receiver
+
+logger = logging.getLogger(__name__)
 
 
 class Profile(models.Model):
@@ -42,7 +45,7 @@ class PaymentsYa(models.Model):
     def get_cost():
         return 1500
 
-    def new_payment(self, d):
+    def new_payment(self, d: dict) -> bool:
         fields = [
             "notification_type",
             "operation_id",
@@ -53,7 +56,6 @@ class PaymentsYa(models.Model):
             "codepro",
             "label",
             "sha1_hash",
-            "withdraw_amount",
         ]
         for field in fields:
             if field not in d:
@@ -74,31 +76,28 @@ class PaymentsYa(models.Model):
         )
 
         hash = hashlib.sha1(s.encode("utf-8")).hexdigest()
-        if d["sha1_hash"] == hash:
-            self.notification_type = d["notification_type"]
-            self.operation_id = d["operation_id"]
-            self.amount = d["amount"]
-            self.currency = d["currency"]
-            self.datetime = d["datetime"]
-            self.sender = d["sender"]
-            if d["codepro"] == "false":
-                self.codepro = False
-            if d["codepro"] == "true":
-                self.codepro = True
-            self.label = d["label"]
-            self.sha1_hash = d["sha1_hash"]
+        if d["sha1_hash"] != hash:
+            logger.warning(f"sha1_hash not equal {d['sha1_hash']} != {hash}")
+            return False
 
-            self.withdraw_amount = d["withdraw_amount"]
-            if "unaccepted" in d:
-                if d["unaccepted"] == "false":
-                    self.unaccepted = False
-                if d["unaccepted"] == "true":
-                    self.unaccepted = True
+        self.notification_type = d["notification_type"]
+        self.operation_id = d["operation_id"]
+        self.amount = d["amount"]
+        self.currency = d["currency"]
+        self.datetime = d["datetime"]
+        self.sender = d["sender"]
+        self.codepro = d["codepro"] == "true"
+        self.label = d["label"]
+        self.sha1_hash = d["sha1_hash"]
 
-            self.save()
+        self.withdraw_amount = d.get("withdraw_amount", "0")
+        if "unaccepted" in d:
+            self.unaccepted = d["unaccepted"] == "true"
+
+        self.save()
+        if self.label:
             self.update_team(self.label)
-            return True
-        return False
+        return True
 
     def get_sum(self, paymentid):
         payments = PaymentsYa.objects.filter(label=paymentid, unaccepted=False)
