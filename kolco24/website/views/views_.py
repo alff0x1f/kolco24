@@ -132,6 +132,7 @@ class RegisterView(View):
                     form.add_error(
                         None, "Пользователь с таким email уже зарегистрирован"
                     )
+                    print("Пользователь с таким email уже зарегистрирован")
                     return render(request, "website/register.html", {"reg_form": form})
 
                 user = User.objects.get(email=email)
@@ -141,7 +142,7 @@ class RegisterView(View):
                 user.set_password(password)
                 user.save()
                 auth_login(request, user)
-                return HttpResponseRedirect("/")
+                return HttpResponseRedirect(reverse("add_team", args=[2]))
 
             username = f"{last_name}, {first_name}"
             if User.objects.filter(username=username).exists():
@@ -153,9 +154,8 @@ class RegisterView(View):
             user.profile.phone = phone
             user.save(update_fields=("first_name", "last_name"))
 
-            user = form.reg_user(request.user)
             auth_login(request, user)
-            return HttpResponseRedirect("/")
+            return HttpResponseRedirect(reverse("add_team", args=[2]))
 
         return render(request, "website/register.html", {"reg_form": form})
 
