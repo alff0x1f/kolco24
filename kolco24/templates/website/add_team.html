@@ -1,0 +1,418 @@
+{% extends "website/base.html" %}
+
+{% block content %}
+    <section class="space-sm">
+        <div class="container">
+            <div class="row flex-md-row card card-lg">
+                <div class="col-12 col-md-7 card-body bg-secondary">
+                    <div class="text-center mb-3">
+                        <h1 class="h2 mb-2">Добавление новой команды</h1>
+                        <span>Данные команды</span>
+                    </div>
+                    <div class="row justify-content-center">
+                        <div class="col-12 col-lg-10">
+                            <form id="teamform" action="{% url 'add_team' race_id %}" method="POST">
+                                <div class="form-row form-group">
+                                    <div class="col">
+                                        {{ team_form.teamname }}
+                                        {% if team_form.teamname.errors %}
+                                            <div class="invalid-feedback">
+                                                {{ team_form.teamname.errors }}
+                                            </div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                <div class="form-row form-group">
+                                    <div class="col">
+                                        {{ team_form.city }}
+                                        {% if team_form.city.errors %}
+                                            <div class="invalid-feedback">
+                                                {{ team_form.city.errors }}
+                                            </div>
+                                        {% endif %}
+                                    </div>
+                                    <div class="col">
+                                        {{ team_form.organization }}
+                                        {% if team_form.organization.errors %}
+                                            <div class="invalid-feedback">
+                                                {{ team_form.organization.errors }}
+                                            </div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                <div class="form-row form-group">
+                                    <div class="col-7">
+                                        {{ team_form.category2_id.label_tag }}
+                                        {{ team_form.category2_id }}
+                                        {% if team_form.category2_id.errors %}
+                                            <div class="invalid-feedback">
+                                                {{ team_form.category2_id.errors }}
+                                            </div>
+                                        {% endif %}
+                                    </div>
+                                    <div class="col-5">
+                                        {{ team_form.ucount.label_tag }}
+                                        {{ team_form.ucount }}
+                                        {% if team_form.ucount.errors %}
+                                            <div class="invalid-feedback">
+                                                {{ team_form.ucount.errors }}
+                                            </div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                <p>Участники:</p>
+
+                                <div class="form-row form-group">
+                                    <div class="col-8">
+                                        {{ team_form.athlet1 }}
+                                        {% if team_form.athlet1.errors %}
+                                            <div class="invalid-feedback">
+                                                {{ team_form.athlet1.errors }}
+                                            </div>
+                                        {% endif %}
+                                    </div>
+                                    <div class="col-4">
+                                        {{ team_form.birth1 }}
+                                        {% if team_form.birth1.errors %}
+                                            <div class="invalid-feedback">
+                                                {{ team_form.birth1.errors }}
+                                            </div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+
+                                <div class="form-row form-group">
+                                    <div class="col-8">
+                                        {{ team_form.athlet2 }}
+                                        {% if team_form.athlet2.errors %}
+                                            <div class="invalid-feedback">
+                                                {{ team_form.athlet2.errors }}
+                                            </div>
+                                        {% endif %}
+                                    </div>
+                                    <div class="col-4">
+                                        {{ team_form.birth2 }}
+                                        {% if team_form.birth2.errors %}
+                                            <div class="invalid-feedback">
+                                                {{ team_form.birth2.errors }}
+                                            </div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+
+                                <div id="member3" class="form-row form-group">
+                                    <div class="col-8">
+                                        {{ team_form.athlet3 }}
+                                        {% if team_form.athlet3.errors %}
+                                            <div class="invalid-feedback">
+                                                {{ team_form.athlet3.errors }}
+                                            </div>
+                                        {% endif %}
+                                    </div>
+                                    <div class="col-4">
+                                        {{ team_form.birth3 }}
+                                        {% if team_form.birth3.errors %}
+                                            <div class="invalid-feedback">
+                                                {{ team_form.birth3.errors }}
+                                            </div>
+
+                                        {% endif %}
+                                    </div>
+                                </div>
+
+                                <div id="member4" class="form-row form-group">
+                                    <div class="col-8">
+                                        {{ team_form.athlet4 }}
+                                        {% if team_form.athlet4.errors %}
+                                            <div class="invalid-feedback">
+                                                {{ team_form.athlet4.errors }}
+                                            </div>
+                                        {% endif %}
+                                    </div>
+                                    <div class="col-4">
+                                        {{ team_form.birth4 }}
+                                        {% if team_form.birth4.errors %}
+                                            <div class="invalid-feedback">
+                                                {{ team_form.birth4.errors }}
+                                            </div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+
+                                <div id="member5" class="form-row form-group">
+                                    <div class="col-8">
+                                        {{ team_form.athlet5 }}
+                                        {% if team_form.athlet5.errors %}
+                                            <div class="invalid-feedback">
+                                                {{ team_form.athlet5.errors }}
+                                            </div>
+                                        {% endif %}
+                                    </div>
+                                    <div class="col-4">
+                                        {{ team_form.birth5 }}
+                                        {% if team_form.birth5.errors %}
+                                            <div class="invalid-feedback">
+                                                {{ team_form.birth5.errors }}
+                                            </div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+
+                                <div id="member6" class="form-row form-group">
+                                    <div class="col-8">
+                                        {{ team_form.athlet6 }}
+                                        {% if team_form.athlet6.errors %}
+                                            <div class="invalid-feedback">
+                                                {{ team_form.athlet6.errors }}
+                                            </div>
+                                        {% endif %}
+                                    </div>
+                                    <div class="col-4">
+                                        {{ team_form.birth6 }}
+                                        {% if team_form.birth6.errors %}
+                                            <div class="invalid-feedback">
+                                                {{ team_form.birth6.errors }}
+                                            </div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                {{ team_form.paymentid }}
+                                {% csrf_token %}
+                                {% if team_form.non_field_errors %}
+                                    <div class="alert alert-danger" role="alert">
+                                        {{ team_form.non_field_errors }}
+                                    </div>
+                                {% endif %}
+                                <div id="team_form_alert" class="alert alert-success" role="alert"
+                                     style="display: none;">
+                                    Text
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+                <!--end of col-->
+                <div class="col-12 col-md-5 card-body">
+                    <div>
+                        <div class="mb-3 text-center">
+                            <h3 class="h2 mb-2">Стартовый взнос</h3>
+                        </div>
+                        <ul class="list-unstyled list-spacing-sm mb-3 ">
+                            <li class="row align-items-center">
+                                <div class="col-3 col-md-3">1500 руб</div>
+                                <div class="col-9">С 10 по 12 сентября</div>
+                            </li>
+                            <li class="row align-items-center">
+                                <div class="col-3 col-md-3">1700 руб</div>
+                                <div class="col-9">С 13 по 30 сентября</div>
+                            </li>
+                            <li class="row align-items-center">
+                                <div class="col-3 col-md-3">1900 руб</div>
+                                <div class="col-9">С 1 по 9 октября</div>
+                            </li>
+                        </ul>
+                        <ul class="list-unstyled list-spacing-sm mb-5 ">
+                            <li class="row">
+                                <div class="col-2 col-md-1"><i class="icon-minus h5 text-muted"></i>
+                                </div>
+                                <div class="col-10">При достижении лимита участников, регистрация может прекратиться
+                                    раньше
+                                </div>
+                            </li>
+                            <li class="row align-items-center">
+                                <div class="col-2 col-md-1"><i class="icon-minus h5 text-muted"></i>
+                                </div>
+                                <div class="col-10">Возврат взносов за вычетом понесенных расходов возможен до 1
+                                    октября
+                                </div>
+                            </li>
+                        </ul>
+                        <div id="sidecolumn_paid">
+                            <div class="row mb-4 justify-content-between">
+                                <div class="col-6"><p><span id="paidfor_action">К оплате</span> <span
+                                        id="ucountlabel_all">за <span id="ucountlabel">1</span> чел.</span></p></div>
+                                <div class="col-6"><p class="text-right"><span id="sumlabel">1500</span> руб</p></div>
+                            </div>
+                            <div class="mb-2 text-center">
+                                <h4 class="h4 mb-2">Способы оплаты</h4>
+                                <div class="row">
+                                    <div class="col-6 col-xs-6 col-lg-3">
+                                        <div class="card">
+                                            <img alt="sber" class="card-img-top" src="/static/images/payments/sber.jpg">
+                                        </div>
+                                    </div>
+                                    <div class="col-6 col-xs-6 col-lg-3">
+                                        <div class="card">
+                                            <img alt="sbp" class="card-img-top" src="/static/images/payments/sbp.png">
+                                        </div>
+                                    </div>
+                                    <div class="col-6 col-xs-6 col-lg-3">
+                                        <div class="card">
+                                            <img alt="mir" class="card-img-top"
+                                                 src="/static/images/payments/visa-mastercard.jpg">
+                                        </div>
+                                    </div>
+                                    <div class="col-6 col-xs-6 col-lg-3">
+                                        <div class="card">
+                                            <img alt="yoomoney" class="card-img-top"
+                                                 src="/static/images/payments/yoomoney.png">
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <form class="d-flex flex-column" id="paymentmethod">
+                                <div class="custom-control custom-checkbox-switch">
+                                    <input id="radio_sber" name="radio" type="radio" value="sberbank"
+                                           class="custom-control-input" checked="">
+                                    <label class="custom-control-label" for="radio_sber">Перевод через
+                                        Сбербанк.Онлайн</label>
+                                </div>
+                                <div class="custom-control custom-checkbox-switch">
+                                    <input id="radio_sbp" name="radio" type="radio" value="sbp"
+                                           class="custom-control-input">
+                                    <label class="  custom-control-label" for="radio_sbp">Перевод через систему быстрых
+                                        платежей</label>
+                                </div>
+                                <div class="custom-control custom-checkbox-switch">
+                                    <input id="radio_visamc" name="radio" type="radio" value="visamc"
+                                           class="custom-control-input">
+                                    <label class="custom-control-label" for="radio_visamc">Картой
+                                        Мир/Visa/Mastercard</label>
+                                </div>
+                                <div class="custom-control custom-checkbox-switch">
+                                    <input id="radio_yoomoney" name="radio" type="radio" value="yandexmoney"
+                                           class="custom-control-input">
+                                    <label class="custom-control-label" for="radio_yoomoney">Yoomoney</label>
+                                </div>
+                            </form>
+                            <small>
+                                После нажатия на "Оплатить" слот на команду резервируется на 15 минут.
+                                При отсутствии поступления оплаты в течении 15 мин, бронь на слот снимается.
+                            </small>
+                            <div class="custom-control custom-checkbox-switch">
+                                <button type="button" class="btn btn-primary float-right mt-3" id="common_paid">
+                                    Оплатить
+                                </button>
+                                <script>
+                                    // Attach click event to the button to submit the form
+                                    document.getElementById('common_paid').addEventListener('click', function () {
+                                        // Submit the team_form
+                                        document.getElementById('teamform').submit();
+                                    });
+                                </script>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <!--end of col-->
+            </div>
+            <!--end of row-->
+        </div>
+        <!--end of container-->
+    </section>
+{% endblock %}
+
+{% block footer_js_include %}
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            // Cache the DOM elements
+            const categorySelect = document.getElementById('id_category2_id');
+            const ucountSelect = document.getElementById('id_ucount');
+            const ucountlabel = document.getElementById('ucountlabel');
+            const sumlabel = document.getElementById('sumlabel')
+
+            // All athlete/birth field wrappers by id
+            const memberFields = {
+                3: document.getElementById('member3'),
+                4: document.getElementById('member4'),
+                5: document.getElementById('member5'),
+                6: document.getElementById('member6')
+            };
+
+            // Function to update the number of visible athlete fields based on ucount value
+            function updateAthleteFields() {
+                const ucount = parseInt(ucountSelect.value); // Get selected ucount
+                // Loop through all athlete/birth fields and hide/show based on ucount
+                for (let i = 3; i <= 6; i++) {
+                    if (i <= ucount) {
+                        memberFields[i].style.display = 'flex'; // Show the field
+                    } else {
+                        memberFields[i].style.display = 'none'; // Hide the field
+                    }
+                }
+                ucountlabel.textContent = ucount; // Update the ucount label
+                sumlabel.textContent = ({{cost  }} * ucount); // Update the sum label
+            }
+
+            // Function to update the ucount options based on the category selection
+            function updateUcountOptions() {
+                const selectedCategory = categorySelect.value;
+                ucountSelect.innerHTML = ''; // Clear current options
+
+                // Set ucount options based on category
+                switch (selectedCategory) {
+                    case '8':
+                        ucountOptions = [2, 3];
+                        break;
+                    case '9':
+                    case '13':
+                        ucountOptions = [4, 5, 6];
+                        break;
+                    default:
+                        ucountOptions = [2]; // Default to 2 participants if category doesn't match
+                }
+
+                // Populate ucount options dynamically
+                ucountOptions.forEach(function (optionValue) {
+                    const option = document.createElement('option');
+                    option.value = optionValue.toString();
+                    option.textContent = optionValue.toString();
+                    ucountSelect.appendChild(option);
+                });
+
+                // Set the first option as selected and trigger the change event to update athlete fields
+                ucountSelect.value = ucountOptions[0].toString();
+                updateAthleteFields();
+            }
+
+            // Event listener for changing the category, update ucount if needed
+            categorySelect.addEventListener('change', updateUcountOptions);
+
+            // Event listener for changing ucount, hide/show athlete fields accordingly
+            ucountSelect.addEventListener('change', updateAthleteFields);
+
+            // Initial setup: Hide all athlete fields above 2 by default
+            updateUcountOptions();
+            updateAthleteFields(); // Set the initial visibility of athlete fields
+
+            // payment method radio buttons
+            function updateTeamFormAction() {
+                // Get the selected radio button's value
+                // print
+                const selectedValue = document.querySelector('input[name="radio"]:checked').value;
+
+                // Example query parameters for each payment method
+                const queryParams = {
+                    'sberbank': '?method=sberbank',
+                    'sbp': '?method=sbp',
+                    'visamc': '?method=visamc',
+                    'yandexmoney': '?method=yandexmoney'
+                };
+
+                // Get the base action URL for the selected payment method
+                const baseAction = '{% url 'add_team' race_id %}';
+
+                // Get the corresponding query parameters for the selected payment method
+                const queryParam = queryParams[selectedValue] || '';
+
+                // Update the team_form action by appending the query parameters
+                const teamForm = document.getElementById('teamform');
+                teamForm.action = baseAction + queryParam;
+            }
+
+            document.getElementById('paymentmethod').addEventListener('change', updateTeamFormAction);
+            updateTeamFormAction();
+        });
+    </script>
+{% endblock %}

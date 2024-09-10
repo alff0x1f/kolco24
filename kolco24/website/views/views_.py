@@ -1,4 +1,5 @@
 import json
+import random
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
@@ -15,6 +16,7 @@ from django.core.files.storage import FileSystemStorage
 from django.db.models import Count, OuterRef, Subquery, Sum
 from django.http import Http404, HttpResponse, HttpResponseRedirect, JsonResponse
 from django.shortcuts import render
+from django.urls import reverse
 from django.utils.decorators import method_decorator
 from django.views import View
 from django.views.decorators.csrf import csrf_exempt
@@ -130,6 +132,7 @@ class RegisterView(View):
                     form.add_error(
                         None, "Пользователь с таким email уже зарегистрирован"
                     )
+                    print("Пользователь с таким email уже зарегистрирован")
                     return render(request, "website/register.html", {"reg_form": form})
 
                 user = User.objects.get(email=email)
@@ -139,7 +142,7 @@ class RegisterView(View):
                 user.set_password(password)
                 user.save()
                 auth_login(request, user)
-                return HttpResponseRedirect("/")
+                return HttpResponseRedirect(reverse("add_team", args=[2]))
 
             username = f"{last_name}, {first_name}"
             if User.objects.filter(username=username).exists():
@@ -151,9 +154,8 @@ class RegisterView(View):
             user.profile.phone = phone
             user.save(update_fields=("first_name", "last_name"))
 
-            user = form.reg_user(request.user)
             auth_login(request, user)
-            return HttpResponseRedirect("/")
+            return HttpResponseRedirect(reverse("add_team", args=[2]))
 
         return render(request, "website/register.html", {"reg_form": form})
 
@@ -1247,6 +1249,168 @@ class AllTeamsView(View):
             "show_category": True,
         }
         return render(request, "teams.html", context)
+
+
+class AddTeam(View):
+    def get(self, request, race_id):
+        if not request.user.is_authenticated:
+            return HttpResponseRedirect(reverse("passlogin") + f"?next={request.path}")
+        form = TeamForm(race_id)
+        return render(
+            request,
+            "website/add_team.html",
+            {"race_id": race_id, "team_form": form, "cost": PaymentsYa.get_cost()},
+        )
+
+    def post(self, request, race_id):
+        if not request.user.is_authenticated:
+            return HttpResponseRedirect(reverse("passlogin") + f"?next={request.path}")
+
+        category2_id = request.POST.get("category2_id")
+        category2 = Category.objects.filter(id=category2_id).first()
+        if not category2:
+            return JsonResponse({"error": "Category not found"}, status=404)
+
+        data = request.POST.copy()
+        data["dist"] = category2.code
+        data["paymentid"] = "%016x" % random.randrange(16**16)  # legacy
+        form = TeamForm(race_id, data)
+        if form.is_valid():
+            # save team
+            team = Team.objects.create(
+                year=2024,
+                owner_id=request.user.id,
+                **form.cleaned_data,
+            )
+            team.save()
+
+            # payment
+            payment_method = request.GET.get("method", "visamc")
+            cost_now = PaymentsYa.get_cost()
+            cost = (int(team.ucount) - team.paid_people) * cost_now
+            if cost < 0:
+                cost = 0
+
+            if payment_method in ("visamc", "yandexmoney"):
+                payment = Payment.objects.create(
+                    owner=request.user.is_authenticated,
+                    team=team,
+                    payment_method=payment_method,
+                    payment_amount=cost,
+                    payment_with_discount=cost,
+                    cost_per_person=cost_now,
+                    paid_for=int(team.ucount) - team.paid_people,
+                    additional_charge=team.additional_charge,
+                    status="draft",
+                )
+
+                paymenttype = "AC"
+                if payment_method == "yandexmoney":
+                    paymenttype = "PC"
+                return render(
+                    request,
+                    "website/yoomoney.html",
+                    context={
+                        "paymenttype": paymenttype,
+                        "yalabel": payment.id,
+                        "paymentid": team.paymentid,
+                        "yandexwallet": settings.YANDEX_WALLET,
+                        "sum": cost,
+                    },
+                )
+            else:
+                # redirect
+                return HttpResponseRedirect(
+                    reverse("pay_team", args=[team.id]) + f"?method={payment_method}"
+                )
+
+        return render(
+            request,
+            "website/add_team.html",
+            {"race_id": race_id, "team_form": form, "cost": PaymentsYa.get_cost()},
+        )
+
+
+class TeamPayment(View):
+    def get(self, request, team_id):
+        if not request.user.is_authenticated:
+            return HttpResponseRedirect(reverse("passlogin") + f"?next={request.path}")
+
+        team = Team.objects.filter(id=team_id).first()
+        payment_method = request.GET.get("method")
+        if not team or payment_method not in ("sbp", "sberbank"):
+            raise Http404("Not found")
+
+        cost_now = PaymentsYa.get_cost()
+        payment_amount = (team.ucount - team.paid_people) * cost_now
+        if payment_amount < 0:
+            payment_amount = 0
+
+        payment = Payment.objects.create(
+            owner=request.user.is_authenticated,
+            team=team,
+            payment_method=payment_method,
+            payment_amount=payment_amount,
+            payment_with_discount=payment_amount,
+            cost_per_person=cost_now,
+            paid_for=int(team.ucount) - team.paid_people,
+            additional_charge=team.additional_charge,
+            status="draft",
+        )
+
+        team = Team.objects.filter(id=team_id).first()
+        if not team:
+            raise Http404("Team not found")
+
+        payment_method = request.GET.get("method", "visamc")
+
+        if payment_method == "sberbank":
+            return render(
+                request,
+                "website/sberbank.html",
+                context={
+                    "team": team,
+                    "id": payment.id,
+                    "payment_amount": payment_amount,
+                    "phone": settings.SBERBANK_INFO["phone"],
+                    "name": settings.SBERBANK_INFO["name"],
+                    "today_date": strftime("%d.%m.%Y", gmtime()),
+                },
+            )
+        elif payment_method == "sbp":
+            return render(
+                request,
+                "website/sbp.html",
+                context={
+                    "team": team,
+                    "id": payment.id,
+                    "payment_amount": payment_amount,
+                    "phone": settings.SBERBANK_INFO["phone"],
+                    "name": settings.SBERBANK_INFO["name"],
+                    "today_date": strftime("%d.%m.%Y", gmtime()),
+                },
+            )
+        raise Http404("Not found")
+
+    def post(self, request, team_id):
+        team = Team.objects.filter(id=team_id).first()
+        if not team:
+            raise Http404("Team not found")
+
+        payment_id = request.POST.get("id")
+        payment = Payment.objects.filter(id=payment_id).first()
+
+        if payment and payment.status == "draft" and payment.owner == request.user:
+            payment.status = "draft_with_info"
+            payment.sender_card_number = (
+                request.POST["sender_card_number"] + " " + request.POST["payment_sum"]
+            )
+            pdate = datetime.strptime(request.POST["payment_date"], "%d.%m.%Y")
+            payment.payment_date = pdate
+            payment.save()
+
+            return render(request, "website/payment_process.html", {"team": team})
+        raise Http404("Not found")
 
 
 class AllTeamsResultView(View):

@@ -197,7 +197,7 @@ def category2_from_dist(dist, ucount):
 
 
 class TeamForm(forms.Form):
-    name = forms.CharField(
+    teamname = forms.CharField(
         required=False,
         widget=forms.TextInput(
             attrs={
@@ -221,7 +221,16 @@ class TeamForm(forms.Form):
             }
         ),
     )
-    ucount = forms.IntegerField()
+    ucount = forms.ChoiceField(
+        choices=[(i, str(i)) for i in range(2, 7)],
+        widget=forms.Select(
+            attrs={
+                "class": "form-control form-control-lg",
+                "placeholder": "Количество участников",
+            },
+        ),
+        label="Количество участников",
+    )
     dist = forms.CharField()
     paymentid = forms.CharField(widget=forms.HiddenInput())
 
@@ -236,8 +245,23 @@ class TeamForm(forms.Form):
         ),
     )
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, race_id, *args, **kwargs):
         super(TeamForm, self).__init__(*args, **kwargs)
+        categories = (
+            (category.id, f"{category.short_name} ({category.name})")
+            for category in Category.objects.filter(race_id=race_id)
+        )
+        self.fields["category2_id"] = forms.ChoiceField(
+            required=False,
+            choices=categories,
+            label="Категория",
+            widget=forms.Select(
+                attrs={
+                    "class": "form-control form-control-lg",
+                    "placeholder": "Категория",
+                }
+            ),
+        )
         for i in range(6):
             self.fields["athlet%s" % (i + 1)] = forms.CharField(
                 required=False,
@@ -309,11 +333,44 @@ class TeamForm(forms.Form):
             return True
 
     def clean(self):
-        paymentid = self.cleaned_data["paymentid"]
-        team = Team.objects.filter(paymentid=paymentid, year=2023)[:1]
-        if not team:
-            raise forms.ValidationError("Команда не найдена.")
+        # make invalid forms red:
+        if self.errors:
+            for f_name in self.fields:
+                if f_name in self.errors:
+                    classes = self.fields[f_name].widget.attrs.get("class", "")
+                    classes += " is-invalid"
+                    self.fields[f_name].widget.attrs["class"] = classes
+            raise forms.ValidationError("Заполните все поля")
         return self.cleaned_data
+
+    @staticmethod
+    def clean_birth(birth):
+        if not birth:
+            return "0"
+        if not birth.isdigit():
+            raise forms.ValidationError("Год рождения должен быть числом.")
+        return birth
+
+    def clean_birth1(self):
+        return self.clean_birth(self.cleaned_data["birth1"])
+
+    def clean_birth2(self):
+        return self.clean_birth(self.cleaned_data["birth2"])
+
+    def clean_birth3(self):
+        return self.clean_birth(self.cleaned_data["birth3"])
+
+    def clean_birth4(self):
+        return self.clean_birth(self.cleaned_data["birth4"])
+
+    def clean_birth5(self):
+        return self.clean_birth(self.cleaned_data["birth5"])
+
+    def clean_birth6(self):
+        return self.clean_birth(self.cleaned_data["birth6"])
+
+    def clean_map_count(self):
+        return self.clean_birth(self.cleaned_data["map_count"])
 
     def save(self):
         if "paymentid" not in self.cleaned_data:

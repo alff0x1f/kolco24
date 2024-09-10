@@ -96,7 +96,7 @@
                                 {% for link in links %}
                                     <li>
                                         <i class="icon-text-document text-muted mr-1"></i>
-                                        <a href="{{ link.url }}">{{link.name}}</a>
+                                        <a href="{{ link.url }}">{{ link.name }}</a>
                                     </li>
                                 {% endfor %}
                             </ul>
@@ -135,6 +135,11 @@
                                 </a>
                             {% endfor %}
                             <!-- end of categories -->
+                            {% if user.is_authenticated %}
+                                <div class="list-group m-3 list-group-flush">
+                                    <a href="{% url 'add_team' race.id %}" class="btn btn-block btn-secondary">Добавить новую команду</a>
+                                </div>
+                            {% endif %}
                         </div>
                     </div>
                 </div>

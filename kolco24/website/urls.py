@@ -44,14 +44,16 @@ urlpatterns = [
     path("team/", views.my_team, name="my_team"),
     path("team_admin/", views.team_admin, name="team_admin"),
     path("teams/", views.teams, name="teams"),
+    path("team/<team_id>/pay/", views.TeamPayment.as_view(), name="pay_team"),
     path("race/<race_id>/", views.RaceNewsView.as_view(), name="race"),
     path("race/<race_id>/teams/", views.AllTeamsView.as_view(), name="all_teams"),
+    path("race/<race_id>/teams/add/", views.AddTeam.as_view(), name="add_team"),
     # path(
     #     "race/<race_id>/teams_result",
     #     views.AllTeamsResultView.as_view(),
     #     name="all_teams",
     # ),
-    path("team/<team_id>/points/", views.TeamPointsView.as_view(), name="all_teams"),
+    path("team/<team_id>/points/", views.TeamPointsView.as_view(), name="team_points"),
     path(
         "race/<race_id>/category/<category_id>/teams/",
         views.TeamsView.as_view(),
@@ -60,7 +62,7 @@ urlpatterns = [
     path(
         "race/<int:race_id>/category/<int:category_id>/results/",
         views.AllTeamsResultView.as_view(),
-        name="all_teams",
+        name="category_results",
     ),
     path(
         "race/<race_id>/category/<category_id>/teams.csv",
