@@ -595,6 +595,9 @@ def team_admin(request, teamid=""):
 
 class NewPaymentView(View):
     def post(self, request):
+        if not request.user.is_authenticated:
+            return HttpResponseRedirect(reverse("passlogin") + f"?next={request.path}")
+
         paymentid = request.POST.get("paymentid", "")
         try:
             team = Team.objects.get(paymentid=paymentid, year=2024)
@@ -607,7 +610,7 @@ class NewPaymentView(View):
         cost = (team.ucount - team.paid_people) * cost_now
 
         payment = Payment.objects.create(
-            owner=request.user if request.user.is_authenticated else None,
+            owner=request.user,
             team=team,
             payment_method=payment_method,
             payment_amount=cost,
@@ -1293,7 +1296,7 @@ class AddTeam(View):
 
             if payment_method in ("visamc", "yandexmoney"):
                 payment = Payment.objects.create(
-                    owner=request.user.is_authenticated,
+                    owner=request.user,
                     team=team,
                     payment_method=payment_method,
                     payment_amount=cost,
@@ -1347,7 +1350,7 @@ class TeamPayment(View):
             payment_amount = 0
 
         payment = Payment.objects.create(
-            owner=request.user.is_authenticated,
+            owner=request.user,
             team=team,
             payment_method=payment_method,
             payment_amount=payment_amount,
