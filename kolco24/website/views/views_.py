@@ -1277,8 +1277,38 @@ class AddTeam(View):
                 **form.cleaned_data,
             )
             team.save()
-            return HttpResponseRedirect("/teams")
 
+            # payment
+            payment_method = request.GET.get("method", "visamc")
+            cost_now = PaymentsYa.get_cost()
+            cost = (int(team.ucount) - team.paid_people) * cost_now
+
+            payment = Payment.objects.create(
+                owner=request.user if request.user.is_authenticated else None,
+                team=team,
+                payment_method=payment_method,
+                payment_amount=cost,
+                payment_with_discount=cost,
+                cost_per_person=cost_now,
+                paid_for=int(team.ucount) - team.paid_people,
+                additional_charge=team.additional_charge,
+                status="draft",
+            )
+            if payment_method in ("visamc", "yandexmoney"):
+                paymenttype = "AC"
+                if payment_method == "yandexmoney":
+                    paymenttype = "PC"
+                return render(
+                    request,
+                    "website/yoomoney.html",
+                    context={
+                        "paymenttype": paymenttype,
+                        "yalabel": payment.id,
+                        "paymentid": team.paymentid,
+                        "yandexwallet": settings.YANDEX_WALLET,
+                        "sum": cost,
+                    },
+                )
         return render(
             request,
             "website/add_team.html",

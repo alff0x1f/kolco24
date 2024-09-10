@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Кольцо24</title>
+</head>
+<body>
+<form method="POST" action="https://yoomoney.ru/quickpay/confirm.xml" id="yandexform">
+    <input type="hidden" id="yandexwallet" name="receiver" value="{{ yandexwallet }}">
+    <input type="hidden" name="quickpay-form" value="shop">
+    <input type="hidden" id="yatargets" name="targets" value="Взнос за Кольцо-24">
+    <input type="hidden" id="yasum" name="sum" value="{{ sum }}" data-type="number">
+    <input type="hidden" id="paymenttype" name="paymentType" value="{{ paymenttype }}">
+    <input type="hidden" name="formcomment" value="Кольцо 24">
+    <input type="hidden" name="short-dest" value="Кольцо 24">
+    <input type="hidden" id="yalabel" name="label" value="{{ yalabel }}">
+    <input type="hidden" name="need-fio" value="false">
+    <input type="hidden" name="need-email" value="false">
+    <input type="hidden" name="need-phone" value="false">
+    <input type="hidden" name="need-address" value="false">
+    <input type="hidden" name="successURL" value="https://kolco24.ru/success/{{ paymentid }}">
+</form>
+<script>
+document.getElementById('yandexform').submit();
+</script>
+</body>
+</html>
+

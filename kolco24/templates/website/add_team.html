@@ -183,13 +183,6 @@
                                         {{ team_form.non_field_errors }}
                                     </div>
                                 {% endif %}
-                                <div class="form-row form-group">
-                                    <div class="col">
-                                        <button class="btn btn-block btn-success" type="submit" id="teamform_submit">
-                                            Сохранить
-                                        </button>
-                                    </div>
-                                </div>
                                 <div id="team_form_alert" class="alert alert-success" role="alert"
                                      style="display: none;">
                                     Text
@@ -272,24 +265,25 @@
                                 <div class="custom-control custom-checkbox-switch">
                                     <input id="radio_sber" name="radio" type="radio" value="sberbank"
                                            class="custom-control-input" checked="">
-                                    <label class="custom-control-label" for="radio2">Перевод через
+                                    <label class="custom-control-label" for="radio_sber">Перевод через
                                         Сбербанк.Онлайн</label>
                                 </div>
                                 <div class="custom-control custom-checkbox-switch">
                                     <input id="radio_sbp" name="radio" type="radio" value="sbp"
                                            class="custom-control-input">
-                                    <label class="  custom-control-label" for="radio4">Перевод через систему быстрых
+                                    <label class="  custom-control-label" for="radio_sbp">Перевод через систему быстрых
                                         платежей</label>
                                 </div>
                                 <div class="custom-control custom-checkbox-switch">
                                     <input id="radio_visamc" name="radio" type="radio" value="visamc"
                                            class="custom-control-input">
-                                    <label class="custom-control-label" for="radio1">Картой Visa/Mastercard</label>
+                                    <label class="custom-control-label" for="radio_visamc">Картой
+                                        Мир/Visa/Mastercard</label>
                                 </div>
                                 <div class="custom-control custom-checkbox-switch">
                                     <input id="radio_yoomoney" name="radio" type="radio" value="yandexmoney"
                                            class="custom-control-input">
-                                    <label class="custom-control-label" for="radio3">Yoomoney</label>
+                                    <label class="custom-control-label" for="radio_yoomoney">Yoomoney</label>
                                 </div>
                             </form>
                             <small>
@@ -300,6 +294,13 @@
                                 <button type="button" class="btn btn-primary float-right mt-3" id="common_paid">
                                     Оплатить
                                 </button>
+                                <script>
+                                    // Attach click event to the button to submit the form
+                                    document.getElementById('common_paid').addEventListener('click', function () {
+                                        // Submit the team_form
+                                        document.getElementById('teamform').submit();
+                                    });
+                                </script>
                             </div>
                         </div>
                     </div>
@@ -349,8 +350,6 @@
                 const selectedCategory = categorySelect.value;
                 ucountSelect.innerHTML = ''; // Clear current options
 
-                let ucountOptions = [];
-
                 // Set ucount options based on category
                 switch (selectedCategory) {
                     case '8':
@@ -386,6 +385,34 @@
             // Initial setup: Hide all athlete fields above 2 by default
             updateUcountOptions();
             updateAthleteFields(); // Set the initial visibility of athlete fields
+
+            // payment method radio buttons
+            function updateTeamFormAction() {
+                // Get the selected radio button's value
+                // print
+                const selectedValue = document.querySelector('input[name="radio"]:checked').value;
+
+                // Example query parameters for each payment method
+                const queryParams = {
+                    'sberbank': '?method=sberbank',
+                    'sbp': '?method=sbp',
+                    'visamc': '?method=visamc',
+                    'yandexmoney': '?method=yandexmoney'
+                };
+
+                // Get the base action URL for the selected payment method
+                const baseAction = '{% url 'add_team' race_id %}';
+
+                // Get the corresponding query parameters for the selected payment method
+                const queryParam = queryParams[selectedValue] || '';
+
+                // Update the team_form action by appending the query parameters
+                const teamForm = document.getElementById('teamform');
+                teamForm.action = baseAction + queryParam;
+            }
+
+            document.getElementById('paymentmethod').addEventListener('change', updateTeamFormAction);
+            updateTeamFormAction();
         });
     </script>
 {% endblock %}
