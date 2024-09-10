@@ -805,6 +805,7 @@ def new_team(request):
 @csrf_exempt
 def yandex_payment(request):
     if request.method == "POST":
+        print(dict(request.POST))
         payment = PaymentsYa()
         if payment.new_payment(request.POST):
             # send_success_email(
