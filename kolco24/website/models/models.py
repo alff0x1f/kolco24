@@ -137,7 +137,7 @@ class Team(models.Model):
     paid_sum = models.FloatField(default=0)
     additional_charge = models.FloatField(default=0)
     paid_people = models.FloatField(default=0)
-    dist = models.CharField(max_length=10)
+    dist = models.CharField(max_length=15)
     ucount = models.IntegerField(default=1)
     teamname = models.CharField(max_length=100, blank=True)
     city = models.CharField(max_length=50, blank=True)
