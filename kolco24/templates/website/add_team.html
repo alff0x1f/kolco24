@@ -238,7 +238,7 @@
                                 <div class="row">
                                     <div class="col-6 col-xs-6 col-lg-3">
                                         <div class="card">
-                                            <img alt="sber" class="card-img-top" src="/static/images/payments/sber.jpg">
+                                            <img alt="sber" class="card-img-top" src="/static/images/payments/tinkoff.png">
                                         </div>
                                     </div>
                                     <div class="col-6 col-xs-6 col-lg-3">
@@ -263,16 +263,9 @@
 
                             <form class="d-flex flex-column" id="paymentmethod">
                                 <div class="custom-control custom-checkbox-switch">
-                                    <input id="radio_sber" name="radio" type="radio" value="sberbank"
-                                           class="custom-control-input" checked="">
-                                    <label class="custom-control-label" for="radio_sber">Перевод через
-                                        Сбербанк.Онлайн</label>
-                                </div>
-                                <div class="custom-control custom-checkbox-switch">
                                     <input id="radio_sbp" name="radio" type="radio" value="sbp"
-                                           class="custom-control-input">
-                                    <label class="  custom-control-label" for="radio_sbp">Перевод через систему быстрых
-                                        платежей</label>
+                                           class="custom-control-input" checked="">
+                                    <label class="custom-control-label" for="radio_sbp">Перевод по СБП по номеру телефона (Тиньков)</label>
                                 </div>
                                 <div class="custom-control custom-checkbox-switch">
                                     <input id="radio_visamc" name="radio" type="radio" value="visamc"
@@ -338,7 +331,7 @@
                     }
                 }
                 ucountlabel.textContent = ucount; // Update the ucount label
-                sumlabel.textContent = ({{cost  }} * ucount); // Update the sum label
+                sumlabel.textContent = ({{ cost  }} * ucount); // Update the sum label
             }
 
             // Function to update the ucount options based on the category selection
