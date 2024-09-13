@@ -15,6 +15,7 @@ from .views import (
     CustomPasswordResetDoneView,
     CustomPasswordResetView,
 )
+from .views.team import EditTeamView
 
 urlpatterns = [
     path("", lambda request: redirect("race", race_id=2), name="index"),
@@ -42,9 +43,10 @@ urlpatterns = [
     re_path("^login/(?P<login_key>[0-9a-f]{16})/", views.login_by_key),
     path("logout/", views.LogoutUserView.as_view(), name="logout"),
     path("team/", views.my_team, name="my_team"),
+    path("team/<team_id>/", EditTeamView.as_view(), name="edit_team"),
+    path("team/<team_id>/pay/", views.TeamPayment.as_view(), name="pay_team"),
     path("team_admin/", views.team_admin, name="team_admin"),
     path("teams/", views.teams, name="teams"),
-    path("team/<team_id>/pay/", views.TeamPayment.as_view(), name="pay_team"),
     path("race/<race_id>/", views.RaceNewsView.as_view(), name="race"),
     path("race/<race_id>/teams/", views.AllTeamsView.as_view(), name="all_teams"),
     path("race/<race_id>/teams/add/", views.AddTeam.as_view(), name="add_team"),
