@@ -2,7 +2,16 @@ from django.contrib import admin
 from django.utils.html import format_html
 from markdown import markdown
 
-from .models import ControlPoint, NewsPost, Payment, PaymentsYa, Race, TakenKP, Team
+from .models import (
+    ControlPoint,
+    NewsPost,
+    Payment,
+    PaymentsYa,
+    Race,
+    SbpPaymentRecipient,
+    TakenKP,
+    Team,
+)
 from .models.race import Category, RaceLink
 
 
@@ -92,6 +101,7 @@ class NewsPostAdmin(admin.ModelAdmin):
     content_preview.short_description = "HTML Preview"
 
 
+admin.site.register(SbpPaymentRecipient)
 admin.site.register(Team, TeamAdmin)
 admin.site.register(ControlPoint, ControlPointAdmin)
 admin.site.register(TakenKP, TakenKPAdmin)

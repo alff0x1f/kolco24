@@ -48,6 +48,7 @@ from website.models import (
     PaymentsYa,
     PointTag,
     Race,
+    SbpPaymentRecipient,
     TakenKP,
     Team,
 )
@@ -672,8 +673,12 @@ class ConfirmPaymentView(View):
         team.paid_people += payment.paid_for
         team.paid_sum += payment.payment_amount
 
+        recipient = request.POST.get("recipient", "")
+        if recipient:
+            payment.recipient = SbpPaymentRecipient.objects.get(pk=recipient)
+
         team.save(update_fields=["paid_people", "paid_sum"])
-        payment.save(update_fields=["status", "balance", "order"])
+        payment.save(update_fields=["status", "balance", "order", "recipient"])
         return HttpResponseRedirect("/payments?status=draft_with_info")
 
     def update_only_balance(self, payment, balance):
@@ -1721,7 +1726,7 @@ class TeamsViewCsv(View):
 def payment_list(request):
     # select related team to avoid additional queries
     payments = (
-        Payment.objects.select_related("team", "team__owner")
+        Payment.objects.select_related("team", "team__owner", "recipient")
         .filter(team__year=2024)
         .order_by("-order", "-id")
     )
@@ -1736,19 +1741,21 @@ def payment_list(request):
     elif method_filter:
         payments = payments.filter(payment_method=method_filter)
 
-    payments_summ = (
-        payments.aggregate(Sum("payment_amount"))["payment_amount__sum"] or 0
-    )
+    # recipient
+    recipient_filter = request.GET.get("recipient")
+    if recipient_filter:
+        payments = payments.filter(recipient_id=recipient_filter)
 
-    start_sum = 0
+    # балансы, которые должны быть после каждого платежа
+    balances = defaultdict(int)
     estimate_balances = {}
-    for p in payments:
-        if p.status == Payment.STATUS_DONE and p.payment_method in ("sbp", "sberbank"):
-            estimate_balances[p.id] = start_sum
-            start_sum -= p.payment_amount
-
-    for payment_id in estimate_balances:
-        estimate_balances[payment_id] -= start_sum
+    for payment in payments[::-1]:
+        if payment.status == Payment.STATUS_DONE and payment.payment_method in (
+            "sbp",
+            "sberbank",
+        ):
+            balances[payment.recipient] += payment.payment_amount
+            estimate_balances[payment.id] = balances[payment.recipient]
 
     return render(
         request,
@@ -1756,8 +1763,8 @@ def payment_list(request):
         {
             "payments": payments,
             "estimate_balances": estimate_balances,
-            "payments_summ": round(payments_summ),
             "status": status_filter,
             "method": method_filter,
+            "recipients": SbpPaymentRecipient.objects.all(),
         },
     )

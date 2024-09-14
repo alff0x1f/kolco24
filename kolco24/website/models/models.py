@@ -327,9 +327,9 @@ class Payment(models.Model):
         blank=True,
         null=True,
     )
-    athlet = models.ForeignKey(
-        "Athlet",
-        on_delete=models.CASCADE,
+    recipient = models.ForeignKey(
+        "SbpPaymentRecipient",
+        on_delete=models.SET_NULL,
         blank=True,
         null=True,
     )
