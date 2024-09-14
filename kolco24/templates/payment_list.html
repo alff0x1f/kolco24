@@ -6,17 +6,56 @@
     <section class="flush-with-above">
         <div class="container-fluid">
             <div class="row">
+                <div class="col-md-2">
+                    <h1>Фильтры</h1>
+                    <form method="get" action="{% url 'payment-list' %}">
+                        <div class="form-group">
+                            <label for="status">Статус:</label>
+                            <select class="form-control" id="status" name="status">
+                                <option value="">Все</option>
+                                <option value="draft" {% if status == "draft" %} selected {% endif %}>Draft</option>
+                                <option value="draft_with_info" {% if status == "draft_with_info" %}
+                                        selected {% endif %}>Draft_with_info
+                                </option>
+                                <option value="done" {% if status == "done" %} selected {% endif %}>Done</option>
+                                <option value="cancel" {% if status == "cancel" %} selected {% endif %}>Canceled
+                                </option>
+                            </select>
+
+                            <label for="method">Метод:</label>
+                            <select class="form-control" id="method" name="method">
+                                <option value="">Все</option>
+
+                                <option value="sberbank" {% if method == "sberbank" %} selected {% endif %}>Сбербанк
+                                </option>
+                                <option value="sbp" {% if method == "sbp" %} selected {% endif %}>СБП</option>
+                                <option value="visamc" {% if method == "visamc" %} selected {% endif %}>Card</option>
+                            </select>
+                            <label for="recipients">Получатель:</label>
+                            <select class="form-control" id="recipients" name="recipient">
+                                <option value="">All</option>
+                                {% for recipient in recipients %}
+                                    <option value="{{ recipient.id }}"
+                                            {% if recipient.id|stringformat:"s" == request.GET.recipients %}
+                                            selected
+                                            {% endif %}>
+                                        {{ recipient.name }} ({{ recipient.bank }})
+                                    </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <button type="submit" class="btn btn-primary">Применить</button>
+                    </form>
+                </div>
                 <div class="col-md-10">
-                    <h1>Payment List</h1>
+                    <h1>Список платежей</h1>
                     <table class="table table-bordered">
                         <thead>
                         <tr>
                             <td>order</td>
-                            <td>Team</td>
-                            <td>Team ppl</td>
-                            <th>Payment Method</th>
-                            <th>Sender Card Number</th>
-                            <th>Payment Date</th>
+                            <td>Команда</td>
+                            <th>Платеж</th>
+                            <th>Инфа от пользователя</th>
                             <th>Confirm</th>
                         </tr>
                         </thead>
@@ -36,40 +75,54 @@
                                         </button>
                                     </form>
                                 </td>
-                                <td><a href="/team/{{ payment.team.paymentid }}">{{ payment.team.teamname }}</a>
-                                    <br/>{{ payment.team.owner.last_name }} {{ payment.team.owner.first_name }}
+                                <td><a href="/team/{{ payment.team.paymentid }}">{{ payment.team.teamname }}</a><br/>
+                                    {{ payment.team.owner.last_name }} {{ payment.team.owner.first_name }}<br/>
+                                    Оплачено {{ payment.team.paid_people|floatformat }}
+                                    из {{ payment.team.ucount }}<br/>
+                                    {{ payment.team.paid_sum|floatformat }} руб
                                 </td>
-                                <td>{{ payment.team.paid_people|floatformat }}/{{ payment.team.ucount }}<br/>
-                                    {{ payment.team.paid_sum|floatformat }}</td>
-                                <td>{{ payment.payment_method }}<br/>
-                                    {{ payment.status }}
+                                <td>{{ payment.payment_method }}, {{ payment.status }}<br/>
+                                    {{ payment.payment_amount|floatformat }} руб
+                                    ({{ payment.paid_for|floatformat }} чел) <br/>
+                                    {{ payment.payment_date }}
                                 </td>
                                 <td>{{ payment.sender_card_number }}
-                                    <br/>{{ payment.payment_amount|floatformat }} RUB
-                                    ({{ payment.paid_for|floatformat }} чел)
                                 </td>
-                                <td>{{ payment.payment_date }}</td>
                                 <td {% if payment.balance == estimate_balances|dict_key:payment.pk %}class="bg-success" {% endif %}>
                                     {% if payment.status == "draft" or payment.status == "draft_with_info" %}
                                         {% if payment.payment_method == "sbp" or payment.payment_method == "sberbank" %}
-                                            <div class="mb-2">
+                                            <div class="mb-2 card p-3 shadow-sm">
                                                 <form method="post" action="/payments/confirm/{{ payment.id }}/">
                                                     {% csrf_token %}
-                                                    <label>
-                                                        <input class="form-control-sm" type="text" placeholder="Баланс"
-                                                               name="balance"/>
-                                                    </label>
-                                                    <button type="submit" class="btn btn-success">Confirm</button>
+                                                    <div class="form-group">
+                                                        <label for="balance">Баланс:</label>
+                                                        <input class="form-control form-control-sm" type="text"
+                                                               placeholder="Баланс" name="balance" id="balance"/>
+                                                    </div>
+                                                    <div class="form-group">
+                                                        <label for="recipient">Получатель:</label>
+                                                        <select class="form-control form-control-sm" id="recipient"
+                                                                name="recipient">
+                                                            {% for recipient in recipients %}
+                                                                <option value="{{ recipient.id }}">{{ recipient.name }}
+                                                                    ({{ recipient.bank }})
+                                                                </option>
+                                                            {% endfor %}
+                                                        </select>
+                                                    </div>
+                                                    <button type="submit" class="btn btn-success btn-block">Ок
+                                                    </button>
                                                 </form>
                                             </div>
                                             <form method="post" action="/payments/cancel/{{ payment.id }}/">
                                                 {% csrf_token %}
-                                                <button type="submit" class="btn btn-warning">Cancel</button>
+                                                <button type="submit" class="btn btn-warning">Отмена</button>
                                             </form>
                                         {% endif %}
                                     {% else %}
-                                        Баланс: {{ payment.balance|floatformat }}
-                                        <br/>Ожидаемый: {{ estimate_balances|dict_key:payment.pk|floatformat }}
+                                        Баланс: {{ payment.balance|floatformat }}<br/>
+                                        Ожидаемый: {{ estimate_balances|dict_key:payment.pk|floatformat }}<br/>
+                                        {{ payment.recipient.name }} ({{ payment.recipient.bank }})
                                         {% if payment.balance == 0 and payment.status == "done" %}
                                             {% if payment.payment_method == "sbp" or payment.payment_method == "sberbank" %}
                                                 <form method="post" action="/payments/confirm/{{ payment.id }}/">
@@ -78,6 +131,14 @@
                                                         <input class="form-control-sm" type="text" placeholder="Баланс"
                                                                name="balance"/>
                                                     </label>
+                                                    <label for="recipient">Recipient:</label>
+                                                    <select class="form-control" id="recipient" name="recipient">
+                                                        {% for recipient in recipients %}
+                                                            <option value="{{ recipient.id }}">{{ recipient.name }}
+                                                                ({{ recipient.bank }})
+                                                            </option>
+                                                        {% endfor %}
+                                                    </select>
                                                     <button type="submit" class="btn btn-info">Confirm</button>
                                                 </form>
                                             {% endif %}
@@ -89,39 +150,6 @@
                         {% endfor %}
                         </tbody>
                     </table>
-                    {#        payment_amount summ #}
-                    <p>Payment Amount Summ: {{ payments_summ }}</p>
-                </div>
-                <div class="col-md-2">
-                    <h1>Filters</h1>
-                    <!-- Add your filter inputs and controls here -->
-                    <!-- Example: -->
-                    <form method="get" action="{% url 'payment-list' %}">
-                        <div class="form-group">
-                            <label for="status">Status:</label>
-                            <select class="form-control" id="status" name="status">
-                                <option value="">All</option>
-                                <option value="draft" {% if status == "draft" %} selected {% endif %}>Draft</option>
-                                <option value="draft_with_info" {% if status == "draft_with_info" %}
-                                        selected {% endif %}>Draft_with_info
-                                </option>
-                                <option value="done" {% if status == "done" %} selected {% endif %}>Done</option>
-                                <option value="cancel" {% if status == "cancel" %} selected {% endif %}>Canceled
-                                </option>
-                            </select>
-
-                            <label for="method">Method:</label>
-                            <select class="form-control" id="method" name="method">
-                                <option value="">All</option>
-
-                                <option value="sberbank" {% if method == "sberbank" %} selected {% endif %}>Сбербанк
-                                </option>
-                                <option value="sbp" {% if method == "sbp" %} selected {% endif %}>СБП</option>
-                                <option value="visamc" {% if method == "visamc" %} selected {% endif %}>Card</option>
-                            </select>
-                        </div>
-                        <button type="submit" class="btn btn-primary">Apply Filters</button>
-                    </form>
                 </div>
             </div>
         </div>

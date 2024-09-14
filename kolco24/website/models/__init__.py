@@ -10,5 +10,6 @@ from .models import (
     TeamAdminLog,
 )
 from .news import NewsPost
+from .payment import SbpPaymentRecipient
 from .race import Race, RaceLink
 from .tag import PointTag

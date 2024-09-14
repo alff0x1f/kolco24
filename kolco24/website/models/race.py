@@ -78,4 +78,4 @@ class Category(Model):
         ordering = ["code"]
 
     def __str__(self):
-        return self.code
+        return f"{self.code} ({self.race})"
