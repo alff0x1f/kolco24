@@ -207,6 +207,7 @@ class RaceNewsView(View):
             "links": race.links.order_by("-id"),
             "news_list": NewsPost.objects.filter(race=race)[:10],
             "login_form": LoginForm(),
+            "reg_open": settings.REG_OPEN,
         }
 
 
@@ -1261,6 +1262,8 @@ class AllTeamsView(View):
 
 class AddTeam(View):
     def get(self, request, race_id):
+        if not settings.REG_OPEN:
+            return HttpResponse("Регистрация закрыта")
         if not request.user.is_authenticated:
             return HttpResponseRedirect(reverse("passlogin") + f"?next={request.path}")
         form = TeamForm(race_id)
@@ -1343,6 +1346,8 @@ class TeamPayment(View):
     def get(self, request, team_id):
         if not request.user.is_authenticated:
             return HttpResponseRedirect(reverse("passlogin") + f"?next={request.path}")
+        if not settings.REG_OPEN:
+            return HttpResponse("Регистрация закрыта")
 
         team = Team.objects.filter(id=team_id).first()
         payment_method = request.GET.get("method")
