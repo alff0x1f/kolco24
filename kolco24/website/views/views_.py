@@ -1275,7 +1275,13 @@ class AddTeam(View):
         return render(
             request,
             "website/add_team.html",
-            {"race_id": race_id, "team_form": form, "cost": PaymentsYa.get_cost()},
+            {
+                "race_id": race_id,
+                "team_form": form,
+                "cost": PaymentsYa.get_cost(),
+                "action": reverse("add_team", args=[race_id]),
+                "reg_open": settings.REG_OPEN,
+            },
         )
 
     def post(self, request, race_id):

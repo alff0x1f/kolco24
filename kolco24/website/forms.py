@@ -231,18 +231,20 @@ class TeamForm(forms.Form):
         ),
         label="Количество участников",
     )
-    dist = forms.CharField()
-    paymentid = forms.CharField(widget=forms.HiddenInput())
+    dist = forms.CharField(required=False)
+    paymentid = forms.CharField(widget=forms.HiddenInput(), required=False)
 
-    map_count = forms.IntegerField(
+    map_count = forms.ChoiceField(
+        choices=[(i, str(i) if i else "Нет") for i in range(0, 7)],
         required=False,
         initial=0,
-        widget=forms.NumberInput(
+        widget=forms.Select(
             attrs={
                 "class": "form-control form-control-lg",
                 "placeholder": "Дополнительные карты",
             }
         ),
+        label="Дополнительные карты",
     )
 
     def __init__(self, race_id, *args, **kwargs):
