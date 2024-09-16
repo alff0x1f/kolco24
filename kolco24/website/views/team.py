@@ -87,7 +87,6 @@ class EditTeamView(View):
             )
 
         # If form is not valid, re-render the form with errors
-        print(form.errors)
         return render(
             request,
             "website/add_team.html",

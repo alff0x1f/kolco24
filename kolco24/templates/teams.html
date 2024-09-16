@@ -96,17 +96,16 @@
                                     {% if show_category %}<th scope="col">Категория</th>{% endif %}
                                     <th scope="col">Город</th>
                                     <th scope="col">Участники</th>
-                                    <th scope="col"></th>
+                                    <th scope="col">Кол</th>
                                 </tr>
                                 </thead>
                                 <tbody>
                                 {% for team in teams %}
-                                    <tr class="text-small">
+                                    <tr class="text-small {% if team.owner == user %}table-secondary{% endif %}">
                                         <td>{{ team.start_number }}</td>
                                         <td>{{ team.teamname }} {% if not team.teamname %}Без названия {{ team.id }} ({{ team.owner.last_name }} {{ team.owner.first_name }}) {% endif %}
-                                            {% if user.is_superuser %}
-                                                (<a href="/admin/website/team/{{ team.id }}/change/">id{{ team.id }}</a>)
-                                                <a href="/team/{{ team.paymentid }}"><i class="icon-pencil ml-1"></i></a>
+                                            {% if user.is_superuser or team.owner == user %}
+                                                <a href="/team/{{ team.id }}"><i class="icon-pencil ml-1"></i></a>
                                             {% endif %}
                                             <br/>
                                         </td>
