@@ -6,12 +6,12 @@
             <div class="row flex-md-row card card-lg">
                 <div class="col-12 col-md-7 card-body bg-secondary">
                     <div class="text-center mb-3">
-                        <h1 class="h2 mb-2">Добавление новой команды</h1>
+                        <h1 class="h2 mb-2">{{ team.teamname|default:"Добавление новой команды" }}</h1>
                         <span>Данные команды</span>
                     </div>
                     <div class="row justify-content-center">
                         <div class="col-12 col-lg-10">
-                            <form id="teamform" action="{% url 'add_team' race_id %}" method="POST">
+                            <form id="teamform" action="{{ action }}" method="POST">
                                 <div class="form-row form-group">
                                     <div class="col">
                                         {{ team_form.teamname }}
@@ -176,7 +176,22 @@
                                         {% endif %}
                                     </div>
                                 </div>
-                                {{ team_form.paymentid }}
+                                <div id="map_count" class="form-row form-group">
+                                    <div class="col-6">
+                                        {{ team_form.map_count.label_tag }}
+                                        {{ team_form.map_count }}
+                                        {% if team_form.map_count.errors %}
+                                            <div class="invalid-feedback">
+                                                {{ team_form.map_count.errors }}
+                                            </div>
+                                        {% endif %}
+                                    </div>
+                                    <div class="col-12">
+                                        <small>На команду выдаются 2 карты. Если вы хотите купить дополнительные карты,
+                                            отметьте количество (Цена карты - 200 руб)
+                                        </small>
+                                    </div>
+                                </div>
                                 {% csrf_token %}
                                 {% if team_form.non_field_errors %}
                                     <div class="alert alert-danger" role="alert">
@@ -186,6 +201,16 @@
                                 <div id="team_form_alert" class="alert alert-success" role="alert"
                                      style="display: none;">
                                     Text
+                                </div>
+                                <div class="mb-2" id="reg_close_warning">
+                                    <p>Добавление новых участников невозможно из-за отсутствия слотов.</p>
+                                </div>
+                                <div class="form-row form-group">
+                                    <div class="col">
+                                        <button class="btn btn-block btn-success" type="submit" id="teamform_submit">
+                                            Сохранить
+                                        </button>
+                                    </div>
                                 </div>
                             </form>
                         </div>
@@ -233,64 +258,74 @@
                                         id="ucountlabel_all">за <span id="ucountlabel">1</span> чел.</span></p></div>
                                 <div class="col-6"><p class="text-right"><span id="sumlabel">1500</span> руб</p></div>
                             </div>
-                            <div class="mb-2 text-center">
-                                <h4 class="h4 mb-2">Способы оплаты</h4>
-                                <div class="row">
-                                    <div class="col-6 col-xs-6 col-lg-3">
-                                        <div class="card">
-                                            <img alt="sber" class="card-img-top" src="/static/images/payments/tinkoff.png">
+                            {% if reg_open %}
+                                <div class="mb-2 text-center">
+                                    <h4 class="h4 mb-2">Способы оплаты</h4>
+                                    <div class="row">
+                                        <div class="col-6 col-xs-6 col-lg-3">
+                                            <div class="card">
+                                                <img alt="sber" class="card-img-top"
+                                                     src="/static/images/payments/tinkoff.png">
+                                            </div>
                                         </div>
-                                    </div>
-                                    <div class="col-6 col-xs-6 col-lg-3">
-                                        <div class="card">
-                                            <img alt="sbp" class="card-img-top" src="/static/images/payments/sbp.png">
+                                        <div class="col-6 col-xs-6 col-lg-3">
+                                            <div class="card">
+                                                <img alt="sbp" class="card-img-top"
+                                                     src="/static/images/payments/sbp.png">
+                                            </div>
                                         </div>
-                                    </div>
-                                    <div class="col-6 col-xs-6 col-lg-3">
-                                        <div class="card">
-                                            <img alt="mir" class="card-img-top"
-                                                 src="/static/images/payments/visa-mastercard.jpg">
+                                        <div class="col-6 col-xs-6 col-lg-3">
+                                            <div class="card">
+                                                <img alt="mir" class="card-img-top"
+                                                     src="/static/images/payments/visa-mastercard.jpg">
+                                            </div>
                                         </div>
-                                    </div>
-                                    <div class="col-6 col-xs-6 col-lg-3">
-                                        <div class="card">
-                                            <img alt="yoomoney" class="card-img-top"
-                                                 src="/static/images/payments/yoomoney.png">
+                                        <div class="col-6 col-xs-6 col-lg-3">
+                                            <div class="card">
+                                                <img alt="yoomoney" class="card-img-top"
+                                                     src="/static/images/payments/yoomoney.png">
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
-                            </div>
 
-                            <form class="d-flex flex-column" id="paymentmethod">
+                                <form class="d-flex flex-column" id="paymentmethod">
+                                    <div class="custom-control custom-checkbox-switch">
+                                        <input id="radio_sbp" name="radio" type="radio" value="sbp"
+                                               class="custom-control-input" checked="">
+                                        <label class="  custom-control-label" for="radio_sbp">Перевод по СБП по номеру
+                                            телефона (Тиньков)</label>
+                                    </div>
+                                    <div class="custom-control custom-checkbox-switch">
+                                        <input id="radio_visamc" name="radio" type="radio" value="visamc"
+                                               class="custom-control-input">
+                                        <label class="custom-control-label" for="radio_visamc">Картой
+                                            Мир/Visa/Mastercard</label>
+                                    </div>
+                                    <div class="custom-control custom-checkbox-switch">
+                                        <input id="radio_yoomoney" name="radio" type="radio" value="yandexmoney"
+                                               class="custom-control-input">
+                                        <label class="custom-control-label" for="radio_yoomoney">Yoomoney</label>
+                                    </div>
+                                </form>
                                 <div class="custom-control custom-checkbox-switch">
-                                    <input id="radio_sbp" name="radio" type="radio" value="sbp"
-                                           class="custom-control-input" checked="">
-                                    <label class="custom-control-label" for="radio_sbp">Перевод по СБП по номеру телефона (Тиньков)</label>
+                                    <button type="button" class="btn btn-primary float-right mt-3" id="common_paid">
+                                        Оплатить
+                                    </button>
+                                    <script>
+                                        // Attach click event to the button to submit the form
+                                        document.getElementById('common_paid').addEventListener('click', function () {
+                                            // Submit the team_form
+                                            document.getElementById('teamform').submit();
+                                        });
+                                    </script>
                                 </div>
-                                <div class="custom-control custom-checkbox-switch">
-                                    <input id="radio_visamc" name="radio" type="radio" value="visamc"
-                                           class="custom-control-input">
-                                    <label class="custom-control-label" for="radio_visamc">Картой
-                                        Мир/Visa/Mastercard</label>
+                            {% else %}
+                                <div class="mb-2">
+                                    <h4 class="h4 mb-2">Регистрация закрыта</h4>
+                                    <p>Добавление новых участников невозможно из-за отсутствия слотов.</p>
                                 </div>
-                                <div class="custom-control custom-checkbox-switch">
-                                    <input id="radio_yoomoney" name="radio" type="radio" value="yandexmoney"
-                                           class="custom-control-input">
-                                    <label class="custom-control-label" for="radio_yoomoney">Yoomoney</label>
-                                </div>
-                            </form>
-                            <div class="custom-control custom-checkbox-switch">
-                                <button type="button" class="btn btn-primary float-right mt-3" id="common_paid">
-                                    Оплатить
-                                </button>
-                                <script>
-                                    // Attach click event to the button to submit the form
-                                    document.getElementById('common_paid').addEventListener('click', function () {
-                                        // Submit the team_form
-                                        document.getElementById('teamform').submit();
-                                    });
-                                </script>
-                            </div>
+                            {% endif %}
                         </div>
                     </div>
                 </div>
@@ -308,8 +343,15 @@
             // Cache the DOM elements
             const categorySelect = document.getElementById('id_category2_id');
             const ucountSelect = document.getElementById('id_ucount');
+            const mapCountSelect = document.getElementById('id_map_count');
+            const mapCountField = document.getElementById('map_count');
             const ucountlabel = document.getElementById('ucountlabel');
-            const sumlabel = document.getElementById('sumlabel')
+            const sumlabel = document.getElementById('sumlabel');
+            const paid_block = document.getElementById('sidecolumn_paid');
+            const reg_close_warning = document.getElementById('reg_close_warning');
+
+            const ucount_paid = {{ team.paid_people |default:0| floatformat }};
+            const mapCount = {{ team.map_count |default:0| floatformat }};
 
             // All athlete/birth field wrappers by id
             const memberFields = {
@@ -330,8 +372,41 @@
                         memberFields[i].style.display = 'none'; // Hide the field
                     }
                 }
-                ucountlabel.textContent = ucount; // Update the ucount label
-                sumlabel.textContent = ({{ cost  }} * ucount); // Update the sum label
+
+                mapCountSelect.innerHTML = '';
+                for (let i = 0; i <= ucount - 2; i++) {
+                    const option = document.createElement('option');
+                    option.value = i.toString();
+                    option.textContent = i === 0 ? "Нет" : i.toString();
+                    option.selected = i === mapCount;
+                    mapCountSelect.appendChild(option);
+                }
+                if (ucount > 2) {
+                    mapCountField.style.display = 'flex';
+                } else {
+                    mapCountField.style.display = 'none';
+                }
+
+                const sum = {{ cost }} * (ucount - ucount_paid);
+
+                if (sum > 0) {
+                    paid_block.style.display = 'block';
+                    ucountlabel.textContent = ucount - ucount_paid;
+                    sumlabel.textContent = sum;
+                } else {
+                    paid_block.style.display = 'none';
+                    reg_close_warning.style.display = 'none';
+                }
+                //{% if not reg_open %}
+                    const teamform_submit = document.getElementById('teamform_submit');
+                    if (sum > 0) {
+                        reg_close_warning.style.display = 'block';
+                        teamform_submit.disabled = true;
+                    } else {
+                        reg_close_warning.style.display = 'none';
+                        teamform_submit.disabled = false;
+                    }
+                    //{% endif %}
             }
 
             // Function to update the ucount options based on the category selection
@@ -349,7 +424,7 @@
                         ucountOptions = [4, 5, 6];
                         break;
                     default:
-                        ucountOptions = [2]; // Default to 2 participants if category doesn't match
+                        ucountOptions = [2];
                 }
 
                 // Populate ucount options dynamically
@@ -378,7 +453,6 @@
             // payment method radio buttons
             function updateTeamFormAction() {
                 // Get the selected radio button's value
-                // print
                 const selectedValue = document.querySelector('input[name="radio"]:checked').value;
 
                 // Example query parameters for each payment method
@@ -389,15 +463,12 @@
                     'yandexmoney': '?method=yandexmoney'
                 };
 
-                // Get the base action URL for the selected payment method
-                const baseAction = '{% url 'add_team' race_id %}';
-
                 // Get the corresponding query parameters for the selected payment method
                 const queryParam = queryParams[selectedValue] || '';
 
                 // Update the team_form action by appending the query parameters
                 const teamForm = document.getElementById('teamform');
-                teamForm.action = baseAction + queryParam;
+                teamForm.action = '{{ action }}' + queryParam;
             }
 
             document.getElementById('paymentmethod').addEventListener('change', updateTeamFormAction);

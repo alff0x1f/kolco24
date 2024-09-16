@@ -69,7 +69,7 @@ urlpatterns = [
     path(
         "race/<race_id>/category/<category_id>/teams.csv",
         views.TeamsViewCsv.as_view(),
-        name="teams2",
+        name="teams_csv",
     ),
     # path("teams_predstart/", views.teams_predstart, name="teams_predstart"),
     # path("teams_start/", views.teams_start, name="teams_start"),
