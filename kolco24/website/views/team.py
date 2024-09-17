@@ -28,12 +28,12 @@ class EditTeamView(View):
             "athlet4": team.athlet4,
             "athlet5": team.athlet5,
             "athlet6": team.athlet6,
-            "burth1": team.birth1,
-            "burth2": team.birth2,
-            "burth3": team.birth3,
-            "burth4": team.birth4,
-            "burth5": team.birth5,
-            "burth6": team.birth6,
+            "birth1": team.birth1,
+            "birth2": team.birth2,
+            "birth3": team.birth3,
+            "birth4": team.birth4,
+            "birth5": team.birth5,
+            "birth6": team.birth6,
         }
         form = TeamForm(team.category2.race_id, initial=initial)
         return render(
