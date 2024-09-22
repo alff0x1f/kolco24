@@ -1452,7 +1452,7 @@ class AllTeamsResultView(View):
         if category_id:
             teams_ = teams_.filter(category2_id=category_id)
 
-        points = ControlPoint.objects.filter(year=2024, cost__gte=0)
+        points = ControlPoint.objects.filter(year=2023, cost__gte=0)
         cost = {}
         for p in points:
             cost[p.number] = p.cost

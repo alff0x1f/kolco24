@@ -29,8 +29,8 @@ class TeamAdmin(admin.ModelAdmin):
 
 
 class ControlPointAdmin(admin.ModelAdmin):
-    list_display = ("iterator", "number", "cost")
-    list_filter = ("year", "cost")
+    list_display = ("id", "year", "iterator", "number", "cost", "description", "race")
+    list_filter = ("race", "year", "cost")
 
 
 class TakenKPAdmin(admin.ModelAdmin):
