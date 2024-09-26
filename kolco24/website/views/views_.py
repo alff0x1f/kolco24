@@ -1606,28 +1606,11 @@ class TeamsView(View):
             "start_number",
             "id",
         )
-        points = ControlPoint.objects.filter(year=2024, cost__gte=0)
-        cost = {}
-        for p in points:
-            cost[p.number] = p.cost
-
-        for team in teams_:
-            summ = 0
-            count = 0
-            take_points = (
-                TakenKP.objects.filter(team=team.id)
-                .exclude(nfc="")
-                .distinct("point_number")
-                .order_by("point_number")
+        if request.user.is_superuser:
+            teams_ = Team.objects.filter(category2=category).order_by(
+                "start_number",
+                "id",
             )
-            for p in take_points:
-                summ += cost[p.point_number]
-                count += 1
-
-            team.summ = summ
-            team.count = count
-
-        teams_ = sorted(teams_, key=lambda x: -x.summ)
 
         context = {
             "race": race,

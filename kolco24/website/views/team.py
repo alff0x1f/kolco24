@@ -4,7 +4,7 @@ from django.shortcuts import render
 from django.urls import reverse
 from django.views import View
 from website.forms import TeamForm
-from website.models import PaymentsYa, Team
+from website.models import Payment, PaymentsYa, Team
 
 
 class EditTeamView(View):
@@ -46,6 +46,9 @@ class EditTeamView(View):
                 "cost": PaymentsYa.get_cost(),
                 "reg_open": settings.REG_OPEN,
                 "action": reverse("edit_team", args=[team_id]),
+                "payments": Payment.objects.filter(team=team, status="done").order_by(
+                    "id"
+                ),
             },
         )
 
@@ -97,6 +100,9 @@ class EditTeamView(View):
                 "cost": PaymentsYa.get_cost(),
                 "reg_open": settings.REG_OPEN,
                 "action": reverse("edit_team", args=[team_id]),
+                "payments": Payment.objects.filter(team=team, status="done").order_by(
+                    "id"
+                ),
             },
         )
 
