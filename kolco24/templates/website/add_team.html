@@ -252,6 +252,42 @@
                                 </div>
                             </li>
                         </ul>
+                        <hr class="short">
+                        {% if team.paid_people %}
+                            <div class="row justify-content-between">
+                                <div class="col-6"><p>Оплачено за {{ team.paid_people | floatformat:"0" }} чел.</p></div>
+                                <div class="col-6"><p class="text-right"><span>{{ team.paid_sum }}</span> руб</p></div>
+                            </div>
+                        {% endif %}
+                        {% if payments %}
+                            <hr class="short">
+                            <h4 class="h4 mb-2">История оплат</h4>
+                            {% for payment in payments %}
+                                {% if payment.payment_amount %}
+                                    <div class="row justify-content-between">
+                                        <div class="col-6"><p>Платеж за {{ payment.paid_for | floatformat:"0" }}
+                                            чел.</p>
+                                        </div>
+                                        <div class="col-6">
+                                            <p class="text-right mb-0"><span>{{ payment.payment_amount }}</span> руб</p>
+                                            <p class="text-right"><small>{{ payment.created_at | date:"j.m.Y" }}</small>
+                                            </p>
+                                        </div>
+                                    </div>
+                                {% endif %}
+                                {% if payment.additional_charge %}
+                                    <div class="row justify-content-between">
+                                        <div class="col-6"><p>Доплата </p></div>
+                                        <div class="col-6">
+                                            <p class="text-right mb-0">{{ payment.additional_charge }} руб</p>
+                                            <p class="text-right"><small>{{ payment.created_at | date:"j.m.Y" }}</small>
+                                            </p>
+                                        </div>
+                                    </div>
+                                {% endif %}
+                            {% endfor %}
+                        {% endif %}
+
                         <div id="sidecolumn_paid">
                             <div class="row mb-4 justify-content-between">
                                 <div class="col-6"><p><span id="paidfor_action">К оплате</span> <span
