@@ -1,7 +1,6 @@
+from api.views import MemberTagListCreateView
 from django.http import HttpResponse
 from django.urls import path
-
-from api.views import MemberTagListCreateView
 
 urlpatterns = [
     path(
