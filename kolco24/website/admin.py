@@ -9,6 +9,7 @@ from .models import (
     PaymentsYa,
     Race,
     SbpPaymentRecipient,
+    Tag,
     TakenKP,
     Team,
 )
@@ -99,6 +100,12 @@ class NewsPostAdmin(admin.ModelAdmin):
         return format_html(obj.content_html)
 
     content_preview.short_description = "HTML Preview"
+
+
+@admin.register(Tag)
+class TagAdmin(admin.ModelAdmin):
+    list_display = ("number", "tag_id")
+    search_fields = ("number", "tag_id")
 
 
 admin.site.register(SbpPaymentRecipient)
