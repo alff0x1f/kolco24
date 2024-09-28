@@ -3,7 +3,7 @@ from rest_framework.exceptions import NotFound
 from rest_framework.generics import ListCreateAPIView
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from website.models import ControlPoint, CheckpointTag, Tag
+from website.models import CheckpointTag, ControlPoint, Tag
 
 from ..serializers import CheckpointTagSerializer, TagSerializer
 

@@ -1,4 +1,4 @@
-from api.views import MemberTagListCreateView, CheckpointTagCreateView
+from api.views import CheckpointTagCreateView, MemberTagListCreateView
 from django.http import HttpResponse
 from django.urls import path
 

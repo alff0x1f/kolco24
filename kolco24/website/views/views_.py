@@ -40,13 +40,13 @@ from website.googledocs import (
 )
 from website.models import (
     Athlet,
+    CheckpointTag,
     ControlPoint,
     FastLogin,
     NewsPost,
     Payment,
     PaymentLog,
     PaymentsYa,
-    CheckpointTag,
     Race,
     SbpPaymentRecipient,
     TakenKP,
