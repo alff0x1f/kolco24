@@ -3,6 +3,7 @@ from django.utils.html import format_html
 from markdown import markdown
 
 from .models import (
+    CheckpointTag,
     ControlPoint,
     NewsPost,
     Payment,
@@ -29,9 +30,29 @@ class TeamAdmin(admin.ModelAdmin):
     list_filter = ("year", "category", "category2")
 
 
+class PointTagInline(admin.TabularInline):
+    model = CheckpointTag
+    extra = 1
+
+
+@admin.register(ControlPoint)
 class ControlPointAdmin(admin.ModelAdmin):
     list_display = ("id", "year", "iterator", "number", "cost", "description", "race")
     list_filter = ("race", "year", "cost")
+    inlines = [PointTagInline]
+
+
+@admin.register(CheckpointTag)
+class CheckpointTagAdmin(admin.ModelAdmin):
+    list_display = ("id", "point", "point_number", "tag_id")
+    list_filter = ("point__race",)
+
+    def get_queryset(self, request):
+        queryset = super().get_queryset(request)
+        return queryset.select_related("point")
+
+    def point_number(self, obj) -> int:
+        return obj.point.number
 
 
 class TakenKPAdmin(admin.ModelAdmin):
@@ -110,7 +131,6 @@ class TagAdmin(admin.ModelAdmin):
 
 admin.site.register(SbpPaymentRecipient)
 admin.site.register(Team, TeamAdmin)
-admin.site.register(ControlPoint, ControlPointAdmin)
 admin.site.register(TakenKP, TakenKPAdmin)
 admin.site.register(PaymentsYa, PaymentsYaAdmin)
 admin.site.register(Payment, PaymentAdmin)

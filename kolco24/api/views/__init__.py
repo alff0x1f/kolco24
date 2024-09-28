@@ -1,1 +1,1 @@
-from .tag import MemberTagListCreateView, PointTagsView
+from .tag import CheckpointTagCreateView, MemberTagListCreateView
