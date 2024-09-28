@@ -1,1 +1,1 @@
-from .tag import TagSerializer
+from .tag import CheckpointTagSerializer, TagSerializer

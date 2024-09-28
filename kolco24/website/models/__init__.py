@@ -12,4 +12,4 @@ from .models import (
 from .news import NewsPost
 from .payment import SbpPaymentRecipient
 from .race import Race, RaceLink
-from .tag import PointTag, Tag
+from .tag import CheckpointTag, Tag

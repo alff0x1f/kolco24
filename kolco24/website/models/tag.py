@@ -14,14 +14,7 @@ class Tag(models.Model):
         ordering = ["number"]
 
 
-class PointTag(models.Model):
-    race = models.ForeignKey(
-        "Race",
-        related_name="kp_tag",
-        verbose_name="Метки",
-        on_delete=models.CASCADE,
-        default=1,
-    )
+class CheckpointTag(models.Model):
     point = models.ForeignKey(
         "ControlPoint", verbose_name="КП", on_delete=models.CASCADE
     )

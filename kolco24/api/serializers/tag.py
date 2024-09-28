@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from website.models import ControlPoint, PointTag, Race, Tag
+from website.models import Tag
 
 
 class TagSerializer(serializers.ModelSerializer):
@@ -8,20 +8,6 @@ class TagSerializer(serializers.ModelSerializer):
         fields = ["id", "number", "tag_id"]
 
 
-class PointTagSerializer(serializers.ModelSerializer):
-    race = serializers.PrimaryKeyRelatedField(queryset=Race.objects.all())
-    point = serializers.PrimaryKeyRelatedField(
-        queryset=ControlPoint.objects.all(), required=False
-    )
-
-    class Meta:
-        model = PointTag
-        fields = ["race", "point", "tag_id"]
-
-    def create(self, validated_data):
-        number = self.context["number"]
-        control_point = ControlPoint.objects.get(
-            number=number, race=validated_data["race"]
-        )
-        validated_data["point"] = control_point
-        return super().create(validated_data)
+class CheckpointTagSerializer(serializers.Serializer):
+    number = serializers.IntegerField()
+    tag_id = serializers.CharField(max_length=255)

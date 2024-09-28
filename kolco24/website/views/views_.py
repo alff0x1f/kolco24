@@ -40,13 +40,13 @@ from website.googledocs import (
 )
 from website.models import (
     Athlet,
+    CheckpointTag,
     ControlPoint,
     FastLogin,
     NewsPost,
     Payment,
     PaymentLog,
     PaymentsYa,
-    PointTag,
     Race,
     SbpPaymentRecipient,
     TakenKP,
@@ -1081,7 +1081,9 @@ class PointTagsView(View):
                     {"error": "tag_id is a required field."}, status=400
                 )
 
-            _, created = PointTag.objects.update_or_create(point=point, tag_id=tag_id)
+            _, created = CheckpointTag.objects.update_or_create(
+                point=point, tag_id=tag_id
+            )
             if created:
                 return JsonResponse(
                     {"message": "PointTag created successfully."}, status=201
@@ -1112,7 +1114,9 @@ def points(request):
     )
     points_ids = [point["id"] for point in control_points]
 
-    tags = PointTag.objects.filter(point_id__in=points_ids).values("point_id", "tag_id")
+    tags = CheckpointTag.objects.filter(point_id__in=points_ids).values(
+        "point_id", "tag_id"
+    )
     tags_by_point = defaultdict(list)
     for tag in tags:
         tags_by_point[tag["point_id"]].append(tag["tag_id"])
