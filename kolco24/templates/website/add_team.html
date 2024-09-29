@@ -363,6 +363,33 @@
                                 </div>
                             {% endif %}
                         </div>
+                        {% if team_move_form and team and team.paid_people and user.is_superuser %}
+                            <hr class="short">
+                            <h5 class="h5 mb-2">Перенести участника</h5>
+                            <form method="post" action="{% url 'move_team_member' team.id %}">
+                                {% csrf_token %}
+                                {{ team_move_form.non_field_errors }}
+                                <div class="form-group">
+                                    {{ team_move_form.to_team.label_tag }}
+                                    {{ team_move_form.to_team }}
+                                    {% if team_move_form.to_team.errors %}
+                                        <div class="invalid-feedback">
+                                            {{ team_move_form.to_team.errors }}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                                <div class="form-group">
+                                    {{ team_move_form.moved_people.label_tag }}
+                                    {{ team_move_form.moved_people }}
+                                    {% if team_move_form.moved_people.errors %}
+                                        <div class="invalid-feedback">
+                                            {{ team_move_form.moved_people.errors }}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                                <button type="submit" class="btn btn-primary">Перенести</button>
+                            </form>
+                        {% endif %}
                     </div>
                 </div>
                 <!--end of col-->

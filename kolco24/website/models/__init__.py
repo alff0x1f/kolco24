@@ -8,6 +8,7 @@ from .models import (
     TakenKP,
     Team,
     TeamAdminLog,
+    TeamMemberMove,
 )
 from .news import NewsPost
 from .payment import SbpPaymentRecipient

@@ -1260,6 +1260,16 @@ class AllTeamsView(View):
                 "id",
             )
         )
+        if request.user.is_superuser:
+            teams_ = (
+                Team.objects.filter(category2__race_id=race_id)
+                .select_related("category2")
+                .order_by(
+                    "category2__order",
+                    "start_number",
+                    "id",
+                )
+            )
         context = {
             "race": race,
             "categories": categories,
@@ -1271,7 +1281,7 @@ class AllTeamsView(View):
 
 class AddTeam(View):
     def get(self, request, race_id):
-        if not settings.REG_OPEN:
+        if not settings.REG_OPEN and not request.user.is_superuser:
             return HttpResponse("Регистрация закрыта")
         if not request.user.is_authenticated:
             return HttpResponseRedirect(reverse("passlogin") + f"?next={request.path}")
@@ -1610,11 +1620,6 @@ class TeamsView(View):
             "start_number",
             "id",
         )
-        if request.user.is_superuser:
-            teams_ = Team.objects.filter(category2=category).order_by(
-                "start_number",
-                "id",
-            )
 
         context = {
             "race": race,

@@ -5,7 +5,7 @@ from datetime import timedelta
 from django import forms
 from django.contrib.auth.forms import PasswordResetForm, SetPasswordForm
 from django.contrib.auth.models import User
-from website.models import Athlet, Team, TeamAdminLog
+from website.models import Athlet, Team, TeamAdminLog, TeamMemberMove
 from website.models.race import Category, Race
 
 
@@ -405,6 +405,48 @@ class TeamForm(forms.Form):
             team.save()
             return team
         return False
+
+
+class TeamMemberMoveForm(forms.ModelForm):
+    def __init__(self, *args, **kwargs):
+        race_id = kwargs.pop("race_id", None)
+        super().__init__(*args, **kwargs)
+        if race_id:
+            self.fields["to_team"].queryset = Team.objects.filter(
+                category2__race_id=race_id
+            ).order_by("id")
+        self.fields["to_team"].label = "Команда назначения"
+        self.fields["moved_people"].label = "Количество переносимых участников"
+        self.fields["moved_people"].widget.attrs["min"] = 1
+
+    class Meta:
+        model = TeamMemberMove
+        fields = ["from_team", "to_team", "moved_people"]
+        widgets = {
+            "from_team": forms.Select(attrs={"class": "form-control"}),
+            "to_team": forms.Select(attrs={"class": "form-control"}),
+            "moved_people": forms.NumberInput(
+                attrs={"class": "form-control", "value": 1}
+            ),
+        }
+
+    def clean_moved_people(self):
+        if (
+            self.cleaned_data["moved_people"]
+            > self.cleaned_data["from_team"].paid_people
+        ):
+            raise forms.ValidationError(
+                "Moved people cannot exceed the number of paid people in the from team."
+            )
+        return self.cleaned_data["moved_people"]
+
+    def clean(self):
+        if (
+            self.cleaned_data["from_team"].category2.race_id
+            != self.cleaned_data["to_team"].category2.race_id
+        ):
+            raise forms.ValidationError("Teams must be in the same Race")
+        return super().clean()
 
 
 class TeamFormAdmin(forms.Form):
