@@ -5,7 +5,7 @@ import random
 
 from django.conf import settings
 from django.contrib.auth.models import User
-from django.db import models
+from django.db import models, transaction
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 
@@ -190,7 +190,7 @@ class Team(models.Model):
     place = models.IntegerField(default=0)
 
     def __str__(self):  # __str__ on Python 3
-        return self.start_number.__str__() + " " + self.teamname.__str__()
+        return f"id{self.id} - {self.start_number} {self.teamname}"
 
     @property
     def start_time_date(self):
@@ -272,6 +272,23 @@ class Team(models.Model):
                 if team.dnf and team.place != 10000:
                     team.place = 10000
                     team.save()
+
+
+class TeamMemberMove(models.Model):
+    from_team = models.ForeignKey(
+        Team, related_name="moves_from", on_delete=models.CASCADE
+    )
+    to_team = models.ForeignKey(Team, related_name="moves_to", on_delete=models.CASCADE)
+    moved_people = models.FloatField(default=0)
+    move_date = models.DateTimeField(auto_now_add=True)
+
+    def move_people(self):
+        self.from_team.paid_people -= self.moved_people
+        self.to_team.paid_people += self.moved_people
+
+        with transaction.atomic():
+            self.from_team.save(update_fields=["paid_people"])
+            self.to_team.save(update_fields=["paid_people"])
 
 
 class TeamAdminLog(models.Model):

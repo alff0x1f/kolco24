@@ -1,9 +1,9 @@
 from django.conf import settings
-from django.http import HttpResponseRedirect
+from django.http import HttpResponse, HttpResponseRedirect
 from django.shortcuts import render
 from django.urls import reverse
 from django.views import View
-from website.forms import TeamForm
+from website.forms import TeamForm, TeamMemberMoveForm
 from website.models import Payment, PaymentsYa, Team
 
 
@@ -49,6 +49,7 @@ class EditTeamView(View):
                 "payments": Payment.objects.filter(team=team, status="done").order_by(
                     "id"
                 ),
+                "team_move_form": TeamMemberMoveForm(race_id=team.category2.race_id),
             },
         )
 
@@ -103,6 +104,7 @@ class EditTeamView(View):
                 "payments": Payment.objects.filter(team=team, status="done").order_by(
                     "id"
                 ),
+                "team_move_form": TeamMemberMoveForm(race_id=team.category2.race_id),
             },
         )
 
@@ -111,3 +113,19 @@ class EditTeamView(View):
         if not self.request.user.is_superuser:
             qs = qs.filter(owner_id=self.request.user.id)
         return qs.first()
+
+
+class TeamMemberMoveView(View):
+    def post(self, request, team_id):
+        """Перемещение участника из команды в команду"""
+        if not request.user.is_superuser:
+            return HttpResponseRedirect(reverse("passlogin") + f"?next={request.path}")
+
+        data = request.POST.copy()
+        data["from_team"] = Team.objects.filter(id=team_id).first().id
+        form = TeamMemberMoveForm(data)
+        if form.is_valid():
+            form.save()
+            form.instance.move_people()
+            return HttpResponseRedirect(reverse("edit_team", args=[team_id]))
+        return HttpResponse(f"Ошибка: {form.errors}", status=400)
