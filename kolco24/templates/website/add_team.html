@@ -474,10 +474,12 @@
 
             // Function to update the ucount options based on the category selection
             function updateUcountOptions() {
+                const defaultUcount = {{ team.ucount }}
                 const selectedCategory = categorySelect.value;
                 ucountSelect.innerHTML = ''; // Clear current options
 
                 // Set ucount options based on category
+                let ucountOptions;
                 switch (selectedCategory) {
                     case '8':
                         ucountOptions = [2, 3];
@@ -499,7 +501,7 @@
                 });
 
                 // Set the first option as selected and trigger the change event to update athlete fields
-                ucountSelect.value = ucountOptions[0].toString();
+                ucountSelect.value = (ucountOptions.includes(defaultUcount)) ? defaultUcount.toString() : ucountOptions[0].toString();
                 updateAthleteFields();
             }
 
