@@ -1,10 +1,11 @@
 from django.conf import settings
+from django.db.models import Q
 from django.http import HttpResponse, HttpResponseRedirect
 from django.shortcuts import render
 from django.urls import reverse
 from django.views import View
 from website.forms import TeamForm, TeamMemberMoveForm
-from website.models import Payment, PaymentsYa, Team
+from website.models import Payment, PaymentsYa, Team, TeamMemberMove
 
 
 class EditTeamView(View):
@@ -49,6 +50,9 @@ class EditTeamView(View):
                 "payments": Payment.objects.filter(team=team, status="done").order_by(
                     "id"
                 ),
+                "member_moves": TeamMemberMove.objects.filter(
+                    Q(from_team=team) | Q(to_team=team)
+                ).order_by("id"),
                 "team_move_form": TeamMemberMoveForm(race_id=team.category2.race_id),
             },
         )
@@ -104,6 +108,9 @@ class EditTeamView(View):
                 "payments": Payment.objects.filter(team=team, status="done").order_by(
                     "id"
                 ),
+                "member_moves": TeamMemberMove.objects.filter(
+                    Q(from_team=team) | Q(to_team=team)
+                ).order_by("id"),
                 "team_move_form": TeamMemberMoveForm(race_id=team.category2.race_id),
             },
         )

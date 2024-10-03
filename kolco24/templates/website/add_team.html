@@ -255,9 +255,24 @@
                         <hr class="short">
                         {% if team.paid_people %}
                             <div class="row justify-content-between">
-                                <div class="col-6"><p>Оплачено за {{ team.paid_people | floatformat:"0" }} чел.</p></div>
-                                <div class="col-6"><p class="text-right"><span>{{ team.paid_sum }}</span> руб</p></div>
+                                <div class="col-12"><p>Оплачено за {{ team.paid_people | floatformat:"0" }} чел.</p></div>
                             </div>
+                        {% endif %}
+                        {% if member_moves %}
+                            <hr class="short">
+                            <h4 class="h4 mb-2">Переносы участников</h4>
+                            {% for move in member_moves %}
+                                <div class="row justify-content-between">
+                                    <div class="col-8">
+                                        <p class="mb-0">{{ move.from_team.teamname }} <i class="icon-arrow-right text-muted"></i>  {{ move.to_team.teamname }}</p>
+                                        <p class="mb-0"><small>(id{{ move.from_team_id }} > id{{ move.to_team_id }})</small></p>
+                                    </div>
+                                    <div class="col-4">
+                                        <p class="text-right mb-0">{{ move.moved_people | floatformat    }} чел</p>
+                                        <p class="text-right mb-0"><small> {{ move.move_date | date:"j.m.Y" }}</small></p>
+                                    </div>
+                                </div>
+                            {% endfor %}
                         {% endif %}
                         {% if payments %}
                             <hr class="short">
