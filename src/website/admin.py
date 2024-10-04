@@ -3,8 +3,8 @@ from django.utils.html import format_html
 from markdown import markdown
 
 from .models import (
-    CheckpointTag,
     Checkpoint,
+    CheckpointTag,
     NewsPost,
     Payment,
     PaymentsYa,
