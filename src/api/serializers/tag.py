@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from website.models import Tag, CheckpointTag
+from website.models import CheckpointTag, Tag
 
 
 class TagSerializer(serializers.ModelSerializer):
