@@ -40,8 +40,8 @@ from website.googledocs import (
 )
 from website.models import (
     Athlet,
+    Checkpoint,
     CheckpointTag,
-    ControlPoint,
     FastLogin,
     NewsPost,
     Payment,
@@ -900,7 +900,7 @@ def update_protocol(request):
     for tab in sheet_tabs:
         ws = wb[sheet_tabs[tab]]
         # export KP
-        cpoints = ControlPoint.objects.filter(year="2024").order_by("iterator")
+        cpoints = Checkpoint.objects.filter(year="2024").order_by("iterator")
         column = 14
         point_column = {}
         for p in cpoints:
@@ -1100,15 +1100,18 @@ class PointTagsView(View):
 
     def get_point_by_number(self, point_number):
         try:
-            return ControlPoint.objects.get(number=point_number, year=2024)
-        except ControlPoint.DoesNotExist:
+            return Checkpoint.objects.get(number=point_number, year=2024)
+        except Checkpoint.DoesNotExist:
             return None
 
 
 def points(request):
-    """Возвращает список контрольных пунктов"""
+    """Возвращает список контрольных пунктов
+
+    TODO: Deprecated
+    """
     control_points = (
-        ControlPoint.objects.filter(year=2024)
+        Checkpoint.objects.filter(year=2024)
         .order_by("number")
         .values("id", "number", "description", "cost")
     )
@@ -1466,7 +1469,7 @@ class AllTeamsResultView(View):
         if category_id:
             teams_ = teams_.filter(category2_id=category_id)
 
-        points = ControlPoint.objects.filter(year=2023, cost__gte=0)
+        points = Checkpoint.objects.filter(year=2023, cost__gte=0)
         cost = {}
         for p in points:
             cost[p.number] = p.cost
@@ -1639,7 +1642,7 @@ class TeamsViewCsv(View):
             "start_number",
             "id",
         )
-        points = ControlPoint.objects.filter(year=2024, cost__gte=0)
+        points = Checkpoint.objects.filter(year=2024, cost__gte=0)
         cost = {}
         for p in points:
             cost[p.number] = p.cost

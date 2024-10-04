@@ -431,25 +431,6 @@ class Coupons(models.Model):
     avail_count = models.IntegerField(default=1)
 
 
-class ControlPoint(models.Model):
-    race = models.ForeignKey(
-        "Race", verbose_name="Гонка", on_delete=models.SET_NULL, blank=True, null=True
-    )
-    number = models.IntegerField("Номер контрольной точки", default=1)
-    cost = models.IntegerField("Стоимость", default=1)
-    description = models.CharField("Описание КП", max_length=200, default="")
-    year = models.IntegerField("Год", default=2024)  # deprecated
-    iterator = models.IntegerField(default=0)  # for export
-
-    def __str__(self):  # __str__ on Python 3
-        return self.number.__str__()
-
-    class Meta:
-        ordering = ["id"]
-        verbose_name = "Контрольная точка"
-        verbose_name_plural = "Контрольные точки"
-
-
 class TakenKP(models.Model):
     NEW = "new"
     ACCEPTED = "accepted"

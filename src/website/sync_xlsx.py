@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta
 
 from openpyxl import load_workbook
-from website.models import ControlPoint, TakenKP, Team
+from website.models import Checkpoint, TakenKP, Team
 
 
 def import_file_xlsx(filename):
@@ -168,7 +168,7 @@ def import_points(ws):
             point = ws.cell(row, column).value
             if point:
                 point = int(point)
-                if not ControlPoint.objects.filter(number=point, year="2019").exists():
+                if not Checkpoint.objects.filter(number=point, year="2019").exists():
                     return True, "КП с номером %s не найден [%s,%s]" % (
                         point,
                         row,
@@ -185,7 +185,7 @@ def import_points(ws):
         team = Team.objects.filter(start_number=team_start_num).get()
         for point_num in all_points[team_start_num]:
             import_point_count += 1
-            point = ControlPoint.objects.filter(number=str(point_num)).get()
+            point = Checkpoint.objects.filter(number=str(point_num)).get()
             if not TakenKP.objects.filter(team=team, point=point).exists():
                 new_point = TakenKP(team=team, point=point)
                 new_point.save()
@@ -215,7 +215,7 @@ def import_vova_points(ws):
 
             if is_point_taken:
                 print("point_num", point_num)
-                point = ControlPoint.objects.filter(number=str(point_num)).get()
+                point = Checkpoint.objects.filter(number=str(point_num)).get()
                 if not TakenKP.objects.filter(team=team, point=point).exists():
                     new_point = TakenKP(team=team, point=point)
                     new_point.save()
