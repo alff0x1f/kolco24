@@ -16,8 +16,13 @@ class Race(Model):
     name = CharField("Название", max_length=50)
     code = CharField("Код", max_length=15, unique=True)
     date = DateField("Дата", default=timezone.now)
+    date_end = DateField("Дата окончания", default=timezone.now)
     place = CharField("Место", max_length=50, default="")
     is_active = BooleanField("Активна", default=True)
+
+    is_legend_visible = BooleanField("Легенда открыта", default=False)
+    is_reg_open = BooleanField("Регистрация открыта", default=False)
+    is_teams_editable = BooleanField("Команды редактируемы", default=False)
 
     class Meta:
         verbose_name = "Гонка"

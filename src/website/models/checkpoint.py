@@ -30,7 +30,10 @@ class Checkpoint(models.Model):
 
 class CheckpointTag(models.Model):
     point = models.ForeignKey(
-        "website.Checkpoint", verbose_name="КП", on_delete=models.CASCADE
+        "website.Checkpoint",
+        verbose_name="КП",
+        on_delete=models.CASCADE,
+        related_name="tags",
     )
     tag_id = models.CharField(max_length=255, verbose_name="ID тега")
     check_method = models.CharField(
