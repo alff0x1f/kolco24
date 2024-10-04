@@ -1,0 +1,78 @@
+{% extends "website/base.html" %}
+
+{% block title %} Команды Кольцо 24 {% endblock %}
+{% block og_title %}Зарегистрированные команды{% endblock %}
+{% block twitter_title %}Зарегистрированные команды{% endblock %}
+{% block pagetitle %} Команды Кольцо 24 {% endblock %}
+
+{% block content %}
+<section>
+    <div class="container">
+        <div class="row justify-content-center text-center section-intro">
+            <div class="col-12 col-md-9 col-lg-8">
+                <span class="title-decorative">Кольцо24</span>
+                <h2 class="display-4">Финиш</h2>
+
+            </div>
+            <!--end of col-->
+        </div>
+        <!--end of row-->
+        <div class="row justify-content-center">
+            <div class="col-12 col-md-12">
+                {% for teamgroup in teams %}
+                    <h4 class="mb-4">{{ teamgroup.dist_name }}</h4>
+                    <table class="table table-responsive">
+                        <thead>
+                            <tr>
+                            <th scope="col">#</th>
+                            <th scope="col">Кат</th>
+                            <th scope="col">Название</th>
+                            <!-- {% if user.is_superuser %}
+                            <th scope="col">Финиш</th>
+                            {% endif %} -->
+                            <th scope="col">Представитель</th>
+                            <th scope="col">Участники</th>
+                            <th scope="col">Время</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                        {% for team in teamgroup.teams %}
+                            <tr {% if team.paid_people < team.ucount %}class="table-warning"{% endif%}>
+                            <td scope="row">
+                                    {{ forloop.counter }} <br/>
+                                    {% if team.start_number %}
+                                        {{ team.start_number }} 
+                                    {% endif %}
+                                    </td>
+                            <td>{{ team.category }} </td>
+                            <td>{{ team.teamname }}{% if user.is_superuser %}<br><span class='text-muted text-small'>{{team.owner.profile.phone}}</span>{% endif %}</td>
+                            <!-- {% if user.is_superuser %}
+                                <td><a href="/team_finish/{{team.paymentid}}" class="btn btn-primary" role="button">{{ team.teamname }}</a></td>
+                            {% endif %} -->
+                            <td>{{ team.owner.last_name }} {{ team.owner.first_name }}
+                            </td>
+                            <td>{{ team.athlet1 }}
+                                {% if team.ucount >= 2 and team.athlet2 %}<br>{{ team.athlet2 }} {% endif %}
+                                {% if team.ucount >= 2 and team.athlet3 %}<br>{{ team.athlet3 }} {% endif %}
+                                {% if team.ucount >= 2 and team.athlet4 %}<br>{{ team.athlet4 }} {% endif %}
+                                {% if team.ucount >= 2 and team.athlet5 %}<br>{{ team.athlet5 }} {% endif %}
+                                {% if team.ucount >= 2 and team.athlet6 %}<br>{{ team.athlet6 }} {% endif %}
+                            </td>
+                                <td>
+                                {% if team.start_time %}Старт: {{ team.start_time |date:'d M H:i:s' }}{% endif %}<br/>
+                                {% if team.finish_time %}Финиш: {{ team.finish_time |date:'d M H:i:s' }}{% endif %}
+                                </td>
+                            </tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                {% endfor %}
+
+            </div>
+            <!--end of col-->
+        </div>
+        <!--end of row-->
+    </div>
+    <!--end of container-->
+</section>
+{% endblock %}

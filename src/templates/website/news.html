@@ -1,0 +1,189 @@
+{% extends "website/base.html" %}
+
+{% block content %}
+<section class="bg-dark hide">
+    <img alt="Image" src="/static/images/backgrounds/header2024.jpg" class="bg-image opacity-70"/>
+    <div class="container">
+        <div class="row center justify-content-between">
+            <div class="col-12 col-md-6 col-lg-5">
+                <img class="mx-auto d-none d-sm-block" style="width: 60%" src="/static/images/logo_big.png"
+                     alt="Кольцо 24 2024">
+                <h3 class="text-center">11-13 октября 2024<br/> Белорецкий район, хр. Крака</h3>
+            </div>
+            <!--end of col-->
+
+            <div class="col-12 col-md-6 col-lg-5">
+                <div class="card">
+                    {% if not reg_open %}
+                        <div class="card-header d-flex justify-content-between">
+                            <div>
+                                <span class="h6">Регистрация закрыта</span>
+                            </div>
+                        </div>
+                    {% elif user.is_authenticated %}
+                        <div class="list-group m-3 list-group-flush">
+                            <a href="{% url 'add_team' race.id %}" class="btn btn-block btn-success">Добавить
+                                новую команду</a>
+                        </div>
+                    {% else %}
+                        <div class="list-group m-3 list-group-flush">
+                            <a href="{% url 'register' %}" class="btn btn-block btn-success">Регистрация</a>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        <!--end of row-->
+    </div>
+    <!--end of container-->
+</section>
+<section>
+    <div class="container">
+        <div class="row justify-content-between">
+            <div class="col-12 col-md-8 col-lg-7">
+                {% for news in news_list %}
+                    <article>
+                        <h2 class="mb-1">{{ news.title }}</h2>
+                        <time datetime="{{ news.publication_date }}" class="text-muted d-block mb-2"><i
+                                class="icon-calendar mr-1"></i>{{ news.publication_date }}
+                        </time>
+                        {{ news.content_html | safe }}
+                        {% if news.image %}
+                            <figure class="mb-1 mt-1">
+                                <img alt="" class="img-fluid" src="{{ news.image.url }}">
+                            </figure>
+                        {% endif %}
+                    </article>
+                    <hr class="mb-4 mt-3">
+                {% endfor %}
+            </div>
+            <!--end of col-->
+            <div class="col-12 col-md-4">
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between">
+                        <div>
+                            <span class="h6">{{ race.name }}</span>
+                        </div>
+                        {#                            <a href="#">View all ›</a>#}
+                    </div>
+                    <ul class="list-group list-group-flush">
+                        <li class="list-group-item">
+                            <div class="d-flex justify-content-between">
+                                <div><i class="icon-home mr-1"></i> Место</div>
+                                <span>{{ race.place }}</span>
+                            </div>
+                        </li>
+                        <li class="list-group-item">
+                            <div class="d-flex justify-content-between">
+                                <div><i class="icon-stopwatch mr-1"></i> Дата</div>
+                                <span>{{ race.date }}</span>
+                            </div>
+                        </li>
+                        <li class="list-group-item">
+                            <div class="d-flex justify-content-between">
+                                <div><i class="icon-user mr-1"></i> Участников</div>
+                                <span>{{ race.people_count | floatformat }}</span>
+                            </div>
+                        </li>
+                        <li class="list-group-item">
+                            <div class="d-flex justify-content-between">
+                                <div><i class="icon-flag mr-1"></i> Команд</div>
+                                <span>{{ race.team_count }}</span>
+                            </div>
+                        </li>
+                    </ul>
+                </div>
+                {% if not user.is_authenticated %}
+                    <div class="card">
+                        <div class="card-body">
+                            <form action="{% url 'passlogin' %}" method="POST">
+                                {% csrf_token %}
+                                <div class="form-group">
+                                    {{ login_form.email.label_tag }}
+                                    {{ login_form.email }}
+                                </div>
+                                <div class="form-group">
+                                    {{ login_form.password.label_tag }}
+                                    {{ login_form.password }}
+                                    <small>Нет пароля? <a href="{% url 'password_reset' %}">Сбросить</a></small>
+                                </div>
+                                <button type="submit" class="btn btn-lg btn-success btn-block">Войти
+                                </button>
+                            </form>
+                            {% if messages %}
+                                <ul class="alert alert-danger">
+                                    {% for message in messages %}
+                                        <li>{{ message }}</li>
+                                    {% endfor %}
+                                </ul>
+                            {% endif %}
+                        </div>
+                    </div>
+                {% endif %}
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between">
+                        <div>
+                            <span class="h6">Полезные ссылки</span>
+                        </div>
+                        {#                            <a href="#">View all ›</a>#}
+                    </div>
+                    <div class="card-body">
+                        <ul class="list-unstyled list-spacing-sm">
+                            {% for link in links %}
+                                <li>
+                                    <i class="icon-text-document text-muted mr-1"></i>
+                                    <a href="{{ link.url }}">{{ link.name }}</a>
+                                </li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                </div>
+                <!--end of card-->
+                <div class="card card-sm">
+                    <div class="card-header">
+                        <span class="h6">Команды</span>
+                    </div>
+                    <div class="list-group list-group-flush">
+                        <a class="list-group-item d-flex justify-content-between"
+                           href="/race/{{ race.id }}/teams#teamlist">
+                            <div>
+                                <span>Все</span>
+                            </div>
+                            <div>
+                                <span class="badge badge-secondary ml-2">{{ race.team_count }}</span>
+                                <i class="icon-chevron-right"></i>
+                            </div>
+                        </a>
+                        <!-- Categories link-->
+                        {% for category in categories %}
+                            <a class="list-group-item d-flex justify-content-between"
+                               href="/race/{{ race.id }}/category/{{ category.id }}/teams#teamlist">
+                                <div>
+                                    <i class="icon-dot-single mr-1"></i>
+                                    <span>{{ category.short_name }}</span>
+                                </div>
+                                <div>
+                                    {% if category.team_count %}
+                                        <span class="badge badge-secondary ml-2">{{ category.team_count }}</span>
+                                    {% endif %}
+                                    <i class="icon-chevron-right"></i>
+                                </div>
+                            </a>
+                        {% endfor %}
+                        <!-- end of categories -->
+                        {% if reg_open and user.is_authenticated %}
+                            <div class="list-group m-3 list-group-flush">
+                                <a href="{% url 'add_team' race.id %}" class="btn btn-block btn-secondary">Добавить
+                                    новую команду</a>
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            <!--end of col-->
+        </div>
+        <!--end of row-->
+    </div>
+    <!--end of container-->
+</section>
+{% endblock %}

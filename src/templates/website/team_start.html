@@ -1,0 +1,118 @@
+{% extends "website/base.html" %}
+
+{% block content %}
+        <div class="container">
+            <div class="row flex-md-row card card-lg">
+                            
+                <div class="col-12 col-md-12 card-body">
+                    <div>
+                        <div class="mb-3 text-center">
+                            <h4 class="h4 mb-2">{{main_team.teamname}}</h4>
+                            <h2 class="h2 mb-2" id="date_time"></h2>
+                            {% if main_team.start_time %}
+                            <div class="alert alert-danger" role="alert">
+                                Время старта уже есть: <strong>{{ main_team.start_time |date:'d M H:i:s' }}</strong>
+                            </div>
+                            {% endif %}
+                        </div>
+                        <form id="team_form_admin" action="{% url 'team_admin' %}" method="POST" >
+                            <div class="form-row form-group d-none">
+                                <div class="col">
+                                    {{ team_form_admin.category.label_tag }}
+                                    {{ team_form_admin.category }}
+                                    {% if team_form_admin.category.errors %}
+                                        <div class="invalid-feedback">
+                                            {{ team_form_admin.category.errors}}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <div class="form-row form-group">
+                                <div class="col">
+                                    {{ team_form_admin.start_time.label_tag }}
+                                    {{ team_form_admin.start_time }}
+                                    {% if team_form_admin.start_time.errors %}
+                                        <div class="invalid-feedback">
+                                            {{ team_form_admin.start_time.errors}}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            {{ team_form.paymentid }}
+                            {% csrf_token %}
+                            <div class="form-row form-group">
+                                <div class="col">
+                                    <button class="btn btn-block btn-info" type="submit" id="team_form_admin_submit">СТАРТ!</button>
+                                </div>
+                            </div>
+                            <div id="team_form_admin_alert" class="alert alert-success" role="alert" style="display: none;">
+                                Text
+                            </div>
+                        </form>
+                        <hr class="short">
+                        
+                        <a href="/teams_start" class="btn btn-primary" role="button">Список команд ›</a>
+                        
+                    </div>
+                </div>
+                <!--end of col-->
+            </div>
+            <!--end of row-->
+        </div>
+        <!--end of container-->
+        <!--end of container-->
+    </section>
+    <!--end of section-->
+    <script>
+        {% load l10n %}
+        date_diff = Date.now() - ({{ timestamp | unlocalize }} * 1000);
+        
+
+        function date_time()
+        {
+            date = new Date;
+            date = date - date_diff;
+            date = new Date(date);
+            year = date.getFullYear();
+            month = date.getMonth()+1;
+            d = date.getDate();
+            if(d<10)
+            {
+                    m = "0"+m;
+            }
+            h = date.getHours();
+            if(h<10)
+            {
+                    h = "0"+h;
+            }
+            m = date.getMinutes();
+            if(m<10)
+            {
+                    m = "0"+m;
+            }
+            s = date.getSeconds();
+            if(s<10)
+            {
+                    s = "0"+s;
+            }
+            result = d+'.'+month+'.'+year+' '+h+':'+m+':'+s;
+            document.getElementById('date_time').innerHTML = result;
+            document.getElementById('id_start_time').value = result;
+            setTimeout('date_time("");','1000');
+            return true;
+        };
+        window.onload = date_time();
+    </script>
+{% endblock %}
+{% block footer_js_include %}
+    <script>
+        {% load l10n %}
+        var cost = {{ cost }};
+        var ucount = {{ team_form.ucount.value }};
+        var ucount_paid = {{ main_team.paid_people | unlocalize }};
+        var dist = "{{ team_form.dist.value }}";
+        var csrf_token = "{{ csrf_token }}";
+    </script>
+     <script type="text/javascript" src="/static/js/team.js?ver=3"></script>
+     {% if user.is_superuser %}<script type="text/javascript" src="/static/js/team_admin.js?ver=1"></script>{% endif%}
+{% endblock %}

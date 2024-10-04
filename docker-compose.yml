@@ -7,7 +7,7 @@ services:
     user: "1000:1000"
     command: [ "gunicorn", "--bind", "0.0.0.0:8000", "kolco24.wsgi:application", "--access-logfile", "-", "--log-level", "info"]
     volumes:
-      - ./kolco24:/app
+      - ./src:/app
     depends_on:
       - kolco24_db
     networks:
@@ -20,7 +20,7 @@ services:
     restart: unless-stopped
     command: [ "python", "manage.py", "runmailer" ]
     volumes:
-      - ./kolco24:/app
+      - ./src:/app
     depends_on:
       - kolco24_db
     networks:
