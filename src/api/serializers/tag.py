@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from website.models import Tag
+from website.models import Tag, CheckpointTag
 
 
 class TagSerializer(serializers.ModelSerializer):
@@ -11,3 +11,9 @@ class TagSerializer(serializers.ModelSerializer):
 class CheckpointTagSerializer(serializers.Serializer):
     number = serializers.IntegerField()
     tag_id = serializers.CharField(max_length=255)
+
+
+class CheckpointTagSerializer2(serializers.ModelSerializer):
+    class Meta:
+        model = CheckpointTag
+        fields = ["id", "tag_id", "check_method"]
