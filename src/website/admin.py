@@ -3,8 +3,8 @@ from django.utils.html import format_html
 from markdown import markdown
 
 from .models import (
+    Checkpoint,
     CheckpointTag,
-    ControlPoint,
     NewsPost,
     Payment,
     PaymentsYa,
@@ -35,8 +35,8 @@ class PointTagInline(admin.TabularInline):
     extra = 1
 
 
-@admin.register(ControlPoint)
-class ControlPointAdmin(admin.ModelAdmin):
+@admin.register(Checkpoint)
+class CheckpointAdmin(admin.ModelAdmin):
     list_display = ("id", "year", "iterator", "number", "cost", "description", "race")
     list_filter = ("race", "year", "cost")
     inlines = [PointTagInline]

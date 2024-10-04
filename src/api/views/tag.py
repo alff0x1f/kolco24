@@ -3,7 +3,7 @@ from rest_framework.exceptions import NotFound
 from rest_framework.generics import ListCreateAPIView
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from website.models import CheckpointTag, ControlPoint, Tag
+from website.models import Checkpoint, CheckpointTag, Tag
 
 from ..serializers import CheckpointTagSerializer, TagSerializer
 
@@ -50,10 +50,10 @@ class CheckpointTagCreateView(APIView):
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     @staticmethod
-    def get_control_point(race_id: int, number: int) -> ControlPoint:
+    def get_control_point(race_id: int, number: int) -> Checkpoint:
         try:
-            return ControlPoint.objects.get(race_id=race_id, number=number)
-        except ControlPoint.DoesNotExist:
+            return Checkpoint.objects.get(race_id=race_id, number=number)
+        except Checkpoint.DoesNotExist:
             raise NotFound(
                 {"number": [f"Контрольная точка с номером {number} не найдена"]}
             )
