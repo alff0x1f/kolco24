@@ -1,7 +1,12 @@
 from django.http import HttpResponse
 from django.urls import path
 
-from api.views import CheckpointTagCreateView, CheckpointView, MemberTagListCreateView
+from api.views import (
+    CheckpointTagCreateView,
+    CheckpointView,
+    MemberTagListCreateView,
+    TeamListView,
+)
 
 urlpatterns = [
     path(
@@ -18,4 +23,5 @@ urlpatterns = [
         CheckpointTagCreateView.as_view(),
         name="checkpoint-tag-create",
     ),
+    path("race/<int:race_id>/teams/", TeamListView.as_view(), name="team-list"),
 ]
