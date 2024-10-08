@@ -12,5 +12,5 @@ class TeamListView(ListAPIView):
     def get_queryset(self):
         race_id = self.kwargs.get("race_id")
         return Team.objects.select_related("category2").filter(
-            category2__race_id=race_id
+            category2__race_id=race_id, paid_people__gt=0
         )
