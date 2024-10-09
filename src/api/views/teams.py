@@ -1,4 +1,8 @@
+import csv
+
+from django.http import HttpResponse
 from rest_framework.generics import ListAPIView
+from rest_framework.views import APIView
 from website.models import Team
 
 from api.serializers.team import TeamSerializer
@@ -14,3 +18,72 @@ class TeamListView(ListAPIView):
         return Team.objects.select_related("category2").filter(
             category2__race_id=race_id, paid_people__gt=0
         )
+
+
+class TeamCSVListView(APIView):
+    """Endpoint to return a list of Teams in CSV format"""
+
+    def get(self, request, *args, **kwargs):
+        # Get the queryset
+        race_id = self.kwargs.get("race_id")
+        teams = Team.objects.select_related("category2").filter(
+            category2__race_id=race_id, paid_people__gt=0
+        )
+
+        # Create the HttpResponse with the CSV content type
+        response = HttpResponse(content_type="text/csv; charset=utf-8")
+        response["Content-Disposition"] = 'attachment; filename="teams.csv"'
+
+        # Create a CSV writer
+        writer = csv.writer(response)
+
+        # Write the headers
+        writer.writerow(
+            [
+                "ID",
+                "Team Name",
+                "Paid People",
+                "Ucount",
+                "Category",
+                "Start Number",
+                "Athlete 1",
+                "Birth 1",
+                "Athlete 2",
+                "Birth 2",
+                "Athlete 3",
+                "Birth 3",
+                "Athlete 4",
+                "Birth 4",
+                "Athlete 5",
+                "Birth 5",
+                "Athlete 6",
+            ]
+        )
+
+        # Write data rows
+        for team in teams:
+            writer.writerow(
+                [
+                    team.id,
+                    team.teamname,
+                    round(team.paid_people),
+                    team.ucount,
+                    team.category,
+                    team.start_number,
+                    team.athlet1,
+                    team.birth1,
+                    team.athlet2,
+                    team.birth2,
+                    team.athlet3,
+                    team.birth3,
+                    team.athlet4,
+                    team.birth4,
+                    team.athlet5,
+                    team.birth5,
+                    team.athlet6,
+                    team.birth6,
+                ]
+            )
+
+        # Return the response as a CSV file
+        return response
