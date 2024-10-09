@@ -6,3 +6,4 @@ class CheckpointType(TextChoices):
     finish = "finish", "Финиш"
     test = "test", "Тест"
     kp = "kp", "КП"
+    draft = "draft", "Черновик"  # не отображается в интерфейсе, не поставленные КП
