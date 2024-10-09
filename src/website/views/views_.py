@@ -1105,31 +1105,6 @@ class PointTagsView(View):
             return None
 
 
-def points(request):
-    """Возвращает список контрольных пунктов
-
-    TODO: Deprecated
-    """
-    control_points = (
-        Checkpoint.objects.filter(year=2024)
-        .order_by("number")
-        .values("id", "number", "description", "cost")
-    )
-    points_ids = [point["id"] for point in control_points]
-
-    tags = CheckpointTag.objects.filter(point_id__in=points_ids).values(
-        "point_id", "tag_id"
-    )
-    tags_by_point = defaultdict(list)
-    for tag in tags:
-        tags_by_point[tag["point_id"]].append(tag["tag_id"])
-
-    for point in control_points:
-        point["tags"] = tags_by_point[point["id"]]
-
-    return JsonResponse(list(control_points), safe=False)
-
-
 def teams_api(request):
     """Возвращает список команд"""
     query_params = request.GET.get("category", "")

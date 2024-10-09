@@ -109,7 +109,6 @@ urlpatterns = [
     # app api
     path("api/", include(("api.urls", "api"), namespace="api")),
     path("api/v1/races/", views.RaceView.as_view(), name="api_races"),
-    path("api/v1/points/", views.points, name="api_points"),
     path("api/v1/teams/", views.teams_api, name="api_teams"),
     path("api/v1/teams/times/", views.TeamsTimesView.as_view(), name="api_teams_times"),
     # path("api/v1/upload_photo", views.upload_photo, name="upload_photo"),
