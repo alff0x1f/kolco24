@@ -6,6 +6,7 @@ from api.views import (
     CheckpointView,
     MemberTagListCreateView,
     TeamListView,
+    TeamCSVListView,
 )
 
 urlpatterns = [
@@ -24,4 +25,7 @@ urlpatterns = [
         name="checkpoint-tag-create",
     ),
     path("race/<int:race_id>/teams/", TeamListView.as_view(), name="team-list"),
+    path(
+        "race/<int:race_id>/teams.csv", TeamCSVListView.as_view(), name="team-list-csv"
+    ),
 ]
