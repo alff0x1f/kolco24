@@ -34,7 +34,6 @@ from .views_ import (
     new_team,
     payment_list,
     paymentinfo,
-    points,
     regulations,
     success,
     sync_googledocs,
