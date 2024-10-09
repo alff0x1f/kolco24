@@ -47,8 +47,10 @@ class TeamCSVListView(APIView):
                 "Email",
                 "Phone",
                 "Team Name",
+                "City",
+                "Organization",
                 "Paid People",
-                "Ucount",
+                "Count",
                 "Category",
                 "Start Number",
                 "Athlete 1",
@@ -70,10 +72,16 @@ class TeamCSVListView(APIView):
             writer.writerow(
                 [
                     team.id,
-                    f"{team.owner.last_name} {team.owner.first_name}",
-                    team.owner.email,
-                    team.owner.profile.phone,
+                    (
+                        f"{team.owner.last_name} {team.owner.first_name}"
+                        if team.owner_id != 1
+                        else ""
+                    ),
+                    team.owner.email if team.owner_id != 1 else "",
+                    team.owner.profile.phone if team.owner_id != 1 else "",
                     team.teamname,
+                    team.city,
+                    team.organization,
                     round(team.paid_people),
                     team.ucount,
                     team.category2.short_name,
