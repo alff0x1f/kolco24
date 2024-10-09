@@ -5,8 +5,8 @@ from api.views import (
     CheckpointTagCreateView,
     CheckpointView,
     MemberTagListCreateView,
-    TeamListView,
     TeamCSVListView,
+    TeamListView,
 )
 
 urlpatterns = [
