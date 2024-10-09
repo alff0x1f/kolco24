@@ -26,8 +26,10 @@ class TeamCSVListView(APIView):
     def get(self, request, *args, **kwargs):
         # Get the queryset
         race_id = self.kwargs.get("race_id")
-        teams = Team.objects.select_related("category2").filter(
-            category2__race_id=race_id, paid_people__gt=0
+        teams = (
+            Team.objects.select_related("category2", "owner", "owner__profile")
+            .filter(category2__race_id=race_id, paid_people__gt=0)
+            .order_by("category2", "start_number", "id")
         )
 
         # Create the HttpResponse with the CSV content type
@@ -35,15 +37,20 @@ class TeamCSVListView(APIView):
         response["Content-Disposition"] = 'attachment; filename="teams.csv"'
 
         # Create a CSV writer
-        writer = csv.writer(response)
+        writer = csv.writer(response, delimiter=";")
 
         # Write the headers
         writer.writerow(
             [
                 "ID",
+                "Owner",
+                "Email",
+                "Phone",
                 "Team Name",
+                "City",
+                "Organization",
                 "Paid People",
-                "Ucount",
+                "Count",
                 "Category",
                 "Start Number",
                 "Athlete 1",
@@ -65,10 +72,19 @@ class TeamCSVListView(APIView):
             writer.writerow(
                 [
                     team.id,
+                    (
+                        f"{team.owner.last_name} {team.owner.first_name}"
+                        if team.owner_id != 1
+                        else ""
+                    ),
+                    team.owner.email if team.owner_id != 1 else "",
+                    team.owner.profile.phone if team.owner_id != 1 else "",
                     team.teamname,
+                    team.city,
+                    team.organization,
                     round(team.paid_people),
                     team.ucount,
-                    team.category,
+                    team.category2.short_name,
                     team.start_number,
                     team.athlet1,
                     team.birth1,
