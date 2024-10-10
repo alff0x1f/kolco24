@@ -1173,6 +1173,9 @@ def upload_photo(request):
     if request.method != "POST":
         raise Http404("File not found.")
 
+    if not Race.objects.get(id=2).is_photo_upload_enabled:
+        return JsonResponse({"error": "photo upload is disabled"}, status=403)
+
     file = request.FILES.get("photo")
     team_id = request.POST["team_id"]
     point_number = request.POST["point_number"]
