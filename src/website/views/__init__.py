@@ -47,6 +47,7 @@ from .views_ import (
     teams_predstart,
     teams_start,
     update_protocol,
+    upload_photo,
     upload_protocol,
     yandex_payment,
 )
