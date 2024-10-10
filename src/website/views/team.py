@@ -71,7 +71,7 @@ class EditTeamView(View):
         if not team:
             return HttpResponseRedirect(reverse("passlogin") + f"?next={request.path}")
 
-        if team.category2.race.is_teams_editable and not request.user.is_superuser:
+        if not team.category2.race.is_teams_editable and not request.user.is_superuser:
             return HttpResponse("Редактирование команд запрещено", status=403)
 
         form = TeamForm(team.category2.race_id, request.POST)

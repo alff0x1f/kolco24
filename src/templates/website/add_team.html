@@ -205,13 +205,16 @@
                                 <div class="mb-2" id="reg_close_warning">
                                     <p>Добавление новых участников невозможно из-за отсутствия слотов.</p>
                                 </div>
-                                <div class="form-row form-group">
-                                    <div class="col">
-                                        <button class="btn btn-block btn-success" type="submit" id="teamform_submit">
-                                            Сохранить
-                                        </button>
+                                {% if team.category2.race.is_team_editable %}
+                                    <div class="form-row form-group">
+                                        <div class="col">
+                                            <button class="btn btn-block btn-success" type="submit"
+                                                    id="teamform_submit">
+                                                Сохранить
+                                            </button>
+                                        </div>
                                     </div>
-                                </div>
+                                {% endif %}
                             </form>
                         </div>
                     </div>
