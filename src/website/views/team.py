@@ -37,6 +37,12 @@ class EditTeamView(View):
             "birth6": team.birth6,
         }
         form = TeamForm(team.category2.race_id, initial=initial)
+
+        # Disable all form fields
+        if not team.category2.race.is_teams_editable and not request.user.is_superuser:
+            for field in form.fields.values():
+                field.disabled = True
+
         return render(
             request,
             "website/add_team.html",
@@ -64,6 +70,10 @@ class EditTeamView(View):
         team: Team = self.get_team(team_id)
         if not team:
             return HttpResponseRedirect(reverse("passlogin") + f"?next={request.path}")
+
+        if team.category2.race.is_teams_editable and not request.user.is_superuser:
+            return HttpResponse("Редактирование команд запрещено", status=403)
+
         form = TeamForm(team.category2.race_id, request.POST)
         if form.is_valid():
             if "teamname" in form.cleaned_data:
