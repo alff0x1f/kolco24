@@ -1525,7 +1525,7 @@ class AllTeamsResultView(View):
                 team.penalty = minutes - 12 * 60
             if team.category2_id == 13 and minutes > 24 * 60:
                 team.penalty = minutes - 24 * 60
-            if team.category2_id == (14, 15) and minutes > 8 * 60:
+            if team.category2_id in (14, 15) and minutes > 8 * 60:
                 team.penalty = minutes - 8 * 60
 
             team.points_nfc = ", ".join(str(p) for p in team.points_nfc)
