@@ -1440,14 +1440,16 @@ class AllTeamsResultView(View):
             # page not found
             raise Http404(f"Гонка {race_id} не найдена.")
 
-        teams_ = Team.objects.filter(
-            category2__race_id=race_id, paid_people__gt=0
-        ).select_related("category2")
+        teams_ = (
+            Team.objects.filter(category2__race_id=race_id, paid_people__gt=0)
+            .exclude(start_time=0)
+            .select_related("category2")
+        )
 
         if category_id:
             teams_ = teams_.filter(category2_id=category_id)
 
-        points = Checkpoint.objects.filter(year=2023, cost__gte=0)
+        points = Checkpoint.objects.filter(race_id=race_id, cost__gte=0)
         cost = {}
         for p in points:
             cost[p.number] = p.cost
@@ -1455,16 +1457,16 @@ class AllTeamsResultView(View):
         for team in teams_:
             # members
             members = [team.athlet1]
-            if team.paid_people > 1 and team.athlet2:
+            if team.ucount > 1 and team.athlet2:
                 members.append(team.athlet2)
 
-            if team.paid_people > 2 and team.athlet3:
+            if team.ucount > 2 and team.athlet3:
                 members.append(team.athlet3)
-            if team.paid_people > 3 and team.athlet4:
+            if team.ucount > 3 and team.athlet4:
                 members.append(team.athlet4)
-            if team.paid_people > 4 and team.athlet5:
+            if team.ucount > 4 and team.athlet5:
                 members.append(team.athlet5)
-            if team.paid_people > 5 and team.athlet6:
+            if team.ucount > 5 and team.athlet6:
                 members.append(team.athlet6)
             team.members = ", ".join(members)
 

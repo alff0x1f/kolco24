@@ -68,11 +68,7 @@
                                             <td>{{ team.organization }}</td>
                                             <td>{{ team.city }}</td>
                                             <td>
-                                                {% if team.paid_people != team.ucount %}
-                                                    ({{ team.paid_people|floatformat }}/{{ team.ucount }})
-                                                {% else %}
-                                                    {{ team.paid_people |floatformat }}
-                                                {% endif %}
+                                                    {{ team.ucount }}
                                                 <!-- Button trigger modal -->
                                                 {#                                    <button type="button" class="btn btn-sm btn-outline-primary" data-toggle="modal"#}
                                                 {#                                            data-target="#exampleModalCenter">#}
