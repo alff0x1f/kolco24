@@ -1519,12 +1519,14 @@ class AllTeamsResultView(View):
             else:
                 team.time = "-"
 
-            if team.dist == "6h" and minutes > 6 * 60:
+            if team.category2_id == 8 and minutes > 6 * 60:
                 team.penalty = minutes - 6 * 60
-            if team.dist == "12h" and minutes > 12 * 60:
+            if team.category2_id in (9, 10, 11, 12) and minutes > 12 * 60:
                 team.penalty = minutes - 12 * 60
-            if team.dist == "24h" and minutes > 25 * 60:
-                team.penalty = minutes - 25 * 60
+            if team.category2_id == 13 and minutes > 24 * 60:
+                team.penalty = minutes - 24 * 60
+            if team.category2_id == (14, 15) and minutes > 8 * 60:
+                team.penalty = minutes - 8 * 60
 
             team.points_nfc = ", ".join(str(p) for p in team.points_nfc)
             team.points_photo = ", ".join(str(p) for p in team.points_photo)
