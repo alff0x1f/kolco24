@@ -8,11 +8,11 @@
 {% block twitter_description %}Предварительный протокол Кольцо 2023{% endblock %}
 
 {% block content %}
-    <section class="flush-with-above">
-        <div class="container mb-4">
+    <section class="flush-with-above pt-2">
+        <div class="container-fluid mb-3">
             <h1 class="h2"> Предварительный протокол </h1>
         </div>
-        <div class="container">
+        <div class="container-fluid">
             <div class="row justify-content-between">
                 <!--end of col-->
 
@@ -21,12 +21,12 @@
                         <div class="col mb-2">
                             <h3 class="mb-2">{{ category.name }} ({{ category.short_name }})</h3>
                             <span>{{ category.description }}</span>
-                            </div>
+                        </div>
                     {% endif %}
                     {% if teams %}
                         <div class="col mb-2">
                             <div class="table-responsive">
-                                <table class="table align-items-center table-sm table-striped">
+                                <table class="table align-items-center table-sm table-striped w-100">
                                     <thead>
                                     <tr>
                                         <th scope="col">#</th>
@@ -48,7 +48,7 @@
                                     </thead>
                                     <tbody>
                                     {% for team in teams %}
-                                        <tr class="text-small">
+                                        <tr>
                                             <td> {% if team.place %}{{ team.place }} {% else %}-{% endif %}</td>
                                             <td>{{ team.start_number }} {{ team.teamname }} {% if not team.teamname %}
                                                 Без
@@ -66,7 +66,7 @@
                                             <td>{{ team.organization }}</td>
                                             <td>{{ team.city }}</td>
                                             <td>
-                                                    {{ team.ucount }}
+                                                {{ team.ucount }}
                                                 <!-- Button trigger modal -->
                                                 {#                                    <button type="button" class="btn btn-sm btn-outline-primary" data-toggle="modal"#}
                                                 {#                                            data-target="#exampleModalCenter">#}
@@ -144,4 +144,14 @@
 
 
 
+{% endblock %}
+
+{% block footer_js_include %}
+    <style>
+        @media print {
+            @page {
+                size: landscape;
+            }
+        }
+    </style>
 {% endblock %}
