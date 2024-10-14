@@ -19,10 +19,8 @@
                 <div class="col-12 col-md-12 col-lg-12" id="teamlist">
                     {% if category %}
                         <div class="col mb-2">
-                            <h3 class="mb-2">{{ category.name }}</h3>
+                            <h3 class="mb-2">{{ category.name }} ({{ category.short_name }})</h3>
                             <span>{{ category.description }}</span>
-                            <p>Предварительные результаты, могут быть скорректированы после полной проверки фотографий
-                                и состава участников по бумажным заявкам</p>
                             </div>
                     {% endif %}
                     {% if teams %}
