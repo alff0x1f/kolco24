@@ -111,11 +111,15 @@ class IndexView(View):
 
 class RegisterView(View):
     def get(self, request):
+        if settings.REG_OPEN is False:
+            raise Http404("Регистрация закрыта")
         if request.user.is_authenticated:
             return HttpResponseRedirect("/")
         return render(request, "website/register.html", self.get_context())
 
     def post(self, request):
+        if settings.REG_OPEN is False:
+            raise Http404("Регистрация закрыта")
         form = RegForm(request.POST)
         if form.is_valid():
             # Extract cleaned form data
