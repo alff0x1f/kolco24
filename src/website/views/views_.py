@@ -1012,6 +1012,11 @@ def regulations(request):
     return render(request, "website/regulations.html")
 
 
+def privacy_policy(request):
+    """Display privacy policy page."""
+    return render(request, "website/privacy_policy.html")
+
+
 # API _________________________________________________________________
 class RaceView(View):
     def get(self, request):
