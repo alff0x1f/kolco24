@@ -95,6 +95,7 @@ urlpatterns = [
     path("refund_policy/", views.refund_policy, name="refund_policy"),
     path("service_order_rules/", views.service_order_rules, name="service_order_rules"),
     path("rules/", views.rules, name="rules"),
+    path("contacts/", views.contacts, name="contacts"),
     # admin
     path("payments/", views.payment_list, name="payment-list"),
     path(
