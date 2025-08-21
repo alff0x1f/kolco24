@@ -94,6 +94,7 @@ urlpatterns = [
     path("privacy/", views.privacy_policy, name="privacy_policy"),
     path("refund_policy/", views.refund_policy, name="refund_policy"),
     path("service_order_rules/", views.service_order_rules, name="service_order_rules"),
+    path("rules/", views.rules, name="rules"),
     # admin
     path("payments/", views.payment_list, name="payment-list"),
     path(
