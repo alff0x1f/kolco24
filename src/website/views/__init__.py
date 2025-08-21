@@ -37,6 +37,7 @@ from .views_ import (
     privacy_policy,
     refund_policy,
     regulations,
+    rules,
     service_order_rules,
     success,
     sync_googledocs,

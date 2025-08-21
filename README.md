@@ -12,6 +12,10 @@ source .venv/bin/activate
 pip install -r requirements.txt 
 ```
 
+```shell
+docker-compose -f docker-compose-dbs.yml up -d
+```
+
 Rename `kolco24/settings.py.example` to `kolco24/settings.py` and edit it (at least you must set SECRET_KEY (just random string) and DIRS TEMPLATES)
 
 ##### Create DB:

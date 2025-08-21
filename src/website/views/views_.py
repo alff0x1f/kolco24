@@ -1027,6 +1027,11 @@ def service_order_rules(request):
     return render(request, "website/service_order_rules.html")
 
 
+def rules(request):
+    """Display service order rules page."""
+    return render(request, "website/rules.html")
+
+
 # API _________________________________________________________________
 class RaceView(View):
     def get(self, request):
