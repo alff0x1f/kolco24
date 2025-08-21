@@ -92,6 +92,8 @@ urlpatterns = [
     path("upload_protocol/", views.upload_protocol, name="upload_protocol"),
     path("regulations/", views.regulations, name="regulations"),
     path("privacy/", views.privacy_policy, name="privacy_policy"),
+    path("refund_policy/", views.refund_policy, name="refund_policy"),
+    path("service_order_rules/", views.service_order_rules, name="service_order_rules"),
     # admin
     path("payments/", views.payment_list, name="payment-list"),
     path(

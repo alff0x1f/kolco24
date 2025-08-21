@@ -1016,6 +1016,13 @@ def privacy_policy(request):
     """Display privacy policy page."""
     return render(request, "website/privacy_policy.html")
 
+def refund_policy(request):
+    """Display refund policy page."""
+    return render(request, "website/refund_policy.html")
+
+def service_order_rules(request):
+    """Display service order rules page."""
+    return render(request, "website/service_order_rules.html")
 
 # API _________________________________________________________________
 class RaceView(View):
