@@ -1032,6 +1032,11 @@ def rules(request):
     return render(request, "website/rules.html")
 
 
+def contacts(request):
+    """Display contacts page."""
+    return render(request, "website/contacts.html")
+
+
 # API _________________________________________________________________
 class RaceView(View):
     def get(self, request):

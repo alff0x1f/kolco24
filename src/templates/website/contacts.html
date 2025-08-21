@@ -1,0 +1,70 @@
+{% extends "website/base.html" %}
+
+{% block title %}Контакты{% endblock %}
+{% block pagetitle %}Контакты{% endblock %}
+
+{% block content %}
+<section id="contacts-page" class="pt-4 pb-5">
+  <div class="container">
+    <div class="row g-4">
+      <!-- Навигация по разделам -->
+      <aside class="col-lg-4 col-xl-3">
+        <nav class="position-sticky" style="top: 1rem;">
+          <div class="card shadow-sm">
+            <div class="card-body">
+              <h2 class="h5 mb-3">Содержание</h2>
+              <ol class="list-unstyled m-0">
+                <li class="mb-2"><a class="text-decoration-none" href="#org">1. Организация</a></li>
+                <li class="mb-2"><a class="text-decoration-none" href="#requisites">2. Реквизиты</a></li>
+                <li class="mb-0"><a class="text-decoration-none" href="#contact-email">3. Связаться</a></li>
+              </ol>
+              <hr class="my-3">
+              <p class="small text-muted mb-0">
+                Последнее обновление: <time datetime="2025-08-21">21&nbsp;августа&nbsp;2025</time>
+              </p>
+            </div>
+          </div>
+        </nav>
+      </aside>
+
+      <!-- Основной контент -->
+      <div class="col-lg-8 col-xl-9">
+        <!-- Организация -->
+        <article class="card shadow-sm">
+          <div class="card-body">
+            <h2 id="org" class="h4 mb-3">Организация</h2>
+            <p class="mb-0">
+              ОБЩЕСТВЕННОЕ ОБЪЕДИНЕНИЕ «КЛУБ ТУРИСТОВ «СПУТНИК» СОВЕТСКОГО РАЙОНА Г.&nbsp;УФЫ»
+            </p>
+          </div>
+        </article>
+
+        <!-- Реквизиты -->
+        <article class="card shadow-sm mt-4">
+          <div class="card-body">
+            <h2 id="requisites" class="h4 mb-3">Реквизиты</h2>
+            <dl class="row mb-0">
+              <dt class="col-sm-4">ИНН</dt>
+              <dd class="col-sm-8">0278028908</dd>
+
+              <dt class="col-sm-4">КПП</dt>
+              <dd class="col-sm-8">027801001</dd>
+            </dl>
+          </div>
+        </article>
+
+        <!-- Связаться -->
+        <article class="card shadow-sm mt-4">
+          <div class="card-body">
+            <h2 id="contact-email" class="h4 mb-3">Связаться</h2>
+            <p class="mb-0">
+              По всем вопросам пишите на
+              <a href="mailto:org@kolco24.ru">org@kolco24.ru</a>.
+            </p>
+          </div>
+        </article>
+      </div>
+    </div>
+  </div>
+</section>
+{% endblock %}
