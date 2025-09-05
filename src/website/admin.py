@@ -77,7 +77,7 @@ class PaymentAdmin(admin.ModelAdmin):
 
 
 class RaceAdmin(admin.ModelAdmin):
-    list_display = ("name", "code", "date", "is_active")
+    list_display = ("id", "name", "code", "date", "is_active", "is_reg_open")
     list_filter = ("is_active",)
     search_fields = ("name", "code")
 
