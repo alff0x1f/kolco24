@@ -41,3 +41,21 @@ class NewsPost(models.Model):
         """Render the markdown content to HTML"""
         self.content_html = markdown(self.content)
         super().save(*args, **kwargs)
+
+
+class MenuItem(models.Model):
+    """Model for a menu item"""
+
+    objects = models.Manager()
+
+    name = models.CharField("Название пункта меню", max_length=100)
+    url = models.CharField("URL пункта меню", max_length=255)
+    order = models.IntegerField("Порядок", default=0)
+
+    def __str__(self):
+        return self.name
+
+    class Meta:
+        ordering = ["order"]
+        verbose_name = "Пункт меню"
+        verbose_name_plural = "Пункты меню"

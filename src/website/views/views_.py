@@ -55,6 +55,8 @@ from website.models import (
 from website.models.race import Category
 from website.sync_xlsx import import_file_xlsx
 
+from ..models.news import MenuItem
+
 logger = logging.getLogger(__name__)
 
 
@@ -1024,7 +1026,10 @@ def refund_policy(request):
 
 def service_order_rules(request):
     """Display service order rules page."""
-    return render(request, "website/service_order_rules.html")
+    context = {
+        "menu": MenuItem.objects.all(),
+    }
+    return render(request, "website/service_order_rules.html", context=context)
 
 
 def rules(request):

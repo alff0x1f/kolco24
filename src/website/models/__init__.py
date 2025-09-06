@@ -10,7 +10,7 @@ from .models import (
     TeamAdminLog,
     TeamMemberMove,
 )
-from .news import NewsPost
+from .news import MenuItem, NewsPost
 from .payment import SbpPaymentRecipient
 from .race import Race, RaceLink
 from .tag import Tag

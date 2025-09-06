@@ -13,8 +13,15 @@ from .models import (
     Tag,
     TakenKP,
     Team,
+    MenuItem,
 )
 from .models.race import Category, RaceLink
+
+
+@admin.register(MenuItem)
+class MenuItemAdmin(admin.ModelAdmin):
+    list_display = ("id", "name", "url", "order")
+    ordering = ("order",)
 
 
 class TeamAdmin(admin.ModelAdmin):
