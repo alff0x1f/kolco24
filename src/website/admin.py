@@ -5,7 +5,9 @@ from markdown import markdown
 from .models import (
     Checkpoint,
     CheckpointTag,
+    MenuItem,
     NewsPost,
+    Page,
     Payment,
     PaymentsYa,
     Race,
@@ -13,8 +15,6 @@ from .models import (
     Tag,
     TakenKP,
     Team,
-    MenuItem,
-    Page,
 )
 from .models.race import Category, RaceLink
 
