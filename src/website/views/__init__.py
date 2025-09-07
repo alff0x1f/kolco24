@@ -33,6 +33,7 @@ from .views_ import (
     login_by_key,
     my_team,
     new_team,
+    page,
     payment_list,
     paymentinfo,
     privacy_policy,

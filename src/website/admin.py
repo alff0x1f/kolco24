@@ -5,7 +5,9 @@ from markdown import markdown
 from .models import (
     Checkpoint,
     CheckpointTag,
+    MenuItem,
     NewsPost,
+    Page,
     Payment,
     PaymentsYa,
     Race,
@@ -15,6 +17,22 @@ from .models import (
     Team,
 )
 from .models.race import Category, RaceLink
+
+
+@admin.register(MenuItem)
+class MenuItemAdmin(admin.ModelAdmin):
+    list_display = ("id", "name", "url", "order")
+    ordering = ("order",)
+
+
+@admin.register(Page)
+class PageAdmin(admin.ModelAdmin):
+    list_display = ("id", "title", "slug")
+    search_fields = ("title", "slug")
+    prepopulated_fields = {"slug": ("title",)}
+    readonly_fields = ("content_html",)
+
+    fieldsets = ((None, {"fields": ("title", "slug", "content", "content_html")}),)
 
 
 class TeamAdmin(admin.ModelAdmin):

@@ -1,0 +1,38 @@
+{% extends "website/base.html" %}
+
+{% block title %}Политика возврата{% endblock %}
+{% block pagetitle %}Политика возврата{% endblock %}
+
+{% block content %}
+<section id="refund-policy" class="pt-4 pb-5">
+  <div class="container">
+    <div class="row g-4">
+      <!-- Навигация по разделам -->
+      <aside class="col-lg-4 col-xl-3">
+        <nav class="position-sticky" style="top: 4rem;">
+          <div class="card shadow-sm">
+            <div class="card-body">
+              <h2 class="h5 mb-3">Документы</h2>
+              <ol class="list-unstyled m-0">
+                {% for menu_item in menu %}
+                <li class="mb-2"><a class="text-decoration-none" href="{{menu_item.url}}">{{menu_item.name}}</a></li>
+                {% endfor %}
+              </ol>
+              <hr class="my-3">
+              <p class="small text-muted mb-0">
+                Последнее обновление: <time datetime="2025-08-01">{{page.updated_at | date:"j.m.Y"}}</time>
+              </p>
+            </div>
+          </div>
+        </nav>
+      </aside>
+
+      <!-- Основной контент -->
+      <div class="col-lg-8 col-xl-9">
+        <h1>{{page.title}}</h1>
+        {{page.content_html | safe}}
+      </div>
+    </div>
+  </div>
+</section>
+{% endblock %}
