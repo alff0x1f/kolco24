@@ -4,7 +4,6 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("website", "0046_race_is_photo_upload_enabled"),
     ]
@@ -38,6 +37,47 @@ class Migration(migrations.Migration):
                 "verbose_name": "Пункт меню",
                 "verbose_name_plural": "Пункты меню",
                 "ordering": ["order"],
+            },
+        ),
+        migrations.CreateModel(
+            name="Page",
+            fields=[
+                (
+                    "id",
+                    models.AutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                (
+                    "title",
+                    models.CharField(max_length=255, verbose_name="Заголовок страницы"),
+                ),
+                ("slug", models.SlugField(unique=True, verbose_name="URL страницы")),
+                (
+                    "content",
+                    models.TextField(
+                        help_text="Use Markdown format",
+                        verbose_name="Содержимое страницы",
+                    ),
+                ),
+                (
+                    "content_html",
+                    models.TextField(
+                        editable=False,
+                        help_text="Rendered HTML content",
+                        verbose_name="Содержимое страницы (HTML)",
+                    ),
+                ),
+                ("created_at", models.DateTimeField(auto_now_add=True)),
+                ("updated_at", models.DateTimeField(auto_now=True)),
+            ],
+            options={
+                "verbose_name": "Страница",
+                "verbose_name_plural": "Страницы",
+                "ordering": ["title"],
             },
         ),
     ]

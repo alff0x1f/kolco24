@@ -39,7 +39,7 @@ class NewsPost(models.Model):
 
     def save(self, *args, **kwargs):
         """Render the markdown content to HTML"""
-        self.content_html = markdown(self.content)
+        self.content_html = markdown(str(self.content))
         super().save(*args, **kwargs)
 
 
@@ -59,3 +59,29 @@ class MenuItem(models.Model):
         ordering = ["order"]
         verbose_name = "Пункт меню"
         verbose_name_plural = "Пункты меню"
+
+
+class Page(models.Model):
+    """Model for a page"""
+
+    title = models.CharField("Заголовок страницы", max_length=255)
+    slug = models.SlugField("URL страницы", unique=True)
+    content = models.TextField("Содержимое страницы", help_text="Use Markdown format")
+    content_html = models.TextField(
+        "Содержимое страницы (HTML)", editable=False, help_text="Rendered HTML content"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return self.title
+
+    class Meta:
+        ordering = ["title"]
+        verbose_name = "Страница"
+        verbose_name_plural = "Страницы"
+
+    def save(self, *args, **kwargs):
+        """Render the markdown content to HTML"""
+        self.content_html = markdown(str(self.content))
+        super().save(*args, **kwargs)

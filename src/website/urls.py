@@ -96,6 +96,7 @@ urlpatterns = [
     path("service_order_rules/", views.service_order_rules, name="service_order_rules"),
     path("rules/", views.rules, name="rules"),
     path("contacts/", views.contacts, name="contacts"),
+    path("page/<str:slug>/", views.page, name="page"),
     # admin
     path("payments/", views.payment_list, name="payment-list"),
     path(

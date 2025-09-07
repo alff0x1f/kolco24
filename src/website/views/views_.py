@@ -55,7 +55,7 @@ from website.models import (
 from website.models.race import Category
 from website.sync_xlsx import import_file_xlsx
 
-from ..models.news import MenuItem
+from ..models.news import MenuItem, Page
 
 logger = logging.getLogger(__name__)
 
@@ -1040,6 +1040,20 @@ def rules(request):
 def contacts(request):
     """Display contacts page."""
     return render(request, "website/contacts.html")
+
+
+def page(request, slug):
+    """Display a static page based on the slug."""
+    try:
+        page = Page.objects.get(slug=slug)
+    except Page.DoesNotExist:
+        raise Http404("Page not found.")
+
+    context = {
+        "page": page,
+        "menu": MenuItem.objects.all(),
+    }
+    return render(request, "website/static_page.html", context=context)
 
 
 # API _________________________________________________________________
