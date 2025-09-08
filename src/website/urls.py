@@ -18,7 +18,7 @@ from .views import (
 from .views.team import EditTeamView, TeamMemberMoveView
 
 urlpatterns = [
-    path("", lambda request: redirect("race", race_id=2), name="index"),
+    path("", lambda request: redirect("race", race_id=8), name="index"),
     # path("index_hidden/", views.IndexView.as_view(), name="index"),
     # auth
     path("register/", views.RegisterView.as_view(), name="register"),
