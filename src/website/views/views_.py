@@ -1016,30 +1016,27 @@ def regulations(request):
 
 def privacy_policy(request):
     """Display privacy policy page."""
-    return render(request, "website/privacy_policy.html")
+    return HttpResponseRedirect(reverse("page", args=["privacy_app"]))
 
 
 def refund_policy(request):
     """Display refund policy page."""
-    return render(request, "website/refund_policy.html")
+    return HttpResponseRedirect(reverse("page", args=["refund_policy"]))
 
 
 def service_order_rules(request):
     """Display service order rules page."""
-    context = {
-        "menu": MenuItem.objects.all(),
-    }
-    return render(request, "website/service_order_rules.html", context=context)
+    return HttpResponseRedirect(reverse("page", args=["service_order_rules"]))
 
 
 def rules(request):
     """Display service order rules page."""
-    return render(request, "website/rules.html")
+    return HttpResponseRedirect(reverse("page", args=["rules"]))
 
 
 def contacts(request):
     """Display contacts page."""
-    return render(request, "website/contacts.html")
+    return HttpResponseRedirect(reverse("page", args=["contacts"]))
 
 
 def page(request, slug):
