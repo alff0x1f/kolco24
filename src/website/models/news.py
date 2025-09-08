@@ -39,7 +39,7 @@ class NewsPost(models.Model):
 
     def save(self, *args, **kwargs):
         """Render the markdown content to HTML"""
-        self.content_html = markdown(str(self.content))
+        self.content_html = markdown(str(self.content), extensions=["extra"])
         super().save(*args, **kwargs)
 
 
@@ -83,5 +83,5 @@ class Page(models.Model):
 
     def save(self, *args, **kwargs):
         """Render the markdown content to HTML"""
-        self.content_html = markdown(str(self.content))
+        self.content_html = markdown(str(self.content), extensions=["extra"])
         super().save(*args, **kwargs)
