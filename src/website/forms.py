@@ -6,6 +6,7 @@ from django import forms
 from django.contrib.auth.forms import PasswordResetForm, SetPasswordForm
 from django.contrib.auth.models import User
 from website.models import Athlet, Team, TeamAdminLog, TeamMemberMove
+from website.models.news import Page
 from website.models.race import Category, Race
 
 
@@ -690,3 +691,17 @@ class Export2GoogleDocsForm(forms.Form):
         if url[:39] == "https://docs.google.com/spreadsheets/d/":
             url = url[39:]
         return url.split("/")[0]
+
+
+class PageForm(forms.ModelForm):
+    class Meta:
+        model = Page
+        fields = ["title", "content"]
+        widgets = {
+            "title": forms.TextInput(
+                attrs={"class": "form-control", "placeholder": "Заголовок страницы"}
+            ),
+            "content": forms.Textarea(
+                attrs={"class": "form-control", "rows": 20, "placeholder": "Markdown"}
+            ),
+        }

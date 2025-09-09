@@ -27,6 +27,7 @@ from website.forms import (
     Export2GoogleDocsForm,
     FastLoginForm,
     LoginForm,
+    PageForm,
     RegForm,
     TeamForm,
     TeamFormAdmin,
@@ -1051,6 +1052,33 @@ def page(request, slug):
         "menu": MenuItem.objects.all(),
     }
     return render(request, "website/static_page.html", context=context)
+
+
+@login_required
+def edit_page(request, slug):
+    """Allow moderators to edit a static page."""
+    try:
+        page = Page.objects.get(slug=slug)
+    except Page.DoesNotExist:
+        raise Http404("Page not found.")
+
+    if not getattr(request.user.profile, "is_moderator", False):
+        raise Http404("Page not found.")
+
+    if request.method == "POST":
+        form = PageForm(request.POST, instance=page)
+        if form.is_valid():
+            form.save()
+            return HttpResponseRedirect(reverse("page", args=[page.slug]))
+    else:
+        form = PageForm(instance=page)
+
+    context = {
+        "form": form,
+        "page": page,
+        "menu": MenuItem.objects.all(),
+    }
+    return render(request, "website/edit_page.html", context=context)
 
 
 # API _________________________________________________________________
