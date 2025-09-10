@@ -15,7 +15,6 @@ logger = logging.getLogger(__name__)
 class Profile(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE)
     phone = models.TextField(max_length=500, blank=True)
-    is_moderator = models.BooleanField(default=False)
 
 
 @receiver(post_save, sender=User)

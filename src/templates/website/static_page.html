@@ -30,7 +30,7 @@
       <!-- Основной контент -->
       <div class="col-lg-8 col-xl-9">
         <h1>{{page.title}}</h1>
-        {% if user.is_authenticated and user.profile.is_moderator %}
+        {% if user.is_authenticated and is_moderator %}
         <a class="btn btn-sm btn-secondary mb-3" href="{% url 'edit_page' page.slug %}">Редактировать</a>
         {% endif %}
         {{page.content_html | safe}}

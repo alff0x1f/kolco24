@@ -1050,6 +1050,8 @@ def page(request, slug):
     context = {
         "page": page,
         "menu": MenuItem.objects.all(),
+        "is_moderator": request.user.is_authenticated
+        and request.user.groups.filter(name="moderators").exists(),
     }
     return render(request, "website/static_page.html", context=context)
 
@@ -1062,7 +1064,7 @@ def edit_page(request, slug):
     except Page.DoesNotExist:
         raise Http404("Page not found.")
 
-    if not getattr(request.user.profile, "is_moderator", False):
+    if not request.user.groups.filter(name="moderators").exists():
         raise Http404("Page not found.")
 
     if request.method == "POST":
@@ -1077,6 +1079,7 @@ def edit_page(request, slug):
         "form": form,
         "page": page,
         "menu": MenuItem.objects.all(),
+        "is_moderator": True,
     }
     return render(request, "website/edit_page.html", context=context)
 
