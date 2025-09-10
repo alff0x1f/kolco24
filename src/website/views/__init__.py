@@ -26,6 +26,7 @@ from .views_ import (
     TeamsView,
     TeamsViewCsv,
     contacts,
+    edit_page,
     export_payments,
     get_cost,
     import_categories,
