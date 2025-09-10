@@ -1,0 +1,85 @@
+{% extends "website/base.html" %}
+
+{% block extra_head %}
+  <link rel="stylesheet" href="https://unpkg.com/easymde/dist/easymde.min.css">
+  <script src="https://unpkg.com/easymde/dist/easymde.min.js"></script>
+{% endblock %}
+
+{% block title %}Редактировать: {{ page.title }}{% endblock %}
+{% block pagetitle %}Редактировать: {{ page.title }}{% endblock %}
+
+{% block content %}
+  <section class="pt-4 pb-5">
+    <div class="container">
+      <div class="row g-4">
+        <!-- Навигация по разделам -->
+        <aside class="col-lg-4 col-xl-3">
+          <nav class="position-sticky" style="top: 4rem;">
+            <div class="card shadow-sm">
+              <div class="card-body">
+                <h2 class="h5 mb-3">Документы</h2>
+                <ol class="list-unstyled m-0">
+                  {% for menu_item in menu %}
+                    <li class="mb-2"><a class="text-decoration-none" href="{{ menu_item.url }}">{{ menu_item.name }}</a>
+                    </li>
+                  {% endfor %}
+                </ol>
+              </div>
+            </div>
+          </nav>
+        </aside>
+        <!-- Основной контент -->
+        <div class="col-lg-8 col-xl-9">
+          <form method="post">
+            {% csrf_token %}
+            <div class="mb-3">
+              {{ form.title.label_tag }}
+              {{ form.title }}
+            </div>
+            <div class="mb-3">
+              {{ form.content.label_tag }}
+              {{ form.content }}
+            </div>
+            <button type="submit" class="btn btn-primary">Сохранить</button>
+            <a href="{% url 'page' page.slug %}" class="btn btn-secondary">Отмена</a>
+          </form>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <script>
+      document.addEventListener('DOMContentLoaded', function () {
+          const el = document.getElementById('{{ form.content.id_for_label }}') || document.getElementById('id_content');
+          if (!el) return;
+
+          const mde = new EasyMDE({
+              element: el,
+              minHeight: "300px",
+              spellChecker: false,
+              autosave: {
+                  enabled: false,
+              },
+              toolbar: [
+                  "bold", "italic", "heading", "|",
+                  "quote", "unordered-list", "ordered-list",
+                  {
+                      name: "table1",
+                      action: EasyMDE.drawTable,
+                      className: "fa fa-th mde-icon-table", // вместо конфликтного "table"
+                      title: "Вставить таблицу"
+                  },
+                  "code", "|",
+                  "link", "image", "|",
+                  "preview", "side-by-side", "fullscreen", "guide"
+              ],
+              renderingConfig: {singleLineBreaks: false}
+          });
+
+          // На submit возвращаем Markdown обратно в textarea (на всякий случай)
+          el.form.addEventListener('submit', () => {
+              el.value = mde.value();
+          });
+      });
+  </script>
+{% endblock %}
