@@ -1,7 +1,7 @@
-from __future__ import annotations
 import time
 from dataclasses import dataclass
-from typing import Optional, Dict, Any
+from typing import Any, Dict, Optional
+
 import requests
 from django.conf import settings
 

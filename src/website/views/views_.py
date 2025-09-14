@@ -56,7 +56,8 @@ from website.models import (
 from website.models.race import Category, RegStatus
 from website.sync_xlsx import import_file_xlsx
 
-from ...vtb.client import VTBClient
+from vtb.client import VTBClient
+
 from ..models.news import MenuItem, Page
 from ..models.vtb import VTBPayment, VTBPreparedPayment
 
