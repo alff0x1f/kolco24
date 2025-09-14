@@ -56,7 +56,9 @@ from website.models import (
 from website.models.race import Category, RegStatus
 from website.sync_xlsx import import_file_xlsx
 
+from ...vtb.client import VTBClient
 from ..models.news import MenuItem, Page
+from ..models.vtb import VTBPayment, VTBPreparedPayment
 
 logger = logging.getLogger(__name__)
 
@@ -114,15 +116,11 @@ class IndexView(View):
 
 class RegisterView(View):
     def get(self, request):
-        if settings.REG_OPEN is False:
-            raise Http404("Регистрация закрыта")
         if request.user.is_authenticated:
             return HttpResponseRedirect("/")
         return render(request, "website/register.html", self.get_context())
 
     def post(self, request):
-        if settings.REG_OPEN is False:
-            raise Http404("Регистрация закрыта")
         form = RegForm(request.POST)
         if form.is_valid():
             # Extract cleaned form data
@@ -136,14 +134,13 @@ class RegisterView(View):
             if User.objects.filter(email=email).exists():
                 # update
                 if Team.objects.filter(
-                    owner__email__iexact=form.cleaned_data["email"], year=2024
+                    owner__email__iexact=form.cleaned_data["email"], year=2025
                 ).exists():
                     # по идее эта проверка лишняя, тк аналогичная есть is_valid,
                     # но на всякий случай (рефактора)
                     form.add_error(
                         None, "Пользователь с таким email уже зарегистрирован"
                     )
-                    print("Пользователь с таким email уже зарегистрирован")
                     return render(request, "website/register.html", {"reg_form": form})
 
                 user = User.objects.get(email=email)
@@ -1353,6 +1350,7 @@ class AddTeam(View):
                 "race": race,
                 "race_id": race_id,
                 "team_form": form,
+                "team": Team(),
                 "cost": race.cost,
                 "action": reverse("add_team", args=[race_id]),
                 "reg_open": race.reg_status == RegStatus.OPEN,
@@ -1375,14 +1373,14 @@ class AddTeam(View):
         if form.is_valid():
             # save team
             team = Team.objects.create(
-                year=2024,
+                year=2025,
                 owner_id=request.user.id,
                 **form.cleaned_data,
             )
             team.save()
 
             # payment
-            payment_method = request.GET.get("method", "visamc")
+            payment_method = request.GET.get("method", "sbp2")
             cost_now = PaymentsYa.get_cost()
             cost = (int(team.ucount) - team.paid_people) * cost_now
             if cost < 0:
@@ -1415,6 +1413,36 @@ class AddTeam(View):
                         "sum": cost,
                     },
                 )
+            elif payment_method in ("sbp2"):
+                payment = Payment.objects.create(
+                    owner=request.user,
+                    team=team,
+                    payment_method=payment_method,
+                    payment_amount=cost,
+                    payment_with_discount=cost,
+                    cost_per_person=cost_now,
+                    paid_for=int(team.ucount) - team.paid_people,
+                    additional_charge=team.additional_charge,
+                    status="draft",
+                )
+                vtb_client = VTBClient()
+                vtb_client._ensure_token()
+
+                payload = vtb_client.create_order(
+                    order_id=f"ORDER_{payment.id}",
+                    order_name=f"Оплата за команду на Кольцо 24 ({payment.id})",
+                    amount_value=cost,
+                    return_payment_data="sbp",
+                )
+                vtb_payment = VTBPayment.from_vtb_payload(payload)
+
+                prepared_payment = VTBPreparedPayment.objects.filter(
+                    payment=vtb_payment
+                ).first()
+                if prepared_payment.url:
+                    return HttpResponseRedirect(prepared_payment.url)
+                return HttpResponseRedirect(vtb_payment.pay_url)
+
             else:
                 # redirect
                 return HttpResponseRedirect(
@@ -1432,8 +1460,8 @@ class TeamPayment(View):
     def get(self, request, team_id):
         if not request.user.is_authenticated:
             return HttpResponseRedirect(reverse("passlogin") + f"?next={request.path}")
-        if not settings.REG_OPEN:
-            return HttpResponse("Регистрация закрыта")
+        # if not settings.REG_OPEN:
+        #     return HttpResponse("Регистрация закрыта")
 
         team = Team.objects.filter(id=team_id).first()
         payment_method = request.GET.get("method")
