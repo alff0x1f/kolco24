@@ -2,13 +2,13 @@
 
 {% block content %}
 <section class="bg-dark hide">
-    <img alt="Image" src="/static/images/backgrounds/header2024.jpg" class="bg-image opacity-70"/>
+    <img alt="Image" src="{{ race.header_image }}" class="bg-image opacity-70"/>
     <div class="container">
         <div class="row center justify-content-between">
             <div class="col-12 col-md-6 col-lg-5">
-                <img class="mx-auto d-none d-sm-block" style="width: 60%" src="/static/images/logo_big.png"
-                     alt="Кольцо 24 2025">
-                <h3 class="text-center">10-12 октября 2025<br/> места вокруг Макарово</h3>
+                <img class="mx-auto d-none d-sm-block" style="width: 60%" src="{{ race.header_logo }}"
+                     alt="{{ race.name }}"/>
+                <h3 class="text-center">{{ race.date }}<br/> {{ race.place }}</h3>
             </div>
             <!--end of col-->
 
@@ -94,7 +94,7 @@
                         <li class="list-group-item">
                             <div class="d-flex justify-content-between">
                                 <div><i class="icon-credit-card mr-1"></i> Стартовый взнос</div>
-                                <span>2000 руб./уч</span>
+                                <span>{{ race.cost }} руб./уч</span>
                             </div>
                         </li>
                     </ul>

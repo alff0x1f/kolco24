@@ -8,8 +8,15 @@ from django.db.models import (
     IntegerField,
     Manager,
     Model,
+    TextChoices,
 )
 from django.utils import timezone
+
+
+class RegStatus(TextChoices):
+    UPCOMING = "upcoming", "Откроется"  # регистрация ещё не стартовала
+    OPEN = "open", "Открыта"  # регистрация открыта
+    SOLD_OUT = "sold_out", "Мест нет"  # все слоты заняты
 
 
 class Race(Model):
@@ -19,6 +26,18 @@ class Race(Model):
     date_end = DateField("Дата окончания", default=timezone.now)
     place = CharField("Место", max_length=50, default="")
     is_active = BooleanField("Активна", default=True)
+    cost = IntegerField("Стоимость участия", default=0)
+
+    reg_status = CharField(
+        "Статус регистрации",
+        max_length=16,
+        choices=RegStatus.choices,
+        default=RegStatus.UPCOMING,
+        db_index=True,
+    )
+
+    header_image = CharField("Картинка в шапке", max_length=255, blank=True, default="")
+    header_logo = CharField("Логотип в шапке", max_length=255, blank=True, default="")
 
     is_legend_visible = BooleanField("Легенда открыта", default=False)
     is_reg_open = BooleanField("Регистрация открыта", default=False)
