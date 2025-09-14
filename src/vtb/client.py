@@ -19,7 +19,10 @@ class VTBConfig:
     def token_url(self) -> str:
         if self.env == "prod":
             return "https://open.api.vtb.ru:443/passport/oauth2/token"
-        return "https://auth.bankingapi.ru/auth/realms/kubernetes/protocol/openid-connect/token"
+        return (
+            "https://auth.bankingapi.ru/"
+            "auth/realms/kubernetes/protocol/openid-connect/token"
+        )
 
     @property
     def api_base(self) -> str:
@@ -53,7 +56,7 @@ class VTBClient:
         # OAuth2 client_credentials — x-www-form-urlencoded
         data = {
             "grant_type": "client_credentials",
-            "client_id": self.cfg.client_id,  # для токена — как выдал банк (в проде часто с доменом)
+            "client_id": self.cfg.client_id,
             "client_secret": self.cfg.client_secret,
         }
         headers = {"Content-Type": "application/x-www-form-urlencoded"}
@@ -77,7 +80,6 @@ class VTBClient:
             headers["Merchant-Authorization"] = self.cfg.merchant_auth
         return headers
 
-    # Создать ордер (одностадийный платёж по карте / СБП)
     def create_order(
         self,
         *,
@@ -92,6 +94,7 @@ class VTBClient:
         # "sbp" — чтобы вернуть ссылку/QR для СБП
         additionalinfo: Optional[str] = None,
     ) -> Dict[str, Any]:
+        """Создать ордер (одностадийный платёж по карте / СБП)"""
         payload: Dict[str, Any] = {
             "orderId": order_id,
             "orderName": order_name,
