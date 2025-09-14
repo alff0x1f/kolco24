@@ -71,15 +71,15 @@
                                             {% csrf_token %}
                                         </form>
                                         <a class="dropdown-item" style="color: #495057;" onclick="document.getElementById('logoutForm').submit();">Выход</a>
-                                        
+
                                 </div>
-                                
+
                             </li>
                             {% else %}
                             <li class="nav-item">
                                 <a href="{% url 'passlogin' %}" class="nav-link">Войти</a>
                             </li>
-                            {% endif %}                        
+                            {% endif %}
                         </ul>
 
                     </div>
@@ -127,7 +127,6 @@
                                         <a href="{% url 'passlogin' %}">Вход</a>
                                     </li>
                                     <li>
-                                        {% comment %} <i class="icon-fingerprint"></i> {% endcomment %}
                                         <a href="https://vk.com/kolco24" target="_blank"><i class="icon-vk"></i>Группа в ВК</a>
                                     </li>
                                     <li>
@@ -137,7 +136,6 @@
                                         <a href="https://vk.com/kolco24y2019" target="_blank">Кольцо-24 2019</a>
                                     </li>
                                     <li>
-                                        {% comment %} <i class="icon-fingerprint"></i> {% endcomment %}
                                         <a href="https://vk.com/kolco24y2018" target="_blank">Кольцо-24 2018</a>
                                     </li>
                                     <li>
@@ -155,34 +153,19 @@
                             <div class="col-6 col-lg-4">
                                 <h6>Информация и документы</h6>
                                 <ul class="list-unstyled">
-{#                                    <li>#}
-{#                                        <a href="https://drive.google.com/file/d/18MTdLqYXgowaac6VBdvB6ARlOlbl7-Fs/view" target="_blank">Командная заявка</a>#}
-{#                                    </li>#}
-                                    
-                                    <li>
-                                        <a href="https://vk.com/kolco24" target="_blank">Группа в ВК</a>
-                                    </li>
-                                    <li>
-                                        Email: <a href="mailto:org@kolco24.ru">org@kolco24.ru</a>
-                                    </li>
-                                    <li>
-                                        <a href="/page/privacy_site/">Политика конфиденциальности</a>
-                                    </li>
-                                    <li>
-                                        <a href="{% url 'refund_policy' %}">Политика возврата</a>
-                                    </li>
-                                    <li>
-                                        <a href="{% url 'service_order_rules' %}">Порядок оформления услуги</a>
-                                    </li>
-                                    <li>
-                                        <a href="{% url 'privacy_policy' %}">Политика конфиденциальности приложения</a>
-                                    </li>
+                                  {% load cache menu_tags %}
+                                  {% cache 3600 "footer_menu" %}
+                                    {% footer_menu %}
+                                  {% endcache %}
                                 </ul>
                             </div>
                             <!--end of col-->
                             <div class="col-6 col-lg-4">
                                 <h6>Сообщество и друзья</h6>
                                 <ul class="list-unstyled">
+                                    <li>
+                                        Email: <a href="mailto:org@kolco24.ru">org@kolco24.ru</a>
+                                    </li>
                                     <li>
                                         <a href="https://tk-sputnik.org/" target="_blank">ТК Спутник</a> <a href="https://vk.com/tksputnik" target="_blank">(Группа в VK)</a>
                                     </li>
@@ -192,7 +175,7 @@
                                     <li>
                                         <a href="https://vk.com/velo_sputnik" target="_blank">Школа  велотуризма</a>
                                     </li>
-                                    
+
                                 </ul>
                             </div>
                             <!--end of col-->

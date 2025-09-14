@@ -53,7 +53,7 @@ from website.models import (
     TakenKP,
     Team,
 )
-from website.models.race import Category
+from website.models.race import Category, RegStatus
 from website.sync_xlsx import import_file_xlsx
 
 from ..models.news import MenuItem, Page
@@ -215,7 +215,7 @@ class RaceNewsView(View):
             "links": race.links.order_by("-id"),
             "news_list": NewsPost.objects.filter(race=race)[:10],
             "login_form": LoginForm(),
-            "reg_open": settings.REG_OPEN,
+            "reg_open": race.reg_status == RegStatus.OPEN,
         }
 
 
@@ -1338,8 +1338,11 @@ class AllTeamsView(View):
 
 class AddTeam(View):
     def get(self, request, race_id):
-        if not settings.REG_OPEN and not request.user.is_superuser:
+        race = Race.objects.get(id=race_id)
+
+        if race.reg_status != RegStatus.OPEN and not request.user.is_superuser:
             return HttpResponse("Регистрация закрыта")
+
         if not request.user.is_authenticated:
             return HttpResponseRedirect(reverse("passlogin") + f"?next={request.path}")
         form = TeamForm(race_id)
@@ -1347,11 +1350,12 @@ class AddTeam(View):
             request,
             "website/add_team.html",
             {
+                "race": race,
                 "race_id": race_id,
                 "team_form": form,
-                "cost": PaymentsYa.get_cost(),
+                "cost": race.cost,
                 "action": reverse("add_team", args=[race_id]),
-                "reg_open": settings.REG_OPEN,
+                "reg_open": race.reg_status == RegStatus.OPEN,
             },
         )
 
