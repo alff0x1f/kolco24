@@ -192,6 +192,16 @@
                                         </small>
                                     </div>
                                 </div>
+                                <div class="mb-3 form-check">
+                                  <input class="form-check-input" type="checkbox" id="consent" name="consent" required>
+                                  <label class="form-check-label" for="consent">
+                                    Я подтверждаю, что ознакомлен(а) с
+                                    <a href="/page/personal_data_consent/" target="_blank" rel="noopener">
+                                      Согласием на обработку персональных данных
+                                    </a>
+                                    и даю согласие на обработку моих персональных данных в соответствии с Федеральным законом от 27.07.2006 № 152-ФЗ «О персональных данных».
+                                  </label>
+                                </div>
                                 {% csrf_token %}
                                 {% if team_form.non_field_errors %}
                                     <div class="alert alert-danger" role="alert">
@@ -223,7 +233,7 @@
                 <div class="col-12 col-md-5 card-body">
                     <div>
                         <div class="mb-3 text-center">
-                            <h3 class="h2 mb-2">Стартовый взнос</h3>
+                            <h3 class="h2 mb-2">Стартовый взнос за участника</h3>
                         </div>
                         <ul class="list-unstyled list-spacing-sm mb-3 ">
                             <li class="row align-items-center">
@@ -505,6 +515,19 @@
             // Initial setup: Hide all athlete fields above 2 by default
             updateUcountOptions();
             updateAthleteFields(); // Set the initial visibility of athlete fields
+
+            // Персональные данные - включение кнопки отправки формы
+            const consent = document.getElementById('consent');
+            const teamform_submit = document.getElementById('teamform_submit');
+            const common_paid = document.getElementById('common_paid');
+
+            function toggleSubmit() {
+              teamform_submit.disabled = !consent.checked;
+              common_paid.disabled = !consent.checked;
+            }
+
+            toggleSubmit();                 // первичная инициализация
+            consent.addEventListener('change', toggleSubmit);
         });
     </script>
 {% endblock %}
