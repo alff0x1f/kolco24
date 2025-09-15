@@ -52,7 +52,7 @@ class Command(BaseCommand):
                         .get("description", "")
                     )
                     vtb_payment.save(update_fields=["status", "status_description"])
-                    self.stdout.write(f"Payment {vtb_payment.pk} marked as expired")
+                    self.stdout.write(f"Payment {vtb_payment.pk} marked as paid")
 
                     # order_id has format ORDER_<payment_id>
                     try:
@@ -74,3 +74,4 @@ class Command(BaseCommand):
                     payment.order = payment.pk
                     payment.save(update_fields=["status", "order"])
                     self.stdout.write(f"Payment {payment.pk} marked as paid")
+            sleep(60)

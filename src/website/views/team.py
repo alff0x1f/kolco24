@@ -1,11 +1,19 @@
-from django.conf import settings
 from django.db.models import Q
 from django.http import HttpResponse, HttpResponseRedirect
 from django.shortcuts import render
 from django.urls import reverse
 from django.views import View
 from website.forms import TeamForm, TeamMemberMoveForm
-from website.models import Payment, PaymentsYa, Team, TeamMemberMove
+from website.models import (
+    Payment,
+    PaymentsYa,
+    Team,
+    TeamMemberMove,
+    VTBPayment,
+    VTBPreparedPayment,
+)
+
+from vtb.client import VTBClient
 
 
 class EditTeamView(View):
@@ -16,6 +24,8 @@ class EditTeamView(View):
         team: Team = self.get_team(team_id)
         if not team:
             return HttpResponseRedirect(reverse("passlogin") + f"?next={request.path}")
+
+        race = team.category2.race
 
         initial = {
             "teamname": team.teamname,
@@ -48,10 +58,10 @@ class EditTeamView(View):
             "website/add_team.html",
             {
                 "race_id": team.category2.race_id,
+                "race": race,
                 "team_form": form,
                 "team": team,
-                "cost": PaymentsYa.get_cost(),
-                "reg_open": settings.REG_OPEN,
+                "cost": race.cost,
                 "action": reverse("edit_team", args=[team_id]),
                 "payments": Payment.objects.filter(team=team, status="done").order_by(
                     "id"
@@ -70,6 +80,7 @@ class EditTeamView(View):
         team: Team = self.get_team(team_id)
         if not team:
             return HttpResponseRedirect(reverse("passlogin") + f"?next={request.path}")
+        race = team.category2.race
 
         if not team.category2.race.is_teams_editable and not request.user.is_superuser:
             return HttpResponse("Редактирование команд запрещено", status=403)
@@ -100,6 +111,44 @@ class EditTeamView(View):
                 team.map_count = form.cleaned_data.get("map_count", 0)
 
             team.save()
+
+            # payment
+            race = team.category2.race
+            cost_now = race.cost
+            cost = (int(team.ucount) - team.paid_people) * race.cost + (
+                int(team.map_count) - team.map_count_paid
+            ) * 200
+            if cost > 0:
+                payment = Payment.objects.create(
+                    owner=request.user,
+                    team=team,
+                    payment_method="sbp2",
+                    payment_amount=cost,
+                    payment_with_discount=cost,
+                    cost_per_person=cost_now,
+                    paid_for=int(team.ucount) - team.paid_people,
+                    additional_charge=team.additional_charge,
+                    status="draft",
+                    map=int(team.map_count) - team.map_count_paid,
+                )
+                vtb_client = VTBClient()
+                vtb_client._ensure_token()
+
+                payload = vtb_client.create_order(
+                    order_id=f"ORDER_{payment.id}",
+                    order_name=f"Оплата за команду на Кольцо 24 ({payment.id})",
+                    amount_value=cost,
+                    return_payment_data="sbp",
+                )
+                vtb_payment = VTBPayment.from_vtb_payload(payload)
+
+                prepared_payment = VTBPreparedPayment.objects.filter(
+                    payment=vtb_payment
+                ).first()
+                if prepared_payment and prepared_payment.url:
+                    return HttpResponseRedirect(prepared_payment.url)
+                return HttpResponseRedirect(vtb_payment.pay_url)
+
             return HttpResponseRedirect(
                 reverse("teams2", args=[team.category2.race_id, team.category2_id])
             )
@@ -109,11 +158,11 @@ class EditTeamView(View):
             request,
             "website/add_team.html",
             {
-                "race_id": team.category2.race_id,
+                "race": race,
+                "race_id": race.id,
                 "team_form": form,
                 "team": team,
                 "cost": PaymentsYa.get_cost(),
-                "reg_open": settings.REG_OPEN,
                 "action": reverse("edit_team", args=[team_id]),
                 "payments": Payment.objects.filter(team=team, status="done").order_by(
                     "id"
