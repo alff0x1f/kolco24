@@ -1362,6 +1362,10 @@ class AddTeam(View):
         if not request.user.is_authenticated:
             return HttpResponseRedirect(reverse("passlogin") + f"?next={request.path}")
 
+        race = Race.objects.get(id=race_id)
+        if race.reg_status != RegStatus.OPEN and not request.user.is_superuser:
+            return HttpResponse("Регистрация закрыта")
+
         category2_id = request.POST.get("category2_id")
         category2 = Category.objects.filter(id=category2_id).first()
         if not category2:
@@ -1373,7 +1377,7 @@ class AddTeam(View):
         form = TeamForm(race_id, data)
         if form.is_valid():
             # save team
-            team = Team.objects.create(
+            team: Team = Team.objects.create(
                 year=2025,
                 owner_id=request.user.id,
                 **form.cleaned_data,
@@ -1382,10 +1386,19 @@ class AddTeam(View):
 
             # payment
             payment_method = request.GET.get("method", "sbp2")
-            cost_now = PaymentsYa.get_cost()
-            cost = (int(team.ucount) - team.paid_people) * cost_now
+            cost_now = race.cost
+            cost = (int(team.ucount) - team.paid_people) * race.cost + (
+                int(team.map_count) - team.map_count_paid
+            ) * 200
+
             if cost < 0:
+                # в теории, не может быть, тк это новая команда и она не
+                # может быть оплачена
                 cost = 0
+
+            if payment_method != "sbp2":
+                # закрываем другие методы оплаты
+                raise Http404
 
             if payment_method in ("visamc", "yandexmoney"):
                 payment = Payment.objects.create(
@@ -1396,6 +1409,7 @@ class AddTeam(View):
                     payment_with_discount=cost,
                     cost_per_person=cost_now,
                     paid_for=int(team.ucount) - team.paid_people,
+                    map=team.map_count_paid - team.map_count,
                     additional_charge=team.additional_charge,
                     status="draft",
                 )
@@ -1425,6 +1439,7 @@ class AddTeam(View):
                     paid_for=int(team.ucount) - team.paid_people,
                     additional_charge=team.additional_charge,
                     status="draft",
+                    map=int(team.map_count) - team.map_count_paid,
                 )
                 vtb_client = VTBClient()
                 vtb_client._ensure_token()
