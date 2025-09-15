@@ -1,4 +1,3 @@
-from decimal import Decimal
 from time import sleep
 
 from django.core.management.base import BaseCommand
