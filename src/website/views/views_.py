@@ -151,7 +151,7 @@ class RegisterView(View):
                 user.set_password(password)
                 user.save()
                 auth_login(request, user)
-                return HttpResponseRedirect(reverse("add_team", args=[2]))
+                return HttpResponseRedirect(reverse("add_team", args=[8]))
 
             username = f"{last_name}, {first_name}"
             if User.objects.filter(username=username).exists():
@@ -164,7 +164,7 @@ class RegisterView(View):
             user.save(update_fields=("first_name", "last_name"))
 
             auth_login(request, user)
-            return HttpResponseRedirect(reverse("add_team", args=[2]))
+            return HttpResponseRedirect(reverse("add_team", args=[8]))
 
         return render(request, "website/register.html", {"reg_form": form})
 
