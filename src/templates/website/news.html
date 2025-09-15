@@ -14,22 +14,30 @@
 
             <div class="col-12 col-md-6 col-lg-5">
                 <div class="card">
-                    {% if not reg_open %}
+                    {% if race.reg_status == 'upcoming' %}
                         <div class="card-header d-flex justify-content-between">
                             <div>
                                 <span class="h6">Скоро регистрация!</span>
                             </div>
                         </div>
-                    {% elif user.is_authenticated %}
-                        <div class="list-group m-3 list-group-flush">
-                            <a href="{% url 'add_team' race.id %}" class="btn btn-block btn-success">Добавить
-                                новую команду</a>
+                    {% elif race.reg_status == 'sold_out' %}
+                      <div class="card-header d-flex justify-content-between">
+                        <div>
+                          <span class="h6">Регистрация окончена</span>
                         </div>
-                    {% else %}
-                        <div class="list-group m-3 list-group-flush">
-                            <a href="{% url 'register' %}" class="btn btn-block btn-success">Регистрация</a>
-                        </div>
-                    {% endif %}
+                      </div>
+                    {% elif race.reg_status == 'open' %}
+                      {% if user.is_authenticated %}
+                          <div class="list-group m-3 list-group-flush">
+                              <a href="{% url 'add_team' race.id %}" class="btn btn-block btn-success">Добавить
+                                  новую команду</a>
+                          </div>
+                      {% else %}
+                          <div class="list-group m-3 list-group-flush">
+                              <a href="{% url 'register' %}" class="btn btn-block btn-success">Регистрация</a>
+                          </div>
+                      {% endif %}
+                  {% endif %}
                 </div>
             </div>
         </div>
