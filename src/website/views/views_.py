@@ -1409,7 +1409,7 @@ class AddTeam(View):
                     payment_with_discount=cost,
                     cost_per_person=cost_now,
                     paid_for=int(team.ucount) - team.paid_people,
-                    map=team.map_count_paid - team.map_count,
+                    map=int(team.map_count) - team.map_count_paid,
                     additional_charge=team.additional_charge,
                     status="draft",
                 )
