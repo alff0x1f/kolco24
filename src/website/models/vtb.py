@@ -15,7 +15,7 @@ class VTBPayment(models.Model):
     amount_value = models.DecimalField(max_digits=12, decimal_places=2)
     currency = models.CharField(max_length=3, default="RUB")
 
-    # Lifecyle timestamps from VTB (UTC)
+    # Lifecycle timestamps from VTB (UTC)
     created_at = models.DateTimeField(null=True, blank=True)
     expire_at = models.DateTimeField(null=True, blank=True)
 
