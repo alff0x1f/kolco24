@@ -1839,7 +1839,7 @@ def payment_list(request):
     # select related team to avoid additional queries
     payments = (
         Payment.objects.select_related("team", "team__owner", "recipient")
-        .filter(team__year=2024)
+        .filter(team__year=2025)
         .order_by("-order", "-id")
     )
 
