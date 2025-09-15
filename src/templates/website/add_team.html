@@ -202,10 +202,10 @@
                                      style="display: none;">
                                     Text
                                 </div>
-                                <div class="mb-2" id="reg_close_warning">
+                                <div class="mb-2" id="reg_close_warning" style="display: none">
                                     <p>Добавление новых участников невозможно из-за отсутствия слотов.</p>
                                 </div>
-                                {% if team.category2.race.is_team_editable or user.is_superuser %}
+                                {% if race.reg_status == 'open' or team.category2.race.is_team_editable or user.is_superuser %}
                                     <div class="form-row form-group">
                                         <div class="col">
                                             <button class="btn btn-block btn-success" type="submit"
@@ -227,15 +227,15 @@
                         </div>
                         <ul class="list-unstyled list-spacing-sm mb-3 ">
                             <li class="row align-items-center">
-                                <div class="col-3 col-md-3">1500 руб</div>
-                                <div class="col-9">С 10 по 13 сентября</div>
+                                <div class="col-3 col-md-3">2000 руб</div>
+                                <div class="col-9">С 15 по 17 сентября</div>
                             </li>
                             <li class="row align-items-center">
-                                <div class="col-3 col-md-3">1700 руб</div>
-                                <div class="col-9">С 14 по 30 сентября</div>
+                                <div class="col-3 col-md-3">2500 руб</div>
+                                <div class="col-9">С 18 по 30 сентября</div>
                             </li>
                             <li class="row align-items-center">
-                                <div class="col-3 col-md-3">1900 руб</div>
+                                <div class="col-3 col-md-3">3000 руб</div>
                                 <div class="col-9">С 1 по 9 октября</div>
                             </li>
                         </ul>
@@ -313,55 +313,15 @@
                                 <div class="col-6"><p class="text-right"><span id="sumlabel">1500</span> руб</p></div>
                             </div>
                             {% if race.reg_status == "open" %}
-                                <div class="mb-2 text-center">
-                                    <h4 class="h4 mb-2">Способы оплаты</h4>
-                                    <div class="row">
-                                        <div class="col-6 col-xs-6 col-lg-3">
-                                            <div class="card">
-                                                <img alt="sber" class="card-img-top"
-                                                     src="/static/images/payments/tinkoff.png">
-                                            </div>
-                                        </div>
-                                        <div class="col-6 col-xs-6 col-lg-3">
-                                            <div class="card">
+                                <div class="mb-2 text-center ">
+                                    <h4 class="h4 mb-2">Оплата</h4>
+                                    <div class="row justify-content-center">
+                                        <div class="col-6">
                                                 <img alt="sbp" class="card-img-top"
                                                      src="/static/images/payments/sbp.png">
-                                            </div>
-                                        </div>
-                                        <div class="col-6 col-xs-6 col-lg-3">
-                                            <div class="card">
-                                                <img alt="mir" class="card-img-top"
-                                                     src="/static/images/payments/visa-mastercard.jpg">
-                                            </div>
-                                        </div>
-                                        <div class="col-6 col-xs-6 col-lg-3">
-                                            <div class="card">
-                                                <img alt="yoomoney" class="card-img-top"
-                                                     src="/static/images/payments/yoomoney.png">
-                                            </div>
                                         </div>
                                     </div>
                                 </div>
-
-                                <form class="d-flex flex-column" id="paymentmethod">
-                                    <div class="custom-control custom-checkbox-switch">
-                                        <input id="radio_sbp" name="radio" type="radio" value="sbp"
-                                               class="custom-control-input" checked="">
-                                        <label class="  custom-control-label" for="radio_sbp">Перевод по СБП по номеру
-                                            телефона (Тиньков)</label>
-                                    </div>
-                                    <div class="custom-control custom-checkbox-switch">
-                                        <input id="radio_visamc" name="radio" type="radio" value="visamc"
-                                               class="custom-control-input">
-                                        <label class="custom-control-label" for="radio_visamc">Картой
-                                            Мир/Visa/Mastercard</label>
-                                    </div>
-                                    <div class="custom-control custom-checkbox-switch">
-                                        <input id="radio_yoomoney" name="radio" type="radio" value="yandexmoney"
-                                               class="custom-control-input">
-                                        <label class="custom-control-label" for="radio_yoomoney">Yoomoney</label>
-                                    </div>
-                                </form>
                                 <div class="custom-control custom-checkbox-switch">
                                     <button type="button" class="btn btn-primary float-right mt-3" id="common_paid">
                                         Оплатить
@@ -450,6 +410,7 @@
             // Function to update the number of visible athlete fields based on ucount value
             function updateAthleteFields() {
                 const ucount = parseInt(ucountSelect.value); // Get selected ucount
+                let mapCount = parseInt(mapCountSelect.value) || 0;
                 // Loop through all athlete/birth fields and hide/show based on ucount
                 for (let i = 3; i <= 6; i++) {
                     if (i <= ucount) {
@@ -460,6 +421,7 @@
                 }
 
                 mapCountSelect.innerHTML = '';
+                mapCount = Math.min(mapCount, ucount - 2);
                 for (let i = 0; i <= ucount - 2; i++) {
                     const option = document.createElement('option');
                     option.value = i.toString();
@@ -473,7 +435,7 @@
                     mapCountField.style.display = 'none';
                 }
 
-                const sum = {{ cost }} * (ucount - ucount_paid);
+                const sum = {{ cost }} * (ucount - ucount_paid) + 200 * mapCount;
 
                 if (sum > 0) {
                     paid_block.style.display = 'block';
@@ -481,7 +443,6 @@
                     sumlabel.textContent = sum;
                 } else {
                     paid_block.style.display = 'none';
-                    reg_close_warning.style.display = 'none';
                 }
                 {% if race.reg_status != 'open' %}
                     const teamform_submit = document.getElementById('teamform_submit');
@@ -495,9 +456,10 @@
                 {% endif %}
             }
 
+
             // Function to update the ucount options based on the category selection
             function updateUcountOptions() {
-                const defaultUcount = {{ team.ucount }}
+                const defaultUcount = {{ team.ucount }};
                 const selectedCategory = categorySelect.value;
                 ucountSelect.innerHTML = ''; // Clear current options
 
@@ -537,33 +499,11 @@
             // Event listener for changing ucount, hide/show athlete fields accordingly
             ucountSelect.addEventListener('change', updateAthleteFields);
 
+            mapCountSelect.addEventListener("change", updateAthleteFields);
+
             // Initial setup: Hide all athlete fields above 2 by default
             updateUcountOptions();
             updateAthleteFields(); // Set the initial visibility of athlete fields
-
-            // payment method radio buttons
-            function updateTeamFormAction() {
-                // Get the selected radio button's value
-                const selectedValue = document.querySelector('input[name="radio"]:checked').value;
-
-                // Example query parameters for each payment method
-                const queryParams = {
-                    'sberbank': '?method=sberbank',
-                    'sbp': '?method=sbp',
-                    'visamc': '?method=visamc',
-                    'yandexmoney': '?method=yandexmoney'
-                };
-
-                // Get the corresponding query parameters for the selected payment method
-                const queryParam = queryParams[selectedValue] || '';
-
-                // Update the team_form action by appending the query parameters
-                const teamForm = document.getElementById('teamform');
-                teamForm.action = '{{ action }}' + queryParam;
-            }
-
-            document.getElementById('paymentmethod').addEventListener('change', updateTeamFormAction);
-            updateTeamFormAction();
         });
     </script>
 {% endblock %}

@@ -43,7 +43,7 @@ class PaymentsYa(models.Model):
 
     @staticmethod
     def get_cost():
-        return 1700
+        return 2000
 
     def new_payment(self, d: dict) -> bool:
         fields = [
@@ -358,6 +358,7 @@ class Payment(models.Model):
     payment_with_discount = models.FloatField(default=0)
     cost_per_person = models.FloatField(default=0)
     paid_for = models.FloatField(default=0)
+    map = models.IntegerField(default=0)
     coupon = models.ForeignKey(
         "Coupons",
         on_delete=models.CASCADE,
