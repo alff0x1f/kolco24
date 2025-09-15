@@ -1455,7 +1455,7 @@ class AddTeam(View):
                 prepared_payment = VTBPreparedPayment.objects.filter(
                     payment=vtb_payment
                 ).first()
-                if prepared_payment.url:
+                if prepared_payment and prepared_payment.url:
                     return HttpResponseRedirect(prepared_payment.url)
                 return HttpResponseRedirect(vtb_payment.pay_url)
 
