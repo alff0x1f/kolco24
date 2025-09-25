@@ -1465,7 +1465,7 @@ class AddTeam(View):
                 vtb_client._ensure_token()
 
                 payload = vtb_client.create_order(
-                    order_id=f"TEST_{payment.id}",
+                    order_id=f"ORDER_{payment.id}",
                     order_name=f"Оплата за команду на Кольцо 24 ({payment.id})",
                     amount_value=cost,
                     return_payment_data="sbp",
