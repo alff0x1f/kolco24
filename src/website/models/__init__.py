@@ -9,6 +9,7 @@ from .models import (
     Team,
     TeamAdminLog,
     TeamMemberMove,
+    Transfer,
 )
 from .news import MenuItem, NewsPost, Page
 from .payment import SbpPaymentRecipient

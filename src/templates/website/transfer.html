@@ -1,0 +1,195 @@
+{% extends "website/base.html" %}
+
+{% block content %}
+  <section class="space-sm">
+    <div class="container">
+      <div class="row justify-content-center">
+        <div class="col-12 col-lg-10">
+          <div class="card card-lg">
+            <div class="card-body">
+              <h1 class="h3 mb-4 text-center">Регистрация на автобус</h1>
+              {% if not submitted %}
+                <div class="alert alert-info" role="alert">
+                  <h2 class="h5">Условия трансфера.</h2>
+                  <ul class="mb-0">
+                    <li>Выезд из города Уфа (от ТК спутник, Айская 75/2) в 6 утра в субботу 11 октября 2025г.</li>
+                    <li>Возвращение в город Уфа в воскресенье 12 октября 2025г.</li>
+                    <li>Стоимость трансфера 1500 рублей с человека в обе стороны.</li>
+                    <li>В случае отказа стоимость проезда <b>не возвращается</b>, возможна только замена участника!</li>
+                  </ul>
+                </div>
+                <h2>Оплата</h2>
+                <p>Оплатить трансфер можно на карту Сбербанка:</p>
+                <div class="alert alert-secondary d-flex align-items-center" role="alert">
+                  <svg class="bi bi-credit-card mr-2" width="1.5em" height="1.5em" viewBox="0 0 16 16"
+                       fill="currentColor"
+                       xmlns="http://www.w3.org/2000/svg">
+                    <path fill-rule="evenodd"
+                          d="M0 4a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V4zm14-1H2a1 1 0 0 0-1 1v2h14V4a1 1 0 0 0-1-1zm1 3H1v5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V6z"/>
+                    <rect width="3" height="2" x="2" y="9" rx=".5"/>
+                  </svg>
+                  <div class="ml-2">
+                    <strong>4276 0600 2511 9010</strong><br>
+                    Лилия Вильсуровна Н.
+                  </div>
+                </div>
+                <p>После оплаты необходимо отправить чек об оплате в VK <a href="https://vk.com/id33591130">Лиля
+                  Набиева</a>
+                  с указанием за кого оплачено (написать обязательно, чтобы быть уверенным, что вы заняли место в
+                  автобусе).</p>
+              {% endif %}
+
+              {% if submitted %}
+                <div class="alert alert-success" role="alert">
+                  <h2 class="h5">Спасибо! Заявка отправлена.</h2>
+                  <p class="mb-2">Обязательно:</p>
+                  <ol class="mb-0">
+                    <li>Скинуть чек после оплаты в VK <a href="https://vk.com/id33591130">Лиля Набиева</a> с
+                      указанием за кого оплачено (написать обязательно, чтобы быть уверенным, что вы заняли
+                      место в автобусе).
+                    </li>
+                  </ol>
+                </div>
+              {% else %}
+                <h3>Данные:</h3>
+                <form method="post" action="{% url 'transfer' %}">
+                  {% csrf_token %}
+                  {% if form.non_field_errors %}
+                    <div class="alert alert-danger">
+                      {{ form.non_field_errors }}
+                    </div>
+                  {% endif %}
+                  <div class="form-group">
+                    <label for="id_people_count">Количество человек</label>
+                    {{ form.people_count }}
+                    {% if form.people_count.errors %}
+                      <div class="invalid-feedback d-block">
+                        {{ form.people_count.errors|striptags }}
+                      </div>
+                    {% endif %}
+                  </div>
+                  <div class="form-group">
+                    <label class="d-block">Участники</label>
+                    <div id="passengers-container" data-max-passengers="{{ form.MAX_PASSENGERS }}">
+                      {% for passenger in form.passenger_field_pairs %}
+                        <div class="form-row passenger-entry" data-index="{{ passenger.index }}">
+                          <div class="form-group col-md-6">
+                            <label for="{{ passenger.name.id_for_label }}">Имя участника {{ passenger.index }}</label>
+                            {{ passenger.name }}
+                            {% if passenger.name.errors %}
+                              <div class="invalid-feedback d-block">
+                                {{ passenger.name.errors|striptags }}
+                              </div>
+                            {% endif %}
+                          </div>
+                          <div class="form-group col-md-6">
+                            <label for="{{ passenger.phone.id_for_label }}">Телефон
+                              участника {{ passenger.index }}</label>
+                            {{ passenger.phone }}
+                            {% if passenger.phone.errors %}
+                              <div class="invalid-feedback d-block">
+                                {{ passenger.phone.errors|striptags }}
+                              </div>
+                            {% endif %}
+                          </div>
+                        </div>
+                      {% endfor %}
+                    </div>
+                    <small class="form-text text-muted">Заполните данные каждого человека, который поедет на
+                      автобусе.</small>
+                  </div>
+                  <div class="text-center">
+                    <button type="submit" class="btn btn-success btn-lg">Отправить заявку</button>
+                  </div>
+                </form>
+              {% endif %}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+  <script>
+      (function () {
+          const container = document.getElementById('passengers-container');
+          const peopleCountInput = document.getElementById('id_people_count');
+          if (!container || !peopleCountInput) {
+              return;
+          }
+
+          const maxPassengers = parseInt(container.dataset.maxPassengers || '20', 10);
+
+          const createInput = (name, labelText, placeholder) => {
+              const input = document.createElement('input');
+              input.type = 'text';
+              input.name = name;
+              input.id = `id_${name}`;
+              input.placeholder = placeholder;
+              input.required = true;
+              input.className = 'form-control';
+              input.autocomplete = 'off';
+
+              const label = document.createElement('label');
+              label.setAttribute('for', input.id);
+              label.textContent = labelText;
+
+              const wrapper = document.createElement('div');
+              wrapper.className = 'form-group col-md-6';
+              wrapper.appendChild(label);
+              wrapper.appendChild(input);
+
+              return wrapper;
+          };
+
+          const renderPassengerRow = (index) => {
+              const row = document.createElement('div');
+              row.className = 'form-row passenger-entry';
+              row.dataset.index = String(index);
+
+              const nameField = createInput(
+                  `passenger_${index}_name`,
+                  `Имя участника ${index}`,
+                  `Имя участника ${index}`
+              );
+              const phoneField = createInput(
+                  `passenger_${index}_phone`,
+                  `Телефон участника ${index}`,
+                  '+7 (999) 123-45-67'
+              );
+
+              row.appendChild(nameField);
+              row.appendChild(phoneField);
+              container.appendChild(row);
+          };
+
+          const updatePassengerFields = () => {
+              let desiredCount = parseInt(peopleCountInput.value, 10);
+              if (Number.isNaN(desiredCount) || desiredCount < 1) {
+                  desiredCount = 1;
+              }
+              desiredCount = Math.min(desiredCount, maxPassengers);
+
+              const currentRows = container.querySelectorAll('.passenger-entry');
+              const currentCount = currentRows.length;
+
+              if (currentCount < desiredCount) {
+                  for (let i = currentCount + 1; i <= desiredCount; i += 1) {
+                      renderPassengerRow(i);
+                  }
+              } else if (currentCount > desiredCount) {
+                  for (let i = currentCount; i > desiredCount; i -= 1) {
+                      const row = container.querySelector(`.passenger-entry[data-index="${i}"]`);
+                      if (row) {
+                          container.removeChild(row);
+                      }
+                  }
+              }
+          };
+
+          peopleCountInput.addEventListener('change', updatePassengerFields);
+          peopleCountInput.addEventListener('input', updatePassengerFields);
+
+          updatePassengerFields();
+      })();
+  </script>
+{% endblock %}

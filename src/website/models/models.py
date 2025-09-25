@@ -17,6 +17,36 @@ class Profile(models.Model):
     phone = models.TextField(max_length=500, blank=True)
 
 
+class Transfer(models.Model):
+    people_count = models.PositiveIntegerField(
+        verbose_name="Количество человек", default=1
+    )
+    passenger_contacts = models.JSONField(
+        default=list,
+        verbose_name="Участники",
+        help_text="Список участников с их контактами",
+    )
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="Создано")
+    status = models.CharField(
+        max_length=20,
+        choices=[
+            ("new", "Новая"),
+            ("processed", "Обработана"),
+            ("cancelled", "Отменена"),
+        ],
+        default="new",
+        verbose_name="Статус",
+    )
+
+    class Meta:
+        ordering = ("-created_at",)
+        verbose_name = "Заявка на автобус"
+        verbose_name_plural = "Заявки на автобус"
+
+    def __str__(self) -> str:
+        return f"{self.id} ({self.people_count})"
+
+
 @receiver(post_save, sender=User)
 def create_user_profile(sender, instance, created, **kwargs):
     if created:

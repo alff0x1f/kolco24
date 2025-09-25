@@ -15,6 +15,7 @@ from .models import (
     Tag,
     TakenKP,
     Team,
+    Transfer,
 )
 from .models.race import Category, RaceLink
 
@@ -33,6 +34,35 @@ class PageAdmin(admin.ModelAdmin):
     readonly_fields = ("content_html",)
 
     fieldsets = ((None, {"fields": ("title", "slug", "content", "content_html")}),)
+
+
+@admin.register(Transfer)
+class TransferAdmin(admin.ModelAdmin):
+    list_display = (
+        "id",
+        "people_count",
+        "participants_display",
+        "created_at",
+        "status",
+    )
+    list_filter = ("created_at", "status")
+    ordering = ("-created_at",)
+
+    @admin.display(description="Участники")
+    def participants_display(self, obj):
+        if not obj.passenger_contacts:
+            return "—"
+        parts = []
+        for contact in obj.passenger_contacts:
+            name = (contact or {}).get("name", "").strip()
+            phone = (contact or {}).get("phone", "").strip()
+            if not name and not phone:
+                continue
+            if phone:
+                parts.append(f"{name} ({phone})" if name else phone)
+            else:
+                parts.append(name)
+        return ", ".join(parts) if parts else "—"
 
 
 class TeamAdmin(admin.ModelAdmin):

@@ -31,6 +31,7 @@ from website.forms import (
     RegForm,
     TeamForm,
     TeamFormAdmin,
+    TransferForm,
 )
 from website.googledocs import (
     export_payments_to_sheet,
@@ -182,6 +183,25 @@ class RegisterView(View):
             "reg_form": RegForm(),
             "reg_open": settings.REG_OPEN,
         }
+
+
+class TransferView(View):
+    template_name = "website/transfer.html"
+
+    def get(self, request):
+        return render(request, self.template_name, {"form": TransferForm()})
+
+    def post(self, request):
+        form = TransferForm(request.POST)
+        if form.is_valid():
+            form.save()
+            return render(
+                request,
+                self.template_name,
+                {"form": TransferForm(), "submitted": True},
+            )
+
+        return render(request, self.template_name, {"form": form})
 
 
 class RaceNewsView(View):
