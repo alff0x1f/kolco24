@@ -3,7 +3,7 @@ from django.utils.html import format_html
 from markdown import markdown
 
 from .models import (
-    BusRegistration,
+    Transfer,
     Checkpoint,
     CheckpointTag,
     MenuItem,
@@ -36,9 +36,9 @@ class PageAdmin(admin.ModelAdmin):
     fieldsets = ((None, {"fields": ("title", "slug", "content", "content_html")}),)
 
 
-@admin.register(BusRegistration)
-class BusRegistrationAdmin(admin.ModelAdmin):
-    list_display = ("full_name", "phone", "people_count", "created_at")
+@admin.register(Transfer)
+class TransferAdmin(admin.ModelAdmin):
+    list_display = ("full_name", "phone", "people_count", "created_at", "status")
     search_fields = ("full_name", "phone")
     list_filter = ("created_at",)
     ordering = ("-created_at",)

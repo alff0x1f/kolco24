@@ -1,7 +1,7 @@
 from .checkpoint import Checkpoint, CheckpointTag
 from .models import (
     Athlet,
-    BusRegistration,
+    Transfer,
     FastLogin,
     Payment,
     PaymentLog,

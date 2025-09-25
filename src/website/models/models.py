@@ -17,12 +17,22 @@ class Profile(models.Model):
     phone = models.TextField(max_length=500, blank=True)
 
 
-class BusRegistration(models.Model):
+class Transfer(models.Model):
     full_name = models.CharField(max_length=255, verbose_name="Имя")
     phone = models.CharField(max_length=64, verbose_name="Телефон")
     people_count = models.PositiveIntegerField(verbose_name="Количество человек")
     passengers = models.TextField(verbose_name="Кто поедет")
     created_at = models.DateTimeField(auto_now_add=True, verbose_name="Создано")
+    status = models.CharField(
+        max_length=50,
+        choices=[
+            ("new", "Новая"),
+            ("confirmed", "Подтверждена"),
+            ("canceled", "Отменена"),
+        ],
+        default="new",
+        verbose_name="Статус",
+    )
 
     class Meta:
         ordering = ("-created_at",)

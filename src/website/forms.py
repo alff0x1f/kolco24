@@ -5,7 +5,7 @@ from datetime import timedelta
 from django import forms
 from django.contrib.auth.forms import PasswordResetForm, SetPasswordForm
 from django.contrib.auth.models import User
-from website.models import BusRegistration, Athlet, Team, TeamAdminLog, TeamMemberMove
+from website.models import Transfer, Athlet, Team, TeamAdminLog, TeamMemberMove
 from website.models.news import Page
 from website.models.race import Category, Race
 
@@ -189,7 +189,7 @@ class RegForm(forms.Form):
 
 class BusRegistrationForm(forms.ModelForm):
     class Meta:
-        model = BusRegistration
+        model = Transfer
         fields = ("full_name", "phone", "people_count", "passengers")
         widgets = {
             "full_name": forms.TextInput(
@@ -222,6 +222,7 @@ class BusRegistrationForm(forms.ModelForm):
                 }
             ),
         }
+
 
 def category2_from_dist(dist, ucount):
     race = Race.objects.filter(code="kolco24_2023").first()
