@@ -1,0 +1,178 @@
+{% extends "website/base.html" %}
+
+{% block content %}
+<section class="space-sm">
+    <div class="container">
+        <div class="row justify-content-center">
+            <div class="col-12 col-lg-10">
+                <div class="card card-lg">
+                    <div class="card-body">
+                        <h1 class="h3 mb-4 text-center">Регистрация на автобус</h1>
+                        {% if submitted %}
+                            <div class="alert alert-success" role="alert">
+                                <h2 class="h5">Спасибо! Заявка отправлена.</h2>
+                                <p class="mb-2">Дальнейшие шаги:</p>
+                                <ol class="mb-0">
+                                    <li>Сохраните подтверждение, которое пришло на почту.</li>
+                                    <li>В ближайшее время мы свяжемся с вами и пришлём реквизиты для оплаты.</li>
+                                    <li>После перевода средств отправьте квитанцию на нашу почту.</li>
+                                </ol>
+                                <p class="mt-3 text-muted">— Здесь будет точная инструкция по оплате.</p>
+                            </div>
+                        {% endif %}
+                        <form method="post" action="{% url 'bus_registration' %}">
+                            {% csrf_token %}
+                            {% if form.non_field_errors %}
+                                <div class="alert alert-danger">
+                                    {{ form.non_field_errors }}
+                                </div>
+                            {% endif %}
+                            <div class="form-group">
+                                <label for="id_full_name">Имя контактного лица</label>
+                                {{ form.full_name }}
+                                {% if form.full_name.errors %}
+                                    <div class="invalid-feedback d-block">
+                                        {{ form.full_name.errors|striptags }}
+                                    </div>
+                                {% endif %}
+                            </div>
+                            <div class="form-group">
+                                <label for="id_phone">Телефон контактного лица</label>
+                                {{ form.phone }}
+                                {% if form.phone.errors %}
+                                    <div class="invalid-feedback d-block">
+                                        {{ form.phone.errors|striptags }}
+                                    </div>
+                                {% endif %}
+                            </div>
+                            <div class="form-group">
+                                <label for="id_people_count">Количество человек</label>
+                                {{ form.people_count }}
+                                {% if form.people_count.errors %}
+                                    <div class="invalid-feedback d-block">
+                                        {{ form.people_count.errors|striptags }}
+                                    </div>
+                                {% endif %}
+                            </div>
+                            <div class="form-group">
+                                <label class="d-block">Участники</label>
+                                <div id="passengers-container" data-max-passengers="{{ form.MAX_PASSENGERS }}">
+                                    {% for passenger in form.passenger_field_pairs %}
+                                        <div class="form-row passenger-entry" data-index="{{ passenger.index }}">
+                                            <div class="form-group col-md-6">
+                                                <label for="{{ passenger.name.id_for_label }}">Имя участника {{ passenger.index }}</label>
+                                                {{ passenger.name }}
+                                                {% if passenger.name.errors %}
+                                                    <div class="invalid-feedback d-block">
+                                                        {{ passenger.name.errors|striptags }}
+                                                    </div>
+                                                {% endif %}
+                                            </div>
+                                            <div class="form-group col-md-6">
+                                                <label for="{{ passenger.phone.id_for_label }}">Телефон участника {{ passenger.index }}</label>
+                                                {{ passenger.phone }}
+                                                {% if passenger.phone.errors %}
+                                                    <div class="invalid-feedback d-block">
+                                                        {{ passenger.phone.errors|striptags }}
+                                                    </div>
+                                                {% endif %}
+                                            </div>
+                                        </div>
+                                    {% endfor %}
+                                </div>
+                                <small class="form-text text-muted">Заполните данные каждого человека, который поедет на автобусе.</small>
+                            </div>
+                            <div class="text-center">
+                                <button type="submit" class="btn btn-success btn-lg">Отправить заявку</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+<script>
+    (function() {
+        const container = document.getElementById('passengers-container');
+        const peopleCountInput = document.getElementById('id_people_count');
+        if (!container || !peopleCountInput) {
+            return;
+        }
+
+        const maxPassengers = parseInt(container.dataset.maxPassengers || '20', 10);
+
+        const createInput = (name, labelText, placeholder) => {
+            const input = document.createElement('input');
+            input.type = 'text';
+            input.name = name;
+            input.id = `id_${name}`;
+            input.placeholder = placeholder;
+            input.required = true;
+            input.className = 'form-control';
+            input.autocomplete = 'off';
+
+            const label = document.createElement('label');
+            label.setAttribute('for', input.id);
+            label.textContent = labelText;
+
+            const wrapper = document.createElement('div');
+            wrapper.className = 'form-group col-md-6';
+            wrapper.appendChild(label);
+            wrapper.appendChild(input);
+
+            return wrapper;
+        };
+
+        const renderPassengerRow = (index) => {
+            const row = document.createElement('div');
+            row.className = 'form-row passenger-entry';
+            row.dataset.index = String(index);
+
+            const nameField = createInput(
+                `passenger_${index}_name`,
+                `Имя участника ${index}`,
+                `Имя участника ${index}`
+            );
+            const phoneField = createInput(
+                `passenger_${index}_phone`,
+                `Телефон участника ${index}`,
+                '+7 (999) 123-45-67'
+            );
+
+            row.appendChild(nameField);
+            row.appendChild(phoneField);
+            container.appendChild(row);
+        };
+
+        const updatePassengerFields = () => {
+            let desiredCount = parseInt(peopleCountInput.value, 10);
+            if (Number.isNaN(desiredCount) || desiredCount < 1) {
+                desiredCount = 1;
+            }
+            desiredCount = Math.min(desiredCount, maxPassengers);
+
+            const currentRows = container.querySelectorAll('.passenger-entry');
+            const currentCount = currentRows.length;
+
+            if (currentCount < desiredCount) {
+                for (let i = currentCount + 1; i <= desiredCount; i += 1) {
+                    renderPassengerRow(i);
+                }
+            } else if (currentCount > desiredCount) {
+                for (let i = currentCount; i > desiredCount; i -= 1) {
+                    const row = container.querySelector(`.passenger-entry[data-index="${i}"]`);
+                    if (row) {
+                        container.removeChild(row);
+                    }
+                }
+            }
+        };
+
+        peopleCountInput.addEventListener('change', updatePassengerFields);
+        peopleCountInput.addEventListener('input', updatePassengerFields);
+
+        updatePassengerFields();
+    })();
+</script>
+{% endblock %}

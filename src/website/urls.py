@@ -22,6 +22,7 @@ urlpatterns = [
     # path("index_hidden/", views.IndexView.as_view(), name="index"),
     # auth
     path("register/", views.RegisterView.as_view(), name="register"),
+    path("bus-registration/", views.BusRegistrationView.as_view(), name="bus_registration"),
     path("password_reset/", CustomPasswordResetView.as_view(), name="password_reset"),
     path(
         "password_reset/done/",

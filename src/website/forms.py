@@ -5,9 +5,12 @@ from datetime import timedelta
 from django import forms
 from django.contrib.auth.forms import PasswordResetForm, SetPasswordForm
 from django.contrib.auth.models import User
-from website.models import Athlet, Team, TeamAdminLog, TeamMemberMove
+from website.models import BusRegistration, Athlet, Team, TeamAdminLog, TeamMemberMove
 from website.models.news import Page
 from website.models.race import Category, Race
+
+
+BUS_REGISTRATION_MAX_PASSENGERS = 20
 
 
 class LoginForm(forms.Form):
@@ -186,6 +189,153 @@ class RegForm(forms.Form):
             raise forms.ValidationError("Такой email уже зарегистрирован.")
         return super(RegForm, self).clean()
 
+
+class BusRegistrationForm(forms.ModelForm):
+    MAX_PASSENGERS = BUS_REGISTRATION_MAX_PASSENGERS
+
+    class Meta:
+        model = BusRegistration
+        fields = ("full_name", "phone", "people_count")
+        widgets = {
+            "full_name": forms.TextInput(
+                attrs={
+                    "class": "form-control",
+                    "placeholder": "Имя контактного лица",
+                    "required": True,
+                }
+            ),
+            "phone": forms.TextInput(
+                attrs={
+                    "class": "form-control",
+                    "placeholder": "+7 (999) 123-45-67",
+                    "required": True,
+                }
+            ),
+            "people_count": forms.NumberInput(
+                attrs={
+                    "class": "form-control",
+                    "min": 1,
+                    "max": BUS_REGISTRATION_MAX_PASSENGERS,
+                    "required": True,
+                }
+            ),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.passenger_field_pairs = []
+        self._build_passenger_fields(self._initial_people_count())
+
+    def _initial_people_count(self) -> int:
+        if self.data:
+            raw_value = self.data.get(self.add_prefix("people_count"))
+        elif self.initial.get("people_count"):
+            raw_value = self.initial.get("people_count")
+        elif self.instance and self.instance.pk:
+            raw_value = self.instance.people_count
+        else:
+            raw_value = 1
+
+        try:
+            count = int(raw_value)
+        except (TypeError, ValueError):
+            count = 1
+
+        return max(1, min(count, self.MAX_PASSENGERS))
+
+    def _build_passenger_fields(self, count: int) -> None:
+        existing_contacts = []
+        if self.instance and self.instance.pk:
+            existing_contacts = self.instance.passenger_contacts
+        elif self.initial.get("passenger_contacts"):
+            existing_contacts = self.initial.get("passenger_contacts")
+
+        for index in range(1, count + 1):
+            name_field = f"passenger_{index}_name"
+            phone_field = f"passenger_{index}_phone"
+
+            name_initial = None
+            phone_initial = None
+            if isinstance(existing_contacts, list) and len(existing_contacts) >= index:
+                contact = existing_contacts[index - 1] or {}
+                name_initial = contact.get("name")
+                phone_initial = contact.get("phone")
+
+            self.fields[name_field] = forms.CharField(
+                label=f"Имя участника {index}",
+                max_length=255,
+                initial=name_initial,
+                widget=forms.TextInput(
+                    attrs={
+                        "class": "form-control",
+                        "placeholder": f"Имя участника {index}",
+                        "required": True,
+                    }
+                ),
+            )
+            self.fields[phone_field] = forms.CharField(
+                label=f"Телефон участника {index}",
+                max_length=64,
+                initial=phone_initial,
+                widget=forms.TextInput(
+                    attrs={
+                        "class": "form-control",
+                        "placeholder": "+7 (999) 123-45-67",
+                        "required": True,
+                    }
+                ),
+            )
+
+            name_bound = self[name_field]
+            phone_bound = self[phone_field]
+            self.passenger_field_pairs.append(
+                {
+                    "index": index,
+                    "name": name_bound,
+                    "phone": phone_bound,
+                }
+            )
+
+    def clean_people_count(self):
+        count = self.cleaned_data.get("people_count")
+        if not count:
+            return 1
+        if count < 1:
+            raise forms.ValidationError("Количество должно быть не меньше 1")
+        if count > self.MAX_PASSENGERS:
+            raise forms.ValidationError(
+                f"Мы можем обработать до {self.MAX_PASSENGERS} участников за одну заявку"
+            )
+        return count
+
+    def clean(self):
+        cleaned_data = super().clean()
+        people_count = cleaned_data.get("people_count") or 1
+        passengers = []
+        for index in range(1, people_count + 1):
+            name_key = f"passenger_{index}_name"
+            phone_key = f"passenger_{index}_phone"
+            name = cleaned_data.get(name_key)
+            phone = cleaned_data.get(phone_key)
+
+            if not name:
+                self.add_error(name_key, "Укажите имя участника")
+            if not phone:
+                self.add_error(phone_key, "Укажите телефон участника")
+
+            if name and phone:
+                passengers.append({"name": name, "phone": phone})
+
+        cleaned_data["passenger_contacts"] = passengers
+        return cleaned_data
+
+    def save(self, commit=True):
+        instance = super().save(commit=False)
+        instance.passenger_contacts = self.cleaned_data.get("passenger_contacts", [])
+        instance.people_count = len(instance.passenger_contacts)
+        if commit:
+            instance.save()
+        return instance
 
 def category2_from_dist(dist, ucount):
     race = Race.objects.filter(code="kolco24_2023").first()
