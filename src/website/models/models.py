@@ -17,10 +17,10 @@ class Profile(models.Model):
     phone = models.TextField(max_length=500, blank=True)
 
 
-class BusRegistration(models.Model):
-    full_name = models.CharField(max_length=255, verbose_name="Имя")
-    phone = models.CharField(max_length=64, verbose_name="Телефон")
-    people_count = models.PositiveIntegerField(verbose_name="Количество человек")
+class Transfer(models.Model):
+    people_count = models.PositiveIntegerField(
+        verbose_name="Количество человек", default=1
+    )
     passenger_contacts = models.JSONField(
         default=list,
         verbose_name="Участники",

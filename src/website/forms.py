@@ -5,7 +5,7 @@ from datetime import timedelta
 from django import forms
 from django.contrib.auth.forms import PasswordResetForm, SetPasswordForm
 from django.contrib.auth.models import User
-from website.models import BusRegistration, Athlet, Team, TeamAdminLog, TeamMemberMove
+from website.models import Transfer, Athlet, Team, TeamAdminLog, TeamMemberMove
 from website.models.news import Page
 from website.models.race import Category, Race
 
@@ -190,27 +190,13 @@ class RegForm(forms.Form):
         return super(RegForm, self).clean()
 
 
-class BusRegistrationForm(forms.ModelForm):
+class TransferForm(forms.ModelForm):
     MAX_PASSENGERS = BUS_REGISTRATION_MAX_PASSENGERS
 
     class Meta:
-        model = BusRegistration
-        fields = ("full_name", "phone", "people_count")
+        model = Transfer
+        fields = ("people_count",)
         widgets = {
-            "full_name": forms.TextInput(
-                attrs={
-                    "class": "form-control",
-                    "placeholder": "Имя контактного лица",
-                    "required": True,
-                }
-            ),
-            "phone": forms.TextInput(
-                attrs={
-                    "class": "form-control",
-                    "placeholder": "+7 (999) 123-45-67",
-                    "required": True,
-                }
-            ),
             "people_count": forms.NumberInput(
                 attrs={
                     "class": "form-control",
@@ -336,6 +322,7 @@ class BusRegistrationForm(forms.ModelForm):
         if commit:
             instance.save()
         return instance
+
 
 def category2_from_dist(dist, ucount):
     race = Race.objects.filter(code="kolco24_2023").first()

@@ -6,7 +6,7 @@ from .auth import (
 )
 from .views_ import (
     AddTeam,
-    BusRegistrationView,
+    TransferView,
     AllTeamsResultView,
     AllTeamsView,
     CancelPaymentView,
