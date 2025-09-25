@@ -24,7 +24,7 @@ from django.views.decorators.csrf import csrf_exempt
 from openpyxl import load_workbook
 from website.email import send_login_email
 from website.forms import (
-    BusRegistrationForm,
+    TransferForm,
     Export2GoogleDocsForm,
     FastLoginForm,
     LoginForm,
@@ -185,20 +185,20 @@ class RegisterView(View):
         }
 
 
-class BusRegistrationView(View):
-    template_name = "website/bus_registration.html"
+class TransferView(View):
+    template_name = "website/transfer.html"
 
     def get(self, request):
-        return render(request, self.template_name, {"form": BusRegistrationForm()})
+        return render(request, self.template_name, {"form": TransferForm()})
 
     def post(self, request):
-        form = BusRegistrationForm(request.POST)
+        form = TransferForm(request.POST)
         if form.is_valid():
             form.save()
             return render(
                 request,
                 self.template_name,
-                {"form": BusRegistrationForm(), "submitted": True},
+                {"form": TransferForm(), "submitted": True},
             )
 
         return render(request, self.template_name, {"form": form})
@@ -1465,7 +1465,7 @@ class AddTeam(View):
                 vtb_client._ensure_token()
 
                 payload = vtb_client.create_order(
-                    order_id=f"ORDER_{payment.id}",
+                    order_id=f"TEST_{payment.id}",
                     order_name=f"Оплата за команду на Кольцо 24 ({payment.id})",
                     amount_value=cost,
                     return_payment_data="sbp",
