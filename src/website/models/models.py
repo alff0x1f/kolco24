@@ -27,6 +27,16 @@ class Transfer(models.Model):
         help_text="Список участников с их контактами",
     )
     created_at = models.DateTimeField(auto_now_add=True, verbose_name="Создано")
+    status = models.CharField(
+        max_length=20,
+        choices=[
+            ("new", "Новая"),
+            ("processed", "Обработана"),
+            ("cancelled", "Отменена"),
+        ],
+        default="new",
+        verbose_name="Статус",
+    )
 
     class Meta:
         ordering = ("-created_at",)
@@ -34,7 +44,7 @@ class Transfer(models.Model):
         verbose_name_plural = "Заявки на автобус"
 
     def __str__(self) -> str:
-        return f"{self.full_name} ({self.people_count})"
+        return f"{self.id} ({self.people_count})"
 
 
 @receiver(post_save, sender=User)
