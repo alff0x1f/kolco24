@@ -3,7 +3,6 @@ from django.utils.html import format_html
 from markdown import markdown
 
 from .models import (
-    Transfer,
     Checkpoint,
     CheckpointTag,
     MenuItem,
@@ -16,6 +15,7 @@ from .models import (
     Tag,
     TakenKP,
     Team,
+    Transfer,
 )
 from .models.race import Category, RaceLink
 
@@ -39,12 +39,13 @@ class PageAdmin(admin.ModelAdmin):
 @admin.register(Transfer)
 class TransferAdmin(admin.ModelAdmin):
     list_display = (
+        "id",
         "people_count",
         "participants_display",
         "created_at",
+        "status",
     )
-    search_fields = ("full_name", "phone")
-    list_filter = ("created_at",)
+    list_filter = ("created_at", "status")
     ordering = ("-created_at",)
 
     @admin.display(description="Участники")

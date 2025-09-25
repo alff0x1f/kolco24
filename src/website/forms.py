@@ -5,10 +5,9 @@ from datetime import timedelta
 from django import forms
 from django.contrib.auth.forms import PasswordResetForm, SetPasswordForm
 from django.contrib.auth.models import User
-from website.models import Transfer, Athlet, Team, TeamAdminLog, TeamMemberMove
+from website.models import Athlet, Team, TeamAdminLog, TeamMemberMove, Transfer
 from website.models.news import Page
 from website.models.race import Category, Race
-
 
 BUS_REGISTRATION_MAX_PASSENGERS = 20
 
