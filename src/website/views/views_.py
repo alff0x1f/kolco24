@@ -24,6 +24,7 @@ from django.views.decorators.csrf import csrf_exempt
 from openpyxl import load_workbook
 from website.email import send_login_email
 from website.forms import (
+    BusRegistrationForm,
     Export2GoogleDocsForm,
     FastLoginForm,
     LoginForm,
@@ -182,6 +183,25 @@ class RegisterView(View):
             "reg_form": RegForm(),
             "reg_open": settings.REG_OPEN,
         }
+
+
+class BusRegistrationView(View):
+    template_name = "website/bus_registration.html"
+
+    def get(self, request):
+        return render(request, self.template_name, {"form": BusRegistrationForm()})
+
+    def post(self, request):
+        form = BusRegistrationForm(request.POST)
+        if form.is_valid():
+            form.save()
+            return render(
+                request,
+                self.template_name,
+                {"form": BusRegistrationForm(), "submitted": True},
+            )
+
+        return render(request, self.template_name, {"form": form})
 
 
 class RaceNewsView(View):

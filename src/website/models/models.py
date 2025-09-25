@@ -17,6 +17,22 @@ class Profile(models.Model):
     phone = models.TextField(max_length=500, blank=True)
 
 
+class BusRegistration(models.Model):
+    full_name = models.CharField(max_length=255, verbose_name="Имя")
+    phone = models.CharField(max_length=64, verbose_name="Телефон")
+    people_count = models.PositiveIntegerField(verbose_name="Количество человек")
+    passengers = models.TextField(verbose_name="Кто поедет")
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="Создано")
+
+    class Meta:
+        ordering = ("-created_at",)
+        verbose_name = "Заявка на автобус"
+        verbose_name_plural = "Заявки на автобус"
+
+    def __str__(self) -> str:
+        return f"{self.full_name} ({self.people_count})"
+
+
 @receiver(post_save, sender=User)
 def create_user_profile(sender, instance, created, **kwargs):
     if created:

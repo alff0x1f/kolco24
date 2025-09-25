@@ -5,7 +5,7 @@ from datetime import timedelta
 from django import forms
 from django.contrib.auth.forms import PasswordResetForm, SetPasswordForm
 from django.contrib.auth.models import User
-from website.models import Athlet, Team, TeamAdminLog, TeamMemberMove
+from website.models import BusRegistration, Athlet, Team, TeamAdminLog, TeamMemberMove
 from website.models.news import Page
 from website.models.race import Category, Race
 
@@ -186,6 +186,42 @@ class RegForm(forms.Form):
             raise forms.ValidationError("Такой email уже зарегистрирован.")
         return super(RegForm, self).clean()
 
+
+class BusRegistrationForm(forms.ModelForm):
+    class Meta:
+        model = BusRegistration
+        fields = ("full_name", "phone", "people_count", "passengers")
+        widgets = {
+            "full_name": forms.TextInput(
+                attrs={
+                    "class": "form-control",
+                    "placeholder": "Имя",
+                    "required": True,
+                }
+            ),
+            "phone": forms.TextInput(
+                attrs={
+                    "class": "form-control",
+                    "placeholder": "+7 (999) 123-45-67",
+                    "required": True,
+                }
+            ),
+            "people_count": forms.NumberInput(
+                attrs={
+                    "class": "form-control",
+                    "min": 1,
+                    "required": True,
+                }
+            ),
+            "passengers": forms.Textarea(
+                attrs={
+                    "class": "form-control",
+                    "rows": 5,
+                    "placeholder": "Имена участников, которые поедут",
+                    "required": True,
+                }
+            ),
+        }
 
 def category2_from_dist(dist, ucount):
     race = Race.objects.filter(code="kolco24_2023").first()
