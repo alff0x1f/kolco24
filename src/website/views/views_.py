@@ -24,7 +24,6 @@ from django.views.decorators.csrf import csrf_exempt
 from openpyxl import load_workbook
 from website.email import send_login_email
 from website.forms import (
-    TransferForm,
     Export2GoogleDocsForm,
     FastLoginForm,
     LoginForm,
@@ -32,6 +31,7 @@ from website.forms import (
     RegForm,
     TeamForm,
     TeamFormAdmin,
+    TransferForm,
 )
 from website.googledocs import (
     export_payments_to_sheet,
