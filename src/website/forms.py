@@ -289,7 +289,8 @@ class TransferForm(forms.ModelForm):
             raise forms.ValidationError("Количество должно быть не меньше 1")
         if count > self.MAX_PASSENGERS:
             raise forms.ValidationError(
-                f"Мы можем обработать до {self.MAX_PASSENGERS} участников за одну заявку"
+                f"Мы можем обработать до {self.MAX_PASSENGERS} участников за одну "
+                f"заявку"
             )
         return count
 
