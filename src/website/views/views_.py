@@ -19,6 +19,7 @@ from django.http import Http404, HttpResponse, HttpResponseRedirect, JsonRespons
 from django.shortcuts import render
 from django.urls import reverse
 from django.utils.decorators import method_decorator
+from django.utils.http import url_has_allowed_host_and_scheme
 from django.views import View
 from django.views.decorators.csrf import csrf_exempt
 from openpyxl import load_workbook
@@ -26,6 +27,7 @@ from website.email import send_login_email
 from website.forms import (
     Export2GoogleDocsForm,
     FastLoginForm,
+    ImpersonateForm,
     LoginForm,
     PageForm,
     RegForm,
@@ -316,6 +318,101 @@ class LogoutUserView(View):
             if request.user.is_authenticated:
                 logout(request)
         return HttpResponseRedirect("/")
+
+
+def _get_auth_backend():
+    backends = getattr(settings, "AUTHENTICATION_BACKENDS", [])
+    if backends:
+        return backends[0]
+    return "django.contrib.auth.backends.ModelBackend"
+
+
+def _safe_redirect(request, url):
+    if url and url_has_allowed_host_and_scheme(
+        url,
+        allowed_hosts={request.get_host()},
+        require_https=request.is_secure(),
+    ):
+        return HttpResponseRedirect(url)
+    return HttpResponseRedirect("/")
+
+
+def _find_user_for_impersonation(query):
+    user = None
+    if query.isdigit():
+        user = User.objects.filter(pk=int(query)).first()
+    if not user:
+        user = User.objects.filter(email__iexact=query).first()
+    if not user:
+        user = User.objects.filter(username__iexact=query).first()
+    return user
+
+
+def _login_without_credentials(request, user):
+    backend = _get_auth_backend()
+    user.backend = backend
+    auth_login(request, user)
+
+
+def impersonate(request):
+    if not request.user.is_authenticated:
+        return HttpResponseRedirect(reverse("passlogin") + f"?next={request.path}")
+
+    if not request.user.is_superuser and not request.session.get("impersonator_id"):
+        raise Http404("Not found")
+
+    initial_next = request.GET.get("next")
+    if not initial_next:
+        referer = request.META.get("HTTP_REFERER", "")
+        if referer and url_has_allowed_host_and_scheme(
+            referer,
+            allowed_hosts={request.get_host()},
+            require_https=request.is_secure(),
+        ):
+            initial_next = referer
+
+    form = ImpersonateForm(request.POST or None, initial={"next": initial_next})
+
+    if request.method == "POST" and form.is_valid():
+        query = form.cleaned_data["query"]
+        target_user = _find_user_for_impersonation(query)
+
+        if not target_user:
+            form.add_error("query", "Пользователь не найден.")
+        else:
+            original_user_id = request.session.get("impersonator_id") or request.user.pk
+
+            if target_user.pk == original_user_id:
+                form.add_error("query", "Вы уже вошли под этим пользователем.")
+            else:
+                _login_without_credentials(request, target_user)
+                request.session["impersonator_id"] = original_user_id
+                next_url = form.cleaned_data.get("next")
+                return _safe_redirect(request, next_url)
+
+    return render(request, "website/impersonate.html", {"form": form})
+
+
+def stop_impersonate(request):
+    if not request.user.is_authenticated:
+        return HttpResponseRedirect("/")
+
+    original_user_id = request.session.get("impersonator_id")
+
+    if not original_user_id:
+        return HttpResponseRedirect("/")
+
+    try:
+        original_user = User.objects.get(pk=original_user_id)
+    except User.DoesNotExist:
+        request.session.pop("impersonator_id", None)
+        return HttpResponseRedirect("/")
+
+    _login_without_credentials(request, original_user)
+    request.session.pop("impersonator_id", None)
+
+    next_url = request.GET.get("next")
+    return _safe_redirect(request, next_url)
 
 
 def teams(request, template=""):

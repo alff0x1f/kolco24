@@ -47,6 +47,11 @@
                         </ul>
 
                         <ul class="navbar-nav">
+                            {% if request.session.impersonator_id %}
+                            <li class="nav-item">
+                                <span class="nav-link text-warning font-weight-bold">Режим пользователя</span>
+                            </li>
+                            {% endif %}
                             {% if user.is_active %}
                             <li class="nav-item dropdown">
                                 <a class="nav-link dropdown-toggle" href="#" id="usersDropdown" role="button" data-toggle="dropdown">{{ user.last_name}} {{user.first_name }}</a>
@@ -59,6 +64,11 @@
                                         {% if user.is_superuser %}
                                             <a class="dropdown-item" href="/admin">Админка</a>
                                             <a class="dropdown-item" href="/sync_googledocs">Экспортировать в googledocs</a>
+                                            <a class="dropdown-item" href="{% url 'impersonate' %}">Просмотр как пользователь</a>
+                                        {% endif %}
+                                        {% if request.session.impersonator_id %}
+                                            <span class="dropdown-item-text text-warning">Включён режим пользователя</span>
+                                            <a class="dropdown-item" href="{% url 'stop_impersonate' %}">Вернуться к администратору</a>
                                         {% endif %}
                                         <form action="/logout/" method="POST" id="logoutForm">
                                             <input type="hidden" name="logout" value="logout">

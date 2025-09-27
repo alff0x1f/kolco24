@@ -842,3 +842,20 @@ class PageForm(forms.ModelForm):
                 attrs={"class": "form-control", "rows": 20, "placeholder": "Markdown"}
             ),
         }
+
+
+class ImpersonateForm(forms.Form):
+    query = forms.CharField(
+        label="Email или ID пользователя",
+        widget=forms.TextInput(
+            attrs={
+                "class": "form-control",
+                "placeholder": "Введите email или ID пользователя",
+                "autocomplete": "off",
+            }
+        ),
+    )
+    next = forms.CharField(widget=forms.HiddenInput(), required=False)
+
+    def clean_query(self):
+        return self.cleaned_data["query"].strip()

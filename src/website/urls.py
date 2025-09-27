@@ -43,6 +43,8 @@ urlpatterns = [
     path("login/", views.login, name="login"),
     re_path("^login/(?P<login_key>[0-9a-f]{16})/", views.login_by_key),
     path("logout/", views.LogoutUserView.as_view(), name="logout"),
+    path("impersonate/", views.impersonate, name="impersonate"),
+    path("impersonate/stop/", views.stop_impersonate, name="stop_impersonate"),
     path("team/", views.my_team, name="my_team"),
     path("team/<team_id>/", EditTeamView.as_view(), name="edit_team"),
     path("team/<team_id>/move/", TeamMemberMoveView.as_view(), name="move_team_member"),

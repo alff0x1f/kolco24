@@ -1,0 +1,49 @@
+{% extends "website/base.html" %}
+{% block title %}Просмотр как пользователь{% endblock %}
+{% block content %}
+<section class="pt-5 pb-5 bg-light">
+    <div class="container">
+        <div class="row justify-content-center">
+            <div class="col-lg-6">
+                <div class="card shadow-sm">
+                    <div class="card-body">
+                        <h2 class="h4 mb-3">Просмотр как пользователь</h2>
+                        <p class="text-muted">
+                            Введите email, имя пользователя или идентификатор аккаунта, чтобы переключиться в режим просмотра от лица выбранного пользователя.
+                        </p>
+                        <form method="post">
+                            {% csrf_token %}
+                            {{ form.next }}
+                            <div class="form-group">
+                                <label for="id_query">{{ form.query.label }}</label>
+                                {% if form.query.errors %}
+                                    {{ form.query.as_widget(attrs={"class": "form-control is-invalid"}) }}
+                                {% else %}
+                                    {{ form.query }}
+                                {% endif %}
+                                {% if form.query.errors %}
+                                    {% for error in form.query.errors %}
+                                        <div class="invalid-feedback d-block">{{ error }}</div>
+                                    {% endfor %}
+                                {% endif %}
+                            </div>
+                            {% if form.non_field_errors %}
+                                {% for error in form.non_field_errors %}
+                                    <div class="alert alert-danger" role="alert">{{ error }}</div>
+                                {% endfor %}
+                            {% endif %}
+                            <button type="submit" class="btn btn-primary">Переключиться</button>
+                        </form>
+                    </div>
+                </div>
+                {% if request.session.impersonator_id %}
+                    <div class="alert alert-warning mt-3 mb-0" role="alert">
+                        Сейчас включён режим просмотра от лица другого пользователя.
+                        <a class="alert-link" href="{% url 'stop_impersonate' %}">Вернуться к администратору</a>.
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}
