@@ -349,9 +349,7 @@ def _find_user_for_impersonation(query):
 
 
 def _login_without_credentials(request, user):
-    backend = _get_auth_backend()
-    user.backend = backend
-    auth_login(request, user)
+    auth_login(request, user, backend=_get_auth_backend())
 
 
 def _mark_field_invalid(field):
@@ -394,7 +392,9 @@ def impersonate(request):
                 form.add_error("query", "Пользователь не найден.")
                 _mark_field_invalid(form.fields["query"])
             else:
-                original_user_id = request.session.get("impersonator_id") or request.user.pk
+                original_user_id = (
+                    request.session.get("impersonator_id") or request.user.pk
+                )
 
                 if target_user.pk == request.user.pk:
                     form.add_error("query", "Вы уже вошли под этим пользователем.")
