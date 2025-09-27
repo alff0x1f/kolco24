@@ -365,9 +365,14 @@ def impersonate(request):
     if not request.user.is_authenticated:
         return HttpResponseRedirect(reverse("passlogin") + f"?next={request.path}")
 
-    if not request.user.is_superuser and not request.session.get("impersonator_id"):
+    # Check if the original user (either current user or impersonator) is a superuser
+    original_user_id = request.session.get("impersonator_id") or request.user.pk
+    try:
+        original_user = User.objects.get(pk=original_user_id)
+    except User.DoesNotExist:
         raise Http404("Not found")
-
+    if not original_user.is_superuser:
+        raise Http404("Not found")
     initial_next = request.GET.get("next")
     if not initial_next:
         referer = request.META.get("HTTP_REFERER", "")
