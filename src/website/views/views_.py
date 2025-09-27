@@ -392,16 +392,11 @@ def impersonate(request):
                 form.add_error("query", "Пользователь не найден.")
                 _mark_field_invalid(form.fields["query"])
             else:
-                original_user_id = (
-                    request.session.get("impersonator_id") or request.user.pk
-                )
-
                 if target_user.pk == request.user.pk:
                     form.add_error("query", "Вы уже вошли под этим пользователем.")
                     _mark_field_invalid(form.fields["query"])
                 elif target_user.pk == original_user_id:
                     # Switching back to the original user: stop impersonation
-                    original_user = User.objects.get(pk=original_user_id)
                     _login_without_credentials(request, original_user)
                     request.session.pop("impersonator_id", None)
                     next_url = form.cleaned_data.get("next")
