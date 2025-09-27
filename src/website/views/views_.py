@@ -354,6 +354,13 @@ def _login_without_credentials(request, user):
     auth_login(request, user)
 
 
+def _mark_field_invalid(field):
+    classes = field.widget.attrs.get("class", "").split()
+    if "is-invalid" not in classes:
+        classes.append("is-invalid")
+        field.widget.attrs["class"] = " ".join(filter(None, classes))
+
+
 def impersonate(request):
     if not request.user.is_authenticated:
         return HttpResponseRedirect(reverse("passlogin") + f"?next={request.path}")
@@ -373,22 +380,27 @@ def impersonate(request):
 
     form = ImpersonateForm(request.POST or None, initial={"next": initial_next})
 
-    if request.method == "POST" and form.is_valid():
-        query = form.cleaned_data["query"]
-        target_user = _find_user_for_impersonation(query)
+    if request.method == "POST":
+        if form.is_valid():
+            query = form.cleaned_data["query"]
+            target_user = _find_user_for_impersonation(query)
 
-        if not target_user:
-            form.add_error("query", "Пользователь не найден.")
-        else:
-            original_user_id = request.session.get("impersonator_id") or request.user.pk
-
-            if target_user.pk == original_user_id:
-                form.add_error("query", "Вы уже вошли под этим пользователем.")
+            if not target_user:
+                form.add_error("query", "Пользователь не найден.")
+                _mark_field_invalid(form.fields["query"])
             else:
-                _login_without_credentials(request, target_user)
-                request.session["impersonator_id"] = original_user_id
-                next_url = form.cleaned_data.get("next")
-                return _safe_redirect(request, next_url)
+                original_user_id = request.session.get("impersonator_id") or request.user.pk
+
+                if target_user.pk == original_user_id:
+                    form.add_error("query", "Вы уже вошли под этим пользователем.")
+                    _mark_field_invalid(form.fields["query"])
+                else:
+                    _login_without_credentials(request, target_user)
+                    request.session["impersonator_id"] = original_user_id
+                    next_url = form.cleaned_data.get("next")
+                    return _safe_redirect(request, next_url)
+        else:
+            _mark_field_invalid(form.fields["query"])
 
     return render(request, "website/impersonate.html", {"form": form})
 

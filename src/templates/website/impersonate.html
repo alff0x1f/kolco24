@@ -16,11 +16,7 @@
                             {{ form.next }}
                             <div class="form-group">
                                 <label for="id_query">{{ form.query.label }}</label>
-                                {% if form.query.errors %}
-                                    {{ form.query.as_widget(attrs={"class": "form-control is-invalid"}) }}
-                                {% else %}
-                                    {{ form.query }}
-                                {% endif %}
+                                {{ form.query }}
                                 {% if form.query.errors %}
                                     {% for error in form.query.errors %}
                                         <div class="invalid-feedback d-block">{{ error }}</div>
