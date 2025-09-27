@@ -193,7 +193,7 @@
                                     </div>
                                 </div>
                                 <div class="mb-3 form-check">
-                                  <input class="form-check-input" type="checkbox" id="consent" name="consent" required>
+                                  <input class="form-check-input" type="checkbox" id="consent" name="consent" required {% if team.id %}disabled checked{% endif %}>
                                   <label class="form-check-label" for="consent">
                                     Я подтверждаю, что ознакомлен(а) с
                                     <a href="/page/personal_data_consent/" target="_blank" rel="noopener">
@@ -215,7 +215,7 @@
                                 <div class="mb-2" id="reg_close_warning" style="display: none">
                                     <p>Добавление новых участников невозможно из-за отсутствия слотов.</p>
                                 </div>
-                                {% if race.reg_status == 'open' or team.category2.race.is_team_editable or user.is_superuser %}
+                                {% if race.reg_status == 'open' or team.category2.race.is_teams_editable or user.is_superuser %}
                                     <div class="form-row form-group">
                                         <div class="col">
                                             <button class="btn btn-block btn-success" type="submit"
@@ -407,7 +407,7 @@
             const reg_close_warning = document.getElementById('reg_close_warning');
 
             const ucount_paid = {{ team.paid_people |default:0| floatformat }};
-            const mapCount = {{ team.map_count |default:0| floatformat }};
+            const map_count_paid = {{ team.map_count_paid |default:0| floatformat }};
 
             // All athlete/birth field wrappers by id
             const memberFields = {
@@ -445,7 +445,7 @@
                     mapCountField.style.display = 'none';
                 }
 
-                const sum = {{ cost }} * (ucount - ucount_paid) + 200 * mapCount;
+                const sum = {{ cost }} * (ucount - ucount_paid) + 200 * (mapCount - map_count_paid);
 
                 if (sum > 0) {
                     paid_block.style.display = 'block';
@@ -521,13 +521,17 @@
             const teamform_submit = document.getElementById('teamform_submit');
             const common_paid = document.getElementById('common_paid');
 
-            function toggleSubmit() {
-              teamform_submit.disabled = !consent.checked;
-              common_paid.disabled = !consent.checked;
-            }
-
-            toggleSubmit();                 // первичная инициализация
-            consent.addEventListener('change', toggleSubmit);
+            {% if not team.id %}
+              {# Если редактирование команды, то кнопку показываем #}
+              function toggleSubmit() {
+                teamform_submit.disabled = !consent.checked;
+                if (common_paid) {
+                    common_paid.disabled = !consent.checked;
+                }
+              }
+              toggleSubmit();                 // первичная инициализация
+              consent.addEventListener('change', toggleSubmit);
+            {% endif %}
         });
     </script>
 {% endblock %}

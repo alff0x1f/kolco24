@@ -45,6 +45,7 @@ class EditTeamView(View):
             "birth4": team.birth4,
             "birth5": team.birth5,
             "birth6": team.birth6,
+            "map_count": team.map_count,
         }
         form = TeamForm(team.category2.race_id, initial=initial)
 
