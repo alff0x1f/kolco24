@@ -5,6 +5,7 @@ from api.views import (
     CheckpointTagCreateView,
     CheckpointView,
     MemberTagListCreateView,
+    MemberTagTouchView,
     TeamCSVListView,
     TeamListView,
 )
@@ -14,6 +15,7 @@ urlpatterns = [
         "ping/", lambda request: HttpResponse(content="[pong]", status=200), name="ping"
     ),
     path("member_tag/", MemberTagListCreateView.as_view(), name="tag-list-create"),
+    path("member_tag/touch/", MemberTagTouchView.as_view(), name="tag-touch"),
     path(
         "race/<int:race_id>/checkpoint/",
         CheckpointView.as_view(),

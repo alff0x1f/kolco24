@@ -173,7 +173,7 @@ class NewsPostAdmin(admin.ModelAdmin):
 
 @admin.register(Tag)
 class TagAdmin(admin.ModelAdmin):
-    list_display = ("number", "tag_id")
+    list_display = ("number", "tag_id", "last_seen_at")
     search_fields = ("number", "tag_id")
 
 
