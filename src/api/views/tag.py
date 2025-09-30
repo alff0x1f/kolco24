@@ -7,11 +7,7 @@ from rest_framework.views import APIView
 
 from website.models import Checkpoint, CheckpointTag, Tag
 
-from ..serializers import (
-    CheckpointTagSerializer,
-    TagSerializer,
-    TagTouchSerializer,
-)
+from ..serializers import CheckpointTagSerializer, TagSerializer, TagTouchSerializer
 
 
 class MemberTagListCreateView(ListCreateAPIView):
