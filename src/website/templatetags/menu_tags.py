@@ -1,4 +1,5 @@
 from django import template
+
 from website.models import MenuItem
 
 register = template.Library()

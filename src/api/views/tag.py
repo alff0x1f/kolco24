@@ -1,11 +1,13 @@
+from django.utils import timezone
 from rest_framework import status
 from rest_framework.exceptions import NotFound
 from rest_framework.generics import ListCreateAPIView
 from rest_framework.response import Response
 from rest_framework.views import APIView
+
 from website.models import Checkpoint, CheckpointTag, Tag
 
-from ..serializers import CheckpointTagSerializer, TagSerializer
+from ..serializers import CheckpointTagSerializer, TagSerializer, TagTouchSerializer
 
 
 class MemberTagListCreateView(ListCreateAPIView):
@@ -57,3 +59,21 @@ class CheckpointTagCreateView(APIView):
             raise NotFound(
                 {"number": [f"Контрольная точка с номером {number} не найдена"]}
             )
+
+
+class MemberTagTouchView(APIView):
+    def post(self, request):
+        serializer = TagTouchSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        tag_id = serializer.validated_data["tag_id"]
+
+        try:
+            tag = Tag.objects.get(tag_id=tag_id)
+        except Tag.DoesNotExist:
+            raise NotFound({"tag_id": [f"Тег с ID {tag_id} не найден"]})
+
+        tag.last_seen_at = timezone.now()
+        tag.save(update_fields=["last_seen_at"])
+
+        return Response(TagSerializer(tag).data, status=status.HTTP_200_OK)

@@ -1,5 +1,6 @@
 from rest_framework.fields import SerializerMethodField
 from rest_framework.serializers import ModelSerializer
+
 from website.models import Checkpoint
 from website.models.enums import CheckpointType
 

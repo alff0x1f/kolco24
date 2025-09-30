@@ -3,6 +3,8 @@ from django.http import HttpResponse, HttpResponseRedirect
 from django.shortcuts import render
 from django.urls import reverse
 from django.views import View
+
+from vtb.client import VTBClient
 from website.forms import TeamForm, TeamMemberMoveForm
 from website.models import (
     Payment,
@@ -12,8 +14,6 @@ from website.models import (
     VTBPayment,
     VTBPreparedPayment,
 )
-
-from vtb.client import VTBClient
 
 
 class EditTeamView(View):

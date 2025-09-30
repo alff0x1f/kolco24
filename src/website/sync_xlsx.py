@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta
 
 from openpyxl import load_workbook
+
 from website.models import Checkpoint, TakenKP, Team
 
 

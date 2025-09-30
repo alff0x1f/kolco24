@@ -1,4 +1,5 @@
 from rest_framework.generics import ListAPIView
+
 from website.models import Checkpoint, Race
 from website.models.enums import CheckpointType
 

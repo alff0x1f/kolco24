@@ -23,6 +23,8 @@ from django.utils.http import url_has_allowed_host_and_scheme
 from django.views import View
 from django.views.decorators.csrf import csrf_exempt
 from openpyxl import load_workbook
+
+from vtb.client import VTBClient
 from website.email import send_login_email
 from website.forms import (
     Export2GoogleDocsForm,
@@ -58,8 +60,6 @@ from website.models import (
 )
 from website.models.race import Category, RegStatus
 from website.sync_xlsx import import_file_xlsx
-
-from vtb.client import VTBClient
 
 from ..models.news import MenuItem, Page
 from ..models.vtb import VTBPayment, VTBPreparedPayment
