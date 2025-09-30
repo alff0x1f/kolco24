@@ -1,9 +1,9 @@
 from time import sleep
 
 from django.core.management.base import BaseCommand
-from website.models import Payment, Team, VTBPayment
 
 from vtb.client import VTBClient
+from website.models import Payment, Team, VTBPayment
 
 
 class Command(BaseCommand):

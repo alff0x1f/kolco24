@@ -3,9 +3,9 @@ import csv
 from django.http import HttpResponse
 from rest_framework.generics import ListAPIView
 from rest_framework.views import APIView
-from website.models import Team
 
 from api.serializers.team import TeamSerializer
+from website.models import Team
 
 
 class TeamListView(ListAPIView):
