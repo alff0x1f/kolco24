@@ -86,6 +86,9 @@ class EditTeamView(View):
         if not team.category2.race.is_teams_editable and not request.user.is_superuser:
             return HttpResponse("Редактирование команд запрещено", status=403)
 
+        if request.POST.get("delete_team"):
+            return self.delete_team(request, team)
+
         form = TeamForm(team.category2.race_id, request.POST)
         if form.is_valid():
             if "teamname" in form.cleaned_data:
@@ -175,8 +178,22 @@ class EditTeamView(View):
             },
         )
 
+    def delete_team(self, request, team: Team):
+        if not (request.user.is_superuser or team.owner_id == request.user.id):
+            return HttpResponse("Удаление запрещено", status=403)
+
+        if not team.can_be_deleted:
+            return HttpResponse("Команду нельзя удалить", status=400)
+
+        team.is_deleted = True
+        team.save(update_fields=["is_deleted"])
+
+        return HttpResponseRedirect(
+            reverse("my_teams", args=[team.category2.race_id])
+        )
+
     def get_team(self, team_id):
-        qs = Team.objects.filter(id=team_id).select_related("category2")
+        qs = Team.objects.filter(id=team_id, is_deleted=False).select_related("category2")
         if not self.request.user.is_superuser:
             qs = qs.filter(owner_id=self.request.user.id)
         return qs.first()
@@ -188,8 +205,12 @@ class TeamMemberMoveView(View):
         if not request.user.is_superuser:
             return HttpResponseRedirect(reverse("passlogin") + f"?next={request.path}")
 
+        from_team = Team.objects.filter(id=team_id, is_deleted=False).first()
+        if not from_team:
+            return HttpResponse("Команда недоступна", status=404)
+
         data = request.POST.copy()
-        data["from_team"] = Team.objects.filter(id=team_id).first().id
+        data["from_team"] = from_team.id
         form = TeamMemberMoveForm(data)
         if form.is_valid():
             form.save()

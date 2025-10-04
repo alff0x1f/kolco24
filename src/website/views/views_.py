@@ -222,7 +222,11 @@ class RaceNewsView(View):
             .order_by("order", "id")
             .annotate(
                 team_count=Subquery(
-                    Team.objects.filter(category2=OuterRef("id"), paid_people__gt=0)
+                    Team.objects.filter(
+                        category2=OuterRef("id"),
+                        paid_people__gt=0,
+                        is_deleted=False,
+                    )
                     .values("category2")
                     .annotate(count=Count("id"))
                     .values("count")[:1]
@@ -438,55 +442,85 @@ def teams(request, template=""):
     teams = [
         {
             "teams": Team.objects.filter(
-                dist="6h", year="2024", category="", paid_people__gt=0
+                dist="6h",
+                year="2024",
+                category="",
+                paid_people__gt=0,
+                is_deleted=False,
             ).order_by("start_number", "id"),
             "dist_name": "6ч",
         },
         {
             "teams": Team.objects.filter(
-                dist="12h", year="2024", category="", paid_people__gt=0
+                dist="12h",
+                year="2024",
+                category="",
+                paid_people__gt=0,
+                is_deleted=False,
             ).order_by("start_number", "id"),
             "dist_name": "12ч",
         },
         {
             "teams": Team.objects.filter(
-                dist="24h", year="2024", category="", paid_people__gt=0
+                dist="24h",
+                year="2024",
+                category="",
+                paid_people__gt=0,
+                is_deleted=False,
             ).order_by("start_number", "id"),
             "dist_name": "25ч",
         },
         {
             "teams": Team.objects.filter(
-                category="24h", year="2024", paid_people__gt=0
+                category="24h",
+                year="2024",
+                paid_people__gt=0,
+                is_deleted=False,
             ).order_by("start_number", "id"),
             "dist_name": '"Хождение по мукам" (24ч, 4-6 человек)',
         },
         {
             "teams": Team.objects.filter(
-                category="12h_team", year="2024", paid_people__gt=0
+                category="12h_team",
+                year="2024",
+                paid_people__gt=0,
+                is_deleted=False,
             ).order_by("start_number", "id"),
             "dist_name": '"Горе от ума" (12ч, 4-6 человек)',
         },
         {
             "teams": Team.objects.filter(
-                category="12h_mw", year="2024", paid_people__gt=0
+                category="12h_mw",
+                year="2024",
+                paid_people__gt=0,
+                is_deleted=False,
             ).order_by("start_number", "id"),
             "dist_name": '"Горе от ума" (12ч, МЖ)',
         },
         {
             "teams": Team.objects.filter(
-                category="12h_ww", year="2024", paid_people__gt=0
+                category="12h_ww",
+                year="2024",
+                paid_people__gt=0,
+                is_deleted=False,
             ).order_by("start_number", "id"),
             "dist_name": '"Горе от ума" (12ч, ЖЖ)',
         },
         {
             "teams": Team.objects.filter(
-                category="12h_mm", year="2024", paid_people__gt=0
+                category="12h_mm",
+                year="2024",
+                paid_people__gt=0,
+                is_deleted=False,
             ).order_by("start_number", "id"),
             "dist_name": '"Горе от ума" (12ч, ММ)',
         },
         {
             "teams": Team.objects.filter(
-                category="6h", year="2024", paid_people__gt=0
+                category="6h",
+                year="2024",
+                paid_people__gt=0,
+                is_deleted=False,
             ).order_by("start_number", "id"),
             "dist_name": '"Денискины рассказы" (6ч, 2-3 человека)',
         },
@@ -503,7 +537,11 @@ def teams(request, template=""):
     if request.user.is_superuser:
         teams.append(
             {
-                "teams": Team.objects.filter(paid_people=0, year=2024),
+                "teams": Team.objects.filter(
+                    paid_people=0,
+                    year=2024,
+                    is_deleted=False,
+                ),
                 "dist_name": "Неоплаченное",
             }
         )
@@ -660,7 +698,9 @@ def my_team(request, teamid="", template="my_team"):
             return HttpResponseRedirect("/team/%s" % paymentid)
 
         main_team = Team.objects.get(paymentid=paymentid, year=2024)
-        other_teams = Team.objects.filter(owner=request.user, year=2024).exclude(
+        other_teams = Team.objects.filter(
+            owner=request.user, year=2024, is_deleted=False
+        ).exclude(
             paymentid=paymentid
         )
         teams_count, _ = Team.get_info()
@@ -746,7 +786,9 @@ class NewPaymentView(View):
 
         paymentid = request.POST.get("paymentid", "")
         try:
-            team = Team.objects.get(paymentid=paymentid, year=2024)
+            team = Team.objects.get(
+                paymentid=paymentid, year=2024, is_deleted=False
+            )
         except Team.DoesNotExist:
             raise Http404("Team not found")
 
@@ -1319,7 +1361,7 @@ def teams_api(request):
     """Возвращает список команд"""
     query_params = request.GET.get("category", "")
     teams = (
-        Team.objects.filter(year=2024, paid_people__gt=0)
+        Team.objects.filter(year=2024, paid_people__gt=0, is_deleted=False)
         .order_by("id")
         .values(
             "id",
@@ -1435,7 +1477,11 @@ class AllTeamsView(View):
             .order_by("order", "id")
             .annotate(
                 team_count=Subquery(
-                    Team.objects.filter(category2=OuterRef("id"), paid_people__gt=0)
+                    Team.objects.filter(
+                        category2=OuterRef("id"),
+                        paid_people__gt=0,
+                        is_deleted=False,
+                    )
                     .values("category2")
                     .annotate(count=Count("id"))
                     .values("count")[:1]
@@ -1443,7 +1489,9 @@ class AllTeamsView(View):
             )
         )
         teams_ = (
-            Team.objects.filter(category2__race_id=race_id, paid_people__gt=0)
+            Team.objects.filter(
+                category2__race_id=race_id, paid_people__gt=0, is_deleted=False
+            )
             .select_related("category2")
             .order_by(
                 "category2__order",
@@ -1454,11 +1502,14 @@ class AllTeamsView(View):
         user_team_count = 0
         if request.user.is_authenticated:
             user_team_count = Team.objects.filter(
-                category2__race_id=race_id, owner=request.user
+                category2__race_id=race_id, owner=request.user, is_deleted=False
             ).count()
         if request.user.is_superuser:
             teams_ = (
-                Team.objects.filter(category2__race_id=race_id)
+                Team.objects.filter(
+                    category2__race_id=race_id,
+                    is_deleted=False,
+                )
                 .select_related("category2")
                 .order_by(
                     "category2__order",
@@ -1495,7 +1546,11 @@ class MyTeamsView(View):
             .order_by("order", "id")
             .annotate(
                 team_count=Subquery(
-                    Team.objects.filter(category2=OuterRef("id"), paid_people__gt=0)
+                    Team.objects.filter(
+                        category2=OuterRef("id"),
+                        paid_people__gt=0,
+                        is_deleted=False,
+                    )
                     .values("category2")
                     .annotate(count=Count("id"))
                     .values("count")[:1]
@@ -1503,7 +1558,11 @@ class MyTeamsView(View):
             )
         )
         teams_qs = (
-            Team.objects.filter(category2__race_id=race_id, owner=request.user)
+            Team.objects.filter(
+                category2__race_id=race_id,
+                owner=request.user,
+                is_deleted=False,
+            )
             .select_related("category2")
             .order_by(
                 "category2__order",
@@ -1670,7 +1729,7 @@ class TeamPayment(View):
         # if not settings.REG_OPEN:
         #     return HttpResponse("Регистрация закрыта")
 
-        team = Team.objects.filter(id=team_id).first()
+        team = Team.objects.filter(id=team_id, is_deleted=False).first()
         payment_method = request.GET.get("method")
         if not team or payment_method not in ("sbp", "sberbank"):
             raise Http404("Not found")
@@ -1692,7 +1751,7 @@ class TeamPayment(View):
             status="draft",
         )
 
-        team = Team.objects.filter(id=team_id).first()
+        team = Team.objects.filter(id=team_id, is_deleted=False).first()
         if not team:
             raise Http404("Team not found")
 
@@ -1727,7 +1786,7 @@ class TeamPayment(View):
         raise Http404("Not found")
 
     def post(self, request, team_id):
-        team = Team.objects.filter(id=team_id).first()
+        team = Team.objects.filter(id=team_id, is_deleted=False).first()
         if not team:
             raise Http404("Team not found")
 
@@ -1756,7 +1815,9 @@ class AllTeamsResultView(View):
             raise Http404(f"Гонка {race_id} не найдена.")
 
         teams_ = (
-            Team.objects.filter(category2__race_id=race_id, paid_people__gt=0)
+            Team.objects.filter(
+                category2__race_id=race_id, paid_people__gt=0, is_deleted=False
+            )
             .exclude(start_time=0)
             .select_related("category2")
         )
@@ -1909,14 +1970,20 @@ class TeamsView(View):
             .order_by("order", "id")
             .annotate(
                 team_count=Subquery(
-                    Team.objects.filter(category2=OuterRef("id"), paid_people__gt=0)
+                    Team.objects.filter(
+                        category2=OuterRef("id"),
+                        paid_people__gt=0,
+                        is_deleted=False,
+                    )
                     .values("category2")
                     .annotate(count=Count("id"))
                     .values("count")[:1]
                 )
             )
         )
-        teams_ = Team.objects.filter(category2=category, paid_people__gt=0).order_by(
+        teams_ = Team.objects.filter(
+            category2=category, paid_people__gt=0, is_deleted=False
+        ).order_by(
             "start_number",
             "id",
         )
@@ -1924,7 +1991,9 @@ class TeamsView(View):
         user_team_count = 0
         if request.user.is_authenticated:
             user_team_count = Team.objects.filter(
-                category2__race_id=race_id, owner=request.user
+                category2__race_id=race_id,
+                owner=request.user,
+                is_deleted=False,
             ).count()
 
         context = {
@@ -1943,7 +2012,7 @@ class TeamsView(View):
 class TeamsViewCsv(View):
     def get(self, request, race_id, category_id, *args, **kwargs):
         teams_ = Team.objects.filter(
-            category="6h", paid_people__gt=0, year=2024
+            category="6h", paid_people__gt=0, year=2024, is_deleted=False
         ).order_by(
             "start_number",
             "id",

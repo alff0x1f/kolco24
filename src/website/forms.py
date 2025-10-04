@@ -552,7 +552,7 @@ class TeamMemberMoveForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         if race_id:
             self.fields["to_team"].queryset = Team.objects.filter(
-                category2__race_id=race_id
+                category2__race_id=race_id, is_deleted=False
             ).order_by("id")
         self.fields["to_team"].label = "Команда назначения"
         self.fields["moved_people"].label = "Количество переносимых участников"

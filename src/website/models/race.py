@@ -54,12 +54,16 @@ class Race(Model):
 
     def team_count(self):
         Team = apps.get_model("website", "Team")
-        return len(Team.objects.filter(category2__race=self, paid_people__gt=0))
+        return len(
+            Team.objects.filter(
+                category2__race=self, paid_people__gt=0, is_deleted=False
+            )
+        )
 
     def people_count(self):
         Team = apps.get_model("website", "Team")
         return sum(
-            Team.objects.filter(category2__race=self).values_list(
+            Team.objects.filter(category2__race=self, is_deleted=False).values_list(
                 "paid_people", flat=True
             )
         )
