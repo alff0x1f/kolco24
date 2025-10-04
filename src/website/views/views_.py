@@ -1491,14 +1491,11 @@ class MyTeamsView(View):
             raise Http404("File not found.")
 
         categories = (
-            Category.active_objects.filter(race_id=race_id, team__owner=request.user)
+            Category.active_objects.filter(race_id=race_id)
             .order_by("order", "id")
-            .distinct()
             .annotate(
                 team_count=Subquery(
-                    Team.objects.filter(
-                        category2=OuterRef("id"), owner=request.user
-                    )
+                    Team.objects.filter(category2=OuterRef("id"), paid_people__gt=0)
                     .values("category2")
                     .annotate(count=Count("id"))
                     .values("count")[:1]
