@@ -188,9 +188,7 @@ class EditTeamView(View):
         team.is_deleted = True
         team.save(update_fields=["is_deleted"])
 
-        return HttpResponseRedirect(
-            reverse("my_teams", args=[team.category2.race_id])
-        )
+        return HttpResponseRedirect(reverse("my_teams", args=[team.category2.race_id]))
 
     def get_team(self, team_id):
         qs = Team.objects.filter(id=team_id).select_related("category2")

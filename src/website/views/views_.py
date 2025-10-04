@@ -687,9 +687,7 @@ def my_team(request, teamid="", template="my_team"):
             return HttpResponseRedirect("/team/%s" % paymentid)
 
         main_team = Team.objects.get(paymentid=paymentid, year=2024)
-        other_teams = Team.objects.filter(
-            owner=request.user, year=2024
-        ).exclude(
+        other_teams = Team.objects.filter(owner=request.user, year=2024).exclude(
             paymentid=paymentid
         )
         teams_count, _ = Team.get_info()
@@ -775,9 +773,7 @@ class NewPaymentView(View):
 
         paymentid = request.POST.get("paymentid", "")
         try:
-            team = Team.objects.get(
-                paymentid=paymentid, year=2024
-            )
+            team = Team.objects.get(paymentid=paymentid, year=2024)
         except Team.DoesNotExist:
             raise Http404("Team not found")
 
@@ -1477,9 +1473,7 @@ class AllTeamsView(View):
             )
         )
         teams_ = (
-            Team.objects.filter(
-                category2__race_id=race_id, paid_people__gt=0
-            )
+            Team.objects.filter(category2__race_id=race_id, paid_people__gt=0)
             .select_related("category2")
             .order_by(
                 "category2__order",
@@ -1800,9 +1794,7 @@ class AllTeamsResultView(View):
             raise Http404(f"Гонка {race_id} не найдена.")
 
         teams_ = (
-            Team.objects.filter(
-                category2__race_id=race_id, paid_people__gt=0
-            )
+            Team.objects.filter(category2__race_id=race_id, paid_people__gt=0)
             .exclude(start_time=0)
             .select_related("category2")
         )
@@ -1965,9 +1957,7 @@ class TeamsView(View):
                 )
             )
         )
-        teams_ = Team.objects.filter(
-            category2=category, paid_people__gt=0
-        ).order_by(
+        teams_ = Team.objects.filter(category2=category, paid_people__gt=0).order_by(
             "start_number",
             "id",
         )
