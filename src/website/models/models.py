@@ -158,6 +158,11 @@ class PaymentsYa(models.Model):
         return True
 
 
+class TeamManager(models.Manager):
+    def get_queryset(self):
+        return super().get_queryset().filter(is_deleted=False)
+
+
 class Team(models.Model):
     owner = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -218,6 +223,10 @@ class Team(models.Model):
     dnf = models.BooleanField(default=False)
     points_sum = models.IntegerField(default=0)
     place = models.IntegerField(default=0)
+    is_deleted = models.BooleanField(default=False)
+
+    objects = TeamManager()
+    all_objects = models.Manager()
 
     def __str__(self):  # __str__ on Python 3
         return f"id{self.id} - {self.start_number} {self.teamname}"
@@ -233,6 +242,25 @@ class Team(models.Model):
         if not self.finish_time:
             return
         return datetime.datetime.fromtimestamp(self.finish_time / 1000)
+
+    @property
+    def has_payment_history(self):
+        if not self.pk:
+            return False
+        return (
+            Payment.objects.filter(team=self, status=Payment.STATUS_DONE).exists()
+            or PaymentLog.objects.filter(team=self).exists()
+        )
+
+    @property
+    def can_be_deleted(self):
+        if not self.pk:
+            return False
+        return (
+            not self.is_deleted
+            and self.paid_people == 0
+            and not self.has_payment_history
+        )
 
     def new_team(self, user, dist, ucount):
         # print(user, dist)
@@ -287,7 +315,9 @@ class Team(models.Model):
         categories = ["6h", "12h_mm", "12h_mw", "12h_ww", "24h"]
         for category in categories:
             teams = Team.objects.filter(
-                category=category, paid_sum__gt=0, year=settings.CURRENT_YEAR
+                category=category,
+                paid_sum__gt=0,
+                year=settings.CURRENT_YEAR,
             ).order_by("-points_sum", "distance_time")
             place = 1
             for team in teams:
