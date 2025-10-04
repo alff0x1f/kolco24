@@ -158,6 +158,11 @@ class PaymentsYa(models.Model):
         return True
 
 
+class TeamManager(models.Manager):
+    def get_queryset(self):
+        return super().get_queryset().filter(is_deleted=False)
+
+
 class Team(models.Model):
     owner = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -220,6 +225,9 @@ class Team(models.Model):
     place = models.IntegerField(default=0)
     is_deleted = models.BooleanField(default=False)
 
+    objects = TeamManager()
+    all_objects = models.Manager()
+
     def __str__(self):  # __str__ on Python 3
         return f"id{self.id} - {self.start_number} {self.teamname}"
 
@@ -266,9 +274,7 @@ class Team(models.Model):
 
     @staticmethod
     def get_info():
-        teams = Team.objects.filter(
-            paid_people__gt=0, year=settings.CURRENT_YEAR, is_deleted=False
-        )
+        teams = Team.objects.filter(paid_people__gt=0, year=settings.CURRENT_YEAR)
         people_paid = 0
         teams_count = 0
         teams_ids = set()
@@ -283,9 +289,7 @@ class Team(models.Model):
         return len(teams_ids), people_paid
 
     def update_points_sum(self):
-        teams = Team.objects.filter(
-            paid_sum__gt=0, year=settings.CURRENT_YEAR, is_deleted=False
-        )
+        teams = Team.objects.filter(paid_sum__gt=0, year=settings.CURRENT_YEAR)
         for team in teams:
             points = TakenKP.objects.filter(team=team)
             points_sum = 0
@@ -295,9 +299,7 @@ class Team(models.Model):
             team.save()
 
     def update_distance_time(self):
-        teams = Team.objects.filter(
-            paid_sum__gt=0, year=settings.CURRENT_YEAR, is_deleted=False
-        )
+        teams = Team.objects.filter(paid_sum__gt=0, year=settings.CURRENT_YEAR)
         for team in teams:
             if team.start_time and team.finish_time:
                 team.distance_time = team.finish_time - team.start_time
@@ -316,7 +318,6 @@ class Team(models.Model):
                 category=category,
                 paid_sum__gt=0,
                 year=settings.CURRENT_YEAR,
-                is_deleted=False,
             ).order_by("-points_sum", "distance_time")
             place = 1
             for team in teams:

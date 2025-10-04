@@ -193,7 +193,7 @@ class EditTeamView(View):
         )
 
     def get_team(self, team_id):
-        qs = Team.objects.filter(id=team_id, is_deleted=False).select_related("category2")
+        qs = Team.objects.filter(id=team_id).select_related("category2")
         if not self.request.user.is_superuser:
             qs = qs.filter(owner_id=self.request.user.id)
         return qs.first()
@@ -205,7 +205,7 @@ class TeamMemberMoveView(View):
         if not request.user.is_superuser:
             return HttpResponseRedirect(reverse("passlogin") + f"?next={request.path}")
 
-        from_team = Team.objects.filter(id=team_id, is_deleted=False).first()
+        from_team = Team.objects.filter(id=team_id).first()
         if not from_team:
             return HttpResponse("Команда недоступна", status=404)
 
