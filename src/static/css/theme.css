@@ -6359,6 +6359,16 @@ button.btn-outline-primary[aria-expanded="true"], button.btn-outline-primary:act
   transition: background-color .2s ease; }
   .card > .list-group > a.list-group-item:hover {
     background-color: #f8f9fa; }
+  .card > .list-group > a.list-group-item.active {
+    color: #fff;
+    background-color: #4582EC;
+    border-color: #007bff; }
+    .card > .list-group > a.list-group-item.active .badge,
+    .card > .list-group > a.list-group-item.active i {
+      color: inherit; }
+    .card > .list-group > a.list-group-item.active .badge {
+      background-color: rgba(255, 255, 255, 0.2);
+      border-color: transparent; }
 
 .card > .list-group + .card-footer {
   border-top: none; }

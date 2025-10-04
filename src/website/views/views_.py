@@ -1451,6 +1451,11 @@ class AllTeamsView(View):
                 "id",
             )
         )
+        user_team_count = 0
+        if request.user.is_authenticated:
+            user_team_count = Team.objects.filter(
+                category2__race_id=race_id, owner=request.user
+            ).count()
         if request.user.is_superuser:
             teams_ = (
                 Team.objects.filter(category2__race_id=race_id)
@@ -1466,6 +1471,56 @@ class AllTeamsView(View):
             "categories": categories,
             "teams": teams_,
             "show_category": True,
+            "active_tab": "all",
+            "active_category_id": None,
+            "user_team_count": user_team_count,
+        }
+        return render(request, "teams.html", context)
+
+
+class MyTeamsView(View):
+    def get(self, request, race_id):
+        if not request.user.is_authenticated:
+            return HttpResponseRedirect(reverse("passlogin") + f"?next={request.path}")
+
+        try:
+            race = Race.objects.annotate(
+                people_count=Sum("category__team__paid_people"),
+            ).get(id=race_id)
+        except Race.DoesNotExist:
+            raise Http404("File not found.")
+
+        categories = (
+            Category.active_objects.filter(race_id=race_id)
+            .order_by("order", "id")
+            .annotate(
+                team_count=Subquery(
+                    Team.objects.filter(category2=OuterRef("id"), paid_people__gt=0)
+                    .values("category2")
+                    .annotate(count=Count("id"))
+                    .values("count")[:1]
+                )
+            )
+        )
+        teams_qs = (
+            Team.objects.filter(category2__race_id=race_id, owner=request.user)
+            .select_related("category2")
+            .order_by(
+                "category2__order",
+                "start_number",
+                "id",
+            )
+        )
+        teams_ = list(teams_qs)
+
+        context = {
+            "race": race,
+            "categories": categories,
+            "teams": teams_,
+            "show_category": True,
+            "active_tab": "my",
+            "active_category_id": None,
+            "user_team_count": len(teams_),
         }
         return render(request, "teams.html", context)
 
@@ -1866,12 +1921,21 @@ class TeamsView(View):
             "id",
         )
 
+        user_team_count = 0
+        if request.user.is_authenticated:
+            user_team_count = Team.objects.filter(
+                category2__race_id=race_id, owner=request.user
+            ).count()
+
         context = {
             "race": race,
             "category": category,
             "categories": categories,
             "teams": teams_,
             "show_category": False,
+            "active_tab": "category",
+            "active_category_id": category.id,
+            "user_team_count": user_team_count,
         }
         return render(request, "teams.html", context)
 

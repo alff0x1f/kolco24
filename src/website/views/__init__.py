@@ -12,6 +12,7 @@ from .views_ import (
     ConfirmPaymentView,
     IndexView,
     LogoutUserView,
+    MyTeamsView,
     NewPaymentView,
     PassLoginView,
     PaymentDown,
