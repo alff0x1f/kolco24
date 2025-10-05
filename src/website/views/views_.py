@@ -47,6 +47,7 @@ from website.googledocs import (
 )
 from website.models import (
     Athlet,
+    BreakfastRegistration,
     Checkpoint,
     CheckpointTag,
     FastLogin,
@@ -58,7 +59,6 @@ from website.models import (
     SbpPaymentRecipient,
     TakenKP,
     Team,
-    BreakfastRegistration,
 )
 from website.models.race import Category, RegStatus
 from website.sync_xlsx import import_file_xlsx
