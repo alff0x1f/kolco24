@@ -99,7 +99,9 @@ class BreakfastRegistrationAdmin(admin.ModelAdmin):
     def vegan_count(self, obj):
         if not obj.attendees:
             return 0
-        return sum(1 for attendee in obj.attendees if attendee and attendee.get("is_vegan"))
+        return sum(
+            1 for attendee in obj.attendees if attendee and attendee.get("is_vegan")
+        )
 
 
 class TeamAdmin(admin.ModelAdmin):
