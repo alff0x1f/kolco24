@@ -212,10 +212,10 @@
                                      style="display: none;">
                                     Text
                                 </div>
-                                <div class="mb-2" id="reg_close_warning" style="display: none">
-                                    <p>Добавление новых участников невозможно из-за отсутствия слотов.</p>
+                                <div class="alert alert-danger mb-2" id="reg_close_warning" style="display: none">
+                                    Регистрация закрыта, оплата слотов невозможна.
                                 </div>
-                                {% if race.reg_status == 'open' or team.category2.race.is_teams_editable or user.is_superuser %}
+                                {% if team.category2.race.is_teams_editable or not team.id or user.is_superuser %}
                                     <div class="form-row form-group">
                                         <div class="col">
                                             <button class="btn btn-block btn-success" type="submit"
@@ -362,7 +362,9 @@
                             {% elif race.reg_status == "sold_out" %}
                                 <div class="mb-2">
                                     <h4 class="h4 mb-2">Регистрация закрыта</h4>
-                                    <p>Добавление новых участников невозможно из-за отсутствия слотов.</p>
+                                    <div class="alert alert-danger" role="alert">
+                                        Регистрация закрыта, оплата невозможна.
+                                    </div>
                                 </div>
                             {% elif race.reg_status == "sold_out" %}
                                 <div class="mb-2">
@@ -371,32 +373,41 @@
                                 </div>
                             {% endif %}
                         </div>
-                        {% if team_move_form and team and team.paid_people and user.is_superuser %}
+                        {% if team_move_form and team and team.paid_people and team.category2 and team.category2.race.is_teams_editable %}
                             <hr class="short">
-                            <h5 class="h5 mb-2">Перенести участника</h5>
-                            <form method="post" action="{% url 'move_team_member' team.id %}">
-                                {% csrf_token %}
-                                {{ team_move_form.non_field_errors }}
-                                <div class="form-group">
-                                    {{ team_move_form.to_team.label_tag }}
-                                    {{ team_move_form.to_team }}
-                                    {% if team_move_form.to_team.errors %}
-                                        <div class="invalid-feedback">
-                                            {{ team_move_form.to_team.errors }}
+                            <div class="card border-danger">
+                                <div class="card-body p-3">
+                                    <h5 class="h5 mb-2 text-danger">Перенести участника</h5>
+                                    <div class="alert alert-danger" role="alert">
+                                        Внимание: слот участника будет безвозвратно передан в другой аккаунт. Вернуть его
+                                        обратно будет невозможно.
+                                    </div>
+                                    <form method="post" action="{% url 'move_team_member' team.id %}"
+                                          onsubmit="return confirm('Подтвердите перенос: слот будет безвозвратно передан другому аккаунту и вернуть его не получится. Продолжить?');">
+                                        {% csrf_token %}
+                                        {{ team_move_form.non_field_errors }}
+                                        <div class="form-group">
+                                            {{ team_move_form.to_team.label_tag }}
+                                            {{ team_move_form.to_team }}
+                                            {% if team_move_form.to_team.errors %}
+                                                <div class="invalid-feedback">
+                                                    {{ team_move_form.to_team.errors }}
+                                                </div>
+                                            {% endif %}
                                         </div>
-                                    {% endif %}
-                                </div>
-                                <div class="form-group">
-                                    {{ team_move_form.moved_people.label_tag }}
-                                    {{ team_move_form.moved_people }}
-                                    {% if team_move_form.moved_people.errors %}
-                                        <div class="invalid-feedback">
-                                            {{ team_move_form.moved_people.errors }}
+                                        <div class="form-group">
+                                            {{ team_move_form.moved_people.label_tag }}
+                                            {{ team_move_form.moved_people }}
+                                            {% if team_move_form.moved_people.errors %}
+                                                <div class="invalid-feedback">
+                                                    {{ team_move_form.moved_people.errors }}
+                                                </div>
+                                            {% endif %}
                                         </div>
-                                    {% endif %}
+                                        <button type="submit" class="btn btn-danger">Перенести</button>
+                                    </form>
                                 </div>
-                                <button type="submit" class="btn btn-primary">Перенести</button>
-                            </form>
+                            </div>
                         {% endif %}
                     </div>
                 </div>
@@ -473,10 +484,8 @@
                     const teamform_submit = document.getElementById('teamform_submit');
                     if (sum > 0) {
                         reg_close_warning.style.display = 'block';
-                        teamform_submit.disabled = true;
                     } else {
                         reg_close_warning.style.display = 'none';
-                        teamform_submit.disabled = false;
                     }
                 {% endif %}
             }

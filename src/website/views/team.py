@@ -14,6 +14,7 @@ from website.models import (
     VTBPayment,
     VTBPreparedPayment,
 )
+from website.models.race import RegStatus
 
 
 class EditTeamView(View):
@@ -116,6 +117,9 @@ class EditTeamView(View):
 
             team.save()
 
+            if race.reg_status != RegStatus.OPEN:
+                return HttpResponseRedirect(reverse("my_teams", args=[race.id]))
+
             # payment
             race = team.category2.race
             cost_now = race.cost
@@ -200,12 +204,15 @@ class EditTeamView(View):
 class TeamMemberMoveView(View):
     def post(self, request, team_id):
         """Перемещение участника из команды в команду"""
-        if not request.user.is_superuser:
+        if not request.user.is_authenticated:
             return HttpResponseRedirect(reverse("passlogin") + f"?next={request.path}")
 
         from_team = Team.objects.filter(id=team_id).first()
         if not from_team:
             return HttpResponse("Команда недоступна", status=404)
+
+        if not (request.user.is_superuser or from_team.owner_id == request.user.id):
+            return HttpResponse("Перенос доступен только владельцу команды", status=403)
 
         data = request.POST.copy()
         data["from_team"] = from_team.id
