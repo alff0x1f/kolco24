@@ -155,7 +155,12 @@ class RegisterView(View):
                 user.set_password(password)
                 user.save()
                 auth_login(request, user)
-                return HttpResponseRedirect(reverse("add_team", args=[8]))
+
+                # todo change it in 2026
+                race = Race.objects.filter(id=8).first()  # 2025
+                if race.reg_status == RegStatus.OPEN:
+                    return HttpResponseRedirect(reverse("add_team", args=[8]))
+                return HttpResponseRedirect(reverse("my_teams", args=[8]))
 
             username = f"{last_name}, {first_name}"
             if User.objects.filter(username=username).exists():
@@ -168,7 +173,12 @@ class RegisterView(View):
             user.save(update_fields=("first_name", "last_name"))
 
             auth_login(request, user)
-            return HttpResponseRedirect(reverse("add_team", args=[8]))
+
+            # todo change it in 2026
+            race = Race.objects.filter(id=8).first()  # 2025
+            if race.reg_status == RegStatus.OPEN:
+                return HttpResponseRedirect(reverse("add_team", args=[8]))
+            return HttpResponseRedirect(reverse("my_teams", args=[8]))
 
         return render(request, "website/register.html", {"reg_form": form})
 
@@ -1616,9 +1626,6 @@ class AddTeam(View):
     def get(self, request, race_id):
         race = Race.objects.get(id=race_id)
 
-        if race.reg_status != RegStatus.OPEN and not request.user.is_superuser:
-            return HttpResponse("Регистрация закрыта")
-
         if not request.user.is_authenticated:
             return HttpResponseRedirect(reverse("passlogin") + f"?next={request.path}")
         form = TeamForm(race_id)
@@ -1641,7 +1648,7 @@ class AddTeam(View):
             return HttpResponseRedirect(reverse("passlogin") + f"?next={request.path}")
 
         race = Race.objects.get(id=race_id)
-        if race.reg_status != RegStatus.OPEN and not request.user.is_superuser:
+        if not race.is_teams_editable:
             return HttpResponse("Регистрация закрыта")
 
         category2_id = request.POST.get("category2_id")
@@ -1661,6 +1668,9 @@ class AddTeam(View):
                 **form.cleaned_data,
             )
             team.save()
+
+            if race.reg_status != RegStatus.OPEN:
+                return HttpResponseRedirect(reverse("my_teams", args=[race_id]))
 
             # payment
             payment_method = request.GET.get("method", "sbp2")
