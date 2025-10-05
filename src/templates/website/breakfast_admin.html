@@ -1,0 +1,179 @@
+{% extends "website/base.html" %}
+
+{% block content %}
+  <section class="space-sm">
+    <div class="container">
+      <div class="row mb-4 align-items-center">
+        <div class="col-sm-8">
+          <h1 class="h3 mb-1">Заявки на завтрак — {{ race.name }}</h1>
+          <p class="text-muted mb-0">Управляйте оплатами и следите за количеством порций</p>
+        </div>
+        <div class="col-sm-4 text-sm-right mt-3 mt-sm-0">
+          <a class="btn btn-outline-primary" href="{% url 'breakfast' race.id %}">Страница регистрации</a>
+        </div>
+      </div>
+
+      <div class="card mb-4">
+        <div class="card-body d-flex flex-wrap justify-content-between align-items-center">
+          <div class="mb-2 mb-sm-0"><strong>Всего записано:</strong> {{ total_people }} человек</div>
+          <div class="mb-2 mb-sm-0"><strong>Оплачено:</strong> {{ paid_people }} человек</div>
+          <div><strong>Веганских порций:</strong> {{ vegan_people }}</div>
+        </div>
+        <div class="card-footer d-flex flex-column flex-md-row justify-content-between align-items-md-center">
+          <div class="mb-3 mb-md-0">
+            <span class="text-muted">Отфильтровано: {{ filtered_count }} заявок ({{ filtered_people }} чел.)</span>
+          </div>
+          <div class="btn-group" role="group" aria-label="Фильтр статусов">
+            <a class="btn btn-sm {% if status_filter == 'new' %}btn-primary{% else %}btn-outline-secondary{% endif %}" href="{{ filter_urls.new }}">Новые</a>
+            <a class="btn btn-sm {% if status_filter == 'processed' %}btn-primary{% else %}btn-outline-secondary{% endif %}" href="{{ filter_urls.processed }}">Оплаченные</a>
+            <a class="btn btn-sm {% if status_filter == 'cancelled' %}btn-primary{% else %}btn-outline-secondary{% endif %}" href="{{ filter_urls.cancelled }}">Отменённые</a>
+            <a class="btn btn-sm {% if status_filter == 'all' %}btn-primary{% else %}btn-outline-secondary{% endif %}" href="{{ filter_urls.all }}">Все</a>
+          </div>
+        </div>
+      </div>
+
+      {% if registrations %}
+        <div class="table-responsive d-none d-md-block">
+          <table class="table table-striped table-hover align-middle">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Создано</th>
+                <th>Участники</th>
+                <th>Веганы</th>
+                <th>Статус</th>
+                <th class="text-right">Действия</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for reg in registrations %}
+                <tr>
+                  <td>#{{ reg.id }}</td>
+                  <td>{{ reg.created_at|date:"d.m.Y H:i" }}</td>
+                  <td>
+                    <strong>{{ reg.people_count }}</strong>
+                    <div class="small text-muted">
+                      {% if reg.attendees %}
+                        {% for attendee in reg.attendees %}
+                          {% if attendee %}
+                            {{ attendee.name }}{% if attendee.is_vegan %} (веган){% endif %}{% if not forloop.last %}, {% endif %}
+                          {% endif %}
+                        {% endfor %}
+                      {% else %}
+                        —
+                      {% endif %}
+                    </div>
+                  </td>
+                  <td>
+                    {% if reg.vegan_count %}
+                      {{ reg.vegan_count }}
+                    {% else %}
+                      —
+                    {% endif %}
+                  </td>
+                  <td>
+                    {% if reg.status == "processed" %}
+                      <span class="badge badge-success">Оплачено</span>
+                    {% elif reg.status == "cancelled" %}
+                      <span class="badge badge-secondary">Отменено</span>
+                    {% else %}
+                      <span class="badge badge-warning">Новая</span>
+                    {% endif %}
+                  </td>
+                  <td class="text-right">
+                    <form method="post" action="" class="d-inline">
+                      {% csrf_token %}
+                      <input type="hidden" name="registration_id" value="{{ reg.id }}">
+                      <input type="hidden" name="status" value="{{ status_filter }}">
+                      <input type="hidden" name="action" value="mark_paid">
+                      <button type="submit" class="btn btn-sm btn-success" {% if reg.status == "processed" %}disabled{% endif %}>Отметить оплату</button>
+                    </form>
+                    <form method="post" action="" class="d-inline">
+                      {% csrf_token %}
+                      <input type="hidden" name="registration_id" value="{{ reg.id }}">
+                      <input type="hidden" name="status" value="{{ status_filter }}">
+                      <input type="hidden" name="action" value="mark_new">
+                      <button type="submit" class="btn btn-sm btn-outline-secondary" {% if reg.status == "new" %}disabled{% endif %}>Вернуть в новый</button>
+                    </form>
+                    <form method="post" action="" class="d-inline" onsubmit="return confirm('Пометить заявку как отменённую?');">
+                      {% csrf_token %}
+                      <input type="hidden" name="registration_id" value="{{ reg.id }}">
+                      <input type="hidden" name="status" value="{{ status_filter }}">
+                      <input type="hidden" name="action" value="mark_cancelled">
+                      <button type="submit" class="btn btn-sm btn-outline-danger" {% if reg.status == "cancelled" %}disabled{% endif %}>Отменить</button>
+                    </form>
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        <div class="d-md-none">
+          <div class="card-columns">
+            {% for reg in registrations %}
+              <div class="card mb-3">
+                <div class="card-body">
+                  <div class="d-flex justify-content-between align-items-center mb-2">
+                    <h5 class="card-title mb-0">#{{ reg.id }}</h5>
+                    <small class="text-muted">{{ reg.created_at|date:"d.m.Y H:i" }}</small>
+                  </div>
+                  <p class="mb-2">
+                    <strong>{{ reg.people_count }}</strong> чел.
+                    {% if reg.vegan_count %}
+                      • <span class="text-success">{{ reg.vegan_count }} веган.</span>
+                    {% endif %}
+                  </p>
+                  <div class="mb-2 small text-muted">
+                    {% if reg.attendees %}
+                      {% for attendee in reg.attendees %}
+                        {% if attendee %}
+                          {{ attendee.name }}{% if attendee.is_vegan %} (веган){% endif %}{% if not forloop.last %}, {% endif %}
+                        {% endif %}
+                      {% endfor %}
+                    {% else %}
+                      Участники не указаны
+                    {% endif %}
+                  </div>
+                  <div class="mb-3">
+                    {% if reg.status == "processed" %}
+                      <span class="badge badge-success">Оплачено</span>
+                    {% elif reg.status == "cancelled" %}
+                      <span class="badge badge-secondary">Отменено</span>
+                    {% else %}
+                      <span class="badge badge-warning">Новая</span>
+                    {% endif %}
+                  </div>
+                  <form method="post" action="" class="mb-2">
+                    {% csrf_token %}
+                    <input type="hidden" name="registration_id" value="{{ reg.id }}">
+                    <input type="hidden" name="status" value="{{ status_filter }}">
+                    <input type="hidden" name="action" value="mark_paid">
+                    <button type="submit" class="btn btn-success btn-block" {% if reg.status == "processed" %}disabled{% endif %}>Отметить оплату</button>
+                  </form>
+                  <form method="post" action="" class="mb-2">
+                    {% csrf_token %}
+                    <input type="hidden" name="registration_id" value="{{ reg.id }}">
+                    <input type="hidden" name="status" value="{{ status_filter }}">
+                    <input type="hidden" name="action" value="mark_new">
+                    <button type="submit" class="btn btn-outline-secondary btn-block" {% if reg.status == "new" %}disabled{% endif %}>Вернуть в новый</button>
+                  </form>
+                  <form method="post" action="" onsubmit="return confirm('Пометить заявку как отменённую?');">
+                    {% csrf_token %}
+                    <input type="hidden" name="registration_id" value="{{ reg.id }}">
+                    <input type="hidden" name="status" value="{{ status_filter }}">
+                    <input type="hidden" name="action" value="mark_cancelled">
+                    <button type="submit" class="btn btn-outline-danger btn-block" {% if reg.status == "cancelled" %}disabled{% endif %}>Отменить</button>
+                  </form>
+                </div>
+              </div>
+            {% endfor %}
+          </div>
+        </div>
+      {% else %}
+        <div class="alert alert-info" role="alert">
+          Заявок пока нет.
+        </div>
+      {% endif %}
+    </div>
+  </section>
+{% endblock %}
