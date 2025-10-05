@@ -58,6 +58,7 @@ from website.models import (
     SbpPaymentRecipient,
     TakenKP,
     Team,
+    BreakfastRegistration,
 )
 from website.models.race import Category, RegStatus
 from website.sync_xlsx import import_file_xlsx
@@ -70,6 +71,12 @@ logger = logging.getLogger(__name__)
 
 def is_admin(user):
     return user.is_superuser
+
+
+def can_manage_breakfast(user):
+    if not user.is_authenticated:
+        return False
+    return user.is_superuser or user.has_perm("website.change_breakfastregistration")
 
 
 class IndexView(View):
@@ -299,6 +306,114 @@ class BreakfastView(View):
                 "breakfast_time": self.breakfast_time,
             },
         )
+
+
+@method_decorator(user_passes_test(can_manage_breakfast), name="dispatch")
+class BreakfastAdminView(View):
+    template_name = "website/breakfast_admin.html"
+
+    def get(self, request, race_id):
+        race = get_object_or_404(Race, pk=race_id)
+        status_filter = request.GET.get("status", "new")
+        if status_filter not in {"new", "processed", "cancelled", "all"}:
+            status_filter = "new"
+
+        all_registrations = list(self._registrations_queryset(race, "all"))
+        registrations = list(self._registrations_queryset(race, status_filter))
+
+        overall_totals = self._calculate_totals(all_registrations, annotate=False)
+        current_totals = self._calculate_totals(registrations, annotate=True)
+
+        base_url = reverse("breakfast_admin", args=[race.id])
+        filter_urls = {
+            "new": base_url,
+            "processed": f"{base_url}?status=processed",
+            "cancelled": f"{base_url}?status=cancelled",
+            "all": f"{base_url}?status=all",
+        }
+
+        return render(
+            request,
+            self.template_name,
+            {
+                "race": race,
+                "registrations": registrations,
+                "total_people": overall_totals["total_people"],
+                "paid_people": overall_totals["paid_people"],
+                "vegan_people": overall_totals["vegan_people"],
+                "filtered_people": current_totals["total_people"],
+                "filtered_count": len(registrations),
+                "status_filter": status_filter,
+                "filter_urls": filter_urls,
+            },
+        )
+
+    def post(self, request, race_id):
+        race = get_object_or_404(Race, pk=race_id)
+        registration_id = request.POST.get("registration_id")
+        action = request.POST.get("action")
+        status_filter = request.POST.get("status", "new")
+        if status_filter not in {"new", "processed", "cancelled", "all"}:
+            status_filter = "new"
+
+        if (
+            action not in {"mark_paid", "mark_new", "mark_cancelled"}
+            or not registration_id
+        ):
+            return HttpResponse("Некорректный запрос", status=400)
+
+        registration = get_object_or_404(
+            BreakfastRegistration,
+            pk=registration_id,
+            race=race,
+        )
+
+        status_map = {
+            "mark_paid": "processed",
+            "mark_new": "new",
+            "mark_cancelled": "cancelled",
+        }
+        registration.status = status_map[action]
+        registration.save(update_fields=["status"])
+
+        redirect_url = reverse("breakfast_admin", args=[race.id])
+        if status_filter and status_filter != "new":
+            redirect_url = f"{redirect_url}?status={status_filter}"
+
+        return HttpResponseRedirect(redirect_url)
+
+    @staticmethod
+    def _registrations_queryset(race, status_filter):
+        qs = BreakfastRegistration.objects.filter(race=race).order_by("-created_at")
+        if status_filter == "new":
+            qs = qs.filter(status="new")
+        elif status_filter == "processed":
+            qs = qs.filter(status="processed")
+        elif status_filter == "cancelled":
+            qs = qs.filter(status="cancelled")
+        return qs
+
+    @staticmethod
+    def _calculate_totals(registrations, annotate=False):
+        total_people = 0
+        paid_people = 0
+        vegan_people = 0
+        for reg in registrations:
+            total_people += reg.people_count
+            if reg.status == "processed":
+                paid_people += reg.people_count
+            attendees = reg.attendees or []
+            vegan_count = sum(
+                1 for attendee in attendees if attendee and attendee.get("is_vegan")
+            )
+            vegan_people += vegan_count
+            if annotate:
+                reg.vegan_count = vegan_count
+        return {
+            "total_people": total_people,
+            "paid_people": paid_people,
+            "vegan_people": vegan_people,
+        }
 
 
 def index_dummy(request):
