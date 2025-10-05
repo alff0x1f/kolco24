@@ -47,6 +47,42 @@ class Transfer(models.Model):
         return f"{self.id} ({self.people_count})"
 
 
+class BreakfastRegistration(models.Model):
+    race = models.ForeignKey(
+        "website.Race",
+        on_delete=models.CASCADE,
+        related_name="breakfast_registrations",
+        verbose_name="Гонка",
+    )
+    people_count = models.PositiveIntegerField(
+        verbose_name="Количество человек", default=1
+    )
+    attendees = models.JSONField(
+        default=list,
+        verbose_name="Участники",
+        help_text="Список участников и их предпочтений",
+    )
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="Создано")
+    status = models.CharField(
+        max_length=20,
+        choices=[
+            ("new", "Новая"),
+            ("processed", "Обработана"),
+            ("cancelled", "Отменена"),
+        ],
+        default="new",
+        verbose_name="Статус",
+    )
+
+    class Meta:
+        ordering = ("-created_at",)
+        verbose_name = "Заявка на завтрак"
+        verbose_name_plural = "Заявки на завтрак"
+
+    def __str__(self) -> str:
+        return f"{self.race_id}: {self.people_count} участник(ов)"
+
+
 @receiver(post_save, sender=User)
 def create_user_profile(sender, instance, created, **kwargs):
     if created:

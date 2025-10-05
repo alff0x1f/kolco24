@@ -23,6 +23,11 @@ urlpatterns = [
     # auth
     path("register/", views.RegisterView.as_view(), name="register"),
     path("race/8/transfer/", views.TransferView.as_view(), name="transfer"),
+    path(
+        "race/<int:race_id>/breakfast/",
+        views.BreakfastView.as_view(),
+        name="breakfast",
+    ),
     path("password_reset/", CustomPasswordResetView.as_view(), name="password_reset"),
     path(
         "password_reset/done/",

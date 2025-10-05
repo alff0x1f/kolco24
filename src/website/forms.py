@@ -6,11 +6,19 @@ from django import forms
 from django.contrib.auth.forms import PasswordResetForm, SetPasswordForm
 from django.contrib.auth.models import User
 
-from website.models import Athlet, Team, TeamAdminLog, TeamMemberMove, Transfer
+from website.models import (
+    Athlet,
+    BreakfastRegistration,
+    Team,
+    TeamAdminLog,
+    TeamMemberMove,
+    Transfer,
+)
 from website.models.news import Page
 from website.models.race import Category, Race
 
 BUS_REGISTRATION_MAX_PASSENGERS = 20
+BREAKFAST_MAX_ATTENDEES = 20
 
 
 class LoginForm(forms.Form):
@@ -320,6 +328,143 @@ class TransferForm(forms.ModelForm):
         instance = super().save(commit=False)
         instance.passenger_contacts = self.cleaned_data.get("passenger_contacts", [])
         instance.people_count = len(instance.passenger_contacts)
+        if commit:
+            instance.save()
+        return instance
+
+
+class BreakfastForm(forms.ModelForm):
+    MAX_ATTENDEES = BREAKFAST_MAX_ATTENDEES
+
+    class Meta:
+        model = BreakfastRegistration
+        fields = ("people_count",)
+        widgets = {
+            "people_count": forms.NumberInput(
+                attrs={
+                    "class": "form-control",
+                    "min": 1,
+                    "max": BREAKFAST_MAX_ATTENDEES,
+                    "required": True,
+                }
+            ),
+        }
+
+    def __init__(self, *args, **kwargs):
+        self.race = kwargs.pop("race", None)
+        super().__init__(*args, **kwargs)
+        self.attendee_field_sets = []
+        self._build_attendee_fields(self._initial_people_count())
+
+    def _initial_people_count(self) -> int:
+        if self.data:
+            raw_value = self.data.get(self.add_prefix("people_count"))
+        elif self.initial.get("people_count"):
+            raw_value = self.initial.get("people_count")
+        elif self.instance and self.instance.pk:
+            raw_value = self.instance.people_count
+        else:
+            raw_value = 1
+
+        try:
+            count = int(raw_value)
+        except (TypeError, ValueError):
+            count = 1
+
+        return max(1, min(count, self.MAX_ATTENDEES))
+
+    def _build_attendee_fields(self, count: int) -> None:
+        existing_attendees = []
+        if self.instance and self.instance.pk:
+            existing_attendees = self.instance.attendees
+        elif self.initial.get("attendees"):
+            existing_attendees = self.initial.get("attendees")
+
+        for index in range(1, count + 1):
+            name_field = f"attendee_{index}_name"
+            vegan_field = f"attendee_{index}_is_vegan"
+
+            attendee_initial = {}
+            if (
+                isinstance(existing_attendees, list)
+                and len(existing_attendees) >= index
+            ):
+                attendee_initial = existing_attendees[index - 1] or {}
+
+            self.fields[name_field] = forms.CharField(
+                label=f"Фамилия и имя {index}",
+                max_length=255,
+                initial=attendee_initial.get("name"),
+                widget=forms.TextInput(
+                    attrs={
+                        "class": "form-control",
+                        "placeholder": f"Фамилия и имя {index}",
+                        "required": True,
+                    }
+                ),
+            )
+            self.fields[vegan_field] = forms.BooleanField(
+                label="Веганский вариант",
+                required=False,
+                initial=bool(attendee_initial.get("is_vegan")),
+                widget=forms.CheckboxInput(
+                    attrs={
+                        "class": "form-check-input",
+                    }
+                ),
+            )
+
+            name_bound = self[name_field]
+            vegan_bound = self[vegan_field]
+            self.attendee_field_sets.append(
+                {
+                    "index": index,
+                    "name": name_bound,
+                    "is_vegan": vegan_bound,
+                }
+            )
+
+    def clean_people_count(self):
+        count = self.cleaned_data.get("people_count")
+        if not count:
+            return 1
+        if count < 1:
+            raise forms.ValidationError("Количество должно быть не меньше 1")
+        if count > self.MAX_ATTENDEES:
+            raise forms.ValidationError(
+                f"Мы можем записать до {self.MAX_ATTENDEES} участников за одну заявку"
+            )
+        return count
+
+    def clean(self):
+        cleaned_data = super().clean()
+        people_count = cleaned_data.get("people_count") or 1
+        attendees = []
+        for index in range(1, people_count + 1):
+            name_key = f"attendee_{index}_name"
+            vegan_key = f"attendee_{index}_is_vegan"
+            name = cleaned_data.get(name_key)
+            is_vegan = cleaned_data.get(vegan_key, False)
+
+            if not name:
+                self.add_error(name_key, "Укажите имя участника")
+
+            if name:
+                attendees.append(
+                    {
+                        "name": name,
+                        "is_vegan": bool(is_vegan),
+                    }
+                )
+
+        cleaned_data["attendees"] = attendees
+        return cleaned_data
+
+    def save(self, race=None, commit=True):
+        instance = super().save(commit=False)
+        instance.race = race or self.race
+        instance.attendees = self.cleaned_data.get("attendees", [])
+        instance.people_count = len(instance.attendees)
         if commit:
             instance.save()
         return instance
