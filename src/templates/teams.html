@@ -177,6 +177,11 @@
                             <h4 class="mb-2">Команды не найдены</h4>
                         </div>
                     {% endif %}
+                    {% if active_tab == 'my' %}
+                        <div class="col mb-2 text-right">
+                            <a class="btn btn-success" href="{% url 'add_team' race.id %}">Добавить новую команду</a>
+                        </div>
+                    {% endif %}
                 </div>
                 <!--end of col-->
             </div>
