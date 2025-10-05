@@ -28,6 +28,11 @@ urlpatterns = [
         views.BreakfastView.as_view(),
         name="breakfast",
     ),
+    path(
+        "race/<int:race_id>/breakfast/admin/",
+        views.BreakfastAdminView.as_view(),
+        name="breakfast_admin",
+    ),
     path("password_reset/", CustomPasswordResetView.as_view(), name="password_reset"),
     path(
         "password_reset/done/",
