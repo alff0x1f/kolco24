@@ -16,7 +16,7 @@ from django.contrib.auth.models import User
 from django.core.files.storage import FileSystemStorage
 from django.db.models import Count, OuterRef, Subquery, Sum
 from django.http import Http404, HttpResponse, HttpResponseRedirect, JsonResponse
-from django.shortcuts import render
+from django.shortcuts import get_object_or_404, render
 from django.urls import reverse
 from django.utils.decorators import method_decorator
 from django.utils.http import url_has_allowed_host_and_scheme
@@ -27,6 +27,7 @@ from openpyxl import load_workbook
 from vtb.client import VTBClient
 from website.email import send_login_email
 from website.forms import (
+    BreakfastForm,
     Export2GoogleDocsForm,
     FastLoginForm,
     ImpersonateForm,
@@ -240,6 +241,54 @@ class RaceNewsView(View):
             "login_form": LoginForm(),
             "reg_open": race.reg_status == RegStatus.OPEN,
         }
+
+
+class BreakfastView(View):
+    template_name = "website/breakfast.html"
+    breakfast_time = "08:00"
+    cost_rub = 300
+
+    def get(self, request, race_id):
+        race = get_object_or_404(Race, pk=race_id)
+        form = BreakfastForm(race=race)
+        return render(
+            request,
+            self.template_name,
+            {
+                "form": form,
+                "race": race,
+                "cost": self.cost_rub,
+                "breakfast_time": self.breakfast_time,
+            },
+        )
+
+    def post(self, request, race_id):
+        race = get_object_or_404(Race, pk=race_id)
+        form = BreakfastForm(request.POST, race=race)
+        if form.is_valid():
+            form.save(race=race)
+            return render(
+                request,
+                self.template_name,
+                {
+                    "form": BreakfastForm(race=race),
+                    "race": race,
+                    "submitted": True,
+                    "cost": self.cost_rub,
+                    "breakfast_time": self.breakfast_time,
+                },
+            )
+
+        return render(
+            request,
+            self.template_name,
+            {
+                "form": form,
+                "race": race,
+                "cost": self.cost_rub,
+                "breakfast_time": self.breakfast_time,
+            },
+        )
 
 
 def index_dummy(request):

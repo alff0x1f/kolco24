@@ -1,0 +1,211 @@
+{% extends "website/base.html" %}
+
+{% block content %}
+  <section class="space-sm">
+    <div class="container">
+      <div class="row justify-content-center">
+        <div class="col-12 col-lg-10">
+          <div class="card card-lg">
+            <div class="card-body">
+              <h1 class="h3 mb-4 text-center">Регистрация на завтрак</h1>
+              {% if not submitted %}
+                <div class="alert alert-info" role="alert">
+                  <h2 class="h5">Что вас ждёт утром.</h2>
+                  <ul class="mb-0">
+                    <li>Начало завтрака в {{ breakfast_time }} на поляне старта.</li>
+                    <li>Горячие макароны с сосисками или фасолью для веганов, чай и батончик.</li>
+                    <li>Стоимость комплекта — {{ cost }} ₽ за человека.</li>
+                  </ul>
+                </div>
+                <h2>Оплата</h2>
+                <p>Оплатить завтрак можно на карту Т-банка (Тиньков):</p>
+                <div class="alert alert-secondary d-flex align-items-center" role="alert">
+                  <svg class="bi bi-credit-card mr-2" width="1.5em" height="1.5em" viewBox="0 0 16 16"
+                       fill="currentColor"
+                       xmlns="http://www.w3.org/2000/svg">
+                    <path fill-rule="evenodd"
+                          d="M0 4a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V4zm14-1H2a1 1 0 0 0-1 1v2h14V4a1 1 0 0 0-1-1zm1 3H1v5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V6z"/>
+                    <rect width="3" height="2" x="2" y="9" rx=".5"/>
+                  </svg>
+                  <div class="ml-2">
+                    <strong>2200 7001 6813 0184</strong><br>
+                    Юлия С.
+                  </div>
+                </div>
+                <p>После оплаты отправьте чек в VK <a href="https://vk.com/life_unexpected">Сафиной Юле</a> с указанием, за кого внесена оплата за завтрак.</p>
+              {% endif %}
+
+              {% if submitted %}
+                <div class="alert alert-success" role="alert">
+                  <h2 class="h5">Спасибо! Заявка отправлена.</h2>
+                  <p class="m-0"></p>
+                  <p class="mb-2">Обязательно:</p>
+                  <ol class="mb-2">
+                    <li>Скинуть чек после оплаты в VK <a href="https://vk.com/life_unexpected">Сафиной Юле</a> с
+                      указанием за кого оплачено.
+                    </li>
+                  </ol>
+                </div>
+              {% else %}
+                <h3>Данные участников:</h3>
+                <form method="post" action="{% url 'breakfast' race.id %}">
+                  {% csrf_token %}
+                  {% if form.non_field_errors %}
+                    <div class="alert alert-danger">
+                      {{ form.non_field_errors }}
+                    </div>
+                  {% endif %}
+                  <div class="form-group">
+                    <label for="id_people_count">Количество человек</label>
+                    {{ form.people_count }}
+                    {% if form.people_count.errors %}
+                      <div class="invalid-feedback d-block">
+                        {{ form.people_count.errors|striptags }}
+                      </div>
+                    {% endif %}
+                  </div>
+                  <div class="form-group">
+                    <label class="d-block">Участники</label>
+                    <div id="attendees-container" data-max-attendees="{{ form.MAX_ATTENDEES }}">
+                      {% for attendee in form.attendee_field_sets %}
+                        <div class="form-row attendee-entry" data-index="{{ attendee.index }}">
+                          <div class="form-group col-md-8">
+                            <label for="{{ attendee.name.id_for_label }}">Фамилия и имя {{ attendee.index }}</label>
+                            {{ attendee.name }}
+                            {% if attendee.name.errors %}
+                              <div class="invalid-feedback d-block">
+                                {{ attendee.name.errors|striptags }}
+                              </div>
+                            {% endif %}
+                          </div>
+                          <div class="form-group col-md-4 d-flex align-items-center">
+                            <div class="form-check mt-3">
+                              {{ attendee.is_vegan }}
+                              <label class="form-check-label" for="{{ attendee.is_vegan.id_for_label }}">Веган</label>
+                            </div>
+                          </div>
+                        </div>
+                      {% endfor %}
+                    </div>
+                    <small class="form-text text-muted">Нам важно знать, кому готовить веганскую порцию.</small>
+                  </div>
+                  <div class="text-center">
+                    <button type="submit" class="btn btn-success btn-lg">Отправить заявку</button>
+                  </div>
+                </form>
+              {% endif %}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+  <script>
+      (function () {
+          const container = document.getElementById('attendees-container');
+          const peopleCountInput = document.getElementById('id_people_count');
+          if (!container || !peopleCountInput) {
+              return;
+          }
+
+          const maxAttendees = parseInt(container.dataset.maxAttendees || '20', 10);
+
+          const createInput = (name, labelText, placeholder) => {
+              const input = document.createElement('input');
+              input.type = 'text';
+              input.name = name;
+              input.id = `id_${name}`;
+              input.placeholder = placeholder;
+              input.required = true;
+              input.className = 'form-control';
+              input.autocomplete = 'off';
+
+              const label = document.createElement('label');
+              label.setAttribute('for', input.id);
+              label.textContent = labelText;
+
+              const wrapper = document.createElement('div');
+              wrapper.className = 'form-group';
+              wrapper.appendChild(label);
+              wrapper.appendChild(input);
+
+              return wrapper;
+          };
+
+          const createCheckbox = (name, labelText) => {
+              const input = document.createElement('input');
+              input.type = 'checkbox';
+              input.name = name;
+              input.id = `id_${name}`;
+              input.className = 'form-check-input';
+
+              const label = document.createElement('label');
+              label.setAttribute('for', input.id);
+              label.className = 'form-check-label';
+              label.textContent = labelText;
+
+              const formCheck = document.createElement('div');
+              formCheck.className = 'form-check mt-3';
+              formCheck.appendChild(input);
+              formCheck.appendChild(label);
+
+              const wrapper = document.createElement('div');
+              wrapper.className = 'form-group col-md-4 d-flex align-items-center';
+              wrapper.appendChild(formCheck);
+
+              return wrapper;
+          };
+
+          const renderAttendeeRow = (index) => {
+              const row = document.createElement('div');
+              row.className = 'form-row attendee-entry';
+              row.dataset.index = String(index);
+
+              const nameField = createInput(
+                  `attendee_${index}_name`,
+                  `Фамилия и имя ${index}`,
+                  `Фамилия и имя ${index}`
+              );
+              nameField.classList.add('col-md-8');
+
+              const veganField = createCheckbox(
+                  `attendee_${index}_is_vegan`,
+                  'Веган'
+              );
+
+              row.appendChild(nameField);
+              row.appendChild(veganField);
+              container.appendChild(row);
+          };
+
+          const updateAttendeeFields = () => {
+              let desiredCount = parseInt(peopleCountInput.value, 10);
+              if (Number.isNaN(desiredCount) || desiredCount < 1) {
+                  desiredCount = 1;
+              }
+              desiredCount = Math.min(desiredCount, maxAttendees);
+
+              const currentRows = container.querySelectorAll('.attendee-entry');
+              const currentCount = currentRows.length;
+
+              if (currentCount < desiredCount) {
+                  for (let i = currentCount + 1; i <= desiredCount; i += 1) {
+                      renderAttendeeRow(i);
+                  }
+              } else if (currentCount > desiredCount) {
+                  for (let i = currentCount; i > desiredCount; i -= 1) {
+                      const row = container.querySelector(`.attendee-entry[data-index="${i}"]`);
+                      if (row) {
+                          container.removeChild(row);
+                      }
+                  }
+              }
+          };
+
+          peopleCountInput.addEventListener('change', updateAttendeeFields);
+          peopleCountInput.addEventListener('input', updateAttendeeFields);
+
+          updateAttendeeFields();
+      })();
+  </script>
+{% endblock %}

@@ -8,6 +8,7 @@ from .views_ import (
     AddTeam,
     AllTeamsResultView,
     AllTeamsView,
+    BreakfastView,
     CancelPaymentView,
     ConfirmPaymentView,
     IndexView,

@@ -3,6 +3,7 @@ from django.utils.html import format_html
 from markdown import markdown
 
 from .models import (
+    BreakfastRegistration,
     Checkpoint,
     CheckpointTag,
     MenuItem,
@@ -63,6 +64,42 @@ class TransferAdmin(admin.ModelAdmin):
             else:
                 parts.append(name)
         return ", ".join(parts) if parts else "—"
+
+
+@admin.register(BreakfastRegistration)
+class BreakfastRegistrationAdmin(admin.ModelAdmin):
+    list_display = (
+        "id",
+        "race",
+        "people_count",
+        "attendees_display",
+        "vegan_count",
+        "created_at",
+        "status",
+    )
+    list_filter = ("race", "created_at", "status")
+    search_fields = ("attendees",)
+    ordering = ("-created_at",)
+
+    @admin.display(description="Участники")
+    def attendees_display(self, obj):
+        if not obj.attendees:
+            return "—"
+        parts = []
+        for attendee in obj.attendees:
+            attendee = attendee or {}
+            name = attendee.get("name", "").strip()
+            vegan = attendee.get("is_vegan")
+            vegan_label = " (веган)" if vegan else ""
+            if name:
+                parts.append(f"{name}{vegan_label}")
+        return ", ".join(parts) if parts else "—"
+
+    @admin.display(description="Веганы")
+    def vegan_count(self, obj):
+        if not obj.attendees:
+            return 0
+        return sum(1 for attendee in obj.attendees if attendee and attendee.get("is_vegan"))
 
 
 class TeamAdmin(admin.ModelAdmin):
