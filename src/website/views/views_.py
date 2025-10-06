@@ -308,7 +308,9 @@ class BreakfastView(View):
         )
 
 
-@method_decorator(user_passes_test(can_manage_breakfast), name="dispatch")
+@method_decorator(
+    user_passes_test(can_manage_breakfast, login_url="passlogin"), name="dispatch"
+)
 class BreakfastAdminView(View):
     template_name = "website/breakfast_admin.html"
 
