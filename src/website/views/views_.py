@@ -264,6 +264,7 @@ class BreakfastView(View):
     template_name = "website/breakfast.html"
     breakfast_time = "08:00"
     cost_rub = 300
+    registration_open = False
 
     def get(self, request, race_id):
         race = get_object_or_404(Race, pk=race_id)
@@ -276,10 +277,13 @@ class BreakfastView(View):
                 "race": race,
                 "cost": self.cost_rub,
                 "breakfast_time": self.breakfast_time,
+                "registration_closed": not self.registration_open,
             },
         )
 
     def post(self, request, race_id):
+        if not self.registration_open:
+            return self.get(request, race_id)
         race = get_object_or_404(Race, pk=race_id)
         form = BreakfastForm(request.POST, race=race)
         if form.is_valid():
@@ -293,6 +297,7 @@ class BreakfastView(View):
                     "submitted": True,
                     "cost": self.cost_rub,
                     "breakfast_time": self.breakfast_time,
+                    "registration_closed": False,
                 },
             )
 
@@ -304,6 +309,7 @@ class BreakfastView(View):
                 "race": race,
                 "cost": self.cost_rub,
                 "breakfast_time": self.breakfast_time,
+                "registration_closed": False,
             },
         )
 

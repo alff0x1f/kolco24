@@ -8,7 +8,11 @@
           <div class="card card-lg">
             <div class="card-body">
               <h1 class="h3 mb-4 text-center">Регистрация на завтрак</h1>
-              {% if not submitted %}
+              {% if registration_closed %}
+                <div class="alert alert-danger" role="alert">
+                  Регистрация на завтрак завершена. Новые заявки больше не принимаются.
+                </div>
+              {% elif not submitted %}
                 <div class="alert alert-info" role="alert">
                   <h2 class="h5">Что вас ждёт утром.</h2>
                   <ul class="mb-0">
@@ -46,7 +50,7 @@
                     </li>
                   </ol>
                 </div>
-              {% else %}
+              {% elif not registration_closed %}
                 <h3>Данные участников:</h3>
                 <form method="post" action="{% url 'breakfast' race.id %}">
                   {% csrf_token %}
@@ -100,6 +104,7 @@
       </div>
     </div>
   </section>
+  {% if not registration_closed %}
   <script>
       (function () {
           const container = document.getElementById('attendees-container');
@@ -208,4 +213,5 @@
           updateAttendeeFields();
       })();
   </script>
+  {% endif %}
 {% endblock %}
