@@ -424,6 +424,48 @@ class BreakfastAdminView(View):
         }
 
 
+@method_decorator(
+    user_passes_test(can_manage_breakfast, login_url="passlogin"), name="dispatch"
+)
+class BreakfastPaidListView(View):
+    template_name = "website/breakfast_paid_list.html"
+
+    def get(self, request, race_id):
+        race = get_object_or_404(Race, pk=race_id)
+        registrations = BreakfastRegistration.objects.filter(
+            race=race, status="processed"
+        ).order_by("created_at")
+
+        participants = []
+        for reg in registrations:
+            attendees = reg.attendees or []
+            for attendee in attendees:
+                if not attendee:
+                    continue
+                name = (attendee.get("name") or "").strip()
+                if not name:
+                    continue
+                participants.append(
+                    {
+                        "name": name,
+                        "is_vegan": bool(attendee.get("is_vegan")),
+                        "created_at": reg.created_at,
+                        "registration_id": reg.id,
+                    }
+                )
+
+        return render(
+            request,
+            self.template_name,
+            {
+                "race": race,
+                "participants": participants,
+                "vegan_total": sum(1 for p in participants if p["is_vegan"]),
+                "people_total": len(participants),
+            },
+        )
+
+
 def index_dummy(request):
     return render(request, "website/index_dummy.html")
 

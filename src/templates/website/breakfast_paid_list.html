@@ -1,0 +1,65 @@
+{% extends "website/base.html" %}
+
+{% block content %}
+  <section class="space-sm">
+    <div class="container">
+      <div class="row mb-4 align-items-center">
+        <div class="col-12 col-md-8">
+          <h1 class="h3 mb-1">Оплаченные завтраки — {{ race.name }}</h1>
+          <p class="text-muted mb-0">Всего оплачено: {{ people_total }} чел., веганов: {{ vegan_total }}</p>
+        </div>
+        <div class="col-12 col-md-4 text-md-right mt-3 mt-md-0">
+          <a class="btn btn-outline-primary" href="{% url 'breakfast_admin' race.id %}">К управлению заявками</a>
+        </div>
+      </div>
+
+      {% if participants %}
+        <div class="table-responsive d-none d-md-block">
+          <table class="table table-striped table-hover align-middle">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Фамилия и имя</th>
+                <th>Веган</th>
+                <th>Дата оплаты</th>
+                <th>ID заявки</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for participant in participants %}
+                <tr>
+                  <td>{{ forloop.counter }}</td>
+                  <td>{{ participant.name }}</td>
+                  <td>{% if participant.is_vegan %}<span class="badge badge-success">Да</span>{% else %}<span class="text-muted">Нет</span>{% endif %}</td>
+                  <td>{{ participant.created_at|date:"d.m.Y H:i" }}</td>
+                  <td>#{{ participant.registration_id }}</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+
+        <div class="d-md-none">
+          <div class="card-columns">
+            {% for participant in participants %}
+              <div class="card mb-3">
+                <div class="card-body">
+                  <div class="d-flex justify-content-between">
+                    <h5 class="card-title mb-1">{{ participant.name }}</h5>
+                    <small class="text-muted">#{{ participant.registration_id }}</small>
+                  </div>
+                  <p class="mb-1">Оплата: {{ participant.created_at|date:"d.m.Y H:i" }}</p>
+                  <p class="mb-0">Веган: {% if participant.is_vegan %}<strong class="text-success">да</strong>{% else %}<span class="text-muted">нет</span>{% endif %}</p>
+                </div>
+              </div>
+            {% endfor %}
+          </div>
+        </div>
+      {% else %}
+        <div class="alert alert-info" role="alert">
+          Пока нет оплаченных заявок.
+        </div>
+      {% endif %}
+    </div>
+  </section>
+{% endblock %}
