@@ -23,6 +23,7 @@ urlpatterns = [
     # auth
     path("register/", views.RegisterView.as_view(), name="register"),
     path("race/8/transfer/", views.TransferView.as_view(), name="transfer"),
+    path("race/8/transfer/list/", views.TransferPaidListView.as_view(), name="transfer_paid_list"),
     path(
         "race/<int:race_id>/breakfast/",
         views.BreakfastView.as_view(),
