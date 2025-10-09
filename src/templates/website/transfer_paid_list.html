@@ -1,0 +1,65 @@
+{% extends "website/base.html" %}
+
+{% block content %}
+  <section class="space-sm">
+    <div class="container">
+      <div class="row mb-4 align-items-center">
+        <div class="col-12 col-md-8">
+          <h1 class="h3 mb-1">Оплаченные места в автобусе</h1>
+          <p class="text-muted mb-0">Всего пассажиров: {{ passenger_total }}</p>
+        </div>
+        <div class="col-12 col-md-4 text-md-right mt-3 mt-md-0">
+          <a class="btn btn-outline-primary" href="{% url 'transfer' %}">Страница регистрации</a>
+        </div>
+      </div>
+
+      {% if passengers %}
+        <div class="table-responsive d-none d-md-block">
+          <table class="table table-striped table-hover align-middle">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Фамилия и имя</th>
+                <th>Телефон</th>
+                <th>Дата оплаты</th>
+                <th>ID заявки</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for passenger in passengers %}
+                <tr>
+                  <td>{{ forloop.counter }}</td>
+                  <td>{{ passenger.name }}</td>
+                  <td>{{ passenger.phone|default:"—" }}</td>
+                  <td>{{ passenger.created_at|date:"d.m.Y H:i" }}</td>
+                  <td>#{{ passenger.transfer_id }}</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+
+        <div class="d-md-none">
+          <div class="card-columns">
+            {% for passenger in passengers %}
+              <div class="card mb-3">
+                <div class="card-body">
+                  <div class="d-flex justify-content-between">
+                    <h5 class="card-title mb-1">{{ passenger.name }}</h5>
+                    <small class="text-muted">#{{ passenger.transfer_id }}</small>
+                  </div>
+                  <p class="mb-1">Оплата: {{ passenger.created_at|date:"d.m.Y H:i" }}</p>
+                  <p class="mb-0">Телефон: {{ passenger.phone|default:"—" }}</p>
+                </div>
+              </div>
+            {% endfor %}
+          </div>
+        </div>
+      {% else %}
+        <div class="alert alert-info" role="alert">
+          Пока нет оплаченных заявок.
+        </div>
+      {% endif %}
+    </div>
+  </section>
+{% endblock %}
