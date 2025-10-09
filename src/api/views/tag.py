@@ -22,6 +22,11 @@ class MemberTagListCreateView(ListCreateAPIView):
     queryset = Tag.objects.all()
     serializer_class = TagSerializer
 
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        thirty_days_ago = timezone.now() - timezone.timedelta(days=30)
+        return queryset.filter(last_seen_at__gte=thirty_days_ago)
+
 
 class CheckpointTagCreateView(APIView):
     def post(self, request, race_id):
