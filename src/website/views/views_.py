@@ -1693,12 +1693,16 @@ def teams_api(request):
 
 
 @csrf_exempt
-def upload_photo(request):
+def upload_photo(request, race_id):
     """save file from post request"""
     if request.method != "POST":
         raise Http404("File not found.")
 
-    if not Race.objects.get(id=2).is_photo_upload_enabled:
+    race = Race.objects.filter(id=race_id).first()
+    if not race:
+        return JsonResponse({"error": "race not found"}, status=404)
+
+    if not race.is_photo_upload_enabled:
         return JsonResponse({"error": "photo upload is disabled"}, status=403)
 
     file = request.FILES.get("photo")
@@ -1716,7 +1720,7 @@ def upload_photo(request):
     if file:
         start_number = team.start_number
         folder_name = (
-            "photos/"
+            f"photos/{race_id}/"
             + f"{start_number}-{team_id}/{phone_uuid}/{point_number}-{file.name}"
         )
         fs = FileSystemStorage()
