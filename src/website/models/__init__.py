@@ -10,6 +10,7 @@ from .models import (
     Team,
     TeamAdminLog,
     TeamMemberMove,
+    TeamStartLog,
     Transfer,
 )
 from .news import MenuItem, NewsPost, Page

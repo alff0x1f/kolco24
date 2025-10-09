@@ -83,6 +83,49 @@ class BreakfastRegistration(models.Model):
         return f"{self.race_id}: {self.people_count} участник(ов)"
 
 
+class TeamStartLog(models.Model):
+    race = models.ForeignKey(
+        "website.Race",
+        on_delete=models.CASCADE,
+        related_name="team_start_logs",
+        verbose_name="Гонка",
+    )
+    team = models.ForeignKey(
+        "website.Team",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="start_logs",
+        verbose_name="Команда",
+    )
+    start_number = models.CharField(
+        max_length=50, blank=True, verbose_name="Стартовый номер"
+    )
+    team_name = models.CharField(
+        max_length=255, blank=True, verbose_name="Название команды"
+    )
+    participant_count = models.PositiveIntegerField(
+        default=0, verbose_name="Количество участников"
+    )
+    scanned_count = models.PositiveIntegerField(
+        default=0, verbose_name="Сканировано браслетов"
+    )
+    member_tags = models.JSONField(
+        default=list, blank=True, verbose_name="Теги участников"
+    )
+    start_timestamp = models.BigIntegerField(verbose_name="Время старта (мс)")
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="Создано")
+    updated_at = models.DateTimeField(auto_now=True, verbose_name="Обновлено")
+
+    class Meta:
+        ordering = ("-created_at",)
+        verbose_name = "Старт команды"
+        verbose_name_plural = "Старты команд"
+
+    def __str__(self) -> str:
+        return f"{self.team_name or self.start_number} ({self.start_timestamp})"
+
+
 @receiver(post_save, sender=User)
 def create_user_profile(sender, instance, created, **kwargs):
     if created:

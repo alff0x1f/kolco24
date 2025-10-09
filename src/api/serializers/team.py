@@ -26,3 +26,15 @@ class TeamSerializer(serializers.ModelSerializer):
             "athlet5",
             "athlet6",
         ]
+
+
+class TeamStartSerializer(serializers.Serializer):
+    team_id = serializers.IntegerField()
+    start_number = serializers.CharField(max_length=50, allow_blank=True)
+    team_name = serializers.CharField(max_length=255, allow_blank=True)
+    participant_count = serializers.IntegerField(min_value=0)
+    scanned_count = serializers.IntegerField(min_value=0)
+    member_tags = serializers.ListField(
+        child=serializers.CharField(max_length=64), allow_empty=True
+    )
+    start_timestamp = serializers.IntegerField()

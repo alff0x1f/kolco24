@@ -27,6 +27,7 @@ class Race(Model):
     place = CharField("Место", max_length=50, default="")
     is_active = BooleanField("Активна", default=True)
     cost = IntegerField("Стоимость участия", default=0)
+    time_limit_min = IntegerField("Лимит по времени (мин)", default=0)
 
     reg_status = CharField(
         "Статус регистрации",

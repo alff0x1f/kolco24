@@ -16,6 +16,7 @@ from .models import (
     Tag,
     TakenKP,
     Team,
+    TeamStartLog,
     Transfer,
 )
 from .models.race import Category, RaceLink
@@ -102,6 +103,22 @@ class BreakfastRegistrationAdmin(admin.ModelAdmin):
         return sum(
             1 for attendee in obj.attendees if attendee and attendee.get("is_vegan")
         )
+
+
+@admin.register(TeamStartLog)
+class TeamStartLogAdmin(admin.ModelAdmin):
+    list_display = (
+        "id",
+        "race",
+        "team",
+        "start_number",
+        "participant_count",
+        "scanned_count",
+        "start_timestamp",
+        "created_at",
+    )
+    list_filter = ("race", "created_at")
+    search_fields = ("team_name", "start_number")
 
 
 class TeamAdmin(admin.ModelAdmin):
