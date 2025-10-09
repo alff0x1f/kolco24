@@ -207,21 +207,41 @@ class RegisterView(View):
 
 class TransferView(View):
     template_name = "website/transfer.html"
+    registration_open = False  # TODO перенести эту настройку в модель race
 
     def get(self, request):
-        return render(request, self.template_name, {"form": TransferForm()})
+        registration_closed = not self.registration_open
+        return render(
+            request,
+            self.template_name,
+            {
+                "form": TransferForm(),
+                "registration_closed": registration_closed,
+            },
+        )
 
     def post(self, request):
+        if not self.registration_open:
+            return self.get(request)
+
         form = TransferForm(request.POST)
         if form.is_valid():
             form.save()
             return render(
                 request,
                 self.template_name,
-                {"form": TransferForm(), "submitted": True},
+                {
+                    "form": TransferForm(),
+                    "submitted": True,
+                    "registration_closed": not self.registration_open,
+                },
             )
 
-        return render(request, self.template_name, {"form": form})
+        return render(
+            request,
+            self.template_name,
+            {"form": form, "registration_closed": not self.registration_open},
+        )
 
 
 class RaceNewsView(View):

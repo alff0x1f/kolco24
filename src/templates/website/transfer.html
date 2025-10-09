@@ -8,7 +8,22 @@
           <div class="card card-lg">
             <div class="card-body">
               <h1 class="h3 mb-4 text-center">Регистрация на автобус</h1>
-              {% if not submitted %}
+              {% if registration_closed %}
+                <div class="alert alert-danger" role="alert">
+                  Регистрация на трансфер завершена. Новые заявки не принимаются.
+                </div>
+              {% elif submitted %}
+                <div class="alert alert-success" role="alert">
+                  <h2 class="h5">Спасибо! Заявка отправлена.</h2>
+                  <p class="mb-2">Обязательно:</p>
+                  <ol class="mb-0">
+                    <li>Скинуть чек после оплаты в VK <a href="https://vk.com/id33591130">Лиля Набиева</a> с
+                      указанием за кого оплачено (написать обязательно, чтобы быть уверенным, что вы заняли
+                      место в автобусе).
+                    </li>
+                  </ol>
+                </div>
+              {% else %}
                 <div class="alert alert-info" role="alert">
                   <h2 class="h5">Условия трансфера.</h2>
                   <ul class="mb-0">
@@ -37,20 +52,7 @@
                   Набиева</a>
                   с указанием за кого оплачено (написать обязательно, чтобы быть уверенным, что вы заняли место в
                   автобусе).</p>
-              {% endif %}
 
-              {% if submitted %}
-                <div class="alert alert-success" role="alert">
-                  <h2 class="h5">Спасибо! Заявка отправлена.</h2>
-                  <p class="mb-2">Обязательно:</p>
-                  <ol class="mb-0">
-                    <li>Скинуть чек после оплаты в VK <a href="https://vk.com/id33591130">Лиля Набиева</a> с
-                      указанием за кого оплачено (написать обязательно, чтобы быть уверенным, что вы заняли
-                      место в автобусе).
-                    </li>
-                  </ol>
-                </div>
-              {% else %}
                 <h3>Данные:</h3>
                 <form method="post" action="{% url 'transfer' %}">
                   {% csrf_token %}
@@ -109,6 +111,7 @@
       </div>
     </div>
   </section>
+  {% if not registration_closed %}
   <script>
       (function () {
           const container = document.getElementById('passengers-container');
@@ -192,4 +195,5 @@
           updatePassengerFields();
       })();
   </script>
+  {% endif %}
 {% endblock %}
