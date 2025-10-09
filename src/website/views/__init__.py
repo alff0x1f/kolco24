@@ -11,6 +11,7 @@ from .views_ import (
     BreakfastAdminView,
     BreakfastPaidListView,
     BreakfastView,
+    TransferPaidListView,
     CancelPaymentView,
     ConfirmPaymentView,
     IndexView,
