@@ -59,6 +59,7 @@ from website.models import (
     SbpPaymentRecipient,
     TakenKP,
     Team,
+    Transfer,
 )
 from website.models.race import Category, RegStatus
 from website.sync_xlsx import import_file_xlsx
@@ -77,6 +78,12 @@ def can_manage_breakfast(user):
     if not user.is_authenticated:
         return False
     return user.is_superuser or user.has_perm("website.change_breakfastregistration")
+
+
+def can_manage_transfer(user):
+    if not user.is_authenticated:
+        return False
+    return user.is_superuser or user.has_perm("website.change_transfer")
 
 
 class IndexView(View):
@@ -207,21 +214,78 @@ class RegisterView(View):
 
 class TransferView(View):
     template_name = "website/transfer.html"
+    registration_open = False  # TODO перенести эту настройку в модель race
 
     def get(self, request):
-        return render(request, self.template_name, {"form": TransferForm()})
+        registration_closed = not self.registration_open
+        return render(
+            request,
+            self.template_name,
+            {
+                "form": TransferForm(),
+                "registration_closed": registration_closed,
+            },
+        )
 
     def post(self, request):
+        if not self.registration_open:
+            return self.get(request)
+
         form = TransferForm(request.POST)
         if form.is_valid():
             form.save()
             return render(
                 request,
                 self.template_name,
-                {"form": TransferForm(), "submitted": True},
+                {
+                    "form": TransferForm(),
+                    "submitted": True,
+                    "registration_closed": not self.registration_open,
+                },
             )
 
-        return render(request, self.template_name, {"form": form})
+        return render(
+            request,
+            self.template_name,
+            {"form": form, "registration_closed": not self.registration_open},
+        )
+
+
+@method_decorator(
+    user_passes_test(can_manage_transfer, login_url="passlogin"), name="dispatch"
+)
+class TransferPaidListView(View):
+    template_name = "website/transfer_paid_list.html"
+
+    def get(self, request):
+        transfers = Transfer.objects.filter(status="processed").order_by("created_at")
+
+        passengers = []
+        for transfer in transfers:
+            contacts = transfer.passenger_contacts or []
+            for contact in contacts:
+                if not contact:
+                    continue
+                name = (contact.get("name") or "").strip()
+                if not name:
+                    continue
+                passengers.append(
+                    {
+                        "name": name,
+                        "phone": (contact.get("phone") or "").strip(),
+                        "created_at": transfer.created_at,
+                        "transfer_id": transfer.id,
+                    }
+                )
+
+        return render(
+            request,
+            self.template_name,
+            {
+                "passengers": passengers,
+                "passenger_total": len(passengers),
+            },
+        )
 
 
 class RaceNewsView(View):
