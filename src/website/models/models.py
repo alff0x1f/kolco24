@@ -98,11 +98,21 @@ class TeamStartLog(models.Model):
         related_name="start_logs",
         verbose_name="Команда",
     )
-    start_number = models.CharField(max_length=50, blank=True, verbose_name="Стартовый номер")
-    team_name = models.CharField(max_length=255, blank=True, verbose_name="Название команды")
-    participant_count = models.PositiveIntegerField(default=0, verbose_name="Количество участников")
-    scanned_count = models.PositiveIntegerField(default=0, verbose_name="Сканировано браслетов")
-    member_tags = models.JSONField(default=list, blank=True, verbose_name="Теги участников")
+    start_number = models.CharField(
+        max_length=50, blank=True, verbose_name="Стартовый номер"
+    )
+    team_name = models.CharField(
+        max_length=255, blank=True, verbose_name="Название команды"
+    )
+    participant_count = models.PositiveIntegerField(
+        default=0, verbose_name="Количество участников"
+    )
+    scanned_count = models.PositiveIntegerField(
+        default=0, verbose_name="Сканировано браслетов"
+    )
+    member_tags = models.JSONField(
+        default=list, blank=True, verbose_name="Теги участников"
+    )
     start_timestamp = models.BigIntegerField(verbose_name="Время старта (мс)")
     created_at = models.DateTimeField(auto_now_add=True, verbose_name="Создано")
     updated_at = models.DateTimeField(auto_now=True, verbose_name="Обновлено")
