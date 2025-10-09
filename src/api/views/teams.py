@@ -1,11 +1,15 @@
 import csv
 
+from django.db import transaction
 from django.http import HttpResponse
+from django.shortcuts import get_object_or_404
+from rest_framework import status
 from rest_framework.generics import ListAPIView
+from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from api.serializers.team import TeamSerializer
-from website.models import Team
+from api.serializers.team import TeamSerializer, TeamStartSerializer
+from website.models import Race, Team, TeamStartLog
 
 
 class TeamListView(ListAPIView):
@@ -103,3 +107,40 @@ class TeamCSVListView(APIView):
 
         # Return the response as a CSV file
         return response
+
+
+class TeamStartView(APIView):
+    """Endpoint to record team start events"""
+
+    def post(self, request, race_id):
+        serializer = TeamStartSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+
+        race = get_object_or_404(Race, pk=race_id)
+        team = get_object_or_404(
+            Team.objects.select_related("category2"), pk=data["team_id"]
+        )
+
+        if not team.category2 or team.category2.race_id != race.id:
+            return Response(
+                {"team_id": ["Команда не относится к указанной гонке"]},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        with transaction.atomic():
+            TeamStartLog.objects.create(
+                race=race,
+                team=team,
+                start_number=data["start_number"],
+                team_name=data["team_name"],
+                participant_count=data["participant_count"],
+                scanned_count=data["scanned_count"],
+                member_tags=data["member_tags"],
+                start_timestamp=data["start_timestamp"],
+            )
+
+            team.start_time = data["start_timestamp"]
+            team.save(update_fields=["start_time"])
+
+        return Response({"success": True})
