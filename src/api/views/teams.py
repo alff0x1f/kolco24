@@ -13,7 +13,14 @@ from api.serializers.team import (
     TeamSerializer,
     TeamStartSerializer,
 )
-from website.models import Race, Tag, Team, TeamFinishLog, TeamStartLog
+from website.models import (
+    Race,
+    Tag,
+    Team,
+    TeamFinishLog,
+    TeamMemberRaceLog,
+    TeamStartLog,
+)
 
 
 class TeamListView(ListAPIView):
@@ -147,6 +154,22 @@ class TeamStartView(APIView):
             team.start_time = data["start_timestamp"]
             team.save(update_fields=["start_time"])
 
+            member_tag_values = [
+                (value or "").strip() for value in data.get("member_tags", [])
+            ]
+            member_tag_values = [value for value in member_tag_values if value]
+
+            for tag_value in member_tag_values:
+                tag = Tag.objects.filter(tag_id__iexact=tag_value).first()
+                if not tag:
+                    continue
+
+                TeamMemberRaceLog.objects.update_or_create(
+                    race=race,
+                    member_tag=tag,
+                    defaults={"start_time": data["start_timestamp"]},
+                )
+
         return Response({"success": True})
 
 
@@ -166,10 +189,23 @@ class TeamFinishView(APIView):
 
         normalized_tag_uid = tag_uid.upper()
 
-        tag = Tag.objects.filter(id=member_tag_id, tag_id=normalized_tag_uid).first()
-        if not tag:
+        if member_tag_id is None:
+            return Response(
+                {"member_tag_id": ["Требуется идентификатор тега участника"]},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            tag = Tag.objects.get(pk=member_tag_id)
+        except Tag.DoesNotExist:
             return Response(
                 {"member_tag_id": ["Указанный тег не найден"]},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if tag.tag_id.upper() != normalized_tag_uid:
+            return Response(
+                {"tag_uid": ["UID не соответствует указанному тегу"]},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
@@ -199,5 +235,14 @@ class TeamFinishView(APIView):
 
             team.finish_time = recorded_at
             team.save(update_fields=["finish_time"])
+
+            member_log = TeamMemberRaceLog.objects.filter(
+                race=race,
+                member_tag=tag,
+            ).first()
+
+            if member_log:
+                member_log.finish_time = recorded_at
+                member_log.save(update_fields=["finish_time"])
 
         return Response({"success": True})
