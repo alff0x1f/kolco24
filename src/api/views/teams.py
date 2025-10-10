@@ -8,8 +8,12 @@ from rest_framework.generics import ListAPIView
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from api.serializers.team import TeamSerializer, TeamStartSerializer
-from website.models import Race, Team, TeamStartLog
+from api.serializers.team import (
+    TeamFinishSerializer,
+    TeamSerializer,
+    TeamStartSerializer,
+)
+from website.models import Race, Tag, Team, TeamFinishLog, TeamStartLog
 
 
 class TeamListView(ListAPIView):
@@ -142,5 +146,58 @@ class TeamStartView(APIView):
 
             team.start_time = data["start_timestamp"]
             team.save(update_fields=["start_time"])
+
+        return Response({"success": True})
+
+
+class TeamFinishView(APIView):
+    """Endpoint to record team finish events"""
+
+    def post(self, request, race_id):
+        serializer = TeamFinishSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+
+        race = get_object_or_404(Race, pk=race_id)
+
+        tag_uid = data["tag_uid"].strip()
+        member_tag_id = data.get("member_tag_id")
+        recorded_at = data["recorded_at"]
+
+        normalized_tag_uid = tag_uid.upper()
+
+        tag = Tag.objects.filter(id=member_tag_id, tag_id=normalized_tag_uid).first()
+        if not tag:
+            return Response(
+                {"member_tag_id": ["Указанный тег не найден"]},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        team_start_log = (
+            TeamStartLog.objects.select_related("team")
+            .filter(race=race, member_tags__contains=normalized_tag_uid)
+            .order_by("-created_at")
+            .first()
+        )
+
+        if not team_start_log or not team_start_log.team:
+            return Response(
+                {"detail": "Команда для указанного тега не найдена"},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        team = team_start_log.team
+
+        with transaction.atomic():
+            TeamFinishLog.objects.create(
+                race=race,
+                team=team,
+                member_tag_id=member_tag_id,
+                tag_uid=normalized_tag_uid,
+                recorded_at=recorded_at,
+            )
+
+            team.finish_time = recorded_at
+            team.save(update_fields=["finish_time"])
 
         return Response({"success": True})

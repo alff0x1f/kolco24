@@ -17,6 +17,7 @@ from .models import (
     TakenKP,
     Team,
     TeamStartLog,
+    TeamFinishLog,
     Transfer,
 )
 from .models.race import Category, RaceLink
@@ -119,6 +120,21 @@ class TeamStartLogAdmin(admin.ModelAdmin):
     )
     list_filter = ("race", "created_at")
     search_fields = ("team_name", "start_number")
+
+
+@admin.register(TeamFinishLog)
+class TeamFinishLogAdmin(admin.ModelAdmin):
+    list_display = (
+        "id",
+        "race",
+        "team",
+        "member_tag_id",
+        "tag_uid",
+        "recorded_at",
+        "created_at",
+    )
+    list_filter = ("race", "created_at")
+    search_fields = ("tag_uid",)
 
 
 class TeamAdmin(admin.ModelAdmin):
