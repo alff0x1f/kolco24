@@ -2,9 +2,6 @@ import pytest
 from django.contrib.auth.models import User
 from django.urls import reverse
 
-from website.models import Race, Tag, Team, TeamMemberRaceLog, TeamStartLog
-from website.models.race import Category
-
 
 @pytest.mark.skip
 @pytest.mark.django_db
