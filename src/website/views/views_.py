@@ -302,9 +302,8 @@ class TeamMemberRaceLogView(View):
             .order_by("-finish_time", "-start_time", "member_tag__number")
         )
 
-        start_logs = (
-            TeamStartLog.objects.select_related("team")
-            .filter(race=race, team__isnull=False)
+        start_logs = TeamStartLog.objects.select_related("team").filter(
+            race=race, team__isnull=False
         )
 
         tag_to_team = {}
