@@ -3,6 +3,26 @@
 {% block extra_head %}
   <link rel="stylesheet" href="https://unpkg.com/easymde/dist/easymde.min.css">
   <script src="https://unpkg.com/easymde/dist/easymde.min.js"></script>
+
+  <style>
+      /* У некоторых версий EasyMDE/Bootstrap кнопка получает .table → ширина 100% */
+      .editor-toolbar .table,
+      .editor-toolbar button.table,
+      .editor-toolbar a.table {
+          width: auto !important;
+          margin-bottom: 0 !important;
+          display: inline-block !important;
+      }
+
+      /* > bootstrap fixed top (1030) */
+      .editor-toolbar.fullscreen {
+          position: fixed; /* ensure it docks to the viewport top */
+          top: 0;
+          left: 0;
+          right: 0;
+          z-index: 1030; /* > bootstrap fixed top (1030) */
+      }
+  </style>
 {% endblock %}
 
 {% block title %}Редактировать: {{ page.title }}{% endblock %}
@@ -24,7 +44,7 @@
               {{ form.content }}
             </div>
             <button type="submit" class="btn btn-primary">Сохранить</button>
-            <a href="{% url 'page' page.slug %}" class="btn btn-secondary">Отмена</a>
+            <a href="{% url 'page' page.slug %}" class="btn btn-secondary" id="btn-cancel">Отмена</a>
           </form>
         </div>
       </div>
@@ -33,7 +53,7 @@
 
   <script>
       document.addEventListener('DOMContentLoaded', function () {
-          const el = document.getElementById('{{ form.content.id_for_label }}') || document.getElementById('id_content');
+          const el = document.getElementById('{{ form.content.id_for_label }}');
           if (!el) return;
 
           const mde = new EasyMDE({
@@ -41,18 +61,14 @@
               minHeight: "300px",
               spellChecker: false,
               autosave: {
-                  enabled: false,
+                  enabled: true,
+                  uniqueId: "page-{{ page.id }}-content",
+                  delay: 1000,
               },
               toolbar: [
                   "bold", "italic", "heading", "|",
                   "quote", "unordered-list", "ordered-list",
-                  {
-                      name: "table1",
-                      action: EasyMDE.drawTable,
-                      className: "fa fa-th mde-icon-table", // вместо конфликтного "table"
-                      title: "Вставить таблицу"
-                  },
-                  "code", "|",
+                  "table", "code", "|",
                   "link", "image", "|",
                   "preview", "side-by-side", "fullscreen", "guide"
               ],
@@ -63,6 +79,26 @@
           el.form.addEventListener('submit', () => {
               el.value = mde.value();
           });
+
+          // Очистка автосохранения при "Отмена"
+          const cancelBtn = document.getElementById('btn-cancel');
+          if (cancelBtn) {
+              cancelBtn.addEventListener('click', () => {
+                  try {
+                      if (typeof mde.clearAutosavedValue === 'function') {
+                          mde.clearAutosavedValue();
+                      } else {
+                          // Fallback для форков/версий: ключ SimpleMDE/EasyMDE в localStorage
+                          const uid = mde?.options?.autosave?.uniqueId;
+                          if (uid) {
+                              localStorage.removeItem('smde_' + uid);
+                          }
+                      }
+                  } catch (e) {
+                      // no-op
+                  }
+              }, {once: true});
+          }
       });
   </script>
 {% endblock %}
