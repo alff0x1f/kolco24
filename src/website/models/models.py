@@ -144,9 +144,7 @@ class TeamFinishLog(models.Model):
     member_tag_id = models.PositiveIntegerField(
         verbose_name="ID тега участника", null=True, blank=True
     )
-    tag_uid = models.CharField(
-        max_length=64, blank=True, verbose_name="UID тега"
-    )
+    tag_uid = models.CharField(max_length=64, blank=True, verbose_name="UID тега")
     recorded_at = models.BigIntegerField(verbose_name="Время финиша (мс)")
     created_at = models.DateTimeField(auto_now_add=True, verbose_name="Создано")
     updated_at = models.DateTimeField(auto_now=True, verbose_name="Обновлено")

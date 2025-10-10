@@ -33,7 +33,9 @@ class Migration(migrations.Migration):
                 ),
                 (
                     "tag_uid",
-                    models.CharField(blank=True, max_length=64, verbose_name="UID тега"),
+                    models.CharField(
+                        blank=True, max_length=64, verbose_name="UID тега"
+                    ),
                 ),
                 (
                     "recorded_at",
