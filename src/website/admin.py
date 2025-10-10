@@ -16,8 +16,8 @@ from .models import (
     Tag,
     TakenKP,
     Team,
-    TeamStartLog,
     TeamFinishLog,
+    TeamStartLog,
     Transfer,
 )
 from .models.race import Category, RaceLink
