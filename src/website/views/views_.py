@@ -59,6 +59,8 @@ from website.models import (
     SbpPaymentRecipient,
     TakenKP,
     Team,
+    TeamMemberRaceLog,
+    TeamStartLog,
     Transfer,
 )
 from website.models.race import Category, RegStatus
@@ -286,6 +288,86 @@ class TransferPaidListView(View):
                 "passenger_total": len(passengers),
             },
         )
+
+
+@method_decorator(user_passes_test(is_admin, login_url="passlogin"), name="dispatch")
+class TeamMemberRaceLogView(View):
+    template_name = "website/team_member_race_logs.html"
+
+    def get(self, request, race_id):
+        race = get_object_or_404(Race, pk=race_id)
+        logs = (
+            TeamMemberRaceLog.objects.select_related("member_tag")
+            .filter(race=race)
+            .order_by("-finish_time", "-start_time", "member_tag__number")
+        )
+
+        start_logs = (
+            TeamStartLog.objects.select_related("team")
+            .filter(race=race, team__isnull=False)
+        )
+
+        tag_to_team = {}
+        tag_to_start_timestamp = {}
+        for start_log in start_logs:
+            member_tags = start_log.member_tags or []
+            for value in member_tags:
+                value = (value or "").strip()
+                if not value:
+                    continue
+                normalized = value.upper()
+                if normalized not in tag_to_team:
+                    tag_to_team[normalized] = start_log.team
+                    tag_to_start_timestamp[normalized] = start_log.start_timestamp
+
+        def format_timestamp(timestamp_ms: int) -> str:
+            if not timestamp_ms:
+                return ""
+            try:
+                dt = datetime.fromtimestamp(timestamp_ms / 1000, tz=timezone.utc)
+            except (TypeError, ValueError, OSError, OverflowError):
+                return str(timestamp_ms)
+            return dt.astimezone().strftime("%d.%m.%Y %H:%M:%S")
+
+        entries = []
+        for log in logs:
+            tag = log.member_tag
+            tag_uid = (tag.tag_id or "").strip()
+            normalized = tag_uid.upper()
+            team = tag_to_team.get(normalized)
+            fallback_start = tag_to_start_timestamp.get(normalized, 0)
+            effective_start = log.start_time or fallback_start
+            entries.append(
+                {
+                    "log": log,
+                    "tag_number": tag.number,
+                    "tag_uid": tag_uid,
+                    "team": team,
+                    "team_label": self._make_team_label(team),
+                    "start_timestamp": effective_start,
+                    "raw_start_timestamp": log.start_time,
+                    "finish_timestamp": log.finish_time,
+                    "start_display": format_timestamp(effective_start),
+                    "finish_display": format_timestamp(log.finish_time),
+                }
+            )
+
+        return render(
+            request,
+            self.template_name,
+            {
+                "race": race,
+                "entries": entries,
+            },
+        )
+
+    @staticmethod
+    def _make_team_label(team):
+        if not team:
+            return ""
+        name = team.teamname or "Без названия"
+        start_number = team.start_number or "—"
+        return f"{name} (#{start_number})"
 
 
 class RaceNewsView(View):

@@ -92,6 +92,11 @@ urlpatterns = [
         name="category_results",
     ),
     path(
+        "race/<int:race_id>/member_logs/",
+        views.TeamMemberRaceLogView.as_view(),
+        name="race_member_logs",
+    ),
+    path(
         "race/<race_id>/category/<category_id>/teams.csv",
         views.TeamsViewCsv.as_view(),
         name="teams_csv",
