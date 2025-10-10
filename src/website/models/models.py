@@ -158,6 +158,31 @@ class TeamFinishLog(models.Model):
         return f"{self.tag_uid or self.member_tag_id} ({self.recorded_at})"
 
 
+class TeamMemberRaceLog(models.Model):
+    race = models.ForeignKey(
+        "website.Race",
+        on_delete=models.CASCADE,
+        related_name="member_race_logs",
+        verbose_name="Гонка",
+    )
+    member_tag = models.ForeignKey(
+        "website.Tag",
+        on_delete=models.CASCADE,
+        related_name="race_logs",
+        verbose_name="Тег участника",
+    )
+    start_time = models.BigIntegerField(default=0, verbose_name="Время старта (мс)")
+    finish_time = models.BigIntegerField(default=0, verbose_name="Время финиша (мс)")
+
+    class Meta:
+        unique_together = (("race", "member_tag"),)
+        verbose_name = "Результат участника"
+        verbose_name_plural = "Результаты участников"
+
+    def __str__(self) -> str:
+        return f"{self.member_tag_id} @ {self.race_id}"
+
+
 @receiver(post_save, sender=User)
 def create_user_profile(sender, instance, created, **kwargs):
     if created:

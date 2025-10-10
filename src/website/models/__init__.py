@@ -11,6 +11,7 @@ from .models import (
     TeamAdminLog,
     TeamFinishLog,
     TeamMemberMove,
+    TeamMemberRaceLog,
     TeamStartLog,
     Transfer,
 )
