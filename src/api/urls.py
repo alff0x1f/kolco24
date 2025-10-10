@@ -7,6 +7,7 @@ from api.views import (
     MemberTagListCreateView,
     MemberTagTouchView,
     TeamCSVListView,
+    TeamFinishView,
     TeamListView,
     TeamStartView,
 )
@@ -32,6 +33,11 @@ urlpatterns = [
         "race/<int:race_id>/team_start/",
         TeamStartView.as_view(),
         name="team-start",
+    ),
+    path(
+        "race/<int:race_id>/team_finish/",
+        TeamFinishView.as_view(),
+        name="team-finish",
     ),
     path(
         "race/<int:race_id>/teams.csv", TeamCSVListView.as_view(), name="team-list-csv"

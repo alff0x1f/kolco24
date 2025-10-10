@@ -38,3 +38,15 @@ class TeamStartSerializer(serializers.Serializer):
         child=serializers.CharField(max_length=64), allow_empty=True
     )
     start_timestamp = serializers.IntegerField()
+
+
+class TeamFinishSerializer(serializers.Serializer):
+    member_tag_id = serializers.IntegerField()
+    tag_uid = serializers.CharField(max_length=64)
+    recorded_at = serializers.IntegerField()
+
+    def validate_tag_uid(self, value):
+        value = value.strip()
+        if not value:
+            raise serializers.ValidationError("Tag UID не может быть пустым")
+        return value

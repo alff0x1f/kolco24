@@ -9,6 +9,7 @@ from .models import (
     TakenKP,
     Team,
     TeamAdminLog,
+    TeamFinishLog,
     TeamMemberMove,
     TeamStartLog,
     Transfer,
