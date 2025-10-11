@@ -2200,25 +2200,33 @@ class AllTeamsResultView(View):
             summ_nfc = 0
             count_nfc = 0
             nfc_points = (
-                TakenKP.objects.filter(team=team.id, timestamp__gt=1697223600000)
+                TakenKP.objects.filter(team=team.id)
                 .exclude(nfc="")
-                .distinct("point_number")
                 .order_by("point_number")
             )
-            for p in nfc_points:
-                if cost[p.point_number]:
-                    summ_nfc += cost[p.point_number]
+            nfc_points_set = {point.point_number for point in nfc_points}
+            for point_number in nfc_points_set:
+                if cost[point_number]:
+                    summ_nfc += cost[point_number]
                     count_nfc += 1
-                    team.points_nfc.append(p.point_number)
+                    team.points_nfc.append(point_number)
             team.summ_nfc = summ_nfc
             team.count_nfc = count_nfc
+
+            # ищем уникальные чипы нфс
+            unique_nfc_tags = set()
+            for point in nfc_points:
+                nfc_tags = point.nfc.split(",")
+                unique_nfc_tags.update(nfc_tags)
+
+            team.unique_nfc_tags_count = len(unique_nfc_tags)
 
             # PHOTO
             team.points_photo = []
             summ_photo = 0
             count_photo = 0
             photo_points = (
-                TakenKP.objects.filter(team=team.id, timestamp__gt=1697223600000)
+                TakenKP.objects.filter(team=team.id)
                 .exclude(image_url="")
                 .distinct("point_number")
                 .order_by("point_number")
@@ -2245,13 +2253,13 @@ class AllTeamsResultView(View):
             else:
                 team.time = "-"
 
-            if team.category2_id == 8 and minutes > 6 * 60:
+            if team.category2_id == 16 and minutes > 6 * 60:
                 team.penalty = minutes - 6 * 60
-            if team.category2_id in (9, 10, 11, 12) and minutes > 12 * 60:
+            if team.category2_id in (17, 18, 19, 20) and minutes > 12 * 60:
                 team.penalty = minutes - 12 * 60
-            if team.category2_id == 13 and minutes > 24 * 60:
+            if team.category2_id == 21 and minutes > 24 * 60:
                 team.penalty = minutes - 24 * 60
-            if team.category2_id in (14, 15) and minutes > 8 * 60:
+            if team.category2_id in (22, 23) and minutes > 8 * 60:
                 team.penalty = minutes - 8 * 60
 
             team.points_nfc = ", ".join(str(p) for p in team.points_nfc)
