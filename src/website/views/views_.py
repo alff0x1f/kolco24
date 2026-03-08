@@ -2202,14 +2202,18 @@ class AllTeamsResultView(View):
             nfc_points = (
                 TakenKP.objects.filter(team=team.id)
                 .exclude(nfc="")
-                .order_by("point_number")
+                .order_by("timestamp")
             )
-            nfc_points_set = {point.point_number for point in nfc_points}
-            for point_number in nfc_points_set:
-                if cost[point_number]:
-                    summ_nfc += cost[point_number]
+            nfc_points_set = set()
+            for point in nfc_points:
+                if (
+                    cost[point.point_number]
+                    and point.point_number not in nfc_points_set
+                ):
+                    summ_nfc += cost[point.point_number]
                     count_nfc += 1
-                    team.points_nfc.append(point_number)
+                    team.points_nfc.append(point.point_number)
+                    nfc_points_set.add(point.point_number)
             team.summ_nfc = summ_nfc
             team.count_nfc = count_nfc
 

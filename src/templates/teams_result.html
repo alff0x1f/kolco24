@@ -10,7 +10,9 @@
 {% block content %}
   <section class="flush-with-above pt-2">
     <div class="container-fluid mb-3">
-      <h1 class="h2"> Предварительный протокол </h1>
+      <div class="col mb-2">
+        <h1 class="h2"> Итоговый протокол </h1>
+      </div>
     </div>
     <div class="container-fluid">
       <div class="row justify-content-between">
@@ -91,7 +93,7 @@
                         -->
                       </td>
                       <td>
-                        {% if team.ucount != team.unique_nfc_tags_count %}
+                        {% if team.ucount != team.unique_nfc_tags_count and team.unique_nfc_tags_count != 0 %}
                           <div class="alert alert-danger">
                             Чипов: {{ team.unique_nfc_tags_count }}
                           </div>
