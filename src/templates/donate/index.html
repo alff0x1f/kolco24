@@ -27,7 +27,7 @@
                 <form method="post" class="card card-body">
                     {% csrf_token %}
                     <div class="form-group">
-                        <label for="donate-amount">Сумма доната, руб</label>
+                        <label for="donate-amount">Сумма взноса, руб</label>
                         <input
                             id="donate-amount"
                             class="form-control"
@@ -39,11 +39,39 @@
                             value="{{ amount }}"
                             required
                         >
-                    </div>
-                    <div class="form-group">
-                        <div class="d-flex flex-wrap">
+                        <div class="d-flex flex-wrap mt-2">
                             {% for preset in preset_amounts %}
                                 <button type="button" class="btn btn-outline-primary btn-sm mr-2 mb-2" onclick="document.getElementById('donate-amount').value='{{ preset }}';">{{ preset }} ₽</button>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="donate-sender-name">От кого (Фамилия Имя)</label>
+                        <input
+                            id="donate-sender-name"
+                            class="form-control"
+                            type="text"
+                            name="sender_name"
+                            value="{{ sender_name }}"
+                            placeholder="Иванов Иван"
+                            required
+                        >
+                    </div>
+                    <div class="form-group">
+                        <label for="donate-comment">Комментарий</label>
+                        <input
+                            id="donate-comment"
+                            class="form-control"
+                            type="text"
+                            name="comment"
+                            value="{{ comment }}"
+                            maxlength="255"
+                            placeholder="Например: ГШ, благотворительный взнос"
+                            required
+                        >
+                        <div class="d-flex flex-wrap mt-2">
+                            {% for preset_comment in preset_comments %}
+                                <button type="button" class="btn btn-outline-primary btn-sm mr-2 mb-2" onclick="document.getElementById('donate-comment').value='{{ preset_comment|escapejs }}';">{{ preset_comment }}</button>
                             {% endfor %}
                         </div>
                     </div>
