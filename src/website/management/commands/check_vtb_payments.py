@@ -8,6 +8,7 @@ from website.models import Payment, Team, VTBPayment
 
 class Command(BaseCommand):
     help = "Check VTB payments status and update related Payment and Team if paid."
+    donate_prefix = "SPUTNIK"
 
     def handle(self, *args, **options):
         client = VTBClient()
@@ -53,6 +54,13 @@ class Command(BaseCommand):
                     )
                     vtb_payment.save(update_fields=["status", "status_description"])
                     self.stdout.write(f"Payment {vtb_payment.pk} marked as paid")
+
+                    if vtb_payment.order_id.startswith(f"{self.donate_prefix}_"):
+                        self.stdout.write(
+                            "Donation order "
+                            f"{vtb_payment.order_id} paid, no team update required"
+                        )
+                        continue
 
                     # order_id has format ORDER_<payment_id>
                     try:
