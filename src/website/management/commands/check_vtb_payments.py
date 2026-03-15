@@ -57,7 +57,8 @@ class Command(BaseCommand):
 
                     if vtb_payment.order_id.startswith(f"{self.donate_prefix}_"):
                         self.stdout.write(
-                            f"Donation order {vtb_payment.order_id} paid, no team update required"
+                            "Donation order "
+                            f"{vtb_payment.order_id} paid, no team update required"
                         )
                         continue
 
