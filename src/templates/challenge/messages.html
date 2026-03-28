@@ -1,0 +1,143 @@
+{% extends "website/base.html" %}
+
+{% block title %}Сообщения Challenge{% endblock %}
+
+{% block content %}
+<section class="bg-dark text-light">
+    <div class="container">
+        <div class="row">
+            <div class="col">
+                <h1 class="mb-2">Сообщения Challenge</h1>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section>
+    <div class="container">
+        <div class="row">
+            <div class="col-12">
+                <div class="card mb-4">
+                    <div class="card-body">
+                        <form method="get" class="form-row align-items-end">
+                            <div class="col-md-3 mb-3">
+                                <label for="date_from">Дата от</label>
+                                <input id="date_from" type="date" name="date_from" value="{{ date_from }}" class="form-control">
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <label for="date_to">Дата до</label>
+                                <input id="date_to" type="date" name="date_to" value="{{ date_to }}" class="form-control">
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label for="user">Пользователь</label>
+                                <select id="user" name="user" class="form-control">
+                                    <option value="">Все пользователи</option>
+                                    {% for item in users %}
+                                        <option value="{{ item.participant_key }}" {% if item.participant_key == selected_user %}selected{% endif %}>
+                                            {{ item.participant_name }} ({{ item.message_count }})
+                                        </option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-md-2 mb-3">
+                                <button type="submit" class="btn btn-primary btn-block">Применить</button>
+                            </div>
+                        </form>
+
+                        <div class="d-flex flex-wrap mt-2">
+                            <div class="mr-4 mb-2"><strong>{{ total_messages }}</strong> сообщений</div>
+                            <div class="mr-4 mb-2"><strong>{{ total_users }}</strong> пользователей</div>
+                            {% if selected_user or date_from or date_to %}
+                                <div class="mb-2"><a href="{% url 'challenge_messages' %}">Сбросить фильтры</a></div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row justify-content-between">
+            <div class="col-12 col-lg-8">
+                {% for message in messages_page %}
+                    <article class="card mb-3">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-start mb-2">
+                                <div>
+                                    <h5 class="mb-1">{{ message.participant_name }}</h5>
+                                    <div class="text-muted small">
+                                        {{ message.sent_at }} | chat #{{ message.chat.telegram_id }} | msg #{{ message.telegram_id }}
+                                    </div>
+                                </div>
+                                <div class="text-right">
+                                    <span class="badge badge-secondary">{{ message.message_type }}</span>
+                                    {% if message.media_type %}
+                                        <span class="badge badge-light">{{ message.media_type }}</span>
+                                    {% endif %}
+                                </div>
+                            </div>
+
+                            {% if message.text %}
+                                <div style="white-space: pre-wrap;">{{ message.text }}</div>
+                            {% else %}
+                                <div class="text-muted">Без текста</div>
+                            {% endif %}
+
+                            <div class="mt-3 small text-muted">
+                                {% if message.reply_to_message_id %}<span class="mr-3">reply_to: {{ message.reply_to_message_id }}</span>{% endif %}
+                                {% if message.file_name %}<span class="mr-3">file: {{ message.file_name }}</span>{% endif %}
+                                {% if message.photo %}<span class="mr-3">photo: {{ message.photo }}</span>{% endif %}
+                                {% if message.action %}<span class="mr-3">action: {{ message.action }}</span>{% endif %}
+                            </div>
+                        </div>
+                    </article>
+                {% empty %}
+                    <div class="card">
+                        <div class="card-body">
+                            <p class="mb-0">Сообщения по текущим фильтрам не найдены.</p>
+                        </div>
+                    </div>
+                {% endfor %}
+
+                {% if messages_page.paginator.num_pages > 1 %}
+                    <nav aria-label="Пагинация сообщений" class="mt-4">
+                        <ul class="pagination">
+                            {% if messages_page.has_previous %}
+                                <li class="page-item">
+                                    <a class="page-link" href="?{% if page_query %}{{ page_query }}&{% endif %}page={{ messages_page.previous_page_number }}">Назад</a>
+                                </li>
+                            {% endif %}
+                            <li class="page-item active">
+                                <span class="page-link">{{ messages_page.number }} / {{ messages_page.paginator.num_pages }}</span>
+                            </li>
+                            {% if messages_page.has_next %}
+                                <li class="page-item">
+                                    <a class="page-link" href="?{% if page_query %}{{ page_query }}&{% endif %}page={{ messages_page.next_page_number }}">Вперед</a>
+                                </li>
+                            {% endif %}
+                        </ul>
+                    </nav>
+                {% endif %}
+            </div>
+
+            <div class="col-12 col-lg-4">
+                <div class="card">
+                    <div class="card-header">
+                        <span class="h6">Все пользователи</span>
+                    </div>
+                    <div class="list-group list-group-flush" style="max-height: 80vh; overflow-y: auto;">
+                        {% for item in users %}
+                            <a
+                                class="list-group-item d-flex justify-content-between {% if item.participant_key == selected_user %}active{% endif %}"
+                                href="?user={{ item.participant_key|urlencode }}{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}"
+                            >
+                                <span>{{ item.participant_name }}</span>
+                                <span class="badge badge-secondary ml-2">{{ item.message_count }}</span>
+                            </a>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}
