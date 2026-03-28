@@ -1,12 +1,22 @@
 import json
+from datetime import date
+from decimal import Decimal
 from pathlib import Path
 
 from django.conf import settings
 from django.core.management import call_command
+from django.core.exceptions import ValidationError
+from django.db import IntegrityError
 from django.test import TestCase
 from django.utils import timezone
 
-from challenge.models import TelegramChat, TelegramMessage
+from challenge.models import (
+    Challenge,
+    ChallengeActivity,
+    ChallengeParticipant,
+    TelegramChat,
+    TelegramMessage,
+)
 
 
 class ImportTelegramChatCommandTestCase(TestCase):
@@ -157,3 +167,183 @@ class ImportTelegramChatCommandTestCase(TestCase):
         self.assertEqual(
             TelegramMessage.objects.get(telegram_id=10).text, "Вторая версия"
         )
+
+
+class ChallengeActivityModelTestCase(TestCase):
+    def setUp(self):
+        self.challenge = Challenge.objects.create(
+            name="Зимний челлендж 2025/2026",
+            start_date=date(2025, 12, 1),
+            end_date=date(2026, 3, 31),
+        )
+        self.participant = ChallengeParticipant.objects.create(
+            challenge=self.challenge,
+            telegram_user_id="user42",
+            display_name="Ирек",
+            group="ГШ-1",
+        )
+        self.chat = TelegramChat.objects.create(
+            telegram_id=1,
+            name="Чат челленджа",
+            chat_type="private_supergroup",
+        )
+        self.message = TelegramMessage.objects.create(
+            chat=self.chat,
+            telegram_id=100,
+            message_type="message",
+            sent_at=timezone.now(),
+            sender_name="Ирек",
+            sender_id="user42",
+            text="Бег 6 км\nЛыжи 12 км",
+        )
+
+    def test_run_points_respect_distance_and_pace_thresholds(self):
+        short_run = ChallengeActivity(
+            challenge=self.challenge,
+            participant=self.participant,
+            activity_type=ChallengeActivity.TYPE_RUN,
+            happened_on=date(2025, 12, 1),
+            distance_km=Decimal("5.00"),
+            pace_minutes_per_km=Decimal("9.59"),
+        )
+        long_run = ChallengeActivity(
+            challenge=self.challenge,
+            participant=self.participant,
+            activity_type=ChallengeActivity.TYPE_RUN,
+            happened_on=date(2025, 12, 2),
+            distance_km=Decimal("10.01"),
+            pace_minutes_per_km=Decimal("9.59"),
+        )
+        slow_run = ChallengeActivity(
+            challenge=self.challenge,
+            participant=self.participant,
+            activity_type=ChallengeActivity.TYPE_RUN,
+            happened_on=date(2025, 12, 3),
+            distance_km=Decimal("8.00"),
+            pace_minutes_per_km=Decimal("10.00"),
+        )
+
+        self.assertEqual(short_run.base_points, 0)
+        self.assertEqual(long_run.base_points, 3)
+        self.assertEqual(slow_run.base_points, 0)
+
+    def test_other_activity_thresholds_follow_rules(self):
+        ski = ChallengeActivity(
+            challenge=self.challenge,
+            participant=self.participant,
+            activity_type=ChallengeActivity.TYPE_SKI,
+            happened_on=date(2025, 12, 1),
+            distance_km=Decimal("12.00"),
+        )
+        bike = ChallengeActivity(
+            challenge=self.challenge,
+            participant=self.participant,
+            activity_type=ChallengeActivity.TYPE_BIKE,
+            happened_on=date(2025, 12, 2),
+            distance_km=Decimal("20.00"),
+        )
+        swim = ChallengeActivity(
+            challenge=self.challenge,
+            participant=self.participant,
+            activity_type=ChallengeActivity.TYPE_SWIM,
+            happened_on=date(2025, 12, 3),
+            distance_km=Decimal("2.00"),
+        )
+        hike = ChallengeActivity(
+            challenge=self.challenge,
+            participant=self.participant,
+            activity_type=ChallengeActivity.TYPE_HIKE_DAY,
+            happened_on=date(2025, 12, 4),
+        )
+
+        self.assertEqual(ski.base_points, 3)
+        self.assertEqual(bike.base_points, 2)
+        self.assertEqual(swim.base_points, 3)
+        self.assertEqual(hike.base_points, 2)
+
+    def test_streak_bonus_uses_previous_scoring_activity_within_four_days(self):
+        first_activity = ChallengeActivity.objects.create(
+            challenge=self.challenge,
+            participant=self.participant,
+            activity_type=ChallengeActivity.TYPE_RUN,
+            happened_on=date(2025, 12, 1),
+            distance_km=Decimal("6.00"),
+            pace_minutes_per_km=Decimal("9.30"),
+        )
+        second_activity = ChallengeActivity.objects.create(
+            challenge=self.challenge,
+            participant=self.participant,
+            activity_type=ChallengeActivity.TYPE_SKI,
+            happened_on=date(2025, 12, 5),
+            distance_km=Decimal("6.00"),
+        )
+        late_activity = ChallengeActivity.objects.create(
+            challenge=self.challenge,
+            participant=self.participant,
+            activity_type=ChallengeActivity.TYPE_BIKE,
+            happened_on=date(2025, 12, 11),
+            distance_km=Decimal("20.00"),
+        )
+
+        self.assertEqual(first_activity.total_points, 2)
+        self.assertEqual(second_activity.streak_bonus_points, 1)
+        self.assertEqual(second_activity.total_points, 3)
+        self.assertEqual(late_activity.streak_bonus_points, 0)
+        self.assertEqual(late_activity.total_points, 2)
+
+    def test_multiple_activities_can_reference_same_message(self):
+        run_activity = ChallengeActivity.objects.create(
+            challenge=self.challenge,
+            participant=self.participant,
+            source_message=self.message,
+            source_order=1,
+            activity_type=ChallengeActivity.TYPE_RUN,
+            happened_on=date(2025, 12, 1),
+            distance_km=Decimal("6.00"),
+            pace_minutes_per_km=Decimal("9.30"),
+        )
+        ski_activity = ChallengeActivity.objects.create(
+            challenge=self.challenge,
+            participant=self.participant,
+            source_message=self.message,
+            source_order=2,
+            activity_type=ChallengeActivity.TYPE_SKI,
+            happened_on=date(2025, 12, 5),
+            distance_km=Decimal("12.00"),
+        )
+
+        self.assertEqual(run_activity.source_message_id, self.message.id)
+        self.assertEqual(ski_activity.source_message_id, self.message.id)
+        self.assertEqual(self.message.challenge_activities.count(), 2)
+
+    def test_one_activity_per_participant_per_day_is_enforced(self):
+        ChallengeActivity.objects.create(
+            challenge=self.challenge,
+            participant=self.participant,
+            activity_type=ChallengeActivity.TYPE_RUN,
+            happened_on=date(2025, 12, 1),
+            distance_km=Decimal("6.00"),
+            pace_minutes_per_km=Decimal("9.30"),
+        )
+
+        with self.assertRaises(IntegrityError):
+            ChallengeActivity.objects.create(
+                challenge=self.challenge,
+                participant=self.participant,
+                activity_type=ChallengeActivity.TYPE_SKI,
+                happened_on=date(2025, 12, 1),
+                distance_km=Decimal("12.00"),
+            )
+
+    def test_activity_must_belong_to_challenge_period(self):
+        activity = ChallengeActivity(
+            challenge=self.challenge,
+            participant=self.participant,
+            activity_type=ChallengeActivity.TYPE_RUN,
+            happened_on=date(2025, 11, 30),
+            distance_km=Decimal("6.00"),
+            pace_minutes_per_km=Decimal("9.30"),
+        )
+
+        with self.assertRaises(ValidationError):
+            activity.full_clean()
