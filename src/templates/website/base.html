@@ -44,6 +44,9 @@
                             <li class="nav-item">
                                 <a href="/race/8/teams/" class="nav-link">Команды</a>
                             </li>
+                            <li class="nav-item">
+                                <a href="{% url 'donate' %}" class="nav-link">Взнос</a>
+                            </li>
                         </ul>
 
                         <ul class="navbar-nav">
@@ -60,6 +63,8 @@
                                         <a class="dropdown-item" href="/upload_protocol">Загрузить данные</a>
 
                                         <a class="dropdown-item" href="/update_protocol">Скачать протокол</a>
+                                        <a class="dropdown-item" href="{% url 'challenge_messages' %}">Сообщения Challenge</a>
+                                        <a class="dropdown-item" href="{% url 'challenge_messages_markup' %}">Разметка Challenge</a>
                                         {% endif %}
                                         {% if user.is_superuser %}
                                             <a class="dropdown-item" href="/admin">Админка</a>
@@ -129,6 +134,9 @@
                                     </li>
                                     <li>
                                         <a href="{% url 'passlogin' %}">Вход</a>
+                                    </li>
+                                    <li>
+                                        <a href="{% url 'donate' %}">Поддержать проект</a>
                                     </li>
                                     <li>
                                         <a href="https://vk.com/kolco24" target="_blank"><i class="icon-vk"></i>Группа в ВК</a>

@@ -1,8 +1,8 @@
-from decimal import Decimal
-
+from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import models
-from django.db.models import Q
+from django.db.models import Q, Sum
+from django.utils import timezone
 
 
 class TelegramChat(models.Model):
@@ -207,112 +207,150 @@ class ChallengeParticipant(models.Model):
 
     @property
     def total_points(self):
-        return sum(activity.total_points for activity in self.activities.all())
+        return (
+            self.training_labels.aggregate(points_sum=Sum("total_points"))["points_sum"] or 0
+        )
 
 
-class ChallengeActivity(models.Model):
-    TYPE_RUN = "run"
-    TYPE_SKI = "ski"
-    TYPE_BIKE = "bike"
-    TYPE_SWIM = "swim"
-    TYPE_HIKE_DAY = "hike_day"
-    TYPE_GSH_DAY = "gsh_day"
+class ChallengeTrainingLabel(models.Model):
+    class Decision(models.TextChoices):
+        COUNTED = "counted", "Засчитана"
+        NOT_COUNTED = "not_counted", "Не засчитана"
 
-    ACTIVITY_TYPE_CHOICES = (
-        (TYPE_RUN, "Бег"),
-        (TYPE_SKI, "Лыжи"),
-        (TYPE_BIKE, "Велосипед"),
-        (TYPE_SWIM, "Плавание"),
-        (TYPE_HIKE_DAY, "Поход, полный день"),
-        (TYPE_GSH_DAY, "Тренировочный выезд ГШ, полный день"),
-    )
+    class TrainingType(models.TextChoices):
+        RUN_5_10 = "run_5_10", "Бег 5-10 км"
+        RUN_10_PLUS = "run_10_plus", "Бег 10+ км"
+        SKI_6_12 = "ski_6_12", "Лыжи 6-12 км"
+        SKI_12_PLUS = "ski_12_plus", "Лыжи 12+ км"
+        BIKE_20_40 = "bike_20_40", "Велосипед 20-40 км"
+        BIKE_40_PLUS = "bike_40_plus", "Велосипед 40+ км"
+        SWIM_1_2 = "swim_1_2", "Плавание 1-2 км"
+        SWIM_2_PLUS = "swim_2_plus", "Плавание 2+ км"
+        HIKE_DAY = "hike_day", "Поход"
+        GSH_DAY = "gsh_day", "Тренировочный выезд ГШ"
 
-    DISTANCE_BASED_TYPES = {
-        TYPE_RUN,
-        TYPE_SKI,
-        TYPE_BIKE,
-        TYPE_SWIM,
-    }
-    FULL_DAY_TYPES = {
-        TYPE_HIKE_DAY,
-        TYPE_GSH_DAY,
+    TYPE_POINTS = {
+        TrainingType.RUN_5_10: 2,
+        TrainingType.RUN_10_PLUS: 3,
+        TrainingType.SKI_6_12: 2,
+        TrainingType.SKI_12_PLUS: 3,
+        TrainingType.BIKE_20_40: 2,
+        TrainingType.BIKE_40_PLUS: 3,
+        TrainingType.SWIM_1_2: 2,
+        TrainingType.SWIM_2_PLUS: 3,
+        TrainingType.HIKE_DAY: 2,
+        TrainingType.GSH_DAY: 2,
     }
 
     challenge = models.ForeignKey(
         Challenge,
         on_delete=models.CASCADE,
-        related_name="activities",
+        related_name="training_labels",
         verbose_name="Челлендж",
     )
     participant = models.ForeignKey(
         ChallengeParticipant,
         on_delete=models.CASCADE,
-        related_name="activities",
+        related_name="training_labels",
         verbose_name="Участник",
     )
-    source_message = models.ForeignKey(
-        TelegramMessage,
-        on_delete=models.SET_NULL,
-        related_name="challenge_activities",
-        blank=True,
-        null=True,
-        verbose_name="Сообщение Telegram",
-        help_text="Исходное сообщение, из которого разобрана активность.",
-    )
-    source_order = models.PositiveSmallIntegerField(
-        default=1,
-        verbose_name="Порядок в сообщении",
-        help_text="Нужен, когда в одном сообщении указано несколько тренировок.",
-    )
-    activity_type = models.CharField(
+    training_date = models.DateField(verbose_name="Дата тренировки")
+    decision = models.CharField(
         max_length=32,
-        choices=ACTIVITY_TYPE_CHOICES,
-        verbose_name="Тип активности",
+        choices=Decision.choices,
+        verbose_name="Решение",
     )
-    happened_on = models.DateField(verbose_name="Дата активности")
-    distance_km = models.DecimalField(
-        max_digits=6,
-        decimal_places=2,
+    training_type = models.CharField(
+        max_length=32,
+        choices=TrainingType.choices,
+        verbose_name="Тип тренировки",
+    )
+    base_points = models.PositiveSmallIntegerField(default=0, verbose_name="Базовые баллы")
+    streak_bonus_points = models.PositiveSmallIntegerField(
+        default=0,
+        verbose_name="Бонус за серию",
+    )
+    total_points = models.PositiveSmallIntegerField(default=0, verbose_name="Итого баллов")
+    reviewed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        related_name="challenge_training_labels",
         blank=True,
         null=True,
-        verbose_name="Дистанция, км",
+        verbose_name="Кто разметил",
     )
-    pace_minutes_per_km = models.DecimalField(
-        max_digits=5,
-        decimal_places=2,
-        blank=True,
-        null=True,
-        verbose_name="Темп, мин/км",
-        help_text="Используется только для бега.",
+    reviewed_at = models.DateTimeField(default=timezone.now, verbose_name="Когда разметили")
+    comment = models.TextField(blank=True, verbose_name="Комментарий")
+    source_messages = models.ManyToManyField(
+        TelegramMessage,
+        through="ChallengeTrainingLabelMessage",
+        related_name="training_labels",
+        verbose_name="Сообщения-источники",
     )
-    comment = models.CharField(max_length=255, blank=True, verbose_name="Комментарий")
     created = models.DateTimeField(auto_now_add=True)
     updated = models.DateTimeField(auto_now=True)
 
     class Meta:
-        ordering = ("happened_on", "id")
-        verbose_name = "Активность челленджа"
-        verbose_name_plural = "Активности челленджа"
+        ordering = ("training_date", "id")
+        verbose_name = "Размеченная тренировка"
+        verbose_name_plural = "Размеченные тренировки"
         constraints = [
             models.UniqueConstraint(
-                fields=("challenge", "participant", "happened_on"),
-                name="challenge_activity_unique_participant_day",
-            ),
-            models.UniqueConstraint(
-                fields=("source_message", "source_order"),
-                condition=Q(source_message__isnull=False),
-                name="challenge_activity_unique_message_order",
-            ),
+                fields=("challenge", "participant", "training_date"),
+                name="challenge_training_label_unique_day",
+            )
         ]
         indexes = [
             models.Index(
-                fields=("challenge", "participant", "happened_on"),
-                name="challenge_activity_score_idx",
-            )
+                fields=("challenge", "participant", "training_date"),
+                name="chall_lbl_score_idx",
+            ),
+            models.Index(
+                fields=("challenge", "decision"),
+                name="chall_lbl_dec_idx",
+            ),
         ]
 
     def __str__(self):
-        return f"{self.participant} {self.get_activity_type_display()} {self.happened_on}"
+        return (
+            f"{self.participant} {self.get_training_type_display()} {self.training_date}"
+        )
+
+    @classmethod
+    def get_type_points(cls, training_type):
+        return cls.TYPE_POINTS.get(training_type, 0)
+
+    @classmethod
+    def recalculate_scores_for_participant(cls, challenge_id, participant_id):
+        previous_counted_date = None
+        labels = cls.objects.filter(
+            challenge_id=challenge_id,
+            participant_id=participant_id,
+        ).order_by("training_date", "id")
+
+        for label in labels:
+            base_points = (
+                cls.get_type_points(label.training_type)
+                if label.decision == cls.Decision.COUNTED
+                else 0
+            )
+            streak_bonus = 0
+            if (
+                label.decision == cls.Decision.COUNTED
+                and previous_counted_date is not None
+                and (label.training_date - previous_counted_date).days <= 4
+            ):
+                streak_bonus = 1
+            total_points = base_points + streak_bonus
+
+            cls.objects.filter(pk=label.pk).update(
+                base_points=base_points,
+                streak_bonus_points=streak_bonus,
+                total_points=total_points,
+            )
+
+            if label.decision == cls.Decision.COUNTED:
+                previous_counted_date = label.training_date
 
     def clean(self):
         super().clean()
@@ -327,108 +365,131 @@ class ChallengeActivity(models.Model):
 
         if (
             self.challenge_id
-            and self.happened_on
+            and self.training_date
             and (
-                self.happened_on < self.challenge.start_date
-                or self.happened_on > self.challenge.end_date
+                self.training_date < self.challenge.start_date
+                or self.training_date > self.challenge.end_date
             )
         ):
-            errors["happened_on"] = "Дата активности должна попадать в период челленджа."
+            errors["training_date"] = "Дата тренировки должна попадать в период челленджа."
 
-        if self.activity_type in self.DISTANCE_BASED_TYPES and self.distance_km is None:
-            errors["distance_km"] = "Для этой активности нужна дистанция."
+        if not self.training_type:
+            errors["training_type"] = "Нужно указать тип тренировки."
 
-        if self.activity_type in self.FULL_DAY_TYPES and self.distance_km is not None:
-            errors["distance_km"] = "Для активности полного дня дистанция не используется."
-
-        if self.activity_type == self.TYPE_RUN and self.pace_minutes_per_km is None:
-            errors["pace_minutes_per_km"] = "Для бега нужно указать темп."
-
-        if self.activity_type != self.TYPE_RUN and self.pace_minutes_per_km is not None:
-            errors["pace_minutes_per_km"] = "Темп хранится только для беговых тренировок."
-
-        if self.source_message_id and self.source_order < 1:
-            errors["source_order"] = "Порядковый номер должен быть больше нуля."
+        if not self.decision:
+            errors["decision"] = "Нужно указать решение по тренировке."
 
         if errors:
             raise ValidationError(errors)
 
-    def _distance_or_zero(self):
-        return self.distance_km or Decimal("0")
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        super().save(*args, **kwargs)
+        self.__class__.recalculate_scores_for_participant(
+            self.challenge_id,
+            self.participant_id,
+        )
+        self.refresh_from_db(fields=["base_points", "streak_bonus_points", "total_points"])
 
-    @property
-    def base_points(self):
-        distance = self._distance_or_zero()
+    def delete(self, *args, **kwargs):
+        challenge_id = self.challenge_id
+        participant_id = self.participant_id
+        super().delete(*args, **kwargs)
+        self.__class__.recalculate_scores_for_participant(challenge_id, participant_id)
 
-        if self.activity_type == self.TYPE_RUN:
-            pace = self.pace_minutes_per_km
-            if pace is None or pace >= Decimal("10"):
-                return 0
-            if distance > Decimal("10"):
-                return 3
-            if distance > Decimal("5"):
-                return 2
-            return 0
 
-        if self.activity_type == self.TYPE_SKI:
-            if distance >= Decimal("12"):
-                return 3
-            if distance >= Decimal("6"):
-                return 2
-            return 0
+class ChallengeTrainingLabelMessage(models.Model):
+    label = models.ForeignKey(
+        ChallengeTrainingLabel,
+        on_delete=models.CASCADE,
+        related_name="message_links",
+        verbose_name="Разметка тренировки",
+    )
+    message = models.ForeignKey(
+        TelegramMessage,
+        on_delete=models.CASCADE,
+        related_name="training_label_links",
+        verbose_name="Сообщение Telegram",
+    )
+    created = models.DateTimeField(auto_now_add=True)
 
-        if self.activity_type == self.TYPE_BIKE:
-            if distance >= Decimal("40"):
-                return 3
-            if distance >= Decimal("20"):
-                return 2
-            return 0
+    class Meta:
+        verbose_name = "Связь тренировки с сообщением"
+        verbose_name_plural = "Связи тренировок с сообщениями"
+        constraints = [
+            models.UniqueConstraint(
+                fields=("label", "message"),
+                name="challenge_training_label_message_unique",
+            )
+        ]
 
-        if self.activity_type == self.TYPE_SWIM:
-            if distance >= Decimal("2"):
-                return 3
-            if distance >= Decimal("1"):
-                return 2
-            return 0
+    def __str__(self):
+        return f"{self.label_id}:{self.message_id}"
 
-        if self.activity_type in self.FULL_DAY_TYPES:
-            return 2
 
-        return 0
+class ChallengeMessageBatchReview(models.Model):
+    class Resolution(models.TextChoices):
+        LABELED = "labeled", "Есть тренировки"
+        FLOOD = "flood", "Флуд"
 
-    def _previous_scoring_activity(self):
-        if not self.challenge_id or not self.participant_id or not self.happened_on:
-            return None
+    challenge = models.ForeignKey(
+        Challenge,
+        on_delete=models.CASCADE,
+        related_name="message_batch_reviews",
+        verbose_name="Челлендж",
+    )
+    participant = models.ForeignKey(
+        ChallengeParticipant,
+        on_delete=models.CASCADE,
+        related_name="message_batch_reviews",
+        verbose_name="Участник",
+    )
+    message_day = models.DateField(verbose_name="День сообщений")
+    resolution = models.CharField(
+        max_length=16,
+        choices=Resolution.choices,
+        verbose_name="Результат разбора",
+    )
+    reviewed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        related_name="challenge_message_batch_reviews",
+        blank=True,
+        null=True,
+        verbose_name="Кто разобрал",
+    )
+    reviewed_at = models.DateTimeField(default=timezone.now, verbose_name="Когда разобрали")
+    comment = models.TextField(blank=True, verbose_name="Комментарий")
+    created = models.DateTimeField(auto_now_add=True)
+    updated = models.DateTimeField(auto_now=True)
 
-        previous_activities = self.__class__.objects.filter(
-            challenge_id=self.challenge_id,
-            participant_id=self.participant_id,
-            happened_on__lt=self.happened_on,
-        ).order_by("-happened_on", "-id")
+    class Meta:
+        ordering = ("message_day", "id")
+        verbose_name = "Разбор пачки сообщений"
+        verbose_name_plural = "Разборы пачек сообщений"
+        constraints = [
+            models.UniqueConstraint(
+                fields=("challenge", "participant", "message_day"),
+                name="challenge_message_batch_review_unique_day",
+            )
+        ]
+        indexes = [
+            models.Index(
+                fields=("challenge", "participant", "message_day"),
+                name="chall_batch_rev_idx",
+            )
+        ]
 
-        if self.pk:
-            previous_activities = previous_activities.exclude(pk=self.pk)
+    def __str__(self):
+        return f"{self.participant} {self.message_day} {self.get_resolution_display()}"
 
-        for activity in previous_activities:
-            if activity.base_points > 0:
-                return activity
-
-        return None
-
-    @property
-    def streak_bonus_points(self):
-        if self.base_points == 0:
-            return 0
-
-        previous_activity = self._previous_scoring_activity()
-        if previous_activity is None:
-            return 0
-
-        if (self.happened_on - previous_activity.happened_on).days <= 4:
-            return 1
-
-        return 0
-
-    @property
-    def total_points(self):
-        return self.base_points + self.streak_bonus_points
+    def clean(self):
+        super().clean()
+        if (
+            self.challenge_id
+            and self.participant_id
+            and self.participant.challenge_id != self.challenge_id
+        ):
+            raise ValidationError(
+                {"participant": "Участник должен относиться к тому же челленджу."}
+            )

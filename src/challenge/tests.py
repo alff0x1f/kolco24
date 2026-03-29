@@ -1,19 +1,21 @@
 import json
-from datetime import date
-from decimal import Decimal
+from datetime import date, datetime, time, timedelta
 from pathlib import Path
 
 from django.conf import settings
-from django.core.management import call_command
+from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
+from django.core.management import call_command
 from django.db import IntegrityError
 from django.test import TestCase
+from django.urls import reverse
 from django.utils import timezone
 
 from challenge.models import (
     Challenge,
-    ChallengeActivity,
+    ChallengeMessageBatchReview,
     ChallengeParticipant,
+    ChallengeTrainingLabel,
     TelegramChat,
     TelegramMessage,
 )
@@ -169,7 +171,7 @@ class ImportTelegramChatCommandTestCase(TestCase):
         )
 
 
-class ChallengeActivityModelTestCase(TestCase):
+class ChallengeTrainingLabelModelTestCase(TestCase):
     def setUp(self):
         self.challenge = Challenge.objects.create(
             name="Зимний челлендж 2025/2026",
@@ -182,168 +184,263 @@ class ChallengeActivityModelTestCase(TestCase):
             display_name="Ирек",
             group="ГШ-1",
         )
+
+    def create_label(self, training_date, training_type, decision="counted"):
+        return ChallengeTrainingLabel.objects.create(
+            challenge=self.challenge,
+            participant=self.participant,
+            training_date=training_date,
+            decision=decision,
+            training_type=training_type,
+        )
+
+    def test_type_points_follow_bucket_rules(self):
+        label = self.create_label(
+            date(2025, 12, 1),
+            ChallengeTrainingLabel.TrainingType.SKI_12_PLUS,
+        )
+
+        self.assertEqual(label.base_points, 3)
+        self.assertEqual(label.streak_bonus_points, 0)
+        self.assertEqual(label.total_points, 3)
+
+    def test_not_counted_training_has_zero_points(self):
+        label = self.create_label(
+            date(2025, 12, 1),
+            ChallengeTrainingLabel.TrainingType.RUN_10_PLUS,
+            decision=ChallengeTrainingLabel.Decision.NOT_COUNTED,
+        )
+
+        self.assertEqual(label.base_points, 0)
+        self.assertEqual(label.streak_bonus_points, 0)
+        self.assertEqual(label.total_points, 0)
+
+    def test_streak_bonus_uses_previous_counted_label_within_four_days(self):
+        first_label = self.create_label(
+            date(2025, 12, 1),
+            ChallengeTrainingLabel.TrainingType.RUN_5_10,
+        )
+        second_label = self.create_label(
+            date(2025, 12, 5),
+            ChallengeTrainingLabel.TrainingType.SWIM_1_2,
+        )
+        third_label = self.create_label(
+            date(2025, 12, 10),
+            ChallengeTrainingLabel.TrainingType.BIKE_20_40,
+        )
+
+        self.assertEqual(first_label.total_points, 2)
+        self.assertEqual(second_label.streak_bonus_points, 1)
+        self.assertEqual(second_label.total_points, 3)
+        self.assertEqual(third_label.streak_bonus_points, 0)
+        self.assertEqual(third_label.total_points, 2)
+
+    def test_one_label_per_participant_per_day_is_enforced(self):
+        self.create_label(date(2025, 12, 1), ChallengeTrainingLabel.TrainingType.RUN_5_10)
+
+        with self.assertRaises(IntegrityError):
+            self.create_label(
+                date(2025, 12, 1),
+                ChallengeTrainingLabel.TrainingType.SKI_6_12,
+            )
+
+    def test_label_must_belong_to_challenge_period(self):
+        label = ChallengeTrainingLabel(
+            challenge=self.challenge,
+            participant=self.participant,
+            training_date=date(2025, 11, 30),
+            decision=ChallengeTrainingLabel.Decision.COUNTED,
+            training_type=ChallengeTrainingLabel.TrainingType.RUN_5_10,
+        )
+
+        with self.assertRaises(ValidationError):
+            label.full_clean()
+
+
+class ChallengeMessageMarkupViewTestCase(TestCase):
+    def setUp(self):
+        self.today = timezone.localdate()
+        self.challenge = Challenge.objects.create(
+            name="Весенний челлендж",
+            start_date=self.today - timedelta(days=30),
+            end_date=self.today + timedelta(days=30),
+        )
+        self.participant = ChallengeParticipant.objects.create(
+            challenge=self.challenge,
+            telegram_user_id="user42",
+            display_name="Ирек",
+        )
         self.chat = TelegramChat.objects.create(
             telegram_id=1,
             name="Чат челленджа",
             chat_type="private_supergroup",
         )
-        self.message = TelegramMessage.objects.create(
+        self.staff_user = get_user_model().objects.create_user(
+            username="staff",
+            password="secret",
+            is_staff=True,
+        )
+        self.plain_user = get_user_model().objects.create_user(
+            username="plain",
+            password="secret",
+            is_staff=False,
+        )
+        self.batch_day_1 = self.today - timedelta(days=2)
+        self.batch_day_2 = self.today - timedelta(days=1)
+
+        self.message_1 = self.create_message(
+            telegram_id=10,
+            message_day=self.batch_day_1,
+            text="Вчера бег, сегодня плавание",
+        )
+        self.message_2 = self.create_message(
+            telegram_id=11,
+            message_day=self.batch_day_1,
+            text="Еще одно уточнение по тем же дням",
+        )
+        self.message_3 = self.create_message(
+            telegram_id=12,
+            message_day=self.batch_day_2,
+            text="Тут просто болтовня",
+        )
+
+    def create_message(self, telegram_id, message_day, text):
+        sent_at = timezone.make_aware(datetime.combine(message_day, time(12, 0)))
+        return TelegramMessage.objects.create(
             chat=self.chat,
-            telegram_id=100,
+            telegram_id=telegram_id,
             message_type="message",
-            sent_at=timezone.now(),
-            sender_name="Ирек",
-            sender_id="user42",
-            text="Бег 6 км\nЛыжи 12 км",
+            sent_at=sent_at,
+            sender_name=self.participant.display_name,
+            sender_id=self.participant.telegram_user_id,
+            text=text,
         )
 
-    def test_run_points_respect_distance_and_pace_thresholds(self):
-        short_run = ChallengeActivity(
-            challenge=self.challenge,
-            participant=self.participant,
-            activity_type=ChallengeActivity.TYPE_RUN,
-            happened_on=date(2025, 12, 1),
-            distance_km=Decimal("5.00"),
-            pace_minutes_per_km=Decimal("9.59"),
+    def markup_url(self, participant=None, message_day=None):
+        url = reverse("challenge_messages_markup")
+        query = [f"challenge={self.challenge.id}"]
+        if participant is not None:
+            query.append(f"participant={participant.id}")
+        if message_day is not None:
+            query.append(f"message_day={message_day.isoformat()}")
+        return f"{url}?{'&'.join(query)}"
+
+    def test_non_staff_user_is_denied(self):
+        self.client.login(username="plain", password="secret")
+
+        response = self.client.get(self.markup_url())
+
+        self.assertEqual(response.status_code, 302)
+
+    def test_page_loads_next_unreviewed_batch(self):
+        self.client.login(username="staff", password="secret")
+
+        response = self.client.get(self.markup_url())
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, self.batch_day_1.isoformat())
+        self.assertContains(response, "Вчера бег, сегодня плавание")
+
+    def test_can_add_several_labels_from_one_batch_and_finish_it(self):
+        self.client.login(username="staff", password="secret")
+
+        batch_url = self.markup_url(self.participant, self.batch_day_1)
+        response = self.client.post(
+            batch_url,
+            {
+                "action": "add_label",
+                "challenge": self.challenge.id,
+                "participant": self.participant.id,
+                "message_day": self.batch_day_1.isoformat(),
+                "training_date": (self.today - timedelta(days=3)).isoformat(),
+                "decision": ChallengeTrainingLabel.Decision.COUNTED,
+                "training_type": ChallengeTrainingLabel.TrainingType.RUN_10_PLUS,
+                "comment": "Позавчерашняя тренировка",
+            },
         )
-        long_run = ChallengeActivity(
-            challenge=self.challenge,
-            participant=self.participant,
-            activity_type=ChallengeActivity.TYPE_RUN,
-            happened_on=date(2025, 12, 2),
-            distance_km=Decimal("10.01"),
-            pace_minutes_per_km=Decimal("9.59"),
+        self.assertEqual(response.status_code, 302)
+
+        response = self.client.post(
+            batch_url,
+            {
+                "action": "add_label",
+                "challenge": self.challenge.id,
+                "participant": self.participant.id,
+                "message_day": self.batch_day_1.isoformat(),
+                "training_date": self.today.isoformat(),
+                "decision": ChallengeTrainingLabel.Decision.NOT_COUNTED,
+                "training_type": ChallengeTrainingLabel.TrainingType.SWIM_1_2,
+                "comment": "Сегодня не в зачет",
+            },
         )
-        slow_run = ChallengeActivity(
+        self.assertEqual(response.status_code, 302)
+
+        labels = ChallengeTrainingLabel.objects.order_by("training_date")
+        self.assertEqual(labels.count(), 2)
+        self.assertEqual(labels[0].source_messages.count(), 2)
+        self.assertEqual(labels[1].source_messages.count(), 2)
+        self.assertEqual(labels[0].reviewed_by, self.staff_user)
+        self.assertEqual(labels[1].total_points, 0)
+
+        response = self.client.post(
+            batch_url,
+            {
+                "action": "finish_batch",
+                "challenge": self.challenge.id,
+                "participant": self.participant.id,
+                "message_day": self.batch_day_1.isoformat(),
+            },
+        )
+        self.assertEqual(response.status_code, 302)
+
+        review = ChallengeMessageBatchReview.objects.get(
             challenge=self.challenge,
             participant=self.participant,
-            activity_type=ChallengeActivity.TYPE_RUN,
-            happened_on=date(2025, 12, 3),
-            distance_km=Decimal("8.00"),
-            pace_minutes_per_km=Decimal("10.00"),
+            message_day=self.batch_day_1,
+        )
+        self.assertEqual(review.resolution, ChallengeMessageBatchReview.Resolution.LABELED)
+        self.assertEqual(review.reviewed_by, self.staff_user)
+
+    def test_flood_marks_batch_as_processed_and_moves_queue(self):
+        self.client.login(username="staff", password="secret")
+
+        batch_url = self.markup_url(self.participant, self.batch_day_1)
+        response = self.client.post(
+            batch_url,
+            {
+                "action": "mark_flood",
+                "challenge": self.challenge.id,
+                "participant": self.participant.id,
+                "message_day": self.batch_day_1.isoformat(),
+            },
+        )
+        self.assertEqual(response.status_code, 302)
+
+        review = ChallengeMessageBatchReview.objects.get(
+            challenge=self.challenge,
+            participant=self.participant,
+            message_day=self.batch_day_1,
+        )
+        self.assertEqual(review.resolution, ChallengeMessageBatchReview.Resolution.FLOOD)
+        self.assertEqual(review.reviewed_by, self.staff_user)
+
+        response = self.client.get(self.markup_url())
+        self.assertContains(response, self.batch_day_2.isoformat())
+        self.assertContains(response, "Тут просто болтовня")
+
+    def test_finish_requires_at_least_one_label(self):
+        self.client.login(username="staff", password="secret")
+
+        batch_url = self.markup_url(self.participant, self.batch_day_1)
+        response = self.client.post(
+            batch_url,
+            {
+                "action": "finish_batch",
+                "challenge": self.challenge.id,
+                "participant": self.participant.id,
+                "message_day": self.batch_day_1.isoformat(),
+            },
         )
 
-        self.assertEqual(short_run.base_points, 0)
-        self.assertEqual(long_run.base_points, 3)
-        self.assertEqual(slow_run.base_points, 0)
-
-    def test_other_activity_thresholds_follow_rules(self):
-        ski = ChallengeActivity(
-            challenge=self.challenge,
-            participant=self.participant,
-            activity_type=ChallengeActivity.TYPE_SKI,
-            happened_on=date(2025, 12, 1),
-            distance_km=Decimal("12.00"),
-        )
-        bike = ChallengeActivity(
-            challenge=self.challenge,
-            participant=self.participant,
-            activity_type=ChallengeActivity.TYPE_BIKE,
-            happened_on=date(2025, 12, 2),
-            distance_km=Decimal("20.00"),
-        )
-        swim = ChallengeActivity(
-            challenge=self.challenge,
-            participant=self.participant,
-            activity_type=ChallengeActivity.TYPE_SWIM,
-            happened_on=date(2025, 12, 3),
-            distance_km=Decimal("2.00"),
-        )
-        hike = ChallengeActivity(
-            challenge=self.challenge,
-            participant=self.participant,
-            activity_type=ChallengeActivity.TYPE_HIKE_DAY,
-            happened_on=date(2025, 12, 4),
-        )
-
-        self.assertEqual(ski.base_points, 3)
-        self.assertEqual(bike.base_points, 2)
-        self.assertEqual(swim.base_points, 3)
-        self.assertEqual(hike.base_points, 2)
-
-    def test_streak_bonus_uses_previous_scoring_activity_within_four_days(self):
-        first_activity = ChallengeActivity.objects.create(
-            challenge=self.challenge,
-            participant=self.participant,
-            activity_type=ChallengeActivity.TYPE_RUN,
-            happened_on=date(2025, 12, 1),
-            distance_km=Decimal("6.00"),
-            pace_minutes_per_km=Decimal("9.30"),
-        )
-        second_activity = ChallengeActivity.objects.create(
-            challenge=self.challenge,
-            participant=self.participant,
-            activity_type=ChallengeActivity.TYPE_SKI,
-            happened_on=date(2025, 12, 5),
-            distance_km=Decimal("6.00"),
-        )
-        late_activity = ChallengeActivity.objects.create(
-            challenge=self.challenge,
-            participant=self.participant,
-            activity_type=ChallengeActivity.TYPE_BIKE,
-            happened_on=date(2025, 12, 11),
-            distance_km=Decimal("20.00"),
-        )
-
-        self.assertEqual(first_activity.total_points, 2)
-        self.assertEqual(second_activity.streak_bonus_points, 1)
-        self.assertEqual(second_activity.total_points, 3)
-        self.assertEqual(late_activity.streak_bonus_points, 0)
-        self.assertEqual(late_activity.total_points, 2)
-
-    def test_multiple_activities_can_reference_same_message(self):
-        run_activity = ChallengeActivity.objects.create(
-            challenge=self.challenge,
-            participant=self.participant,
-            source_message=self.message,
-            source_order=1,
-            activity_type=ChallengeActivity.TYPE_RUN,
-            happened_on=date(2025, 12, 1),
-            distance_km=Decimal("6.00"),
-            pace_minutes_per_km=Decimal("9.30"),
-        )
-        ski_activity = ChallengeActivity.objects.create(
-            challenge=self.challenge,
-            participant=self.participant,
-            source_message=self.message,
-            source_order=2,
-            activity_type=ChallengeActivity.TYPE_SKI,
-            happened_on=date(2025, 12, 5),
-            distance_km=Decimal("12.00"),
-        )
-
-        self.assertEqual(run_activity.source_message_id, self.message.id)
-        self.assertEqual(ski_activity.source_message_id, self.message.id)
-        self.assertEqual(self.message.challenge_activities.count(), 2)
-
-    def test_one_activity_per_participant_per_day_is_enforced(self):
-        ChallengeActivity.objects.create(
-            challenge=self.challenge,
-            participant=self.participant,
-            activity_type=ChallengeActivity.TYPE_RUN,
-            happened_on=date(2025, 12, 1),
-            distance_km=Decimal("6.00"),
-            pace_minutes_per_km=Decimal("9.30"),
-        )
-
-        with self.assertRaises(IntegrityError):
-            ChallengeActivity.objects.create(
-                challenge=self.challenge,
-                participant=self.participant,
-                activity_type=ChallengeActivity.TYPE_SKI,
-                happened_on=date(2025, 12, 1),
-                distance_km=Decimal("12.00"),
-            )
-
-    def test_activity_must_belong_to_challenge_period(self):
-        activity = ChallengeActivity(
-            challenge=self.challenge,
-            participant=self.participant,
-            activity_type=ChallengeActivity.TYPE_RUN,
-            happened_on=date(2025, 11, 30),
-            distance_km=Decimal("6.00"),
-            pace_minutes_per_km=Decimal("9.30"),
-        )
-
-        with self.assertRaises(ValidationError):
-            activity.full_clean()
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Сначала добавьте хотя бы одну тренировку")

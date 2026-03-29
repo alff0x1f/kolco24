@@ -2,8 +2,10 @@ from django.contrib import admin
 
 from challenge.models import (
     Challenge,
-    ChallengeActivity,
+    ChallengeMessageBatchReview,
     ChallengeParticipant,
+    ChallengeTrainingLabel,
+    ChallengeTrainingLabelMessage,
     TelegramChat,
     TelegramMessage,
 )
@@ -59,18 +61,49 @@ class ChallengeParticipantAdmin(admin.ModelAdmin):
     autocomplete_fields = ("challenge",)
 
 
-@admin.register(ChallengeActivity)
-class ChallengeActivityAdmin(admin.ModelAdmin):
+class ChallengeTrainingLabelMessageInline(admin.TabularInline):
+    model = ChallengeTrainingLabelMessage
+    extra = 0
+    autocomplete_fields = ("message",)
+
+
+@admin.register(ChallengeTrainingLabel)
+class ChallengeTrainingLabelAdmin(admin.ModelAdmin):
     list_display = (
         "id",
         "participant",
         "challenge",
-        "activity_type",
-        "happened_on",
+        "training_date",
+        "decision",
+        "training_type",
         "base_points",
         "streak_bonus_points",
         "total_points",
+        "reviewed_by",
     )
-    list_filter = ("challenge", "activity_type", "happened_on")
+    list_filter = ("challenge", "decision", "training_type", "training_date")
     search_fields = ("participant__display_name", "comment")
-    autocomplete_fields = ("challenge", "participant", "source_message")
+    autocomplete_fields = ("challenge", "participant", "reviewed_by")
+    inlines = (ChallengeTrainingLabelMessageInline,)
+
+
+@admin.register(ChallengeTrainingLabelMessage)
+class ChallengeTrainingLabelMessageAdmin(admin.ModelAdmin):
+    list_display = ("id", "label", "message", "created")
+    autocomplete_fields = ("label", "message")
+
+
+@admin.register(ChallengeMessageBatchReview)
+class ChallengeMessageBatchReviewAdmin(admin.ModelAdmin):
+    list_display = (
+        "id",
+        "participant",
+        "challenge",
+        "message_day",
+        "resolution",
+        "reviewed_by",
+        "reviewed_at",
+    )
+    list_filter = ("challenge", "resolution", "message_day")
+    search_fields = ("participant__display_name", "comment")
+    autocomplete_fields = ("challenge", "participant", "reviewed_by")

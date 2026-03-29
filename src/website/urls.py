@@ -2,7 +2,7 @@ from django.conf import settings
 from django.conf.urls.static import static
 from django.shortcuts import redirect
 from django.urls import include, path, re_path
-from challenge.views import ChallengeMessagesView
+from challenge.views import ChallengeMessageMarkupView, ChallengeMessagesView
 from wagtail import urls as wagtail_urls
 from wagtail.admin import urls as wagtailadmin_urls
 from wagtail.documents import urls as wagtaildocs_urls
@@ -75,6 +75,11 @@ urlpatterns = [
         "challenge/messages/",
         ChallengeMessagesView.as_view(),
         name="challenge_messages",
+    ),
+    path(
+        "challenge/messages/markup/",
+        ChallengeMessageMarkupView.as_view(),
+        name="challenge_messages_markup",
     ),
     path("teams/", views.teams, name="teams"),
     path("race/<race_id>/", views.RaceNewsView.as_view(), name="race"),
