@@ -1,0 +1,252 @@
+{% extends "website/base.html" %}
+
+{% block title %}Разметка Challenge{% endblock %}
+
+{% block content %}
+<section class="bg-dark text-light">
+    <div class="container">
+        <div class="row">
+            <div class="col">
+                <h1 class="mb-2">Разметка Challenge</h1>
+                {% if challenge %}
+                    <div class="text-muted">Челлендж: {{ challenge.name }}</div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</section>
+
+<section>
+    <div class="container">
+        {% if form_error %}
+            <div class="row">
+                <div class="col-12">
+                    <div class="alert alert-danger mt-3" role="alert">
+                        {{ form_error }}
+                    </div>
+                </div>
+            </div>
+        {% endif %}
+
+        {% if current_batch %}
+            <div class="row mb-4">
+                <div class="col-12 col-lg-8">
+                    <div class="card">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-start flex-wrap">
+                                <div>
+                                    <h3 class="mb-1">{{ current_batch.participant.display_name }}</h3>
+                                    <div class="text-muted">
+                                        День сообщений: {{ current_batch.message_day }}
+                                    </div>
+                                    <div class="text-muted">
+                                        {{ current_batch.message_count }} сообщений
+                                    </div>
+                                </div>
+                                {% if current_review %}
+                                    <div class="mt-2 mt-lg-0 text-right">
+                                        <span class="badge badge-success">{{ current_review.get_resolution_display }}</span>
+                                        <div class="small text-muted mt-1">
+                                            {{ current_review.reviewed_by }} | {{ current_review.reviewed_at }}
+                                        </div>
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-12 col-lg-4 mt-3 mt-lg-0">
+                    <div class="card">
+                        <div class="card-body">
+                            <div class="small text-muted mb-2">Очередь</div>
+                            <div><strong>{{ batches|length }}</strong> батчей в списке</div>
+                            <div class="mt-2">
+                                <a href="{% url 'challenge_messages' %}">Открыть общий список сообщений</a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row">
+                <div class="col-12 col-lg-8">
+                    {% for message in batch_messages %}
+                        <article class="card mb-3">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between align-items-start mb-2">
+                                    <div>
+                                        <h5 class="mb-1">{{ message.participant_name }}</h5>
+                                        <div class="text-muted small">
+                                            {{ message.sent_at }} | chat #{{ message.chat.telegram_id }} | msg #{{ message.telegram_id }}
+                                        </div>
+                                    </div>
+                                    <div class="text-right">
+                                        <span class="badge badge-secondary">{{ message.message_type }}</span>
+                                        {% if message.media_type %}
+                                            <span class="badge badge-light">{{ message.media_type }}</span>
+                                        {% endif %}
+                                    </div>
+                                </div>
+
+                                {% if message.text %}
+                                    <div style="white-space: pre-wrap;">{{ message.text }}</div>
+                                {% else %}
+                                    <div class="text-muted">Без текста</div>
+                                {% endif %}
+
+                                <div class="mt-3 small text-muted">
+                                    {% if message.reply_to_message_id %}<span class="mr-3">reply_to: {{ message.reply_to_message_id }}</span>{% endif %}
+                                    {% if message.file_name %}<span class="mr-3">file: {{ message.file_name }}</span>{% endif %}
+                                    {% if message.photo %}<span class="mr-3">photo: {{ message.photo }}</span>{% endif %}
+                                    {% if message.action %}<span class="mr-3">action: {{ message.action }}</span>{% endif %}
+                                </div>
+                            </div>
+                        </article>
+                    {% empty %}
+                        <div class="card">
+                            <div class="card-body">
+                                <p class="mb-0">В батче нет сообщений.</p>
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
+
+                <div class="col-12 col-lg-4">
+                    <div class="card mb-4">
+                        <div class="card-header">
+                            <span class="h6">Добавить тренировку</span>
+                        </div>
+                        <div class="card-body">
+                            <form method="post">
+                                {% csrf_token %}
+                                <input type="hidden" name="action" value="add_label">
+                                <input type="hidden" name="challenge" value="{{ challenge.id }}">
+                                <input type="hidden" name="participant" value="{{ current_batch.participant.id }}">
+                                <input type="hidden" name="message_day" value="{{ current_batch.message_day|date:'Y-m-d' }}">
+
+                                <div class="form-group">
+                                    <label for="training_date">Дата тренировки</label>
+                                    <input
+                                        id="training_date"
+                                        type="date"
+                                        name="training_date"
+                                        value="{% if form_data.training_date %}{{ form_data.training_date }}{% else %}{{ today|date:'Y-m-d' }}{% endif %}"
+                                        class="form-control"
+                                    >
+                                </div>
+
+                                <div class="form-group">
+                                    <label for="decision">Статус</label>
+                                    <select id="decision" name="decision" class="form-control">
+                                        {% for decision_value, decision_label in decision_choices %}
+                                            <option value="{{ decision_value }}" {% if form_data.decision == decision_value %}selected{% endif %}>
+                                                {{ decision_label }}
+                                            </option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+
+                                <div class="form-group">
+                                    <label for="training_type">Тип тренировки</label>
+                                    <select id="training_type" name="training_type" class="form-control">
+                                        {% for training_value, training_label in training_type_choices %}
+                                            <option value="{{ training_value }}" {% if form_data.training_type == training_value %}selected{% endif %}>
+                                                {{ training_label }}
+                                            </option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+
+                                <div class="form-group">
+                                    <label for="comment">Комментарий</label>
+                                    <textarea id="comment" name="comment" rows="3" class="form-control">{% if form_data.comment %}{{ form_data.comment }}{% endif %}</textarea>
+                                </div>
+
+                                <button type="submit" class="btn btn-primary btn-block">Добавить тренировку</button>
+                            </form>
+                        </div>
+                    </div>
+
+                    <div class="card mb-4">
+                        <div class="card-header">
+                            <span class="h6">Размеченные тренировки</span>
+                        </div>
+                        <div class="list-group list-group-flush">
+                            {% for label in batch_labels %}
+                                <div class="list-group-item">
+                                    <div class="font-weight-bold">{{ label.training_date }}: {{ label.get_training_type_display }}</div>
+                                    <div class="small text-muted">
+                                        {{ label.get_decision_display }} |
+                                        {{ label.total_points }} баллов |
+                                        {{ label.reviewed_by }}
+                                    </div>
+                                    {% if label.comment %}
+                                        <div class="small mt-1">{{ label.comment }}</div>
+                                    {% endif %}
+                                </div>
+                            {% empty %}
+                                <div class="list-group-item text-muted">Пока ничего не добавлено.</div>
+                            {% endfor %}
+                        </div>
+                    </div>
+
+                    <div class="card mb-4">
+                        <div class="card-body">
+                            <form method="post" class="mb-2">
+                                {% csrf_token %}
+                                <input type="hidden" name="action" value="finish_batch">
+                                <input type="hidden" name="challenge" value="{{ challenge.id }}">
+                                <input type="hidden" name="participant" value="{{ current_batch.participant.id }}">
+                                <input type="hidden" name="message_day" value="{{ current_batch.message_day|date:'Y-m-d' }}">
+                                <button type="submit" class="btn btn-success btn-block">Завершить разбор</button>
+                            </form>
+
+                            <form method="post">
+                                {% csrf_token %}
+                                <input type="hidden" name="action" value="mark_flood">
+                                <input type="hidden" name="challenge" value="{{ challenge.id }}">
+                                <input type="hidden" name="participant" value="{{ current_batch.participant.id }}">
+                                <input type="hidden" name="message_day" value="{{ current_batch.message_day|date:'Y-m-d' }}">
+                                <button type="submit" class="btn btn-outline-secondary btn-block">Флуд / нет тренировки</button>
+                            </form>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <div class="card-header">
+                            <span class="h6">Очередь батчей</span>
+                        </div>
+                        <div class="list-group list-group-flush" style="max-height: 60vh; overflow-y: auto;">
+                            {% for batch in batches %}
+                                <a
+                                    class="list-group-item d-flex justify-content-between {% if batch.participant.id == current_batch.participant.id and batch.message_day == current_batch.message_day %}active{% endif %}"
+                                    href="{% url 'challenge_messages_markup' %}?challenge={{ challenge.id }}&participant={{ batch.participant.id }}&message_day={{ batch.message_day|date:'Y-m-d' }}"
+                                >
+                                    <span>{{ batch.participant.display_name }} / {{ batch.message_day }}</span>
+                                    {% if batch.is_reviewed %}
+                                        <span class="badge badge-success ml-2">OK</span>
+                                    {% else %}
+                                        <span class="badge badge-warning ml-2">{{ batch.message_count }}</span>
+                                    {% endif %}
+                                </a>
+                            {% empty %}
+                                <div class="list-group-item text-muted">Очередь пуста.</div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        {% else %}
+            <div class="row">
+                <div class="col-12">
+                    <div class="card mt-4">
+                        <div class="card-body">
+                            <p class="mb-0">Неразобранных батчей не найдено.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        {% endif %}
+    </div>
+</section>
+{% endblock %}
