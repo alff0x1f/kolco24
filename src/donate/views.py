@@ -5,7 +5,7 @@ from django.contrib import messages
 from django.shortcuts import redirect, render
 from django.views import View
 
-from donate.models import DonateRequest
+from donate.models import ClubMember, DonateRequest, DonationPeriod, MemberDonation
 from vtb.client import VTBClient
 from website.models import VTBPayment, VTBPreparedPayment
 
@@ -149,6 +149,56 @@ class DonateView(View):
             "max_amount": int(self.max_amount),
             "sender_name": sender_name,
             "comment": comment,
+            "donor_table": self.build_donor_table(),
+        }
+
+    @staticmethod
+    def build_donor_table():
+        # Периоды: от нового к старому (слева направо)
+        periods = list(DonationPeriod.objects.filter(is_active=True).order_by("-date"))
+        if not periods:
+            return None
+
+        period_ids = [p.id for p in periods]
+
+        # Все записи по активным периодам
+        donations = MemberDonation.objects.filter(
+            period_id__in=period_ids
+        ).select_related("member", "period")
+
+        # member_id -> {period_id -> is_paid}
+        payment_map = {}
+        for d in donations:
+            payment_map.setdefault(d.member_id, {})[d.period_id] = d.is_paid
+
+        # Все участники у кого есть хоть одна запись
+        members = list(
+            ClubMember.objects.filter(id__in=payment_map.keys()).order_by("name")
+        )
+
+        latest_period_id = periods[0].id
+
+        def row_sort_key(member):
+            paid_latest = payment_map[member.id].get(latest_period_id, None)
+            # Оплатил последний период → первые; остальные по имени
+            return (0 if paid_latest else 1, member.name)
+
+        members.sort(key=row_sort_key)
+
+        # Строки таблицы: [{member, cells: [True/False/None, ...], paid_latest}]
+        rows = []
+        for member in members:
+            pmap = payment_map[member.id]
+            cells = [pmap.get(pid) for pid in period_ids]
+            rows.append({
+                "member": member,
+                "cells": cells,
+                "paid_latest": pmap.get(latest_period_id, None),
+            })
+
+        return {
+            "periods": periods,
+            "rows": rows,
         }
 
     @staticmethod

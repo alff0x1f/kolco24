@@ -15,6 +15,7 @@ venv/
 db/
 dumps/
 src/media/
+scratch/
 
 # just my playground
 playground.py

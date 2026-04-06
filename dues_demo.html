@@ -1,0 +1,541 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Клубные взносы — Кольцо 24</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: linear-gradient(180deg, #eef1eb 0%, #f8f6f0 30%, #ffffff 100%);
+      min-height: 100vh;
+      color: #293843;
+    }
+
+    /* ── Header ─────────────────────────────────────────── */
+    .site-header {
+      padding: 1.1rem 0;
+      background: rgba(255,255,255,0.85);
+      backdrop-filter: blur(8px);
+      border-bottom: 1px solid rgba(28,39,50,0.07);
+      position: sticky; top: 0; z-index: 10;
+    }
+    .site-header .inner {
+      max-width: 1200px; margin: 0 auto; padding: 0 1.5rem;
+      display: flex; align-items: center; gap: 1rem;
+    }
+    .logo { font-weight: 800; font-size: 1.2rem; color: #1b2c37; text-decoration: none; }
+    .logo span { color: #3e8f67; }
+    .header-tag {
+      font-size: 0.75rem; font-weight: 600; letter-spacing: 0.07em;
+      text-transform: uppercase; color: #667783;
+      padding: 0.3rem 0.7rem; background: #edf1f2; border-radius: 999px;
+    }
+
+    /* ── Layout ─────────────────────────────────────────── */
+    .page { max-width: 1200px; margin: 0 auto; padding: 2.5rem 1.5rem 5rem; }
+
+    .page-title { font-size: 2rem; font-weight: 800; color: #1b2c37; margin-bottom: 0.4rem; }
+    .page-sub { color: #667783; font-size: 1rem; margin-bottom: 2rem; }
+
+    /* stats strip */
+    .stats-strip {
+      display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 2rem;
+    }
+    .stat-card {
+      flex: 1 1 140px;
+      background: rgba(255,255,255,0.92);
+      border: 1px solid rgba(28,39,50,0.08);
+      border-radius: 20px; padding: 1rem 1.2rem;
+      box-shadow: 0 4px 16px rgba(18,32,32,0.06);
+    }
+    .stat-card__label { font-size: 0.78rem; color: #667783; text-transform: uppercase; letter-spacing: 0.07em; font-weight: 600; margin-bottom: 0.4rem; }
+    .stat-card__value { font-size: 2rem; font-weight: 800; color: #1b2c37; line-height: 1; }
+    .stat-card__value--green { color: #3e8f67; }
+    .stat-card__value--red   { color: #c05a3b; }
+
+    .two-col { display: grid; grid-template-columns: 380px minmax(0,1fr); gap: 1.5rem; align-items: start; }
+
+    /* ── Panel ───────────────────────────────────────────── */
+    .panel {
+      background: rgba(255,255,255,0.92);
+      border: 1px solid rgba(28,39,50,0.08);
+      border-radius: 28px; padding: 2rem;
+      box-shadow: 0 24px 60px rgba(18,32,32,0.1);
+    }
+    .panel + .panel { margin-top: 1.5rem; }
+
+    .eyebrow {
+      text-transform: uppercase; letter-spacing: 0.1em;
+      font-size: 0.75rem; font-weight: 700; color: #667783; margin-bottom: 0.5rem;
+    }
+    .panel-title { font-size: 1.35rem; font-weight: 700; color: #1b2c37; margin-bottom: 1.4rem; }
+
+    /* ── Search / checker ────────────────────────────────── */
+    .field-label { font-size: 0.88rem; font-weight: 500; color: #1b2c37; display: block; margin-bottom: 0.5rem; }
+    .field-row { display: grid; grid-template-columns: 1fr auto; gap: 0.65rem; }
+
+    input[type="text"], input[type="number"] {
+      width: 100%; min-height: 3.2rem; padding: 0.8rem 1rem;
+      border: 1.5px solid #d6dde2; border-radius: 14px;
+      background: #fbfcfa; font-size: 0.97rem; color: #1b2c37;
+      outline: none; transition: border-color .15s, box-shadow .15s;
+    }
+    input:focus { border-color: #496779; box-shadow: 0 0 0 3px rgba(73,103,121,0.12); }
+
+    .btn {
+      display: inline-flex; align-items: center; justify-content: center;
+      border: 0; border-radius: 14px; cursor: pointer;
+      font-size: 0.95rem; font-weight: 600; transition: opacity .15s, transform .1s;
+    }
+    .btn:active { transform: scale(.97); }
+
+    .btn-find {
+      min-height: 3.2rem; padding: 0 1.2rem; white-space: nowrap;
+      background: #d8b16d; color: #173142;
+    }
+    .btn-find:hover { opacity: .88; }
+
+    /* result card */
+    .result-card {
+      margin-top: 1.2rem; padding: 1.1rem 1.2rem;
+      border-radius: 18px; background: #f3f0e8;
+      display: none;
+    }
+    .result-card.visible { display: block; }
+    .result-card__top { display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; margin-bottom: 0.85rem; }
+    .result-card__name { font-size: 1.35rem; font-weight: 700; color: #1b2c37; }
+    .result-card__period { font-size: 0.85rem; color: #667783; margin-top: 0.2rem; }
+
+    .badge {
+      display: inline-flex; align-items: center; white-space: nowrap;
+      border-radius: 999px; font-size: 0.78rem; font-weight: 700;
+      padding: 0.45rem 0.85rem; letter-spacing: 0.02em;
+    }
+    .badge--ok       { background: #b8ecc6; color: #12462c; }
+    .badge--pending  { background: #f4d1c5; color: #6a2f1f; }
+    .badge--inactive { background: #dfe5ea; color: #42515b; }
+
+    .result-status { font-size: 0.82rem; color: #667783; }
+    .result-date   { font-weight: 600; color: #1b2c37; font-size: 0.95rem; margin-top: 0.2rem; }
+
+    .history-list { margin-top: 0.9rem; border-top: 1px solid rgba(27,44,55,0.1); }
+    .history-row {
+      display: flex; justify-content: space-between;
+      padding: 0.6rem 0; border-bottom: 1px solid rgba(27,44,55,0.06);
+      font-size: 0.88rem;
+    }
+    .history-row span:last-child { font-weight: 600; color: #1b2c37; }
+
+    .not-found {
+      margin-top: 1rem; padding: 1rem 1.1rem; border-radius: 14px;
+      background: #fff5f2; color: #7a3522; font-size: 0.9rem;
+      display: none;
+    }
+    .not-found.visible { display: block; }
+
+    /* ── Payment form ─────────────────────────────────────── */
+    .form-group { margin-bottom: 1.2rem; }
+
+    .preset-group { display: flex; flex-wrap: wrap; gap: 0.55rem; margin-top: 0.75rem; }
+    .preset {
+      border-radius: 999px; padding: 0.5rem 0.9rem;
+      background: #edf1f2; color: #213543; border: 0;
+      font-size: 0.88rem; cursor: pointer; font-weight: 500;
+      transition: background .15s;
+    }
+    .preset:hover { background: #dde4e8; }
+    .preset--soft { background: #f3ede4; }
+    .preset--soft:hover { background: #e9e0d4; }
+
+    .btn-pay {
+      width: 100%; min-height: 3.6rem; margin-top: 0.5rem;
+      border-radius: 18px;
+      background: linear-gradient(135deg, #2a5a6f 0%, #3f7e6a 100%);
+      color: #fff; font-size: 1rem; font-weight: 600;
+      box-shadow: 0 16px 32px rgba(42,90,111,0.2);
+    }
+    .btn-pay:hover { opacity: .9; }
+
+    /* ── Table panel ──────────────────────────────────────── */
+    .table-header {
+      display: flex; justify-content: space-between; align-items: flex-end;
+      gap: 1rem; margin-bottom: 1.2rem; flex-wrap: wrap;
+    }
+    .table-search-wrap { position: relative; width: 240px; }
+    .table-search-wrap input { padding-left: 2.4rem; min-height: 2.7rem; font-size: 0.9rem; }
+    .table-search-wrap .icon-search {
+      position: absolute; left: 0.85rem; top: 50%; transform: translateY(-50%);
+      color: #9baab4; pointer-events: none; font-size: 1rem;
+    }
+
+    .filter-tabs { display: flex; gap: 0.4rem; }
+    .filter-tab {
+      border: 0; border-radius: 999px; padding: 0.4rem 0.85rem;
+      font-size: 0.82rem; font-weight: 600; cursor: pointer;
+      background: #edf1f2; color: #667783;
+      transition: background .15s, color .15s;
+    }
+    .filter-tab.active { background: #1b2c37; color: #fff; }
+
+    .table-wrap { overflow-x: auto; }
+
+    table { width: 100%; border-collapse: collapse; min-width: 560px; }
+    thead th {
+      padding: 0.6rem 0.8rem; text-align: left;
+      font-size: 0.76rem; text-transform: uppercase; letter-spacing: 0.05em;
+      color: #667783; border-bottom: 1.5px solid #d9e0e4; white-space: nowrap;
+    }
+    thead th.center { text-align: center; }
+
+    tbody tr { transition: background .1s; }
+    tbody tr:hover { background: rgba(73,103,121,0.04); }
+
+    tbody td {
+      padding: 0.9rem 0.8rem; vertical-align: middle;
+      border-bottom: 1px solid #edf1f2; font-size: 0.93rem;
+    }
+    tbody td.center { text-align: center; }
+
+    .row--paid     { }
+    .row--pending  { background: rgba(244,209,197,0.12); }
+    .row--inactive { background: rgba(223,229,234,0.25); }
+    .row--hidden   { display: none; }
+
+    .member-name { font-weight: 600; color: #1b2c37; }
+    .member-note { font-size: 0.82rem; color: #667783; margin-top: 0.3rem; }
+
+    .dot {
+      width: 0.88rem; height: 0.88rem; border-radius: 50%;
+      display: inline-block; vertical-align: middle;
+    }
+    .dot--paid     { background: #3e8f67; }
+    .dot--pending  { background: #d26a4c; }
+    .dot--inactive { background: #b8c1c9; }
+
+    /* legend */
+    .legend { display: flex; gap: 1.25rem; flex-wrap: wrap; margin-top: 1.25rem; padding-top: 1rem; border-top: 1px solid #edf1f2; }
+    .legend-item { display: flex; align-items: center; gap: 0.4rem; font-size: 0.8rem; color: #667783; }
+
+    /* highlight for found row */
+    .row--highlight { outline: 2px solid #d8b16d; outline-offset: -1px; background: rgba(216,177,109,0.08) !important; }
+
+    /* ── Responsive ───────────────────────────────────────── */
+    @media (max-width: 900px) {
+      .two-col { grid-template-columns: 1fr; }
+      .table-search-wrap { width: 100%; }
+      .table-header { flex-direction: column; align-items: flex-start; }
+    }
+    @media (max-width: 600px) {
+      .page { padding: 1.5rem 1rem 4rem; }
+      .panel { padding: 1.4rem; border-radius: 20px; }
+      .stats-strip { gap: 0.75rem; }
+      .stat-card { flex: 1 1 120px; }
+      .field-row { grid-template-columns: 1fr; }
+      .btn-find { min-height: 2.8rem; }
+    }
+  </style>
+</head>
+<body>
+
+<header class="site-header">
+  <div class="inner">
+    <a href="#" class="logo">Кольцо<span>24</span></a>
+    <span class="header-tag">Клубные взносы</span>
+  </div>
+</header>
+
+<div class="page">
+
+  <h1 class="page-title">Учёт клубных взносов</h1>
+  <p class="page-sub">Весна 2026 · Найди себя в списке или внеси взнос онлайн</p>
+
+  <!-- Stats strip -->
+  <div class="stats-strip">
+    <div class="stat-card">
+      <div class="stat-card__label">Всего активных</div>
+      <div class="stat-card__value" id="stat-total">18</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-card__label">Оплатили</div>
+      <div class="stat-card__value stat-card__value--green" id="stat-paid">11</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-card__label">Ещё не оплатили</div>
+      <div class="stat-card__value stat-card__value--red" id="stat-pending">7</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-card__label">Собрано, ₽</div>
+      <div class="stat-card__value" id="stat-sum">33 000</div>
+    </div>
+  </div>
+
+  <div class="two-col">
+
+    <!-- Left: checker + form -->
+    <div>
+      <!-- Checker -->
+      <div class="panel">
+        <p class="eyebrow">Проверить взнос</p>
+        <div class="panel-title" style="margin-bottom:1rem;">Найти себя</div>
+        <label class="field-label" for="check-name">Имя и фамилия</label>
+        <div class="field-row">
+          <input id="check-name" type="text" placeholder="Например: Иван Петров" autocomplete="off">
+          <button class="btn btn-find" onclick="checkMember()">Найти</button>
+        </div>
+
+        <div class="not-found" id="not-found">
+          Участник не найден. Проверьте написание или обратитесь к администратору.
+        </div>
+
+        <div class="result-card" id="result-card">
+          <div class="result-card__top">
+            <div>
+              <div class="result-card__name" id="result-name"></div>
+              <div class="result-card__period" id="result-period"></div>
+            </div>
+            <span class="badge" id="result-badge"></span>
+          </div>
+          <div class="result-status">Последний платёж</div>
+          <div class="result-date" id="result-date"></div>
+          <div class="history-list" id="result-history"></div>
+        </div>
+      </div>
+
+      <!-- Payment form -->
+      <div class="panel">
+        <p class="eyebrow">Внести взнос</p>
+        <div class="panel-title">Оплата онлайн</div>
+
+        <div class="form-group">
+          <label class="field-label" for="pay-amount">Сумма, ₽</label>
+          <input id="pay-amount" type="number" value="3000" min="100" max="50000" step="100">
+          <div class="preset-group">
+            <button class="preset" onclick="setAmount(1500)">1 500 ₽</button>
+            <button class="preset" onclick="setAmount(3000)">3 000 ₽</button>
+            <button class="preset" onclick="setAmount(5000)">5 000 ₽</button>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="field-label" for="pay-name">Кто платит</label>
+          <input id="pay-name" type="text" placeholder="Иванов Иван" value="">
+        </div>
+
+        <div class="form-group">
+          <label class="field-label" for="pay-comment">За что</label>
+          <input id="pay-comment" type="text" value="Клубный взнос, весна 2026" placeholder="Клубный взнос, весна 2026">
+          <div class="preset-group">
+            <button class="preset preset--soft" onclick="setComment('Клубный взнос, весна 2026')">Весна 2026</button>
+            <button class="preset preset--soft" onclick="setComment('Клубный взнос, осень 2026')">Осень 2026</button>
+          </div>
+        </div>
+
+        <button class="btn btn-pay" onclick="alert('Здесь будет переход к платёжной системе')">
+          Перейти к оплате →
+        </button>
+      </div>
+    </div>
+
+    <!-- Right: member table -->
+    <div class="panel">
+      <div class="table-header">
+        <div>
+          <p class="eyebrow">Статусы участников</p>
+          <div class="panel-title" style="margin-bottom:0;">Кто уже оплатил</div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:0.6rem;align-items:flex-end;">
+          <div class="filter-tabs">
+            <button class="filter-tab active" onclick="setFilter('all', this)">Все</button>
+            <button class="filter-tab" onclick="setFilter('paid', this)">Оплатили</button>
+            <button class="filter-tab" onclick="setFilter('pending', this)">Не оплатили</button>
+          </div>
+          <div class="table-search-wrap">
+            <span class="icon-search">&#9740;</span>
+            <input type="text" id="table-search" placeholder="Поиск по имени…" oninput="filterTable()">
+          </div>
+        </div>
+      </div>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Участник</th>
+              <th class="center">Весна 2026</th>
+              <th class="center">Осень 2025</th>
+              <th class="center">Весна 2025</th>
+              <th class="center">Осень 2024</th>
+            </tr>
+          </thead>
+          <tbody id="member-tbody">
+            <!-- строки генерируются JS -->
+          </tbody>
+        </table>
+      </div>
+
+      <div class="legend">
+        <span class="legend-item"><span class="dot dot--paid"></span> Оплачено</span>
+        <span class="legend-item"><span class="dot dot--pending"></span> Не оплачено</span>
+        <span class="legend-item"><span class="dot dot--inactive"></span> Не в этот период</span>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+  /* ── Demo data ─────────────────────────────────────── */
+  const PERIODS = ['Весна 2026', 'Осень 2025', 'Весна 2025', 'Осень 2024'];
+
+  // status: 'paid' | 'pending' | 'inactive'
+  // cells: true=paid, false=pending, null=not member in that period
+  const MEMBERS = [
+    { name: 'Иван Петров',      status: 'paid',     cells: [true, true, true, true],     lastPaid: '14 марта 2026',  note: '' },
+    { name: 'Мария Соколова',   status: 'paid',     cells: [true, true, true, false],    lastPaid: '10 марта 2026',  note: 'Оплатила через СБП' },
+    { name: 'Дмитрий Орлов',   status: 'paid',     cells: [true, true, false, false],   lastPaid: '2 апреля 2026',  note: '' },
+    { name: 'Екатерина Лисова', status: 'paid',     cells: [true, true, true, true],     lastPaid: '18 марта 2026',  note: '' },
+    { name: 'Николай Зайцев',  status: 'paid',     cells: [true, false, true, true],    lastPaid: '22 марта 2026',  note: '' },
+    { name: 'Светлана Морозова',status: 'paid',     cells: [true, true, true, true],     lastPaid: '5 марта 2026',   note: '' },
+    { name: 'Андрей Краснов',  status: 'paid',     cells: [true, true, true, false],    lastPaid: '28 февраля 2026',note: '' },
+    { name: 'Татьяна Белова',  status: 'paid',     cells: [true, false, false, null],   lastPaid: '19 марта 2026',  note: 'Новый участник, весна 2025' },
+    { name: 'Роман Щукин',     status: 'paid',     cells: [true, true, true, true],     lastPaid: '1 марта 2026',   note: '' },
+    { name: 'Ольга Волкова',   status: 'paid',     cells: [true, true, true, true],     lastPaid: '7 марта 2026',   note: '' },
+    { name: 'Юрий Ершов',     status: 'paid',     cells: [true, null, null, null],     lastPaid: '15 марта 2026',  note: 'Только вступил' },
+    { name: 'Алексей Власов',  status: 'pending',  cells: [false, true, true, true],    lastPaid: '5 сент. 2025',   note: '' },
+    { name: 'Ольга Николаева', status: 'pending',  cells: [false, false, true, true],   lastPaid: '12 апр. 2025',   note: 'Напоминание отправлено' },
+    { name: 'Павел Кузнецов',  status: 'pending',  cells: [false, true, true, false],   lastPaid: '3 сент. 2025',   note: '' },
+    { name: 'Вера Тихомирова', status: 'pending',  cells: [false, false, false, true],  lastPaid: '10 окт. 2024',   note: '' },
+    { name: 'Денис Козлов',    status: 'pending',  cells: [false, true, false, null],   lastPaid: '20 авг. 2025',   note: '' },
+    { name: 'Ирина Фёдорова',  status: 'pending',  cells: [false, false, true, true],   lastPaid: '8 апр. 2025',    note: 'Уточнить ситуацию' },
+    { name: 'Максим Рыбин',    status: 'pending',  cells: [false, null, null, null],    lastPaid: '—',              note: 'Новый, ещё ни разу не платил' },
+    { name: 'Сергей Егоров',   status: 'inactive', cells: [null, null, true, true],     lastPaid: '15 марта 2025',  note: 'Был в клубе до весны 2025' },
+    { name: 'Анна Громова',    status: 'inactive', cells: [null, true, true, false],    lastPaid: '3 авг. 2025',    note: 'Ушла из клуба' },
+    { name: 'Виктор Панов',    status: 'inactive', cells: [null, null, null, true],     lastPaid: '2 окт. 2024',    note: 'Архивный участник' },
+  ];
+
+  /* ── Build table ─────────────────────────────────── */
+  function dotHtml(cell) {
+    if (cell === null) return `<span class="dot dot--inactive" title="Не состоял в клубе"></span>`;
+    if (cell)          return `<span class="dot dot--paid" title="Оплачено"></span>`;
+                       return `<span class="dot dot--pending" title="Не оплачено"></span>`;
+  }
+
+  function buildTable() {
+    const tbody = document.getElementById('member-tbody');
+    tbody.innerHTML = MEMBERS.map((m, i) => {
+      const rowClass = `row--${m.status}`;
+      const badgeHtml = m.status === 'paid'
+        ? `<span class="badge badge--ok">Оплатил</span>`
+        : m.status === 'pending'
+          ? `<span class="badge badge--pending">Не оплачено</span>`
+          : `<span class="badge badge--inactive">Не в активном составе</span>`;
+      const noteHtml = m.note
+        ? `<div class="member-note">${m.note}</div>`
+        : (m.status === 'inactive' ? `<div class="member-note">Не отмечается как должник текущего периода</div>` : '');
+      const cellsHtml = m.cells.map(c => `<td class="center">${dotHtml(c)}</td>`).join('');
+      return `<tr class="${rowClass}" data-status="${m.status}" data-name="${m.name.toLowerCase()}" data-idx="${i}">
+        <td>
+          <div class="member-name">${m.name} ${badgeHtml}</div>
+          ${noteHtml}
+        </td>
+        ${cellsHtml}
+      </tr>`;
+    }).join('');
+  }
+
+  /* ── Filter ──────────────────────────────────────── */
+  let currentFilter = 'all';
+
+  function setFilter(f, btn) {
+    currentFilter = f;
+    document.querySelectorAll('.filter-tab').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    filterTable();
+  }
+
+  function filterTable() {
+    const q = document.getElementById('table-search').value.toLowerCase().trim();
+    document.querySelectorAll('#member-tbody tr').forEach(tr => {
+      const name = tr.dataset.name;
+      const status = tr.dataset.status;
+      const matchFilter = currentFilter === 'all' || status === currentFilter;
+      const matchSearch = !q || name.includes(q);
+      tr.classList.toggle('row--hidden', !(matchFilter && matchSearch));
+    });
+  }
+
+  /* ── Member checker ──────────────────────────────── */
+  function checkMember() {
+    const query = document.getElementById('check-name').value.trim().toLowerCase();
+    const found = MEMBERS.find(m => m.name.toLowerCase().includes(query) && query.length > 1);
+
+    document.getElementById('result-card').classList.remove('visible');
+    document.getElementById('not-found').classList.remove('visible');
+    // remove previous highlight
+    document.querySelectorAll('.row--highlight').forEach(r => r.classList.remove('row--highlight'));
+
+    if (!found) {
+      document.getElementById('not-found').classList.add('visible');
+      return;
+    }
+
+    // Fill result card
+    document.getElementById('result-name').textContent = found.name;
+    document.getElementById('result-period').textContent = 'Текущий период: ' + PERIODS[0];
+    document.getElementById('result-date').textContent = found.lastPaid !== '—' ? found.lastPaid : 'Нет данных';
+
+    const badge = document.getElementById('result-badge');
+    if (found.status === 'paid') {
+      badge.className = 'badge badge--ok'; badge.textContent = 'Оплачено';
+    } else if (found.status === 'pending') {
+      badge.className = 'badge badge--pending'; badge.textContent = 'Не оплачено';
+    } else {
+      badge.className = 'badge badge--inactive'; badge.textContent = 'Не в активном составе';
+    }
+
+    // History rows
+    const history = document.getElementById('result-history');
+    history.innerHTML = found.cells.map((c, i) => {
+      const val = c === null ? '—' : c ? 'Оплачено ✓' : 'Не оплачено';
+      const color = c === true ? '#3e8f67' : c === false ? '#c05a3b' : '#9baab4';
+      return `<div class="history-row">
+        <span>${PERIODS[i]}</span>
+        <span style="color:${color}">${val}</span>
+      </div>`;
+    }).join('');
+
+    document.getElementById('result-card').classList.add('visible');
+
+    // Highlight in table & scroll
+    const rows = document.querySelectorAll('#member-tbody tr');
+    rows.forEach(tr => {
+      if (tr.dataset.name === found.name.toLowerCase()) {
+        tr.classList.add('row--highlight');
+        // reset filter to show all so the row is visible
+        if (currentFilter !== 'all') {
+          setFilter('all', document.querySelector('.filter-tab'));
+        }
+        tr.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    });
+
+    // Pre-fill payment form
+    document.getElementById('pay-name').value = found.name;
+  }
+
+  document.getElementById('check-name').addEventListener('keydown', e => {
+    if (e.key === 'Enter') checkMember();
+  });
+
+  /* ── Payment helpers ─────────────────────────────── */
+  function setAmount(v)  { document.getElementById('pay-amount').value = v; }
+  function setComment(v) { document.getElementById('pay-comment').value = v; }
+
+  /* ── Init ────────────────────────────────────────── */
+  buildTable();
+</script>
+</body>
+</html>
