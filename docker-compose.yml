@@ -6,6 +6,8 @@ services:
     restart: unless-stopped
     user: "1000:1000"
     command: [ "gunicorn", "--bind", "0.0.0.0:8000", "kolco24.wsgi:application", "--access-logfile", "-", "--log-level", "info"]
+    env_file:
+      - .env
     volumes:
       - ./src:/app
     depends_on:
@@ -19,6 +21,8 @@ services:
     container_name: kolco24_runmailer
     restart: unless-stopped
     command: [ "python", "manage.py", "runmailer" ]
+    env_file:
+      - .env
     volumes:
       - ./src:/app
     depends_on:

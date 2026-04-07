@@ -18,3 +18,7 @@ src/media/
 
 # just my playground
 playground.py
+
+# Environment secrets
+.env
+.env.prod
