@@ -2,15 +2,6 @@
 
 from django.db import migrations, models
 
-from website.forms import category2_from_dist
-from website.models import Team
-
-
-def pupulate_teams_category2(apps, schema_editor):
-    for team in Team.objects.filter(year=2023):
-        team.category2 = category2_from_dist(team.dist, team.ucount)
-        team.save(update_fields=["category2"])
-
 
 class Migration(migrations.Migration):
 
@@ -31,5 +22,4 @@ class Migration(migrations.Migration):
                 default="", max_length=15, verbose_name="Короткое название"
             ),
         ),
-        migrations.RunPython(pupulate_teams_category2),
     ]
