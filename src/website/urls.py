@@ -2,6 +2,7 @@ from django.conf import settings
 from django.conf.urls.static import static
 from django.shortcuts import redirect
 from django.urls import include, path, re_path
+
 from . import views
 from .views import (
     CancelPaymentView,
