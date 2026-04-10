@@ -8,6 +8,18 @@
 
 services:
 
+  kolco24_migrate:
+    image: ${KOLCO24_IMAGE:?KOLCO24_IMAGE is required, e.g. registry.lab.tk-sputnik.org/kolco24:latest}
+    container_name: kolco24_migrate
+    command: ["python", "manage.py", "migrate", "--noinput"]
+    env_file:
+      - ./deploy/kolco24.env
+    depends_on:
+      - kolco24_db
+    networks:
+      - kolco24_default
+    restart: "no"
+
   kolco24_web:
     image: ${KOLCO24_IMAGE:?KOLCO24_IMAGE is required, e.g. registry.lab.tk-sputnik.org/kolco24:latest}
     container_name: kolco24_django
@@ -18,7 +30,7 @@ services:
     volumes:
       - media:/app/media
     depends_on:
-      - kolco24_db
+      - kolco24_migrate
     networks:
       - nginx_network
       - kolco24_default
@@ -31,7 +43,7 @@ services:
     env_file:
       - ./deploy/kolco24.env
     depends_on:
-      - kolco24_db
+      - kolco24_migrate
     networks:
       - kolco24_default
 
