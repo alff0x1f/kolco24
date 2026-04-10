@@ -1,0 +1,503 @@
+<!doctype html>
+<html lang="ru">
+<head>
+    <meta charset="utf-8">
+    <title>Кольцо 24 — Соревновательный поход с элементами рогейна</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Соревнования по пешеходному туризму, рогейн КОЛЬЦО 24">
+    <link href="https://fonts.googleapis.com/css?family=Rubik:300,400,400,500" rel="stylesheet">
+    <link href="/static/css/socicon.css" rel="stylesheet" type="text/css" media="all" />
+    <link href="/static/css/entypo.css" rel="stylesheet" type="text/css" media="all" />
+    <link href="/static/css/theme.css" rel="stylesheet" type="text/css" media="all" />
+    <link href="/static/favicon.ico" rel="shortcut icon" type="image/png">
+    <style>
+        /* Race card hero style */
+        .race-card {
+            position: relative;
+            border: none;
+            overflow: hidden;
+            min-height: 260px;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-end;
+        }
+        .race-card .race-card-bg {
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background-size: cover;
+            background-position: center;
+            opacity: 0.45;
+        }
+        .race-card .race-card-body {
+            position: relative;
+            z-index: 1;
+            padding: 1.5rem;
+            color: #fff;
+        }
+        .race-card .race-card-body .badge {
+            font-size: 0.8rem;
+        }
+        .race-card .race-card-body h3 {
+            margin-top: 0.5rem;
+            margin-bottom: 0.25rem;
+        }
+        .race-card .race-card-body .race-meta {
+            font-size: 0.9rem;
+            opacity: 0.85;
+            margin-bottom: 1rem;
+        }
+
+        /* History table */
+        .history-table td, .history-table th {
+            vertical-align: middle;
+        }
+
+        /* News card equal height */
+        .news-cards .card {
+            height: 100%;
+        }
+
+        /* Reduce default section padding */
+        section {
+            padding: 1rem 0;
+        }
+
+        /* Empty state */
+        .empty-races {
+            padding: 3rem 0;
+            text-align: center;
+            color: #6c757d;
+        }
+        .empty-races .icon-cup {
+            font-size: 3rem;
+            display: block;
+            margin-bottom: 1rem;
+            opacity: 0.4;
+        }
+    </style>
+</head>
+<body>
+
+<!-- ======== NAVBAR ======== -->
+<div class="nav-container">
+    <div class="bg-dark navbar-dark" data-sticky="top">
+        <div class="container">
+            <nav class="navbar navbar-expand-lg">
+                <a class="navbar-brand" href="/">
+                    <img alt="Кольцо 24" src="/static/images/logo.png" /> Кольцо 24
+                </a>
+                <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarNav"
+                        aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+                    <i class="icon-menu h4"></i>
+                </button>
+                <div class="collapse navbar-collapse justify-content-between" id="navbarNav">
+                    <ul class="navbar-nav">
+                        <li class="nav-item">
+                            <a href="/page/rules/" class="nav-link">Правила</a>
+                        </li>
+                        <li class="nav-item">
+                            <a href="/race/8/teams/" class="nav-link">Команды</a>
+                        </li>
+                    </ul>
+                    <ul class="navbar-nav">
+                        <li class="nav-item">
+                            <a href="/login/" class="nav-link">Войти</a>
+                        </li>
+                    </ul>
+                </div>
+            </nav>
+        </div>
+    </div>
+</div>
+
+<div class="main-container">
+
+    <!-- ======== HERO ======== -->
+    <section class="bg-dark text-white">
+        <img alt="" src="/static/images/backgrounds/header2024.jpg" class="bg-image opacity-40" />
+        <div class="container py-5">
+            <div class="row align-items-center justify-content-center text-center">
+                <div class="col-12 col-md-8">
+                    <img src="/static/images/logo_big.png" alt="Кольцо 24" style="height:90px;" class="mb-3" />
+                    <h1 class="display-4 font-weight-bold">Кольцо 24</h1>
+                    <p class="lead mb-4">
+                        Соревновательный поход выходного дня с элементами рогейна и ориентирования.
+                        Горы, лес, карта, команда.
+                    </p>
+                    <a href="#races" class="btn btn-success btn-lg mr-2">Соревнования</a>
+                    <a href="#about" class="btn btn-outline-light btn-lg">Узнать подробнее</a>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ======== АКТИВНЫЕ СОРЕВНОВАНИЯ ======== -->
+    <section id="races" class="section">
+        <div class="container">
+
+            <div class="row justify-content-center text-center section-intro">
+                <div class="col-12 col-md-9 col-lg-8">
+                    <h2 class="display-4">Предстоящие соревнования</h2>
+                </div>
+            </div>
+
+            <!-- ВАРИАНТ: есть 2 активных соревнования -->
+            <div class="row">
+
+                <!-- Гонка 1: регистрация открыта -->
+                <div class="col-12 col-sm-6 col-lg-4 mb-4">
+                    <div class="card race-card bg-dark">
+                        <div class="race-card-bg" style="background-image: url('/static/images/backgrounds/header2024.jpg');"></div>
+                        <div class="race-card-body">
+                            <span class="badge badge-success">Регистрация открыта</span>
+                            <h3>Кольцо 24 — 2025</h3>
+                            <div class="race-meta">
+                                <i class="icon-calendar mr-1"></i> Октябрь 2025<br>
+                                <i class="icon-location-pin mr-1"></i> Мурадымовское ущелье
+                            </div>
+                            <a href="/race/8/" class="btn btn-success btn-block">Подробнее и регистрация</a>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Гонка 2: скоро открытие -->
+                <div class="col-12 col-sm-6 col-lg-4 mb-4">
+                    <div class="card race-card bg-dark">
+                        <div class="race-card-bg" style="background-image: url('/static/images/backgrounds/header2023.jpg');"></div>
+                        <div class="race-card-body">
+                            <span class="badge badge-warning text-dark">Скоро открытие</span>
+                            <h3>Кольцо 24 — Зимний 2026</h3>
+                            <div class="race-meta">
+                                <i class="icon-calendar mr-1"></i> Февраль 2026<br>
+                                <i class="icon-location-pin mr-1"></i> Место уточняется
+                            </div>
+                            <a href="/race/9/" class="btn btn-outline-light btn-block">Подробнее</a>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+            <!-- конец варианта с 2 активными -->
+
+            <!-- ВАРИАНТ: нет активных соревнований (показать когда races пусто) -->
+            <!--
+            <div class="empty-races">
+                <i class="icon-cup"></i>
+                <h4>Сейчас активных соревнований нет</h4>
+                <p class="text-muted">Следите за новостями — анонс появится здесь</p>
+                <a href="https://vk.com/kolco24" target="_blank" class="btn btn-outline-secondary">
+                    <i class="icon-vk mr-1"></i>Группа ВКонтакте
+                </a>
+            </div>
+            -->
+
+        </div>
+    </section>
+
+    <!-- ======== НОВОСТИ ======== -->
+    <section id="news" class="section bg-light">
+        <div class="container">
+
+            <div class="row justify-content-center text-center section-intro">
+                <div class="col-12 col-md-9 col-lg-8">
+                    <h2 class="display-4">Новости</h2>
+                    <span class="lead">Обновления и объявления от организаторов</span>
+                </div>
+            </div>
+
+            <div class="row news-cards">
+
+                <!-- Новость 1 -->
+                <div class="col-12 col-md-4 mb-4">
+                    <div class="card">
+                        <div class="card-body">
+                            <time class="text-muted d-block mb-2" style="font-size:0.85rem;">
+                                <i class="icon-calendar mr-1"></i> 15 марта 2025
+                            </time>
+                            <h5 class="card-title">Объявлены даты Кольца 24 — 2025</h5>
+                            <p class="card-text text-muted">
+                                Рады сообщить, что в этом году снова встретимся в Мурадымовском ущелье.
+                                Соревнования пройдут в октябре. Регистрация откроется весной.
+                            </p>
+                            <a href="#" class="btn btn-sm btn-outline-primary">Читать →</a>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Новость 2 -->
+                <div class="col-12 col-md-4 mb-4">
+                    <div class="card">
+                        <div class="card-body">
+                            <time class="text-muted d-block mb-2" style="font-size:0.85rem;">
+                                <i class="icon-calendar mr-1"></i> 20 октября 2024
+                            </time>
+                            <h5 class="card-title">Итоги Кольца 24 — 2024</h5>
+                            <p class="card-text text-muted">
+                                Соревнования прошли! 312 участников, 98 команд. Спасибо всем, кто был
+                                с нами. Результаты опубликованы, фотографии загружаются.
+                            </p>
+                            <a href="#" class="btn btn-sm btn-outline-primary">Читать →</a>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Новость 3 -->
+                <div class="col-12 col-md-4 mb-4">
+                    <div class="card">
+                        <div class="card-body">
+                            <time class="text-muted d-block mb-2" style="font-size:0.85rem;">
+                                <i class="icon-calendar mr-1"></i> 1 сентября 2024
+                            </time>
+                            <h5 class="card-title">Обновление правил 2024</h5>
+                            <p class="card-text text-muted">
+                                В этом году изменены требования к весу рюкзака для дистанции 12 часов
+                                и состав обязательного снаряжения. Ознакомьтесь с новыми правилами.
+                            </p>
+                            <a href="/page/rules/" class="btn btn-sm btn-outline-primary">Читать →</a>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+            <div class="row">
+                <div class="col text-center">
+                    <a href="#" class="btn btn-outline-secondary">Все новости</a>
+                </div>
+            </div>
+
+        </div>
+    </section>
+
+    <!-- ======== О СОРЕВНОВАНИИ ======== -->
+    <section id="about" class="section about">
+        <div class="container">
+            <div class="row">
+                <div class="col-sm-6">
+
+                    <h3 class="section-title">Что такое Кольцо24?</h3>
+                    <p>Ориентирование на местности с определенным контрольным временем. После старта каждая команда,
+                        используя карту с обозначенными контрольными пунктами, старается собрать наибольшее число
+                        баллов. Последовательность и количество взятия КП команда определяет сама.</p>
+                    <p>Выигрывает команда, собравшая максимальное количество баллов.</p>
+                    <p>В отличие от классического рогейна, данное мероприятие является настоящим походом. У вас должно
+                        быть для этого необходимое снаряжение и серьезное отношение к собственной безопасности.
+                        Использование спутниковой навигации разрешено и рекомендовано.</p>
+
+                    <h3 class="section-title multiple-title">Зачем участвовать?</h3>
+                    <p>Азарт и радость, усталость и преодоление, теплая компания и прекрасные виды.
+                        Представители из множества разных городов и регионов, самые активные турклубы Урала, более
+                        трёхсот участников самых разных возрастов. Всех объединяет одно — неравнодушие к туризму и
+                        желание испытать себя.</p>
+
+                </div>
+
+                <div class="col-sm-6">
+
+                    <figure>
+                        <img alt="" class="img-fluid rounded mb-3" src="/static/images/about-us3.jpg">
+                    </figure>
+
+                    <h3 class="section-title multiple-title">Какие дистанции?</h3>
+                    <ul class="list-arrow-right">
+                        <li>«Неспешная река» — КВ 6 часов (2–3 человека)</li>
+                        <li>«Идущий в закат» — КВ 12 часов (4–6 человек или 2 человека ММ/МЖ/ЖЖ)</li>
+                        <li>«Долгий рассвет» — КВ 25 часов (4–6 человек)</li>
+                    </ul>
+
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ======== СТАТИСТИКА ======== -->
+    <section class="text-white space-sm">
+        <div class="container">
+            <img class="bg-image" src="/static/images/backgrounds/bg-1.jpg" alt="">
+            <div class="row justify-content-center">
+                <div class="col-sm-3 text-center">
+                    <i class="ion-ios-calendar"></i>
+                    <h3>с 2015 года</h3>
+                </div>
+                <div class="col-sm-3 text-center">
+                    <i class="ion-ios-location"></i>
+                    <h3>Южный Урал</h3>
+                </div>
+                <div class="col-sm-3 text-center">
+                    <i class="ion-ios-people"></i>
+                    <h3>300+ участников</h3>
+                </div>
+                <div class="col-sm-3 text-center">
+                    <i class="ion-trophy"></i>
+                    <h3>8 соревнований</h3>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ======== ИСТОРИЯ СОРЕВНОВАНИЙ ======== -->
+    <section id="history" class="section">
+        <div class="container">
+
+            <div class="row justify-content-center text-center section-intro">
+                <div class="col-12 col-md-9 col-lg-8">
+                    <h2 class="display-4">История</h2>
+                    <span class="lead">Все прошедшие соревнования Кольцо 24</span>
+                </div>
+            </div>
+
+            <div class="row justify-content-center">
+                <div class="col-12 col-lg-10">
+                    <div class="card">
+                        <div class="table-responsive">
+                            <table class="table table-hover mb-0 history-table">
+                                <thead class="thead-light">
+                                    <tr>
+                                        <th>Год</th>
+                                        <th>Место проведения</th>
+                                        <th class="text-center">Участников</th>
+                                        <th class="text-center">Команд</th>
+                                        <th></th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td><strong>2023</strong></td>
+                                        <td>Мурадымовское ущелье</td>
+                                        <td class="text-center">312</td>
+                                        <td class="text-center">98</td>
+                                        <td class="text-right">
+                                            <a href="/race/8/" class="btn btn-sm btn-outline-primary">Результаты →</a>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td><strong>2022</strong></td>
+                                        <td>Мурадымовское ущелье</td>
+                                        <td class="text-center">288</td>
+                                        <td class="text-center">90</td>
+                                        <td class="text-right">
+                                            <a href="/race/7/" class="btn btn-sm btn-outline-primary">Результаты →</a>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td><strong>2021</strong></td>
+                                        <td>Уфа — Нугуш</td>
+                                        <td class="text-center">260</td>
+                                        <td class="text-center">82</td>
+                                        <td class="text-right">
+                                            <a href="/race/6/" class="btn btn-sm btn-outline-primary">Результаты →</a>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td><strong>2020</strong></td>
+                                        <td>Нугуш</td>
+                                        <td class="text-center">—</td>
+                                        <td class="text-center">—</td>
+                                        <td class="text-right">
+                                            <a href="https://vk.com/kolco24y2020" target="_blank" class="btn btn-sm btn-outline-secondary">ВКонтакте →</a>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td><strong>2019</strong></td>
+                                        <td>Южный Урал</td>
+                                        <td class="text-center">—</td>
+                                        <td class="text-center">—</td>
+                                        <td class="text-right">
+                                            <a href="https://vk.com/kolco24y2019" target="_blank" class="btn btn-sm btn-outline-secondary">ВКонтакте →</a>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td><strong>2018</strong></td>
+                                        <td>Южный Урал</td>
+                                        <td class="text-center">—</td>
+                                        <td class="text-center">—</td>
+                                        <td class="text-right">
+                                            <a href="https://vk.com/kolco24y2018" target="_blank" class="btn btn-sm btn-outline-secondary">ВКонтакте →</a>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td><strong>2017</strong></td>
+                                        <td>Южный Урал</td>
+                                        <td class="text-center">—</td>
+                                        <td class="text-center">—</td>
+                                        <td class="text-right">
+                                            <a href="https://vk.com/kolco242017" target="_blank" class="btn btn-sm btn-outline-secondary">ВКонтакте →</a>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td><strong>2015</strong></td>
+                                        <td>Южный Урал</td>
+                                        <td class="text-center">—</td>
+                                        <td class="text-center">—</td>
+                                        <td class="text-right">
+                                            <a href="https://vk.com/kolco242015" target="_blank" class="btn btn-sm btn-outline-secondary">ВКонтакте →</a>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </section>
+
+    <!-- ======== FOOTER ======== -->
+    <footer class="bg-gray text-light footer-long d-print-none">
+        <div class="container">
+            <div class="row">
+                <div class="col-12 col-md-3">
+                    <img alt="Кольцо 24" src="/static/images/logo_big.png" width="80%" class="mb-4" />
+                </div>
+                <div class="col-12 col-md-9">
+                    <span class="h5">КОЛЬЦО 24. Соревновательный поход выходного дня</span>
+                    <div class="row no-gutters">
+                        <div class="col-6 col-lg-4">
+                            <h6>Навигация</h6>
+                            <ul class="list-unstyled">
+                                <li><a href="/">Главная</a></li>
+                                <li><a href="/login/">Вход</a></li>
+                                <li><a href="https://vk.com/kolco24" target="_blank"><i class="icon-vk"></i>Группа в ВК</a></li>
+                                <li><a href="https://vk.com/kolco24y2020" target="_blank">Кольцо-24 2020</a></li>
+                                <li><a href="https://vk.com/kolco24y2019" target="_blank">Кольцо-24 2019</a></li>
+                                <li><a href="https://vk.com/kolco24y2018" target="_blank">Кольцо-24 2018</a></li>
+                                <li><a href="https://vk.com/kolco242017" target="_blank">Кольцо-24 2017</a></li>
+                                <li><a href="https://vk.com/kolco242016" target="_blank">Кольцо-24 2016</a></li>
+                                <li><a href="https://vk.com/kolco242015" target="_blank">Кольцо-24 2015</a></li>
+                            </ul>
+                        </div>
+                        <div class="col-6 col-lg-4">
+                            <h6>Информация и документы</h6>
+                            <ul class="list-unstyled">
+                                <li><a href="/page/rules/">Правила</a></li>
+                                <li><a href="/privacy/">Политика конфиденциальности</a></li>
+                                <li><a href="/refund_policy/">Политика возврата</a></li>
+                                <li><a href="/contacts/">Контакты</a></li>
+                            </ul>
+                        </div>
+                        <div class="col-6 col-lg-4">
+                            <h6>Сообщество и друзья</h6>
+                            <ul class="list-unstyled">
+                                <li>Email: <a href="mailto:org@kolco24.ru">org@kolco24.ru</a></li>
+                                <li><a href="https://tk-sputnik.org/" target="_blank">ТК Спутник</a> <a href="https://vk.com/tksputnik" target="_blank">(Группа в VK)</a></li>
+                                <li><a href="https://vk.com/mountain_sputnik" target="_blank">Школа горного туризма</a></li>
+                                <li><a href="https://vk.com/velo_sputnik" target="_blank">Школа велотуризма</a></li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+</div>
+<!-- end main-container -->
+
+<script type="text/javascript" src="/static/js/jquery-3.2.1.min.js"></script>
+<script type="text/javascript" src="/static/js/popper.min.js"></script>
+<script type="text/javascript" src="/static/js/bootstrap.min.js"></script>
+<script type="text/javascript" src="/static/js/theme.js"></script>
+
+</body>
+</html>

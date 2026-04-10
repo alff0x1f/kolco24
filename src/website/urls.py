@@ -2,6 +2,7 @@ from django.conf import settings
 from django.conf.urls.static import static
 from django.shortcuts import redirect
 from django.urls import include, path, re_path
+from django.views.generic import TemplateView
 
 from . import views
 from .views import (
@@ -16,6 +17,7 @@ from .views.team import EditTeamView, TeamMemberMoveView
 
 urlpatterns = [
     path("", lambda request: redirect("race", race_id=8), name="index"),
+    path("index_new/", TemplateView.as_view(template_name="website/index_new.html"), name="index_new"),
     # path("index_hidden/", views.IndexView.as_view(), name="index"),
     # auth
     path("register/", views.RegisterView.as_view(), name="register"),
