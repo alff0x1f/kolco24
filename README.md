@@ -1,31 +1,54 @@
 # kolco24
 
-##### How to install:
-You need python3
+## Разработка
 
 ```bash
-git clone git@github.com:alff0x1f/kolco24.git 
-(or git clone https://github.com/alff0x1f/kolco24.git)
+git clone git@github.com:alff0x1f/kolco24.git
 cd kolco24
 python3 -m venv .venv
 source .venv/bin/activate
-pip install -r requirements.txt 
+pip install -r requirements.txt
 ```
 
-```shell
-docker-compose -f docker-compose-dbs.yml up -d
+Запустить базу данных:
+
+```bash
+docker compose -f docker-compose-dbs.yml up -d
 ```
 
-Rename `kolco24/settings.py.example` to `kolco24/settings.py` and edit it (at least you must set SECRET_KEY (just random string) and DIRS TEMPLATES)
-
-##### Create DB:
+Применить миграции и запустить devserver:
 
 ```bash
 python manage.py migrate
-```
-
-##### Run devserver:
-
-```bash
 python manage.py runserver 0:8080
 ```
+
+## Продакшен
+
+### Сборка и публикация образа
+
+```bash
+make login          # авторизация в registry
+make build-push     # сборка и push latest
+make build-push TAG=v1.2.3  # с конкретным тегом
+```
+
+### Деплой на сервере
+
+```bash
+cp deploy/kolco24.env.example deploy/kolco24.env
+# заполнить deploy/kolco24.env
+
+echo "KOLCO24_IMAGE=registry.lab.tk-sputnik.org/kolco24:latest" > .env
+docker compose -f docker-compose_v2.yml up -d
+```
+
+Для обновления до новой версии:
+
+```bash
+echo "KOLCO24_IMAGE=registry.lab.tk-sputnik.org/kolco24:v1.2.3" > .env
+docker compose -f docker-compose_v2.yml pull
+docker compose -f docker-compose_v2.yml up -d
+```
+
+> Требует внешней сети `nginx_network` (создаётся отдельно: `docker network create nginx_network`).
