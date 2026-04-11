@@ -11,7 +11,7 @@ build:
 	$(PODMAN) build -t $(FULL_IMAGE) --platform linux/amd64 .
 
 push:
-	$(PODMAN) push $(FULL_IMAGE)
+	$(PODMAN) push --format v2s2 $(FULL_IMAGE)
 
 build-push: build push
 
