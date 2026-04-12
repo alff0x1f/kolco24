@@ -57,16 +57,12 @@ CURRENT_YEAR = 2023
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.getenv("DEBUG", "False") == "True"
 
-ALLOWED_HOSTS = [
-    "127.0.0.1",
-    "kolco24.ru",
-    "192.168.88.5",
-    "xn--24-1lceob9c6b.xn--p1ai",
-    "kolco-24.ru",
-    "192.168.1.5",
-]
-CSRF_TRUSTED_ORIGINS = ["https://kolco24.ru", "https://xn--24-1lceob9c6b.xn--p1ai"]
-
+ALLOWED_HOSTS = os.getenv("ALLOWED_HOSTS", "127.0.0.1").split(",")
+CSRF_TRUSTED_ORIGINS = (
+    os.getenv("CSRF_TRUSTED_ORIGINS", "").split(",")
+    if os.getenv("CSRF_TRUSTED_ORIGINS")
+    else []
+)
 
 # Application definition
 
@@ -174,8 +170,8 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/2.0/howto/static-files/
 
 STATIC_URL = "/static/"
-STATIC_ROOT = os.path.join(BASE_DIR, "static/")
-# STATICFILES_DIRS = [os.path.join(BASE_DIR, "static")]
+STATIC_ROOT = os.path.join(BASE_DIR, "staticfiles")
+STATICFILES_DIRS = [os.path.join(BASE_DIR, "static")]
 if not DEBUG:
     STATICFILES_STORAGE = "whitenoise.storage.CompressedStaticFilesStorage"
 

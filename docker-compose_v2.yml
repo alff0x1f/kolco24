@@ -1,0 +1,77 @@
+# Production docker-compose.
+# Uses pre-built image from registry (built via: make build-push)
+#
+# Quick start:
+#   cp deploy/kolco24.env.example deploy/kolco24.env  # заполни переменные
+#   echo "KOLCO24_IMAGE=registry.lab.tk-sputnik.org/kolco24:latest" > .env
+#   docker compose -f docker-compose_v2.yml up -d
+
+services:
+
+  kolco24_migrate:
+    image: ${KOLCO24_IMAGE:?KOLCO24_IMAGE is required, e.g. registry.lab.tk-sputnik.org/kolco24:latest}
+    container_name: kolco24_migrate
+    command: ["python", "manage.py", "migrate", "--noinput"]
+    env_file:
+      - ./deploy/kolco24.env
+    depends_on:
+      kolco24_db:
+        condition: service_healthy
+    networks:
+      - kolco24_default
+    restart: "no"
+
+  kolco24_web:
+    image: ${KOLCO24_IMAGE:?KOLCO24_IMAGE is required, e.g. registry.lab.tk-sputnik.org/kolco24:latest}
+    container_name: kolco24_django
+    restart: unless-stopped
+    command: ["gunicorn", "--bind", "0.0.0.0:8000", "kolco24.wsgi:application", "--access-logfile", "-", "--log-level", "info"]
+    env_file:
+      - ./deploy/kolco24.env
+    volumes:
+      - media:/app/media
+    depends_on:
+      kolco24_migrate:
+        condition: service_completed_successfully
+    networks:
+      - nginx_network
+      - kolco24_default
+
+  kolco24_runmailer:
+    image: ${KOLCO24_IMAGE:?KOLCO24_IMAGE is required}
+    container_name: kolco24_runmailer
+    restart: unless-stopped
+    command: ["python", "manage.py", "runmailer"]
+    env_file:
+      - ./deploy/kolco24.env
+    depends_on:
+      kolco24_migrate:
+        condition: service_completed_successfully
+    networks:
+      - kolco24_default
+
+  kolco24_db:
+    image: postgres:15
+    container_name: kolco24_db
+    restart: unless-stopped
+    env_file:
+      - ./deploy/kolco24.env
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - kolco24_default
+
+networks:
+  kolco24_default:
+  nginx_network:
+    external: true
+
+volumes:
+  postgres-data:
+  media:
