@@ -1,6 +1,5 @@
 import os
 import subprocess
-import sys
 from datetime import datetime, timedelta
 from pathlib import Path
 
@@ -39,7 +38,20 @@ class Command(BaseCommand):
 
         env = {**os.environ, "PGPASSWORD": password}
         result = subprocess.run(
-            ["pg_dump", "-Fc", "-h", host, "-p", port, "-U", user, "-d", name, "-f", filepath],
+            [
+                "pg_dump",
+                "-Fc",
+                "-h",
+                host,
+                "-p",
+                port,
+                "-U",
+                user,
+                "-d",
+                name,
+                "-f",
+                filepath,
+            ],
             env=env,
             capture_output=True,
             text=True,
@@ -49,7 +61,9 @@ class Command(BaseCommand):
             raise CommandError(f"pg_dump failed:\n{result.stderr}")
 
         size = Path(filepath).stat().st_size
-        self.stdout.write(self.style.SUCCESS(f"Backup created: {filepath} ({size:,} bytes)"))
+        self.stdout.write(
+            self.style.SUCCESS(f"Backup created: {filepath} ({size:,} bytes)")
+        )
 
         self._prune_old_backups(output_dir, retention_days)
 
@@ -61,4 +75,6 @@ class Command(BaseCommand):
                 path.unlink()
                 pruned += 1
         if pruned:
-            self.stdout.write(f"Pruned {pruned} backup(s) older than {retention_days} days.")
+            self.stdout.write(
+                f"Pruned {pruned} backup(s) older than {retention_days} days."
+            )

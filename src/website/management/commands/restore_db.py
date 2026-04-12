@@ -46,9 +46,18 @@ class Command(BaseCommand):
         result = subprocess.run(
             [
                 "pg_restore",
-                "--clean", "--if-exists", "--no-owner",
+                "--clean",
+                "--if-exists",
+                "--no-owner",
                 "-Fc",
-                "-h", host, "-p", port, "-U", user, "-d", name,
+                "-h",
+                host,
+                "-p",
+                port,
+                "-U",
+                user,
+                "-d",
+                name,
                 str(filepath),
             ],
             env=env,
@@ -75,7 +84,9 @@ class Command(BaseCommand):
 
         if options["latest"]:
             backup_dir = os.getenv("BACKUP_DIR", "/app/backups")
-            dumps = sorted(Path(backup_dir).glob("*.dump"), key=lambda p: p.stat().st_mtime)
+            dumps = sorted(
+                Path(backup_dir).glob("*.dump"), key=lambda p: p.stat().st_mtime
+            )
             if not dumps:
                 raise CommandError(f"No .dump files found in {backup_dir}")
             return dumps[-1]
