@@ -92,7 +92,8 @@ class Command(BaseCommand):
             return dumps[-1]
 
         raise CommandError(
-            "Provide a backup file path or use --latest to restore the most recent backup."
+            "Provide a backup file path or use "
+            "--latest to restore the most recent backup."
         )
 
     def _confirm(self, filepath, db_name):
@@ -104,7 +105,8 @@ class Command(BaseCommand):
         )
         if not sys.stdin.isatty():
             raise CommandError(
-                "Restore requires confirmation. Pass --no-confirm to skip in non-interactive mode."
+                "Restore requires confirmation. "
+                "Pass --no-confirm to skip in non-interactive mode."
             )
         answer = input("Type 'yes' to continue: ").strip().lower()
         if answer != "yes":
