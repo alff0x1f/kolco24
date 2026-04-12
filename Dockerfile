@@ -20,8 +20,4 @@ COPY src ./
 
 RUN DJANGO_SECRET_KEY=build python manage.py collectstatic --noinput
 
-RUN useradd --no-create-home --no-log-init -u 1000 appuser \
-    && chown -R appuser /app
-USER appuser
-
 CMD ["gunicorn", "--bind", "0.0.0.0:8000", "kolco24.wsgi:application"]

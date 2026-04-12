@@ -19,8 +19,8 @@ docker compose -f docker-compose-dbs.yml up -d
 Применить миграции и запустить devserver:
 
 ```bash
-python manage.py migrate
-python manage.py runserver 0:8080
+python src/manage.py migrate
+python src/manage.py runserver 0:8080
 ```
 
 ## Продакшен
