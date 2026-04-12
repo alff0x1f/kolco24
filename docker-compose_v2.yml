@@ -30,11 +30,34 @@ services:
       - ./deploy/kolco24.env
     volumes:
       - media:/app/media
+      - backups:/app/backups
     depends_on:
       kolco24_migrate:
         condition: service_completed_successfully
     networks:
       - nginx_network
+      - kolco24_default
+
+  kolco24_backup:
+    image: ${KOLCO24_IMAGE:?KOLCO24_IMAGE is required}
+    container_name: kolco24_backup
+    restart: unless-stopped
+    command:
+      - /bin/sh
+      - -c
+      - |
+        while true; do
+          python manage.py backup_db
+          sleep 86400
+        done
+    env_file:
+      - ./deploy/kolco24.env
+    volumes:
+      - backups:/app/backups
+    depends_on:
+      kolco24_migrate:
+        condition: service_completed_successfully
+    networks:
       - kolco24_default
 
   kolco24_runmailer:
@@ -75,3 +98,4 @@ networks:
 volumes:
   postgres-data:
   media:
+  backups:

@@ -9,7 +9,7 @@ WORKDIR /app
 
 COPY ru-trust-bundle.pem /usr/local/share/ca-certificates/ru-trust-bundle.crt
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends ca-certificates \
+    && apt-get install -y --no-install-recommends ca-certificates postgresql-client-15 \
     && update-ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
