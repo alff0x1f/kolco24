@@ -12,5 +12,5 @@ gunicorn==22.0.0
 whitenoise==6.6.0
 markdown==3.8.1
 # Testing
-pytest==8.2.2
+pytest==9.0.3
 pytest-django==4.8.0
