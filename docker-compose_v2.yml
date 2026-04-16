@@ -11,9 +11,16 @@ services:
   kolco24_migrate:
     image: ${KOLCO24_IMAGE:?KOLCO24_IMAGE is required, e.g. registry.lab.tk-sputnik.org/kolco24:latest}
     container_name: kolco24_migrate
-    command: ["python", "manage.py", "migrate", "--noinput"]
+    command:
+      - /bin/sh
+      - -c
+      - |
+        python manage.py migrate --noinput &&
+        python manage.py collectstatic --noinput
     env_file:
       - ./deploy/kolco24.env
+    volumes:
+      - static:/app/staticfiles
     depends_on:
       kolco24_db:
         condition: service_healthy
@@ -31,6 +38,20 @@ services:
     volumes:
       - media:/app/media
       - backups:/app/backups
+    depends_on:
+      kolco24_migrate:
+        condition: service_completed_successfully
+    networks:
+      - kolco24_default
+
+  kolco24_nginx:
+    image: nginx:alpine
+    container_name: kolco24_nginx
+    restart: unless-stopped
+    volumes:
+      - static:/app/staticfiles:ro
+      - media:/app/media:ro
+      - ./deploy/nginx.conf:/etc/nginx/conf.d/default.conf:ro
     depends_on:
       kolco24_migrate:
         condition: service_completed_successfully
@@ -97,5 +118,6 @@ networks:
 
 volumes:
   postgres-data:
+  static:
   media:
   backups:
