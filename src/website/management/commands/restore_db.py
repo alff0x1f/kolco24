@@ -65,13 +65,13 @@ class Command(BaseCommand):
             text=True,
         )
 
-        if result.returncode != 0:
-            # pg_restore may emit non-fatal warnings to stderr and still exit 0,
-            # but a non-zero exit means something actually failed.
-            raise CommandError(f"pg_restore failed:\n{result.stderr}")
-
         if result.stderr:
-            self.stderr.write(result.stderr)
+            self.stderr.write(
+                self.style.WARNING(f"pg_restore warnings:\n{result.stderr}")
+            )
+
+        if result.returncode not in (0, 1):
+            raise CommandError(f"pg_restore failed (exit code {result.returncode})")
 
         self.stdout.write(self.style.SUCCESS("Restore completed successfully."))
 
