@@ -4,6 +4,7 @@
 # Quick start:
 #   cp deploy/kolco24.env.example deploy/kolco24.env  # заполни переменные
 #   echo "KOLCO24_IMAGE=registry.lab.tk-sputnik.org/kolco24:latest" > .env
+#   echo "DATA_LOCATION=./data" >> .env                 # путь для хранения данных (абс. или относительный)
 #   docker compose -f docker-compose_v2.yml up -d
 
 services:
@@ -20,7 +21,7 @@ services:
     env_file:
       - ./deploy/kolco24.env
     volumes:
-      - static:/app/staticfiles
+      - ${DATA_LOCATION}/static:/app/staticfiles
     depends_on:
       kolco24_db:
         condition: service_healthy
@@ -36,8 +37,8 @@ services:
     env_file:
       - ./deploy/kolco24.env
     volumes:
-      - media:/app/media
-      - backups:/app/backups
+      - ${DATA_LOCATION}/media:/app/media
+      - ${DATA_LOCATION}/backups:/app/backups
     depends_on:
       kolco24_migrate:
         condition: service_completed_successfully
@@ -49,14 +50,14 @@ services:
     container_name: kolco24_nginx
     restart: unless-stopped
     volumes:
-      - static:/app/staticfiles:ro
-      - media:/app/media:ro
+      - ${DATA_LOCATION}/static:/app/staticfiles:ro
+      - ${DATA_LOCATION}/media:/app/media:ro
       - ./deploy/nginx.conf:/etc/nginx/conf.d/default.conf:ro
     depends_on:
       kolco24_migrate:
         condition: service_completed_successfully
     networks:
-      - nginx_network
+      - proxy
       - kolco24_default
 
   kolco24_backup:
@@ -74,7 +75,7 @@ services:
     env_file:
       - ./deploy/kolco24.env
     volumes:
-      - backups:/app/backups
+      - ${DATA_LOCATION}/backups:/app/backups
     depends_on:
       kolco24_migrate:
         condition: service_completed_successfully
@@ -101,9 +102,9 @@ services:
     env_file:
       - ./deploy/kolco24.env
     volumes:
-      - postgres-data:/var/lib/postgresql/data
+      - ${DATA_LOCATION}/postgres-data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      test: [ "CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -113,11 +114,5 @@ services:
 
 networks:
   kolco24_default:
-  nginx_network:
+  proxy:
     external: true
-
-volumes:
-  postgres-data:
-  static:
-  media:
-  backups:
