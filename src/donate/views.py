@@ -13,7 +13,6 @@ from website.models import VTBPayment, VTBPreparedPayment
 class DonateView(View):
     template_name = "donate/index.html"
     preset_amounts = (1500, 3000)
-    preset_comments = ("ГШ 2 полугодие 2025", "ГШ 1 полугодие 2026")
     min_amount = Decimal("10")
     max_amount = Decimal("20000")
     comment_max_length = 255
@@ -139,9 +138,14 @@ class DonateView(View):
         return render(request, self.template_name, self.get_context(amount))
 
     def get_context(self, amount=None, sender_name="", comment=""):
+        preset_comments = list(
+            DonationPeriod.objects.filter(is_active=True)
+            .order_by("-date")
+            .values_list("name", flat=True)[:2]
+        )
         return {
             "preset_amounts": self.preset_amounts,
-            "preset_comments": self.preset_comments,
+            "preset_comments": preset_comments,
             "amount": (
                 str(amount) if amount is not None else str(self.preset_amounts[0])
             ),
@@ -149,6 +153,7 @@ class DonateView(View):
             "max_amount": int(self.max_amount),
             "sender_name": sender_name,
             "comment": comment,
+            "default_comment": preset_comments[0] if preset_comments else "",
             "donor_table": self.build_donor_table(),
         }
 
@@ -190,11 +195,13 @@ class DonateView(View):
         for member in members:
             pmap = payment_map[member.id]
             cells = [pmap.get(pid) for pid in period_ids]
-            rows.append({
-                "member": member,
-                "cells": cells,
-                "paid_latest": pmap.get(latest_period_id, None),
-            })
+            rows.append(
+                {
+                    "member": member,
+                    "cells": cells,
+                    "paid_latest": pmap.get(latest_period_id, None),
+                }
+            )
 
         return {
             "periods": periods,

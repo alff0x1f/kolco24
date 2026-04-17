@@ -58,8 +58,8 @@
                                 class="form-control dues-input"
                                 type="text"
                                 name="sender_name"
-                                value="{% firstof sender_name 'Иван Петров' %}"
-                                placeholder="Иванов Иван"
+                                value="{{ sender_name }}"
+                                placeholder="Фамилия Имя"
                                 required
                             >
                         </div>
@@ -71,7 +71,7 @@
                                 class="form-control dues-input"
                                 type="text"
                                 name="comment"
-                                value="{% firstof comment 'Клубный взнос, весна 2026' %}"
+                                value="{% firstof comment default_comment %}"
                                 maxlength="255"
                                 placeholder="Например: клубный взнос, весна 2026"
                                 required
