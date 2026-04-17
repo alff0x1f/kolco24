@@ -17,61 +17,6 @@
 
         <div class="row">
             <div class="col-xl-5 mb-4 mb-xl-0">
-                <div class="dues-panel dues-panel--status mb-4">
-                    <p class="dues-eyebrow">Проверить взнос</p>
-                    <div class="dues-checker">
-                        <label class="dues-checker__label" for="dues-check-name">Имя и фамилия</label>
-                        <div class="dues-checker__row">
-                            <input
-                                id="dues-check-name"
-                                class="form-control dues-input"
-                                type="text"
-                                value="Иван Петров"
-                                placeholder="Например: Иван Петров"
-                            >
-                            <button type="button" class="btn dues-checker__button">Найти</button>
-                        </div>
-                    </div>
-                    <div class="dues-profile">
-                        <div class="dues-profile__main">
-                            <h2 class="dues-profile__name dues-profile__name--dark">Иван Петров</h2>
-                            <p class="dues-profile__meta">
-                                {% if donor_table and donor_table.periods %}
-                                    Период: {{ donor_table.periods.0.name }}
-                                {% else %}
-                                    Период: Весна 2026
-                                {% endif %}
-                            </p>
-                        </div>
-                        <span class="dues-badge dues-badge--ok">Оплачено</span>
-                    </div>
-                    <div class="dues-status-card dues-status-card--result dues-status-card--light">
-                        <div>
-                            <div class="dues-status-card__label">Статус</div>
-                            <div class="dues-status-card__value dues-status-card__value--compact dues-status-card__value--dark">Взнос есть</div>
-                        </div>
-                        <div class="dues-status-card__aside">
-                            <span>14 марта 2026</span>
-                            <small>{{ preset_amounts.0 }} ₽</small>
-                        </div>
-                    </div>
-
-                    <div class="dues-mini-list dues-mini-list--light">
-                        <div class="dues-mini-list__item">
-                            <span>Предыдущий период</span>
-                            <strong>Оплачен</strong>
-                        </div>
-                        <div class="dues-mini-list__item">
-                            <span>Следующий взнос</span>
-                            <strong>Осень 2026</strong>
-                        </div>
-                        <div class="dues-mini-list__item">
-                            <span>Если участник выбыл</span>
-                            <strong>Показывается архивный статус</strong>
-                        </div>
-                    </div>
-                </div>
-
                 <div class="dues-panel dues-panel--form h-100">
                     <div class="dues-section-heading">
                         <p class="dues-eyebrow">Внести взнос</p>
@@ -153,10 +98,8 @@
                 <div class="dues-panel dues-panel--table h-100">
                     <div class="dues-section-heading dues-section-heading--inline">
                         <div>
-                            <p class="dues-eyebrow">Статусы участников</p>
-                            <h2>Кто уже оплатил</h2>
+                            <h2>Участники клуба</h2>
                         </div>
-                        <span class="dues-note">Текущий период слева</span>
                     </div>
 
                     {% if donor_table %}
@@ -180,13 +123,6 @@
                                             <td class="dues-member">
                                                 <div class="dues-member__line">
                                                     <span class="dues-member__name">{{ row.member.name }}</span>
-                                                    {% if row.cells.0 == None %}
-                                                        <span class="dues-badge dues-badge--inactive">Не в активном составе</span>
-                                                    {% elif row.paid_latest %}
-                                                        <span class="dues-badge dues-badge--ok">Оплатил</span>
-                                                    {% else %}
-                                                        <span class="dues-badge dues-badge--pending">Не оплачено</span>
-                                                    {% endif %}
                                                 </div>
                                                 {% if row.member.notes %}
                                                     <div class="dues-member__note">{{ row.member.notes }}</div>
@@ -227,7 +163,6 @@
                                         <td class="dues-member">
                                             <div class="dues-member__line">
                                                 <span class="dues-member__name">Иван Петров</span>
-                                                <span class="dues-badge dues-badge--ok">Оплатил</span>
                                             </div>
                                         </td>
                                         <td class="text-center"><span class="dues-cell dues-cell--paid"></span></td>
@@ -239,7 +174,6 @@
                                         <td class="dues-member">
                                             <div class="dues-member__line">
                                                 <span class="dues-member__name">Мария Соколова</span>
-                                                <span class="dues-badge dues-badge--ok">Оплатил</span>
                                             </div>
                                             <div class="dues-member__note">Сдала взнос через СБП</div>
                                         </td>
@@ -252,7 +186,6 @@
                                         <td class="dues-member">
                                             <div class="dues-member__line">
                                                 <span class="dues-member__name">Алексей Власов</span>
-                                                <span class="dues-badge dues-badge--pending">Не оплачено</span>
                                             </div>
                                         </td>
                                         <td class="text-center"><span class="dues-cell dues-cell--pending"></span></td>
@@ -264,7 +197,6 @@
                                         <td class="dues-member">
                                             <div class="dues-member__line">
                                                 <span class="dues-member__name">Ольга Николаева</span>
-                                                <span class="dues-badge dues-badge--pending">Не оплачено</span>
                                             </div>
                                             <div class="dues-member__note">Напоминание отправлено</div>
                                         </td>
@@ -277,8 +209,7 @@
                                         <td class="dues-member">
                                             <div class="dues-member__line">
                                                 <span class="dues-member__name">Сергей Егоров</span>
-                                                <span class="dues-badge dues-badge--inactive">Не в активном составе</span>
-                                            </div>
+</div>
                                             <div class="dues-member__note">Был в клубе до осени 2025</div>
                                         </td>
                                         <td class="text-center"><span class="dues-cell dues-cell--inactive"></span></td>
@@ -290,8 +221,7 @@
                                         <td class="dues-member">
                                             <div class="dues-member__line">
                                                 <span class="dues-member__name">Анна Громова</span>
-                                                <span class="dues-badge dues-badge--inactive">Не в активном составе</span>
-                                            </div>
+</div>
                                             <div class="dues-member__note">В архиве оплат, в текущем периоде не учитывается</div>
                                         </td>
                                         <td class="text-center"><span class="dues-cell dues-cell--inactive"></span></td>
@@ -579,7 +509,6 @@
 
 .dues-table {
     margin-bottom: 0;
-    min-width: 720px;
 }
 
 .dues-table thead th {
@@ -598,7 +527,6 @@
 }
 
 .dues-member {
-    min-width: 260px;
 }
 
 .dues-member__line {
