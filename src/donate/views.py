@@ -10,7 +10,6 @@ from donate.models import ClubMember, DonateRequest, DonationPeriod, MemberDonat
 from vtb.client import VTBClient
 from website.models import VTBPayment, VTBPreparedPayment
 
-
 _CROCKFORD = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"
 
 
