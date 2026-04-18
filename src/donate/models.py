@@ -51,6 +51,13 @@ class DonationPeriod(models.Model):
 
 
 class MemberDonation(models.Model):
+    RECIPIENT_TAMILA = "tamila"
+    RECIPIENT_SBP = "sbp"
+    RECIPIENT_CHOICES = [
+        (RECIPIENT_TAMILA, "Тамиле"),
+        (RECIPIENT_SBP, "СБП через сайт"),
+    ]
+
     member = models.ForeignKey(
         ClubMember,
         on_delete=models.CASCADE,
@@ -64,6 +71,13 @@ class MemberDonation(models.Model):
     is_paid = models.BooleanField(default=False)
     amount = models.DecimalField(
         max_digits=10, decimal_places=2, null=True, blank=True
+    )
+    paid_date = models.DateField(null=True, blank=True, verbose_name="Дата взноса")
+    recipient = models.CharField(
+        max_length=20,
+        choices=RECIPIENT_CHOICES,
+        blank=True,
+        verbose_name="Кому",
     )
     note = models.CharField(max_length=255, blank=True)
 
