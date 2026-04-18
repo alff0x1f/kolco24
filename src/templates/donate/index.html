@@ -261,26 +261,12 @@
 }
 
 .dues-panel--form,
-.dues-panel--table,
-.dues-panel--status {
+.dues-panel--table {
     background: rgba(255, 255, 255, 0.92);
     border: 1px solid rgba(28, 39, 50, 0.08);
 }
 
-.dues-badge {
-    display: inline-flex;
-    align-items: center;
-    border-radius: 999px;
-    font-size: 0.78rem;
-    line-height: 1;
-    padding: 0.5rem 0.8rem;
-    font-weight: 600;
-    letter-spacing: 0.03em;
-}
-
-.dues-profile__meta,
 .dues-section-heading p,
-.dues-note,
 .dues-member__note {
     color: rgba(41, 56, 67, 0.72);
 }
@@ -312,141 +298,8 @@
     margin-bottom: 0.65rem;
 }
 
-.dues-profile {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    gap: 1rem;
-    margin-bottom: 1.2rem;
-}
-
-.dues-profile__name,
 .dues-section-heading h2 {
     margin-bottom: 0.4rem;
-}
-
-.dues-profile__name {
-    font-size: 1.75rem;
-    color: #1b2c37;
-}
-
-.dues-profile__name--dark {
-    color: #1b2c37;
-}
-
-.dues-badge--ok {
-    color: #12462c;
-    background: #b8ecc6;
-}
-
-.dues-badge--pending {
-    color: #6a2f1f;
-    background: #f4d1c5;
-}
-
-.dues-badge--inactive {
-    color: #42515b;
-    background: #dfe5ea;
-}
-
-.dues-status-card {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
-    gap: 1rem;
-    margin-bottom: 1rem;
-    padding: 1rem 1.1rem;
-    border-radius: 20px;
-    background: rgba(27, 44, 55, 0.05);
-}
-
-.dues-status-card--result {
-    margin-top: 1.15rem;
-}
-
-.dues-status-card--light {
-    background: #f3f0e8;
-}
-
-.dues-status-card__label {
-    display: block;
-    font-size: 0.85rem;
-}
-
-.dues-status-card__value {
-    color: #1b2c37;
-    font-size: 2rem;
-    font-weight: 700;
-    line-height: 1.1;
-}
-
-.dues-status-card__value--dark {
-    color: #1b2c37;
-}
-
-.dues-status-card__value--compact {
-    font-size: 1.65rem;
-}
-
-.dues-status-card__aside {
-    display: flex;
-    flex-direction: column;
-    justify-content: flex-end;
-    text-align: right;
-}
-
-.dues-mini-list {
-    display: grid;
-    gap: 0.85rem;
-}
-
-.dues-checker {
-    margin-bottom: 1.25rem;
-}
-
-.dues-checker__label {
-    display: block;
-    margin-bottom: 0.55rem;
-    color: #1b2c37;
-    font-size: 0.92rem;
-    font-weight: 500;
-}
-
-.dues-checker__row {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
-    gap: 0.75rem;
-}
-
-.dues-checker__button {
-    min-height: 3.35rem;
-    padding: 0.85rem 1.2rem;
-    border-radius: 16px;
-    border: 0;
-    background: #d8b16d;
-    color: #173142;
-    font-weight: 700;
-}
-
-.dues-mini-list--light .dues-mini-list__item {
-    border-top-color: rgba(27, 44, 55, 0.1);
-}
-
-.dues-mini-list--light .dues-mini-list__item strong {
-    color: #1b2c37;
-}
-
-.dues-mini-list__item {
-    display: flex;
-    justify-content: space-between;
-    gap: 1rem;
-    padding-top: 0.85rem;
-    border-top: 1px solid rgba(255, 255, 255, 0.12);
-}
-
-.dues-mini-list__item strong {
-    color: #ffffff;
-    font-size: 0.96rem;
-    text-align: right;
 }
 
 .dues-section-heading--inline {
@@ -516,7 +369,7 @@
 .dues-table td {
     vertical-align: middle;
     border-top: 1px solid #edf1f2;
-  padding: 0.4rem 0.35rem;
+    padding: 0.4rem 0.35rem;
 }
 
 .dues-period-header {
@@ -536,9 +389,6 @@
     color: #667783;
     font-weight: 600;
     white-space: nowrap;
-}
-
-.dues-member {
 }
 
 .dues-member__line {
@@ -565,13 +415,6 @@
 
 .dues-row--pending {
     background: rgba(244, 209, 197, 0.15);
-}
-
-.dues-empty {
-    margin-top: 1.5rem;
-    padding: 2rem;
-    border-radius: 22px;
-    background: #f6f2ea;
 }
 
 .table.dues-table th {
@@ -611,21 +454,8 @@
         border-radius: 22px;
     }
 
-    .dues-status-card,
-    .dues-checker__row {
-        grid-template-columns: 1fr;
-    }
-
-    .dues-profile,
-    .dues-section-heading--inline,
-    .dues-mini-list__item {
+    .dues-section-heading--inline {
         display: block;
-    }
-
-    .dues-status-card__aside,
-    .dues-mini-list__item strong {
-        text-align: left;
-        margin-top: 0.4rem;
     }
 
     .table.dues-table th {
