@@ -36,7 +36,9 @@ class ClubMember(models.Model):
 
 class DonationPeriod(models.Model):
     name = models.CharField(max_length=120, unique=True)
-    date = models.DateField(help_text="Дата начала периода — используется для сортировки")
+    date = models.DateField(
+        help_text="Дата начала периода — используется для сортировки"
+    )
     is_active = models.BooleanField(
         default=True,
         help_text="Показывать в таблице на сайте",
@@ -69,9 +71,7 @@ class MemberDonation(models.Model):
         related_name="member_donations",
     )
     is_paid = models.BooleanField(default=False)
-    amount = models.DecimalField(
-        max_digits=10, decimal_places=2, null=True, blank=True
-    )
+    amount = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
     paid_date = models.DateField(null=True, blank=True, verbose_name="Дата взноса")
     recipient = models.CharField(
         max_length=20,
