@@ -109,7 +109,7 @@
                                     <tr>
                                         <th>Участник</th>
                                         {% for period in donor_table.periods %}
-                                            <th class="text-center text-nowrap">{{ period.name }}</th>
+                                            <th class="dues-period-header"><div>{{ period.name }}</div></th>
                                         {% endfor %}
                                     </tr>
                                 </thead>
@@ -150,10 +150,10 @@
                                 <thead>
                                     <tr>
                                         <th>Участник</th>
-                                        <th class="text-center text-nowrap">Весна 2026</th>
-                                        <th class="text-center text-nowrap">Осень 2025</th>
-                                        <th class="text-center text-nowrap">Весна 2025</th>
-                                        <th class="text-center text-nowrap">Осень 2024</th>
+                                        <th class="dues-period-header"><div>Весна 2026</div></th>
+                                        <th class="dues-period-header"><div>Осень 2025</div></th>
+                                        <th class="dues-period-header"><div>Весна 2025</div></th>
+                                        <th class="dues-period-header"><div>Осень 2024</div></th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -502,7 +502,6 @@
 
 .dues-table-wrap {
     margin-top: 1.5rem;
-    overflow-x: auto;
 }
 
 .dues-table {
@@ -512,16 +511,31 @@
 .dues-table thead th {
     border-top: 0;
     border-bottom: 1px solid #d9e0e4;
-    color: #667783;
-    font-size: 0.8rem;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
 }
 
 .dues-table td {
     vertical-align: middle;
     border-top: 1px solid #edf1f2;
-    padding: 1rem 0.85rem;
+    padding: 0.45rem 0.5rem;
+}
+
+.dues-period-header {
+    height: 8rem;
+    padding: 0 0.25rem 0.5rem;
+    vertical-align: bottom;
+    width: 2rem;
+    min-width: 2rem;
+}
+
+.dues-period-header > div {
+    writing-mode: vertical-rl;
+    transform: rotate(180deg);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    font-size: 0.75rem;
+    color: #667783;
+    font-weight: 600;
+    white-space: nowrap;
 }
 
 .dues-member {
