@@ -164,6 +164,7 @@ class DonateView(View):
             "comment": comment,
             "default_comment": preset_comments[0] if preset_comments else "",
             "donor_table": self.build_donor_table(),
+            "member_names": list(ClubMember.objects.values_list("name", flat=True)),
         }
 
     @staticmethod
