@@ -126,8 +126,6 @@
                                                 </div>
                                                 {% if row.member.notes %}
                                                     <div class="dues-member__note">{{ row.member.notes }}</div>
-                                                {% elif row.cells.0 == None %}
-                                                    <div class="dues-member__note">Человек виден в истории оплат, но не отмечается как должник текущего периода.</div>
                                                 {% endif %}
                                             </td>
                                             {% for cell in row.cells %}
