@@ -1,84 +1,611 @@
 {% extends "website/base.html" %}
 
-{% block title %}Поддержать проект | Кольцо 24{% endblock %}
+{% block title %}Клубные взносы | Кольцо 24{% endblock %}
 
 {% block content %}
-<section class="bg-dark text-light o-hidden">
+<section class="dues-main">
     <div class="container">
-        <div class="row justify-content-center text-center">
-            <div class="col-md-8 col-lg-7">
-                <h1 class="display-4">Поддержать ТК Спутник</h1>
-                <p class="lead">Вы можете сделать пожертвование на развитие турклуба/горной школы.</p>
-            </div>
-        </div>
-    </div>
-</section>
-
-<section>
-    <div class="container">
-        <div class="row justify-content-center">
-            <div class="col-md-8 col-lg-6">
-                {% if messages %}
+        {% if messages %}
+            <div class="row">
+                <div class="col-12">
                     {% for message in messages %}
                         <div class="alert alert-{% if message.tags == 'error' %}danger{% else %}info{% endif %}">{{ message }}</div>
                     {% endfor %}
-                {% endif %}
+                </div>
+            </div>
+        {% endif %}
 
-                <form method="post" class="card card-body">
-                    {% csrf_token %}
-                    <div class="form-group">
-                        <label for="donate-amount">Сумма взноса, руб</label>
-                        <input
-                            id="donate-amount"
-                            class="form-control"
-                            type="number"
-                            name="amount"
-                            min="{{ min_amount }}"
-                            max="{{ max_amount }}"
-                            step="1"
-                            value="{{ amount }}"
-                            required
-                        >
-                        <div class="d-flex flex-wrap mt-2">
-                            {% for preset in preset_amounts %}
-                                <button type="button" class="btn btn-outline-primary btn-sm mr-2 mb-2" onclick="document.getElementById('donate-amount').value='{{ preset }}';">{{ preset }} ₽</button>
-                            {% endfor %}
+        <div class="row">
+            <div class="col-xl-5 mb-4 mb-xl-0">
+                <div class="dues-panel dues-panel--form h-100">
+                    <div class="dues-section-heading">
+                        <p class="dues-eyebrow">Внести взнос</p>
+                        <h2>Оплата</h2>
+                    </div>
+
+                    <form method="post" class="dues-form">
+                        {% csrf_token %}
+                        <div class="form-group">
+                            <label for="donate-amount">Сумма, руб</label>
+                            <input
+                                id="donate-amount"
+                                class="form-control dues-input"
+                                type="number"
+                                name="amount"
+                                min="{{ min_amount }}"
+                                max="{{ max_amount }}"
+                                step="1"
+                                value="{{ amount }}"
+                                required
+                            >
+                            <div class="dues-preset-group">
+                                {% for preset in preset_amounts %}
+                                    <button
+                                        type="button"
+                                        class="btn dues-preset"
+                                        onclick="document.getElementById('donate-amount').value='{{ preset }}';"
+                                    >
+                                        {{ preset }} ₽
+                                    </button>
+                                {% endfor %}
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="donate-sender-name">Кто платит</label>
+                            <input
+                                id="donate-sender-name"
+                                class="form-control dues-input"
+                                type="text"
+                                name="sender_name"
+                                value="{{ sender_name }}"
+                                placeholder="Фамилия Имя"
+                                list="member-names"
+                                required
+                            >
+                            <datalist id="member-names">
+                                {% for name in member_names %}<option value="{{ name }}">{% endfor %}
+                            </datalist>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="donate-comment">За что взнос</label>
+                            <input
+                                id="donate-comment"
+                                class="form-control dues-input"
+                                type="text"
+                                name="comment"
+                                value="{% firstof comment default_comment %}"
+                                maxlength="255"
+                                placeholder="Например: клубный взнос, весна 2026"
+                                required
+                            >
+                            <div class="dues-preset-group">
+                                {% for preset_comment in preset_comments %}
+                                    <button
+                                        type="button"
+                                        class="btn dues-preset dues-preset--soft"
+                                        onclick="document.getElementById('donate-comment').value='{{ preset_comment|escapejs }}';"
+                                    >
+                                        {{ preset_comment }}
+                                    </button>
+                                {% endfor %}
+                            </div>
+                        </div>
+
+                        <button type="submit" class="btn dues-submit">Перейти к оплате</button>
+                    </form>
+                </div>
+            </div>
+
+            <div class="col-xl-7">
+                <div class="dues-panel dues-panel--table h-100">
+                    <div class="dues-section-heading dues-section-heading--inline">
+                        <div>
+                            <h2>Участники клуба</h2>
                         </div>
                     </div>
-                    <div class="form-group">
-                        <label for="donate-sender-name">От кого (Фамилия Имя)</label>
-                        <input
-                            id="donate-sender-name"
-                            class="form-control"
-                            type="text"
-                            name="sender_name"
-                            value="{{ sender_name }}"
-                            placeholder="Иванов Иван"
-                            required
-                        >
-                    </div>
-                    <div class="form-group">
-                        <label for="donate-comment">Комментарий</label>
-                        <input
-                            id="donate-comment"
-                            class="form-control"
-                            type="text"
-                            name="comment"
-                            value="{{ comment }}"
-                            maxlength="255"
-                            placeholder="Например: ГШ, благотворительный взнос"
-                            required
-                        >
-                        <div class="d-flex flex-wrap mt-2">
-                            {% for preset_comment in preset_comments %}
-                                <button type="button" class="btn btn-outline-primary btn-sm mr-2 mb-2" onclick="document.getElementById('donate-comment').value='{{ preset_comment|escapejs }}';">{{ preset_comment }}</button>
-                            {% endfor %}
+
+                    {% if donor_table %}
+                        <div class="dues-table-wrap">
+                            <table class="table dues-table">
+                                <thead>
+                                    <tr>
+                                        <th>Участник</th>
+                                        {% for period in donor_table.periods %}
+                                            <th class="dues-period-header"><div>{{ period.name }}</div></th>
+                                        {% endfor %}
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for row in donor_table.rows %}
+                                        <tr class="
+                                            {% if row.cells.0 == None %}dues-row--inactive
+                                            {% elif row.paid_latest %}dues-row--paid
+                                            {% else %}dues-row--pending{% endif %}
+                                        ">
+                                            <td class="dues-member">
+                                                <div class="dues-member__line">
+                                                    <span class="dues-member__name">{{ row.member.name }}</span>
+                                                </div>
+                                                {% if row.member.notes %}
+                                                    <div class="dues-member__note">{{ row.member.notes }}</div>
+                                                {% endif %}
+                                            </td>
+                                            {% for cell in row.cells %}
+                                                <td class="text-center">
+                                                    {% if cell == None %}
+                                                        <span class="dues-cell dues-cell--inactive" title="Не состоял в клубе в этот период"></span>
+                                                    {% elif cell %}
+                                                        <span class="dues-cell dues-cell--paid" title="Оплатил"></span>
+                                                    {% else %}
+                                                        <span class="dues-cell dues-cell--pending" title="Не оплатил"></span>
+                                                    {% endif %}
+                                                </td>
+                                            {% endfor %}
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
                         </div>
-                    </div>
-                    <button type="submit" class="btn btn-primary btn-lg">Перейти к оплате</button>
-                </form>
+                    {% else %}
+                        <div class="dues-table-wrap">
+                            <table class="table dues-table">
+                                <thead>
+                                    <tr>
+                                        <th>Участник</th>
+                                        <th class="dues-period-header"><div>Весна 2026</div></th>
+                                        <th class="dues-period-header"><div>Осень 2025</div></th>
+                                        <th class="dues-period-header"><div>Весна 2025</div></th>
+                                        <th class="dues-period-header"><div>Осень 2024</div></th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr class="dues-row--paid">
+                                        <td class="dues-member">
+                                            <div class="dues-member__line">
+                                                <span class="dues-member__name">Иван Петров</span>
+                                            </div>
+                                        </td>
+                                        <td class="text-center"><span class="dues-cell dues-cell--paid"></span></td>
+                                        <td class="text-center"><span class="dues-cell dues-cell--paid"></span></td>
+                                        <td class="text-center"><span class="dues-cell dues-cell--paid"></span></td>
+                                        <td class="text-center"><span class="dues-cell dues-cell--paid"></span></td>
+                                    </tr>
+                                    <tr class="dues-row--paid">
+                                        <td class="dues-member">
+                                            <div class="dues-member__line">
+                                                <span class="dues-member__name">Мария Соколова</span>
+                                            </div>
+                                            <div class="dues-member__note">Сдала взнос через СБП</div>
+                                        </td>
+                                        <td class="text-center"><span class="dues-cell dues-cell--paid"></span></td>
+                                        <td class="text-center"><span class="dues-cell dues-cell--paid"></span></td>
+                                        <td class="text-center"><span class="dues-cell dues-cell--paid"></span></td>
+                                        <td class="text-center"><span class="dues-cell dues-cell--pending"></span></td>
+                                    </tr>
+                                    <tr class="dues-row--pending">
+                                        <td class="dues-member">
+                                            <div class="dues-member__line">
+                                                <span class="dues-member__name">Алексей Власов</span>
+                                            </div>
+                                        </td>
+                                        <td class="text-center"><span class="dues-cell dues-cell--pending"></span></td>
+                                        <td class="text-center"><span class="dues-cell dues-cell--paid"></span></td>
+                                        <td class="text-center"><span class="dues-cell dues-cell--paid"></span></td>
+                                        <td class="text-center"><span class="dues-cell dues-cell--paid"></span></td>
+                                    </tr>
+                                    <tr class="dues-row--pending">
+                                        <td class="dues-member">
+                                            <div class="dues-member__line">
+                                                <span class="dues-member__name">Ольга Николаева</span>
+                                            </div>
+                                            <div class="dues-member__note">Напоминание отправлено</div>
+                                        </td>
+                                        <td class="text-center"><span class="dues-cell dues-cell--pending"></span></td>
+                                        <td class="text-center"><span class="dues-cell dues-cell--pending"></span></td>
+                                        <td class="text-center"><span class="dues-cell dues-cell--paid"></span></td>
+                                        <td class="text-center"><span class="dues-cell dues-cell--paid"></span></td>
+                                    </tr>
+                                    <tr class="dues-row--inactive">
+                                        <td class="dues-member">
+                                            <div class="dues-member__line">
+                                                <span class="dues-member__name">Сергей Егоров</span>
+</div>
+                                            <div class="dues-member__note">Был в клубе до осени 2025</div>
+                                        </td>
+                                        <td class="text-center"><span class="dues-cell dues-cell--inactive"></span></td>
+                                        <td class="text-center"><span class="dues-cell dues-cell--inactive"></span></td>
+                                        <td class="text-center"><span class="dues-cell dues-cell--paid"></span></td>
+                                        <td class="text-center"><span class="dues-cell dues-cell--paid"></span></td>
+                                    </tr>
+                                    <tr class="dues-row--inactive">
+                                        <td class="dues-member">
+                                            <div class="dues-member__line">
+                                                <span class="dues-member__name">Анна Громова</span>
+</div>
+                                            <div class="dues-member__note">В архиве оплат, в текущем периоде не учитывается</div>
+                                        </td>
+                                        <td class="text-center"><span class="dues-cell dues-cell--inactive"></span></td>
+                                        <td class="text-center"><span class="dues-cell dues-cell--paid"></span></td>
+                                        <td class="text-center"><span class="dues-cell dues-cell--paid"></span></td>
+                                        <td class="text-center"><span class="dues-cell dues-cell--pending"></span></td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    {% endif %}
+                </div>
             </div>
         </div>
     </div>
 </section>
+
+<style>
+.dues-main {
+    position: relative;
+    overflow: hidden;
+}
+
+.dues-main {
+    padding: 3rem 0 5rem;
+    background:
+        linear-gradient(180deg, #eef1eb 0%, #f8f6f0 30%, #ffffff 100%);
+}
+
+.dues-panel {
+    border-radius: 28px;
+    padding: 2rem;
+    position: relative;
+    box-shadow: 0 24px 60px rgba(18, 32, 32, 0.12);
+}
+
+.dues-panel--form,
+.dues-panel--table,
+.dues-panel--status {
+    background: rgba(255, 255, 255, 0.92);
+    border: 1px solid rgba(28, 39, 50, 0.08);
+}
+
+.dues-badge {
+    display: inline-flex;
+    align-items: center;
+    border-radius: 999px;
+    font-size: 0.78rem;
+    line-height: 1;
+    padding: 0.5rem 0.8rem;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+}
+
+.dues-profile__meta,
+.dues-section-heading p,
+.dues-note,
+.dues-member__note {
+    color: rgba(41, 56, 67, 0.72);
+}
+
+.dues-cell {
+    width: 0.9rem;
+    height: 0.9rem;
+    border-radius: 50%;
+    display: inline-block;
+}
+
+.dues-cell--paid {
+    background: #3e8f67;
+}
+
+.dues-cell--pending {
+    background: #d26a4c;
+}
+
+.dues-cell--inactive {
+    background: #dfe5ea;
+}
+
+.dues-eyebrow {
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    font-size: 0.78rem;
+    font-weight: 700;
+    margin-bottom: 0.65rem;
+}
+
+.dues-profile {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 1rem;
+    margin-bottom: 1.2rem;
+}
+
+.dues-profile__name,
+.dues-section-heading h2 {
+    margin-bottom: 0.4rem;
+}
+
+.dues-profile__name {
+    font-size: 1.75rem;
+    color: #1b2c37;
+}
+
+.dues-profile__name--dark {
+    color: #1b2c37;
+}
+
+.dues-badge--ok {
+    color: #12462c;
+    background: #b8ecc6;
+}
+
+.dues-badge--pending {
+    color: #6a2f1f;
+    background: #f4d1c5;
+}
+
+.dues-badge--inactive {
+    color: #42515b;
+    background: #dfe5ea;
+}
+
+.dues-status-card {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 1rem;
+    margin-bottom: 1rem;
+    padding: 1rem 1.1rem;
+    border-radius: 20px;
+    background: rgba(27, 44, 55, 0.05);
+}
+
+.dues-status-card--result {
+    margin-top: 1.15rem;
+}
+
+.dues-status-card--light {
+    background: #f3f0e8;
+}
+
+.dues-status-card__label {
+    display: block;
+    font-size: 0.85rem;
+}
+
+.dues-status-card__value {
+    color: #1b2c37;
+    font-size: 2rem;
+    font-weight: 700;
+    line-height: 1.1;
+}
+
+.dues-status-card__value--dark {
+    color: #1b2c37;
+}
+
+.dues-status-card__value--compact {
+    font-size: 1.65rem;
+}
+
+.dues-status-card__aside {
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    text-align: right;
+}
+
+.dues-mini-list {
+    display: grid;
+    gap: 0.85rem;
+}
+
+.dues-checker {
+    margin-bottom: 1.25rem;
+}
+
+.dues-checker__label {
+    display: block;
+    margin-bottom: 0.55rem;
+    color: #1b2c37;
+    font-size: 0.92rem;
+    font-weight: 500;
+}
+
+.dues-checker__row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 0.75rem;
+}
+
+.dues-checker__button {
+    min-height: 3.35rem;
+    padding: 0.85rem 1.2rem;
+    border-radius: 16px;
+    border: 0;
+    background: #d8b16d;
+    color: #173142;
+    font-weight: 700;
+}
+
+.dues-mini-list--light .dues-mini-list__item {
+    border-top-color: rgba(27, 44, 55, 0.1);
+}
+
+.dues-mini-list--light .dues-mini-list__item strong {
+    color: #1b2c37;
+}
+
+.dues-mini-list__item {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    padding-top: 0.85rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.dues-mini-list__item strong {
+    color: #ffffff;
+    font-size: 0.96rem;
+    text-align: right;
+}
+
+.dues-section-heading--inline {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    align-items: flex-end;
+}
+
+.dues-form {
+    margin-top: 1.5rem;
+}
+
+.dues-input {
+    min-height: 3.35rem;
+    border-radius: 16px;
+    border: 1px solid #d6dde2;
+    background: #fbfcfa;
+    padding: 0.85rem 1rem;
+}
+
+.dues-input:focus {
+    border-color: #496779;
+    box-shadow: 0 0 0 0.2rem rgba(73, 103, 121, 0.16);
+}
+
+.dues-preset-group {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.65rem;
+    margin-top: 0.8rem;
+}
+
+.dues-preset {
+    border-radius: 999px;
+    padding: 0.55rem 0.95rem;
+    background: #edf1f2;
+    color: #213543;
+    border: 0;
+}
+
+.dues-preset--soft {
+    background: #f3ede4;
+}
+
+.dues-submit {
+    width: 100%;
+    margin-top: 0.8rem;
+    min-height: 3.6rem;
+    border: 0;
+    border-radius: 18px;
+    background: linear-gradient(135deg, #2a5a6f 0%, #3f7e6a 100%);
+    color: #ffffff;
+    font-weight: 600;
+    box-shadow: 0 18px 36px rgba(42, 90, 111, 0.22);
+}
+
+.dues-table-wrap {
+    margin-top: 1.5rem;
+}
+
+.dues-table {
+    margin-bottom: 0;
+}
+
+.dues-table thead th {
+    border-top: 0;
+    border-bottom: 1px solid #d9e0e4;
+}
+
+.dues-table td {
+    vertical-align: middle;
+    border-top: 1px solid #edf1f2;
+    padding: 0.45rem 0.5rem;
+}
+
+.dues-period-header {
+    height: 8rem;
+    padding: 0 0.25rem 0.5rem;
+    vertical-align: bottom;
+    width: 2rem;
+    min-width: 2rem;
+}
+
+.dues-period-header > div {
+    writing-mode: vertical-rl;
+    transform: rotate(180deg);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    font-size: 0.75rem;
+    color: #667783;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.dues-member {
+}
+
+.dues-member__line {
+    display: flex;
+    gap: 0.75rem;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.dues-member__name {
+    color: #1b2c37;
+    font-weight: 600;
+}
+
+.dues-member__note {
+    margin-top: 0.45rem;
+    font-size: 0.9rem;
+    line-height: 1.45;
+}
+
+.dues-row--inactive {
+    background: rgba(223, 229, 234, 0.3);
+}
+
+.dues-row--pending {
+    background: rgba(244, 209, 197, 0.15);
+}
+
+.dues-empty {
+    margin-top: 1.5rem;
+    padding: 2rem;
+    border-radius: 22px;
+    background: #f6f2ea;
+}
+
+@media (max-width: 991.98px) {
+    .dues-main {
+        padding-top: 2rem;
+    }
+}
+
+@media (max-width: 767.98px) {
+    .dues-panel {
+        padding: 1.5rem;
+        border-radius: 22px;
+    }
+
+    .dues-status-card,
+    .dues-checker__row {
+        grid-template-columns: 1fr;
+    }
+
+    .dues-profile,
+    .dues-section-heading--inline,
+    .dues-mini-list__item {
+        display: block;
+    }
+
+    .dues-status-card__aside,
+    .dues-mini-list__item strong {
+        text-align: left;
+        margin-top: 0.4rem;
+    }
+}
+</style>
 {% endblock %}

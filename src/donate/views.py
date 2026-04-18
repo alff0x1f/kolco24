@@ -1,19 +1,26 @@
+import os
+import time
 from decimal import Decimal, InvalidOperation
-from uuid import uuid4
 
 from django.contrib import messages
 from django.shortcuts import redirect, render
 from django.views import View
 
-from donate.models import DonateRequest
+from donate.models import ClubMember, DonateRequest, DonationPeriod, MemberDonation
 from vtb.client import VTBClient
 from website.models import VTBPayment, VTBPreparedPayment
+
+_CROCKFORD = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"
+
+
+def _ulid():
+    val = (int(time.time() * 1000) << 80) | int.from_bytes(os.urandom(10), "big")
+    return "".join(_CROCKFORD[(val >> (5 * i)) & 0x1F] for i in range(25, -1, -1))
 
 
 class DonateView(View):
     template_name = "donate/index.html"
     preset_amounts = (1500, 3000)
-    preset_comments = ("ГШ 2 полугодие 2025", "ГШ 1 полугодие 2026")
     min_amount = Decimal("10")
     max_amount = Decimal("20000")
     comment_max_length = 255
@@ -94,7 +101,7 @@ class DonateView(View):
                 ),
             )
 
-        donate_order_id = f"SPUTNIK_{uuid4().hex[:12].upper()}"
+        donate_order_id = f"SPUTNIK_{_ulid()}"
         try:
             payload = VTBClient().create_order(
                 order_id=donate_order_id,
@@ -139,9 +146,14 @@ class DonateView(View):
         return render(request, self.template_name, self.get_context(amount))
 
     def get_context(self, amount=None, sender_name="", comment=""):
+        preset_comments = list(
+            DonationPeriod.objects.filter(is_active=True)
+            .order_by("-date")
+            .values_list("name", flat=True)[:2]
+        )
         return {
             "preset_amounts": self.preset_amounts,
-            "preset_comments": self.preset_comments,
+            "preset_comments": preset_comments,
             "amount": (
                 str(amount) if amount is not None else str(self.preset_amounts[0])
             ),
@@ -149,6 +161,60 @@ class DonateView(View):
             "max_amount": int(self.max_amount),
             "sender_name": sender_name,
             "comment": comment,
+            "default_comment": preset_comments[0] if preset_comments else "",
+            "donor_table": self.build_donor_table(),
+            "member_names": list(ClubMember.objects.values_list("name", flat=True)),
+        }
+
+    @staticmethod
+    def build_donor_table():
+        # Периоды: от нового к старому (слева направо)
+        periods = list(DonationPeriod.objects.filter(is_active=True).order_by("-date"))
+        if not periods:
+            return None
+
+        period_ids = [p.id for p in periods]
+
+        # Все записи по активным периодам
+        donations = MemberDonation.objects.filter(
+            period_id__in=period_ids
+        ).select_related("member", "period")
+
+        # member_id -> {period_id -> is_paid}
+        payment_map = {}
+        for d in donations:
+            payment_map.setdefault(d.member_id, {})[d.period_id] = d.is_paid
+
+        # Все участники у кого есть хоть одна запись
+        members = list(
+            ClubMember.objects.filter(id__in=payment_map.keys()).order_by("name")
+        )
+
+        latest_period_id = periods[0].id
+
+        def row_sort_key(member):
+            paid_latest = payment_map[member.id].get(latest_period_id, None)
+            # Оплатил последний период → первые; остальные по имени
+            return (0 if paid_latest else 1, member.name)
+
+        members.sort(key=row_sort_key)
+
+        # Строки таблицы: [{member, cells: [True/False/None, ...], paid_latest}]
+        rows = []
+        for member in members:
+            pmap = payment_map[member.id]
+            cells = [pmap.get(pid) for pid in period_ids]
+            rows.append(
+                {
+                    "member": member,
+                    "cells": cells,
+                    "paid_latest": pmap.get(latest_period_id, None),
+                }
+            )
+
+        return {
+            "periods": periods,
+            "rows": rows,
         }
 
     @staticmethod
