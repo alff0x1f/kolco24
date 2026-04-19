@@ -33,7 +33,7 @@ services:
     image: ${KOLCO24_IMAGE:?KOLCO24_IMAGE is required, e.g. registry.lab.tk-sputnik.org/kolco24:latest}
     container_name: kolco24_django
     restart: unless-stopped
-    command: ["gunicorn", "--bind", "0.0.0.0:8000", "kolco24.wsgi:application", "--access-logfile", "-", "--log-level", "info"]
+    command: [ "gunicorn", "--bind", "0.0.0.0:8000", "kolco24.wsgi:application", "--access-logfile", "-", "--log-level", "info" ]
     env_file:
       - ./deploy/kolco24.env
     volumes:
@@ -86,7 +86,20 @@ services:
     image: ${KOLCO24_IMAGE:?KOLCO24_IMAGE is required}
     container_name: kolco24_runmailer
     restart: unless-stopped
-    command: ["python", "manage.py", "runmailer"]
+    command: [ "python", "manage.py", "runmailer" ]
+    env_file:
+      - ./deploy/kolco24.env
+    depends_on:
+      kolco24_migrate:
+        condition: service_completed_successfully
+    networks:
+      - kolco24_default
+
+  kolco24_vtb_checker:
+    image: ${KOLCO24_IMAGE:?KOLCO24_IMAGE is required}
+    container_name: kolco24_vtb_checker
+    restart: unless-stopped
+    command: [ "python", "manage.py", "check_vtb_payments" ]
     env_file:
       - ./deploy/kolco24.env
     depends_on:
