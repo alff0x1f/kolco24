@@ -119,7 +119,7 @@
                                 <tbody>
                                     {% for row in donor_table.rows %}
                                         <tr class="
-                                            {% if row.cells.0 == None %}dues-row--inactive
+                                            {% if row.paid_latest == None %}dues-row--inactive
                                             {% elif row.paid_latest %}dues-row--paid
                                             {% else %}dues-row--pending{% endif %}
                                         ">
