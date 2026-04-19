@@ -168,8 +168,8 @@ class DonateView(View):
 
     @staticmethod
     def build_donor_table():
-        # Периоды: от нового к старому (слева направо)
-        periods = list(DonationPeriod.objects.filter(is_active=True).order_by("-date"))
+        # Периоды: от старого к новому (слева направо)
+        periods = list(DonationPeriod.objects.filter(is_active=True).order_by("date"))
         if not periods:
             return None
 
@@ -190,7 +190,7 @@ class DonateView(View):
             ClubMember.objects.filter(id__in=payment_map.keys()).order_by("name")
         )
 
-        latest_period_id = periods[0].id
+        latest_period_id = periods[-1].id
 
         def row_sort_key(member):
             paid_latest = payment_map[member.id].get(latest_period_id, None)

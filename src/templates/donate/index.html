@@ -19,8 +19,7 @@
             <div class="col-xl-5 mb-4 mb-xl-0">
                 <div class="dues-panel dues-panel--form h-100">
                     <div class="dues-section-heading">
-                        <p class="dues-eyebrow">Внести взнос</p>
-                        <h2>Оплата</h2>
+                        <h2>Поддержать школу горного туризма т/к Спутник</h2>
                     </div>
 
                     <form method="post" class="dues-form">
@@ -52,7 +51,7 @@
                         </div>
 
                         <div class="form-group">
-                            <label for="donate-sender-name">Кто платит</label>
+                            <label for="donate-sender-name">От кого</label>
                             <input
                                 id="donate-sender-name"
                                 class="form-control dues-input"
@@ -69,7 +68,7 @@
                         </div>
 
                         <div class="form-group">
-                            <label for="donate-comment">За что взнос</label>
+                            <label for="donate-comment">Период</label>
                             <input
                                 id="donate-comment"
                                 class="form-control dues-input"
@@ -102,7 +101,7 @@
                 <div class="dues-panel dues-panel--table h-100">
                     <div class="dues-section-heading dues-section-heading--inline">
                         <div>
-                            <h2>Участники клуба</h2>
+                            <h2>Участники горной школы</h2>
                         </div>
                     </div>
 
@@ -145,92 +144,6 @@
                                             {% endfor %}
                                         </tr>
                                     {% endfor %}
-                                </tbody>
-                            </table>
-                        </div>
-                    {% else %}
-                        <div class="dues-table-wrap">
-                            <table class="table dues-table">
-                                <thead>
-                                    <tr>
-                                        <th>Участник</th>
-                                        <th class="dues-period-header"><div>Весна 2026</div></th>
-                                        <th class="dues-period-header"><div>Осень 2025</div></th>
-                                        <th class="dues-period-header"><div>Весна 2025</div></th>
-                                        <th class="dues-period-header"><div>Осень 2024</div></th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <tr class="dues-row--paid">
-                                        <td class="dues-member">
-                                            <div class="dues-member__line">
-                                                <span class="dues-member__name">Иван Петров</span>
-                                            </div>
-                                        </td>
-                                        <td class="text-center"><span class="dues-cell dues-cell--paid"></span></td>
-                                        <td class="text-center"><span class="dues-cell dues-cell--paid"></span></td>
-                                        <td class="text-center"><span class="dues-cell dues-cell--paid"></span></td>
-                                        <td class="text-center"><span class="dues-cell dues-cell--paid"></span></td>
-                                    </tr>
-                                    <tr class="dues-row--paid">
-                                        <td class="dues-member">
-                                            <div class="dues-member__line">
-                                                <span class="dues-member__name">Мария Соколова</span>
-                                            </div>
-                                            <div class="dues-member__note">Сдала взнос через СБП</div>
-                                        </td>
-                                        <td class="text-center"><span class="dues-cell dues-cell--paid"></span></td>
-                                        <td class="text-center"><span class="dues-cell dues-cell--paid"></span></td>
-                                        <td class="text-center"><span class="dues-cell dues-cell--paid"></span></td>
-                                        <td class="text-center"><span class="dues-cell dues-cell--pending"></span></td>
-                                    </tr>
-                                    <tr class="dues-row--pending">
-                                        <td class="dues-member">
-                                            <div class="dues-member__line">
-                                                <span class="dues-member__name">Алексей Власов</span>
-                                            </div>
-                                        </td>
-                                        <td class="text-center"><span class="dues-cell dues-cell--pending"></span></td>
-                                        <td class="text-center"><span class="dues-cell dues-cell--paid"></span></td>
-                                        <td class="text-center"><span class="dues-cell dues-cell--paid"></span></td>
-                                        <td class="text-center"><span class="dues-cell dues-cell--paid"></span></td>
-                                    </tr>
-                                    <tr class="dues-row--pending">
-                                        <td class="dues-member">
-                                            <div class="dues-member__line">
-                                                <span class="dues-member__name">Ольга Николаева</span>
-                                            </div>
-                                            <div class="dues-member__note">Напоминание отправлено</div>
-                                        </td>
-                                        <td class="text-center"><span class="dues-cell dues-cell--pending"></span></td>
-                                        <td class="text-center"><span class="dues-cell dues-cell--pending"></span></td>
-                                        <td class="text-center"><span class="dues-cell dues-cell--paid"></span></td>
-                                        <td class="text-center"><span class="dues-cell dues-cell--paid"></span></td>
-                                    </tr>
-                                    <tr class="dues-row--inactive">
-                                        <td class="dues-member">
-                                            <div class="dues-member__line">
-                                                <span class="dues-member__name">Сергей Егоров</span>
-</div>
-                                            <div class="dues-member__note">Был в клубе до осени 2025</div>
-                                        </td>
-                                        <td class="text-center"><span class="dues-cell dues-cell--inactive"></span></td>
-                                        <td class="text-center"><span class="dues-cell dues-cell--inactive"></span></td>
-                                        <td class="text-center"><span class="dues-cell dues-cell--paid"></span></td>
-                                        <td class="text-center"><span class="dues-cell dues-cell--paid"></span></td>
-                                    </tr>
-                                    <tr class="dues-row--inactive">
-                                        <td class="dues-member">
-                                            <div class="dues-member__line">
-                                                <span class="dues-member__name">Анна Громова</span>
-</div>
-                                            <div class="dues-member__note">В архиве оплат, в текущем периоде не учитывается</div>
-                                        </td>
-                                        <td class="text-center"><span class="dues-cell dues-cell--inactive"></span></td>
-                                        <td class="text-center"><span class="dues-cell dues-cell--paid"></span></td>
-                                        <td class="text-center"><span class="dues-cell dues-cell--paid"></span></td>
-                                        <td class="text-center"><span class="dues-cell dues-cell--pending"></span></td>
-                                    </tr>
                                 </tbody>
                             </table>
                         </div>
@@ -292,14 +205,6 @@
 
 .dues-cell--inactive {
     background: #dfe5ea;
-}
-
-.dues-eyebrow {
-    text-transform: uppercase;
-    letter-spacing: 0.1em;
-    font-size: 0.78rem;
-    font-weight: 700;
-    margin-bottom: 0.4rem;
 }
 
 .dues-section-heading h2 {
