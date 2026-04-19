@@ -43,6 +43,20 @@ services:
     networks:
       - kolco24_default
 
+  kolco24_vtb_checker:
+    build: .
+    container_name: kolco24_vtb_checker
+    restart: unless-stopped
+    command: ["python", "manage.py", "check_vtb_payments"]
+    env_file:
+      - .env
+    volumes:
+      - ./src:/app
+    depends_on:
+      - kolco24_db
+    networks:
+      - kolco24_default
+
   kolco24_db:
     image: postgres:14
     container_name: kolco24_db

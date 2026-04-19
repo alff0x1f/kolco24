@@ -95,6 +95,19 @@ services:
     networks:
       - kolco24_default
 
+  kolco24_vtb_checker:
+    image: ${KOLCO24_IMAGE:?KOLCO24_IMAGE is required}
+    container_name: kolco24_vtb_checker
+    restart: unless-stopped
+    command: ["python", "manage.py", "check_vtb_payments"]
+    env_file:
+      - ./deploy/kolco24.env
+    depends_on:
+      kolco24_migrate:
+        condition: service_completed_successfully
+    networks:
+      - kolco24_default
+
   kolco24_db:
     image: postgres:15
     container_name: kolco24_db
