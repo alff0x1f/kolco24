@@ -5,7 +5,7 @@ services:
     container_name: kolco24_django
     restart: unless-stopped
     user: "1000:1000"
-    command: [ "gunicorn", "--bind", "0.0.0.0:8000", "kolco24.wsgi:application", "--access-logfile", "-", "--log-level", "info"]
+    command: [ "gunicorn", "--bind", "0.0.0.0:8000", "kolco24.wsgi:application", "--access-logfile", "-", "--log-level", "info" ]
     env_file:
       - .env
     volumes:
@@ -47,7 +47,7 @@ services:
     build: .
     container_name: kolco24_vtb_checker
     restart: unless-stopped
-    command: ["python", "manage.py", "check_vtb_payments"]
+    command: [ "python", "manage.py", "check_vtb_payments" ]
     env_file:
       - .env
     volumes:
