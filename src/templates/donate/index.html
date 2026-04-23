@@ -112,15 +112,15 @@
                                     <tr>
                                         <th>Участник</th>
                                         {% for period in donor_table.periods %}
-                                            <th class="dues-period-header"><div>{{ period.name }}</div></th>
+                                            <th class="dues-period-header{% if forloop.counter0 == donor_table.current_period_index %} dues-period-header--current{% endif %}"><div>{{ period.name }}</div></th>
                                         {% endfor %}
                                     </tr>
                                 </thead>
                                 <tbody>
                                     {% for row in donor_table.rows %}
                                         <tr class="
-                                            {% if row.paid_latest == None %}dues-row--inactive
-                                            {% elif row.paid_latest %}dues-row--paid
+                                            {% if row.paid_current == None %}dues-row--inactive
+                                            {% elif row.paid_current %}dues-row--paid
                                             {% else %}dues-row--pending{% endif %}
                                         ">
                                             <td class="dues-member">
@@ -132,7 +132,7 @@
                                                 {% endif %}
                                             </td>
                                             {% for cell in row.cells %}
-                                                <td class="text-center">
+                                                <td class="text-center{% if forloop.counter0 == donor_table.current_period_index %} dues-col--current{% endif %}">
                                                     {% if cell == None %}
                                                         <span class="dues-cell dues-cell--inactive" title="Не состоял в клубе в этот период"></span>
                                                     {% elif cell %}
@@ -329,6 +329,14 @@
 
 .dues-row--pending {
     background: rgba(244, 209, 197, 0.15);
+}
+
+.dues-period-header--current > div {
+    color: #1b2c37;
+}
+
+.dues-col--current {
+    background: rgba(100, 149, 200, 0.07);
 }
 
 .table.dues-table th {

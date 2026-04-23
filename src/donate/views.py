@@ -203,7 +203,7 @@ class DonateView(View):
 
         members.sort(key=row_sort_key)
 
-        # Строки таблицы: [{member, cells: [True/False/None, ...], paid_latest}]
+        # Строки таблицы: [{member, cells: [True/False/None, ...], paid_current}]
         rows = []
         for member in members:
             pmap = payment_map[member.id]
@@ -212,12 +212,13 @@ class DonateView(View):
                 {
                     "member": member,
                     "cells": cells,
-                    "paid_latest": pmap.get(current_period_id, None),
+                    "paid_current": pmap.get(current_period_id, None),
                 }
             )
 
         return {
             "periods": periods,
+            "current_period_index": periods.index(current_period),
             "rows": rows,
         }
 
