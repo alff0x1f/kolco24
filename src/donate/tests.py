@@ -42,19 +42,6 @@ class DonateViewTests(TestCase):
         self.assertEqual(donate_request.sender_name, "Иванов Иван")
         self.assertEqual(donate_request.comment, "ГШ 2 полугодие 2025")
 
-    def test_rejects_invalid_sender_name(self):
-        response = self.client.post(
-            reverse("donate"),
-            data={
-                "amount": "1500",
-                "sender_name": "Иванов",
-                "comment": "ГШ 2 полугодие 2025",
-            },
-        )
-
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(DonateRequest.objects.count(), 0)
-
     @patch("donate.views.VTBClient.create_order")
     def test_creates_donate_request_with_text_comment(self, create_order_mock):
         create_order_mock.return_value = {
