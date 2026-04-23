@@ -22,78 +22,84 @@
                         <h2>Поддержать школу горного туризма т/к Спутник</h2>
                     </div>
 
-                    <form method="post" class="dues-form">
-                        {% csrf_token %}
-                        <div class="form-group">
-                            <label for="donate-amount">Сумма, руб</label>
-                            <input
-                                id="donate-amount"
-                                class="form-control dues-input"
-                                type="number"
-                                name="amount"
-                                min="{{ min_amount }}"
-                                max="{{ max_amount }}"
-                                step="1"
-                                value="{{ amount }}"
-                                required
-                            >
-                            <div class="dues-preset-group">
-                                {% for preset in preset_amounts %}
-                                    <button
-                                        type="button"
-                                        class="btn dues-preset"
-                                        onclick="document.getElementById('donate-amount').value='{{ preset }}';"
-                                    >
-                                        {{ preset }} ₽
-                                    </button>
-                                {% endfor %}
+                    {% if payments_enabled %}
+                        <form method="post" class="dues-form">
+                            {% csrf_token %}
+                            <div class="form-group">
+                                <label for="donate-amount">Сумма, руб</label>
+                                <input
+                                    id="donate-amount"
+                                    class="form-control dues-input"
+                                    type="number"
+                                    name="amount"
+                                    min="{{ min_amount }}"
+                                    max="{{ max_amount }}"
+                                    step="1"
+                                    value="{{ amount }}"
+                                    required
+                                >
+                                <div class="dues-preset-group">
+                                    {% for preset in preset_amounts %}
+                                        <button
+                                            type="button"
+                                            class="btn dues-preset"
+                                            onclick="document.getElementById('donate-amount').value='{{ preset }}';"
+                                        >
+                                            {{ preset }} ₽
+                                        </button>
+                                    {% endfor %}
+                                </div>
                             </div>
-                        </div>
 
-                        <div class="form-group">
-                            <label for="donate-sender-name">От кого</label>
-                            <input
-                                id="donate-sender-name"
-                                class="form-control dues-input"
-                                type="text"
-                                name="sender_name"
-                                value="{{ sender_name }}"
-                                placeholder="Фамилия Имя"
-                                list="member-names"
-                                required
-                            >
-                            <datalist id="member-names">
-                                {% for name in member_names %}<option value="{{ name }}">{% endfor %}
-                            </datalist>
-                        </div>
-
-                        <div class="form-group">
-                            <label for="donate-comment">Период</label>
-                            <input
-                                id="donate-comment"
-                                class="form-control dues-input"
-                                type="text"
-                                name="comment"
-                                value="{% firstof comment default_comment %}"
-                                maxlength="255"
-                                placeholder="Например: клубный взнос, весна 2026"
-                                required
-                            >
-                            <div class="dues-preset-group">
-                                {% for preset_comment in preset_comments %}
-                                    <button
-                                        type="button"
-                                        class="btn dues-preset dues-preset--soft"
-                                        onclick="document.getElementById('donate-comment').value='{{ preset_comment|escapejs }}';"
-                                    >
-                                        {{ preset_comment }}
-                                    </button>
-                                {% endfor %}
+                            <div class="form-group">
+                                <label for="donate-sender-name">От кого</label>
+                                <input
+                                    id="donate-sender-name"
+                                    class="form-control dues-input"
+                                    type="text"
+                                    name="sender_name"
+                                    value="{{ sender_name }}"
+                                    placeholder="Фамилия Имя"
+                                    list="member-names"
+                                    required
+                                >
+                                <datalist id="member-names">
+                                    {% for name in member_names %}<option value="{{ name }}">{% endfor %}
+                                </datalist>
                             </div>
-                        </div>
 
-                        <button type="submit" class="btn dues-submit">Перейти к оплате</button>
-                    </form>
+                            <div class="form-group">
+                                <label for="donate-comment">Период</label>
+                                <input
+                                    id="donate-comment"
+                                    class="form-control dues-input"
+                                    type="text"
+                                    name="comment"
+                                    value="{% firstof comment default_comment %}"
+                                    maxlength="255"
+                                    placeholder="Например: клубный взнос, весна 2026"
+                                    required
+                                >
+                                <div class="dues-preset-group">
+                                    {% for preset_comment in preset_comments %}
+                                        <button
+                                            type="button"
+                                            class="btn dues-preset dues-preset--soft"
+                                            onclick="document.getElementById('donate-comment').value='{{ preset_comment|escapejs }}';"
+                                        >
+                                            {{ preset_comment }}
+                                        </button>
+                                    {% endfor %}
+                                </div>
+                            </div>
+
+                            <button type="submit" class="btn dues-submit">Перейти к оплате</button>
+                        </form>
+                    {% else %}
+                        <div class="dues-disabled-note">
+                            Прием взносов временно приостановлен.
+                        </div>
+                    {% endif %}
                 </div>
             </div>
 
@@ -273,6 +279,16 @@
 
 .dues-table {
     margin-bottom: 0;
+}
+
+.dues-disabled-note {
+    margin-top: 1rem;
+    padding: 1rem 1.1rem;
+    border-radius: 16px;
+    background: #f4efe5;
+    border: 1px solid #e5d8bf;
+    color: #5d4932;
+    line-height: 1.5;
 }
 
 .dues-table thead th {

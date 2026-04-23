@@ -20,6 +20,7 @@ def _ulid():
 
 class DonateView(View):
     template_name = "donate/index.html"
+    payments_enabled = False
     preset_amounts = (1500, 3000)
     min_amount = Decimal("10")
     max_amount = Decimal("20000")
@@ -29,6 +30,13 @@ class DonateView(View):
         return render(request, self.template_name, self.get_context())
 
     def post(self, request):
+        if not self.payments_enabled:
+            messages.info(
+                request,
+                "Прием взносов временно приостановлен. Попробуйте зайти позже.",
+            )
+            return render(request, self.template_name, self.get_context())
+
         amount = self.parse_amount(request.POST.get("amount", ""))
         sender_name = self.parse_sender_name(request.POST.get("sender_name", ""))
         comment = self.parse_comment(request.POST.get("comment", ""))
@@ -154,6 +162,7 @@ class DonateView(View):
         return {
             "preset_amounts": self.preset_amounts,
             "preset_comments": preset_comments,
+            "payments_enabled": self.payments_enabled,
             "amount": (
                 str(amount) if amount is not None else str(self.preset_amounts[0])
             ),
