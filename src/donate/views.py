@@ -4,6 +4,7 @@ from decimal import Decimal, InvalidOperation
 
 from django.contrib import messages
 from django.shortcuts import redirect, render
+from django.utils import timezone
 from django.views import View
 
 from donate.models import ClubMember, DonateRequest, DonationPeriod, MemberDonation
@@ -190,12 +191,15 @@ class DonateView(View):
             ClubMember.objects.filter(id__in=payment_map.keys()).order_by("name")
         )
 
-        latest_period_id = periods[-1].id
+        today = timezone.now().date()
+        past_or_current = [p for p in periods if p.date <= today]
+        current_period = past_or_current[-1] if past_or_current else periods[0]
+        current_period_id = current_period.id
 
         def row_sort_key(member):
-            paid_latest = payment_map[member.id].get(latest_period_id, None)
-            # Оплатил последний период → первые; остальные по имени
-            return (0 if paid_latest else 1, member.name)
+            paid_current = payment_map[member.id].get(current_period_id, None)
+            # Оплатил текущий период → первые; остальные по имени
+            return (0 if paid_current else 1, member.name)
 
         members.sort(key=row_sort_key)
 
@@ -208,7 +212,7 @@ class DonateView(View):
                 {
                     "member": member,
                     "cells": cells,
-                    "paid_latest": pmap.get(latest_period_id, None),
+                    "paid_latest": pmap.get(current_period_id, None),
                 }
             )
 
