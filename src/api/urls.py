@@ -4,6 +4,7 @@ from django.urls import path
 from api.views import (
     CheckpointTagCreateView,
     CheckpointView,
+    ContributorsView,
     MemberTagListCreateView,
     MemberTagTouchView,
     TeamCSVListView,
@@ -42,4 +43,5 @@ urlpatterns = [
     path(
         "race/<int:race_id>/teams.csv", TeamCSVListView.as_view(), name="team-list-csv"
     ),
+    path("contributors/", ContributorsView.as_view(), name="contributors"),
 ]
