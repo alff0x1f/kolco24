@@ -2,13 +2,26 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Local environment
+
+**Container runtime**: use `podman` (not `docker`). Start the DB:
+```bash
+podman compose -f docker-compose-dbs.yml up -d
+```
+
+**`.env` file**: `src/kolco24/settings.py` loads `src/.env` via `python-dotenv`. Copy from `deploy/kolco24.env.example` and fill in secrets before running the server or tests:
+```bash
+cp deploy/kolco24.env.example src/.env
+```
+Without `.env`, most env vars will be `None` (DB password, VTB keys, etc.) and tests/server will fail.
+
 ## Commands
 
 All Django management commands run from `src/`:
 
 ```bash
 # Development
-docker compose -f docker-compose-dbs.yml up -d   # start local DB
+podman compose -f docker-compose-dbs.yml up -d   # start local DB
 python src/manage.py migrate
 python src/manage.py runserver 0:8080
 

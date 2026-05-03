@@ -42,6 +42,8 @@ SBP_INFO = {
 
 GOOGLE_DOCS_KEY = os.getenv("GOOGLE_DOCS_KEY")
 
+CONTRIBUTORS_API_TOKEN = os.getenv("CONTRIBUTORS_API_TOKEN")
+
 EMAIL_BACKEND = "mailer.backend.DbBackend"
 
 EMAIL_HOST = "smtp.yandex.ru"
