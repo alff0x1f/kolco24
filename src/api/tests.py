@@ -123,7 +123,7 @@ class ContributorsAPITestCase(APITestCase):
         no_label = next(m for m in response.data["members"] if m["name"] == "Без метки")
         self.assertEqual(no_label["label"], "")
 
-    def test_returns_401_without_token(self):
+    def test_returns_403_without_token(self):
         response = self.client.get(URL)
         self.assertEqual(response.status_code, 403)
 
