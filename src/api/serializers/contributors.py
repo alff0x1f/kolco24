@@ -18,8 +18,8 @@ class ClubMemberSerializer(serializers.ModelSerializer):
 
 
 class MemberDonationSerializer(serializers.ModelSerializer):
-    member_id = serializers.IntegerField(source="member_id")
-    period_id = serializers.IntegerField(source="period_id")
+    member_id = serializers.IntegerField(read_only=True)
+    period_id = serializers.IntegerField(read_only=True)
     amount = serializers.DecimalField(max_digits=10, decimal_places=2, allow_null=True)
 
     class Meta:
