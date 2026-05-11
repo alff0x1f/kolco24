@@ -1,4 +1,4 @@
-PODMAN   ?= podman
+PODMAN   ?= docker
 REGISTRY ?= registry.lab.tk-sputnik.org
 IMAGE    ?= kolco24
 TAG      ?= latest
@@ -11,7 +11,7 @@ build:
 	$(PODMAN) build -t $(FULL_IMAGE) --platform linux/amd64 .
 
 push:
-	$(PODMAN) push --format v2s2 $(FULL_IMAGE)
+	$(PODMAN) push $(FULL_IMAGE)
 
 build-push: build push
 
