@@ -13,7 +13,7 @@ def connect_to_sheet(sheet_number=0, tablekey=settings.GOOGLE_DOCS_KEY):
         "https://www.googleapis.com/auth/drive",
     ]
     credentials = ServiceAccountCredentials.from_json_keyfile_name(
-        "./kolco24/googledocs_api_key.json", scope
+        "./config/googledocs_api_key.json", scope
     )
 
     gc = gspread.authorize(credentials)

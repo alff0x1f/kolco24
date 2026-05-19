@@ -9,7 +9,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 podman compose -f docker-compose-dbs.yml up -d
 ```
 
-**`.env` file**: `src/kolco24/settings.py` loads `src/.env` via `python-dotenv`. Copy from `deploy/kolco24.env.example` and fill in secrets before running the server or tests:
+**`.env` file**: `src/config/settings.py` loads `src/.env` via `python-dotenv`. Copy from `deploy/kolco24.env.example` and fill in secrets before running the server or tests:
 ```bash
 cp deploy/kolco24.env.example src/.env
 ```
@@ -51,7 +51,7 @@ Django 4.2 project. Source lives entirely under `src/`, with `manage.py` at `src
 - `website` — core domain: team registration, race management, payment processing (VTB, Yandex, Sberbank, SBP), checkpoint tracking, athlete profiles. Models are split into files under `src/website/models/`.
 - `api` — DRF REST API consumed by the mobile app: member tag scanning, checkpoint events, team CRUD, CSV exports.
 - `donate` — donation flow built on top of `VTBPayment`.
-- `kolco24` — Django project config (settings, urls, wsgi).
+- `config` — Django project config (settings, urls, wsgi).
 
 **Payments** integrate with four providers: VTB (OAuth), Yandex Wallet, Sberbank (phone transfer), SBP. Each has its own model (`VTBPayment`, `YandexPayment`, etc.) in `website/models/`. Credentials come from env vars — see `deploy/kolco24.env.example`.
 
@@ -59,10 +59,10 @@ Django 4.2 project. Source lives entirely under `src/`, with `manage.py` at `src
 
 **Static files** are served by WhiteNoise from `STATIC_ROOT = src/staticfiles/` (populated by `collectstatic` at Docker build time). `STATICFILES_DIRS` points to `src/static/` (source assets).
 
-**Settings**: `src/kolco24/settings.py` reads all secrets from env vars via `python-dotenv`. For production, values go in `deploy/kolco24.env` (copy from `deploy/kolco24.env.example`).
+**Settings**: `src/config/settings.py` reads all secrets from env vars via `python-dotenv`. For production, values go in `deploy/kolco24.env` (copy from `deploy/kolco24.env.example`).
 
 ## Code Style
 
 Black 88-char limit, `isort` with Black profile. `ruff` and `flake8` share ignore rules from `setup.cfg` (`W503`, `E722`; `F401` ignored in `__init__.py`).
 
-Tests use Django `TestCase`, live in `src/<app>/tests.py`. `DJANGO_SETTINGS_MODULE = kolco24.settings` is set automatically by `pyproject.toml`.
+Tests use Django `TestCase`, live in `src/<app>/tests.py`. `DJANGO_SETTINGS_MODULE = config.settings` is set automatically by `pyproject.toml`.

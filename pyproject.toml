@@ -1,5 +1,5 @@
 [tool.pytest.ini_options]
-DJANGO_SETTINGS_MODULE = "kolco24.settings"
+DJANGO_SETTINGS_MODULE = "config.settings"
 python_files = "tests.py test_*.py"
 
 [tool.ruff.lint.extend-per-file-ignores]

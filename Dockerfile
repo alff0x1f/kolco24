@@ -20,4 +20,4 @@ COPY src ./
 
 RUN DJANGO_SECRET_KEY=build python manage.py collectstatic --noinput
 
-CMD ["gunicorn", "--bind", "0.0.0.0:8000", "kolco24.wsgi:application"]
+CMD ["gunicorn", "--bind", "0.0.0.0:8000", "config.wsgi:application"]
