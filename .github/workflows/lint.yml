@@ -19,17 +19,17 @@ jobs:
       - name: Check out Git repository
         uses: actions/checkout@v2
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v5
         with:
-          python-version: "3.10"
+          python-version: "3.12"
 
       - name: Install Python dependencies
-        run: pip install -r requirements-linters.txt
+        run: uv sync --frozen --dev
 
       - name: Run linters
         run: |
-          ruff check src
-          isort src --check-only
-          black src --check
-          flake8 src
+          uv run ruff check src
+          uv run isort src --check-only
+          uv run black src --check
+          uv run flake8 src

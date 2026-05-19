@@ -5,9 +5,7 @@
 ```bash
 git clone git@github.com:alff0x1f/kolco24.git
 cd kolco24
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
+uv sync --dev
 ```
 
 Запустить базу данных:

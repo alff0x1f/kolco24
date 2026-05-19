@@ -10,9 +10,7 @@ https://kolco24.ru/login/%s
 
 Ссылка действительна 24 часа. Получить новую ссылку для входа можно тут:
 https://kolco24.ru/login
-    """ % (
-        flogin_key
-    )
+    """ % (flogin_key)
 
     from_email = "Кольцо 24 <org@kolco24.ru>"
 
