@@ -9,10 +9,9 @@ Reference materials and HTTP traces sit in `docs/`, `http/`, and banking artifac
 
 ## Build, Test, and Development Commands
 
-Create and activate a virtualenv (`python3 -m venv .venv && source .venv/bin/activate`), then install dependencies with
-`pip install -r requirements.txt`. Start databases via `docker-compose -f docker-compose-dbs.yml up -d`, run migrations
-with `python src/manage.py migrate`, and serve locally using `python src/manage.py runserver 0:8080`. Use `pytest` for
-the test suite and `ruff check src`, `black --check src`, plus `isort --check src` before pushing.
+Install dependencies with `uv sync --dev`. Start databases via `docker-compose -f docker-compose-dbs.yml up -d`, run
+migrations with `uv run python src/manage.py migrate`, and serve locally using
+`uv run python src/manage.py runserver 0:8080`. Use `uv run pytest` for the test suite and `make lint` before pushing.
 
 ## Coding Style & Naming Conventions
 
