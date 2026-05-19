@@ -21,6 +21,26 @@ python src/manage.py migrate
 python src/manage.py runserver 0:8080
 ```
 
+## Проверка отправки писем
+
+В разработке (письмо уходит через SMTP напрямую):
+
+```bash
+python src/manage.py check_email your@email.com
+```
+
+В продакшене (письмо ставится в очередь django-mailer, затем отправляется контейнером `kolco24_runmailer`):
+
+```bash
+docker compose exec kolco24_django uv run python manage.py check_email your@email.com
+```
+
+Команда выводит статус и показывает, сколько писем стоит в очереди. Если письмо встало в очередь, но не доходит — проверьте логи `kolco24_runmailer`:
+
+```bash
+docker compose logs kolco24_runmailer
+```
+
 ## Продакшен
 
 ### Сборка и публикация образа
