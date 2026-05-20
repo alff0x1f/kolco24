@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **Container runtime**: use `docker`. Start the DB:
 ```bash
-docker compose -f docker-compose-dbs.yml up -d
+docker compose up -d kolco24_db
 ```
 
 **`.env` file**: `src/config/settings.py` loads `src/.env` via `python-dotenv`. Copy from `deploy/kolco24.env.example` and fill in secrets before running the server or tests:
@@ -19,7 +19,7 @@ Without `.env`, most env vars will be `None` (DB password, VTB keys, etc.) and t
 
 ```bash
 # Development
-docker compose -f docker-compose-dbs.yml up -d   # start local DB
+docker compose up -d kolco24_db   # start local DB
 uv run python src/manage.py migrate
 uv run python src/manage.py runserver 0:8080
 

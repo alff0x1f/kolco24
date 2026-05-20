@@ -11,7 +11,7 @@ uv sync --dev
 Запустить базу данных:
 
 ```bash
-docker compose -f docker-compose-dbs.yml up -d
+docker compose up -d kolco24_db
 ```
 
 Применить миграции и запустить devserver:
