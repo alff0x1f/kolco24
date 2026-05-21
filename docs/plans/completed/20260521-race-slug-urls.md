@@ -239,7 +239,7 @@ These need to pass slugs instead. `team.category2.race_id` is an integer FK; we 
 
 ### Task 6: [Final] Update documentation
 
-- [ ] move this plan to `docs/plans/completed/`
+- [x] move this plan to `docs/plans/completed/`
   (`mkdir -p docs/plans/completed && mv docs/plans/20260521-race-slug-urls.md docs/plans/completed/`)
 
 ## Post-Completion
