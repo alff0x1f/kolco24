@@ -1954,7 +1954,7 @@ class MyTeamsView(View):
 
 class AddTeam(View):
     def get(self, request, race_slug):
-        race = Race.objects.get(slug=race_slug)
+        race = get_object_or_404(Race, slug=race_slug)
 
         if not request.user.is_authenticated:
             return HttpResponseRedirect(reverse("passlogin") + f"?next={request.path}")
@@ -1977,7 +1977,7 @@ class AddTeam(View):
         if not request.user.is_authenticated:
             return HttpResponseRedirect(reverse("passlogin") + f"?next={request.path}")
 
-        race = Race.objects.get(slug=race_slug)
+        race = get_object_or_404(Race, slug=race_slug)
         if not race.is_teams_editable:
             return HttpResponse("Регистрация закрыта")
 
@@ -2387,13 +2387,13 @@ class TeamsView(View):
 
 class TeamsViewCsv(View):
     def get(self, request, race_slug, category_id, *args, **kwargs):
-        teams_ = Team.objects.filter(
-            category="6h", paid_people__gt=0, year=2024
-        ).order_by(
+        race = get_object_or_404(Race, slug=race_slug)
+        category = get_object_or_404(Category, race_id=race.id, id=category_id)
+        teams_ = Team.objects.filter(category2=category, paid_people__gt=0).order_by(
             "start_number",
             "id",
         )
-        points = Checkpoint.objects.filter(year=2024, cost__gte=0)
+        points = Checkpoint.objects.filter(race_id=race.id, cost__gte=0)
         cost = {}
         for p in points:
             cost[p.number] = p.cost
