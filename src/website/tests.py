@@ -1,6 +1,9 @@
 import pytest
 from django.contrib.auth.models import User
+from django.db import IntegrityError
 from django.urls import reverse
+
+from website.models import Race
 
 
 @pytest.mark.skip
@@ -45,3 +48,20 @@ def test_logout_user_view(client):
 
     # Ensure the user is logged out
     assert "_auth_user_id" not in client.session
+
+
+@pytest.mark.django_db
+def test_race_slug_populated():
+    race = Race.objects.create(
+        name="Test Race",
+        code="test-race",
+        slug="test-race",
+    )
+    assert race.slug == "test-race"
+
+
+@pytest.mark.django_db
+def test_race_slug_unique():
+    Race.objects.create(name="Race A", code="race-a", slug="same-slug")
+    with pytest.raises(IntegrityError):
+        Race.objects.create(name="Race B", code="race-b", slug="same-slug")

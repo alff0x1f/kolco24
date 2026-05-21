@@ -79,11 +79,11 @@ parameter name and DB lookup key change.
 - Create: `src/website/migrations/0059_race_slug.py` (via makemigrations)
 - Create: `src/website/migrations/0060_race_slug_populate.py` (data migration)
 
-- [ ] add `slug = SlugField("URL-slug", max_length=50, unique=True, blank=True)` to
+- [x] add `slug = SlugField("URL-slug", max_length=50, unique=True, blank=True)` to
   `Race` model in `src/website/models/race.py`
-- [ ] run `uv run python src/manage.py makemigrations website --name race_slug` to
+- [x] run `uv run python src/manage.py makemigrations website --name race_slug` to
   generate `0059_race_slug.py`
-- [ ] create `0060_race_slug_populate.py` data migration:
+- [x] create `0060_race_slug_populate.py` data migration:
   ```python
   from django.db import migrations
   from django.db.models import F
@@ -96,16 +96,16 @@ parameter name and DB lookup key change.
       dependencies = [("website", "0059_race_slug")]
       operations = [migrations.RunPython(populate_slug, migrations.RunPython.noop)]
   ```
-- [ ] run `uv run python src/manage.py migrate` and confirm all races have non-empty slug
-- [ ] verify race id=8 slug value:
+- [x] run `uv run python src/manage.py migrate` and confirm all races have non-empty slug
+- [x] verify race id=8 slug value:
   `uv run python src/manage.py shell -c "from website.models import Race; print(Race.objects.get(pk=8).slug)"`
-  → note this value for use in Task 2 (index URL)
-- [ ] add `src/website/admin.py`: ensure `slug` is visible/editable in `RaceAdmin`
+  → note this value for use in Task 2 (index URL): **kolco24_2025**
+- [x] add `src/website/admin.py`: ensure `slug` is visible/editable in `RaceAdmin`
   (add to `fields` or `list_display` if a `ModelAdmin` exists)
-- [ ] write test `test_race_slug_populated`: create Race with code="test-race", run
+- [x] write test `test_race_slug_populated`: create Race with code="test-race", run
   migration equivalent, assert `race.slug == "test-race"`
-- [ ] write test `test_race_slug_unique`: two races with same slug raises IntegrityError
-- [ ] run `uv run pytest --reuse-db` — must pass before Task 2
+- [x] write test `test_race_slug_unique`: two races with same slug raises IntegrityError
+- [x] run `uv run pytest --reuse-db` — must pass before Task 2
 
 ---
 
