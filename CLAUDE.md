@@ -4,9 +4,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Local environment
 
-**Container runtime**: use `podman` (not `docker`). Start the DB:
+**Container runtime**: use `docker`. Start the DB:
 ```bash
-podman compose -f docker-compose-dbs.yml up -d
+docker compose up -d kolco24_db
 ```
 
 **`.env` file**: `src/config/settings.py` loads `src/.env` via `python-dotenv`. Copy from `deploy/kolco24.env.example` and fill in secrets before running the server or tests:
@@ -17,24 +17,22 @@ Without `.env`, most env vars will be `None` (DB password, VTB keys, etc.) and t
 
 ## Commands
 
-All Django management commands run from `src/`:
-
 ```bash
 # Development
-podman compose -f docker-compose-dbs.yml up -d   # start local DB
-python src/manage.py migrate
-python src/manage.py runserver 0:8080
+docker compose up -d kolco24_db   # start local DB
+uv run python src/manage.py migrate
+uv run python src/manage.py runserver 0:8080
 
 # Tests
-pytest                    # full suite
-pytest --reuse-db         # faster iteration (reuse DB between runs)
-pytest src/website/tests.py::ClassName::test_method  # single test
+uv run pytest                    # full suite
+uv run pytest --reuse-db         # faster iteration (reuse DB between runs)
+uv run pytest src/website/tests.py::ClassName::test_method  # single test
 
 # Linting (must pass before pushing)
-ruff check src
-black --check src
-isort --check src
-flake8 src
+uv run ruff check src
+uv run black --check src
+uv run isort --check src
+uv run flake8 src
 
 # Docker build & push
 make build-push           # build + push to registry.lab.tk-sputnik.org
