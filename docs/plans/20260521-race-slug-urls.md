@@ -119,7 +119,7 @@ This task changes URL patterns and view signatures atomically (they are tightly 
 
 **2a — Add `RaceIdRedirectView` to `views_.py`:**
 
-- [ ] add after existing imports in `views_.py`:
+- [x] add after existing imports in `views_.py`:
   ```python
   from django.http import HttpResponsePermanentRedirect
 
@@ -137,68 +137,40 @@ For each view below, rename parameter `race_id` → `race_slug` and change DB lo
 to `get_object_or_404(Race, slug=race_slug)`. Where the int PK is needed for ORM filters,
 add `race_id = race.id` immediately after the lookup.
 
-- [ ] `TeamMemberRaceLogView.get(request, race_id)` → `race_slug`
-- [ ] `RaceNewsView.get(request, race_id)` → `race_slug`
-- [ ] `BreakfastView.get(request, race_id)` and `.post(request, race_id)` → `race_slug`
-- [ ] `BreakfastAdminView.get` and `.post` → `race_slug`; update
+- [x] `TeamMemberRaceLogView.get(request, race_id)` → `race_slug`
+- [x] `RaceNewsView.get(request, race_id)` → `race_slug`
+- [x] `BreakfastView.get(request, race_id)` and `.post(request, race_id)` → `race_slug`
+- [x] `BreakfastAdminView.get` and `.post` → `race_slug`; update
   `reverse("breakfast_admin", args=[race.id])` → `reverse("breakfast_admin", args=[race.slug])`
-- [ ] `BreakfastPaidListView.get` → `race_slug`
-- [ ] `AllTeamsView.get(request, race_id)` → `race_slug`; add `race_id = race.id` for ORM filters
-- [ ] `MyTeamsView.get(request, race_id)` → `race_slug`; add `race_id = race.id`
-- [ ] `AddTeam.get` and `.post` → `race_slug`; update
+- [x] `BreakfastPaidListView.get` → `race_slug`
+- [x] `AllTeamsView.get(request, race_id)` → `race_slug`; add `race_id = race.id` for ORM filters
+- [x] `MyTeamsView.get(request, race_id)` → `race_slug`; add `race_id = race.id`
+- [x] `AddTeam.get` and `.post` → `race_slug`; update
   `reverse("add_team", args=[race_id])` → `reverse("add_team", args=[race.slug])`
   and `reverse("my_teams", args=[race_id])` → `reverse("my_teams", args=[race.slug])`
   and context `"race_id": race_id` → `"race_id": race.id`
   and `TeamForm(race_id, ...)` → `TeamForm(race.id, ...)`
-- [ ] `AllTeamsResultView.get(request, race_id, category_id)` → `race_slug`; add `race_id = race.id`
-- [ ] `TeamsView.get(request, race_id, category_id)` → `race_slug`; add `race_id = race.id`
-- [ ] `TeamsViewCsv.get(request, race_id, category_id)` → `race_slug`; add `race_id = race.id`
-- [ ] leave `upload_photo(request, race_id)` and `PointTagsView` unchanged (internal API)
+- [x] `AllTeamsResultView.get(request, race_id, category_id)` → `race_slug`; add `race_id = race.id`
+- [x] `TeamsView.get(request, race_id, category_id)` → `race_slug`; add `race_id = race.id`
+- [x] `TeamsViewCsv.get(request, race_id, category_id)` → `race_slug`; add `race_id = race.id`
+- [x] leave `upload_photo(request, race_id)` and `PointTagsView` unchanged (internal API)
 
 **2c — Update `urls.py`:**
 
-- [ ] add `RaceIdRedirectView` to imports from `.views`
-- [ ] replace the block of `race/<race_id>/...` patterns with:
-  ```python
-  # Slug-based (primary)
-  path("race/<slug:race_slug>/", views.RaceNewsView.as_view(), name="race"),
-  path("race/<slug:race_slug>/teams/", views.AllTeamsView.as_view(), name="all_teams"),
-  path("race/<slug:race_slug>/teams/my/", views.MyTeamsView.as_view(), name="my_teams"),
-  path("race/<slug:race_slug>/teams/add/", views.AddTeam.as_view(), name="add_team"),
-  path("race/<slug:race_slug>/category/<category_id>/teams/", views.TeamsView.as_view(), name="teams2"),
-  path("race/<slug:race_slug>/category/<int:category_id>/results/", views.AllTeamsResultView.as_view(), name="category_results"),
-  path("race/<slug:race_slug>/category/<category_id>/teams.csv", views.TeamsViewCsv.as_view(), name="teams_csv"),
-  path("race/<slug:race_slug>/breakfast/", views.BreakfastView.as_view(), name="breakfast"),
-  path("race/<slug:race_slug>/breakfast/admin/", views.BreakfastAdminView.as_view(), name="breakfast_admin"),
-  path("race/<slug:race_slug>/breakfast/list/", views.BreakfastPaidListView.as_view(), name="breakfast_paid_list"),
-  path("race/<int:race_id>/member_logs/", views.TeamMemberRaceLogView.as_view(), name="race_member_logs"),
-  # Int-id redirects (backward compat, 301)
-  path("race/<int:race_id>/", RaceIdRedirectView.as_view()),
-  path("race/<int:race_id>/teams/", RaceIdRedirectView.as_view()),
-  path("race/<int:race_id>/teams/my/", RaceIdRedirectView.as_view()),
-  path("race/<int:race_id>/teams/add/", RaceIdRedirectView.as_view()),
-  path("race/<int:race_id>/category/<category_id>/teams/", RaceIdRedirectView.as_view()),
-  path("race/<int:race_id>/category/<int:category_id>/results/", RaceIdRedirectView.as_view()),
-  path("race/<int:race_id>/category/<category_id>/teams.csv", RaceIdRedirectView.as_view()),
-  path("race/<int:race_id>/breakfast/", RaceIdRedirectView.as_view()),
-  path("race/<int:race_id>/breakfast/admin/", RaceIdRedirectView.as_view()),
-  path("race/<int:race_id>/breakfast/list/", RaceIdRedirectView.as_view()),
-  ```
-- [ ] update index redirect (line 18) using the slug value determined in Task 1 step 5:
-  `lambda request: redirect("race", race_slug="<SLUG_FROM_TASK_1>")` — replace
-  `<SLUG_FROM_TASK_1>` with actual value (e.g. `"kolco24"`)
-- [ ] update `race/8/transfer/` hardcoded pattern — leave it as-is (no slug needed)
-- [ ] note: `race_member_logs` keeps `<int:race_id>` since it is an internal admin view;
-  `TeamMemberRaceLogView` signature still needs `race_slug` → update the URL pattern for
-  member_logs to use `<slug:race_slug>` too, OR keep int and leave its view unchanged.
-  **Decision**: convert `race_member_logs` to slug as well for consistency.
+- [x] add `RaceIdRedirectView` to imports from `.views`
+- [x] replace the block of `race/<race_id>/...` patterns with slug-based primary + int-id redirects
+  (int-id redirects placed before slug patterns since slug matches integers too)
+- [x] update index redirect (line 18) using the slug value determined in Task 1 step 5:
+  `lambda request: redirect("race", race_slug="kolco24_2025")`
+- [x] update `race/8/transfer/` hardcoded pattern — leave it as-is (no slug needed)
+- [x] convert `race_member_logs` to slug as well for consistency
 
 **2d — Tests:**
 
-- [ ] write `test_race_id_redirect_main`: GET `/race/8/` → 301 to `/race/<slug>/`
-- [ ] write `test_race_id_redirect_teams`: GET `/race/8/teams/` → 301 to `/race/<slug>/teams/`
-- [ ] write `test_race_slug_news_view`: GET `/race/<slug>/` → 200
-- [ ] run `uv run pytest --reuse-db` — must pass before Task 3
+- [x] write `test_race_id_redirect_main`: GET `/race/8/` → 301 to `/race/<slug>/`
+- [x] write `test_race_id_redirect_teams`: GET `/race/8/teams/` → 301 to `/race/<slug>/teams/`
+- [x] write `test_race_slug_news_view`: GET `/race/<slug>/` → 200
+- [x] run `uv run pytest --reuse-db` — must pass before Task 3
 
 ---
 

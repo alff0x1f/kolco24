@@ -11,11 +11,12 @@ from .views import (
     CustomPasswordResetConfirmView,
     CustomPasswordResetDoneView,
     CustomPasswordResetView,
+    RaceIdRedirectView,
 )
 from .views.team import EditTeamView, TeamMemberMoveView
 
 urlpatterns = [
-    path("", lambda request: redirect("race", race_id=8), name="index"),
+    path("", lambda request: redirect("race", race_slug="kolco24_2025"), name="index"),
     # path("index_hidden/", views.IndexView.as_view(), name="index"),
     # auth
     path("register/", views.RegisterView.as_view(), name="register"),
@@ -24,21 +25,6 @@ urlpatterns = [
         "race/8/transfer/list/",
         views.TransferPaidListView.as_view(),
         name="transfer_paid_list",
-    ),
-    path(
-        "race/<int:race_id>/breakfast/",
-        views.BreakfastView.as_view(),
-        name="breakfast",
-    ),
-    path(
-        "race/<int:race_id>/breakfast/admin/",
-        views.BreakfastAdminView.as_view(),
-        name="breakfast_admin",
-    ),
-    path(
-        "race/<int:race_id>/breakfast/list/",
-        views.BreakfastPaidListView.as_view(),
-        name="breakfast_paid_list",
     ),
     path("password_reset/", CustomPasswordResetView.as_view(), name="password_reset"),
     path(
@@ -68,36 +54,76 @@ urlpatterns = [
     path("team/<team_id>/pay/", views.TeamPayment.as_view(), name="pay_team"),
     path("team_admin/", views.team_admin, name="team_admin"),
     path("teams/", views.teams, name="teams"),
-    path("race/<race_id>/", views.RaceNewsView.as_view(), name="race"),
-    path("race/<race_id>/teams/", views.AllTeamsView.as_view(), name="all_teams"),
-    path("race/<race_id>/teams/my/", views.MyTeamsView.as_view(), name="my_teams"),
-    path("race/<race_id>/teams/add/", views.AddTeam.as_view(), name="add_team"),
+    # Int-id redirects must come before slug patterns (slug matches ints too)
+    path("race/<int:race_id>/", RaceIdRedirectView.as_view()),
+    path("race/<int:race_id>/teams/", RaceIdRedirectView.as_view()),
+    path("race/<int:race_id>/teams/my/", RaceIdRedirectView.as_view()),
+    path("race/<int:race_id>/teams/add/", RaceIdRedirectView.as_view()),
+    path(
+        "race/<int:race_id>/category/<category_id>/teams/", RaceIdRedirectView.as_view()
+    ),
+    path(
+        "race/<int:race_id>/category/<int:category_id>/results/",
+        RaceIdRedirectView.as_view(),
+    ),
+    path(
+        "race/<int:race_id>/category/<category_id>/teams.csv",
+        RaceIdRedirectView.as_view(),
+    ),
+    path("race/<int:race_id>/breakfast/", RaceIdRedirectView.as_view()),
+    path("race/<int:race_id>/breakfast/admin/", RaceIdRedirectView.as_view()),
+    path("race/<int:race_id>/breakfast/list/", RaceIdRedirectView.as_view()),
+    path("race/<int:race_id>/member_logs/", RaceIdRedirectView.as_view()),
+    # Slug-based (primary)
+    path("race/<slug:race_slug>/", views.RaceNewsView.as_view(), name="race"),
+    path(
+        "race/<slug:race_slug>/teams/", views.AllTeamsView.as_view(), name="all_teams"
+    ),
+    path(
+        "race/<slug:race_slug>/teams/my/", views.MyTeamsView.as_view(), name="my_teams"
+    ),
+    path("race/<slug:race_slug>/teams/add/", views.AddTeam.as_view(), name="add_team"),
+    path(
+        "race/<slug:race_slug>/category/<category_id>/teams/",
+        views.TeamsView.as_view(),
+        name="teams2",
+    ),
+    path(
+        "race/<slug:race_slug>/category/<int:category_id>/results/",
+        views.AllTeamsResultView.as_view(),
+        name="category_results",
+    ),
+    path(
+        "race/<slug:race_slug>/member_logs/",
+        views.TeamMemberRaceLogView.as_view(),
+        name="race_member_logs",
+    ),
+    path(
+        "race/<slug:race_slug>/category/<category_id>/teams.csv",
+        views.TeamsViewCsv.as_view(),
+        name="teams_csv",
+    ),
+    path(
+        "race/<slug:race_slug>/breakfast/",
+        views.BreakfastView.as_view(),
+        name="breakfast",
+    ),
+    path(
+        "race/<slug:race_slug>/breakfast/admin/",
+        views.BreakfastAdminView.as_view(),
+        name="breakfast_admin",
+    ),
+    path(
+        "race/<slug:race_slug>/breakfast/list/",
+        views.BreakfastPaidListView.as_view(),
+        name="breakfast_paid_list",
+    ),
     # path(
     #     "race/<race_id>/teams_result",
     #     views.AllTeamsResultView.as_view(),
     #     name="all_teams",
     # ),
     path("team/<team_id>/points/", views.TeamPointsView.as_view(), name="team_points"),
-    path(
-        "race/<race_id>/category/<category_id>/teams/",
-        views.TeamsView.as_view(),
-        name="teams2",
-    ),
-    path(
-        "race/<int:race_id>/category/<int:category_id>/results/",
-        views.AllTeamsResultView.as_view(),
-        name="category_results",
-    ),
-    path(
-        "race/<int:race_id>/member_logs/",
-        views.TeamMemberRaceLogView.as_view(),
-        name="race_member_logs",
-    ),
-    path(
-        "race/<race_id>/category/<category_id>/teams.csv",
-        views.TeamsViewCsv.as_view(),
-        name="teams_csv",
-    ),
     # path("teams_predstart/", views.teams_predstart, name="teams_predstart"),
     # path("teams_start/", views.teams_start, name="teams_start"),
     # path("teams_finish/", views.teams_finish, name="teams_finish"),
