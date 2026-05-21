@@ -183,18 +183,18 @@ The `EditTeamView` and related code in `team.py` call `reverse()` with integer r
 These need to pass slugs instead. `team.category2.race_id` is an integer FK; we need
 `team.category2.race.slug` which requires a JOIN.
 
-- [ ] in `EditTeamView` (or wherever `get_team` is called), ensure `select_related("category2__race")`
+- [x] in `EditTeamView` (or wherever `get_team` is called), ensure `select_related("category2__race")`
   is in the queryset (check `get_team` method in `team.py`)
-- [ ] `reverse("my_teams", args=[race.id])` (line 121) → `reverse("my_teams", args=[race.slug])`
-- [ ] `reverse("teams2", args=[team.category2.race_id, team.category2_id])` (line 161) →
+- [x] `reverse("my_teams", args=[race.id])` (line 121) → `reverse("my_teams", args=[race.slug])`
+- [x] `reverse("teams2", args=[team.category2.race_id, team.category2_id])` (line 161) →
   `reverse("teams2", args=[team.category2.race.slug, team.category2_id])`
-- [ ] `reverse("my_teams", args=[team.category2.race_id])` (line 195) →
+- [x] `reverse("my_teams", args=[team.category2.race_id])` (line 195) →
   `reverse("my_teams", args=[team.category2.race.slug])`
-- [ ] context `"race_id": team.category2.race_id` (line 62) — used internally; update to
+- [x] context `"race_id": team.category2.race_id` (line 62) — used internally; update to
   `"race_id": team.category2.race_id` (unchanged — this is the int PK for TeamForm, not URL)
-- [ ] write test `test_edit_team_redirect_uses_slug`: after team edit, redirect location
+- [x] write test `test_edit_team_redirect_uses_slug`: after team edit, redirect location
   contains slug not int
-- [ ] run `uv run pytest --reuse-db` — must pass before Task 4
+- [x] run `uv run pytest --reuse-db` — must pass before Task 4
 
 ---
 

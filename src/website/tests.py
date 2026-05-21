@@ -4,6 +4,8 @@ from django.db import IntegrityError
 from django.urls import reverse
 
 from website.models import Race
+from website.models.models import Team
+from website.models.race import Category, RegStatus
 
 
 @pytest.mark.skip
@@ -88,3 +90,38 @@ def test_race_slug_news_view(client):
     race = Race.objects.create(name="Test Race", code="tr2025c", slug="tr2025c")
     response = client.get(f"/race/{race.slug}/")
     assert response.status_code == 200
+
+
+@pytest.mark.django_db
+def test_edit_team_redirect_uses_slug(client):
+    user = User.objects.create_user(
+        username="edituser", password="pass", email="edit@example.com"
+    )
+    race = Race.objects.create(
+        name="Edit Race",
+        code="edit24",
+        slug="edit-race-2024",
+        is_teams_editable=True,
+        reg_status=RegStatus.UPCOMING,
+    )
+    category = Category.objects.create(
+        code="12h",
+        name="12 hours",
+        short_name="12h",
+        race=race,
+    )
+    team = Team.objects.create(
+        owner=user,
+        paymentid="testpay",
+        dist="12h",
+        category2=category,
+        ucount=2,
+    )
+    client.force_login(user)
+    response = client.post(
+        f"/team/{team.id}/",
+        {"ucount": "2", "category2_id": str(category.id)},
+    )
+    assert response.status_code == 302
+    assert race.slug in response["Location"]
+    assert str(race.id) not in response["Location"]
