@@ -228,12 +228,12 @@ These need to pass slugs instead. `team.category2.race_id` is an integer FK; we 
 
 ### Task 5: Verify acceptance criteria
 
-- [ ] verify all `race/<race_id>/...` URL patterns now have slug equivalents
-- [ ] verify old int-id URLs return 301, not 404 or 200
-- [ ] verify slug URLs return 200
-- [ ] verify templates render without `NoReverseMatch` errors
-- [ ] run full test suite: `uv run pytest`
-- [ ] run linting: `uv run ruff check src && uv run black --check src && uv run isort --check src && uv run flake8 src`
+- [x] verify all `race/<race_id>/...` URL patterns now have slug equivalents
+- [x] verify old int-id URLs return 301, not 404 or 200
+- [x] verify slug URLs return 200
+- [x] verify templates render without `NoReverseMatch` errors
+- [x] run full test suite: `uv run pytest`
+- [x] run linting: `uv run ruff check src && uv run black --check src && uv run isort --check src && uv run flake8 src`
 
 ---
 
