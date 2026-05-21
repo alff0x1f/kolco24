@@ -179,7 +179,7 @@
                     {% endif %}
                     {% if active_tab == 'my' %}
                         <div class="col mb-2 text-right">
-                            <a class="btn btn-success" href="{% url 'add_team' race.id %}">Добавить новую команду</a>
+                            <a class="btn btn-success" href="{% url 'add_team' race.slug %}">Добавить новую команду</a>
                         </div>
                     {% endif %}
                 </div>

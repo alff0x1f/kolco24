@@ -208,21 +208,21 @@ These need to pass slugs instead. `team.category2.race_id` is an integer FK; we 
 - Modify: `src/templates/website/team_member_race_logs.html`
 - Modify: `src/templates/website/news.html`
 
-- [ ] `src/templates/teams.html` line 182:
+- [x] `src/templates/teams.html` line 182:
   `{% url 'add_team' race.id %}` → `{% url 'add_team' race.slug %}`
-- [ ] `src/templates/website/breakfast.html` line 55:
+- [x] `src/templates/website/breakfast.html` line 55:
   `{% url 'breakfast' race.id %}` → `{% url 'breakfast' race.slug %}`
-- [ ] `src/templates/website/breakfast_admin.html` line 12:
+- [x] `src/templates/website/breakfast_admin.html` line 12:
   `{% url 'breakfast' race.id %}` → `{% url 'breakfast' race.slug %}`
-- [ ] `src/templates/website/breakfast_paid_list.html` line 12:
+- [x] `src/templates/website/breakfast_paid_list.html` line 12:
   `{% url 'breakfast_admin' race.id %}` → `{% url 'breakfast_admin' race.slug %}`
-- [ ] `src/templates/website/team_member_race_logs.html` line 12:
+- [x] `src/templates/website/team_member_race_logs.html` line 12:
   `{% url 'race' race.id %}` → `{% url 'race' race.slug %}`
-- [ ] `src/templates/website/news.html` lines 32, 190:
+- [x] `src/templates/website/news.html` lines 32, 190:
   `{% url 'add_team' race.id %}` → `{% url 'add_team' race.slug %}`
-- [ ] grep all templates for any remaining `race.id` in `{% url %}` tags:
+- [x] grep all templates for any remaining `race.id` in `{% url %}` tags:
   `grep -rn "url.*race\.id" src/templates/`
-- [ ] run `uv run pytest --reuse-db` — must pass before Task 5
+- [x] run `uv run pytest --reuse-db` — must pass before Task 5
 
 ---
 

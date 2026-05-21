@@ -29,7 +29,7 @@
                     {% elif race.reg_status == 'open' %}
                       {% if user.is_authenticated %}
                           <div class="list-group m-3 list-group-flush">
-                              <a href="{% url 'add_team' race.id %}" class="btn btn-block btn-success">Добавить
+                              <a href="{% url 'add_team' race.slug %}" class="btn btn-block btn-success">Добавить
                                   новую команду</a>
                           </div>
                       {% else %}
@@ -187,7 +187,7 @@
                         <!-- end of categories -->
                         {% if reg_open and user.is_authenticated %}
                             <div class="list-group m-3 list-group-flush">
-                                <a href="{% url 'add_team' race.id %}" class="btn btn-block btn-secondary">Добавить
+                                <a href="{% url 'add_team' race.slug %}" class="btn btn-block btn-secondary">Добавить
                                     новую команду</a>
                             </div>
                         {% endif %}
