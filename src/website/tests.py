@@ -146,7 +146,9 @@ def test_race_admin_unique_together():
 
     from website.models.race import RaceAdmin
 
-    race = Race.objects.create(name="Unique Race", code="ur2025", slug="unique-race-2025")
+    race = Race.objects.create(
+        name="Unique Race", code="ur2025", slug="unique-race-2025"
+    )
     user = User.objects.create_user(username="uniqueadmin", password="pass")
     RaceAdmin.objects.create(race=race, user=user)
     with pytest.raises(IntegrityError):
@@ -157,7 +159,9 @@ def test_race_admin_unique_together():
 def test_news_post_form_valid():
     from website.forms import NewsPostForm
 
-    form = NewsPostForm(data={"title": "Test Post", "content": "Some **markdown** text"})
+    form = NewsPostForm(
+        data={"title": "Test Post", "content": "Some **markdown** text"}
+    )
     assert form.is_valid(), form.errors
 
 
@@ -168,3 +172,42 @@ def test_news_post_form_invalid():
     form = NewsPostForm(data={"title": "", "content": "Some content"})
     assert not form.is_valid()
     assert "title" in form.errors
+
+
+@pytest.mark.django_db
+def test_add_post_by_race_admin(client):
+    from website.models.news import NewsPost
+    from website.models.race import RaceAdmin
+
+    race = Race.objects.create(name="Post Race", code="pr2025", slug="post-race-2025")
+    user = User.objects.create_user(username="postadmin", password="pass")
+    RaceAdmin.objects.create(race=race, user=user, role=RaceAdmin.Role.ADMIN)
+    client.force_login(user)
+    response = client.post(
+        f"/race/{race.slug}/post/add/",
+        {"title": "New Post", "content": "Hello world"},
+    )
+    assert response.status_code == 302
+    assert NewsPost.objects.filter(race=race, title="New Post").exists()
+
+
+@pytest.mark.django_db
+def test_add_post_unauthorized(client):
+    race = Race.objects.create(name="Post Race2", code="pr2026", slug="post-race-2026")
+    response = client.post(
+        f"/race/{race.slug}/post/add/",
+        {"title": "Should fail", "content": "No auth"},
+    )
+    assert response.status_code == 403
+
+
+@pytest.mark.django_db
+def test_add_post_non_admin_user(client):
+    race = Race.objects.create(name="Post Race3", code="pr2027", slug="post-race-2027")
+    user = User.objects.create_user(username="notadmin", password="pass")
+    client.force_login(user)
+    response = client.post(
+        f"/race/{race.slug}/post/add/",
+        {"title": "Should fail", "content": "Not admin"},
+    )
+    assert response.status_code == 403

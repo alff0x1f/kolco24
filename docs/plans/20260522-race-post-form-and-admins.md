@@ -123,25 +123,25 @@ post publishes; verify non-admin sees no form.
 **Files:**
 - Modify: `src/website/views/views_.py`
 
-- [ ] Add helper function `is_race_admin(user, race) -> bool`:
+- [x] Add helper function `is_race_admin(user, race) -> bool`:
   ```python
   def is_race_admin(user, race):
       if not user.is_authenticated:
           return False
       return RaceAdmin.objects.filter(race=race, user=user).exists()
   ```
-- [ ] Import `RaceAdmin`, `NewsPostForm` in views file
-- [ ] Add `AddNewsPostView(View)`:
+- [x] Import `RaceAdmin`, `NewsPostForm` in views file
+- [x] Add `AddNewsPostView(View)`:
   - `post()` method only (GET → `HttpResponseNotAllowed`)
   - Check `is_race_admin(request.user, race)` → 403 if not
   - Bind `NewsPostForm(request.POST, request.FILES)`, save with `race=race`
   - On success: `redirect("race", race_slug=race_slug)`
   - On form invalid: re-render `RaceNewsView` with form errors in context
-- [ ] Write tests:
+- [x] Write tests:
   - `test_add_post_by_race_admin` — admin posts successfully, post appears in DB
   - `test_add_post_unauthorized` — anonymous user gets 403
   - `test_add_post_non_admin_user` — authenticated but not admin gets 403
-- [ ] Run tests — must pass before task 6
+- [x] Run tests — must pass before task 6
 
 ### Task 6: Update `RaceNewsView` to inject post form for admins
 
@@ -193,12 +193,12 @@ post publishes; verify non-admin sees no form.
 **Files:**
 - Modify: `src/website/urls.py`
 
-- [ ] Import `AddNewsPostView` in `urls.py`
-- [ ] Add URL pattern before `race/<slug:race_slug>/`:
+- [x] Import `AddNewsPostView` in `urls.py`
+- [x] Add URL pattern before `race/<slug:race_slug>/`:
   ```python
   path("race/<slug:race_slug>/post/add/", AddNewsPostView.as_view(), name="add_post"),
   ```
-- [ ] Run full test suite: `uv run pytest` — all must pass
+- [x] Run full test suite: `uv run pytest` — all must pass
 
 ### Task 9: Verify acceptance criteria
 

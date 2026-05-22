@@ -18,6 +18,8 @@ from django.db.models import Count, OuterRef, Subquery, Sum
 from django.http import (
     Http404,
     HttpResponse,
+    HttpResponseForbidden,
+    HttpResponseNotAllowed,
     HttpResponsePermanentRedirect,
     HttpResponseRedirect,
     JsonResponse,
@@ -38,6 +40,7 @@ from website.forms import (
     FastLoginForm,
     ImpersonateForm,
     LoginForm,
+    NewsPostForm,
     PageForm,
     RegForm,
     TeamForm,
@@ -62,6 +65,7 @@ from website.models import (
     PaymentLog,
     PaymentsYa,
     Race,
+    RaceAdmin,
     SbpPaymentRecipient,
     TakenKP,
     Team,
@@ -92,6 +96,33 @@ def can_manage_transfer(user):
     if not user.is_authenticated:
         return False
     return user.is_superuser or user.has_perm("website.change_transfer")
+
+
+def is_race_admin(user, race):
+    if not user.is_authenticated:
+        return False
+    return RaceAdmin.objects.filter(race=race, user=user).exists()
+
+
+class AddNewsPostView(View):
+    def get(self, request, race_slug):
+        return HttpResponseNotAllowed(["POST"])
+
+    def post(self, request, race_slug):
+        race = get_object_or_404(Race, slug=race_slug)
+        if not is_race_admin(request.user, race):
+            return HttpResponseForbidden()
+        form = NewsPostForm(request.POST, request.FILES)
+        if form.is_valid():
+            post = form.save(commit=False)
+            post.race = race
+            post.save()
+            return HttpResponseRedirect(
+                reverse("race", kwargs={"race_slug": race_slug})
+            )
+        context = RaceNewsView.get_context(race)
+        context["post_form"] = form
+        return render(request, "website/news.html", context)
 
 
 class RaceIdRedirectView(View):
