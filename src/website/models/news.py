@@ -1,5 +1,93 @@
+import nh3
 from django.db import models
 from markdown import markdown
+
+# Tags produced by Python-Markdown (with extra) that are safe to render
+_MD_ALLOWED_TAGS = frozenset(
+    {
+        "a",
+        "abbr",
+        "b",
+        "blockquote",
+        "br",
+        "caption",
+        "cite",
+        "code",
+        "col",
+        "colgroup",
+        "dd",
+        "del",
+        "details",
+        "div",
+        "dl",
+        "dt",
+        "em",
+        "figcaption",
+        "figure",
+        "h1",
+        "h2",
+        "h3",
+        "h4",
+        "h5",
+        "h6",
+        "hr",
+        "i",
+        "img",
+        "ins",
+        "kbd",
+        "li",
+        "ol",
+        "p",
+        "pre",
+        "q",
+        "s",
+        "samp",
+        "section",
+        "small",
+        "span",
+        "strong",
+        "sub",
+        "summary",
+        "sup",
+        "table",
+        "tbody",
+        "td",
+        "th",
+        "thead",
+        "time",
+        "tr",
+        "tt",
+        "ul",
+        "var",
+    }
+)
+
+_MD_ALLOWED_ATTRIBUTES = {
+    "a": {"href", "title"},
+    "abbr": {"title"},
+    "img": {"src", "alt", "title", "width", "height"},
+    "td": {"colspan", "rowspan", "align"},
+    "th": {"colspan", "rowspan", "align", "scope"},
+    "ol": {"start", "type"},
+    "li": {"value"},
+    "col": {"span"},
+    "colgroup": {"span"},
+    "code": {"class"},
+    "span": {"class"},
+    "div": {"class"},
+    "pre": {"class"},
+    "h1": {"id"},
+    "h2": {"id"},
+    "h3": {"id"},
+    "h4": {"id"},
+    "h5": {"id"},
+    "h6": {"id"},
+}
+
+
+def _render_markdown(text):
+    raw_html = markdown(str(text), extensions=["extra"])
+    return nh3.clean(raw_html, tags=_MD_ALLOWED_TAGS, attributes=_MD_ALLOWED_ATTRIBUTES)
 
 
 class NewsPost(models.Model):
@@ -39,7 +127,7 @@ class NewsPost(models.Model):
 
     def save(self, *args, **kwargs):
         """Render the markdown content to HTML"""
-        self.content_html = markdown(str(self.content), extensions=["extra"])
+        self.content_html = _render_markdown(self.content)
         super().save(*args, **kwargs)
 
 
@@ -83,5 +171,5 @@ class Page(models.Model):
 
     def save(self, *args, **kwargs):
         """Render the markdown content to HTML"""
-        self.content_html = markdown(str(self.content), extensions=["extra"])
+        self.content_html = _render_markdown(self.content)
         super().save(*args, **kwargs)

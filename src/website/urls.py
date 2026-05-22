@@ -75,6 +75,11 @@ urlpatterns = [
     path("race/<int:race_id>/breakfast/list/", RaceIdRedirectView.as_view()),
     path("race/<int:race_id>/member_logs/", RaceIdRedirectView.as_view()),
     # Slug-based (primary)
+    path(
+        "race/<slug:race_slug>/post/add/",
+        views.AddNewsPostView.as_view(),
+        name="add_post",
+    ),
     path("race/<slug:race_slug>/", views.RaceNewsView.as_view(), name="race"),
     path(
         "race/<slug:race_slug>/teams/", views.AllTeamsView.as_view(), name="all_teams"

@@ -125,3 +125,137 @@ def test_edit_team_redirect_uses_slug(client):
     assert response.status_code == 302
     assert race.slug in response["Location"]
     assert str(race.id) not in response["Location"]
+
+
+@pytest.mark.django_db
+def test_race_admin_model_creation():
+    from django.contrib.auth.models import User
+
+    from website.models.race import RaceAdmin
+
+    race = Race.objects.create(name="Admin Race", code="ar2025", slug="admin-race-2025")
+    user = User.objects.create_user(username="raceadmin", password="pass")
+    ra = RaceAdmin.objects.create(race=race, user=user, role=RaceAdmin.Role.ADMIN)
+    assert str(ra) == f"{user} — {race} (admin)"
+    assert ra.role == RaceAdmin.Role.ADMIN
+
+
+@pytest.mark.django_db
+def test_race_admin_unique_together():
+    from django.contrib.auth.models import User
+
+    from website.models.race import RaceAdmin
+
+    race = Race.objects.create(
+        name="Unique Race", code="ur2025", slug="unique-race-2025"
+    )
+    user = User.objects.create_user(username="uniqueadmin", password="pass")
+    RaceAdmin.objects.create(race=race, user=user)
+    with pytest.raises(IntegrityError):
+        RaceAdmin.objects.create(race=race, user=user)
+
+
+@pytest.mark.django_db
+def test_newspost_xss_sanitization():
+    from website.models.news import NewsPost
+
+    race = Race.objects.create(name="XSS Race", code="xss1", slug="xss-race")
+    post = NewsPost.objects.create(
+        title="XSS Test",
+        content='<script>alert("xss")</script> Normal **bold** text',
+        race=race,
+    )
+    assert "<script>" not in post.content_html
+    assert "alert" not in post.content_html
+    assert "<strong>bold</strong>" in post.content_html
+
+
+@pytest.mark.django_db
+def test_newspost_xss_event_handler_stripped():
+    from website.models.news import NewsPost
+
+    race = Race.objects.create(name="XSS Race2", code="xss2", slug="xss-race-2")
+    post = NewsPost.objects.create(
+        title="Event Handler Test",
+        content='<img src="x" onerror="alert(1)"> text',
+        race=race,
+    )
+    assert "onerror" not in post.content_html
+
+
+@pytest.mark.django_db
+def test_news_post_form_valid():
+    from website.forms import NewsPostForm
+
+    form = NewsPostForm(
+        data={"title": "Test Post", "content": "Some **markdown** text"}
+    )
+    assert form.is_valid(), form.errors
+
+
+@pytest.mark.django_db
+def test_news_post_form_invalid():
+    from website.forms import NewsPostForm
+
+    form = NewsPostForm(data={"title": "", "content": "Some content"})
+    assert not form.is_valid()
+    assert "title" in form.errors
+
+
+@pytest.mark.django_db
+def test_add_post_by_race_admin(client):
+    from website.models.news import NewsPost
+    from website.models.race import RaceAdmin
+
+    race = Race.objects.create(name="Post Race", code="pr2025", slug="post-race-2025")
+    user = User.objects.create_user(username="postadmin", password="pass")
+    RaceAdmin.objects.create(race=race, user=user, role=RaceAdmin.Role.ADMIN)
+    client.force_login(user)
+    response = client.post(
+        f"/race/{race.slug}/post/add/",
+        {"title": "New Post", "content": "Hello world"},
+    )
+    assert response.status_code == 302
+    assert NewsPost.objects.filter(race=race, title="New Post").exists()
+
+
+@pytest.mark.django_db
+def test_add_post_unauthorized(client):
+    race = Race.objects.create(name="Post Race2", code="pr2026", slug="post-race-2026")
+    response = client.post(
+        f"/race/{race.slug}/post/add/",
+        {"title": "Should fail", "content": "No auth"},
+    )
+    assert response.status_code == 403
+
+
+@pytest.mark.django_db
+def test_add_post_non_admin_user(client):
+    race = Race.objects.create(name="Post Race3", code="pr2027", slug="post-race-2027")
+    user = User.objects.create_user(username="notadmin", password="pass")
+    client.force_login(user)
+    response = client.post(
+        f"/race/{race.slug}/post/add/",
+        {"title": "Should fail", "content": "Not admin"},
+    )
+    assert response.status_code == 403
+
+
+@pytest.mark.django_db
+def test_race_news_view_shows_form_for_admin(client):
+    from website.models.race import RaceAdmin
+
+    race = Race.objects.create(name="Admin Race", code="ar2025", slug="admin-race-2025")
+    admin_user = User.objects.create_user(username="newsadmin", password="pass")
+    regular_user = User.objects.create_user(username="regularuser", password="pass")
+    RaceAdmin.objects.create(race=race, user=admin_user, role=RaceAdmin.Role.ADMIN)
+
+    client.force_login(admin_user)
+    response = client.get(f"/race/{race.slug}/")
+    assert response.status_code == 200
+    assert "post_form" in response.context
+
+    client.force_login(regular_user)
+    response = client.get(f"/race/{race.slug}/")
+    assert response.status_code == 200
+    assert "post_form" not in response.context

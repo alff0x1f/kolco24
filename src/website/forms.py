@@ -14,7 +14,7 @@ from website.models import (
     TeamMemberMove,
     Transfer,
 )
-from website.models.news import Page
+from website.models.news import NewsPost, Page
 from website.models.race import Category, Race
 
 BUS_REGISTRATION_MAX_PASSENGERS = 20
@@ -986,6 +986,20 @@ class PageForm(forms.ModelForm):
             ),
             "content": forms.Textarea(
                 attrs={"class": "form-control", "rows": 20, "placeholder": "Markdown"}
+            ),
+        }
+
+
+class NewsPostForm(forms.ModelForm):
+    class Meta:
+        model = NewsPost
+        fields = ["title", "content", "image"]
+        widgets = {
+            "title": forms.TextInput(
+                attrs={"class": "form-control", "placeholder": "Заголовок"}
+            ),
+            "content": forms.Textarea(
+                attrs={"class": "form-control", "rows": 6, "placeholder": "Markdown"}
             ),
         }
 
