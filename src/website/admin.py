@@ -12,6 +12,7 @@ from .models import (
     Payment,
     PaymentsYa,
     Race,
+    RaceAdmin,
     SbpPaymentRecipient,
     Tag,
     TakenKP,
@@ -210,11 +211,17 @@ class PaymentAdmin(admin.ModelAdmin):
     )
 
 
-class RaceAdmin(admin.ModelAdmin):
+class RaceAdminInline(admin.TabularInline):
+    model = RaceAdmin
+    extra = 1
+
+
+class RaceModelAdmin(admin.ModelAdmin):
     list_display = ("id", "name", "code", "slug", "date", "is_active", "is_reg_open")
     list_filter = ("is_active",)
     search_fields = ("name", "code", "slug")
     prepopulated_fields = {"slug": ("code",)}
+    inlines = [RaceAdminInline]
 
 
 class RaceLinkAdmin(admin.ModelAdmin):
@@ -269,7 +276,7 @@ admin.site.register(Team, TeamAdmin)
 admin.site.register(TakenKP, TakenKPAdmin)
 admin.site.register(PaymentsYa, PaymentsYaAdmin)
 admin.site.register(Payment, PaymentAdmin)
-admin.site.register(Race, RaceAdmin)
+admin.site.register(Race, RaceModelAdmin)
 admin.site.register(Category, CategoryAdmin)
 admin.site.register(NewsPost, NewsPostAdmin)
 admin.site.register(RaceLink, RaceLinkAdmin)

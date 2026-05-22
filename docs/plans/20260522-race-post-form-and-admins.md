@@ -101,12 +101,12 @@ post publishes; verify non-admin sees no form.
 **Files:**
 - Modify: `src/website/admin.py`
 
-- [ ] Rename existing `class RaceAdmin(admin.ModelAdmin)` → `class RaceModelAdmin(admin.ModelAdmin)` (the Django admin class for Race)
-- [ ] Update `admin.site.register(Race, RaceAdmin)` → `admin.site.register(Race, RaceModelAdmin)`
-- [ ] Import `RaceAdmin` model from `website.models` (the new model, not the admin class)
-- [ ] Add `RaceAdminInline(admin.TabularInline)` with `model = RaceAdmin`, `extra = 1`
-- [ ] Add `inlines = [RaceAdminInline]` to `RaceModelAdmin`
-- [ ] Run tests — must pass before task 4
+- [x] Rename existing `class RaceAdmin(admin.ModelAdmin)` → `class RaceModelAdmin(admin.ModelAdmin)` (the Django admin class for Race)
+- [x] Update `admin.site.register(Race, RaceAdmin)` → `admin.site.register(Race, RaceModelAdmin)`
+- [x] Import `RaceAdmin` model from `website.models` (the new model, not the admin class)
+- [x] Add `RaceAdminInline(admin.TabularInline)` with `model = RaceAdmin`, `extra = 1`
+- [x] Add `inlines = [RaceAdminInline]` to `RaceModelAdmin`
+- [x] Run tests — must pass before task 4
 
 ### Task 4: Add `NewsPostForm`
 
