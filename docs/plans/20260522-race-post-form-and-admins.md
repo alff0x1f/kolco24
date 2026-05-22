@@ -160,7 +160,7 @@ post publishes; verify non-admin sees no form.
 **Files:**
 - Modify: `src/templates/website/news.html`
 
-- [ ] Add post form card above `{% for news in news_list %}`, rendered only when `post_form` is set:
+- [x] Add post form card above `{% for news in news_list %}`, rendered only when `post_form` is set:
   ```html
   {% if post_form %}
   <div class="card mb-4">
@@ -186,7 +186,7 @@ post publishes; verify non-admin sees no form.
   </div>
   {% endif %}
   ```
-- [ ] (No unit test needed for template rendering beyond Task 6 coverage)
+- [x] (No unit test needed for template rendering beyond Task 6 coverage)
 
 ### Task 8: Register URL `race/<slug>/post/add/`
 
