@@ -31,7 +31,6 @@ from .views_ import (
     TeamPointsView,
     TeamsTimesView,
     TeamsView,
-    TeamsViewCsv,
     TransferPaidListView,
     TransferView,
     contacts,
