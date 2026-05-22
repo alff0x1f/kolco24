@@ -29,7 +29,7 @@
                     {% elif race.reg_status == 'open' %}
                       {% if user.is_authenticated %}
                           <div class="list-group m-3 list-group-flush">
-                              <a href="{% url 'add_team' race.id %}" class="btn btn-block btn-success">Добавить
+                              <a href="{% url 'add_team' race.slug %}" class="btn btn-block btn-success">Добавить
                                   новую команду</a>
                           </div>
                       {% else %}
@@ -159,7 +159,7 @@
                     </div>
                     <div class="list-group list-group-flush">
                         <a class="list-group-item d-flex justify-content-between"
-                           href="/race/{{ race.id }}/teams#teamlist">
+                           href="{% url 'all_teams' race.slug %}#teamlist">
                             <div>
                                 <span>Все</span>
                             </div>
@@ -171,7 +171,7 @@
                         <!-- Categories link-->
                         {% for category in categories %}
                             <a class="list-group-item d-flex justify-content-between"
-                               href="/race/{{ race.id }}/category/{{ category.id }}/teams#teamlist">
+                               href="{% url 'teams2' race.slug category.id %}#teamlist">
                                 <div>
                                     <i class="icon-dot-single mr-1"></i>
                                     <span>{{ category.short_name }}</span>
@@ -187,7 +187,7 @@
                         <!-- end of categories -->
                         {% if reg_open and user.is_authenticated %}
                             <div class="list-group m-3 list-group-flush">
-                                <a href="{% url 'add_team' race.id %}" class="btn btn-block btn-secondary">Добавить
+                                <a href="{% url 'add_team' race.slug %}" class="btn btn-block btn-secondary">Добавить
                                     новую команду</a>
                             </div>
                         {% endif %}

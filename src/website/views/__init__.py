@@ -21,6 +21,7 @@ from .views_ import (
     PaymentDown,
     PaymentUp,
     PointTagsView,
+    RaceIdRedirectView,
     RaceNewsView,
     RaceView,
     RegisterView,

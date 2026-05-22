@@ -118,7 +118,7 @@ class EditTeamView(View):
             team.save()
 
             if race.reg_status != RegStatus.OPEN:
-                return HttpResponseRedirect(reverse("my_teams", args=[race.id]))
+                return HttpResponseRedirect(reverse("my_teams", args=[race.slug]))
 
             # payment
             race = team.category2.race
@@ -158,7 +158,7 @@ class EditTeamView(View):
                 return HttpResponseRedirect(vtb_payment.pay_url)
 
             return HttpResponseRedirect(
-                reverse("teams2", args=[team.category2.race_id, team.category2_id])
+                reverse("teams2", args=[team.category2.race.slug, team.category2_id])
             )
 
         # If form is not valid, re-render the form with errors
@@ -192,10 +192,12 @@ class EditTeamView(View):
         team.is_deleted = True
         team.save(update_fields=["is_deleted"])
 
-        return HttpResponseRedirect(reverse("my_teams", args=[team.category2.race_id]))
+        return HttpResponseRedirect(
+            reverse("my_teams", args=[team.category2.race.slug])
+        )
 
     def get_team(self, team_id):
-        qs = Team.objects.filter(id=team_id).select_related("category2")
+        qs = Team.objects.filter(id=team_id).select_related("category2__race")
         if not self.request.user.is_superuser:
             qs = qs.filter(owner_id=self.request.user.id)
         return qs.first()

@@ -211,9 +211,10 @@ class PaymentAdmin(admin.ModelAdmin):
 
 
 class RaceAdmin(admin.ModelAdmin):
-    list_display = ("id", "name", "code", "date", "is_active", "is_reg_open")
+    list_display = ("id", "name", "code", "slug", "date", "is_active", "is_reg_open")
     list_filter = ("is_active",)
-    search_fields = ("name", "code")
+    search_fields = ("name", "code", "slug")
+    prepopulated_fields = {"slug": ("code",)}
 
 
 class RaceLinkAdmin(admin.ModelAdmin):

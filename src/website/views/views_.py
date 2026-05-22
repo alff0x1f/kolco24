@@ -15,7 +15,13 @@ from django.contrib.auth.decorators import login_required, user_passes_test
 from django.contrib.auth.models import User
 from django.core.files.storage import FileSystemStorage
 from django.db.models import Count, OuterRef, Subquery, Sum
-from django.http import Http404, HttpResponse, HttpResponseRedirect, JsonResponse
+from django.http import (
+    Http404,
+    HttpResponse,
+    HttpResponsePermanentRedirect,
+    HttpResponseRedirect,
+    JsonResponse,
+)
 from django.shortcuts import get_object_or_404, render
 from django.urls import reverse
 from django.utils.decorators import method_decorator
@@ -86,6 +92,14 @@ def can_manage_transfer(user):
     if not user.is_authenticated:
         return False
     return user.is_superuser or user.has_perm("website.change_transfer")
+
+
+class RaceIdRedirectView(View):
+    def get(self, request, race_id, **kwargs):
+        race = get_object_or_404(Race, pk=race_id)
+        new_path = request.path.replace(f"/race/{race_id}/", f"/race/{race.slug}/", 1)
+        qs = f"?{request.GET.urlencode()}" if request.GET else ""
+        return HttpResponsePermanentRedirect(new_path + qs)
 
 
 class IndexView(View):
@@ -175,8 +189,8 @@ class RegisterView(View):
                 # todo change it in 2026
                 race = Race.objects.filter(id=8).first()  # 2025
                 if race.reg_status == RegStatus.OPEN:
-                    return HttpResponseRedirect(reverse("add_team", args=[8]))
-                return HttpResponseRedirect(reverse("my_teams", args=[8]))
+                    return HttpResponseRedirect(reverse("add_team", args=[race.slug]))
+                return HttpResponseRedirect(reverse("my_teams", args=[race.slug]))
 
             username = f"{last_name}, {first_name}"
             if User.objects.filter(username=username).exists():
@@ -193,8 +207,8 @@ class RegisterView(View):
             # todo change it in 2026
             race = Race.objects.filter(id=8).first()  # 2025
             if race.reg_status == RegStatus.OPEN:
-                return HttpResponseRedirect(reverse("add_team", args=[8]))
-            return HttpResponseRedirect(reverse("my_teams", args=[8]))
+                return HttpResponseRedirect(reverse("add_team", args=[race.slug]))
+            return HttpResponseRedirect(reverse("my_teams", args=[race.slug]))
 
         return render(request, "website/register.html", {"reg_form": form})
 
@@ -294,8 +308,8 @@ class TransferPaidListView(View):
 class TeamMemberRaceLogView(View):
     template_name = "website/team_member_race_logs.html"
 
-    def get(self, request, race_id):
-        race = get_object_or_404(Race, pk=race_id)
+    def get(self, request, race_slug):
+        race = get_object_or_404(Race, slug=race_slug)
         logs = (
             TeamMemberRaceLog.objects.select_related("member_tag")
             .filter(race=race)
@@ -370,9 +384,9 @@ class TeamMemberRaceLogView(View):
 
 
 class RaceNewsView(View):
-    def get(self, request, race_id):
+    def get(self, request, race_slug):
         try:
-            race = Race.objects.get(id=race_id)
+            race = Race.objects.get(slug=race_slug)
         except Race.DoesNotExist:
             raise Http404
         context = self.get_context(race)
@@ -411,8 +425,8 @@ class BreakfastView(View):
     cost_rub = 300
     registration_open = False
 
-    def get(self, request, race_id):
-        race = get_object_or_404(Race, pk=race_id)
+    def get(self, request, race_slug):
+        race = get_object_or_404(Race, slug=race_slug)
         form = BreakfastForm(race=race)
         return render(
             request,
@@ -426,10 +440,10 @@ class BreakfastView(View):
             },
         )
 
-    def post(self, request, race_id):
+    def post(self, request, race_slug):
         if not self.registration_open:
-            return self.get(request, race_id)
-        race = get_object_or_404(Race, pk=race_id)
+            return self.get(request, race_slug)
+        race = get_object_or_404(Race, slug=race_slug)
         form = BreakfastForm(request.POST, race=race)
         if form.is_valid():
             form.save(race=race)
@@ -465,8 +479,8 @@ class BreakfastView(View):
 class BreakfastAdminView(View):
     template_name = "website/breakfast_admin.html"
 
-    def get(self, request, race_id):
-        race = get_object_or_404(Race, pk=race_id)
+    def get(self, request, race_slug):
+        race = get_object_or_404(Race, slug=race_slug)
         status_filter = request.GET.get("status", "new")
         if status_filter not in {"new", "processed", "cancelled", "all"}:
             status_filter = "new"
@@ -477,7 +491,7 @@ class BreakfastAdminView(View):
         overall_totals = self._calculate_totals(all_registrations, annotate=False)
         current_totals = self._calculate_totals(registrations, annotate=True)
 
-        base_url = reverse("breakfast_admin", args=[race.id])
+        base_url = reverse("breakfast_admin", args=[race.slug])
         filter_urls = {
             "new": base_url,
             "processed": f"{base_url}?status=processed",
@@ -501,8 +515,8 @@ class BreakfastAdminView(View):
             },
         )
 
-    def post(self, request, race_id):
-        race = get_object_or_404(Race, pk=race_id)
+    def post(self, request, race_slug):
+        race = get_object_or_404(Race, slug=race_slug)
         registration_id = request.POST.get("registration_id")
         action = request.POST.get("action")
         status_filter = request.POST.get("status", "new")
@@ -529,7 +543,7 @@ class BreakfastAdminView(View):
         registration.status = status_map[action]
         registration.save(update_fields=["status"])
 
-        redirect_url = reverse("breakfast_admin", args=[race.id])
+        redirect_url = reverse("breakfast_admin", args=[race.slug])
         if status_filter and status_filter != "new":
             redirect_url = f"{redirect_url}?status={status_filter}"
 
@@ -575,8 +589,8 @@ class BreakfastAdminView(View):
 class BreakfastPaidListView(View):
     template_name = "website/breakfast_paid_list.html"
 
-    def get(self, request, race_id):
-        race = get_object_or_404(Race, pk=race_id)
+    def get(self, request, race_slug):
+        race = get_object_or_404(Race, slug=race_slug)
         registrations = BreakfastRegistration.objects.filter(
             race=race, status="processed"
         ).order_by("created_at")
@@ -1821,15 +1835,16 @@ def upload_photo(request, race_id):
 
 
 class AllTeamsView(View):
-    def get(self, request, race_id):
+    def get(self, request, race_slug):
         try:
             race = Race.objects.annotate(
                 people_count=Sum("category__team__paid_people"),
-            ).get(id=race_id)
+            ).get(slug=race_slug)
         except Race.DoesNotExist:
             # page not found
             raise Http404("File not found.")
 
+        race_id = race.id
         categories = (
             Category.active_objects.filter(race_id=race_id)
             .order_by("order", "id")
@@ -1884,17 +1899,18 @@ class AllTeamsView(View):
 
 
 class MyTeamsView(View):
-    def get(self, request, race_id):
+    def get(self, request, race_slug):
         if not request.user.is_authenticated:
             return HttpResponseRedirect(reverse("passlogin") + f"?next={request.path}")
 
         try:
             race = Race.objects.annotate(
                 people_count=Sum("category__team__paid_people"),
-            ).get(id=race_id)
+            ).get(slug=race_slug)
         except Race.DoesNotExist:
             raise Http404("File not found.")
 
+        race_id = race.id
         categories = (
             Category.active_objects.filter(race_id=race_id)
             .order_by("order", "id")
@@ -1937,31 +1953,31 @@ class MyTeamsView(View):
 
 
 class AddTeam(View):
-    def get(self, request, race_id):
-        race = Race.objects.get(id=race_id)
+    def get(self, request, race_slug):
+        race = get_object_or_404(Race, slug=race_slug)
 
         if not request.user.is_authenticated:
             return HttpResponseRedirect(reverse("passlogin") + f"?next={request.path}")
-        form = TeamForm(race_id)
+        form = TeamForm(race.id)
         return render(
             request,
             "website/add_team.html",
             {
                 "race": race,
-                "race_id": race_id,
+                "race_id": race.id,
                 "team_form": form,
                 "team": Team(),
                 "cost": race.cost,
-                "action": reverse("add_team", args=[race_id]),
+                "action": reverse("add_team", args=[race.slug]),
                 "reg_open": race.reg_status == RegStatus.OPEN,
             },
         )
 
-    def post(self, request, race_id):
+    def post(self, request, race_slug):
         if not request.user.is_authenticated:
             return HttpResponseRedirect(reverse("passlogin") + f"?next={request.path}")
 
-        race = Race.objects.get(id=race_id)
+        race = get_object_or_404(Race, slug=race_slug)
         if not race.is_teams_editable:
             return HttpResponse("Регистрация закрыта")
 
@@ -1973,7 +1989,7 @@ class AddTeam(View):
         data = request.POST.copy()
         data["dist"] = category2.code
         data["paymentid"] = "%016x" % random.randrange(16**16)  # legacy
-        form = TeamForm(race_id, data)
+        form = TeamForm(race.id, data)
         if form.is_valid():
             # save team
             team: Team = Team.objects.create(
@@ -1984,7 +2000,7 @@ class AddTeam(View):
             team.save()
 
             if race.reg_status != RegStatus.OPEN:
-                return HttpResponseRedirect(reverse("my_teams", args=[race_id]))
+                return HttpResponseRedirect(reverse("my_teams", args=[race.slug]))
 
             # payment
             payment_method = request.GET.get("method", "sbp2")
@@ -2070,7 +2086,7 @@ class AddTeam(View):
         return render(
             request,
             "website/add_team.html",
-            {"race_id": race_id, "team_form": form, "cost": PaymentsYa.get_cost()},
+            {"race_id": race.id, "team_form": form, "cost": PaymentsYa.get_cost()},
         )
 
 
@@ -2159,13 +2175,14 @@ class TeamPayment(View):
 
 
 class AllTeamsResultView(View):
-    def get(self, request, race_id, category_id=None):
+    def get(self, request, race_slug, category_id=None):
         try:
-            race = Race.objects.get(id=race_id)
+            race = Race.objects.get(slug=race_slug)
         except Race.DoesNotExist:
             # page not found
-            raise Http404(f"Гонка {race_id} не найдена.")
+            raise Http404(f"Гонка {race_slug} не найдена.")
 
+        race_id = race.id
         teams_ = (
             Team.objects.filter(category2__race_id=race_id, paid_people__gt=0)
             .exclude(start_time=0)
@@ -2318,11 +2335,12 @@ class TeamPointsView(View):
 
 
 class TeamsView(View):
-    def get(self, request, race_id, category_id, *args, **kwargs):
+    def get(self, request, race_slug, category_id, *args, **kwargs):
         try:
             race = Race.objects.annotate(
                 people_count=Sum("category__team__paid_people")
-            ).get(id=race_id)
+            ).get(slug=race_slug)
+            race_id = race.id
             category = Category.active_objects.get(race_id=race_id, id=category_id)
         except (Race.DoesNotExist, Category.DoesNotExist):
             # page not found
@@ -2368,14 +2386,14 @@ class TeamsView(View):
 
 
 class TeamsViewCsv(View):
-    def get(self, request, race_id, category_id, *args, **kwargs):
-        teams_ = Team.objects.filter(
-            category="6h", paid_people__gt=0, year=2024
-        ).order_by(
+    def get(self, request, race_slug, category_id, *args, **kwargs):
+        race = get_object_or_404(Race, slug=race_slug)
+        category = get_object_or_404(Category, race_id=race.id, id=category_id)
+        teams_ = Team.objects.filter(category2=category, paid_people__gt=0).order_by(
             "start_number",
             "id",
         )
-        points = Checkpoint.objects.filter(year=2024, cost__gte=0)
+        points = Checkpoint.objects.filter(race_id=race.id, cost__gte=0)
         cost = {}
         for p in points:
             cost[p.number] = p.cost

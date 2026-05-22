@@ -8,6 +8,7 @@ from django.db.models import (
     IntegerField,
     Manager,
     Model,
+    SlugField,
     TextChoices,
 )
 from django.utils import timezone
@@ -22,6 +23,7 @@ class RegStatus(TextChoices):
 class Race(Model):
     name = CharField("Название", max_length=50)
     code = CharField("Код", max_length=15, unique=True)
+    slug = SlugField("URL-slug", max_length=50, unique=True)
     date = DateField("Дата", default=timezone.now)
     date_end = DateField("Дата окончания", default=timezone.now)
     place = CharField("Место", max_length=50, default="")
