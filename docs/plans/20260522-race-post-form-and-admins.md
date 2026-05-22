@@ -113,10 +113,10 @@ post publishes; verify non-admin sees no form.
 **Files:**
 - Modify: `src/website/forms.py`
 
-- [ ] Add `NewsPostForm(forms.ModelForm)` for `NewsPost`, fields: `title`, `content`, `image`
-- [ ] Import `NewsPost` in forms.py if not already imported
-- [ ] Write tests: `test_news_post_form_valid` (with title+content), `test_news_post_form_invalid` (empty title)
-- [ ] Run tests — must pass before task 5
+- [x] Add `NewsPostForm(forms.ModelForm)` for `NewsPost`, fields: `title`, `content`, `image`
+- [x] Import `NewsPost` in forms.py if not already imported
+- [x] Write tests: `test_news_post_form_valid` (with title+content), `test_news_post_form_invalid` (empty title)
+- [x] Run tests — must pass before task 5
 
 ### Task 5: Add `AddNewsPostView` and helper `is_race_admin`
 

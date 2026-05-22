@@ -151,3 +151,20 @@ def test_race_admin_unique_together():
     RaceAdmin.objects.create(race=race, user=user)
     with pytest.raises(IntegrityError):
         RaceAdmin.objects.create(race=race, user=user)
+
+
+@pytest.mark.django_db
+def test_news_post_form_valid():
+    from website.forms import NewsPostForm
+
+    form = NewsPostForm(data={"title": "Test Post", "content": "Some **markdown** text"})
+    assert form.is_valid(), form.errors
+
+
+@pytest.mark.django_db
+def test_news_post_form_invalid():
+    from website.forms import NewsPostForm
+
+    form = NewsPostForm(data={"title": "", "content": "Some content"})
+    assert not form.is_valid()
+    assert "title" in form.errors
