@@ -202,12 +202,12 @@ post publishes; verify non-admin sees no form.
 
 ### Task 9: Verify acceptance criteria
 
-- [ ] All requirements from Overview are implemented
-- [ ] Race admin sees form on `race/<slug>/` — non-admin does not
-- [ ] POST to `race/<slug>/post/add/` creates `NewsPost` linked to correct race
-- [ ] Anonymous and non-admin users get 403 on POST
-- [ ] Run full test suite: `uv run pytest`
-- [ ] Lint: `uv run ruff check src && uv run black --check src && uv run isort --check src`
+- [x] All requirements from Overview are implemented
+- [x] Race admin sees form on `race/<slug>/` — non-admin does not (covered by test_race_news_view_shows_form_for_admin)
+- [x] POST to `race/<slug>/post/add/` creates `NewsPost` linked to correct race (covered by test_add_post_by_race_admin)
+- [x] Anonymous and non-admin users get 403 on POST (covered by test_add_post_unauthorized, test_add_post_non_admin_user)
+- [x] Run full test suite: `uv run pytest` — 15 passed, 1 skipped
+- [x] Lint: `uv run ruff check src && uv run black --check src && uv run isort --check src` — all passed
 
 ### Task 10: [Final] Cleanup
 
