@@ -65,7 +65,7 @@ post publishes; verify non-admin sees no form.
 - Modify: `src/website/models/race.py`
 - Modify: `src/website/models/__init__.py`
 
-- [ ] Add `RaceAdmin` model to `src/website/models/race.py` after `RaceLink`:
+- [x] Add `RaceAdmin` model to `src/website/models/race.py` after `RaceLink`:
   ```python
   class RaceAdmin(Model):
       class Role(TextChoices):
@@ -81,20 +81,20 @@ post publishes; verify non-admin sees no form.
       def __str__(self):
           return f"{self.user} — {self.race} ({self.role})"
   ```
-- [ ] Add `from django.conf import settings` import if not present in `race.py`
-- [ ] Export `RaceAdmin` from `src/website/models/__init__.py` (add to `from .race import ...`)
-- [ ] Write tests: `test_race_admin_model_creation` — create RaceAdmin, verify str, unique_together constraint
-- [ ] Run tests — must pass before task 2
+- [x] Add `from django.conf import settings` import if not present in `race.py`
+- [x] Export `RaceAdmin` from `src/website/models/__init__.py` (add to `from .race import ...`)
+- [x] Write tests: `test_race_admin_model_creation` — create RaceAdmin, verify str, unique_together constraint
+- [x] Run tests — must pass before task 2
 
 ### Task 2: Generate and apply migration
 
 **Files:**
 - Create: `src/website/migrations/006X_raceadmin.py` (auto-generated)
 
-- [ ] Run `uv run python src/manage.py makemigrations website --name raceadmin`
-- [ ] Inspect generated migration for correctness (FK to auth.User, unique_together)
-- [ ] Run `uv run python src/manage.py migrate` (requires DB running: `docker compose up -d kolco24_db`)
-- [ ] Run tests — must pass before task 3
+- [x] Run `uv run python src/manage.py makemigrations website --name raceadmin`
+- [x] Inspect generated migration for correctness (FK to auth.User, unique_together)
+- [x] Run `uv run python src/manage.py migrate` (requires DB running: `docker compose up -d kolco24_db`)
+- [x] Run tests — must pass before task 3
 
 ### Task 3: Fix admin.py naming conflict and add RaceAdmin inline
 

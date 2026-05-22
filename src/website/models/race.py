@@ -1,4 +1,5 @@
 from django.apps import apps
+from django.conf import settings
 from django.db.models import (
     CASCADE,
     BooleanField,
@@ -80,6 +81,26 @@ class RaceLink(Model):
     class Meta:
         verbose_name = "Ссылка"
         verbose_name_plural = "Ссылки"
+
+
+class RaceAdmin(Model):
+    class Role(TextChoices):
+        ADMIN = "admin", "Администратор"
+        MODERATOR = "moderator", "Модератор"
+
+    race = ForeignKey(Race, on_delete=CASCADE, related_name="race_admins")
+    user = ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=CASCADE, related_name="race_admins"
+    )
+    role = CharField(max_length=16, choices=Role.choices, default=Role.ADMIN)
+
+    class Meta:
+        unique_together = ("race", "user")
+        verbose_name = "Администратор гонки"
+        verbose_name_plural = "Администраторы гонки"
+
+    def __str__(self):
+        return f"{self.user} — {self.race} ({self.role})"
 
 
 class ActiveManager(Manager):

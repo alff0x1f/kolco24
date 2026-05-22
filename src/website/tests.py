@@ -125,3 +125,29 @@ def test_edit_team_redirect_uses_slug(client):
     assert response.status_code == 302
     assert race.slug in response["Location"]
     assert str(race.id) not in response["Location"]
+
+
+@pytest.mark.django_db
+def test_race_admin_model_creation():
+    from django.contrib.auth.models import User
+
+    from website.models.race import RaceAdmin
+
+    race = Race.objects.create(name="Admin Race", code="ar2025", slug="admin-race-2025")
+    user = User.objects.create_user(username="raceadmin", password="pass")
+    ra = RaceAdmin.objects.create(race=race, user=user, role=RaceAdmin.Role.ADMIN)
+    assert str(ra) == f"{user} — {race} (admin)"
+    assert ra.role == RaceAdmin.Role.ADMIN
+
+
+@pytest.mark.django_db
+def test_race_admin_unique_together():
+    from django.contrib.auth.models import User
+
+    from website.models.race import RaceAdmin
+
+    race = Race.objects.create(name="Unique Race", code="ur2025", slug="unique-race-2025")
+    user = User.objects.create_user(username="uniqueadmin", password="pass")
+    RaceAdmin.objects.create(race=race, user=user)
+    with pytest.raises(IntegrityError):
+        RaceAdmin.objects.create(race=race, user=user)
