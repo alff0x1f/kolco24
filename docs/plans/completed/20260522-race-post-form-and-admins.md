@@ -211,7 +211,7 @@ post publishes; verify non-admin sees no form.
 
 ### Task 10: [Final] Cleanup
 
-- [ ] Move this plan to `docs/plans/completed/`
+- [x] Move this plan to `docs/plans/completed/`
 
 ## Post-Completion
 
