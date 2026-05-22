@@ -211,3 +211,23 @@ def test_add_post_non_admin_user(client):
         {"title": "Should fail", "content": "Not admin"},
     )
     assert response.status_code == 403
+
+
+@pytest.mark.django_db
+def test_race_news_view_shows_form_for_admin(client):
+    from website.models.race import RaceAdmin
+
+    race = Race.objects.create(name="Admin Race", code="ar2025", slug="admin-race-2025")
+    admin_user = User.objects.create_user(username="newsadmin", password="pass")
+    regular_user = User.objects.create_user(username="regularuser", password="pass")
+    RaceAdmin.objects.create(race=race, user=admin_user, role=RaceAdmin.Role.ADMIN)
+
+    client.force_login(admin_user)
+    response = client.get(f"/race/{race.slug}/")
+    assert response.status_code == 200
+    assert "post_form" in response.context
+
+    client.force_login(regular_user)
+    response = client.get(f"/race/{race.slug}/")
+    assert response.status_code == 200
+    assert "post_form" not in response.context

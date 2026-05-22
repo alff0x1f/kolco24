@@ -148,12 +148,12 @@ post publishes; verify non-admin sees no form.
 **Files:**
 - Modify: `src/website/views/views_.py`
 
-- [ ] Change `RaceNewsView.get()` to pass `request` to `get_context()`:
+- [x] Change `RaceNewsView.get()` to pass `request` to `get_context()`:
   `context = self.get_context(race, request.user)`
-- [ ] Update `get_context(race, user=None)` signature
-- [ ] Inside `get_context`: if `user` and `is_race_admin(user, race)` → add `"post_form": NewsPostForm()` to context
-- [ ] Write test: `test_race_news_view_shows_form_for_admin` — admin GET includes `post_form`; non-admin does not
-- [ ] Run tests — must pass before task 7
+- [x] Update `get_context(race, user=None)` signature
+- [x] Inside `get_context`: if `user` and `is_race_admin(user, race)` → add `"post_form": NewsPostForm()` to context
+- [x] Write test: `test_race_news_view_shows_form_for_admin` — admin GET includes `post_form`; non-admin does not
+- [x] Run tests — must pass before task 7
 
 ### Task 7: Update `news.html` template
 

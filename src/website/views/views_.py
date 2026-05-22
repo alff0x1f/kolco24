@@ -420,11 +420,11 @@ class RaceNewsView(View):
             race = Race.objects.get(slug=race_slug)
         except Race.DoesNotExist:
             raise Http404
-        context = self.get_context(race)
+        context = self.get_context(race, request.user)
         return render(request, "website/news.html", context)
 
     @staticmethod
-    def get_context(race: Race):
+    def get_context(race: Race, user=None):
         categories = (
             Category.active_objects.filter(race=race)
             .order_by("order", "id")
@@ -440,7 +440,7 @@ class RaceNewsView(View):
                 )
             )
         )
-        return {
+        context = {
             "race": race,
             "categories": categories,
             "links": race.links.order_by("-id"),
@@ -448,6 +448,9 @@ class RaceNewsView(View):
             "login_form": LoginForm(),
             "reg_open": race.reg_status == RegStatus.OPEN,
         }
+        if user and is_race_admin(user, race):
+            context["post_form"] = NewsPostForm()
+        return context
 
 
 class BreakfastView(View):
