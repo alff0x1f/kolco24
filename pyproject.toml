@@ -16,6 +16,7 @@ dependencies = [
     "gunicorn==22.0.0",
     "whitenoise==6.6.0",
     "markdown==3.8.1",
+    "nh3>=0.2.14",
 ]
 
 [dependency-groups]

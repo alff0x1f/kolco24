@@ -156,6 +156,34 @@ def test_race_admin_unique_together():
 
 
 @pytest.mark.django_db
+def test_newspost_xss_sanitization():
+    from website.models.news import NewsPost
+
+    race = Race.objects.create(name="XSS Race", code="xss1", slug="xss-race")
+    post = NewsPost.objects.create(
+        title="XSS Test",
+        content='<script>alert("xss")</script> Normal **bold** text',
+        race=race,
+    )
+    assert "<script>" not in post.content_html
+    assert "alert" not in post.content_html
+    assert "<strong>bold</strong>" in post.content_html
+
+
+@pytest.mark.django_db
+def test_newspost_xss_event_handler_stripped():
+    from website.models.news import NewsPost
+
+    race = Race.objects.create(name="XSS Race2", code="xss2", slug="xss-race-2")
+    post = NewsPost.objects.create(
+        title="Event Handler Test",
+        content='<img src="x" onerror="alert(1)"> text',
+        race=race,
+    )
+    assert "onerror" not in post.content_html
+
+
+@pytest.mark.django_db
 def test_news_post_form_valid():
     from website.forms import NewsPostForm
 
