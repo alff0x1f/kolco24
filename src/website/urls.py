@@ -66,10 +66,6 @@ urlpatterns = [
         "race/<int:race_id>/category/<int:category_id>/results/",
         RaceIdRedirectView.as_view(),
     ),
-    path(
-        "race/<int:race_id>/category/<category_id>/teams.csv",
-        RaceIdRedirectView.as_view(),
-    ),
     path("race/<int:race_id>/breakfast/", RaceIdRedirectView.as_view()),
     path("race/<int:race_id>/breakfast/admin/", RaceIdRedirectView.as_view()),
     path("race/<int:race_id>/breakfast/list/", RaceIdRedirectView.as_view()),
@@ -102,11 +98,6 @@ urlpatterns = [
         "race/<slug:race_slug>/member_logs/",
         views.TeamMemberRaceLogView.as_view(),
         name="race_member_logs",
-    ),
-    path(
-        "race/<slug:race_slug>/category/<category_id>/teams.csv",
-        views.TeamsViewCsv.as_view(),
-        name="teams_csv",
     ),
     path(
         "race/<slug:race_slug>/breakfast/",
