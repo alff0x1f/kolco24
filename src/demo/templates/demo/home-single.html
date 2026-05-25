@@ -1827,10 +1827,15 @@
         document.getElementById('season').scrollIntoView({behavior:'smooth', block:'start'});
       });
     });
-    const hash = location.hash.replace('#','');
-    if (hash && document.querySelector(`.tab[data-tab="${hash}"]`)) {
-      activate(hash);
+    function activateFromHash() {
+      const hash = location.hash.replace('#','');
+      if (hash && document.querySelector(`.tab[data-tab="${CSS.escape(hash)}"]`)) {
+        activate(hash);
+        document.getElementById('season').scrollIntoView({behavior:'smooth', block:'start'});
+      }
     }
+    window.addEventListener('hashchange', activateFromHash);
+    activateFromHash();
   })();
 
   // ── TWEAKS ────────────────────────────────────────────
