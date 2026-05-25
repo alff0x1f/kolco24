@@ -79,6 +79,7 @@ INSTALLED_APPS = [
     "website",
     "api",
     "donate",
+    "demo",
     "mailer",
 ]
 
