@@ -1,0 +1,1918 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>Кольцо 24 — главная</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="description" content="Кольцо 24 — соревновательный поход выходного дня. 24-часовой рогейн с 2014 года.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Rubik:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  /* ── Tokens — те же, что в Race Page ───────────────────── */
+  :root {
+    --ink:        #161a1f;
+    --ink-soft:   #2c333c;
+    --muted:      #6b7785;
+    --muted-2:    #99a3b0;
+    --paper:      #eef0f3;
+    --paper-2:    #ffffff;
+    --line:       #e2e6eb;
+    --line-soft:  #eef0f3;
+    --primary:    #2a5288;
+    --primary-2:  #4582EC;
+    --primary-dk: #1d3a63;
+    --success:    #02B875;
+    --success-dk: #018655;
+    --warn:       #c75a26;
+    --warn-bg:    #fbeee4;
+    --dark:       #1d242d;
+    --shadow-sm:  0 1px 2px rgba(22,26,31,.04);
+    --shadow:     0 1px 2px rgba(22,26,31,.04), 0 8px 24px rgba(22,26,31,.05);
+    --radius:     14px;
+    --radius-sm:  10px;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    font-family: "Rubik", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    color: var(--ink-soft);
+    background: var(--paper);
+    font-size: 15px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+  h1, h2, h3, h4, h5, h6 {
+    color: var(--ink); font-weight: 500; margin: 0; line-height: 1.2;
+    letter-spacing: -0.005em;
+  }
+  a { color: var(--primary-2); text-decoration: none; transition: color .12s; }
+  a:hover { color: var(--primary-dk); }
+  img { max-width: 100%; display: block; }
+  button { font-family: inherit; }
+
+  .container { max-width: 1180px; margin: 0 auto; padding: 0 20px; }
+
+  /* ── pills / kicker ────────────────────────────────────── */
+  .pill {
+    display: inline-flex; align-items: center; gap: 7px;
+    padding: 5px 12px; border-radius: 999px;
+    font-size: 13px; font-weight: 500;
+    background: rgba(2,184,117,.12); color: var(--success-dk);
+  }
+  .pill::before {
+    content:''; width:6px; height:6px; border-radius:50%;
+    background: var(--success); box-shadow: 0 0 0 3px rgba(2,184,117,.18);
+  }
+  .pill.warn { background: var(--warn-bg); color: var(--warn); }
+  .pill.warn::before { background: var(--warn); box-shadow: none; }
+  .pill.muted { background: #e7eaef; color: var(--muted); }
+  .pill.muted::before { background: var(--muted-2); box-shadow: none; }
+
+  /* ── Nav (точно как Race Page) ─────────────────────────── */
+  .nav { background: var(--dark); color: #fff; position: sticky; top: 0; z-index: 50; }
+  .nav-inner {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 8px 0; gap: 14px;
+  }
+  .brand { display: flex; align-items: center; gap: 11px; color: #fff; font-weight: 500; font-size: 16px; }
+  .brand-logo { width: 32px; height: 32px; object-fit: contain; flex-shrink: 0; }
+  .nav-burger {
+    display: none; width: 38px; height: 38px;
+    border: 1px solid rgba(255,255,255,.18); border-radius: 8px;
+    background: transparent; cursor: pointer;
+    align-items: center; justify-content: center;
+    flex-direction: column; gap: 5px; flex-shrink: 0;
+  }
+  .nav-burger span {
+    display: block; width: 16px; height: 1.5px; background: #fff;
+    transition: transform .2s, opacity .2s;
+  }
+  .nav.is-open .nav-burger span:nth-child(1) { transform: translateY(6.5px) rotate(45deg); }
+  .nav.is-open .nav-burger span:nth-child(2) { opacity: 0; }
+  .nav.is-open .nav-burger span:nth-child(3) { transform: translateY(-6.5px) rotate(-45deg); }
+  .nav-menu { display: flex; align-items: center; gap: 28px; }
+  .nav-links { display: flex; gap: 26px; list-style: none; padding: 0; margin: 0; font-size: 14px; }
+  .nav-links a { color: rgba(255,255,255,.8); }
+  .nav-links a:hover { color: #fff; }
+  .nav-actions { display: flex; align-items: center; gap: 12px; }
+  .nav-actions .login {
+    color: rgba(255,255,255,.92);
+    border: 1px solid rgba(255,255,255,.22);
+    padding: 6px 14px; border-radius: 8px;
+    font-weight: 500; font-size: 14px;
+  }
+  .nav-actions .login:hover { background: rgba(255,255,255,.07); border-color: rgba(255,255,255,.4); color: #fff; }
+
+  /* ── Cover (как Race Page, но обыгрываем главную) ─────── */
+  .cover-banner { position: relative; width: 100%; background: #1d242d; }
+  .cover-image {
+    position: relative; width: 100%;
+    aspect-ratio: 1920 / 480;
+    min-height: 200px; max-height: 460px;
+    overflow: hidden;
+    background:
+      linear-gradient(180deg, rgba(0,0,0,0) 30%, rgba(0,0,0,.45) 100%),
+      url('/static/images/backgrounds/header2024.jpg') center/cover no-repeat;
+  }
+  .cover-image::before { content: none; }
+  /* В межсезонье — приглушаем кавер */
+  body[data-state="offseason"] .cover-image {
+    background:
+      linear-gradient(180deg, rgba(0,0,0,0) 30%, rgba(0,0,0,.55) 100%),
+      url('/static/images/backgrounds/header2024.jpg') center/cover no-repeat;
+    filter: saturate(.7);
+  }
+  .cover-image .photo-slot {
+    position: absolute; left: 50%; top: 50%;
+    transform: translate(-50%, -50%);
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-size: 11px;
+    color: rgba(255,255,255,.7); letter-spacing: .08em;
+    text-transform: uppercase;
+    background: rgba(0,0,0,.28);
+    padding: 6px 14px;
+    border: 1px dashed rgba(255,255,255,.4);
+    border-radius: 4px;
+  }
+  /* Большой брендовый блок поверх кавера (для главной — у нас тут не одна гонка, а клуб) */
+  .cover-hero {
+    position: absolute;
+    left: max(20px, calc((100% - 1180px) / 2 + 20px));
+    bottom: 28px; right: 20px;
+    color: #fff;
+    max-width: 540px;
+    z-index: 2;
+  }
+  .cover-hero .eyebrow {
+    font-size: 11px; letter-spacing: 0.16em; text-transform: uppercase;
+    color: rgba(255,255,255,.78);
+    margin-bottom: 10px;
+    display: inline-flex; align-items: center; gap: 8px;
+  }
+  .cover-hero .eyebrow .dot {
+    width: 5px; height: 5px; background: rgba(255,255,255,.5); border-radius: 50%;
+  }
+  .cover-hero h1 {
+    font-size: 38px; font-weight: 600;
+    letter-spacing: -0.015em; line-height: 1.05;
+    color: #fff; margin-bottom: 8px;
+    text-shadow: 0 1px 2px rgba(0,0,0,.18);
+  }
+  .cover-hero .tag {
+    font-size: 15px; color: rgba(255,255,255,.86);
+    line-height: 1.4;
+    max-width: 38ch;
+  }
+  .cover-status {
+    position: absolute; top: 18px;
+    right: max(20px, calc((100% - 1180px) / 2 + 20px));
+    z-index: 2;
+  }
+  .cover-status .pill {
+    background: rgba(255,255,255,.95);
+    backdrop-filter: blur(8px);
+    box-shadow: 0 1px 2px rgba(0,0,0,.08), 0 8px 24px rgba(0,0,0,.12);
+  }
+
+  /* ── Кавер мета-карточка (адаптивная: ближайшая гонка) ── */
+  .cover-meta-card {
+    background: var(--paper-2);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    overflow: hidden;
+    box-shadow: var(--shadow-sm);
+    margin-bottom: 16px;
+    margin-top: -22px;
+    position: relative; z-index: 3;
+  }
+  .next-strip {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    gap: 22px;
+    align-items: center;
+    padding: 18px 24px;
+  }
+  .next-strip .when {
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    background: var(--ink);
+    color: #fff;
+    padding: 10px 16px;
+    border-radius: 10px;
+    min-width: 86px;
+    line-height: 1;
+  }
+  .next-strip .when .day {
+    font-size: 30px; font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.02em;
+  }
+  .next-strip .when .mon {
+    font-size: 11px; font-weight: 500;
+    letter-spacing: 0.14em;
+    margin-top: 4px;
+    color: rgba(255,255,255,.7);
+    text-transform: uppercase;
+  }
+  .next-strip .when.tba {
+    background: transparent;
+    color: var(--muted);
+    border: 1.5px dashed var(--line);
+  }
+  .next-strip .when.tba .day { font-size: 22px; color: var(--ink-soft); }
+
+  .next-strip .info .label {
+    font-size: 11px; letter-spacing: 0.12em;
+    text-transform: uppercase; color: var(--muted);
+    margin-bottom: 4px;
+  }
+  .next-strip .info h2 {
+    font-size: 22px; font-weight: 600;
+    color: var(--ink); letter-spacing: -0.01em;
+    margin-bottom: 4px;
+  }
+  .next-strip .info .sub {
+    font-size: 14px; color: var(--muted);
+    display: flex; flex-wrap: wrap; gap: 14px;
+    align-items: center;
+  }
+  .next-strip .info .sub .dot {
+    width: 3px; height: 3px; background: var(--muted-2); border-radius: 50%;
+  }
+  .next-strip .actions { display: flex; gap: 8px; flex-shrink: 0; }
+
+  /* Если несколько активных гонок — лента из 2-3 миник */
+  .upcoming-row {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0;
+    border-top: 1px solid var(--line);
+  }
+  .upcoming-row .up-card {
+    padding: 14px 22px;
+    border-right: 1px solid var(--line);
+    display: grid;
+    grid-template-columns: 56px 1fr auto;
+    gap: 14px; align-items: center;
+    text-decoration: none;
+    transition: background .12s;
+  }
+  .upcoming-row .up-card:hover { background: #f4f6f9; }
+  .upcoming-row .up-card:last-child { border-right: none; }
+  .upcoming-row .up-card .when-mini {
+    background: var(--paper);
+    border-radius: 8px;
+    padding: 6px 0;
+    text-align: center;
+    color: var(--ink);
+  }
+  .upcoming-row .up-card .when-mini .day {
+    font-size: 18px; font-weight: 600; line-height: 1;
+    font-variant-numeric: tabular-nums;
+  }
+  .upcoming-row .up-card .when-mini .mon {
+    font-size: 10px; letter-spacing: 0.1em;
+    text-transform: uppercase; color: var(--muted);
+    margin-top: 2px;
+  }
+  .upcoming-row .up-card .title {
+    font-size: 14px; font-weight: 500;
+    color: var(--ink); line-height: 1.25;
+    margin-bottom: 2px;
+  }
+  .upcoming-row .up-card .meta {
+    font-size: 12px; color: var(--muted);
+  }
+  .upcoming-row .up-card .arrow { color: var(--muted-2); }
+
+  /* ── Кнопки ────────────────────────────────────────────── */
+  .btn {
+    display: inline-flex; align-items: center; gap: 7px;
+    padding: 8px 16px; border-radius: 8px;
+    font-weight: 500; font-size: 14px;
+    border: 1px solid transparent;
+    cursor: pointer; transition: all .12s;
+    text-decoration: none; line-height: 1.4;
+    white-space: nowrap;
+  }
+  .btn-primary {
+    background: var(--success); color: #fff;
+    border-color: var(--success);
+  }
+  .btn-primary:hover { background: var(--success-dk); color: #fff; border-color: var(--success-dk); }
+  .btn-ghost { background: #f4f6f9; color: var(--ink); }
+  .btn-ghost:hover { background: #e7ebf0; }
+  .btn-outline { background: var(--paper-2); color: var(--ink); border-color: var(--line); }
+  .btn-outline:hover { border-color: var(--ink); }
+  .btn-blue { background: var(--primary-2); color: #fff; border-color: var(--primary-2); }
+  .btn-blue:hover { background: var(--primary-dk); color: #fff; border-color: var(--primary-dk); }
+
+  /* ── Layout ───────────────────────────────────────────── */
+  .page { padding: 0 0 56px; }
+  .grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 320px;
+    gap: 16px; align-items: start;
+  }
+
+  /* ── Card ─────────────────────────────────────────────── */
+  .card {
+    background: var(--paper-2);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-sm);
+    margin-bottom: 16px;
+  }
+  .card-pad { padding: 18px 22px; }
+
+  /* ── Tabs (как Race Page) ─────────────────────────────── */
+  .tabs-card { padding-bottom: 6px; }
+  .tabs {
+    display: flex; align-items: stretch; gap: 0;
+    padding: 16px 22px 0;
+    border-bottom: 1px solid var(--line);
+    overflow-x: auto; scrollbar-width: none;
+    position: relative;
+  }
+  .tabs::-webkit-scrollbar { display: none; }
+  .tab {
+    display: inline-flex; align-items: baseline; gap: 8px;
+    padding: 0 0 14px; margin-right: 28px;
+    border: none; background: transparent;
+    color: var(--muted);
+    font-size: 17px; font-weight: 500;
+    font-family: inherit; letter-spacing: -0.005em;
+    cursor: pointer; border-radius: 0;
+    position: relative; white-space: nowrap;
+    transition: color .12s; line-height: 1.2;
+  }
+  .tab:last-child { margin-right: 0; }
+  .tab .count {
+    font-size: 12px; font-weight: 500;
+    color: var(--muted-2); font-variant-numeric: tabular-nums;
+  }
+  .tab:hover { color: var(--ink); }
+  .tab:hover .count { color: var(--ink-soft); }
+  .tab.is-active { color: var(--ink); }
+  .tab.is-active .count { color: var(--ink); }
+  .tab.is-active::after {
+    content:''; position: absolute;
+    left: 0; right: 0; bottom: -1px;
+    height: 3px; background: var(--ink);
+  }
+  .tab-body { padding: 20px 22px 22px; }
+  .tab-pane { display: none; }
+  .tab-pane.is-active { display: block; }
+
+  /* ── Season tab — список будущих гонок ─────────────────── */
+  .season-head {
+    display: flex; align-items: baseline; justify-content: space-between;
+    margin-bottom: 14px;
+  }
+  .season-head h2 {
+    font-size: 19px; font-weight: 500;
+    color: var(--ink);
+  }
+  .season-head .meta {
+    font-size: 13px; color: var(--muted);
+  }
+  .race-card {
+    display: grid;
+    grid-template-columns: 200px minmax(0, 1fr);
+    gap: 18px;
+    padding: 16px 0;
+    border-bottom: 1px solid var(--line-soft);
+  }
+  .race-card:last-child { border-bottom: none; padding-bottom: 4px; }
+  .race-card:first-child { padding-top: 0; }
+  .race-card .thumb {
+    aspect-ratio: 4 / 3;
+    border-radius: 10px;
+    overflow: hidden;
+    position: relative;
+    background:
+      linear-gradient(135deg, #4a5e74 0%, #708498 60%, #a8b0a0 100%);
+    border: 1px solid var(--line);
+  }
+  .race-card.kind-multi .thumb {
+    background: linear-gradient(135deg, #1f3a5e 0%, #2a5388 50%, #4582EC 100%);
+  }
+  .race-card.kind-friendly .thumb {
+    background: linear-gradient(135deg, #02B875 0%, #018655 100%);
+  }
+  .race-card .thumb .ph {
+    position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%);
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-size: 10px; color: rgba(255,255,255,.7);
+    background: rgba(0,0,0,.3);
+    padding: 3px 8px; border-radius: 3px;
+    letter-spacing: .06em;
+    white-space: nowrap;
+  }
+  .race-card .thumb .when-overlay {
+    position: absolute; top: 12px; left: 12px;
+    background: rgba(255,255,255,.95);
+    border-radius: 8px;
+    padding: 6px 10px;
+    text-align: center;
+    color: var(--ink);
+    line-height: 1;
+  }
+  .race-card .thumb .when-overlay .day {
+    font-size: 22px; font-weight: 600; font-variant-numeric: tabular-nums;
+    letter-spacing: -0.02em;
+  }
+  .race-card .thumb .when-overlay .mon {
+    font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase;
+    color: var(--muted); margin-top: 2px;
+  }
+  .race-card .body { min-width: 0; }
+  .race-card .kicker {
+    font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase;
+    color: var(--muted); font-weight: 500;
+  }
+  .race-card h3 {
+    font-size: 22px; font-weight: 500;
+    color: var(--ink); margin: 4px 0 6px;
+    letter-spacing: -0.01em;
+  }
+  .race-card h3 a { color: var(--ink); }
+  .race-card h3 a:hover { color: var(--primary-2); }
+  .race-card .race-meta {
+    display: flex; gap: 14px; flex-wrap: wrap;
+    font-size: 13px; color: var(--muted);
+    margin-bottom: 10px;
+  }
+  .race-card .race-meta .dot {
+    width: 3px; height: 3px; background: var(--muted-2);
+    border-radius: 50%; align-self: center;
+  }
+  .race-card .desc {
+    font-size: 14px; line-height: 1.5;
+    color: var(--ink-soft);
+    margin-bottom: 12px;
+    text-wrap: pretty;
+  }
+  .race-card .reg-strip {
+    display: flex; align-items: center; gap: 14px;
+    flex-wrap: wrap;
+  }
+  .race-card .reg-strip .bar {
+    flex: 1; min-width: 140px; max-width: 220px;
+    height: 6px; background: var(--line-soft);
+    border-radius: 999px; overflow: hidden;
+  }
+  .race-card .reg-strip .bar > div {
+    height: 100%; background: var(--success);
+    border-radius: 999px;
+  }
+  .race-card .reg-strip .nums {
+    font-size: 13px; color: var(--muted);
+    font-variant-numeric: tabular-nums;
+  }
+  .race-card .reg-strip .nums strong { color: var(--ink); font-weight: 500; }
+
+  /* «Сезон закрыт» состояние */
+  .offseason-block {
+    padding: 32px 22px;
+    text-align: center;
+    border: 1.5px dashed var(--line);
+    border-radius: 12px;
+    background: linear-gradient(180deg, transparent, var(--line-soft));
+  }
+  .offseason-block .label {
+    font-size: 11px; letter-spacing: 0.14em;
+    text-transform: uppercase; color: var(--muted);
+    margin-bottom: 8px;
+  }
+  .offseason-block h2 {
+    font-size: 24px; font-weight: 500;
+    color: var(--ink); margin-bottom: 6px;
+  }
+  .offseason-block p {
+    font-size: 14px; color: var(--ink-soft);
+    max-width: 44ch; margin: 0 auto 16px;
+    line-height: 1.5; text-wrap: pretty;
+  }
+
+  /* ── Archive tab ──────────────────────────────────────── */
+  .archive-toolbar {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 14px; gap: 12px; flex-wrap: wrap;
+  }
+  .archive-toolbar .chips {
+    display: flex; gap: 6px; flex-wrap: wrap;
+  }
+  .archive-toolbar .chip {
+    font-size: 12px; padding: 4px 10px;
+    border-radius: 999px;
+    border: 1px solid var(--line);
+    background: var(--paper-2);
+    color: var(--muted);
+    cursor: pointer;
+    font-family: inherit;
+  }
+  .archive-toolbar .chip.is-on {
+    background: var(--ink); color: #fff; border-color: var(--ink);
+  }
+  .archive-toolbar .total {
+    font-size: 13px; color: var(--muted);
+  }
+
+  .archive-list {
+    display: flex; flex-direction: column;
+    border-top: 1px solid var(--line-soft);
+  }
+  .arch-row {
+    display: grid;
+    grid-template-columns: 70px 130px minmax(0, 1fr) 110px 90px 28px;
+    gap: 14px; align-items: center;
+    padding: 12px 6px;
+    border-bottom: 1px solid var(--line-soft);
+    text-decoration: none;
+    color: var(--ink-soft);
+    transition: background .12s;
+  }
+  .arch-row:hover { background: #f6f8fa; }
+  .arch-row .yr {
+    font-size: 22px; font-weight: 500;
+    color: var(--ink);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.01em;
+  }
+  .arch-row .yr-mini {
+    font-size: 11px; color: var(--muted-2);
+    margin-top: -2px;
+  }
+  .arch-row .date {
+    font-size: 13px; color: var(--muted);
+    font-variant-numeric: tabular-nums;
+  }
+  .arch-row .name {
+    font-size: 15px; color: var(--ink);
+    font-weight: 500; line-height: 1.3;
+  }
+  .arch-row .place {
+    font-size: 12px; color: var(--muted);
+    margin-top: 2px;
+  }
+  .arch-row .teams,
+  .arch-row .winners {
+    font-size: 13px; color: var(--ink-soft);
+    font-variant-numeric: tabular-nums;
+  }
+  .arch-row .teams .lbl,
+  .arch-row .winners .lbl {
+    font-size: 11px; color: var(--muted);
+    letter-spacing: 0.08em; text-transform: uppercase;
+    margin-bottom: 2px;
+  }
+  .arch-row .arrow { color: var(--muted-2); text-align: right; }
+  .arch-row.dim {
+    color: var(--muted);
+  }
+  .arch-row.dim .yr { color: var(--muted); font-weight: 400; }
+  .arch-row.dim .name { color: var(--ink-soft); }
+
+  .arch-footer {
+    padding: 16px 6px 4px;
+    display: flex; justify-content: space-between; align-items: center;
+    font-size: 13px; color: var(--muted);
+    flex-wrap: wrap; gap: 12px;
+  }
+
+  /* ── News tab ─────────────────────────────────────────── */
+  .post {
+    padding: 18px 0;
+    border-bottom: 1px solid var(--line-soft);
+  }
+  .post:first-child { padding-top: 4px; }
+  .post:last-child { border-bottom: none; padding-bottom: 4px; }
+  .post-meta {
+    display: flex; align-items: center; gap: 10px;
+    font-size: 13px; color: var(--muted);
+    margin-bottom: 10px;
+  }
+  .post-meta .tag {
+    color: var(--primary-2); font-weight: 500;
+    text-transform: uppercase; letter-spacing: 0.08em;
+    font-size: 11px;
+  }
+  .post-meta .from {
+    font-size: 12px; color: var(--muted-2);
+  }
+  .post-title {
+    font-size: 19px; font-weight: 500;
+    color: var(--ink); line-height: 1.25;
+    margin-bottom: 8px;
+  }
+  .post-title a { color: var(--ink); }
+  .post-title a:hover { color: var(--primary-2); }
+  .post-body {
+    font-size: 15px; line-height: 1.55;
+    color: var(--ink-soft);
+    margin-bottom: 12px;
+    text-wrap: pretty;
+  }
+  .post-foot {
+    display: flex; align-items: center; gap: 18px;
+    font-size: 13px; color: var(--muted);
+  }
+  .post-foot .react { display: inline-flex; align-items: center; gap: 5px; }
+
+  /* ── Photo tab ────────────────────────────────────────── */
+  .photo-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 4px;
+  }
+  .photo-grid .tile {
+    aspect-ratio: 1;
+    border-radius: 6px;
+    overflow: hidden;
+    position: relative;
+    background:
+      repeating-linear-gradient(135deg, #e8e6dc 0 8px, #efede4 8px 16px);
+    cursor: pointer;
+    transition: transform .12s;
+  }
+  .photo-grid .tile:hover { transform: scale(1.01); }
+  .photo-grid .tile .ph {
+    position: absolute; inset: 0;
+    display: grid; place-items: center;
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-size: 10px; color: var(--muted-2);
+  }
+  .photo-grid .tile .ph span {
+    background: rgba(255,255,255,.85);
+    padding: 2px 6px; border-radius: 3px;
+  }
+  .photo-grid .tile .year-badge {
+    position: absolute; top: 6px; left: 6px;
+    background: rgba(0,0,0,.6); color: #fff;
+    font-size: 10px; padding: 2px 6px;
+    border-radius: 3px;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.04em;
+  }
+  .photo-toolbar {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 14px 0 4px;
+    font-size: 14px;
+  }
+  .photo-toolbar .count { color: var(--muted); }
+
+  /* ── Sidebar ──────────────────────────────────────────── */
+  .sidebar { display: flex; flex-direction: column; gap: 16px; }
+  .side-head {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 16px 22px 4px;
+  }
+  .side-head h3 {
+    font-size: 14px; font-weight: 500;
+    color: var(--ink);
+  }
+  .side-head a { color: var(--muted); font-size: 12px; }
+  .side-head a:hover { color: var(--primary-2); }
+
+  .info-list { list-style: none; padding: 0; margin: 0; }
+  .info-list li {
+    display: grid;
+    grid-template-columns: 24px 1fr auto;
+    gap: 12px; padding: 11px 0;
+    border-top: 1px solid var(--line-soft);
+    font-size: 14px; align-items: center;
+  }
+  .info-list li:first-child { border-top: none; padding-top: 0; }
+  .info-list li:last-child { padding-bottom: 0; }
+  .info-list .icon { width: 20px; height: 20px; color: var(--muted); }
+  .info-list .label { color: var(--muted); }
+  .info-list .value { color: var(--ink); font-weight: 500; text-align: right; font-variant-numeric: tabular-nums; }
+
+  .side-menu { list-style: none; padding: 8px 12px 12px; margin: 0; }
+  .side-menu li a {
+    display: flex; align-items: center; gap: 12px;
+    padding: 9px 10px; border-radius: 8px;
+    color: var(--ink); font-size: 14px;
+    transition: background .12s;
+  }
+  .side-menu li a:hover { background: #f4f6f9; }
+  .side-menu li a .icon { color: var(--muted); width: 18px; height: 18px; }
+  .side-menu li a .badge {
+    margin-left: auto; font-size: 12px;
+    color: var(--muted-2); font-variant-numeric: tabular-nums;
+  }
+
+  /* «Стартует через N дней» блок в сайдбаре */
+  .next-side {
+    padding: 16px 22px 18px;
+  }
+  .next-side .label {
+    font-size: 11px; letter-spacing: 0.14em;
+    text-transform: uppercase; color: var(--muted);
+    margin-bottom: 8px;
+  }
+  .next-side .num {
+    font-size: 60px; font-weight: 500;
+    line-height: 1; color: var(--ink);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.03em;
+  }
+  .next-side .unit {
+    font-size: 14px; color: var(--muted);
+    margin-top: 6px;
+  }
+  .next-side .sub {
+    font-size: 13px; color: var(--ink-soft);
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid var(--line-soft);
+  }
+  body[data-state="offseason"] .next-side .num {
+    font-size: 32px;
+  }
+
+  /* Mini archive в сайдбаре */
+  .mini-archive {
+    list-style: none; padding: 6px 14px 14px; margin: 0;
+  }
+  .mini-archive li {
+    padding: 8px 8px;
+    border-radius: 8px;
+  }
+  .mini-archive li a {
+    display: grid;
+    grid-template-columns: 36px 1fr auto;
+    gap: 10px;
+    align-items: center;
+    color: var(--ink);
+  }
+  .mini-archive li a:hover { color: var(--primary-2); }
+  .mini-archive li:hover { background: #f4f6f9; }
+  .mini-archive .yr {
+    font-size: 16px; font-weight: 500;
+    font-variant-numeric: tabular-nums;
+    color: var(--ink); letter-spacing: -0.01em;
+  }
+  .mini-archive .name {
+    font-size: 13px; color: var(--ink-soft);
+    line-height: 1.25;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .mini-archive .ct {
+    font-size: 11px; color: var(--muted-2);
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* ── State-based show/hide ────────────────────────────── */
+  .for-one, .for-many, .for-offseason { display: none; }
+  body[data-state="one"] .for-one { display: block; }
+  body[data-state="one"] .for-one.inline { display: inline; }
+  body[data-state="one"] .for-one.flex { display: flex; }
+  body[data-state="one"] .for-one.grid { display: grid; }
+  body[data-state="many"] .for-many { display: block; }
+  body[data-state="many"] .for-many.inline { display: inline; }
+  body[data-state="many"] .for-many.flex { display: flex; }
+  body[data-state="many"] .for-many.grid { display: grid; }
+  body[data-state="offseason"] .for-offseason { display: block; }
+  body[data-state="offseason"] .for-offseason.inline { display: inline; }
+  body[data-state="offseason"] .for-offseason.flex { display: flex; }
+  body[data-state="offseason"] .for-offseason.grid { display: grid; }
+
+  /* hide actions on offseason */
+  body[data-state="offseason"] .hide-on-offseason { display: none; }
+
+  /* ── Footer ──────────────────────────────────────────── */
+  .footer {
+    margin-top: 24px; padding: 28px 0;
+    color: var(--muted); font-size: 13px;
+    border-top: 1px solid var(--line);
+    background: var(--paper-2);
+  }
+  .footer .container {
+    display: flex; justify-content: space-between;
+    flex-wrap: wrap; gap: 12px;
+  }
+  .footer a { color: var(--muted); }
+  .footer a:hover { color: var(--ink); }
+
+  /* ── Responsive ──────────────────────────────────────── */
+  @media (max-width: 980px) {
+    .cover-hero h1 { font-size: 30px; }
+    .upcoming-row { grid-template-columns: 1fr; }
+    .upcoming-row .up-card { border-right: none; border-bottom: 1px solid var(--line); }
+    .upcoming-row .up-card:last-child { border-bottom: none; }
+  }
+  @media (max-width: 920px) {
+    .grid { grid-template-columns: 1fr; }
+    .sidebar { order: 2; }
+    .cover-image { aspect-ratio: 16 / 9; }
+    .cover-hero {
+      position: static;
+      padding: 20px 0 24px;
+      max-width: none;
+    }
+    .cover-banner { padding-bottom: 0; }
+    .cover-banner .container { padding: 0 20px; }
+    /* перенесём cover-hero в DOM подаче — но проще через CSS: */
+  }
+  @media (max-width: 760px) {
+    .next-strip { grid-template-columns: 1fr; gap: 14px; }
+    .next-strip .actions { justify-content: flex-start; }
+    .race-card { grid-template-columns: 1fr; }
+    .race-card .thumb { aspect-ratio: 16 / 9; }
+    .arch-row {
+      grid-template-columns: 60px 1fr 28px;
+      gap: 10px;
+    }
+    .arch-row .date,
+    .arch-row .teams,
+    .arch-row .winners { display: none; }
+  }
+  @media (max-width: 720px) {
+    .nav-burger { display: inline-flex; }
+    .nav-menu {
+      position: absolute; left: 0; right: 0; top: 100%;
+      background: var(--dark);
+      max-height: 0; overflow: hidden;
+      flex-direction: column; align-items: stretch;
+      gap: 0;
+      transition: max-height .25s ease;
+      box-shadow: 0 10px 24px rgba(0,0,0,.25);
+      border-top: 1px solid rgba(255,255,255,.08);
+    }
+    .nav.is-open .nav-menu { max-height: 420px; }
+    .nav-links { flex-direction: column; gap: 0; padding: 8px 20px 12px; }
+    .nav-links li { border-bottom: 1px solid rgba(255,255,255,.06); }
+    .nav-links li:last-child { border-bottom: none; }
+    .nav-links a { display: block; padding: 12px 4px; font-size: 15px; }
+    .nav-actions { padding: 8px 20px 14px; border-top: 1px solid rgba(255,255,255,.06); }
+    .nav-actions .login { width: 100%; justify-content: center; padding: 10px 14px; }
+    .nav > .container { position: relative; }
+  }
+  @media (max-width: 600px) {
+    .container { padding: 0 12px; }
+    .page { padding: 0 0 36px; }
+    .cover-meta-card { border-radius: 0; border-left: none; border-right: none; margin-top: -10px; }
+    .card { border-radius: 0; border-left: none; border-right: none; }
+    .cover-image { aspect-ratio: 4 / 3; min-height: 240px; }
+    .cover-status { top: 10px; right: 10px; }
+    .cover-status .pill { font-size: 12px; padding: 4px 10px; }
+    .cover-hero h1 { font-size: 26px; }
+    .tabs { padding: 12px 14px 0; }
+    .tab { margin-right: 20px; font-size: 15px; padding: 0 0 11px; }
+    .tab-body { padding: 16px 16px 18px; }
+    .photo-grid { grid-template-columns: repeat(3, 1fr); gap: 3px; }
+    .next-strip { padding: 14px 16px; }
+  }
+</style>
+</head>
+<body data-state="offseason">
+
+<!-- ───────── NAV ───────── -->
+<header class="nav" id="siteNav">
+  <div class="container nav-inner">
+    <a class="brand" href="/">
+      <img class="brand-logo" src="/static/images/logo.png" alt="">
+      <span>Кольцо&nbsp;24</span>
+    </a>
+    <button class="nav-burger" type="button" aria-label="Меню" aria-expanded="false" onclick="document.getElementById('siteNav').classList.toggle('is-open'); this.setAttribute('aria-expanded', document.getElementById('siteNav').classList.contains('is-open'));">
+      <span></span><span></span><span></span>
+    </button>
+    <div class="nav-menu">
+      <ul class="nav-links">
+        <li><a href="#season">Сезон</a></li>
+        <li><a href="#archive">Архив</a></li>
+        <li><a href="/page/rules/">Правила</a></li>
+        <li><a href="#contacts">Контакты</a></li>
+      </ul>
+      <div class="nav-actions">
+        <a class="login" href="/login/">Войти</a>
+      </div>
+    </div>
+  </div>
+</header>
+
+<!-- ───────── COVER ───────── -->
+<div class="cover-banner">
+  <div class="cover-image">
+    <div class="cover-status">
+      <span class="pill for-one">Регистрация открыта · Кольцо&nbsp;24 ·&nbsp;2026</span>
+      <span class="pill for-many">3&nbsp;соревнования в&nbsp;сезоне</span>
+      <span class="pill muted for-offseason">Сезон завершён · ждём&nbsp;2026</span>
+    </div>
+    <div class="cover-hero">
+      <div class="eyebrow">
+        <span>Турклуб «Спутник»</span>
+      </div>
+      <h1>Кольцо&nbsp;24</h1>
+      <div class="tag">
+        Соревновательный поход выходного дня. 24-часовой пеший рогейн.
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ───────── PAGE ───────── -->
+<div class="page">
+  <div class="container">
+
+    <!-- ── СТРИП «Ближайшая гонка» / «Сезон закрыт» ── -->
+    <section class="cover-meta-card">
+
+      <!-- Один активный старт -->
+      <div class="for-one">
+        <div class="next-strip">
+          <div class="when">
+            <div class="day">11</div>
+            <div class="mon">окт</div>
+          </div>
+          <div class="info">
+            <div class="label">Ближайшая гонка</div>
+            <h2>Кольцо&nbsp;24 ·&nbsp;2026</h2>
+            <div class="sub">
+              <span>📍 Башкортостан</span>
+              <span class="dot"></span>
+              <span>пеший · 24&nbsp;ч</span>
+              <span class="dot"></span>
+              <span>112 из&nbsp;180 команд</span>
+            </div>
+          </div>
+          <div class="actions">
+            <a class="btn btn-primary" href="#">Регистрация&nbsp;→</a>
+            <a class="btn btn-outline" href="#">Подробнее</a>
+          </div>
+        </div>
+      </div>
+
+      <!-- Несколько активных стартов -->
+      <div class="for-many">
+        <div class="next-strip">
+          <div class="when">
+            <div class="day">10</div>
+            <div class="mon">мая</div>
+          </div>
+          <div class="info">
+            <div class="label">Ближайший старт · 1&nbsp;из&nbsp;3</div>
+            <h2>Майский рогейн</h2>
+            <div class="sub">
+              <span>📍 парк Сосновка</span>
+              <span class="dot"></span>
+              <span>пеший · 4&nbsp;ч</span>
+              <span class="dot"></span>
+              <span>свободный взнос</span>
+            </div>
+          </div>
+          <div class="actions">
+            <a class="btn btn-primary" href="#">Регистрация&nbsp;→</a>
+          </div>
+        </div>
+        <div class="upcoming-row">
+          <a class="up-card" href="#">
+            <div class="when-mini">
+              <div class="day">14</div>
+              <div class="mon">июн</div>
+            </div>
+            <div>
+              <div class="title">Спутник Multi</div>
+              <div class="meta">мультигонка · 6&nbsp;ч · Карелия</div>
+            </div>
+            <span class="arrow">→</span>
+          </a>
+          <a class="up-card" href="#">
+            <div class="when-mini">
+              <div class="day">11</div>
+              <div class="mon">окт</div>
+            </div>
+            <div>
+              <div class="title">Кольцо&nbsp;24 ·&nbsp;2026</div>
+              <div class="meta">пеший · 24&nbsp;ч · регистрация открыта</div>
+            </div>
+            <span class="arrow">→</span>
+          </a>
+          <a class="up-card" href="#">
+            <div class="when-mini">
+              <div class="day tba" style="color: var(--muted); font-size: 14px;">TBD</div>
+              <div class="mon">дек</div>
+            </div>
+            <div>
+              <div class="title">Зимний ночной</div>
+              <div class="meta">пеший · 8&nbsp;ч · дата уточняется</div>
+            </div>
+            <span class="arrow">→</span>
+          </a>
+        </div>
+      </div>
+
+      <!-- Межсезонье -->
+      <div class="for-offseason">
+        <div class="next-strip">
+          <div class="when tba">
+            <div class="day">TBD</div>
+            <div class="mon">2026</div>
+          </div>
+          <div class="info">
+            <div class="label">Следующий сезон</div>
+            <h2>Дату объявим дополнительно</h2>
+            <div class="sub">
+              <span>Сейчас межсезонье</span>
+              <span class="dot"></span>
+              <span>следите за&nbsp;группой в&nbsp;ВК</span>
+            </div>
+          </div>
+          <div class="actions">
+            <a class="btn btn-blue" href="https://vk.com/kolco24">Группа в&nbsp;ВК&nbsp;↗</a>
+            <a class="btn btn-outline" href="#archive">Посмотреть архив</a>
+          </div>
+        </div>
+      </div>
+
+    </section>
+
+    <div class="grid">
+
+      <!-- ── MAIN COLUMN ── -->
+      <main>
+
+        <section class="card tabs-card" id="season">
+          <div class="tabs" role="tablist">
+            <button class="tab is-active" role="tab" data-tab="season">
+              <span>Сезон <span class="for-one inline">2026</span><span class="for-many inline">2026</span><span class="for-offseason inline">2026</span></span>
+              <span class="count for-one inline">1</span>
+              <span class="count for-many inline">3</span>
+              <span class="count for-offseason inline">—</span>
+            </button>
+            <button class="tab" role="tab" data-tab="archive">
+              <span>Архив</span>
+              <span class="count">11&nbsp;сезонов</span>
+            </button>
+            <button class="tab" role="tab" data-tab="news">
+              <span>Новости</span>
+              <span class="count">12</span>
+            </button>
+            <button class="tab" role="tab" data-tab="photos">
+              <span>Фото</span>
+              <span class="count">2.4k</span>
+            </button>
+          </div>
+
+          <!-- ─── TAB: Season ─── -->
+          <div class="tab-body tab-pane is-active" data-pane="season">
+            <div class="season-head">
+              <h2 class="for-one">Старт сезона</h2>
+              <h2 class="for-many">Все&nbsp;старты сезона</h2>
+              <h2 class="for-offseason">Сезон&nbsp;2025 завершён</h2>
+              <div class="meta hide-on-offseason">
+                <span class="for-one inline">1&nbsp;соревнование</span>
+                <span class="for-many inline">3&nbsp;соревнования · 184 команды записаны</span>
+              </div>
+            </div>
+
+            <!-- ONE: подробная карточка одной гонки -->
+            <div class="for-one">
+              <article class="race-card">
+                <div class="thumb">
+                  <div class="when-overlay">
+                    <div class="day">11–12</div>
+                    <div class="mon">окт 2026</div>
+                  </div>
+                  <span class="ph">фото · prev. season header</span>
+                </div>
+                <div class="body">
+                  <div class="kicker">Рогейн · 24&nbsp;часа · главное соревнование</div>
+                  <h3><a href="Race Page.html">Кольцо&nbsp;24 ·&nbsp;2026</a></h3>
+                  <div class="race-meta">
+                    <span>📍 Башкортостан, точное место уточняется</span>
+                    <span class="dot"></span>
+                    <span>пеший · 24&nbsp;ч</span>
+                    <span class="dot"></span>
+                    <span>команды&nbsp;2–4</span>
+                    <span class="dot"></span>
+                    <span>от&nbsp;2000&nbsp;₽</span>
+                  </div>
+                  <p class="desc">
+                    Команды по&nbsp;карте за&nbsp;24&nbsp;часа набирают как&nbsp;можно больше
+                    контрольных пунктов. Семь категорий: от&nbsp;семейной 8-часовой
+                    до&nbsp;спортивной элиты. Регистрация открыта до&nbsp;1&nbsp;сентября.
+                  </p>
+                  <div class="reg-strip">
+                    <div class="bar"><div style="width: 62%;"></div></div>
+                    <div class="nums"><strong>112</strong> из&nbsp;180 команд</div>
+                    <a class="btn btn-primary" href="#" style="margin-left: auto;">Регистрация&nbsp;→</a>
+                  </div>
+                </div>
+              </article>
+            </div>
+
+            <!-- MANY: список из 3 гонок сезона -->
+            <div class="for-many">
+              <article class="race-card kind-friendly">
+                <div class="thumb">
+                  <div class="when-overlay">
+                    <div class="day">10</div>
+                    <div class="mon">мая</div>
+                  </div>
+                  <span class="ph">фото · разогрев в&nbsp;Сосновке</span>
+                </div>
+                <div class="body">
+                  <div class="kicker">Дружеский старт · 4&nbsp;часа · сезон открыт</div>
+                  <h3><a href="#">Майский рогейн</a></h3>
+                  <div class="race-meta">
+                    <span>📍 парк Сосновка</span>
+                    <span class="dot"></span>
+                    <span>пеший · 4&nbsp;ч</span>
+                    <span class="dot"></span>
+                    <span>свободный взнос</span>
+                  </div>
+                  <p class="desc">
+                    Разогрев сезона&nbsp;— короткий городской рогейн в&nbsp;парке. Подойдёт
+                    тем, кто только пробует формат: финиш засветло, никаких
+                    обязательных списков снаряжения.
+                  </p>
+                  <div class="reg-strip">
+                    <div class="bar"><div style="width: 78%;"></div></div>
+                    <div class="nums"><strong>54</strong> из&nbsp;70 команд</div>
+                    <a class="btn btn-primary" href="#" style="margin-left: auto;">Записаться</a>
+                  </div>
+                </div>
+              </article>
+
+              <article class="race-card kind-multi">
+                <div class="thumb">
+                  <div class="when-overlay">
+                    <div class="day">14</div>
+                    <div class="mon">июн</div>
+                  </div>
+                  <span class="ph">фото · мультигонка</span>
+                </div>
+                <div class="body">
+                  <div class="kicker">Мультигонка · 6&nbsp;часов</div>
+                  <h3><a href="#">Спутник Multi&nbsp;·&nbsp;2026</a></h3>
+                  <div class="race-meta">
+                    <span>📍 Карельский перешеек</span>
+                    <span class="dot"></span>
+                    <span>вело + пеший + пэддл</span>
+                    <span class="dot"></span>
+                    <span>от&nbsp;1500&nbsp;₽</span>
+                  </div>
+                  <p class="desc">
+                    Три дисциплины в&nbsp;одной гонке. Маршрут проходит вдоль озёр —
+                    лодки даём на&nbsp;старте, велосипед свой.
+                  </p>
+                  <div class="reg-strip">
+                    <div class="bar"><div style="width: 32%;"></div></div>
+                    <div class="nums"><strong>18</strong> из&nbsp;56 команд</div>
+                    <a class="btn btn-primary" href="#" style="margin-left: auto;">Регистрация</a>
+                  </div>
+                </div>
+              </article>
+
+              <article class="race-card">
+                <div class="thumb">
+                  <div class="when-overlay">
+                    <div class="day">11–12</div>
+                    <div class="mon">окт</div>
+                  </div>
+                  <span class="ph">фото · главный старт</span>
+                </div>
+                <div class="body">
+                  <div class="kicker">Рогейн · 24&nbsp;часа · главное соревнование</div>
+                  <h3><a href="Race Page.html">Кольцо&nbsp;24 ·&nbsp;2026</a></h3>
+                  <div class="race-meta">
+                    <span>📍 Башкортостан</span>
+                    <span class="dot"></span>
+                    <span>пеший · 24&nbsp;ч</span>
+                    <span class="dot"></span>
+                    <span>команды&nbsp;2–4</span>
+                    <span class="dot"></span>
+                    <span>от&nbsp;2000&nbsp;₽</span>
+                  </div>
+                  <p class="desc">
+                    24&nbsp;часа, семь категорий, команды от&nbsp;2&nbsp;до&nbsp;4 человек.
+                    Главное событие сезона&nbsp;— на&nbsp;него мы&nbsp;готовимся весь год.
+                  </p>
+                  <div class="reg-strip">
+                    <div class="bar"><div style="width: 62%;"></div></div>
+                    <div class="nums"><strong>112</strong> из&nbsp;180 команд</div>
+                    <a class="btn btn-primary" href="#" style="margin-left: auto;">Регистрация&nbsp;→</a>
+                  </div>
+                </div>
+              </article>
+            </div>
+
+            <!-- OFFSEASON -->
+            <div class="for-offseason">
+              <div class="offseason-block">
+                <div class="label">Межсезонье</div>
+                <h2>Дата следующего старта объявим дополнительно</h2>
+                <p>
+                  Сезон 2025 закончился&nbsp;— 1002 участника, 332 команды, спасибо!
+                  Сейчас разбираем фото и&nbsp;готовим следующий год. Чтобы первыми
+                  узнать о&nbsp;дате&nbsp;— подпишитесь на&nbsp;группу в&nbsp;ВК.
+                </p>
+                <div style="display: flex; gap: 8px; justify-content: center; flex-wrap: wrap;">
+                  <a class="btn btn-blue" href="https://vk.com/kolco24">Группа в&nbsp;ВК&nbsp;↗</a>
+                  <a class="btn btn-outline" href="#" data-tab-link="archive">Архив сезонов</a>
+                </div>
+              </div>
+
+              <!-- + краткие итоги последнего -->
+              <div style="margin-top: 22px; padding-top: 20px; border-top: 1px solid var(--line-soft);">
+                <div class="season-head">
+                  <h2 style="font-size: 17px;">Итоги последнего сезона</h2>
+                  <a class="meta" href="#" style="color: var(--primary-2);">Полный протокол&nbsp;→</a>
+                </div>
+                <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 18px; padding: 10px 0;">
+                  <div>
+                    <div style="font-size: 32px; font-weight: 500; color: var(--ink); line-height: 1; font-variant-numeric: tabular-nums;">1002</div>
+                    <div style="font-size: 12px; color: var(--muted); margin-top: 6px; letter-spacing: 0.06em;">УЧАСТНИКА</div>
+                  </div>
+                  <div>
+                    <div style="font-size: 32px; font-weight: 500; color: var(--ink); line-height: 1; font-variant-numeric: tabular-nums;">332</div>
+                    <div style="font-size: 12px; color: var(--muted); margin-top: 6px; letter-spacing: 0.06em;">КОМАНДЫ</div>
+                  </div>
+                  <div>
+                    <div style="font-size: 32px; font-weight: 500; color: var(--ink); line-height: 1; font-variant-numeric: tabular-nums;">68</div>
+                    <div style="font-size: 12px; color: var(--muted); margin-top: 6px; letter-spacing: 0.06em;">КП</div>
+                  </div>
+                  <div>
+                    <div style="font-size: 32px; font-weight: 500; color: var(--ink); line-height: 1; font-variant-numeric: tabular-nums;">2480</div>
+                    <div style="font-size: 12px; color: var(--muted); margin-top: 6px; letter-spacing: 0.06em;">ОЧКОВ&nbsp;ЛИДЕР</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- ─── TAB: Archive ─── -->
+          <div class="tab-body tab-pane" data-pane="archive">
+            <div class="archive-toolbar">
+              <div class="chips">
+                <button class="chip is-on">все&nbsp;·&nbsp;11</button>
+                <button class="chip">Кольцо&nbsp;24</button>
+                <button class="chip">Спутник Multi</button>
+                <button class="chip">прочее</button>
+              </div>
+              <span class="total">всего 11&nbsp;сезонов&nbsp;· 2014–2025</span>
+            </div>
+
+            <div class="archive-list">
+              <a class="arch-row" href="Race Page.html">
+                <div>
+                  <div class="yr">2025</div>
+                  <div class="yr-mini">Кольцо&nbsp;24</div>
+                </div>
+                <div class="date">11 окт 2025</div>
+                <div>
+                  <div class="name">Кольцо&nbsp;24 ·&nbsp;2025</div>
+                  <div class="place">📍 окрестности Макарово · Башкортостан</div>
+                </div>
+                <div class="teams">
+                  <div class="lbl">КОМАНД</div>
+                  <div>332</div>
+                </div>
+                <div class="winners">
+                  <div class="lbl">ПОБЕДИТЕЛЬ</div>
+                  <div>«Гранит»</div>
+                </div>
+                <span class="arrow">→</span>
+              </a>
+
+              <a class="arch-row" href="#">
+                <div>
+                  <div class="yr">2024</div>
+                  <div class="yr-mini">Кольцо&nbsp;24</div>
+                </div>
+                <div class="date">12 окт 2024</div>
+                <div>
+                  <div class="name">Кольцо&nbsp;24 ·&nbsp;2024</div>
+                  <div class="place">📍 Лосево · Башкортостан</div>
+                </div>
+                <div class="teams">
+                  <div class="lbl">КОМАНД</div>
+                  <div>186</div>
+                </div>
+                <div class="winners">
+                  <div class="lbl">ПОБЕДИТЕЛЬ</div>
+                  <div>«Гранит»</div>
+                </div>
+                <span class="arrow">→</span>
+              </a>
+
+              <a class="arch-row" href="#">
+                <div>
+                  <div class="yr">2023</div>
+                  <div class="yr-mini">Кольцо&nbsp;24</div>
+                </div>
+                <div class="date">14 окт 2023</div>
+                <div>
+                  <div class="name">Кольцо&nbsp;24 ·&nbsp;2023</div>
+                  <div class="place">📍 Сосново · Башкортостан</div>
+                </div>
+                <div class="teams">
+                  <div class="lbl">КОМАНД</div>
+                  <div>172</div>
+                </div>
+                <div class="winners">
+                  <div class="lbl">ПОБЕДИТЕЛЬ</div>
+                  <div>«Лосось»</div>
+                </div>
+                <span class="arrow">→</span>
+              </a>
+
+              <a class="arch-row" href="#">
+                <div>
+                  <div class="yr">2022</div>
+                  <div class="yr-mini">Кольцо&nbsp;24</div>
+                </div>
+                <div class="date">8 окт 2022</div>
+                <div>
+                  <div class="name">Кольцо&nbsp;24 ·&nbsp;2022</div>
+                  <div class="place">📍 Орехово · Башкортостан</div>
+                </div>
+                <div class="teams">
+                  <div class="lbl">КОМАНД</div>
+                  <div>154</div>
+                </div>
+                <div class="winners">
+                  <div class="lbl">ПОБЕДИТЕЛЬ</div>
+                  <div>«Северный»</div>
+                </div>
+                <span class="arrow">→</span>
+              </a>
+
+              <a class="arch-row" href="#">
+                <div>
+                  <div class="yr">2021</div>
+                  <div class="yr-mini">Кольцо&nbsp;24</div>
+                </div>
+                <div class="date">9 окт 2021</div>
+                <div>
+                  <div class="name">Кольцо&nbsp;24 ·&nbsp;2021</div>
+                  <div class="place">📍 Лемболово</div>
+                </div>
+                <div class="teams">
+                  <div class="lbl">КОМАНД</div>
+                  <div>140</div>
+                </div>
+                <div class="winners">
+                  <div class="lbl">ПОБЕДИТЕЛЬ</div>
+                  <div>«Лосось»</div>
+                </div>
+                <span class="arrow">→</span>
+              </a>
+
+              <a class="arch-row" href="#">
+                <div>
+                  <div class="yr">2020</div>
+                  <div class="yr-mini">Кольцо&nbsp;24</div>
+                </div>
+                <div class="date">10 окт 2020</div>
+                <div>
+                  <div class="name">Кольцо&nbsp;24 ·&nbsp;2020</div>
+                  <div class="place">📍 Кузнечное</div>
+                </div>
+                <div class="teams">
+                  <div class="lbl">КОМАНД</div>
+                  <div>118</div>
+                </div>
+                <div class="winners">
+                  <div class="lbl">ПОБЕДИТЕЛЬ</div>
+                  <div>«Гранит»</div>
+                </div>
+                <span class="arrow">→</span>
+              </a>
+
+              <a class="arch-row" href="#">
+                <div>
+                  <div class="yr">2019</div>
+                  <div class="yr-mini">Кольцо&nbsp;24</div>
+                </div>
+                <div class="date">12 окт 2019</div>
+                <div>
+                  <div class="name">Кольцо&nbsp;24 ·&nbsp;2019</div>
+                  <div class="place">📍 Мичуринское</div>
+                </div>
+                <div class="teams">
+                  <div class="lbl">КОМАНД</div>
+                  <div>128</div>
+                </div>
+                <div class="winners">
+                  <div class="lbl">ПОБЕДИТЕЛЬ</div>
+                  <div>«Лесные»</div>
+                </div>
+                <span class="arrow">→</span>
+              </a>
+
+              <a class="arch-row dim" href="#">
+                <div>
+                  <div class="yr">2018</div>
+                </div>
+                <div class="date">13 окт 2018</div>
+                <div>
+                  <div class="name">Кольцо&nbsp;24 ·&nbsp;2018</div>
+                  <div class="place">📍 Запорожское</div>
+                </div>
+                <div class="teams">
+                  <div class="lbl">КОМАНД</div>
+                  <div>110</div>
+                </div>
+                <div class="winners">
+                  <div class="lbl">ПОБЕДИТЕЛЬ</div>
+                  <div>«Гранит»</div>
+                </div>
+                <span class="arrow">→</span>
+              </a>
+
+              <a class="arch-row dim" href="#">
+                <div>
+                  <div class="yr">2017</div>
+                </div>
+                <div class="date">14 окт 2017</div>
+                <div>
+                  <div class="name">Кольцо&nbsp;24 ·&nbsp;2017</div>
+                  <div class="place">📍 Орехово</div>
+                </div>
+                <div class="teams">
+                  <div class="lbl">КОМАНД</div>
+                  <div>96</div>
+                </div>
+                <div class="winners">
+                  <div class="lbl">ПОБЕДИТЕЛЬ</div>
+                  <div>«Север»</div>
+                </div>
+                <span class="arrow">→</span>
+              </a>
+
+              <a class="arch-row dim" href="#">
+                <div>
+                  <div class="yr">2016</div>
+                </div>
+                <div class="date">8 окт 2016</div>
+                <div>
+                  <div class="name">Кольцо&nbsp;24 ·&nbsp;2016</div>
+                  <div class="place">📍 Сосново</div>
+                </div>
+                <div class="teams">
+                  <div class="lbl">КОМАНД</div>
+                  <div>82</div>
+                </div>
+                <div class="winners">
+                  <div class="lbl">ПОБЕДИТЕЛЬ</div>
+                  <div>«Лосось»</div>
+                </div>
+                <span class="arrow">→</span>
+              </a>
+
+              <a class="arch-row dim" href="#">
+                <div>
+                  <div class="yr">2015</div>
+                </div>
+                <div class="date">10 окт 2015</div>
+                <div>
+                  <div class="name">Кольцо&nbsp;24 ·&nbsp;2015</div>
+                  <div class="place">📍 Лосево</div>
+                </div>
+                <div class="teams">
+                  <div class="lbl">КОМАНД</div>
+                  <div>68</div>
+                </div>
+                <div class="winners">
+                  <div class="lbl">ПОБЕДИТЕЛЬ</div>
+                  <div>«Гранит»</div>
+                </div>
+                <span class="arrow">→</span>
+              </a>
+
+              <a class="arch-row dim" href="#">
+                <div>
+                  <div class="yr">2014</div>
+                </div>
+                <div class="date">12 окт 2014</div>
+                <div>
+                  <div class="name">Кольцо&nbsp;24 ·&nbsp;2014 · первый</div>
+                  <div class="place">📍 Лемболово</div>
+                </div>
+                <div class="teams">
+                  <div class="lbl">КОМАНД</div>
+                  <div>54</div>
+                </div>
+                <div class="winners">
+                  <div class="lbl">ПОБЕДИТЕЛЬ</div>
+                  <div>«Север»</div>
+                </div>
+                <span class="arrow">→</span>
+              </a>
+            </div>
+
+            <div class="arch-footer">
+              <span>Показаны все 11&nbsp;сезонов с&nbsp;2014&nbsp;года. Более&nbsp;ранние&nbsp;— по&nbsp;запросу.</span>
+              <a href="mailto:org@kolco24.ru">org@kolco24.ru&nbsp;→</a>
+            </div>
+          </div>
+
+          <!-- ─── TAB: News ─── -->
+          <div class="tab-body tab-pane" data-pane="news">
+            <article class="post">
+              <div class="post-meta">
+                <span class="tag">Объявление</span>
+                <span class="from">Кольцо&nbsp;24 ·&nbsp;2026</span>
+                <time>04 апр 2026</time>
+              </div>
+              <h3 class="post-title"><a href="#">Регистрация на&nbsp;Кольцо&nbsp;24·2026 открыта</a></h3>
+              <p class="post-body">
+                В&nbsp;этом году семь категорий, формат остаётся прежним&nbsp;— 24&nbsp;часа,
+                пеший рогейн, команды от&nbsp;2&nbsp;до&nbsp;4&nbsp;человек. Раннее
+                бронирование до&nbsp;1&nbsp;июня.
+              </p>
+              <div class="post-foot">
+                <span class="react">♡ 86</span>
+                <span class="react">💬 31</span>
+                <a href="#" style="margin-left: auto;">Читать&nbsp;→</a>
+              </div>
+            </article>
+
+            <article class="post">
+              <div class="post-meta">
+                <span class="tag">Итоги</span>
+                <span class="from">Кольцо&nbsp;24 ·&nbsp;2025</span>
+                <time>21 окт 2025</time>
+              </div>
+              <h3 class="post-title"><a href="#">Кольцо-24·2025 завершилось — спасибо всем</a></h3>
+              <p class="post-body">
+                1002&nbsp;человека, 332&nbsp;команды, 36&nbsp;часов на&nbsp;ногах для самых выносливых.
+                Протокол выложен, фото&nbsp;— по&nbsp;мере разбора альбомов.
+              </p>
+              <div class="post-foot">
+                <span class="react">♡ 214</span>
+                <span class="react">💬 62</span>
+                <a href="#" style="margin-left: auto;">Читать&nbsp;→</a>
+              </div>
+            </article>
+
+            <article class="post">
+              <div class="post-meta">
+                <span class="tag">Подготовка</span>
+                <span class="from">Кольцо&nbsp;24 ·&nbsp;2026</span>
+                <time>12 апр 2026</time>
+              </div>
+              <h3 class="post-title"><a href="#">Маршрут разведан, отмечены новые контрольные пункты</a></h3>
+              <p class="post-body">
+                Сергей и&nbsp;Аня прошли северный квадрант: добавили шесть КП у&nbsp;старого карьера
+                и&nbsp;перенесли два опасных пункта подальше от&nbsp;воды.
+              </p>
+              <div class="post-foot">
+                <span class="react">♡ 48</span>
+                <span class="react">💬 14</span>
+                <a href="#" style="margin-left: auto;">Читать&nbsp;→</a>
+              </div>
+            </article>
+
+            <article class="post">
+              <div class="post-meta">
+                <span class="tag">Интервью</span>
+                <span class="from">истории клуба</span>
+                <time>28 мар 2026</time>
+              </div>
+              <h3 class="post-title"><a href="#">«Карта&nbsp;— это треть результата». Интервью с&nbsp;Сергеем</a></h3>
+              <p class="post-body">
+                Главный картограф Кольца рассказывает, как мы&nbsp;готовим основу для соревнования,
+                почему отказались от&nbsp;OSM и&nbsp;что меняется год к&nbsp;году.
+              </p>
+              <div class="post-foot">
+                <span class="react">♡ 64</span>
+                <span class="react">💬 12</span>
+                <a href="#" style="margin-left: auto;">Читать&nbsp;→</a>
+              </div>
+            </article>
+          </div>
+
+          <!-- ─── TAB: Photos ─── -->
+          <div class="tab-body tab-pane" data-pane="photos">
+            <div class="photo-grid">
+              <div class="tile"><span class="year-badge">2025</span><div class="ph"><span>01</span></div></div>
+              <div class="tile"><span class="year-badge">2025</span><div class="ph"><span>02</span></div></div>
+              <div class="tile"><span class="year-badge">2025</span><div class="ph"><span>03</span></div></div>
+              <div class="tile"><span class="year-badge">2025</span><div class="ph"><span>04</span></div></div>
+              <div class="tile"><span class="year-badge">2024</span><div class="ph"><span>05</span></div></div>
+              <div class="tile"><span class="year-badge">2024</span><div class="ph"><span>06</span></div></div>
+              <div class="tile"><span class="year-badge">2024</span><div class="ph"><span>07</span></div></div>
+              <div class="tile"><span class="year-badge">2024</span><div class="ph"><span>08</span></div></div>
+              <div class="tile"><span class="year-badge">2023</span><div class="ph"><span>09</span></div></div>
+              <div class="tile"><span class="year-badge">2023</span><div class="ph"><span>10</span></div></div>
+              <div class="tile"><span class="year-badge">2022</span><div class="ph"><span>11</span></div></div>
+              <div class="tile"><span class="year-badge">2022</span><div class="ph"><span>12</span></div></div>
+            </div>
+            <div class="photo-toolbar">
+              <span class="count">показаны 12 из&nbsp;2400+ за&nbsp;все сезоны</span>
+              <a class="btn btn-outline" href="#">Открыть архив фото</a>
+            </div>
+          </div>
+        </section>
+
+      </main>
+
+      <!-- ── SIDEBAR ── -->
+      <aside class="sidebar">
+
+        <!-- До старта / межсезонье -->
+        <div class="card">
+          <div class="next-side">
+            <div class="for-one">
+              <div class="label">До старта</div>
+              <div class="num">156</div>
+              <div class="unit">дней до&nbsp;Кольца&nbsp;·&nbsp;2026</div>
+              <div class="sub">
+                Регистрация открыта · 112 из&nbsp;180 команд<br>
+                Раннее бронирование до&nbsp;1&nbsp;июня
+              </div>
+            </div>
+            <div class="for-many">
+              <div class="label">Ближайший старт</div>
+              <div class="num">17</div>
+              <div class="unit">дней до&nbsp;Майского рогейна</div>
+              <div class="sub">
+                10&nbsp;мая · парк Сосновка<br>
+                Свободный взнос, регистрация открыта
+              </div>
+            </div>
+            <div class="for-offseason">
+              <div class="label">Сейчас</div>
+              <div class="num">межсезонье</div>
+              <div class="unit" style="margin-top: 10px;">Дату 2026&nbsp;объявим в&nbsp;январе</div>
+              <div class="sub">
+                Следующий анонс выйдет в&nbsp;группе в&nbsp;ВК.
+                Можно подписаться на&nbsp;письмо&nbsp;— один раз в&nbsp;сезон.
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- О клубе -->
+        <div class="card">
+          <div class="side-head">
+            <h3>Кольцо&nbsp;24</h3>
+          </div>
+          <div class="card-pad" style="padding-top: 6px;">
+            <ul class="info-list">
+              <li>
+                <svg class="icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="10" cy="10" r="7"/><path d="M10 6v4l2.5 2"/></svg>
+                <span class="label">С&nbsp;года</span>
+                <span class="value">2014</span>
+              </li>
+              <li>
+                <svg class="icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 9l7-5 7 5v8a1 1 0 0 1-1 1h-4v-5H8v5H4a1 1 0 0 1-1-1V9z"/></svg>
+                <span class="label">Сезонов</span>
+                <span class="value">11</span>
+              </li>
+              <li>
+                <svg class="icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="10" cy="7" r="3"/><path d="M4 17c0-3 2.7-5 6-5s6 2 6 5"/></svg>
+                <span class="label">Участников</span>
+                <span class="value">2400+</span>
+              </li>
+              <li>
+                <svg class="icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M5 3v14"/><path d="M5 4h9l-2 3 2 3H5"/></svg>
+                <span class="label">Команд</span>
+                <span class="value">1480+</span>
+              </li>
+              <li>
+                <svg class="icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 10l2.5 2.5L16 5"/></svg>
+                <span class="label">Организатор</span>
+                <span class="value" style="font-size: 13px;">ТК&nbsp;«Спутник»</span>
+              </li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- Mini-archive (quick list of recent seasons) -->
+        <div class="card">
+          <div class="side-head">
+            <h3>Последние сезоны</h3>
+            <a href="#" data-tab-link="archive">Все&nbsp;11&nbsp;→</a>
+          </div>
+          <ul class="mini-archive">
+            <li><a href="Race Page.html">
+              <span class="yr">2025</span>
+              <span class="name">Кольцо&nbsp;24 · Макарово</span>
+              <span class="ct">332</span>
+            </a></li>
+            <li><a href="#">
+              <span class="yr">2024</span>
+              <span class="name">Кольцо&nbsp;24 · Лосево</span>
+              <span class="ct">186</span>
+            </a></li>
+            <li><a href="#">
+              <span class="yr">2023</span>
+              <span class="name">Кольцо&nbsp;24 · Сосново</span>
+              <span class="ct">172</span>
+            </a></li>
+            <li><a href="#">
+              <span class="yr">2022</span>
+              <span class="name">Кольцо&nbsp;24 · Орехово</span>
+              <span class="ct">154</span>
+            </a></li>
+            <li><a href="#">
+              <span class="yr">2021</span>
+              <span class="name">Кольцо&nbsp;24 · Лемболово</span>
+              <span class="ct">140</span>
+            </a></li>
+          </ul>
+        </div>
+
+        <!-- Документы -->
+        <div class="card">
+          <div class="side-head">
+            <h3>Документы</h3>
+          </div>
+          <ul class="side-menu">
+            <li><a href="#">
+              <svg class="icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M5 3h7l4 4v10a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1Z"/><path d="M12 3v4h4"/></svg>
+              Положение&nbsp;2026
+            </a></li>
+            <li><a href="#">
+              <svg class="icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 15l4-9 3 5 2-3 3 7"/></svg>
+              Категории и&nbsp;дистанции
+            </a></li>
+            <li><a href="#">
+              <svg class="icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="6" width="14" height="11" rx="1.5"/><path d="M3 9h14M7 13h6"/></svg>
+              Правила проведения рогейна
+            </a></li>
+            <li><a href="#">
+              <svg class="icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M10 3v14M3 10h14"/></svg>
+              Список снаряжения
+            </a></li>
+          </ul>
+        </div>
+
+        <!-- Сообщество -->
+        <div class="card" id="contacts">
+          <div class="side-head">
+            <h3>Сообщество</h3>
+          </div>
+          <ul class="side-menu">
+            <li><a href="https://vk.com/kolco24">
+              <svg class="icon" viewBox="0 0 20 20" fill="currentColor"><path d="M10 2a8 8 0 1 0 0 16 8 8 0 0 0 0-16Zm3.4 11.4h-1.1c-.4 0-.5-.3-1.3-1.1-.7-.6-1-.7-1.2-.7-.3 0-.4.1-.4.5v1c0 .3-.1.4-.7.4-1 0-2.1-.6-2.9-1.7-1.2-1.6-1.5-2.8-1.5-3.1 0-.2.1-.3.4-.3h1.1c.3 0 .4.1.5.4.5 1.5 1.4 2.7 1.7 2.7.1 0 .2-.1.2-.4V9.7c0-.7-.4-.7-.4-1 0-.1.1-.3.3-.3h1.7c.3 0 .4.1.4.4v2.2c0 .3.1.4.2.4.2 0 .3-.1.6-.4.8-1 1.4-2.5 1.4-2.5.1-.2.2-.4.5-.4h1.1c.3 0 .4.2.3.5-.1.6-1.3 2.2-1.3 2.3-.1.2-.1.3 0 .5.1.1.5.5.8.8.5.6.9 1.1 1 1.4.2.3 0 .5-.3.5Z"/></svg>
+              Группа в&nbsp;ВК
+              <span class="badge">↗</span>
+            </a></li>
+            <li><a href="https://t.me/kolco24tg">
+              <svg class="icon" viewBox="0 0 20 20" fill="currentColor"><path d="M10 2a8 8 0 1 0 0 16A8 8 0 0 0 10 2Zm3.9 5.6-1.4 6.4c-.1.4-.4.5-.7.3l-1.9-1.4-1 .9c-.1.1-.2.2-.4.2l.1-1.9 2.8-2.5c.1-.1 0-.2-.2-.1L7 12.5 5.2 12c-.4-.1-.4-.4.1-.6l7.6-2.9c.3-.1.6.1.5.5-.1 0-.1 0 0 0Z"/></svg>
+              Канал в&nbsp;Telegram
+              <span class="badge">↗</span>
+            </a></li>
+            <li><a href="https://tk-sputnik.org/">
+              <svg class="icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M10 17s-6-4-6-9a6 6 0 0 1 12 0c0 5-6 9-6 9Z"/><circle cx="10" cy="8" r="2"/></svg>
+              ТК&nbsp;«Спутник»
+              <span class="badge">↗</span>
+            </a></li>
+            <li><a href="mailto:org@kolco24.ru">
+              <svg class="icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="2.5" y="4.5" width="15" height="11" rx="1.5"/><path d="m3 6 7 5 7-5"/></svg>
+              org@kolco24.ru
+            </a></li>
+          </ul>
+        </div>
+
+      </aside>
+
+    </div>
+  </div>
+</div>
+
+<!-- ───────── FOOTER ───────── -->
+<footer class="footer">
+  <div class="container">
+    <span>© 2014–2026 Турклуб «Спутник» · Кольцо&nbsp;24</span>
+    <span>
+      <a href="mailto:org@kolco24.ru">org@kolco24.ru</a>
+      &nbsp;·&nbsp;
+      <a href="https://vk.com/kolco24">vk.com/kolco24</a>
+    </span>
+  </div>
+</footer>
+
+<script>
+  // Tabs
+  (function() {
+    const tabs = document.querySelectorAll('.tab');
+    const panes = document.querySelectorAll('.tab-pane');
+    function activate(name) {
+      tabs.forEach(t => t.classList.toggle('is-active', t.dataset.tab === name));
+      panes.forEach(p => p.classList.toggle('is-active', p.dataset.pane === name));
+    }
+    tabs.forEach(btn => {
+      btn.addEventListener('click', () => {
+        activate(btn.dataset.tab);
+        history.replaceState(null, '', '#' + btn.dataset.tab);
+      });
+    });
+    document.querySelectorAll('[data-tab-link]').forEach(a => {
+      a.addEventListener('click', (e) => {
+        e.preventDefault();
+        activate(a.dataset.tabLink);
+        document.getElementById('season').scrollIntoView({behavior:'smooth', block:'start'});
+      });
+    });
+    function activateFromHash() {
+      const hash = location.hash.replace('#','');
+      if (hash && document.querySelector(`.tab[data-tab="${CSS.escape(hash)}"]`)) {
+        activate(hash);
+        document.getElementById('season').scrollIntoView({behavior:'smooth', block:'start'});
+      }
+    }
+    window.addEventListener('hashchange', activateFromHash);
+    activateFromHash();
+  })();
+
+  // ── TWEAKS ────────────────────────────────────────────
+  const TWEAKS = /*EDITMODE-BEGIN*/{
+    "state": "offseason"
+  }/*EDITMODE-END*/;
+
+  (function() {
+    // Apply initial state
+    document.body.dataset.state = TWEAKS.state;
+
+    let panelEl = null;
+
+    function applyState(s) {
+      document.body.dataset.state = s;
+      window.parent.postMessage({type:'__edit_mode_set_keys', edits:{state:s}}, '*');
+      updateRadios(s);
+    }
+
+    function updateRadios(s) {
+      if (!panelEl) return;
+      panelEl.querySelectorAll('[data-state-val]').forEach(b => {
+        b.classList.toggle('is-on', b.dataset.stateVal === s);
+      });
+    }
+
+    function buildPanel() {
+      if (panelEl) return panelEl;
+      panelEl = document.createElement('div');
+      panelEl.id = 'tweaksPanel';
+      panelEl.style.cssText = `
+        position: fixed; right: 16px; bottom: 16px; z-index: 1000;
+        width: 240px;
+        background: #fff; border: 1px solid var(--line);
+        border-radius: 12px; padding: 14px;
+        box-shadow: 0 8px 32px rgba(0,0,0,.18);
+        font-family: "Rubik", sans-serif;
+      `;
+      panelEl.innerHTML = `
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+          <strong style="font-size:13px;letter-spacing:0.12em;text-transform:uppercase;color:#6b7785;">Tweaks</strong>
+          <button id="tweaksClose" style="border:none;background:transparent;cursor:pointer;color:#6b7785;font-size:18px;line-height:1;padding:2px 6px;">×</button>
+        </div>
+        <div style="font-size:12px;color:#6b7785;margin-bottom:8px;">Состояние сайта</div>
+        <div style="display:grid;grid-template-columns:1fr;gap:4px;">
+          <button data-state-val="one" class="tw-opt">1 активная гонка</button>
+          <button data-state-val="many" class="tw-opt">2–3 гонки в сезоне</button>
+          <button data-state-val="offseason" class="tw-opt">Межсезонье</button>
+        </div>
+        <style>
+          .tw-opt {
+            text-align: left;
+            padding: 8px 12px;
+            border: 1px solid #e2e6eb;
+            border-radius: 8px;
+            background: #fff;
+            color: #161a1f;
+            font-size: 13px;
+            font-family: inherit;
+            cursor: pointer;
+            transition: all .12s;
+          }
+          .tw-opt:hover { border-color: #161a1f; }
+          .tw-opt.is-on { background: #161a1f; color: #fff; border-color: #161a1f; }
+        </style>
+      `;
+      document.body.appendChild(panelEl);
+      panelEl.querySelectorAll('[data-state-val]').forEach(b => {
+        b.addEventListener('click', () => applyState(b.dataset.stateVal));
+      });
+      panelEl.querySelector('#tweaksClose').addEventListener('click', () => {
+        panelEl.style.display = 'none';
+        window.parent.postMessage({type:'__edit_mode_dismissed'}, '*');
+      });
+      updateRadios(document.body.dataset.state);
+      return panelEl;
+    }
+
+    window.addEventListener('message', (e) => {
+      const m = e.data || {};
+      if (m.type === '__activate_edit_mode') {
+        buildPanel().style.display = 'block';
+      } else if (m.type === '__deactivate_edit_mode') {
+        if (panelEl) panelEl.style.display = 'none';
+      }
+    });
+    // Announce after listener attached
+    window.parent.postMessage({type:'__edit_mode_available'}, '*');
+  })();
+</script>
+</body>
+</html>
