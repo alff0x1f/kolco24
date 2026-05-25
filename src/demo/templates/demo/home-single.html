@@ -75,17 +75,10 @@
   .nav { background: var(--dark); color: #fff; position: sticky; top: 0; z-index: 50; }
   .nav-inner {
     display: flex; align-items: center; justify-content: space-between;
-    padding: 12px 0; gap: 14px;
+    padding: 8px 0; gap: 14px;
   }
   .brand { display: flex; align-items: center; gap: 11px; color: #fff; font-weight: 500; font-size: 16px; }
-  .brand-mark {
-    width: 32px; height: 32px; border-radius: 50%;
-    border: 2px solid #fff; position: relative; flex-shrink: 0;
-  }
-  .brand-mark::after {
-    content:''; position: absolute; inset: 4px;
-    border: 2px solid #fff; border-radius: 50%;
-  }
+  .brand-logo { width: 32px; height: 32px; object-fit: contain; flex-shrink: 0; }
   .nav-burger {
     display: none; width: 38px; height: 38px;
     border: 1px solid rgba(255,255,255,.18); border-radius: 8px;
@@ -122,20 +115,14 @@
     overflow: hidden;
     background:
       linear-gradient(180deg, rgba(0,0,0,0) 30%, rgba(0,0,0,.45) 100%),
-      radial-gradient(110% 80% at 25% 15%, rgba(255,255,255,.18), transparent 55%),
-      linear-gradient(145deg, #2a3e54 0%, #3d5872 35%, #708498 70%, #a8b0a0 100%);
+      url('/static/images/backgrounds/header2024.jpg') center/cover no-repeat;
   }
-  .cover-image::before {
-    content:''; position: absolute; inset: 0;
-    background:
-      linear-gradient(110deg, transparent 55%, rgba(40,55,70,.35) 56%, transparent 58%),
-      linear-gradient(115deg, transparent 70%, rgba(60,80,95,.25) 71%, transparent 73%);
-  }
+  .cover-image::before { content: none; }
   /* В межсезонье — приглушаем кавер */
   body[data-state="offseason"] .cover-image {
     background:
       linear-gradient(180deg, rgba(0,0,0,0) 30%, rgba(0,0,0,.55) 100%),
-      linear-gradient(145deg, #2a2823 0%, #3a3830 50%, #5a5648 100%);
+      url('/static/images/backgrounds/header2024.jpg') center/cover no-repeat;
     filter: saturate(.7);
   }
   .cover-image .photo-slot {
@@ -889,7 +876,7 @@
 <header class="nav" id="siteNav">
   <div class="container nav-inner">
     <a class="brand" href="/">
-      <span class="brand-mark"></span>
+      <img class="brand-logo" src="/static/images/logo.png" alt="">
       <span>Кольцо&nbsp;24</span>
     </a>
     <button class="nav-burger" type="button" aria-label="Меню" aria-expanded="false" onclick="document.getElementById('siteNav').classList.toggle('is-open'); this.setAttribute('aria-expanded', document.getElementById('siteNav').classList.contains('is-open'));">
@@ -912,7 +899,6 @@
 <!-- ───────── COVER ───────── -->
 <div class="cover-banner">
   <div class="cover-image">
-    <div class="photo-slot">header_image · фото с одного из сезонов</div>
     <div class="cover-status">
       <span class="pill for-one">Регистрация открыта · Кольцо&nbsp;24 ·&nbsp;2026</span>
       <span class="pill for-many">3&nbsp;соревнования в&nbsp;сезоне</span>
@@ -921,13 +907,10 @@
     <div class="cover-hero">
       <div class="eyebrow">
         <span>Турклуб «Спутник»</span>
-        <span class="dot"></span>
-        <span>с&nbsp;2014 года</span>
       </div>
       <h1>Кольцо&nbsp;24</h1>
       <div class="tag">
-        Соревновательный поход выходного дня. 24-часовой пеший рогейн
-        в&nbsp;лесах Ленинградской области.
+        Соревновательный поход выходного дня. 24-часовой пеший рогейн.
       </div>
     </div>
   </div>
