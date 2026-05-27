@@ -82,14 +82,14 @@ document.addEventListener('click', function(e) {
 **Files:**
 - Create: `src/static/css/theme-2.css`
 
-- [ ] Скопировать все CSS-правила из `<style>` тега `scratch/Регистрация.html`
-- [ ] Заменить `.brand-mark` (CSS-кружок) на `.brand-logo` (стиль для `<img>`: `height: 32px; width: auto`)
-- [ ] Добавить `.nav-user`, `.nav-user-btn`, `.nav-user-menu`, `.nav-user.is-open` — dropdown для юзера
-- [ ] Добавить `.nav-user-menu a`, `.nav-user-menu button`, `.menu-divider`, `.menu-text` — элементы dropdown
-- [ ] Добавить `.footer-dark`, `.footer-dark .footer-grid`, `.footer-dark .footer-cols` — тёмный 3-колоночный footer
-- [ ] Добавить `.footer-dark h6`, `.footer-dark ul/li/a`, `.footer-dark .footer-brand`, `.footer-dark .footer-bottom`
-- [ ] Добавить responsive для `.footer-dark` (920px, 720px, 600px) + `@media print`
-- [ ] Добавить `.main-container { min-height: ... }` чтобы footer прижимался к низу
+- [x] Скопировать все CSS-правила из `<style>` тега `scratch/Регистрация.html`
+- [x] Заменить `.brand-mark` (CSS-кружок) на `.brand-logo` (стиль для `<img>`: `height: 32px; width: auto`)
+- [x] Добавить `.nav-user`, `.nav-user-btn`, `.nav-user-menu`, `.nav-user.is-open` — dropdown для юзера
+- [x] Добавить `.nav-user-menu a`, `.nav-user-menu button`, `.menu-divider`, `.menu-text` — элементы dropdown
+- [x] Добавить `.footer-dark`, `.footer-dark .footer-grid`, `.footer-dark .footer-cols` — тёмный 3-колоночный footer
+- [x] Добавить `.footer-dark h6`, `.footer-dark ul/li/a`, `.footer-dark .footer-brand`, `.footer-dark .footer-bottom`
+- [x] Добавить responsive для `.footer-dark` (920px, 720px, 600px) + `@media print`
+- [x] Добавить `.main-container { min-height: ... }` чтобы footer прижимался к низу
 
 ### Task 2: Создать base-2.html
 
