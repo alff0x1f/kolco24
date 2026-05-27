@@ -15,6 +15,10 @@ def deduplicate_emails(apps, schema_editor):
         key = user.email.lower()
         if key in seen:
             placeholder = f"dup.{user.pk}@invalid.local"
+            suffix = 0
+            while User.objects.filter(email__iexact=placeholder).exists():
+                suffix += 1
+                placeholder = f"dup.{user.pk}.{suffix}@invalid.local"
             User.objects.filter(pk=user.pk).update(email=placeholder)
         else:
             seen[key] = user.pk
