@@ -5,6 +5,7 @@ from datetime import timedelta
 from django import forms
 from django.contrib.auth.forms import PasswordResetForm, SetPasswordForm
 from django.contrib.auth.models import User
+from django.utils.safestring import mark_safe
 
 from website.models import (
     Athlet,
@@ -19,8 +20,9 @@ from website.models.race import Category, Race
 
 BUS_REGISTRATION_MAX_PASSENGERS = 20
 BREAKFAST_MAX_ATTENDEES = 20
-DUPLICATE_EMAIL_MSG = (
-    "Пользователь с таким email уже зарегистрирован. " "Войдите в существующий аккаунт."
+DUPLICATE_EMAIL_MSG = mark_safe(
+    "Пользователь с таким email уже зарегистрирован. "
+    '<a href="/login/">Войдите</a> в существующий аккаунт.'
 )
 
 

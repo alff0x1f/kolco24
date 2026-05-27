@@ -122,7 +122,7 @@
                                 <label class="check">
                                     <input type="checkbox" name="agree_privacy"{% if reg_form.agree_privacy.value %} checked{% endif %}>
                                     <span class="box"></span>
-                                    <span>Даю согласие на&nbsp;обработку персональных данных согласно <a href="{% url 'privacy_policy' %}" onclick="event.stopPropagation()">политике&nbsp;ПДн</a>.</span>
+                                    <span>Даю согласие на&nbsp;обработку персональных данных согласно <a href="{% url 'page' 'privacy_site' %}" onclick="event.stopPropagation()">политике&nbsp;ПДн</a>.</span>
                                 </label>
                                 {% if reg_form.agree_privacy.errors %}
                                 <span class="hint err">{{ reg_form.agree_privacy.errors|join:", " }}</span>
