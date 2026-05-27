@@ -211,6 +211,8 @@ class RegisterView(View):
 
                 # todo change it in 2026
                 race = Race.objects.filter(id=8).first()  # 2025
+                if race is None:
+                    return HttpResponseRedirect("/")
                 if race.reg_status == RegStatus.OPEN:
                     return HttpResponseRedirect(reverse("add_team", args=[race.slug]))
                 return HttpResponseRedirect(reverse("my_teams", args=[race.slug]))
@@ -229,6 +231,8 @@ class RegisterView(View):
 
             # todo change it in 2026
             race = Race.objects.filter(id=8).first()  # 2025
+            if race is None:
+                return HttpResponseRedirect("/")
             if race.reg_status == RegStatus.OPEN:
                 return HttpResponseRedirect(reverse("add_team", args=[race.slug]))
             return HttpResponseRedirect(reverse("my_teams", args=[race.slug]))

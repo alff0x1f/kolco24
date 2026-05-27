@@ -252,7 +252,6 @@ REG_FORM_BASE = {
 }
 
 
-@pytest.mark.django_db
 def test_reg_form_missing_agree_terms():
     from website.forms import RegForm
 
@@ -262,7 +261,6 @@ def test_reg_form_missing_agree_terms():
     assert "agree_terms" in form.errors
 
 
-@pytest.mark.django_db
 def test_reg_form_missing_agree_privacy():
     from website.forms import RegForm
 
@@ -270,6 +268,16 @@ def test_reg_form_missing_agree_privacy():
     form = RegForm(data=data)
     assert not form.is_valid()
     assert "agree_privacy" in form.errors
+
+
+@pytest.mark.django_db
+def test_reg_form_agree_news_is_optional():
+    from website.forms import RegForm
+
+    data = {k: v for k, v in REG_FORM_BASE.items() if k != "agree_news"}
+    form = RegForm(data=data)
+    # field-level validation passes without agree_news
+    assert "agree_news" not in form.errors
 
 
 @pytest.mark.django_db
