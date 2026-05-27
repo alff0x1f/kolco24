@@ -182,17 +182,11 @@ class RegForm(forms.Form):
         return request_user
 
     def clean(self):
-        # make invalid forms red:
         if self.errors:
-            for f_name in self.fields:
-                if f_name in self.errors:
-                    classes = self.fields[f_name].widget.attrs.get("class", "")
-                    classes += " is-invalid"
-                    self.fields[f_name].widget.attrs["class"] = classes
-            raise forms.ValidationError("Заполните все поля")
+            return super(RegForm, self).clean()
 
         if Team.objects.filter(
-            owner__email__iexact=self.cleaned_data["email"], year=2024
+            owner__email__iexact=self.cleaned_data["email"], year=2025
         ).exists():
             raise forms.ValidationError("Такой email уже зарегистрирован.")
         return super(RegForm, self).clean()

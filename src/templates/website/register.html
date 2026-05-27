@@ -34,8 +34,8 @@
 
                     {% if reg_form.non_field_errors %}
                     <div class="card-section" style="padding-bottom:0;">
-                        <div style="background:var(--danger-bg);border:1px solid var(--danger);border-radius:8px;padding:12px 14px;font-size:13.5px;color:var(--danger);">
-                            {{ reg_form.non_field_errors|join:", " }}
+                        <div class="alert-error">
+                            {% for error in reg_form.non_field_errors %}{{ error }}{% endfor %}
                         </div>
                     </div>
                     {% endif %}

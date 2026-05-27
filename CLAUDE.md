@@ -50,6 +50,10 @@ Django 4.2 project. Source lives entirely under `src/`, with `manage.py` at `src
 - `demo` — static HTML mockups served at `/demo/home-multiple/`, `/demo/home-offseason/`, `/demo/home-single/` for design review. No models or auth required. Templates live in `src/templates/demo/` (common templates dir), not in the app's own `templates/` folder.
 - `config` — Django project config (settings, urls, wsgi).
 
+**Template stacks**: `src/templates/website/` has two base templates. `base.html` + `src/static/css/theme.css` — Bootstrap-based, used by all pages except registration. `base-2.html` + `src/static/css/theme-2.css` — custom CSS (Rubik font, vanilla JS), used by `register.html`. New pages matching the new design should extend `base-2.html`.
+
+**Form fields in `base-2.html` pages**: Do not use `{{ form.field }}` — Django widgets emit `class="form-control"` (Bootstrap) which conflicts with `theme-2.css`. Write fields manually: `<input class="input{% if form.field.errors %} has-error{% endif %}" name="field_name" value="{{ form.field.value|default:'' }}">`, with errors shown via `{{ form.field.errors|join:", " }}` beneath each input.
+
 **Payments** integrate with four providers: VTB (OAuth), Yandex Wallet, Sberbank (phone transfer), SBP. Each has its own model (`VTBPayment`, `YandexPayment`, etc.) in `website/models/`. Credentials come from env vars — see `deploy/kolco24.env.example`.
 
 **Email** goes through `django-mailer` (`EMAIL_BACKEND = "mailer.backend.DbBackend"`): messages are queued in the DB and sent by the `kolco24_runmailer` container running `manage.py runmailer`.
