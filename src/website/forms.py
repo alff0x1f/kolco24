@@ -22,7 +22,7 @@ BUS_REGISTRATION_MAX_PASSENGERS = 20
 BREAKFAST_MAX_ATTENDEES = 20
 DUPLICATE_EMAIL_MSG = mark_safe(
     "Пользователь с таким email уже зарегистрирован. "
-    '<a href="/login/">Войдите</a> в существующий аккаунт.'
+    '<a href="/passlogin/">Войдите</a> в существующий аккаунт.'
 )
 
 
