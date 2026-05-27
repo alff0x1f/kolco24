@@ -63,7 +63,6 @@
                                         {% endif %}
                                         {% if user.is_superuser %}
                                             <a class="dropdown-item" href="/admin">Админка</a>
-                                            <a class="dropdown-item" href="/sync_googledocs">Экспортировать в googledocs</a>
                                             <a class="dropdown-item" href="{% url 'impersonate' %}">Просмотр как пользователь</a>
                                         {% endif %}
                                         {% if request.session.impersonator_id %}
