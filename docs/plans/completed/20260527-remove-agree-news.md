@@ -65,4 +65,4 @@
 
 ### Task 5: Финал
 
-- [ ] Переместить план: `mv docs/plans/20260527-remove-agree-news.md docs/plans/completed/`
+- [x] Переместить план: `mv docs/plans/20260527-remove-agree-news.md docs/plans/completed/`
