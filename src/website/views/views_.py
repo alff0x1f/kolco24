@@ -36,7 +36,6 @@ from vtb.client import VTBClient
 from website.email import send_login_email
 from website.forms import (
     BreakfastForm,
-    Export2GoogleDocsForm,
     FastLoginForm,
     ImpersonateForm,
     LoginForm,
@@ -46,13 +45,6 @@ from website.forms import (
     TeamForm,
     TeamFormAdmin,
     TransferForm,
-)
-from website.googledocs import (
-    export_payments_to_sheet,
-    export_teams,
-    export_teams_pretty,
-    import_category_from_sheet,
-    import_start_numbers_from_sheet,
 )
 from website.models import (
     Athlet,
@@ -1408,55 +1400,6 @@ def yandex_payment(request):
             raise Http404("Wrong values")
     raise Http404("File not found.")
 
-
-def import_categories(request):
-    if request.user.is_superuser:
-        count = import_category_from_sheet()
-        return HttpResponse("Updated: %s" % count)
-    else:
-        raise Http404("File not found.")
-
-
-def export_payments(request):
-    if request.user.is_superuser:
-        count = export_payments_to_sheet()
-        return HttpResponse("Updated: %s" % count)
-    else:
-        raise Http404("File not found.")
-
-
-def sync_googledocs(request):
-    if request.user.is_superuser:
-        form = Export2GoogleDocsForm(request.POST or None)
-        if request.method == "POST" and form.is_valid():
-            if form.cleaned_data["sync_type"] == "export_team":
-                if export_teams(form.googlekey):
-                    return render(
-                        request,
-                        "website/sync_googledocs.html",
-                        {"success": "export", "form": form},
-                    )
-                return HttpResponse("Export failed")
-            elif form.cleaned_data["sync_type"] == "export_team_pretty":
-                if export_teams_pretty(form.googlekey):
-                    return render(
-                        request,
-                        "website/sync_googledocs.html",
-                        {"success": "export", "form": form},
-                    )
-                return HttpResponse("Export failed")
-            elif form.cleaned_data["sync_type"] == "import_team_numbers":
-                count = import_start_numbers_from_sheet(form.googlekey)
-                return render(
-                    request,
-                    "website/sync_googledocs.html",
-                    {"success": "import", "count": count, "form": form},
-                )
-            else:
-                raise Http404("File not found.")
-        return render(request, "website/sync_googledocs.html", {"form": form})
-    else:
-        raise Http404("File not found.")
 
 
 def update_protocol(request):
