@@ -145,8 +145,8 @@ document.addEventListener('click', function(e) {
 
 ### Task 5: Финал
 
-- [ ] Закоммитить: `git add src/static/css/theme-2.css src/templates/website/base-2.html src/templates/website/register.html`
-- [ ] Переместить план: `mv docs/plans/20260527-registration-redesign.md docs/plans/completed/`
+- [x] Закоммитить: `git add src/static/css/theme-2.css src/templates/website/base-2.html src/templates/website/register.html`
+- [x] Переместить план: `mv docs/plans/20260527-registration-redesign.md docs/plans/completed/`
 
 ## Post-Completion
 
