@@ -118,20 +118,20 @@ document.addEventListener('click', function(e) {
 **Files:**
 - Modify: `src/templates/website/register.html`
 
-- [ ] Сменить `{% extends "website/base.html" %}` на `{% extends "website/base-2.html" %}`
-- [ ] Переписать `{% block content %}` полностью
-- [ ] Добавить `<div class="page"><div class="container">`
-- [ ] Хлебные крошки: `<nav class="crumbs">` — Главная / Регистрация
-- [ ] Заголовок: `<header class="page-head"><h1>Регистрация</h1><div class="sub">...</div>` + login-hint "Уже есть аккаунт? Войти →"
-- [ ] `<div class="grid">` — левая колонка форма, правая сайдбар
-- [ ] Форма `<form action="{% url 'register' %}" method="POST">{% csrf_token %}` — card с секциями
-- [ ] Секция "Аккаунт": поля Имя/Фамилия (form-grid), Email/Телефон, Пароль (с strength meter и toggle)
-- [ ] Каждое поле: кастомный `<input class="input">` с `name=` (first_name, last_name, email, phone, password), `value="{{ reg_form.X.value|default:'' }}"`, ошибки под полем
-- [ ] `reg_form.non_field_errors` — alert-блок над submit-кнопкой
-- [ ] Submit-row: кнопки "Отмена" (→ /) и "Зарегистрироваться"
-- [ ] Сайдбар: card "Зачем регистрироваться" (два why-item: Создать команду, Связь во время гонки)
-- [ ] Сайдбар: card "Нужна помощь?" с email и Telegram (из scratch)
-- [ ] `{% block footer_js_include %}`: JS для toggle пароля + strength meter (из scratch)
+- [x] Сменить `{% extends "website/base.html" %}` на `{% extends "website/base-2.html" %}`
+- [x] Переписать `{% block content %}` полностью
+- [x] Добавить `<div class="page"><div class="container">`
+- [x] Хлебные крошки: `<nav class="crumbs">` — Главная / Регистрация
+- [x] Заголовок: `<header class="page-head"><h1>Регистрация</h1><div class="sub">...</div>` + login-hint "Уже есть аккаунт? Войти →"
+- [x] `<div class="grid">` — левая колонка форма, правая сайдбар
+- [x] Форма `<form action="{% url 'register' %}" method="POST">{% csrf_token %}` — card с секциями
+- [x] Секция "Аккаунт": поля Имя/Фамилия (form-grid), Email/Телефон, Пароль (с strength meter и toggle)
+- [x] Каждое поле: кастомный `<input class="input">` с `name=` (first_name, last_name, email, phone, password), `value="{{ reg_form.X.value|default:'' }}"`, ошибки под полем
+- [x] `reg_form.non_field_errors` — alert-блок над submit-кнопкой
+- [x] Submit-row: кнопки "Отмена" (→ /) и "Зарегистрироваться"
+- [x] Сайдбар: card "Зачем регистрироваться" (два why-item: Создать команду, Связь во время гонки)
+- [x] Сайдбар: card "Нужна помощь?" с email и Telegram (из scratch)
+- [x] `{% block footer_js_include %}`: JS для toggle пароля + strength meter (из scratch)
 
 ### Task 4: Проверка
 
