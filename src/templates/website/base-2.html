@@ -42,7 +42,7 @@
                 {% if request.session.impersonator_id %}
                 <span class="nav-impersonator">Режим пользователя</span>
                 {% endif %}
-                {% if user.is_active %}
+                {% if user.is_authenticated %}
                 <div class="nav-user" id="navUser">
                     <button class="nav-user-btn" type="button" id="navUserBtn"
                         onclick="document.getElementById('navUser').classList.toggle('is-open');">

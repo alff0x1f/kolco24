@@ -252,6 +252,7 @@ REG_FORM_BASE = {
 }
 
 
+@pytest.mark.django_db
 def test_reg_form_missing_agree_terms():
     from website.forms import RegForm
 
@@ -261,6 +262,7 @@ def test_reg_form_missing_agree_terms():
     assert "agree_terms" in form.errors
 
 
+@pytest.mark.django_db
 def test_reg_form_missing_agree_privacy():
     from website.forms import RegForm
 

@@ -189,7 +189,7 @@ class RegForm(forms.Form):
         return request_user
 
     def clean(self):
-        if self.errors:
+        if "email" not in self.cleaned_data:
             return super(RegForm, self).clean()
 
         if Team.objects.filter(
