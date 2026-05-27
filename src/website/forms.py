@@ -160,9 +160,11 @@ class RegForm(forms.Form):
             while User.objects.filter(username=username).exists():
                 username = self.id_generator(12)
 
-            old_user = User.objects.filter(email__iexact=self.cleaned_data["email"])[:1]
+            old_user = User.objects.filter(
+                email__iexact=self.cleaned_data["email"]
+            ).first()
             if old_user:
-                user = old_user.get()
+                user = old_user
             else:
                 user = User.objects.create_user(username, email, password)
             user.first_name = first_name
