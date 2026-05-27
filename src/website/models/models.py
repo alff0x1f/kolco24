@@ -555,12 +555,6 @@ class Payment(models.Model):
     cost_per_person = models.FloatField(default=0)
     paid_for = models.FloatField(default=0)
     map = models.IntegerField(default=0)
-    coupon = models.ForeignKey(
-        "Coupons",
-        on_delete=models.CASCADE,
-        blank=True,
-        null=True,
-    )
     status = models.CharField(max_length=50, default="draft", choices=STATUS_CHOICES)
     sender_card_number = models.CharField(max_length=50)
     payment_date = models.DateField(null=True, blank=True)
@@ -613,19 +607,6 @@ class Athlet(models.Model):
             if 1910 < birth < settings.CURRENT_YEAR:
                 self.birth = birth
             self.save()
-
-
-class Coupons(models.Model):
-    COVER_TYPE_CHOICES = [("TEAM", "Coupon for team"), ("ATHLET", "Coupon for athlet")]
-    code = models.CharField(max_length=20)
-    expire_at = models.DateTimeField()
-    discount_sum = models.FloatField(default=0)
-    discount_persent = models.FloatField(default=0)
-    cover_type = models.CharField(
-        max_length=20, choices=COVER_TYPE_CHOICES, default="ATHLET"
-    )
-    count = models.IntegerField(default=1)
-    avail_count = models.IntegerField(default=1)
 
 
 class TakenKP(models.Model):
