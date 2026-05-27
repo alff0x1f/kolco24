@@ -22,7 +22,8 @@ class Command(BaseCommand):
         token_url = (
             "https://open.api.vtb.ru:443/passport/oauth2/token"
             if s["ENV"] == "prod"
-            else "https://auth.bankingapi.ru/auth/realms/kubernetes/protocol/openid-connect/token"
+            else "https://auth.bankingapi.ru/"
+            "auth/realms/kubernetes/protocol/openid-connect/token"
         )
         api_base = (
             "https://gw.api.vtb.ru/openapi/smb/efcp/e-commerce/v1"
