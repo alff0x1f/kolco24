@@ -61,7 +61,7 @@ class VTBClient:
         }
         headers = {"Content-Type": "application/x-www-form-urlencoded"}
         resp = self.session.post(
-            self.cfg.token_url, data=data, headers=headers, timeout=15, verify=False
+            self.cfg.token_url, data=data, headers=headers, timeout=15
         )
         resp.raise_for_status()
         j = resp.json()
@@ -113,14 +113,14 @@ class VTBClient:
 
         url = f"{self.cfg.api_base}/orders"
         r = self.session.post(
-            url, headers=self._headers(), json=payload, timeout=20, verify=False
+            url, headers=self._headers(), json=payload, timeout=20
         )
         r.raise_for_status()
         return r.json()
 
     def get_order(self, order_id: str) -> Dict[str, Any]:
         url = f"{self.cfg.api_base}/orders/{order_id}"
-        r = self.session.get(url, headers=self._headers(), timeout=15, verify=False)
+        r = self.session.get(url, headers=self._headers(), timeout=15)
         r.raise_for_status()
         return r.json()
 
@@ -148,7 +148,7 @@ class VTBClient:
 
         url = f"{self.cfg.api_base}/refunds"
         r = self.session.post(
-            url, headers=self._headers(), json=payload, timeout=20, verify=False
+            url, headers=self._headers(), json=payload, timeout=20
         )
         r.raise_for_status()
         return r.json()
