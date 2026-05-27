@@ -247,19 +247,8 @@ REG_FORM_BASE = {
     "email": "ivan@example.com",
     "phone": "+79001234567",
     "password": "secret123",
-    "agree_terms": True,
     "agree_privacy": True,
 }
-
-
-@pytest.mark.django_db
-def test_reg_form_missing_agree_terms():
-    from website.forms import RegForm
-
-    data = {**REG_FORM_BASE, "agree_terms": False}
-    form = RegForm(data=data)
-    assert not form.is_valid()
-    assert "agree_terms" in form.errors
 
 
 @pytest.mark.django_db
@@ -320,15 +309,6 @@ def test_register_view_post_duplicate_email_shows_error(client):
     assert response.status_code == 200
     assert "reg_form" in response.context
     assert response.context["reg_form"].non_field_errors()
-
-
-@pytest.mark.django_db
-def test_register_view_post_missing_agreement_shows_error(client):
-    data = {k: v for k, v in REG_FORM_BASE.items() if k != "agree_terms"}
-    response = client.post("/register/", data)
-    assert response.status_code == 200
-    assert "reg_form" in response.context
-    assert "agree_terms" in response.context["reg_form"].errors
 
 
 @pytest.mark.django_db

@@ -120,16 +120,6 @@
                         <div style="display: flex; flex-direction: column; gap: 6px;">
                             <div>
                                 <label class="check">
-                                    <input type="checkbox" name="agree_terms"{% if reg_form.agree_terms.value %} checked{% endif %}>
-                                    <span class="box"></span>
-                                    <span>Соглашаюсь с&nbsp;<a href="{% url 'rules' %}" onclick="event.stopPropagation()">правилами соревнования</a> и&nbsp;<a href="{% url 'privacy_policy' %}" onclick="event.stopPropagation()">пользовательским соглашением</a>.</span>
-                                </label>
-                                {% if reg_form.agree_terms.errors %}
-                                <span class="hint err">{{ reg_form.agree_terms.errors|join:", " }}</span>
-                                {% endif %}
-                            </div>
-                            <div>
-                                <label class="check">
                                     <input type="checkbox" name="agree_privacy"{% if reg_form.agree_privacy.value %} checked{% endif %}>
                                     <span class="box"></span>
                                     <span>Даю согласие на&nbsp;обработку персональных данных согласно <a href="{% url 'privacy_policy' %}" onclick="event.stopPropagation()">политике&nbsp;ПДн</a>.</span>

@@ -130,7 +130,6 @@ class RegForm(forms.Form):
     )
     ucount = forms.IntegerField(required=False)
     dist = forms.CharField(required=False)
-    agree_terms = forms.BooleanField(required=True)
     agree_privacy = forms.BooleanField(required=True)
 
     def __init__(self, *args, **kwargs):
@@ -138,7 +137,6 @@ class RegForm(forms.Form):
         require_agreements = kwargs.pop("require_agreements", True)
         super(RegForm, self).__init__(*args, **kwargs)
         if not require_agreements:
-            self.fields["agree_terms"].required = False
             self.fields["agree_privacy"].required = False
 
     @staticmethod

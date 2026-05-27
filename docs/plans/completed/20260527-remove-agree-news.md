@@ -66,3 +66,16 @@
 ### Task 5: Финал
 
 - [x] Переместить план: `mv docs/plans/20260527-remove-agree-news.md docs/plans/completed/`
+
+---
+
+## Дополнительное удаление: agree_terms (27.05.2026)
+
+После завершения плана был удалён ещё один лишний чекбокс — «Соглашаюсь с правилами соревнования и пользовательским соглашением» (`agree_terms`).
+
+**Что удалено:**
+- `src/website/forms.py` — поле `agree_terms = forms.BooleanField(required=True)` из `RegForm` и строка `self.fields["agree_terms"].required = False` из `__init__`
+- `src/templates/website/register.html` — блок `<div>…agree_terms…</div>` (чекбокс с меткой)
+- `src/website/tests.py` — функция `test_reg_form_missing_agree_terms`, тест `test_register_view_post_missing_agreement_shows_error`, а также `"agree_terms": True` из `REG_FORM_BASE`
+
+Миграций `agree_terms` не порождал — поле было только в форме и шаблоне.
