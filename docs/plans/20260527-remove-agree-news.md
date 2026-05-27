@@ -30,8 +30,8 @@
 - Delete: `src/website/migrations/0064_add_agree_news_to_profile.py`
 - Modify: `src/website/migrations/0065_unique_user_email.py`
 
-- [ ] Удалить файл `src/website/migrations/0064_add_agree_news_to_profile.py`
-- [ ] В `0065_unique_user_email.py` заменить зависимость `("website", "0064_add_agree_news_to_profile")` на `("website", "0063_remove_coupons")`
+- [x] Удалить файл `src/website/migrations/0064_add_agree_news_to_profile.py`
+- [x] В `0065_unique_user_email.py` заменить зависимость `("website", "0064_add_agree_news_to_profile")` на `("website", "0063_remove_coupons")`
 
 ### Task 2: Удалить поле из модели и формы
 

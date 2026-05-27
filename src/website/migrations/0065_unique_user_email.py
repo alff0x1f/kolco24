@@ -27,7 +27,7 @@ def deduplicate_emails(apps, schema_editor):
 class Migration(migrations.Migration):
 
     dependencies = [
-        ("website", "0064_add_agree_news_to_profile"),
+        ("website", "0063_remove_coupons"),
     ]
 
     operations = [
