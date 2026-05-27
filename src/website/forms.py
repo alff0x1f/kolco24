@@ -932,50 +932,6 @@ class TeamFormAdmin(forms.Form):
         return False
 
 
-class Export2GoogleDocsForm(forms.Form):
-    urladdress = forms.CharField(
-        widget=forms.TextInput(
-            attrs={
-                "class": "form-control form-control-lg",
-                "placeholder": "https://docs.google.com/spreadsheets/d/...",
-            }
-        ),
-        label="Введите адрес Таблицы Google Docs",
-    )
-    sync_type = forms.ChoiceField(
-        choices=(
-            ("export_team", "Экпортировать команды"),
-            ("export_team_pretty", "Экпортировать команды (для печати)"),
-            ("import_team_numbers", "Импорт номеров команд"),
-        ),
-        label="Синхронизировать",
-        widget=forms.Select(
-            attrs={
-                "class": "form-control form-control-lg",
-                "placeholder": "Синхронизация",
-            }
-        ),
-    )
-
-    def clean(self):
-        urladdress = self.cleaned_data["urladdress"]
-        googlekey = self.extractKeyFromUrl(urladdress)
-        if not googlekey:
-            raise forms.ValidationError(
-                "Необходимо ввести корректный адрес для экспорта"
-            )
-        else:
-            self.googlekey = googlekey
-        return self.cleaned_data
-
-    def extractKeyFromUrl(self, url):
-        if len(url) <= 40:
-            return False
-        if url[:39] == "https://docs.google.com/spreadsheets/d/":
-            url = url[39:]
-        return url.split("/")[0]
-
-
 class PageForm(forms.ModelForm):
     class Meta:
         model = Page

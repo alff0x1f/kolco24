@@ -28,11 +28,9 @@ uv run pytest                    # full suite
 uv run pytest --reuse-db         # faster iteration (reuse DB between runs)
 uv run pytest src/website/tests.py::ClassName::test_method  # single test
 
-# Linting (must pass before pushing)
-uv run ruff check src
-uv run black --check src
-uv run isort --check src
-uv run flake8 src
+# Format & lint (run before every commit)
+make format                      # auto-fix: ruff --fix, black, isort
+make lint                        # verify: ruff, black --check, isort --check, flake8
 
 # Docker build & push
 make build-push           # build + push to registry.lab.tk-sputnik.org
