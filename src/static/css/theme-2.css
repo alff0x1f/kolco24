@@ -338,6 +338,45 @@ button { font-family: inherit; }
 .strength.s3 span:nth-child(-n+3) { background: #d4a017; }
 .strength.s4 span { background: var(--success); }
 
+/* checkbox */
+.check {
+  display: grid;
+  grid-template-columns: 18px 1fr;
+  gap: 10px;
+  align-items: start;
+  font-size: 13.5px;
+  color: var(--ink-soft);
+  cursor: pointer;
+  line-height: 1.45;
+  padding: 4px 0;
+}
+.check input { position: absolute; opacity: 0; pointer-events: none; }
+.check .box {
+  width: 18px; height: 18px;
+  border: 1.5px solid #c7cdd6;
+  border-radius: 5px;
+  background: var(--paper-2);
+  position: relative;
+  transition: all .12s;
+  margin-top: 1px;
+}
+.check:hover .box { border-color: var(--primary-2); }
+.check input:checked + .box {
+  background: var(--primary-2);
+  border-color: var(--primary-2);
+}
+.check input:checked + .box::after {
+  content:''; position: absolute;
+  left: 5px; top: 1px;
+  width: 5px; height: 10px;
+  border-right: 2px solid #fff;
+  border-bottom: 2px solid #fff;
+  transform: rotate(45deg);
+}
+.check input:focus-visible + .box {
+  box-shadow: 0 0 0 3px rgba(69,130,236,.2);
+}
+
 /* submit row */
 .submit-row {
   display: flex; align-items: center; justify-content: space-between;

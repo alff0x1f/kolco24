@@ -38,8 +38,8 @@
 **Files:**
 - Modify: `src/static/css/theme-2.css`
 
-- [ ] Добавить стили `.check`, `.check input`, `.check .box`, `.check:hover .box`, `.check input:checked + .box`, `.check input:checked + .box::after`, `.check input:focus-visible + .box` из `scratch/Регистрация.html` (строки 304–341)
-- [ ] Убедиться, что стили добавлены в правильном месте (рядом с секцией формы)
+- [x] Добавить стили `.check`, `.check input`, `.check .box`, `.check:hover .box`, `.check input:checked + .box`, `.check input:checked + .box::after`, `.check input:focus-visible + .box` из `scratch/Регистрация.html` (строки 304–341)
+- [x] Убедиться, что стили добавлены в правильном месте (рядом с секцией формы)
 
 ### Task 2: Добавить поля согласий в RegForm
 
