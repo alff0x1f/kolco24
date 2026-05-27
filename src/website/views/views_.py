@@ -196,7 +196,6 @@ class RegisterView(View):
             email = form.cleaned_data["email"]
             phone = form.cleaned_data["phone"]
             password = form.cleaned_data["password"]
-            agree_news = form.cleaned_data.get("agree_news", False)
 
             username = f"{last_name}, {first_name}"
             if User.objects.filter(username=username).exists():
@@ -208,7 +207,6 @@ class RegisterView(View):
                     user.first_name = first_name
                     user.last_name = last_name
                     user.profile.phone = phone
-                    user.profile.agree_news = agree_news
                     user.save(update_fields=("first_name", "last_name"))
             except IntegrityError:
                 if User.objects.filter(email__iexact=email).exists():

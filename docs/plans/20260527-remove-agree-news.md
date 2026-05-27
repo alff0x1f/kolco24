@@ -50,9 +50,9 @@
 - Modify: `src/website/views/views_.py`
 - Modify: `src/templates/website/register.html`
 
-- [ ] Удалить `agree_news = form.cleaned_data.get("agree_news", False)` (строка ~199) из вьюхи
-- [ ] Удалить `user.profile.agree_news = agree_news` (строка ~211) из вьюхи
-- [ ] Удалить блок `<div>…agree_news…</div>` (строки 141–148) из `register.html`
+- [x] Удалить `agree_news = form.cleaned_data.get("agree_news", False)` (строка ~199) из вьюхи
+- [x] Удалить `user.profile.agree_news = agree_news` (строка ~211) из вьюхи
+- [x] Удалить блок `<div>…agree_news…</div>` (строки 141–148) из `register.html`
 
 ### Task 4: Удалить тест и проверить
 
