@@ -112,9 +112,7 @@ class VTBClient:
             payload["additionalinfo"] = additionalinfo
 
         url = f"{self.cfg.api_base}/orders"
-        r = self.session.post(
-            url, headers=self._headers(), json=payload, timeout=20
-        )
+        r = self.session.post(url, headers=self._headers(), json=payload, timeout=20)
         r.raise_for_status()
         return r.json()
 
@@ -147,8 +145,6 @@ class VTBClient:
             payload["additionalinfo"] = additionalinfo
 
         url = f"{self.cfg.api_base}/refunds"
-        r = self.session.post(
-            url, headers=self._headers(), json=payload, timeout=20
-        )
+        r = self.session.post(url, headers=self._headers(), json=payload, timeout=20)
         r.raise_for_status()
         return r.json()
