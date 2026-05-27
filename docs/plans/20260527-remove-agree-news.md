@@ -39,10 +39,10 @@
 - Modify: `src/website/models/models.py`
 - Modify: `src/website/forms.py`
 
-- [ ] Удалить `agree_news = models.BooleanField(default=False)` из `Profile` в `models.py`
-- [ ] Удалить `agree_news = forms.BooleanField(required=False)` из `RegForm` в `forms.py`
-- [ ] Удалить строку `self.fields["agree_news"].required = ...` если есть (нет — пропустить)
-- [ ] Удалить строку сохранения `user.profile.agree_news = self.cleaned_data.get("agree_news", False)` из `RegForm.save()`
+- [x] Удалить `agree_news = models.BooleanField(default=False)` из `Profile` в `models.py`
+- [x] Удалить `agree_news = forms.BooleanField(required=False)` из `RegForm` в `forms.py`
+- [x] Удалить строку `self.fields["agree_news"].required = ...` если есть (нет — пропустить)
+- [x] Удалить строку сохранения `user.profile.agree_news = self.cleaned_data.get("agree_news", False)` из `RegForm.save()`
 
 ### Task 3: Удалить из вьюхи и шаблона
 

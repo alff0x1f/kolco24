@@ -129,7 +129,6 @@ class RegForm(forms.Form):
     dist = forms.CharField(required=False)
     agree_terms = forms.BooleanField(required=True)
     agree_privacy = forms.BooleanField(required=True)
-    agree_news = forms.BooleanField(required=False)
 
     def __init__(self, *args, **kwargs):
         self.user = kwargs.pop("user", None)
@@ -164,7 +163,6 @@ class RegForm(forms.Form):
             user.first_name = first_name
             user.last_name = last_name
             user.profile.phone = phone
-            user.profile.agree_news = self.cleaned_data.get("agree_news", False)
             user.save()
 
             if ucount == 1:
