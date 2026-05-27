@@ -932,8 +932,6 @@ class TeamFormAdmin(forms.Form):
         return False
 
 
-
-
 class PageForm(forms.ModelForm):
     class Meta:
         model = Page

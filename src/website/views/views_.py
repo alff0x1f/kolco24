@@ -1401,7 +1401,6 @@ def yandex_payment(request):
     raise Http404("File not found.")
 
 
-
 def update_protocol(request):
     if not request.user.is_staff:
         raise Http404("File not found.")
