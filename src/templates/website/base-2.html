@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="ru">
+<head>
+    <meta charset="utf-8">
+    <title>{% block title %}Кольцо 24{% endblock %}</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="{% block head_descr %}Cоревнования по пешеходному туризму, рогейн КОЛЬЦО 24{% endblock %}">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="/static/css/theme-2.css" rel="stylesheet" type="text/css">
+    <link href="/static/favicon.ico" rel="shortcut icon" type="image/png">
+    <meta name="author" content="Турклуб Спутник">
+    <meta property="article:author" content="Турклуб Спутник">
+    <meta property="article:section" content="Туризм">
+    <meta property="og:title" content="{% block og_title %}Кольцо 24{% endblock %}">
+    <meta property="og:type" content="website">
+    <meta property="og:description" content="{% block og_description %}Cоревнования по пешеходному туризму в дисциплине рогейн{% endblock %}">
+    <meta property="og:image" content="https://kolco24.ru/static/images/backgrounds/header2024.jpg">
+    <meta property="og:url" content="https://kolco24.ru">
+    <meta property="og:site_name" content="Кольцо 24">
+    {% block extra_head %}{% endblock %}
+</head>
+<body>
+{% block navbar %}
+<header class="nav" id="siteNav">
+    <div class="container nav-inner">
+        <a class="brand" href="/">
+            <img src="/static/images/logo.png" class="brand-logo" alt="Кольцо 24">
+            <span>Кольцо&nbsp;24</span>
+        </a>
+        <button class="nav-burger" type="button" aria-label="Меню" aria-expanded="false"
+            onclick="document.getElementById('siteNav').classList.toggle('is-open'); this.setAttribute('aria-expanded', document.getElementById('siteNav').classList.contains('is-open'));">
+            <span></span><span></span><span></span>
+        </button>
+        <div class="nav-menu">
+            <ul class="nav-links">
+                <li><a href="/page/rules/">Правила</a></li>
+                <li><a href="{% url 'all_teams' 'kolco24_2025' %}">Команды</a></li>
+            </ul>
+            <div class="nav-actions">
+                {% if request.session.impersonator_id %}
+                <span class="nav-impersonator">Режим пользователя</span>
+                {% endif %}
+                {% if user.is_active %}
+                <div class="nav-user" id="navUser">
+                    <button class="nav-user-btn" type="button" id="navUserBtn"
+                        onclick="document.getElementById('navUser').classList.toggle('is-open');">
+                        {{ user.last_name }} {{ user.first_name }}
+                        <span class="chevron"></span>
+                    </button>
+                    <div class="nav-user-menu">
+                        {% if request.user.is_staff %}
+                        <a href="/upload_protocol">Загрузить данные</a>
+                        <a href="/update_protocol">Скачать протокол</a>
+                        <div class="menu-divider"></div>
+                        {% endif %}
+                        {% if user.is_superuser %}
+                        <a href="/admin">Админка</a>
+                        <a href="{% url 'impersonate' %}">Просмотр как пользователь</a>
+                        <div class="menu-divider"></div>
+                        {% endif %}
+                        {% if request.session.impersonator_id %}
+                        <span class="menu-text">Включён режим пользователя</span>
+                        <a href="{% url 'stop_impersonate' %}">Вернуться к администратору</a>
+                        <div class="menu-divider"></div>
+                        {% endif %}
+                        <form action="/logout/" method="POST" id="logoutForm">
+                            <input type="hidden" name="logout" value="logout">
+                            {% csrf_token %}
+                        </form>
+                        <button type="button" onclick="document.getElementById('logoutForm').submit();">Выход</button>
+                    </div>
+                </div>
+                {% else %}
+                <a class="login" href="{% url 'passlogin' %}">Войти</a>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</header>
+{% endblock %}
+
+<div class="main-container">
+    {% block content %}{% endblock %}
+
+    {% block footer_menu %}
+    <footer class="footer-dark d-print-none">
+        <div class="container">
+            <div class="footer-grid">
+                <div>
+                    <h6>Навигация</h6>
+                    <ul>
+                        <li><a href="/">Главная</a></li>
+                        <li><a href="{% url 'passlogin' %}">Вход</a></li>
+                        <li><a href="https://vk.com/kolco24" target="_blank">Группа в ВК</a></li>
+                        <li><a href="https://vk.com/kolco24y2020" target="_blank">Кольцо-24 2020</a></li>
+                        <li><a href="https://vk.com/kolco24y2019" target="_blank">Кольцо-24 2019</a></li>
+                        <li><a href="https://vk.com/kolco24y2018" target="_blank">Кольцо-24 2018</a></li>
+                        <li><a href="https://vk.com/kolco242017" target="_blank">Кольцо-24 2017</a></li>
+                        <li><a href="https://vk.com/kolco242016" target="_blank">Кольцо-24 2016</a></li>
+                        <li><a href="https://vk.com/kolco242015" target="_blank">Кольцо-24 2015</a></li>
+                    </ul>
+                </div>
+                <div>
+                    <h6>Информация и документы</h6>
+                    <ul>
+                        {% load cache menu_tags %}
+                        {% cache 3600 "footer_menu" %}
+                        {% footer_menu %}
+                        {% endcache %}
+                    </ul>
+                </div>
+                <div>
+                    <h6>Сообщество и друзья</h6>
+                    <ul>
+                        <li>Email: <a href="mailto:org@kolco24.ru">org@kolco24.ru</a></li>
+                        <li><a href="https://tk-sputnik.org/" target="_blank">ТК Спутник</a> <a href="https://vk.com/tksputnik" target="_blank">(Группа в VK)</a></li>
+                        <li><a href="https://vk.com/mountain_sputnik" target="_blank">Школа горного туризма</a></li>
+                        <li><a href="https://vk.com/velo_sputnik" target="_blank">Школа велотуризма</a></li>
+                    </ul>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                <span>© 2015–2026 Турклуб «Спутник» · Кольцо&nbsp;24</span>
+                <div class="footer-links">
+                    <a href="mailto:org@kolco24.ru">org@kolco24.ru</a>
+                    <a href="https://vk.com/kolco24" target="_blank">vk.com/kolco24</a>
+                </div>
+            </div>
+        </div>
+    </footer>
+    {% endblock %}
+</div>
+
+<script>
+    document.addEventListener('click', function(e) {
+        var m = document.getElementById('navUser');
+        if (m && !m.contains(e.target)) m.classList.remove('is-open');
+    });
+</script>
+{% block footer_js_include %}{% endblock %}
+</body>
+</html>

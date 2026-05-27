@@ -96,22 +96,22 @@ document.addEventListener('click', function(e) {
 **Files:**
 - Create: `src/templates/website/base-2.html`
 
-- [ ] `<head>`: charset, viewport, title-block, description-block, Rubik от Google Fonts, theme-2.css, favicon, OG-мета-теги (как в base.html)
-- [ ] `{% block extra_head %}` в `<head>`
-- [ ] `{% block navbar %}`: `<header class="nav" id="siteNav">` с burger-кнопкой (inline onclick toggle)
-- [ ] В nav: `<img src="/static/images/logo.png" class="brand-logo">` + текст "Кольцо 24"
-- [ ] Nav-ссылки: Правила `/page/rules/`, Команды `{% url 'all_teams' 'kolco24_2025' %}`
-- [ ] Nav auth: `{% if user.is_active %}` → `.nav-user` dropdown с `{{ user.last_name }} {{ user.first_name }}`, staff-ссылки, superuser-ссылки, impersonate, logout-форма; `{% else %}` → ссылка "Войти" `{% url 'passlogin' %}`
-- [ ] Impersonator warning: `{% if request.session.impersonator_id %}` → предупреждение в nav
-- [ ] `<div class="main-container">{% block content %}{% endblock %}</div>`
-- [ ] `{% block footer_menu %}`: `<footer class="footer-dark d-print-none">` с 3 колонками
-- [ ] Footer col 1 "Навигация": те же ссылки что в base.html (Главная, Вход, VK-архивы)
-- [ ] Footer col 2 "Информация и документы": `{% load cache menu_tags %}{% cache 3600 "footer_menu" %}{% footer_menu %}{% endcache %}`
-- [ ] Footer col 3 "Сообщество и друзья": email, ТК Спутник, Школы (как в base.html)
-- [ ] Footer `.footer-bottom`: копирайт + email + VK-ссылка
-- [ ] `{% endblock %}` для footer_menu
-- [ ] Inline `<script>` для закрытия nav-user dropdown по клику вне него
-- [ ] `{% block footer_js_include %}{% endblock %}`
+- [x] `<head>`: charset, viewport, title-block, description-block, Rubik от Google Fonts, theme-2.css, favicon, OG-мета-теги (как в base.html)
+- [x] `{% block extra_head %}` в `<head>`
+- [x] `{% block navbar %}`: `<header class="nav" id="siteNav">` с burger-кнопкой (inline onclick toggle)
+- [x] В nav: `<img src="/static/images/logo.png" class="brand-logo">` + текст "Кольцо 24"
+- [x] Nav-ссылки: Правила `/page/rules/`, Команды `{% url 'all_teams' 'kolco24_2025' %}`
+- [x] Nav auth: `{% if user.is_active %}` → `.nav-user` dropdown с `{{ user.last_name }} {{ user.first_name }}`, staff-ссылки, superuser-ссылки, impersonate, logout-форма; `{% else %}` → ссылка "Войти" `{% url 'passlogin' %}`
+- [x] Impersonator warning: `{% if request.session.impersonator_id %}` → предупреждение в nav
+- [x] `<div class="main-container">{% block content %}{% endblock %}</div>`
+- [x] `{% block footer_menu %}`: `<footer class="footer-dark d-print-none">` с 3 колонками
+- [x] Footer col 1 "Навигация": те же ссылки что в base.html (Главная, Вход, VK-архивы)
+- [x] Footer col 2 "Информация и документы": `{% load cache menu_tags %}{% cache 3600 "footer_menu" %}{% footer_menu %}{% endcache %}`
+- [x] Footer col 3 "Сообщество и друзья": email, ТК Спутник, Школы (как в base.html)
+- [x] Footer `.footer-bottom`: копирайт + email + VK-ссылка
+- [x] `{% endblock %}` для footer_menu
+- [x] Inline `<script>` для закрытия nav-user dropdown по клику вне него
+- [x] `{% block footer_js_include %}{% endblock %}`
 
 ### Task 3: Обновить register.html
 
