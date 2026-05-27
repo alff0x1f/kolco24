@@ -133,7 +133,11 @@ class RegForm(forms.Form):
 
     def __init__(self, *args, **kwargs):
         self.user = kwargs.pop("user", None)
+        require_agreements = kwargs.pop("require_agreements", True)
         super(RegForm, self).__init__(*args, **kwargs)
+        if not require_agreements:
+            self.fields["agree_terms"].required = False
+            self.fields["agree_privacy"].required = False
 
     @staticmethod
     def id_generator(

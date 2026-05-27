@@ -140,7 +140,7 @@ class IndexView(View):
         return render(request, "website/index.html", contex)
 
     def post(self, request):
-        reg_form = RegForm(request.POST, user=request.user)
+        reg_form = RegForm(request.POST, user=request.user, require_agreements=False)
         if reg_form.is_valid():
             user = reg_form.reg_user(request.user)
             auth_login(request, user)
