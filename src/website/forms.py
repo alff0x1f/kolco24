@@ -19,6 +19,9 @@ from website.models.race import Category, Race
 
 BUS_REGISTRATION_MAX_PASSENGERS = 20
 BREAKFAST_MAX_ATTENDEES = 20
+DUPLICATE_EMAIL_MSG = (
+    "Пользователь с таким email уже зарегистрирован. " "Войдите в существующий аккаунт."
+)
 
 
 class LoginForm(forms.Form):
@@ -191,10 +194,7 @@ class RegForm(forms.Form):
         if self.user and self.user.is_authenticated:
             qs = qs.exclude(pk=self.user.pk)
         if qs.exists():
-            raise forms.ValidationError(
-                "Пользователь с таким email уже зарегистрирован. "
-                "Войдите в существующий аккаунт."
-            )
+            raise forms.ValidationError(DUPLICATE_EMAIL_MSG)
         return super(RegForm, self).clean()
 
 

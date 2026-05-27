@@ -36,6 +36,7 @@ from openpyxl import load_workbook
 from vtb.client import VTBClient
 from website.email import send_login_email
 from website.forms import (
+    DUPLICATE_EMAIL_MSG,
     BreakfastForm,
     FastLoginForm,
     ImpersonateForm,
@@ -146,11 +147,7 @@ class IndexView(View):
             try:
                 user = reg_form.reg_user(request.user)
             except IntegrityError:
-                reg_form.add_error(
-                    "email",
-                    "Пользователь с таким email уже зарегистрирован. "
-                    "Войдите в существующий аккаунт.",
-                )
+                reg_form.add_error("email", DUPLICATE_EMAIL_MSG)
             else:
                 auth_login(request, user)
                 return HttpResponseRedirect("/team")
@@ -210,11 +207,7 @@ class RegisterView(View):
                     user.save(update_fields=("first_name", "last_name"))
             except IntegrityError:
                 if User.objects.filter(email__iexact=email).exists():
-                    form.add_error(
-                        "email",
-                        "Пользователь с таким email уже зарегистрирован. "
-                        "Войдите в существующий аккаунт.",
-                    )
+                    form.add_error("email", DUPLICATE_EMAIL_MSG)
                     return render(request, "website/register.html", {"reg_form": form})
                 raise
 

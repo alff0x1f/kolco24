@@ -54,6 +54,8 @@ Django 4.2 project. Source lives entirely under `src/`, with `manage.py` at `src
 
 **Form fields in `base-2.html` pages**: Do not use `{{ form.field }}` — Django widgets emit `class="form-control"` (Bootstrap) which conflicts with `theme-2.css`. Write fields manually: `<input class="input{% if form.field.errors %} has-error{% endif %}" name="field_name" value="{{ form.field.value|default:'' }}">`, with errors shown via `{{ form.field.errors|join:", " }}` beneath each input.
 
+**Email uniqueness**: `auth_user.email` has a case-insensitive unique index (migration `0065_unique_user_email`). Registration views wrap `User.objects.create_user` in `transaction.atomic()` and catch `IntegrityError` to surface a field error on `email`. `EmailBackend` catches `MultipleObjectsReturned` defensively. Any code that creates users must handle `IntegrityError` from this constraint.
+
 **Payments** integrate with four providers: VTB (OAuth), Yandex Wallet, Sberbank (phone transfer), SBP. Each has its own model (`VTBPayment`, `YandexPayment`, etc.) in `website/models/`. Credentials come from env vars — see `deploy/kolco24.env.example`.
 
 **Email** goes through `django-mailer` (`EMAIL_BACKEND = "mailer.backend.DbBackend"`): messages are queued in the DB and sent by the `kolco24_runmailer` container running `manage.py runmailer`.
