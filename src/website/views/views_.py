@@ -14,6 +14,7 @@ from django.contrib.auth import logout
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.contrib.auth.models import User
 from django.core.files.storage import FileSystemStorage
+from django.db import IntegrityError, transaction
 from django.db.models import Count, OuterRef, Subquery, Sum
 from django.http import (
     Http404,
@@ -142,9 +143,17 @@ class IndexView(View):
     def post(self, request):
         reg_form = RegForm(request.POST, user=request.user, require_agreements=False)
         if reg_form.is_valid():
-            user = reg_form.reg_user(request.user)
-            auth_login(request, user)
-            return HttpResponseRedirect("/team")
+            try:
+                user = reg_form.reg_user(request.user)
+            except IntegrityError:
+                reg_form.add_error(
+                    "email",
+                    "Пользователь с таким email уже зарегистрирован. "
+                    "Войдите в существующий аккаунт.",
+                )
+            else:
+                auth_login(request, user)
+                return HttpResponseRedirect("/team")
 
         contex = self.get_context()
         contex["reg_form"] = reg_form
@@ -187,45 +196,29 @@ class RegisterView(View):
             email = form.cleaned_data["email"]
             phone = form.cleaned_data["phone"]
             password = form.cleaned_data["password"]
-
-            # Check if user already exists
-            if User.objects.filter(email__iexact=email).exists():
-                # update
-                if Team.objects.filter(
-                    owner__email__iexact=form.cleaned_data["email"], year=2025
-                ).exists():
-                    # по идее эта проверка лишняя, тк аналогичная есть is_valid,
-                    # но на всякий случай (рефактора)
-                    form.add_error(
-                        None, "Пользователь с таким email уже зарегистрирован"
-                    )
-                    return render(request, "website/register.html", {"reg_form": form})
-
-                user = User.objects.get(email__iexact=email)
-                user.first_name = first_name
-                user.last_name = last_name
-                user.profile.phone = phone
-                user.set_password(password)
-                user.save()
-                auth_login(request, user)
-
-                # todo change it in 2026
-                race = Race.objects.filter(id=8).first()  # 2025
-                if race is None:
-                    return HttpResponseRedirect("/")
-                if race.reg_status == RegStatus.OPEN:
-                    return HttpResponseRedirect(reverse("add_team", args=[race.slug]))
-                return HttpResponseRedirect(reverse("my_teams", args=[race.slug]))
+            agree_news = form.cleaned_data.get("agree_news", False)
 
             username = f"{last_name}, {first_name}"
             if User.objects.filter(username=username).exists():
                 username = self.get_next_username(first_name, last_name)
 
-            user = User.objects.create_user(username, email, password)
-            user.first_name = first_name
-            user.last_name = last_name
-            user.profile.phone = phone
-            user.save(update_fields=("first_name", "last_name"))
+            try:
+                with transaction.atomic():
+                    user = User.objects.create_user(username, email, password)
+                    user.first_name = first_name
+                    user.last_name = last_name
+                    user.profile.phone = phone
+                    user.profile.agree_news = agree_news
+                    user.save(update_fields=("first_name", "last_name"))
+            except IntegrityError:
+                if User.objects.filter(email__iexact=email).exists():
+                    form.add_error(
+                        "email",
+                        "Пользователь с таким email уже зарегистрирован. "
+                        "Войдите в существующий аккаунт.",
+                    )
+                    return render(request, "website/register.html", {"reg_form": form})
+                raise
 
             auth_login(request, user)
 

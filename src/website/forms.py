@@ -160,13 +160,7 @@ class RegForm(forms.Form):
             while User.objects.filter(username=username).exists():
                 username = self.id_generator(12)
 
-            old_user = User.objects.filter(
-                email__iexact=self.cleaned_data["email"]
-            ).first()
-            if old_user:
-                user = old_user
-            else:
-                user = User.objects.create_user(username, email, password)
+            user = User.objects.create_user(username, email, password)
             user.first_name = first_name
             user.last_name = last_name
             user.profile.phone = phone
@@ -194,10 +188,14 @@ class RegForm(forms.Form):
         if "email" not in self.cleaned_data:
             return super(RegForm, self).clean()
 
-        if Team.objects.filter(
-            owner__email__iexact=self.cleaned_data["email"], year=2025
-        ).exists():
-            raise forms.ValidationError("Такой email уже зарегистрирован.")
+        qs = User.objects.filter(email__iexact=self.cleaned_data["email"])
+        if self.user and self.user.is_authenticated:
+            qs = qs.exclude(pk=self.user.pk)
+        if qs.exists():
+            raise forms.ValidationError(
+                "Пользователь с таким email уже зарегистрирован. "
+                "Войдите в существующий аккаунт."
+            )
         return super(RegForm, self).clean()
 
 

@@ -15,6 +15,7 @@ logger = logging.getLogger(__name__)
 class Profile(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE)
     phone = models.TextField(max_length=500, blank=True)
+    agree_news = models.BooleanField(default=False)
 
 
 class Transfer(models.Model):

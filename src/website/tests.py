@@ -291,6 +291,18 @@ def test_reg_form_all_required_fields_valid():
 
 
 @pytest.mark.django_db
+def test_reg_form_rejects_existing_email():
+    from website.forms import RegForm
+
+    User.objects.create_user(
+        username="existing", email="ivan@example.com", password="x"
+    )
+    form = RegForm(data=REG_FORM_BASE)
+    assert not form.is_valid()
+    assert form.non_field_errors()
+
+
+@pytest.mark.django_db
 def test_race_news_view_shows_form_for_admin(client):
     from website.models.race import RaceAdmin
 

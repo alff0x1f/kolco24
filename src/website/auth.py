@@ -13,8 +13,8 @@ class EmailBackend(ModelBackend):
 
         # Try to fetch the user by email
         try:
-            user = UserModel.objects.get(email=username)
-        except UserModel.DoesNotExist:
+            user = UserModel.objects.get(email__iexact=username)
+        except (UserModel.DoesNotExist, UserModel.MultipleObjectsReturned):
             return None
 
         # If user is found, check if the password is correct
