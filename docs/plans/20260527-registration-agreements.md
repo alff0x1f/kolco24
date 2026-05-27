@@ -58,11 +58,11 @@
 **Files:**
 - Modify: `src/templates/website/register.html`
 
-- [ ] Вставить `<div class="card-section">` с заголовком «Согласия» между секцией «Аккаунт» и `submit-row`
-- [ ] Добавить три чекбокса с классом `.check` (custom styling)
-- [ ] `agree_terms`: `<input type="checkbox" name="agree_terms">` + текст со ссылками на `{% url 'rules' %}` и `{% url 'privacy_policy' %}` + вывод ошибок `{{ reg_form.agree_terms.errors|join:", " }}`
-- [ ] `agree_privacy`: `<input type="checkbox" name="agree_privacy">` + текст со ссылкой `{% url 'privacy_policy' %}` + вывод ошибок `{{ reg_form.agree_privacy.errors|join:", " }}`
-- [ ] `agree_news`: `<input type="checkbox" name="agree_news">` + текст (без ошибок — не обязательный)
+- [x] Вставить `<div class="card-section">` с заголовком «Согласия» между секцией «Аккаунт» и `submit-row`
+- [x] Добавить три чекбокса с классом `.check` (custom styling)
+- [x] `agree_terms`: `<input type="checkbox" name="agree_terms">` + текст со ссылками на `{% url 'rules' %}` и `{% url 'privacy_policy' %}` + вывод ошибок `{{ reg_form.agree_terms.errors|join:", " }}`
+- [x] `agree_privacy`: `<input type="checkbox" name="agree_privacy">` + текст со ссылкой `{% url 'privacy_policy' %}` + вывод ошибок `{{ reg_form.agree_privacy.errors|join:", " }}`
+- [x] `agree_news`: `<input type="checkbox" name="agree_news">` + текст (без ошибок — не обязательный)
 
 ### Task 4: Проверка
 

@@ -113,6 +113,41 @@
                         </div>
                     </div>
 
+                    <div class="card-section">
+                        <div class="card-section-head">
+                            <h2>Согласия</h2>
+                        </div>
+                        <div style="display: flex; flex-direction: column; gap: 6px;">
+                            <div>
+                                <label class="check">
+                                    <input type="checkbox" name="agree_terms"{% if reg_form.agree_terms.value %} checked{% endif %}>
+                                    <span class="box"></span>
+                                    <span>Соглашаюсь с&nbsp;<a href="{% url 'rules' %}">правилами соревнования</a> и&nbsp;<a href="{% url 'privacy_policy' %}">пользовательским соглашением</a>.</span>
+                                </label>
+                                {% if reg_form.agree_terms.errors %}
+                                <span class="hint err">{{ reg_form.agree_terms.errors|join:", " }}</span>
+                                {% endif %}
+                            </div>
+                            <div>
+                                <label class="check">
+                                    <input type="checkbox" name="agree_privacy"{% if reg_form.agree_privacy.value %} checked{% endif %}>
+                                    <span class="box"></span>
+                                    <span>Даю согласие на&nbsp;обработку персональных данных согласно <a href="{% url 'privacy_policy' %}">политике&nbsp;ПДн</a>.</span>
+                                </label>
+                                {% if reg_form.agree_privacy.errors %}
+                                <span class="hint err">{{ reg_form.agree_privacy.errors|join:", " }}</span>
+                                {% endif %}
+                            </div>
+                            <div>
+                                <label class="check">
+                                    <input type="checkbox" name="agree_news"{% if reg_form.agree_news.value %} checked{% endif %}>
+                                    <span class="box"></span>
+                                    <span>Получать новости о&nbsp;следующих гонках на&nbsp;e-mail&nbsp;— не&nbsp;чаще раза в&nbsp;месяц.</span>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+
                     <div class="submit-row">
                         <div class="actions">
                             <a class="btn btn-ghost" href="/">Отмена</a>
