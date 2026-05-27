@@ -59,9 +59,9 @@
 **Files:**
 - Modify: `src/website/tests.py`
 
-- [ ] Удалить функцию `test_reg_form_agree_news_is_optional` (строки 275–282) из `tests.py`
-- [ ] `make format && make lint` — без ошибок
-- [ ] `uv run pytest --reuse-db` — все тесты проходят
+- [x] Удалить функцию `test_reg_form_agree_news_is_optional` (строки 275–282) из `tests.py`
+- [x] `make format && make lint` — без ошибок
+- [x] `uv run pytest --reuse-db` — все тесты проходят
 
 ### Task 5: Финал
 
