@@ -164,6 +164,7 @@ class RegForm(forms.Form):
             user.first_name = first_name
             user.last_name = last_name
             user.profile.phone = phone
+            user.profile.agree_news = self.cleaned_data.get("agree_news", False)
             user.save()
 
             if ucount == 1:
