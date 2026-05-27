@@ -46,12 +46,12 @@
 **Files:**
 - Modify: `src/website/forms.py`
 
-- [ ] Добавить `agree_terms = forms.BooleanField(required=True)` в `RegForm`
-- [ ] Добавить `agree_privacy = forms.BooleanField(required=True)` в `RegForm`
-- [ ] Добавить `agree_news = forms.BooleanField(required=False)` в `RegForm`
-- [ ] Написать тесты для `RegForm`: submit с незаполненными `agree_terms`/`agree_privacy` возвращает ошибки
-- [ ] Написать тест: submit со всеми заполненными полями проходит валидацию
-- [ ] Запустить `uv run pytest --reuse-db` — все тесты проходят
+- [x] Добавить `agree_terms = forms.BooleanField(required=True)` в `RegForm`
+- [x] Добавить `agree_privacy = forms.BooleanField(required=True)` в `RegForm`
+- [x] Добавить `agree_news = forms.BooleanField(required=False)` в `RegForm`
+- [x] Написать тесты для `RegForm`: submit с незаполненными `agree_terms`/`agree_privacy` возвращает ошибки
+- [x] Написать тест: submit со всеми заполненными полями проходит валидацию
+- [x] Запустить `uv run pytest --reuse-db` — все тесты проходят
 
 ### Task 3: Добавить секцию «Согласия» в register.html
 

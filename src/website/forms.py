@@ -127,6 +127,9 @@ class RegForm(forms.Form):
     )
     ucount = forms.IntegerField(required=False)
     dist = forms.CharField(required=False)
+    agree_terms = forms.BooleanField(required=True)
+    agree_privacy = forms.BooleanField(required=True)
+    agree_news = forms.BooleanField(required=False)
 
     def __init__(self, *args, **kwargs):
         self.user = kwargs.pop("user", None)

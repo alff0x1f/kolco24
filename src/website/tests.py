@@ -241,6 +241,45 @@ def test_add_post_non_admin_user(client):
     assert response.status_code == 403
 
 
+REG_FORM_BASE = {
+    "first_name": "Иван",
+    "last_name": "Иванов",
+    "email": "ivan@example.com",
+    "phone": "+79001234567",
+    "password": "secret123",
+    "agree_terms": True,
+    "agree_privacy": True,
+}
+
+
+@pytest.mark.django_db
+def test_reg_form_missing_agree_terms():
+    from website.forms import RegForm
+
+    data = {**REG_FORM_BASE, "agree_terms": False}
+    form = RegForm(data=data)
+    assert not form.is_valid()
+    assert "agree_terms" in form.errors
+
+
+@pytest.mark.django_db
+def test_reg_form_missing_agree_privacy():
+    from website.forms import RegForm
+
+    data = {**REG_FORM_BASE, "agree_privacy": False}
+    form = RegForm(data=data)
+    assert not form.is_valid()
+    assert "agree_privacy" in form.errors
+
+
+@pytest.mark.django_db
+def test_reg_form_all_required_fields_valid():
+    from website.forms import RegForm
+
+    form = RegForm(data=REG_FORM_BASE)
+    assert form.is_valid(), form.errors
+
+
 @pytest.mark.django_db
 def test_race_news_view_shows_form_for_admin(client):
     from website.models.race import RaceAdmin
