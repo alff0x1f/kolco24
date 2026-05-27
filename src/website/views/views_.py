@@ -189,7 +189,7 @@ class RegisterView(View):
             password = form.cleaned_data["password"]
 
             # Check if user already exists
-            if User.objects.filter(email=email).exists():
+            if User.objects.filter(email__iexact=email).exists():
                 # update
                 if Team.objects.filter(
                     owner__email__iexact=form.cleaned_data["email"], year=2025
@@ -201,7 +201,7 @@ class RegisterView(View):
                     )
                     return render(request, "website/register.html", {"reg_form": form})
 
-                user = User.objects.get(email=email)
+                user = User.objects.get(email__iexact=email)
                 user.first_name = first_name
                 user.last_name = last_name
                 user.profile.phone = phone
