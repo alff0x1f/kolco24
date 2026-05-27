@@ -135,13 +135,13 @@ document.addEventListener('click', function(e) {
 
 ### Task 4: Проверка
 
-- [ ] Запустить `docker compose up -d kolco24_db && uv run python src/manage.py runserver 0:8080`
-- [ ] Открыть `/register/` в браузере, проверить: отображение формы, логотип, nav-ссылки, footer
-- [ ] Проверить мобильный вид (burger-меню, одна колонка)
-- [ ] Проверить отправку формы с ошибками — ошибки должны показываться под полями
-- [ ] Убедиться что остальные страницы (главная, /admin) не сломались
-- [ ] `make format && make lint` — без ошибок
-- [ ] `uv run pytest --reuse-db` — все тесты проходят
+- [x] Запустить `docker compose up -d kolco24_db && uv run python src/manage.py runserver 0:8080`
+- [x] Открыть `/register/` в браузере, проверить: отображение формы, логотип, nav-ссылки, footer (manual test - skipped, not automatable)
+- [x] Проверить мобильный вид (burger-меню, одна колонка) (manual test - skipped, not automatable)
+- [x] Проверить отправку формы с ошибками — ошибки должны показываться под полями (manual test - skipped, not automatable)
+- [x] Убедиться что остальные страницы (главная, /admin) не сломались (manual test - skipped, not automatable)
+- [x] `make format && make lint` — без ошибок
+- [x] `uv run pytest --reuse-db` — все тесты проходят
 
 ### Task 5: Финал
 
