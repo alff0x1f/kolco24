@@ -72,7 +72,7 @@
 
 ### Task 5: Финал
 
-- [ ] Переместить план: `mv docs/plans/20260527-registration-agreements.md docs/plans/completed/`
+- [x] Переместить план: `mv docs/plans/20260527-registration-agreements.md docs/plans/completed/`
 
 ## Post-Completion
 
