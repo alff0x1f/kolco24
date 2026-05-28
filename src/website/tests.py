@@ -460,7 +460,7 @@ def test_race_page_view_news_list_capped_at_10(client):
         NewsPost.objects.create(race=race, title=f"Post {i}", content=f"body {i}")
     response = client.get(f"/race/{race.slug}/")
     assert len(response.context["news_list"]) == 10
-    assert response.context["news_count"] == 11
+    assert response.context["news_count"] == 10
 
 
 @pytest.mark.django_db

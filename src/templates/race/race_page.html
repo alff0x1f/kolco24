@@ -43,6 +43,9 @@
               <a class="btn btn-primary" href="{% url 'register' %}">Зарегистрироваться</a>
             {% endif %}
           {% endif %}
+          {% if not user.is_authenticated %}
+            <a class="btn btn-ghost" href="{% url 'login' %}">Войти</a>
+          {% endif %}
           <a class="btn btn-ghost" href="{% url 'all_teams' race.slug %}">Все команды</a>
         </div>
       </div>

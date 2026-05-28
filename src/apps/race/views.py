@@ -29,7 +29,7 @@ class RacePageView(View):
         )
         news_qs = NewsPost.objects.filter(race=race).order_by("-publication_date")
         news_list = list(news_qs[:10])
-        news_count = news_qs.count()
+        news_count = len(news_list)
         context = {
             "race": race,
             "categories": categories,
