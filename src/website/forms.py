@@ -82,27 +82,6 @@ class CustomSetPasswordForm(SetPasswordForm):
     )
 
 
-class FastLoginForm(forms.Form):
-    email = forms.EmailField(
-        widget=forms.EmailInput(
-            attrs={
-                "class": "form-control form-control-lg",
-                "placeholder": "Введите email",
-            }
-        ),
-        label="Адрес email:",
-    )
-
-    def clean(self):
-        email = self.cleaned_data["email"]
-        user = User.objects.filter(email__iexact=email)
-        if not user:
-            raise forms.ValidationError("Такой email не найден.")
-        else:
-            self.user = user
-        return self.cleaned_data
-
-
 class RegForm(forms.Form):
     first_name = forms.CharField(
         widget=forms.TextInput(attrs={"class": "form-control", "placeholder": "Имя"})

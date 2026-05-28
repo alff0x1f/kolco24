@@ -563,25 +563,6 @@ class Payment(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
 
-class FastLogin(models.Model):
-    user = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
-        on_delete=models.CASCADE,
-    )
-    login_key = models.CharField(max_length=50)
-    created_at = models.DateTimeField(auto_now_add=True)
-
-    def new_login_link(self, email):
-        u = User.objects.filter(email__iexact=email)
-        if u[:1]:
-            u = u[0]
-            self.user = u
-            self.login_key = "%016x" % random.randrange(16**16)
-            self.save()
-            return self.login_key
-        return False
-
-
 class Athlet(models.Model):
     owner = models.ForeignKey(
         settings.AUTH_USER_MODEL,

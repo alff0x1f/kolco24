@@ -37,8 +37,6 @@ from .views_ import (
     edit_page,
     get_cost,
     impersonate,
-    login,
-    login_by_key,
     my_team,
     new_team,
     page,

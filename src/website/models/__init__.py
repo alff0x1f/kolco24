@@ -2,7 +2,6 @@ from .checkpoint import Checkpoint, CheckpointTag
 from .models import (
     Athlet,
     BreakfastRegistration,
-    FastLogin,
     Payment,
     PaymentLog,
     PaymentsYa,

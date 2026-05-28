@@ -34,11 +34,9 @@ from django.views.decorators.csrf import csrf_exempt
 from openpyxl import load_workbook
 
 from vtb.client import VTBClient
-from website.email import send_login_email
 from website.forms import (
     DUPLICATE_EMAIL_MSG,
     BreakfastForm,
-    FastLoginForm,
     ImpersonateForm,
     LoginForm,
     NewsPostForm,
@@ -53,7 +51,6 @@ from website.models import (
     BreakfastRegistration,
     Checkpoint,
     CheckpointTag,
-    FastLogin,
     NewsPost,
     Payment,
     PaymentLog,
@@ -670,46 +667,6 @@ class PassLoginView(View):
                     request, "Неправильный email или пароль. Попробуйте снова."
                 )
         return render(request, self.template, {"form": form})
-
-
-def login(request):
-    if request.user.is_authenticated:
-        return HttpResponseRedirect("/")
-    form = FastLoginForm(request.POST or None)
-    if request.method == "POST" and form.is_valid():
-        login = FastLogin()
-        login_key = login.new_login_link(form.cleaned_data["email"])
-        send_login_email(form.cleaned_data["email"], login_key)
-        return render(request, "website/login.html", {"success": "ok", "form": form})
-
-    return render(request, "website/login.html", {"form": form})
-
-
-def login_by_key(request, login_key=""):
-    keys = FastLogin.objects.filter(login_key=login_key)
-    for key in keys:
-        curr_time = datetime.now(timezone.utc)
-        delta = curr_time - key.created_at
-        if delta.total_seconds() < 24 * 3600:
-            if (
-                request.method == "POST"
-                and "login_key" in request.POST
-                and request.POST["login_key"] == login_key
-            ):
-                user = key.user
-                auth_login(request, user)
-                return HttpResponseRedirect("/")
-            else:
-                return render(
-                    request,
-                    "website/login.html",
-                    {
-                        "success": "enter",
-                        "login_key": login_key,
-                        "username": key.user.first_name + " " + key.user.last_name,
-                    },
-                )
-    return HttpResponseRedirect("/login")
 
 
 class LogoutUserView(View):
