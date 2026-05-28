@@ -76,11 +76,11 @@
 - Modify: `src/website/email.py`
 - Delete: `src/templates/website/login.html`
 
-- [ ] удалить класс `FastLoginForm` (строки 85-103) из `src/website/forms.py`
-- [ ] удалить функцию `send_login_email()` (строки 6-23) из `src/website/email.py`
-- [ ] удалить шаблон: `rm src/templates/website/login.html`
-- [ ] проверить, что `login.html` не рефернцируется нигде в коде: `grep -r "login.html" src/`
-- [ ] запустить `uv run python src/manage.py check` — ошибок быть не должно
+- [x] удалить класс `FastLoginForm` (строки 85-103) из `src/website/forms.py`
+- [x] удалить функцию `send_login_email()` (строки 6-23) из `src/website/email.py`
+- [x] удалить шаблон: `rm src/templates/website/login.html`
+- [x] проверить, что `login.html` не рефернцируется нигде в коде: `grep -r "login.html" src/`
+- [x] запустить `uv run python src/manage.py check` — ошибок быть не должно
 
 ### Task 6: Финальная проверка
 
