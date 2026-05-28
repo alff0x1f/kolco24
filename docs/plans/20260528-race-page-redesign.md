@@ -208,10 +208,10 @@
 
 **НЕ копируем:** `.nav`, `.nav-*`, `.brand*`, `.container`, `.btn`, `.btn-*`, `.card`, `.pill` (базовый), `:root {}` (CSS-переменные)
 
-- [ ] проверить в theme-2.css: наличие `.pill.success`, `.pill.warn` (или аналогов)
-- [ ] создать `src/static/css/race.css` с указанными стилями
-- [ ] не создавать `.page` — только `.race-page`
-- [ ] убедиться, что нет дублирующих class names с theme-2.css
+- [x] проверить в theme-2.css: наличие `.pill.success`, `.pill.warn` (или аналогов)
+- [x] создать `src/static/css/race.css` с указанными стилями
+- [x] не создавать `.page` — только `.race-page`
+- [x] убедиться, что нет дублирующих class names с theme-2.css
 
 ### Task 5: Написать шаблон `race_page.html`
 
