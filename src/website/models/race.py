@@ -12,6 +12,7 @@ from django.db.models import (
     Manager,
     Model,
     SlugField,
+    Sum,
     TextChoices,
 )
 from django.utils import timezone
@@ -61,15 +62,16 @@ class Race(Model):
 
     def clean(self):
         super().clean()
+        errors = {}
         for field in ("header_image", "header_logo"):
             value = getattr(self, field)
             if value:
                 try:
                     _url_validator(value)
                 except ValidationError:
-                    raise ValidationError(
-                        {field: "Введите корректный URL (http/https)."}
-                    )
+                    errors[field] = "Введите корректный URL (http/https)."
+        if errors:
+            raise ValidationError(errors)
 
     def team_count(self):
         Team = apps.get_model("website", "Team")
@@ -77,11 +79,10 @@ class Race(Model):
 
     def people_count(self):
         Team = apps.get_model("website", "Team")
-        return sum(
-            Team.objects.filter(category2__race=self).values_list(
-                "paid_people", flat=True
-            )
-        )
+        result = Team.objects.filter(category2__race=self).aggregate(
+            total=Sum("paid_people")
+        )["total"]
+        return result or 0
 
 
 class RaceLink(Model):
