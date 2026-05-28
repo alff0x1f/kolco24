@@ -1,5 +1,7 @@
 from django.apps import apps
 from django.conf import settings
+from django.core.exceptions import ValidationError
+from django.core.validators import URLValidator
 from django.db.models import (
     CASCADE,
     BooleanField,
@@ -13,6 +15,8 @@ from django.db.models import (
     TextChoices,
 )
 from django.utils import timezone
+
+_url_validator = URLValidator(schemes=["http", "https"])
 
 
 class RegStatus(TextChoices):
@@ -55,6 +59,18 @@ class Race(Model):
     def __str__(self):
         return self.name
 
+    def clean(self):
+        super().clean()
+        for field in ("header_image", "header_logo"):
+            value = getattr(self, field)
+            if value:
+                try:
+                    _url_validator(value)
+                except ValidationError:
+                    raise ValidationError(
+                        {field: "Введите корректный URL (http/https)."}
+                    )
+
     def team_count(self):
         Team = apps.get_model("website", "Team")
         return len(Team.objects.filter(category2__race=self, paid_people__gt=0))
@@ -74,6 +90,13 @@ class RaceLink(Model):
     race = ForeignKey(
         "Race", related_name="links", verbose_name="Гонка", on_delete=CASCADE
     )
+
+    def clean(self):
+        super().clean()
+        try:
+            _url_validator(self.url)
+        except ValidationError:
+            raise ValidationError({"url": "Введите корректный URL (http/https)."})
 
     def __str__(self):
         return f"{self.id} - {self.name} ({self.race})"

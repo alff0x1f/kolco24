@@ -397,6 +397,7 @@ def test_race_page_view_context_keys(client):
         "links",
         "news_list",
         "reg_open",
+        "reg_upcoming",
         "race_team_count",
         "race_people_count",
     ):
