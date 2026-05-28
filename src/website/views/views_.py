@@ -100,6 +100,8 @@ class AddNewsPostView(View):
         return HttpResponseNotAllowed(["POST"])
 
     def post(self, request, race_slug):
+        if not request.user.is_authenticated:
+            return HttpResponseRedirect(reverse("login") + "?next=" + request.path)
         race = get_object_or_404(Race, slug=race_slug)
         if not is_race_admin(request.user, race):
             return HttpResponseForbidden()

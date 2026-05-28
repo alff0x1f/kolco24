@@ -96,7 +96,7 @@
             {% for news in news_list %}
             <article class="post">
               <div class="post-meta">
-                <time datetime="{{ news.publication_date|date:'Y-m-d' }}">{{ news.publication_date }}</time>
+                <time datetime="{{ news.publication_date|date:'Y-m-d' }}">{{ news.publication_date|date:"j E Y" }}</time>
               </div>
               {% if news.image %}
               <div class="post-image">

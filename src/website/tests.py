@@ -210,7 +210,8 @@ def test_add_post_unauthorized(client):
         f"/race/{race.slug}/post/add/",
         {"title": "Should fail", "content": "No auth"},
     )
-    assert response.status_code == 403
+    assert response.status_code == 302
+    assert "/login/" in response["Location"]
 
 
 @pytest.mark.django_db
