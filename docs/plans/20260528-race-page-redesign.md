@@ -58,9 +58,9 @@
 - Create: `src/apps/race/apps.py`
 - Modify: `src/config/settings.py`
 
-- [ ] создать `src/apps/__init__.py` (пустой — обязателен для Python package resolution)
-- [ ] создать `src/apps/race/__init__.py` (пустой)
-- [ ] создать `src/apps/race/apps.py`:
+- [x] создать `src/apps/__init__.py` (пустой — обязателен для Python package resolution)
+- [x] создать `src/apps/race/__init__.py` (пустой)
+- [x] создать `src/apps/race/apps.py`:
   ```python
   from django.apps import AppConfig
 
@@ -71,8 +71,8 @@
       verbose_name = "Race page"
   ```
   (`label = "race_app"` уникален, нет конфликтов с существующими apps)
-- [ ] добавить `"apps.race"` в `INSTALLED_APPS` в `src/config/settings.py`
-- [ ] проверить: `uv run python src/manage.py check` — без ошибок
+- [x] добавить `"apps.race"` в `INSTALLED_APPS` в `src/config/settings.py`
+- [x] проверить: `uv run python src/manage.py check` — без ошибок
 
 ### Task 2: Создать `RacePageView`
 

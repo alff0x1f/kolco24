@@ -79,6 +79,7 @@ INSTALLED_APPS = [
     "donate",
     "demo",
     "mailer",
+    "apps.race",
 ]
 
 MIDDLEWARE = [
