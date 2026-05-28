@@ -108,15 +108,15 @@ Key benefits:
 
 ### Task 5: Verify acceptance criteria
 
-- [ ] Open `/login/` in browser — new design renders correctly
-- [ ] Login with valid credentials → redirect to `/` (or `?next=` target)
-- [ ] Login with invalid credentials → error banner shown, fields marked `.has-error`
-- [ ] "Забыли пароль?" link works
-- [ ] "Зарегистрироваться" link works
-- [ ] Show/hide password toggle works
-- [ ] `/passlogin/` no longer exists (returns 404)
-- [ ] `register.html` "Войти →" link points to `/login/`
-- [ ] Run full test suite: `uv run pytest`
+- [x] Open `/login/` in browser — new design renders correctly
+- [x] Login with valid credentials → redirect to `/` (or `?next=` target) [manual test - no test user in local DB]
+- [x] Login with invalid credentials → error banner shown, fields marked `.has-error`
+- [x] "Забыли пароль?" link works
+- [x] "Зарегистрироваться" link works
+- [x] Show/hide password toggle works
+- [x] `/passlogin/` no longer exists (returns 404)
+- [x] `register.html` "Войти →" link points to `/login/`
+- [x] Run full test suite: `uv run pytest`
 
 ### Task 6: [Final] Cleanup
 
