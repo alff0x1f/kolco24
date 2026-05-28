@@ -647,11 +647,16 @@ class LoginView(View):
         if request.user.is_authenticated:
             return _safe_redirect(request, request.GET.get("next", "/"))
         form = LoginForm()
-        return render(request, self.template, {"form": form})
+        return render(
+            request,
+            self.template,
+            {"form": form, "next": request.GET.get("next", "")},
+        )
 
     def post(self, request, *args, **kwargs):
+        next_url = request.POST.get("next") or request.GET.get("next", "/")
         if request.user.is_authenticated:
-            return _safe_redirect(request, request.GET.get("next", "/"))
+            return _safe_redirect(request, next_url)
         form = LoginForm(request.POST)
         if form.is_valid():
             email = form.cleaned_data.get("email")
@@ -661,12 +666,12 @@ class LoginView(View):
 
             if user is not None:
                 auth_login(request, user)
-                return _safe_redirect(request, request.GET.get("next", "/"))
+                return _safe_redirect(request, next_url)
             else:
                 messages.error(
                     request, "Неправильный email или пароль. Попробуйте снова."
                 )
-        return render(request, self.template, {"form": form})
+        return render(request, self.template, {"form": form, "next": next_url})
 
 
 class LogoutUserView(View):

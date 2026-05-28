@@ -301,10 +301,11 @@ def test_login_view_post_valid_credentials(client):
 
 @pytest.mark.django_db
 def test_login_view_post_valid_credentials_next_redirect(client):
+    # Simulate real browser flow: form action is /login/, ?next= comes from hidden field
     User.objects.create_user(username="u2", password="pass", email="u2@example.com")
     response = client.post(
-        "/login/?next=/race/kolco24_2025/",
-        {"email": "u2@example.com", "password": "pass"},
+        "/login/",
+        {"email": "u2@example.com", "password": "pass", "next": "/race/kolco24_2025/"},
     )
     assert response.status_code == 302
     assert response.url == "/race/kolco24_2025/"

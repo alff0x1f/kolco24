@@ -43,6 +43,7 @@
 
     <form class="card" action="{% url 'login' %}" method="POST" novalidate>
       {% csrf_token %}
+      <input type="hidden" name="next" value="{{ next }}">
       <div class="card-pad">
 
         {% if messages or form.non_field_errors %}
