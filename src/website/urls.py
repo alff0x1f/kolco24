@@ -3,6 +3,8 @@ from django.conf.urls.static import static
 from django.shortcuts import redirect
 from django.urls import include, path, re_path
 
+from apps.race.views import RacePageView
+
 from . import views
 from .views import (
     CancelPaymentView,
@@ -74,7 +76,7 @@ urlpatterns = [
         views.AddNewsPostView.as_view(),
         name="add_post",
     ),
-    path("race/<slug:race_slug>/", views.RaceNewsView.as_view(), name="race"),
+    path("race/<slug:race_slug>/", RacePageView.as_view(), name="race"),
     path(
         "race/<slug:race_slug>/teams/", views.AllTeamsView.as_view(), name="all_teams"
     ),

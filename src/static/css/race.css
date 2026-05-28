@@ -1,0 +1,300 @@
+/* Race page styles — /race/<slug>/ */
+/* Does NOT duplicate: :root, .container, .grid, .card, .btn, .btn-primary,
+   .btn-ghost, .sidebar, .side-head, responsive .grid/.sidebar */
+
+/* ── Status pill ─────────────────────────────────────── */
+.pill {
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 5px 12px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 500;
+  background: var(--warn-bg);
+  color: var(--warn);
+}
+.pill::before {
+  content: ''; width: 6px; height: 6px; border-radius: 50%;
+  background: var(--warn);
+}
+.pill.success {
+  background: rgba(2, 184, 117, .12);
+  color: var(--success-dk);
+}
+.pill.success::before {
+  background: var(--success);
+  box-shadow: 0 0 0 3px rgba(2, 184, 117, .18);
+}
+.pill.muted {
+  background: rgba(107, 119, 133, .1);
+  color: var(--muted);
+}
+.pill.muted::before { background: var(--muted-2); }
+
+/* ── Kicker label ────────────────────────────────────── */
+.kicker {
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+/* ── Race page wrapper ───────────────────────────────── */
+/* top-padding is 0 because the cover banner sits flush at the top */
+.race-page { padding: 0 0 56px; }
+
+/* ── Cover banner ────────────────────────────────────── */
+.cover-banner {
+  position: relative;
+  width: 100%;
+  background: #1d242d;
+}
+.cover-image {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1920 / 480;
+  min-height: 200px;
+  max-height: 460px;
+  /* fallback gradient when no header_image */
+  background: linear-gradient(145deg, #4a5e74 0%, #5d7388 35%, #8c9aa6 65%, #b6b6a6 100%);
+  background-size: cover;
+  background-position: center;
+  overflow: hidden;
+}
+.cover-bg-img {
+  position: absolute; inset: 0;
+  width: 100%; height: 100%;
+  object-fit: cover; object-position: center;
+  z-index: 0;
+}
+.cover-image::before {
+  content: ''; position: absolute; inset: 0; z-index: 1;
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0) 35%, rgba(0, 0, 0, .38) 100%);
+}
+.cover-status {
+  position: absolute; top: 18px; z-index: 2;
+  right: max(20px, calc((100% - 1180px) / 2 + 20px));
+}
+.cover-status .pill {
+  background: rgba(255, 255, 255, .95);
+  backdrop-filter: blur(8px);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, .08), 0 8px 24px rgba(0, 0, 0, .12);
+}
+
+.cover-meta-card {
+  background: var(--paper-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  overflow: hidden;
+  box-shadow: var(--shadow-sm);
+  margin-bottom: 16px;
+  margin-top: -16px;
+  position: relative;
+  z-index: 2;
+}
+.cover-meta {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 18px;
+  align-items: center;
+  padding: 18px 24px 20px;
+}
+.cover-title h1 {
+  font-size: 24px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  margin-bottom: 4px;
+  color: var(--ink);
+}
+.cover-title .sub {
+  font-size: 14px;
+  color: var(--muted);
+  display: flex; gap: 14px; flex-wrap: wrap;
+  align-items: center;
+}
+.cover-title .sub .dot {
+  width: 3px; height: 3px;
+  background: var(--muted-2);
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.cover-actions { display: flex; gap: 8px; align-items: center; }
+
+/* ── Outline button (not in theme-2.css) ─────────────── */
+.btn-outline {
+  background: var(--paper-2);
+  color: var(--ink);
+  border-color: var(--line);
+}
+.btn-outline:hover { border-color: var(--ink); color: var(--ink); }
+
+/* ── Tabs card ───────────────────────────────────────── */
+.tabs-card { padding-bottom: 6px; }
+.tabs-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px 22px 14px;
+}
+.tabs-head h2 {
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin: 0;
+}
+.tabs-head .badge {
+  font-size: 12px;
+  color: var(--muted-2);
+  font-variant-numeric: tabular-nums;
+}
+.tab-body { padding: 22px 22px 20px; }
+
+/* ── News posts ──────────────────────────────────────── */
+.post {
+  padding: 18px 0;
+  border-bottom: 1px solid var(--line-soft);
+}
+.post:first-child { padding-top: 4px; }
+.post:last-child { border-bottom: none; padding-bottom: 4px; }
+.post-meta {
+  display: flex; align-items: center; gap: 10px;
+  font-size: 13px;
+  color: var(--muted);
+  margin-bottom: 10px;
+}
+.post-meta time { font-variant-numeric: tabular-nums; }
+.post-title {
+  font-size: 19px;
+  font-weight: 500;
+  color: var(--ink);
+  line-height: 1.25;
+  margin-bottom: 8px;
+}
+.post-body {
+  font-size: 15px;
+  line-height: 1.55;
+  color: var(--ink-soft);
+  margin-bottom: 12px;
+}
+.post-body p { margin: 0 0 8px; }
+.post-body p:last-child { margin-bottom: 0; }
+.post-foot {
+  display: flex; align-items: center; gap: 18px;
+  font-size: 13px;
+  color: var(--muted);
+}
+.post-image {
+  margin: 0 0 12px;
+  border-radius: 10px;
+  overflow: hidden;
+  position: relative;
+  aspect-ratio: 16 / 9;
+  background: var(--paper);
+  border: 1px solid var(--line);
+}
+.post-image img {
+  width: 100%; height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.post-empty {
+  text-align: center;
+  color: var(--muted);
+  padding: 32px 0;
+  font-size: 14px;
+}
+
+/* ── Admin: add post form card ───────────────────────── */
+.post-add-card { margin-bottom: 16px; }
+.post-add-card .card-pad { padding: 20px 22px; }
+.post-add-card .field-row {
+  display: flex; flex-direction: column; gap: 10px;
+  margin-bottom: 12px;
+}
+.post-add-card label {
+  font-size: 13px; font-weight: 500; color: var(--ink-soft);
+}
+
+/* ── Sidebar: info list ──────────────────────────────── */
+.info-list { list-style: none; padding: 0; margin: 0; }
+.info-list li {
+  display: grid;
+  grid-template-columns: 24px 1fr auto;
+  gap: 12px;
+  padding: 11px 0;
+  border-top: 1px solid var(--line-soft);
+  font-size: 14px;
+  align-items: center;
+}
+.info-list li:first-child { border-top: none; padding-top: 0; }
+.info-list li:last-child { padding-bottom: 0; }
+.info-list .icon { width: 20px; height: 20px; color: var(--muted); flex-shrink: 0; }
+.info-list .label { color: var(--muted); }
+.info-list .value {
+  color: var(--ink);
+  font-weight: 500;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Sidebar: info card / category CTA ───────────────── */
+.info-card-pad { padding-top: 6px; }
+.category-cta { padding: 4px 16px 16px; }
+.category-cta .btn { width: 100%; justify-content: center; }
+
+/* ── Sidebar: nav-style menu ─────────────────────────── */
+.side-menu { list-style: none; padding: 8px 12px 12px; margin: 0; }
+.side-menu li a {
+  display: flex; align-items: center; gap: 12px;
+  padding: 9px 10px;
+  border-radius: 8px;
+  color: var(--ink);
+  font-size: 14px;
+  transition: background .12s;
+}
+.side-menu li a:hover { background: #f4f6f9; color: var(--ink); }
+.side-menu li a .icon { color: var(--muted); width: 18px; height: 18px; flex-shrink: 0; }
+.side-menu li a .badge {
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--muted-2);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Responsive ──────────────────────────────────────── */
+@media (max-width: 920px) {
+  .cover-image { aspect-ratio: 16 / 9; }
+  .cover-meta {
+    grid-template-columns: 1fr;
+    padding: 14px 18px 16px;
+    row-gap: 14px;
+  }
+  .cover-actions { justify-content: flex-start; }
+}
+@media (max-width: 720px) {
+  .cover-image { aspect-ratio: 16 / 10; }
+}
+@media (max-width: 600px) {
+  .race-page { padding: 0 0 36px; }
+  .cover-meta-card {
+    border-radius: 0;
+    border-left: none;
+    border-right: none;
+    margin-top: -10px;
+  }
+  .cover-image { aspect-ratio: 3 / 2; min-height: 180px; }
+  .cover-status { top: 10px; right: 10px; }
+  .cover-status .pill { font-size: 12px; padding: 4px 10px; }
+  .cover-meta { grid-template-columns: 1fr; padding: 12px 16px 16px; gap: 10px; }
+  .cover-title h1 { font-size: 20px; }
+  .cover-title .sub { font-size: 13px; gap: 10px; }
+  .cover-actions { width: 100%; flex-wrap: wrap; }
+  .cover-actions .btn { flex: 1; justify-content: center; min-width: 0; }
+  .tab-body { padding: 16px 16px 18px; }
+  .post-title { font-size: 17px; }
+  .post-body { font-size: 14.5px; }
+  .info-list li { grid-template-columns: 22px 1fr auto; gap: 10px; font-size: 14px; }
+}

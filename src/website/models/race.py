@@ -1,5 +1,7 @@
 from django.apps import apps
 from django.conf import settings
+from django.core.exceptions import ValidationError
+from django.core.validators import URLValidator
 from django.db.models import (
     CASCADE,
     BooleanField,
@@ -10,9 +12,12 @@ from django.db.models import (
     Manager,
     Model,
     SlugField,
+    Sum,
     TextChoices,
 )
 from django.utils import timezone
+
+_url_validator = URLValidator(schemes=["http", "https"])
 
 
 class RegStatus(TextChoices):
@@ -55,17 +60,29 @@ class Race(Model):
     def __str__(self):
         return self.name
 
+    def clean(self):
+        super().clean()
+        errors = {}
+        for field in ("header_image", "header_logo"):
+            value = getattr(self, field)
+            if value:
+                try:
+                    _url_validator(value)
+                except ValidationError:
+                    errors[field] = "Введите корректный URL (http/https)."
+        if errors:
+            raise ValidationError(errors)
+
     def team_count(self):
         Team = apps.get_model("website", "Team")
-        return len(Team.objects.filter(category2__race=self, paid_people__gt=0))
+        return Team.objects.filter(category2__race=self, paid_people__gt=0).count()
 
     def people_count(self):
         Team = apps.get_model("website", "Team")
-        return sum(
-            Team.objects.filter(category2__race=self).values_list(
-                "paid_people", flat=True
-            )
-        )
+        result = Team.objects.filter(category2__race=self).aggregate(
+            total=Sum("paid_people")
+        )["total"]
+        return result or 0
 
 
 class RaceLink(Model):
@@ -74,6 +91,13 @@ class RaceLink(Model):
     race = ForeignKey(
         "Race", related_name="links", verbose_name="Гонка", on_delete=CASCADE
     )
+
+    def clean(self):
+        super().clean()
+        try:
+            _url_validator(self.url)
+        except ValidationError:
+            raise ValidationError({"url": "Введите корректный URL (http/https)."})
 
     def __str__(self):
         return f"{self.id} - {self.name} ({self.race})"

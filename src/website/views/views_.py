@@ -52,7 +52,6 @@ from website.models import (
     BreakfastRegistration,
     Checkpoint,
     CheckpointTag,
-    NewsPost,
     Payment,
     PaymentLog,
     PaymentsYa,
@@ -101,6 +100,10 @@ class AddNewsPostView(View):
         return HttpResponseNotAllowed(["POST"])
 
     def post(self, request, race_slug):
+        if not request.user.is_authenticated:
+            return HttpResponseRedirect(
+                reverse("login") + "?next=" + quote(request.path, safe="/:@")
+            )
         race = get_object_or_404(Race, slug=race_slug)
         if not is_race_admin(request.user, race):
             return HttpResponseForbidden()
@@ -112,9 +115,11 @@ class AddNewsPostView(View):
             return HttpResponseRedirect(
                 reverse("race", kwargs={"race_slug": race_slug})
             )
-        context = RaceNewsView.get_context(race)
+        from apps.race.views import RacePageView
+
+        context = RacePageView.build_context(race, request.user)
         context["post_form"] = form
-        return render(request, "website/news.html", context)
+        return render(request, "race/race_page.html", context)
 
 
 class RaceIdRedirectView(View):
@@ -390,45 +395,6 @@ class TeamMemberRaceLogView(View):
         name = team.teamname or "Без названия"
         start_number = team.start_number or "—"
         return f"{name} (#{start_number})"
-
-
-class RaceNewsView(View):
-    def get(self, request, race_slug):
-        try:
-            race = Race.objects.get(slug=race_slug)
-        except Race.DoesNotExist:
-            raise Http404
-        context = self.get_context(race, request.user)
-        return render(request, "website/news.html", context)
-
-    @staticmethod
-    def get_context(race: Race, user=None):
-        categories = (
-            Category.active_objects.filter(race=race)
-            .order_by("order", "id")
-            .annotate(
-                team_count=Subquery(
-                    Team.objects.filter(
-                        category2=OuterRef("id"),
-                        paid_people__gt=0,
-                    )
-                    .values("category2")
-                    .annotate(count=Count("id"))
-                    .values("count")[:1]
-                )
-            )
-        )
-        context = {
-            "race": race,
-            "categories": categories,
-            "links": race.links.order_by("-id"),
-            "news_list": NewsPost.objects.filter(race=race)[:10],
-            "login_form": LoginForm(),
-            "reg_open": race.reg_status == RegStatus.OPEN,
-        }
-        if user and is_race_admin(user, race):
-            context["post_form"] = NewsPostForm()
-        return context
 
 
 class BreakfastView(View):

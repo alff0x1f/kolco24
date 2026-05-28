@@ -49,8 +49,11 @@ Django 4.2 project. Source lives entirely under `src/`, with `manage.py` at `src
 - `donate` — donation flow built on top of `VTBPayment`.
 - `demo` — static HTML mockups served at `/demo/home-multiple/`, `/demo/home-offseason/`, `/demo/home-single/` for design review. No models or auth required. Templates live in `src/templates/demo/` (common templates dir), not in the app's own `templates/` folder.
 - `config` — Django project config (settings, urls, wsgi).
+- `apps.race` — race detail page (`/race/<slug>/`). View only; no models or migrations — all models remain in `website`. Entry point: `src/apps/race/views.py:RacePageView`. Uses `label = "race_app"` in `AppConfig` to avoid Django app-registry collision with the `race` model label. `RacePageView.build_context` is also called by `website.views.views_.AddNewsPostView` via a deferred import to avoid a circular dependency.
 
-**Template stacks**: `src/templates/website/` has two base templates. `base.html` + `src/static/css/theme.css` — Bootstrap-based, used by all pages except registration and login. `base-2.html` + `src/static/css/theme-2.css` — custom CSS (Rubik font, vanilla JS), used by `register.html` and `login.html`. New pages matching the new design should extend `base-2.html`.
+New feature apps that don't fit in `website` live under `src/apps/<name>/`. Each needs a unique `AppConfig` label (e.g. `label = "race_app"`).
+
+**Template stacks**: `src/templates/website/` has two base templates. `base.html` + `src/static/css/theme.css` — Bootstrap-based, used by all pages except registration and login. `base-2.html` + `src/static/css/theme-2.css` — custom CSS (Rubik font, vanilla JS), used by `register.html` and `login.html`. New pages matching the new design should extend `base-2.html`. Page-specific CSS goes in `src/static/css/<page>.css` and is loaded via `{% block extra_head %}`. Do not define a bare `.page` class in page-specific CSS — `theme-2.css` already defines it. Use a scoped wrapper class (e.g. `.race-page`).
 
 **Auth**: `LOGIN_URL = "login"` in `settings.py` points Django's `@login_required` and `user_passes_test` decorators to `LoginView` at `/login/`. The URL name is `login`; `passlogin` was removed. `LoginView` authenticates by email via `website.auth.EmailBackend`.
 

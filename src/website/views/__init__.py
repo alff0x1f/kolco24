@@ -23,7 +23,6 @@ from .views_ import (
     PaymentUp,
     PointTagsView,
     RaceIdRedirectView,
-    RaceNewsView,
     RaceView,
     RegisterView,
     TeamMemberRaceLogView,

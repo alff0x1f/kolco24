@@ -1,11 +1,12 @@
 import pytest
 from django.contrib.auth.models import User
+from django.core.exceptions import ValidationError
 from django.db import IntegrityError
 from django.urls import reverse
 
 from website.models import Race
 from website.models.models import Team
-from website.models.race import Category, RegStatus
+from website.models.race import Category, RaceLink, RegStatus
 
 
 @pytest.mark.django_db
@@ -209,7 +210,8 @@ def test_add_post_unauthorized(client):
         f"/race/{race.slug}/post/add/",
         {"title": "Should fail", "content": "No auth"},
     )
-    assert response.status_code == 403
+    assert response.status_code == 302
+    assert "/login/" in response["Location"]
 
 
 @pytest.mark.django_db
@@ -355,7 +357,7 @@ def test_register_view_post_duplicate_email_shows_error(client):
 
 
 @pytest.mark.django_db
-def test_race_news_view_shows_form_for_admin(client):
+def test_race_page_view_shows_form_for_admin(client):
     from website.models.race import RaceAdmin
 
     race = Race.objects.create(name="Admin Race", code="ar2025", slug="admin-race-2025")
@@ -372,3 +374,161 @@ def test_race_news_view_shows_form_for_admin(client):
     response = client.get(f"/race/{race.slug}/")
     assert response.status_code == 200
     assert "post_form" not in response.context
+
+
+@pytest.mark.django_db
+def test_race_page_view_status_200(client):
+    race = Race.objects.create(name="T", code="t25", slug="t-2025")
+    response = client.get(f"/race/{race.slug}/")
+    assert response.status_code == 200
+    assert "race/race_page.html" in [t.name for t in response.templates]
+
+
+@pytest.mark.django_db
+def test_race_page_view_404_for_unknown_slug(client):
+    response = client.get("/race/nonexistent-2099/")
+    assert response.status_code == 404
+
+
+@pytest.mark.django_db
+def test_race_page_view_context_keys(client):
+    race = Race.objects.create(name="C", code="c25", slug="c-2025")
+    response = client.get(f"/race/{race.slug}/")
+    for key in (
+        "categories",
+        "links",
+        "news_list",
+        "news_count",
+        "reg_open",
+        "reg_upcoming",
+        "race_team_count",
+        "race_people_count",
+    ):
+        assert key in response.context, f"context missing: {key}"
+
+
+@pytest.mark.django_db
+def test_race_page_view_no_post_form_for_anon(client):
+    race = Race.objects.create(name="A", code="a25", slug="a-2025")
+    response = client.get(f"/race/{race.slug}/")
+    assert "post_form" not in response.context
+
+
+@pytest.mark.django_db
+def test_race_page_view_reg_open_flag(client):
+    race = Race.objects.create(
+        name="R", code="ro1", slug="ro-2025", reg_status=RegStatus.OPEN
+    )
+    response = client.get(f"/race/{race.slug}/")
+    assert response.context["reg_open"] is True
+    assert response.context["reg_upcoming"] is False
+
+    race.reg_status = RegStatus.UPCOMING
+    race.save()
+    response = client.get(f"/race/{race.slug}/")
+    assert response.context["reg_open"] is False
+    assert response.context["reg_upcoming"] is True
+
+    race.reg_status = RegStatus.SOLD_OUT
+    race.save()
+    response = client.get(f"/race/{race.slug}/")
+    assert response.context["reg_open"] is False
+    assert response.context["reg_upcoming"] is False
+
+
+@pytest.mark.django_db
+def test_race_page_view_excludes_inactive_categories(client):
+    race = Race.objects.create(name="R", code="rc2", slug="rc-2026")
+    Category.objects.create(
+        code="active", name="Active", short_name="A", race=race, is_active=True
+    )
+    Category.objects.create(
+        code="inactive", name="Inactive", short_name="I", race=race, is_active=False
+    )
+    response = client.get(f"/race/{race.slug}/")
+    codes = [c.code for c in response.context["categories"]]
+    assert "active" in codes
+    assert "inactive" not in codes
+
+
+@pytest.mark.django_db
+def test_race_page_view_news_list_capped_at_10(client):
+    from website.models import NewsPost
+
+    race = Race.objects.create(name="N", code="nl1", slug="nl-2025")
+    for i in range(11):
+        NewsPost.objects.create(race=race, title=f"Post {i}", content=f"body {i}")
+    response = client.get(f"/race/{race.slug}/")
+    assert len(response.context["news_list"]) == 10
+    assert response.context["news_count"] == 10
+
+
+@pytest.mark.django_db
+def test_add_post_invalid_form_shows_errors(client):
+    from website.models.race import RaceAdmin
+
+    race = Race.objects.create(name="R", code="ap1", slug="ap-2025")
+    admin_user = User.objects.create_user(username="postadmin", password="pass")
+    RaceAdmin.objects.create(race=race, user=admin_user, role=RaceAdmin.Role.ADMIN)
+    client.force_login(admin_user)
+    response = client.post(f"/race/{race.slug}/post/add/", {"title": "", "content": ""})
+    assert response.status_code == 200
+    assert "race/race_page.html" in [t.name for t in response.templates]
+    assert "post_form" in response.context
+    assert "title" in response.context["post_form"].errors
+
+
+@pytest.mark.django_db
+def test_race_clean_accepts_valid_url():
+    race = Race.objects.create(
+        name="URL Race",
+        code="ur1",
+        slug="url-race-1",
+        place="Moscow",
+        header_image="https://example.com/banner.jpg",
+        header_logo="http://example.com/logo.png",
+    )
+    race.full_clean()
+
+
+@pytest.mark.django_db
+def test_race_clean_rejects_invalid_url():
+    race = Race.objects.create(
+        name="URL Race",
+        code="ur2",
+        slug="url-race-2",
+        place="Moscow",
+        header_image="not-a-url",
+    )
+    with pytest.raises(ValidationError) as exc_info:
+        race.full_clean()
+    assert "header_image" in exc_info.value.message_dict
+
+
+@pytest.mark.django_db
+def test_race_clean_accepts_blank_url():
+    race = Race.objects.create(
+        name="URL Race",
+        code="ur3",
+        slug="url-race-3",
+        place="Moscow",
+        header_image="",
+        header_logo="",
+    )
+    race.full_clean()
+
+
+@pytest.mark.django_db
+def test_race_link_clean_accepts_valid_url():
+    race = Race.objects.create(name="LR", code="lr1", slug="lr-2025")
+    link = RaceLink.objects.create(race=race, name="Site", url="https://example.com/")
+    link.full_clean()
+
+
+@pytest.mark.django_db
+def test_race_link_clean_rejects_invalid_url():
+    race = Race.objects.create(name="LR", code="lr2", slug="lr-2026")
+    link = RaceLink.objects.create(race=race, name="Bad", url="not-a-url")
+    with pytest.raises(ValidationError) as exc_info:
+        link.full_clean()
+    assert "url" in exc_info.value.message_dict
