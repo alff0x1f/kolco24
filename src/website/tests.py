@@ -355,7 +355,7 @@ def test_register_view_post_duplicate_email_shows_error(client):
 
 
 @pytest.mark.django_db
-def test_race_news_view_shows_form_for_admin(client):
+def test_race_page_view_shows_form_for_admin(client):
     from website.models.race import RaceAdmin
 
     race = Race.objects.create(name="Admin Race", code="ar2025", slug="admin-race-2025")
@@ -408,3 +408,60 @@ def test_race_page_view_no_post_form_for_anon(client):
     race = Race.objects.create(name="A", code="a25", slug="a-2025")
     response = client.get(f"/race/{race.slug}/")
     assert "post_form" not in response.context
+
+
+@pytest.mark.django_db
+def test_race_page_view_reg_open_flag(client):
+    race = Race.objects.create(
+        name="R", code="ro1", slug="ro-2025", reg_status=RegStatus.OPEN
+    )
+    response = client.get(f"/race/{race.slug}/")
+    assert response.context["reg_open"] is True
+    assert response.context["reg_upcoming"] is False
+
+    race.reg_status = RegStatus.UPCOMING
+    race.save()
+    response = client.get(f"/race/{race.slug}/")
+    assert response.context["reg_open"] is False
+    assert response.context["reg_upcoming"] is True
+
+
+@pytest.mark.django_db
+def test_race_page_view_excludes_inactive_categories(client):
+    race = Race.objects.create(name="R", code="rc2", slug="rc-2026")
+    Category.objects.create(
+        code="active", name="Active", short_name="A", race=race, is_active=True
+    )
+    Category.objects.create(
+        code="inactive", name="Inactive", short_name="I", race=race, is_active=False
+    )
+    response = client.get(f"/race/{race.slug}/")
+    codes = [c.code for c in response.context["categories"]]
+    assert "active" in codes
+    assert "inactive" not in codes
+
+
+@pytest.mark.django_db
+def test_race_page_view_news_list_capped_at_10(client):
+    from website.models import NewsPost
+
+    race = Race.objects.create(name="N", code="nl1", slug="nl-2025")
+    for i in range(11):
+        NewsPost.objects.create(race=race, title=f"Post {i}", content=f"body {i}")
+    response = client.get(f"/race/{race.slug}/")
+    assert len(response.context["news_list"]) == 10
+
+
+@pytest.mark.django_db
+def test_add_post_invalid_form_shows_errors(client):
+    from website.models.race import RaceAdmin
+
+    race = Race.objects.create(name="R", code="ap1", slug="ap-2025")
+    admin_user = User.objects.create_user(username="postadmin", password="pass")
+    RaceAdmin.objects.create(race=race, user=admin_user, role=RaceAdmin.Role.ADMIN)
+    client.force_login(admin_user)
+    response = client.post(f"/race/{race.slug}/post/add/", {"title": "", "content": ""})
+    assert response.status_code == 200
+    assert "race/race_page.html" in [t.name for t in response.templates]
+    assert "post_form" in response.context
+    assert response.context["post_form"].errors

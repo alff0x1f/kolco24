@@ -31,8 +31,11 @@ class RacePageView(View):
             "race": race,
             "categories": categories,
             "links": race.links.order_by("-id"),
-            "news_list": NewsPost.objects.filter(race=race)[:10],
+            "news_list": list(
+                NewsPost.objects.filter(race=race).order_by("-publication_date")[:10]
+            ),
             "reg_open": race.reg_status == RegStatus.OPEN,
+            "reg_upcoming": race.reg_status == RegStatus.UPCOMING,
             "race_team_count": race.team_count(),
             "race_people_count": race.people_count(),
         }

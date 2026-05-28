@@ -9,9 +9,9 @@
 <div class="cover-banner">
   <div class="cover-image"{% if race.header_image %} style="background-image: url('{{ race.header_image }}');"{% endif %}>
     <div class="cover-status">
-      {% if race.reg_status == 'open' %}
+      {% if reg_open %}
         <span class="pill success">Регистрация открыта</span>
-      {% elif race.reg_status == 'upcoming' %}
+      {% elif reg_upcoming %}
         <span class="pill muted">Регистрация скоро</span>
       {% else %}
         <span class="pill">Регистрация окончена</span>
