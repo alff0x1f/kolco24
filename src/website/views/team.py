@@ -1,5 +1,5 @@
 from django.db.models import Q
-from django.http import HttpResponse, HttpResponseRedirect
+from django.http import Http404, HttpResponse, HttpResponseRedirect
 from django.shortcuts import render
 from django.urls import reverse
 from django.views import View
@@ -20,11 +20,11 @@ from website.models.race import RegStatus
 class EditTeamView(View):
     def get(self, request, team_id):
         if not request.user.is_authenticated:
-            return HttpResponseRedirect(reverse("passlogin") + f"?next={request.path}")
+            return HttpResponseRedirect(reverse("login") + f"?next={request.path}")
 
         team: Team = self.get_team(team_id)
         if not team:
-            return HttpResponseRedirect(reverse("passlogin") + f"?next={request.path}")
+            raise Http404
 
         race = team.category2.race
 
@@ -77,11 +77,11 @@ class EditTeamView(View):
 
     def post(self, request, team_id):
         if not request.user.is_authenticated:
-            return HttpResponseRedirect(reverse("passlogin") + f"?next={request.path}")
+            return HttpResponseRedirect(reverse("login") + f"?next={request.path}")
 
         team: Team = self.get_team(team_id)
         if not team:
-            return HttpResponseRedirect(reverse("passlogin") + f"?next={request.path}")
+            raise Http404
         race = team.category2.race
 
         if not team.category2.race.is_teams_editable and not request.user.is_superuser:
@@ -207,7 +207,7 @@ class TeamMemberMoveView(View):
     def post(self, request, team_id):
         """Перемещение участника из команды в команду"""
         if not request.user.is_authenticated:
-            return HttpResponseRedirect(reverse("passlogin") + f"?next={request.path}")
+            return HttpResponseRedirect(reverse("login") + f"?next={request.path}")
 
         from_team = Team.objects.filter(id=team_id).first()
         if not from_team:

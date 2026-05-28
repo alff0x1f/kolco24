@@ -284,6 +284,66 @@ def test_register_view_post_creates_user(client):
 
 
 @pytest.mark.django_db
+def test_login_view_get(client):
+    response = client.get("/login/")
+    assert response.status_code == 200
+    assert "form" in response.context
+
+
+@pytest.mark.django_db
+def test_login_view_post_valid_credentials(client):
+    User.objects.create_user(username="u", password="pass", email="u@example.com")
+    response = client.post("/login/", {"email": "u@example.com", "password": "pass"})
+    assert response.status_code == 302
+    assert response.url == "/"
+    assert "_auth_user_id" in client.session
+
+
+@pytest.mark.django_db
+def test_login_view_post_valid_credentials_next_redirect(client):
+    # Simulate real browser flow: form action is /login/, ?next= comes from hidden field
+    User.objects.create_user(username="u2", password="pass", email="u2@example.com")
+    response = client.post(
+        "/login/",
+        {"email": "u2@example.com", "password": "pass", "next": "/race/kolco24_2025/"},
+    )
+    assert response.status_code == 302
+    assert response.url == "/race/kolco24_2025/"
+
+
+@pytest.mark.django_db
+def test_login_view_post_invalid_credentials(client):
+    User.objects.create_user(username="u3", password="pass", email="u3@example.com")
+    response = client.post("/login/", {"email": "u3@example.com", "password": "wrong"})
+    assert response.status_code == 200
+    assert "_auth_user_id" not in client.session
+
+
+@pytest.mark.django_db
+def test_passlogin_url_returns_404(client):
+    response = client.get("/passlogin/")
+    assert response.status_code == 404
+
+
+@pytest.mark.django_db
+def test_login_view_post_blocks_open_redirect(client):
+    User.objects.create_user(username="u4", password="pass", email="u4@example.com")
+    response = client.post(
+        "/login/?next=https://evil.com/steal",
+        {"email": "u4@example.com", "password": "pass"},
+    )
+    assert response.status_code == 302
+    assert response.url == "/"
+
+
+@pytest.mark.django_db
+def test_login_required_redirects_to_login_url(client):
+    response = client.get("/team/")
+    assert response.status_code == 302
+    assert "/login/" in response.url
+
+
+@pytest.mark.django_db
 def test_register_view_post_duplicate_email_shows_error(client):
     User.objects.create_user(
         username="existing", email="ivan@example.com", password="x"

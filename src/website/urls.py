@@ -42,7 +42,7 @@ urlpatterns = [
         CustomPasswordResetCompleteView.as_view(),
         name="password_reset_complete",
     ),
-    path("passlogin/", views.PassLoginView.as_view(), name="passlogin"),
+    path("login/", views.LoginView.as_view(), name="login"),
     path("logout/", views.LogoutUserView.as_view(), name="logout"),
     path("impersonate/", views.impersonate, name="impersonate"),
     path("impersonate/stop/", views.stop_impersonate, name="stop_impersonate"),

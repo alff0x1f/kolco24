@@ -1,0 +1,84 @@
+{% extends "website/base-2.html" %}
+
+{% block title %}Вход · Кольцо 24{% endblock %}
+{% block head_descr %}Вход в личный кабинет Кольцо 24 — соревнования по спортивному ориентированию.{% endblock %}
+
+{% block content %}
+<main class="page login-page">
+  <div class="login-wrap">
+
+    <header class="page-head">
+      <h1>Вход в&nbsp;личный кабинет</h1>
+    </header>
+
+    <form class="card" action="{% url 'login' %}" method="POST" novalidate>
+      {% csrf_token %}
+      <input type="hidden" name="next" value="{{ next }}">
+      <div class="card-pad">
+
+        {% if messages or form.non_field_errors %}
+        <div class="err-banner show">
+          {% for message in messages %}{{ message }}{% if not forloop.last %}<br>{% endif %}{% endfor %}
+          {% for error in form.non_field_errors %}{{ error }}{% if not forloop.last %}<br>{% endif %}{% endfor %}
+        </div>
+        {% endif %}
+
+        <div class="form">
+          <div class="field">
+            <label for="email">E-mail</label>
+            <input
+              class="input{% if form.email.errors %} has-error{% endif %}"
+              id="email" name="email" type="email"
+              autocomplete="email" placeholder="you@example.ru"
+              value="{{ form.email.value|default:'' }}"
+              autofocus
+            >
+            {% if form.email.errors %}
+            <span class="hint err">{{ form.email.errors|join:", " }}</span>
+            {% endif %}
+          </div>
+
+          <div class="field">
+            <div class="field-head">
+              <label for="password">Пароль</label>
+              <a class="forgot" href="{% url 'password_reset' %}">Забыли пароль?</a>
+            </div>
+            <div class="input-wrap">
+              <input
+                class="input with-adorn{% if form.password.errors %} has-error{% endif %}"
+                id="password" name="password" type="password"
+                autocomplete="current-password" placeholder="Ваш пароль"
+              >
+              <button type="button" class="adorn" id="togglePwd" aria-label="Показать пароль">
+                <svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M2 10s3-6 8-6 8 6 8 6-3 6-8 6-8-6-8-6Z"/><circle cx="10" cy="10" r="2.5"/></svg>
+              </button>
+            </div>
+            {% if form.password.errors %}
+            <span class="hint err">{{ form.password.errors|join:", " }}</span>
+            {% endif %}
+          </div>
+
+          <button class="btn btn-primary btn-lg btn-block" type="submit">Войти</button>
+        </div>
+      </div>
+    </form>
+
+    <div class="below">
+      Ещё нет аккаунта? <a href="{% url 'register' %}">Зарегистрироваться&nbsp;→</a>
+    </div>
+
+  </div>
+</main>
+
+<script>
+  (function () {
+    var btn = document.getElementById('togglePwd');
+    var pwd = document.getElementById('password');
+    btn.addEventListener('click', function () {
+      var isPwd = pwd.type === 'password';
+      pwd.type = isPwd ? 'text' : 'password';
+      btn.setAttribute('aria-label', isPwd ? 'Скрыть пароль' : 'Показать пароль');
+    });
+  })();
+</script>
+{% endblock %}

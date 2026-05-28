@@ -5,6 +5,7 @@ from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from time import gmtime, strftime, time
+from urllib.parse import quote
 
 from django.conf import settings
 from django.contrib import messages
@@ -276,7 +277,7 @@ class TransferView(View):
 
 
 @method_decorator(
-    user_passes_test(can_manage_transfer, login_url="passlogin"), name="dispatch"
+    user_passes_test(can_manage_transfer, login_url="login"), name="dispatch"
 )
 class TransferPaidListView(View):
     template_name = "website/transfer_paid_list.html"
@@ -312,7 +313,7 @@ class TransferPaidListView(View):
         )
 
 
-@method_decorator(user_passes_test(is_admin, login_url="passlogin"), name="dispatch")
+@method_decorator(user_passes_test(is_admin, login_url="login"), name="dispatch")
 class TeamMemberRaceLogView(View):
     template_name = "website/team_member_race_logs.html"
 
@@ -485,7 +486,7 @@ class BreakfastView(View):
 
 
 @method_decorator(
-    user_passes_test(can_manage_breakfast, login_url="passlogin"), name="dispatch"
+    user_passes_test(can_manage_breakfast, login_url="login"), name="dispatch"
 )
 class BreakfastAdminView(View):
     template_name = "website/breakfast_admin.html"
@@ -595,7 +596,7 @@ class BreakfastAdminView(View):
 
 
 @method_decorator(
-    user_passes_test(can_manage_breakfast, login_url="passlogin"), name="dispatch"
+    user_passes_test(can_manage_breakfast, login_url="login"), name="dispatch"
 )
 class BreakfastPaidListView(View):
     template_name = "website/breakfast_paid_list.html"
@@ -640,18 +641,23 @@ def index_dummy(request):
     return render(request, "website/index_dummy.html")
 
 
-class PassLoginView(View):
-    template = "website/passlogin.html"
+class LoginView(View):
+    template = "website/login.html"
 
     def get(self, request, *args, **kwargs):
         if request.user.is_authenticated:
-            return HttpResponseRedirect("/")
+            return _safe_redirect(request, request.GET.get("next", "/"))
         form = LoginForm()
-        return render(request, self.template, {"form": form})
+        return render(
+            request,
+            self.template,
+            {"form": form, "next": request.GET.get("next", "")},
+        )
 
     def post(self, request, *args, **kwargs):
+        next_url = request.POST.get("next") or request.GET.get("next", "/")
         if request.user.is_authenticated:
-            return HttpResponseRedirect("/")
+            return _safe_redirect(request, next_url)
         form = LoginForm(request.POST)
         if form.is_valid():
             email = form.cleaned_data.get("email")
@@ -661,12 +667,12 @@ class PassLoginView(View):
 
             if user is not None:
                 auth_login(request, user)
-                return HttpResponseRedirect("/")
+                return _safe_redirect(request, next_url)
             else:
                 messages.error(
                     request, "Неправильный email или пароль. Попробуйте снова."
                 )
-        return render(request, self.template, {"form": form})
+        return render(request, self.template, {"form": form, "next": next_url})
 
 
 class LogoutUserView(View):
@@ -718,7 +724,7 @@ def _mark_field_invalid(field):
 
 def impersonate(request):
     if not request.user.is_authenticated:
-        return HttpResponseRedirect(reverse("passlogin") + f"?next={request.path}")
+        return HttpResponseRedirect(reverse("login") + f"?next={request.path}")
 
     # Check if the original user (either current user or impersonator) is a superuser
     original_user_id = request.session.get("impersonator_id") or request.user.pk
@@ -1123,7 +1129,7 @@ def team_admin(request, teamid=""):
 class NewPaymentView(View):
     def post(self, request):
         if not request.user.is_authenticated:
-            return HttpResponseRedirect(reverse("passlogin") + f"?next={request.path}")
+            return HttpResponseRedirect(reverse("login") + f"?next={request.path}")
 
         paymentid = request.POST.get("paymentid", "")
         try:
@@ -1822,7 +1828,7 @@ class AllTeamsView(View):
 class MyTeamsView(View):
     def get(self, request, race_slug):
         if not request.user.is_authenticated:
-            return HttpResponseRedirect(reverse("passlogin") + f"?next={request.path}")
+            return HttpResponseRedirect(reverse("login") + f"?next={request.path}")
 
         try:
             race = Race.objects.annotate(
@@ -1878,7 +1884,7 @@ class AddTeam(View):
         race = get_object_or_404(Race, slug=race_slug)
 
         if not request.user.is_authenticated:
-            return HttpResponseRedirect(reverse("passlogin") + f"?next={request.path}")
+            return HttpResponseRedirect(reverse("login") + f"?next={request.path}")
         form = TeamForm(race.id)
         return render(
             request,
@@ -1896,7 +1902,7 @@ class AddTeam(View):
 
     def post(self, request, race_slug):
         if not request.user.is_authenticated:
-            return HttpResponseRedirect(reverse("passlogin") + f"?next={request.path}")
+            return HttpResponseRedirect(reverse("login") + f"?next={request.path}")
 
         race = get_object_or_404(Race, slug=race_slug)
         if not race.is_teams_editable:
@@ -2014,7 +2020,9 @@ class AddTeam(View):
 class TeamPayment(View):
     def get(self, request, team_id):
         if not request.user.is_authenticated:
-            return HttpResponseRedirect(reverse("passlogin") + f"?next={request.path}")
+            return HttpResponseRedirect(
+                reverse("login") + "?next=" + quote(request.get_full_path())
+            )
         # if not settings.REG_OPEN:
         #     return HttpResponse("Регистрация закрыта")
 
