@@ -529,5 +529,3 @@ def test_race_link_clean_rejects_invalid_url():
     with pytest.raises(ValidationError) as exc_info:
         link.full_clean()
     assert "url" in exc_info.value.message_dict
-
-

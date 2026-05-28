@@ -30,7 +30,7 @@
           <h1>{{ race.name }} · {{ race.date }}</h1>
           <div class="sub">
             {% if race.place %}<span>📍 {{ race.place }}</span><span class="dot"></span>{% endif %}
-            <span>{{ race_people_count }} участников</span>
+            <span>{{ race_people_count|floatformat:0 }} участников</span>
             <span class="dot"></span>
             <span>{{ race_team_count }} команд</span>
           </div>
@@ -143,7 +143,7 @@
                   <circle cx="10" cy="7" r="3"/><path d="M4 17c0-3 2.7-5 6-5s6 2 6 5"/>
                 </svg>
                 <span class="label">Участников</span>
-                <span class="value">{{ race_people_count }}</span>
+                <span class="value">{{ race_people_count|floatformat:0 }}</span>
               </li>
               <li>
                 <svg class="icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6">
