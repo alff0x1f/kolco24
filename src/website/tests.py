@@ -397,7 +397,6 @@ def test_race_page_view_context_keys(client):
         "categories",
         "links",
         "news_list",
-        "news_count",
         "reg_open",
         "reg_upcoming",
         "race_team_count",
@@ -532,13 +531,3 @@ def test_race_link_clean_rejects_invalid_url():
     assert "url" in exc_info.value.message_dict
 
 
-@pytest.mark.django_db
-def test_race_page_view_news_count_exceeds_list(client):
-    from website.models import NewsPost
-
-    race = Race.objects.create(name="NC", code="nc1", slug="nc-2025")
-    for i in range(11):
-        NewsPost.objects.create(race=race, title=f"Post {i}", content=f"body {i}")
-    response = client.get(f"/race/{race.slug}/")
-    assert response.context["news_count"] == 11
-    assert len(response.context["news_list"]) == 10

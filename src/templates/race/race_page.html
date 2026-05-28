@@ -90,7 +90,7 @@
 
         <section class="card tabs-card">
           <div class="tabs-head">
-            <h2>Новости <span class="badge">{{ news_count }}</span></h2>
+            <h2>Новости <span class="badge">{{ news_list|length }}</span></h2>
           </div>
           <div class="tab-body">
             {% for news in news_list %}
