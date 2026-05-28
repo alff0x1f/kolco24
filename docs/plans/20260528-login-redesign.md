@@ -102,9 +102,9 @@ Key benefits:
 **Files:**
 - Modify: `src/templates/website/register.html`
 
-- [ ] In `register.html`: `{% url 'passlogin' %}` → `{% url 'login' %}`
-- [ ] Grep all templates for remaining `passlogin` references and update: `grep -r "passlogin" src/templates/`
-- [ ] Run `uv run pytest src/website/tests.py` — must pass before Task 5
+- [x] In `register.html`: `{% url 'passlogin' %}` → `{% url 'login' %}` (already done in Task 3)
+- [x] Grep all templates for remaining `passlogin` references and update: `grep -r "passlogin" src/templates/`
+- [x] Run `uv run pytest src/website/tests.py` — must pass before Task 5
 
 ### Task 5: Verify acceptance criteria
 
