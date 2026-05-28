@@ -81,7 +81,7 @@
 
 **Важно:** `Race.team_count()` и `Race.people_count()` — методы (каждый вызов = отдельный DB-запрос). Вычислить один раз в view и передать как контекст. Аннотация `team_count` на queryset категорий — это другой объект.
 
-- [ ] создать `src/apps/race/views.py`:
+- [x] создать `src/apps/race/views.py`:
   ```python
   from django.db.models import Count, OuterRef, Subquery
   from django.http import Http404
@@ -129,8 +129,8 @@
           return render(request, "race/race_page.html", context)
   ```
   Анонимным пользователям login-форма не нужна — в шаблоне будет ссылка на `/login/`.
-- [ ] проверить импорты: `Team` нужен для аннотации (взять из `website.models`)
-- [ ] `uv run python src/manage.py check` — без ошибок
+- [x] проверить импорты: `Team` нужен для аннотации (взять из `website.models`)
+- [x] `uv run python src/manage.py check` — без ошибок
 
 ### Task 3: Подключить URL и обновить `AddNewsPostView`
 
