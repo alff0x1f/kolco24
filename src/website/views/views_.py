@@ -112,9 +112,11 @@ class AddNewsPostView(View):
             return HttpResponseRedirect(
                 reverse("race", kwargs={"race_slug": race_slug})
             )
-        context = RaceNewsView.get_context(race)
+        from apps.race.views import RacePageView
+
+        context = RacePageView.build_context(race, request.user)
         context["post_form"] = form
-        return render(request, "website/news.html", context)
+        return render(request, "race/race_page.html", context)
 
 
 class RaceIdRedirectView(View):

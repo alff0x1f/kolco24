@@ -139,17 +139,17 @@
 - Modify: `src/website/views/views_.py`
 
 **Шаг A — URL:**
-- [ ] добавить импорт в `src/website/urls.py`: `from apps.race.views import RacePageView`
-- [ ] изменить строку 77: `path("race/<slug:race_slug>/", views.RaceNewsView.as_view(), ...)` → `path("race/<slug:race_slug>/", RacePageView.as_view(), name="race")`
-- [ ] создать временную заглушку `src/templates/race/race_page.html` (`{% extends "website/base-2.html" %}{% block content %}OK{% endblock %}`) чтобы URL работал
-- [ ] проверить: `uv run python src/manage.py check` — без ошибок; `curl -s http://localhost:8080/race/kolco24_2025/` → 200
+- [x] добавить импорт в `src/website/urls.py`: `from apps.race.views import RacePageView`
+- [x] изменить строку 77: `path("race/<slug:race_slug>/", views.RaceNewsView.as_view(), ...)` → `path("race/<slug:race_slug>/", RacePageView.as_view(), name="race")`
+- [x] создать временную заглушку `src/templates/race/race_page.html` (`{% extends "website/base-2.html" %}{% block content %}OK{% endblock %}`) чтобы URL работал
+- [x] проверить: `uv run python src/manage.py check` — без ошибок; `curl -s http://localhost:8080/race/kolco24_2025/` → 200
 
 **Шаг B — `AddNewsPostView.post` (views_.py:115-117):**
 
 При ошибке валидации формы этот view рендерит `website/news.html` через `RaceNewsView.get_context`. Обновим его на новый шаблон:
 
-- [ ] в `src/website/views/views_.py` найти `AddNewsPostView.post` (line 103)
-- [ ] заменить блок ошибки формы (lines 115-117):
+- [x] в `src/website/views/views_.py` найти `AddNewsPostView.post` (line 103)
+- [x] заменить блок ошибки формы (lines 115-117):
   ```python
   # было:
   context = RaceNewsView.get_context(race)
@@ -182,9 +182,9 @@
   Затем в `get()`: `context = self.build_context(race, request.user)`.
   В `AddNewsPostView.post`: `from apps.race.views import RacePageView; context = RacePageView.build_context(race, request.user)`.
 
-- [ ] обновить `apps/race/views.py` — вынести логику контекста в `build_context(race, user=None)`
-- [ ] обновить `AddNewsPostView.post` в `views_.py` — использовать `RacePageView.build_context`
-- [ ] `uv run python src/manage.py check` — без ошибок
+- [x] обновить `apps/race/views.py` — вынести логику контекста в `build_context(race, user=None)`
+- [x] обновить `AddNewsPostView.post` в `views_.py` — использовать `RacePageView.build_context`
+- [x] `uv run python src/manage.py check` — без ошибок
 
 ### Task 4: Создать `race.css`
 

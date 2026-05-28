@@ -10,11 +10,8 @@ from website.views.views_ import is_race_admin
 
 
 class RacePageView(View):
-    def get(self, request, race_slug):
-        try:
-            race = Race.objects.get(slug=race_slug)
-        except Race.DoesNotExist:
-            raise Http404
+    @staticmethod
+    def build_context(race, user=None):
         categories = (
             Category.active_objects.filter(race=race)
             .order_by("order", "id")
@@ -39,6 +36,14 @@ class RacePageView(View):
             "race_team_count": race.team_count(),
             "race_people_count": race.people_count(),
         }
-        if is_race_admin(request.user, race):
+        if user is not None and is_race_admin(user, race):
             context["post_form"] = NewsPostForm()
+        return context
+
+    def get(self, request, race_slug):
+        try:
+            race = Race.objects.get(slug=race_slug)
+        except Race.DoesNotExist:
+            raise Http404
+        context = self.build_context(race, request.user)
         return render(request, "race/race_page.html", context)
