@@ -1,5 +1,5 @@
 from django.db.models import Q
-from django.http import HttpResponse, HttpResponseRedirect
+from django.http import Http404, HttpResponse, HttpResponseRedirect
 from django.shortcuts import render
 from django.urls import reverse
 from django.views import View
@@ -24,7 +24,7 @@ class EditTeamView(View):
 
         team: Team = self.get_team(team_id)
         if not team:
-            return HttpResponseRedirect(reverse("login") + f"?next={request.path}")
+            raise Http404
 
         race = team.category2.race
 
@@ -81,7 +81,7 @@ class EditTeamView(View):
 
         team: Team = self.get_team(team_id)
         if not team:
-            return HttpResponseRedirect(reverse("login") + f"?next={request.path}")
+            raise Http404
         race = team.category2.race
 
         if not team.category2.race.is_teams_editable and not request.user.is_superuser:
