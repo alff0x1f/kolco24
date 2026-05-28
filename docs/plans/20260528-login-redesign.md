@@ -80,6 +80,7 @@ Key benefits:
 - Create: `src/templates/website/login.html`
 - Delete: `src/templates/website/passlogin.html`
 
+- [ ] Use `scratch/Вход.html` as the reference design for all markup, CSS classes, and JS
 - [ ] Create `src/templates/website/login.html` extending `base-2.html`
 - [ ] Add `{% block title %}Вход · Кольцо 24{% endblock %}` and description meta block
 - [ ] Page layout: centered `.login-wrap` (max-width 420px), `.page-head` with `<h1>Вход в личный кабинет</h1>` and subtitle
