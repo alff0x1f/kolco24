@@ -1,111 +1,202 @@
-{% extends "website/base.html" %}
+{% extends "website/base-2.html" %}
+
+{% block title %}Регистрация · Кольцо 24{% endblock %}
+{% block head_descr %}Регистрация участника на Кольцо 24 — соревнования по спортивному ориентированию.{% endblock %}
+{% block og_title %}Регистрация · Кольцо 24{% endblock %}
+{% block og_description %}Создайте аккаунт, чтобы записать команду на гонку и следить за результатами.{% endblock %}
 
 {% block content %}
-    <section class="space-sm">
-        <div class="container">
-            <div class="row flex-md-row card card-lg">
-                <div class="col-12 col-md-7 card-body bg-secondary">
-                    <div class="text-center mb-3">
-                        <h1 class="h2 mb-2">Регистрация аккаунта</h1>
-                        <span>Данные представителя команды</span>
-                    </div>
-                    <div class="row justify-content-center">
-                        <div class="col-12 col-lg-9">
-                            <form  action="{% url 'register' %}" method="POST">
-                                {% csrf_token %}
-                                <div class="form-row form-group">
-                                    <div class="col">
-                                        {{ reg_form.last_name }}
-                                    </div>
-                                    <div class="col">
-                                        {{ reg_form.first_name }}
-                                    </div>
-                                </div>
-                                <div class="form-row form-group">
-                                    <div class="col">
-                                        {{ reg_form.email.label_tag }}
-                                        {{ reg_form.email }}
-                                    </div>
-                                </div>
-                                <div class="form-row form-group">
-                                    <div class="col">
-                                        {{ reg_form.phone.label_tag }}
-                                        {{ reg_form.phone }}
-                                    </div>
-                                </div>
-                                {% if reg_form.phone.errors %}
-                                    <div class="invalid-feedback">
-                                        {{ reg_form.phone.errors }}
-                                    </div>
-                                {% endif %}
-                                <div class="form-row form-group">
-                                    <div class="col">
-                                        {{ reg_form.password.label_tag }}
-                                        {{ reg_form.password }}
-                                    </div>
-                                </div>
-                                <!-- Non-field form errors -->
-                                {% if reg_form.non_field_errors %}
-                                    <div class="alert alert-danger">
-                                        {{ reg_form.non_field_errors }}
-                                    </div>
-                                {% endif %}
-                                <div class="form-row form-group">
-                                    <div class="col">
-                                        <button class="btn btn-block btn-success btn-lg" type="submit">Создать аккаунт
-                                        </button>
-                                    </div>
-                                </div>
-                                <div class="text-center">
-                                    <span class="text-small">Уже есть аккаунт? <a href="{% url 'passlogin' %}">Войти</a></span>
-                                </div>
-                            </form>
-                        </div>
-                    </div>
-                </div>
-                <!--end of col-->
-                <div class="col-12 col-md-5 card-body">
-                    <div>
-                        <div class="mb-3 text-center">
-                            <h3 class="h2 mb-2">Стартовый взнос</h3>
-                        </div>
-                        <ul class="list-unstyled list-spacing-sm mb-3 ">
-                            <li class="row align-items-center">
-                                <div class="col-3 col-md-3">2000 руб</div>
-                                <div class="col-9">С 15 по 17 сентября</div>
-                            </li>
-                            <li class="row align-items-center">
-                                <div class="col-3 col-md-3">2500 руб</div>
-                                <div class="col-9">С 18 по 30 сентября</div>
-                            </li>
-                            <li class="row align-items-center">
-                                <div class="col-3 col-md-3">3000 руб</div>
-                                <div class="col-9">С 1 по 9 октября</div>
-                            </li>
-                        </ul>
-                        <ul class="list-unstyled list-spacing-sm mb-5 ">
-                            <li class="row">
-                                <div class="col-2 col-md-1"><i class="icon-minus h5 text-muted"></i>
-                                </div>
-                                <div class="col-10">При достижении лимита участников, регистрация может прекратиться
-                                    раньше
-                                </div>
-                            </li>
-                            <li class="row align-items-center">
-                                <div class="col-2 col-md-1"><i class="icon-minus h5 text-muted"></i>
-                                </div>
-                                <div class="col-10">Возврат взносов за вычетом понесенных расходов возможен до 1
-                                    октября
-                                </div>
-                            </li>
-                        </ul>
+<div class="page">
+    <div class="container">
 
+        <nav class="crumbs" aria-label="Хлебные крошки">
+            <a href="/">Главная</a>
+            <span class="sep">/</span>
+            <span>Регистрация</span>
+        </nav>
+
+        <header class="page-head">
+            <div>
+                <h1>Регистрация</h1>
+                <div class="sub">Создайте аккаунт, чтобы записать команду на&nbsp;гонку и&nbsp;следить за&nbsp;результатами.</div>
+            </div>
+            <div class="login-hint">
+                Уже есть аккаунт? <a href="{% url 'passlogin' %}">Войти&nbsp;→</a>
+            </div>
+        </header>
+
+        <div class="grid">
+
+            <!-- ─── MAIN: form ─── -->
+            <main>
+                <form class="card" action="{% url 'register' %}" method="POST" id="regForm" novalidate>
+                    {% csrf_token %}
+
+                    {% if reg_form.non_field_errors %}
+                    <div class="card-section" style="padding-bottom:0;">
+                        <div class="alert-error">
+                            {% for error in reg_form.non_field_errors %}{{ error }}{% endfor %}
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    <div class="card-section">
+                        <div class="card-section-head">
+                            <h2>Аккаунт</h2>
+                        </div>
+                        <div class="form-grid">
+
+                            <div class="field">
+                                <label for="firstName">Имя</label>
+                                <input class="input{% if reg_form.first_name.errors %} has-error{% endif %}"
+                                       id="firstName" name="first_name" type="text"
+                                       value="{{ reg_form.first_name.value|default:'' }}"
+                                       placeholder="Алексей" autocomplete="given-name">
+                                {% if reg_form.first_name.errors %}
+                                <span class="hint err">{{ reg_form.first_name.errors|join:", " }}</span>
+                                {% endif %}
+                            </div>
+
+                            <div class="field">
+                                <label for="lastName">Фамилия</label>
+                                <input class="input{% if reg_form.last_name.errors %} has-error{% endif %}"
+                                       id="lastName" name="last_name" type="text"
+                                       value="{{ reg_form.last_name.value|default:'' }}"
+                                       placeholder="Иванов" autocomplete="family-name">
+                                {% if reg_form.last_name.errors %}
+                                <span class="hint err">{{ reg_form.last_name.errors|join:", " }}</span>
+                                {% endif %}
+                            </div>
+
+                            <div class="field">
+                                <label for="email">E-mail</label>
+                                <input class="input{% if reg_form.email.errors %} has-error{% endif %}"
+                                       id="email" name="email" type="email"
+                                       value="{{ reg_form.email.value|default:'' }}"
+                                       placeholder="you@example.ru" autocomplete="email">
+                                {% if reg_form.email.errors %}
+                                <span class="hint err">{{ reg_form.email.errors|join:", " }}</span>
+                                {% else %}
+                                <span class="hint">На&nbsp;него придёт письмо для подтверждения.</span>
+                                {% endif %}
+                            </div>
+
+                            <div class="field">
+                                <label for="phone">Телефон</label>
+                                <input class="input{% if reg_form.phone.errors %} has-error{% endif %}"
+                                       id="phone" name="phone" type="tel"
+                                       value="{{ reg_form.phone.value|default:'' }}"
+                                       placeholder="+7 (900) 123-45-67" autocomplete="tel">
+                                {% if reg_form.phone.errors %}
+                                <span class="hint err">{{ reg_form.phone.errors|join:", " }}</span>
+                                {% endif %}
+                            </div>
+
+                            <div class="field full">
+                                <label for="password">Пароль</label>
+                                <div class="input-wrap">
+                                    <input class="input with-adorn{% if reg_form.password.errors %} has-error{% endif %}"
+                                           id="password" name="password" type="password"
+                                           placeholder="Минимум 8 символов" autocomplete="new-password">
+                                    <button type="button" class="adorn" id="togglePwd" aria-label="Показать пароль">
+                                        <svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M2 10s3-6 8-6 8 6 8 6-3 6-8 6-8-6-8-6Z"/><circle cx="10" cy="10" r="2.5"/></svg>
+                                    </button>
+                                </div>
+                                <div class="strength" id="strength" aria-hidden="true"><span></span><span></span><span></span><span></span></div>
+                                {% if reg_form.password.errors %}
+                                <span class="hint err">{{ reg_form.password.errors|join:", " }}</span>
+                                {% else %}
+                                <span class="hint">Буквы, цифры и&nbsp;один спецсимвол&nbsp;— безопаснее.</span>
+                                {% endif %}
+                            </div>
+
+                        </div>
+                    </div>
+
+                    <div class="card-section">
+                        <div class="card-section-head">
+                            <h2>Согласия</h2>
+                        </div>
+                        <div style="display: flex; flex-direction: column; gap: 6px;">
+                            <div>
+                                <label class="check">
+                                    <input type="checkbox" name="agree_privacy"{% if reg_form.agree_privacy.value %} checked{% endif %}>
+                                    <span class="box"></span>
+                                    <span>Даю согласие на&nbsp;обработку персональных данных согласно <a href="{% url 'page' 'privacy_site' %}" onclick="event.stopPropagation()">политике&nbsp;ПДн</a>.</span>
+                                </label>
+                                {% if reg_form.agree_privacy.errors %}
+                                <span class="hint err">{{ reg_form.agree_privacy.errors|join:", " }}</span>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="submit-row">
+                        <p class="small">Нажимая «Зарегистрироваться», вы подтверждаете, что вам исполнилось 18 лет. Участие в соревнованиях только для совершеннолетних.</p>
+                        <div class="actions">
+                            <a class="btn btn-ghost" href="/">Отмена</a>
+                            <button class="btn btn-primary btn-lg" type="submit">Зарегистрироваться</button>
+                        </div>
+                    </div>
+
+                </form>
+            </main>
+
+            <!-- ─── SIDEBAR ─── -->
+            <aside class="sidebar">
+
+                <div class="card">
+                    <div class="side-head">
+                        <h3>Нужна помощь?</h3>
+                    </div>
+                    <div class="help-card">
+                        <p>Если что-то&nbsp;не работает или&nbsp;есть вопросы по&nbsp;регистрации&nbsp;— напишите нам, мы&nbsp;поможем с&nbsp;учётками и&nbsp;командами.</p>
+                        <div style="display: flex; flex-direction: column; gap: 8px; align-items: flex-start;">
+                            <a class="contact" href="mailto:org@kolco24.ru">
+                                <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="2.5" y="4.5" width="15" height="11" rx="1.5"/><path d="m3 6 7 5 7-5"/></svg>
+                                org@kolco24.ru
+                            </a>
+                            <a class="contact" href="https://t.me/alff0x1f">
+                                <svg viewBox="0 0 20 20" fill="currentColor"><path d="M10 1.7a8.3 8.3 0 1 0 0 16.6 8.3 8.3 0 0 0 0-16.6Zm3.85 5.7-1.29 6.07c-.1.43-.36.54-.72.34l-2-1.47-.96.93c-.11.11-.2.2-.4.2l.14-2.04 3.7-3.35c.16-.14-.04-.22-.25-.08L7.5 10.85l-1.97-.62c-.43-.13-.44-.43.09-.63l7.7-2.97c.36-.13.67.08.55.77Z"/></svg>
+                                Ильдус
+                            </a>
+                        </div>
                     </div>
                 </div>
-                <!--end of col-->
-            </div>
-            <!--end of row-->
+
+            </aside>
+
         </div>
-        <!--end of container-->
-    </section>
+    </div>
+</div>
+{% endblock %}
+
+{% block footer_js_include %}
+<script>
+    (function () {
+        var btn = document.getElementById('togglePwd');
+        var pwd = document.getElementById('password');
+        if (!btn || !pwd) return;
+        btn.addEventListener('click', function () {
+            var isPwd = pwd.type === 'password';
+            pwd.type = isPwd ? 'text' : 'password';
+            btn.setAttribute('aria-label', isPwd ? 'Скрыть пароль' : 'Показать пароль');
+        });
+    })();
+
+    (function () {
+        var pwd = document.getElementById('password');
+        var meter = document.getElementById('strength');
+        if (!pwd || !meter) return;
+        pwd.addEventListener('input', function () {
+            var v = pwd.value;
+            var s = 0;
+            if (v.length >= 8) s++;
+            if (/[A-Za-zА-Яа-я]/.test(v) && /\d/.test(v)) s++;
+            if (/[^A-Za-zА-Яа-я0-9]/.test(v)) s++;
+            if (v.length >= 12) s++;
+            meter.className = 'strength' + (s ? ' s' + s : '');
+        });
+    })();
+</script>
 {% endblock %}

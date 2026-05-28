@@ -241,6 +241,76 @@ def test_add_post_non_admin_user(client):
     assert response.status_code == 403
 
 
+REG_FORM_BASE = {
+    "first_name": "Иван",
+    "last_name": "Иванов",
+    "email": "ivan@example.com",
+    "phone": "+79001234567",
+    "password": "secret123",
+    "agree_privacy": True,
+}
+
+
+@pytest.mark.django_db
+def test_reg_form_missing_agree_privacy():
+    from website.forms import RegForm
+
+    data = {**REG_FORM_BASE, "agree_privacy": False}
+    form = RegForm(data=data)
+    assert not form.is_valid()
+    assert "agree_privacy" in form.errors
+
+
+@pytest.mark.django_db
+def test_reg_form_all_required_fields_valid():
+    from website.forms import RegForm
+
+    form = RegForm(data=REG_FORM_BASE)
+    assert form.is_valid(), form.errors
+
+
+@pytest.mark.django_db
+def test_reg_form_rejects_existing_email():
+    from website.forms import RegForm
+
+    User.objects.create_user(
+        username="existing", email="ivan@example.com", password="x"
+    )
+    form = RegForm(data=REG_FORM_BASE)
+    assert not form.is_valid()
+    assert form.non_field_errors()
+
+
+@pytest.mark.django_db
+def test_reg_form_rejects_duplicate_email_case_insensitive():
+    from website.forms import RegForm
+
+    User.objects.create_user(
+        username="existing", email="IVAN@EXAMPLE.COM", password="x"
+    )
+    form = RegForm(data=REG_FORM_BASE)  # submits "ivan@example.com"
+    assert not form.is_valid()
+    assert form.non_field_errors()
+
+
+@pytest.mark.django_db
+def test_register_view_post_creates_user(client):
+    response = client.post("/register/", REG_FORM_BASE)
+    assert response.status_code == 302
+    assert User.objects.filter(email="ivan@example.com").exists()
+
+
+@pytest.mark.django_db
+def test_register_view_post_duplicate_email_shows_error(client):
+    User.objects.create_user(
+        username="existing", email="ivan@example.com", password="x"
+    )
+    response = client.post("/register/", REG_FORM_BASE)
+    assert response.status_code == 200
+    assert "reg_form" in response.context
+    assert response.context["reg_form"].non_field_errors()
+
+
 @pytest.mark.django_db
 def test_race_news_view_shows_form_for_admin(client):
     from website.models.race import RaceAdmin

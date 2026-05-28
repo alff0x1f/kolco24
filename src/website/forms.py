@@ -5,6 +5,7 @@ from datetime import timedelta
 from django import forms
 from django.contrib.auth.forms import PasswordResetForm, SetPasswordForm
 from django.contrib.auth.models import User
+from django.utils.safestring import mark_safe
 
 from website.models import (
     Athlet,
@@ -19,6 +20,10 @@ from website.models.race import Category, Race
 
 BUS_REGISTRATION_MAX_PASSENGERS = 20
 BREAKFAST_MAX_ATTENDEES = 20
+DUPLICATE_EMAIL_MSG = mark_safe(
+    "Пользователь с таким email уже зарегистрирован. "
+    '<a href="/passlogin/">Войдите</a> в существующий аккаунт.'
+)
 
 
 class LoginForm(forms.Form):
@@ -127,10 +132,14 @@ class RegForm(forms.Form):
     )
     ucount = forms.IntegerField(required=False)
     dist = forms.CharField(required=False)
+    agree_privacy = forms.BooleanField(required=True)
 
     def __init__(self, *args, **kwargs):
         self.user = kwargs.pop("user", None)
+        require_agreements = kwargs.pop("require_agreements", True)
         super(RegForm, self).__init__(*args, **kwargs)
+        if not require_agreements:
+            self.fields["agree_privacy"].required = False
 
     @staticmethod
     def id_generator(
@@ -153,11 +162,7 @@ class RegForm(forms.Form):
             while User.objects.filter(username=username).exists():
                 username = self.id_generator(12)
 
-            old_user = User.objects.filter(email__iexact=self.cleaned_data["email"])[:1]
-            if old_user:
-                user = old_user.get()
-            else:
-                user = User.objects.create_user(username, email, password)
+            user = User.objects.create_user(username, email, password)
             user.first_name = first_name
             user.last_name = last_name
             user.profile.phone = phone
@@ -182,19 +187,14 @@ class RegForm(forms.Form):
         return request_user
 
     def clean(self):
-        # make invalid forms red:
-        if self.errors:
-            for f_name in self.fields:
-                if f_name in self.errors:
-                    classes = self.fields[f_name].widget.attrs.get("class", "")
-                    classes += " is-invalid"
-                    self.fields[f_name].widget.attrs["class"] = classes
-            raise forms.ValidationError("Заполните все поля")
+        if "email" not in self.cleaned_data:
+            return super(RegForm, self).clean()
 
-        if Team.objects.filter(
-            owner__email__iexact=self.cleaned_data["email"], year=2024
-        ).exists():
-            raise forms.ValidationError("Такой email уже зарегистрирован.")
+        qs = User.objects.filter(email__iexact=self.cleaned_data["email"])
+        if self.user and self.user.is_authenticated:
+            qs = qs.exclude(pk=self.user.pk)
+        if qs.exists():
+            raise forms.ValidationError(DUPLICATE_EMAIL_MSG)
         return super(RegForm, self).clean()
 
 
