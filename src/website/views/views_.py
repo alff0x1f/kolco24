@@ -5,6 +5,7 @@ from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from time import gmtime, strftime, time
+from urllib.parse import quote
 
 from django.conf import settings
 from django.contrib import messages
@@ -2019,7 +2020,9 @@ class AddTeam(View):
 class TeamPayment(View):
     def get(self, request, team_id):
         if not request.user.is_authenticated:
-            return HttpResponseRedirect(reverse("login") + f"?next={request.path}")
+            return HttpResponseRedirect(
+                reverse("login") + "?next=" + quote(request.get_full_path())
+            )
         # if not settings.REG_OPEN:
         #     return HttpResponse("Регистрация закрыта")
 
