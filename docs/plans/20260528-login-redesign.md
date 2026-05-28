@@ -80,22 +80,22 @@ Key benefits:
 - Create: `src/templates/website/login.html`
 - Delete: `src/templates/website/passlogin.html`
 
-- [ ] Use `scratch/Вход.html` as the reference design for all markup, CSS classes, and JS
-- [ ] Create `src/templates/website/login.html` extending `base-2.html`
-- [ ] Add `{% block title %}Вход · Кольцо 24{% endblock %}` and description meta block
-- [ ] Page layout: centered `.login-wrap` (max-width 420px), `.page-head` with `<h1>Вход в личный кабинет</h1>` and subtitle
-- [ ] Error banner: `<div class="err-banner{% if messages or form.non_field_errors %} show{% endif %}">` displaying `messages` and `form.non_field_errors`
-- [ ] Email field: manual `<input class="input{% if form.email.errors %} has-error{% endif %}" name="email" ...>` with errors below
-- [ ] Password field: `<div class="input-wrap">` with `.with-adorn` input and `.adorn` toggle button (show/hide icon SVG); errors below
-- [ ] "Запомнить меня" checkbox using `.check` component
-- [ ] Submit button: `<button class="btn btn-primary btn-lg btn-block" type="submit">Войти</button>`
-- [ ] "Забыли пароль?" link in `.field-head` → `{% url 'password_reset' %}`
-- [ ] Below-card div: "Ещё нет аккаунта? <a href="{% url 'register' %}">Зарегистрироваться →</a>"
-- [ ] Inline `<script>` for show/hide password toggle (same pattern as `scratch/Вход.html`)
-- [ ] `{% csrf_token %}` inside the form
-- [ ] Form `action="{% url 'login' %}"` with `method="POST"`
-- [ ] Delete `src/templates/website/passlogin.html`
-- [ ] Run `uv run pytest src/website/tests.py` — must pass before Task 4
+- [x] Use `scratch/Вход.html` as the reference design for all markup, CSS classes, and JS
+- [x] Create `src/templates/website/login.html` extending `base-2.html`
+- [x] Add `{% block title %}Вход · Кольцо 24{% endblock %}` and description meta block
+- [x] Page layout: centered `.login-wrap` (max-width 420px), `.page-head` with `<h1>Вход в личный кабинет</h1>` and subtitle
+- [x] Error banner: `<div class="err-banner{% if messages or form.non_field_errors %} show{% endif %}">` displaying `messages` and `form.non_field_errors`
+- [x] Email field: manual `<input class="input{% if form.email.errors %} has-error{% endif %}" name="email" ...>` with errors below
+- [x] Password field: `<div class="input-wrap">` with `.with-adorn` input and `.adorn` toggle button (show/hide icon SVG); errors below
+- [x] "Запомнить меня" checkbox using `.check` component
+- [x] Submit button: `<button class="btn btn-primary btn-lg btn-block" type="submit">Войти</button>`
+- [x] "Забыли пароль?" link in `.field-head` → `{% url 'password_reset' %}`
+- [x] Below-card div: "Ещё нет аккаунта? <a href="{% url 'register' %}">Зарегистрироваться →</a>"
+- [x] Inline `<script>` for show/hide password toggle (same pattern as `scratch/Вход.html`)
+- [x] `{% csrf_token %}` inside the form
+- [x] Form `action="{% url 'login' %}"` with `method="POST"`
+- [x] Delete `src/templates/website/passlogin.html`
+- [x] Run `uv run pytest src/website/tests.py` — must pass before Task 4
 
 ### Task 4: Update remaining template references
 
