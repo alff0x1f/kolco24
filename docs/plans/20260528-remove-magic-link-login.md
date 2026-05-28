@@ -30,26 +30,20 @@
 
 ## Implementation Steps
 
-### Task 1: Создать миграцию для удаления таблицы FastLogin
+### Task 1: Удалить модель FastLogin и сгенерировать миграцию
 
-**Files:**
-- Create: `src/website/migrations/<next_number>_delete_fastlogin.py`
-
-- [ ] определить номер следующей миграции (`ls src/website/migrations/ | tail -5`)
-- [ ] создать миграцию: `uv run python src/manage.py makemigrations website --name delete_fastlogin`
-- [ ] проверить содержимое миграции — должен быть `migrations.DeleteModel(name="FastLogin")`
-- [ ] применить миграцию локально: `uv run python src/manage.py migrate`
-- [ ] убедиться, что таблица `website_fastlogin` исчезла из БД
-
-### Task 2: Удалить модель FastLogin из models.py
+`makemigrations` детектирует удаление модели только после того, как класс убран из кода — поэтому сначала удаляем, потом генерируем миграцию.
 
 **Files:**
 - Modify: `src/website/models/models.py`
+- Create: `src/website/migrations/<next_number>_delete_fastlogin.py`
 
 - [ ] удалить класс `FastLogin` (строки 566-582) из `src/website/models/models.py`
-- [ ] удалить импорт `random` если он используется только в FastLogin (проверить grep)
-- [ ] убедиться, что `from website.models import FastLogin` нигде не остался (`grep -r FastLogin src/`)
-- [ ] запустить `uv run python src/manage.py check` — ошибок быть не должно
+- [ ] удалить импорт `random`, если он используется только в FastLogin: `grep -n "random" src/website/models/models.py`
+- [ ] сгенерировать миграцию: `uv run python src/manage.py makemigrations website --name delete_fastlogin`
+- [ ] проверить содержимое миграции — должен быть `migrations.DeleteModel(name="FastLogin")`
+- [ ] применить миграцию: `uv run python src/manage.py migrate`
+- [ ] убедиться, что `grep -r FastLogin src/` не находит ничего в коде (кроме файлов миграций)
 
 ### Task 3: Удалить вьюхи login() и login_by_key() из views_.py
 
