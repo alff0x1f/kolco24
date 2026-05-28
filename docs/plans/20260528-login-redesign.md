@@ -66,13 +66,13 @@ Key benefits:
 **Files:**
 - Modify: `src/website/views/views_.py`
 
-- [ ] Rename class `PassLoginView` → `LoginView`
-- [ ] Update `template` attribute: `"website/passlogin.html"` → `"website/login.html"`
-- [ ] Fix post-login redirect: replace `HttpResponseRedirect("/")` with `_safe_redirect(request, request.GET.get("next", "/"))`  in both `get()` and `post()`
-- [ ] Replace all `reverse("passlogin")` → `reverse("login")` (~8 occurrences)
-- [ ] Replace all `login_url="passlogin"` → `login_url="login"` in `@user_passes_test` decorators (~3 occurrences)
-- [ ] Update `__init__.py` export if `PassLoginView` is re-exported there
-- [ ] Run `uv run pytest src/website/tests.py` — must pass before Task 3
+- [x] Rename class `PassLoginView` → `LoginView`
+- [x] Update `template` attribute: `"website/passlogin.html"` → `"website/login.html"`
+- [x] Fix post-login redirect: replace `HttpResponseRedirect("/")` with `_safe_redirect(request, request.GET.get("next", "/"))`  in both `get()` and `post()`
+- [x] Replace all `reverse("passlogin")` → `reverse("login")` (~8 occurrences)
+- [x] Replace all `login_url="passlogin"` → `login_url="login"` in `@user_passes_test` decorators (~3 occurrences)
+- [x] Update `__init__.py` export if `PassLoginView` is re-exported there
+- [x] Run `uv run pytest src/website/tests.py` — must pass before Task 3
 
 ### Task 3: Create new login template
 
