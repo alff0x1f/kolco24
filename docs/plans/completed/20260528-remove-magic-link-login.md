@@ -86,11 +86,11 @@
 
 **Files:** —
 
-- [ ] запустить `make format` (ruff --fix, black, isort)
-- [ ] запустить `make lint` — ошибок быть не должно
-- [ ] запустить полный тест-сюит: `uv run pytest`
-- [ ] убедиться, что `grep -r "FastLogin\|login_by_key\|send_login_email\|FastLoginForm" src/` ничего не находит
-- [ ] переместить план: `mv docs/plans/20260528-remove-magic-link-login.md docs/plans/completed/`
+- [x] запустить `make format` (ruff --fix, black, isort)
+- [x] запустить `make lint` — ошибок быть не должно
+- [x] запустить полный тест-сюит: `uv run pytest`
+- [x] убедиться, что `grep -r "FastLogin\|login_by_key\|send_login_email\|FastLoginForm" src/` ничего не находит
+- [x] переместить план: `mv docs/plans/20260528-remove-magic-link-login.md docs/plans/completed/`
 
 ## Post-Completion
 
