@@ -372,3 +372,39 @@ def test_race_news_view_shows_form_for_admin(client):
     response = client.get(f"/race/{race.slug}/")
     assert response.status_code == 200
     assert "post_form" not in response.context
+
+
+@pytest.mark.django_db
+def test_race_page_view_status_200(client):
+    race = Race.objects.create(name="T", code="t25", slug="t-2025")
+    response = client.get(f"/race/{race.slug}/")
+    assert response.status_code == 200
+    assert "race/race_page.html" in [t.name for t in response.templates]
+
+
+@pytest.mark.django_db
+def test_race_page_view_404_for_unknown_slug(client):
+    response = client.get("/race/nonexistent-2099/")
+    assert response.status_code == 404
+
+
+@pytest.mark.django_db
+def test_race_page_view_context_keys(client):
+    race = Race.objects.create(name="C", code="c25", slug="c-2025")
+    response = client.get(f"/race/{race.slug}/")
+    for key in (
+        "categories",
+        "links",
+        "news_list",
+        "reg_open",
+        "race_team_count",
+        "race_people_count",
+    ):
+        assert key in response.context, f"context missing: {key}"
+
+
+@pytest.mark.django_db
+def test_race_page_view_no_post_form_for_anon(client):
+    race = Race.objects.create(name="A", code="a25", slug="a-2025")
+    response = client.get(f"/race/{race.slug}/")
+    assert "post_form" not in response.context
