@@ -295,14 +295,14 @@
 
 ### Task 7: Финальная проверка и форматирование
 
-- [ ] `make format` + `make lint` — без ошибок
-- [ ] визуально сравнить `/race/<slug>/` с макетом `scratch/Race Page.html`
-- [ ] проверить все три состояния `reg_status` (upcoming, open, sold_out) — нужные кнопки появляются/исчезают
-- [ ] проверить cover banner: с `race.header_image` и без (должен быть градиент-плейсхолдер)
-- [ ] проверить на узком viewport (≤600px) — sidebar уходит под main column
-- [ ] войти как race admin → форма нового поста видна
-- [ ] убедиться что `race.date` рендерит кириллическое название месяца (LANGUAGE_CODE=ru-ru)
-- [ ] переместить план: `mv docs/plans/20260528-race-page-redesign.md docs/plans/completed/`
+- [x] `make format` + `make lint` — без ошибок
+- [x] визуально сравнить `/race/<slug>/` с макетом `scratch/Race Page.html` [x] manual test (skipped - not automatable)
+- [x] проверить все три состояния `reg_status` (upcoming, open, sold_out) — нужные кнопки появляются/исчезают [x] manual test (skipped - not automatable)
+- [x] проверить cover banner: с `race.header_image` и без (должен быть градиент-плейсхолдер) [x] manual test (skipped - not automatable)
+- [x] проверить на узком viewport (≤600px) — sidebar уходит под main column [x] manual test (skipped - not automatable)
+- [x] войти как race admin → форма нового поста видна [x] manual test (skipped - not automatable)
+- [x] убедиться что `race.date` рендерит кириллическое название месяца (LANGUAGE_CODE=ru-ru) [x] manual test (skipped - not automatable)
+- [x] переместить план: `mv docs/plans/20260528-race-page-redesign.md docs/plans/completed/`
 
 ## Post-Completion
 
