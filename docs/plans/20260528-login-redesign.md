@@ -57,9 +57,9 @@ Key benefits:
 - Modify: `src/website/urls.py`
 - Modify: `src/config/settings.py`
 
-- [ ] In `src/website/urls.py`: change `path("passlogin/", ..., name="passlogin")` → `path("login/", ..., name="login")`
-- [ ] In `src/config/settings.py`: `LOGIN_URL = "passlogin"` → `LOGIN_URL = "login"`
-- [ ] Run `uv run pytest src/website/tests.py` — must pass before Task 2
+- [x] In `src/website/urls.py`: change `path("passlogin/", ..., name="passlogin")` → `path("login/", ..., name="login")`
+- [x] In `src/config/settings.py`: `LOGIN_URL = "passlogin"` → `LOGIN_URL = "login"`
+- [x] Run `uv run pytest src/website/tests.py` — must pass before Task 2
 
 ### Task 2: Update view — rename, fix redirect, update references
 
