@@ -528,6 +528,25 @@ button { font-family: inherit; }
   display: flex; align-items: center; gap: 16px;
 }
 
+/* ── Login page ─────────────────────────────────────── */
+.login-page { flex: 1; padding: 48px 0 56px; display: flex; align-items: flex-start; justify-content: center; }
+.login-wrap { width: 100%; max-width: 420px; }
+.login-page .page-head { display: block; text-align: center; margin-bottom: 22px; }
+.login-page .page-head h1 { font-size: 26px; margin-bottom: 6px; }
+.err-banner {
+  display: none; padding: 10px 12px; border-radius: 8px;
+  background: var(--danger-bg); color: var(--danger); font-size: 13px;
+  border: 1px solid rgba(217,54,68,.2); margin-bottom: 4px;
+}
+.err-banner.show { display: block; }
+.form { display: flex; flex-direction: column; gap: 14px; }
+.field-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+.field-head .forgot { font-size: 12.5px; color: var(--muted); }
+.field-head .forgot:hover { color: var(--primary-2); }
+.form-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.below { text-align: center; margin-top: 18px; font-size: 14px; color: var(--muted); }
+.below a { font-weight: 500; }
+
 /* ── Responsive ──────────────────────────────────────── */
 @media (max-width: 920px) {
   .grid { grid-template-columns: 1fr; }
@@ -563,6 +582,9 @@ button { font-family: inherit; }
   .container { padding: 0 12px; }
   .page { padding: 14px 0 36px; }
   .page-head h1 { font-size: 22px; }
+  .login-page { padding: 24px 0 36px; }
+  .login-page .page-head h1 { font-size: 22px; }
+  .login-wrap { max-width: 100%; }
   .card { border-radius: 0; border-left: none; border-right: none; }
   .submit-row { border-radius: 0; }
   .card-pad, .card-section { padding: 18px 16px; }
