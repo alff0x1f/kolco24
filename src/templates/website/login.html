@@ -50,8 +50,6 @@
           {% for message in messages %}{{ message }}{% if not forloop.last %}<br>{% endif %}{% endfor %}
           {% for error in form.non_field_errors %}{{ error }}{% if not forloop.last %}<br>{% endif %}{% endfor %}
         </div>
-        {% else %}
-        <div class="err-banner"></div>
         {% endif %}
 
         <div class="form">
@@ -87,14 +85,6 @@
             {% if form.password.errors %}
             <span class="hint err">{{ form.password.errors|join:", " }}</span>
             {% endif %}
-          </div>
-
-          <div class="form-row">
-            <label class="check">
-              <input type="checkbox" id="remember" checked>
-              <span class="box"></span>
-              <span>Запомнить меня</span>
-            </label>
           </div>
 
           <button class="btn btn-primary btn-lg btn-block" type="submit">Войти</button>
