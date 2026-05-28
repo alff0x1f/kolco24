@@ -43,8 +43,6 @@ urlpatterns = [
         name="password_reset_complete",
     ),
     path("passlogin/", views.PassLoginView.as_view(), name="passlogin"),
-    path("login/", views.login, name="login"),
-    re_path("^login/(?P<login_key>[0-9a-f]{16})/", views.login_by_key),
     path("logout/", views.LogoutUserView.as_view(), name="logout"),
     path("impersonate/", views.impersonate, name="impersonate"),
     path("impersonate/stop/", views.stop_impersonate, name="stop_impersonate"),
