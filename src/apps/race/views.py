@@ -27,13 +27,13 @@ class RacePageView(View):
                 )
             )
         )
+        news_qs = NewsPost.objects.filter(race=race)
         context = {
             "race": race,
             "categories": categories,
             "links": race.links.order_by("-id"),
-            "news_list": list(
-                NewsPost.objects.filter(race=race).order_by("-publication_date")[:10]
-            ),
+            "news_list": list(news_qs.order_by("-publication_date")[:10]),
+            "news_count": news_qs.count(),
             "reg_open": race.reg_status == RegStatus.OPEN,
             "reg_upcoming": race.reg_status == RegStatus.UPCOMING,
             "race_team_count": race.team_count(),

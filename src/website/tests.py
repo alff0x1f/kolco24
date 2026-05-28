@@ -1,11 +1,12 @@
 import pytest
 from django.contrib.auth.models import User
+from django.core.exceptions import ValidationError
 from django.db import IntegrityError
 from django.urls import reverse
 
 from website.models import Race
 from website.models.models import Team
-from website.models.race import Category, RegStatus
+from website.models.race import Category, RaceLink, RegStatus
 
 
 @pytest.mark.django_db
@@ -396,6 +397,7 @@ def test_race_page_view_context_keys(client):
         "categories",
         "links",
         "news_list",
+        "news_count",
         "reg_open",
         "reg_upcoming",
         "race_team_count",
@@ -425,6 +427,12 @@ def test_race_page_view_reg_open_flag(client):
     response = client.get(f"/race/{race.slug}/")
     assert response.context["reg_open"] is False
     assert response.context["reg_upcoming"] is True
+
+    race.reg_status = RegStatus.SOLD_OUT
+    race.save()
+    response = client.get(f"/race/{race.slug}/")
+    assert response.context["reg_open"] is False
+    assert response.context["reg_upcoming"] is False
 
 
 @pytest.mark.django_db
@@ -465,4 +473,72 @@ def test_add_post_invalid_form_shows_errors(client):
     assert response.status_code == 200
     assert "race/race_page.html" in [t.name for t in response.templates]
     assert "post_form" in response.context
-    assert response.context["post_form"].errors
+    assert "title" in response.context["post_form"].errors
+
+
+@pytest.mark.django_db
+def test_race_clean_accepts_valid_url():
+    race = Race.objects.create(
+        name="URL Race",
+        code="ur1",
+        slug="url-race-1",
+        place="Moscow",
+        header_image="https://example.com/banner.jpg",
+        header_logo="http://example.com/logo.png",
+    )
+    race.full_clean()
+
+
+@pytest.mark.django_db
+def test_race_clean_rejects_invalid_url():
+    race = Race.objects.create(
+        name="URL Race",
+        code="ur2",
+        slug="url-race-2",
+        place="Moscow",
+        header_image="not-a-url",
+    )
+    with pytest.raises(ValidationError) as exc_info:
+        race.full_clean()
+    assert "header_image" in exc_info.value.message_dict
+
+
+@pytest.mark.django_db
+def test_race_clean_accepts_blank_url():
+    race = Race.objects.create(
+        name="URL Race",
+        code="ur3",
+        slug="url-race-3",
+        place="Moscow",
+        header_image="",
+        header_logo="",
+    )
+    race.full_clean()
+
+
+@pytest.mark.django_db
+def test_race_link_clean_accepts_valid_url():
+    race = Race.objects.create(name="LR", code="lr1", slug="lr-2025")
+    link = RaceLink.objects.create(race=race, name="Site", url="https://example.com/")
+    link.full_clean()
+
+
+@pytest.mark.django_db
+def test_race_link_clean_rejects_invalid_url():
+    race = Race.objects.create(name="LR", code="lr2", slug="lr-2026")
+    link = RaceLink.objects.create(race=race, name="Bad", url="not-a-url")
+    with pytest.raises(ValidationError) as exc_info:
+        link.full_clean()
+    assert "url" in exc_info.value.message_dict
+
+
+@pytest.mark.django_db
+def test_race_page_view_news_count_exceeds_list(client):
+    from website.models import NewsPost
+
+    race = Race.objects.create(name="NC", code="nc1", slug="nc-2025")
+    for i in range(11):
+        NewsPost.objects.create(race=race, title=f"Post {i}", content=f"body {i}")
+    response = client.get(f"/race/{race.slug}/")
+    assert response.context["news_count"] == 11
+    assert len(response.context["news_list"]) == 10
