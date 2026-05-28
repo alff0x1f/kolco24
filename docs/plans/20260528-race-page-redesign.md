@@ -221,7 +221,7 @@
 
 В шаблоне используем `race_team_count` и `race_people_count` из контекста (не `race.team_count` напрямую).
 
-- [ ] написать заголовок шаблона:
+- [x] написать заголовок шаблона:
   ```html
   {% extends "website/base-2.html" %}
   {% load static %}
@@ -230,10 +230,10 @@
   <link href="{% static 'css/race.css' %}" rel="stylesheet">
   {% endblock %}
   ```
-- [ ] написать cover banner в `{% block content %}`:
+- [x] написать cover banner в `{% block content %}`:
   - `<div class="cover-banner">` → `<div class="cover-image"` с `style="background-image: url('{{ race.header_image }}')"` если `race.header_image` не пустой
   - pill статуса: `upcoming` → серая, `open` → `.pill.success`, `sold_out` → оранжевая
-- [ ] написать cover-meta-card:
+- [x] написать cover-meta-card:
   - `h1`: `{{ race.name }} · {{ race.date }}`
   - `.sub`: `📍 {{ race.place }}`, `{{ race_people_count }} участников`, `{{ race_team_count }} команд`
   - cover-actions:
@@ -241,18 +241,18 @@
     - `{% if race.reg_status == 'open' %}` + не auth → кнопка "Зарегистрироваться" → `{% url 'register' %}`
     - иначе — кнопки регистрации нет
     - всегда: кнопка "Все команды" (btn-ghost) → `{% url 'all_teams' race.slug %}`
-- [ ] написать main-колонку:
+- [x] написать main-колонку:
   - форма нового поста: `{% if post_form %}<form action="{% url 'add_post' race.slug %}" method="post" enctype="multipart/form-data">...{% endif %}`
   - tabs-card с `tabs-head` "Новости" + `<span class="badge">{{ news_list|length }}</span>`
   - `tab-body`: `{% for news in news_list %} ... {% empty %}<p class="post-empty">Новостей пока нет.</p>{% endfor %}`
   - article.post: `.post-meta` с `<time>{{ news.publication_date }}</time>`, `.post-title`, `.post-image` (если `news.image`), `.post-body {{ news.content_html|safe }}`
   - нет поля `tag` у NewsPost — не выводим
-- [ ] написать sidebar:
+- [x] написать sidebar:
   - Race info card: SVG-иконки из макета + место, дата (`{{ race.date }}`), участников (`{{ race_people_count }}`), команд (`{{ race_team_count }}`), взнос (`{{ race.cost }} ₽/уч`)
   - Полезные ссылки card: `{% if links %}{% for link in links %}<li><a href="{{ link.url }}">{{ link.name }}</a></li>{% endfor %}{% endif %}`
   - Teams card: "Все `{{ race_team_count }}`" → `{% url 'all_teams' race.slug %}`; per-category с `category.team_count` → `{% url 'teams2' race.slug category.id %}`; кнопка "Добавить команду" если `reg_open and user.is_authenticated`
-- [ ] запустить dev server: `uv run python src/manage.py runserver 0:8080`
-- [ ] проверить в браузере: `/race/kolco24_2025/` — страница рендерится без ошибок
+- [x] запустить dev server: `uv run python src/manage.py runserver 0:8080`
+- [x] проверить в браузере: `/race/kolco24_2025/` — страница рендерится без ошибок
 
 ### Task 6: Тесты
 
