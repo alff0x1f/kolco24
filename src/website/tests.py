@@ -397,6 +397,7 @@ def test_race_page_view_context_keys(client):
         "categories",
         "links",
         "news_list",
+        "news_count",
         "reg_open",
         "reg_upcoming",
         "race_team_count",
@@ -458,6 +459,7 @@ def test_race_page_view_news_list_capped_at_10(client):
         NewsPost.objects.create(race=race, title=f"Post {i}", content=f"body {i}")
     response = client.get(f"/race/{race.slug}/")
     assert len(response.context["news_list"]) == 10
+    assert response.context["news_count"] == 11
 
 
 @pytest.mark.django_db
