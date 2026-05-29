@@ -271,8 +271,8 @@ Key design decisions & rationale:
 - [x] `make format && make lint` — clean: ruff/black/isort/flake8 all pass; `make format` left 142 files unchanged
 
 ### Task 8: [Final] Update documentation
-- [ ] update CLAUDE.md if new patterns are worth recording (e.g. the `team-form.*` shared-asset + JSON-island convention, `RacePriceTier`/`current_price` source of truth)
-- [ ] move this plan to `docs/plans/completed/`
+- [x] update CLAUDE.md if new patterns are worth recording (e.g. the `team-form.*` shared-asset + JSON-island convention, `RacePriceTier`/`current_price` source of truth) — added two paragraphs: "Team add/edit pages" (duplicated base-2 templates, shared `team-form.css`/`team-form.js`, `#teamFormConfig` JSON island, `data-counts` segmented control, shared view context helpers, server-side guards) and "Team pricing & sizes" (`RacePriceTier`, `Race.current_price` source of truth + `cost` fallback, `price_tier_ladder()`, `cost_per_person` rule, `Category.min_people/max_people`, maps constant)
+- [x] move this plan to `docs/plans/completed/`
 
 ## Post-Completion
 *Items requiring manual intervention or external systems — informational only.*
