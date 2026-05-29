@@ -359,3 +359,44 @@ def test_non_numeric_category_returns_404(client):
 
     resp = client.get(f"/race/{race.slug}/category/not-a-number/teams/")
     assert resp.status_code == 404
+
+
+@pytest.mark.django_db
+def test_teams_page_renders_key_markup(client):
+    owner = User.objects.create_user(
+        username="ru8", password="p", email="ru8@example.com"
+    )
+    race = _make_race(slug="ru8", code="ru8")
+    cat = _make_category(race)
+    _make_team(owner, cat, teamname="Paid", paid_people=2)
+
+    resp = client.get(reverse("all_teams", args=[race.slug]))
+
+    assert resp.status_code == 200
+    html = resp.content.decode()
+    # page wrapper + initial filter
+    assert 'class="teams-page"' in html
+    assert 'data-initial="all"' in html
+    # cover meta card + breadcrumb
+    assert 'class="cover-meta-card"' in html
+    assert 'class="crumb"' in html
+    # search box + chips container the JS hydrates
+    assert 'id="searchInput"' in html
+    assert 'id="catChips"' in html
+    assert 'class="cat-chips"' in html
+    # sortable table + JS-built body / empty state / foot
+    assert 'class="teams-table"' in html
+    assert 'data-sort="name"' in html
+    assert 'data-sort="cat"' in html
+    assert 'data-sort="city"' in html
+    assert 'id="teamRows"' in html
+    assert 'id="emptyState"' in html
+    assert 'id="footCount"' in html
+    # sidebar summary + breakdown
+    assert 'id="brk"' in html
+    assert 'id="resetCat"' in html
+    # both JSON blocks present and parseable
+    _script_json(html, "teams-data")
+    _script_json(html, "categories-data")
+    # teams.js wired up
+    assert "js/teams.js" in html

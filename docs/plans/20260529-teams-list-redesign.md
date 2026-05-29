@@ -251,19 +251,19 @@ and `/race/<slug>/teams/my/` (my teams) onto a **single** new-design page.
 Task 3 should **expand/replace** it with the full design markup below (do not assume an
 empty file).
 
-- [ ] Extend `base-2.html`; `extra_head` loads `race.css` + `teams.css`; wrapper
+- [x] Extend `base-2.html`; `extra_head` loads `race.css` + `teams.css`; wrapper
       `.teams-page` with `data-initial`.
-- [ ] Build cover-banner + cover-meta-card (breadcrumb, h1, sub, cover-actions per
+- [x] Build cover-banner + cover-meta-card (breadcrumb, h1, sub, cover-actions per
       decision 5) mirroring `race_page.html`.
-- [ ] Build `.grid` → main `.teams-card` (sticky head + search, `.cat-chips`,
+- [x] Build `.grid` → main `.teams-card` (sticky head + search, `.cat-chips`,
       `.teams-table` sortable thead + empty tbody, `.empty`, `.teams-foot`).
-- [ ] Build `aside.sidebar`: Сводка `info-list` (Команд/Участников/Категорий/Дата) +
+- [x] Build `aside.sidebar`: Сводка `info-list` (Команд/Участников/Категорий/Дата) +
       По категориям `.brk` card with «Сбросить».
-- [ ] Emit `teams-data` + `categories-data` JSON `<script>` blocks; load `js/teams.js`
+- [x] Emit `teams-data` + `categories-data` JSON `<script>` blocks; load `js/teams.js`
       via `footer_js_include`.
-- [ ] Verify rendering via a view test asserting key markup is present (chips
+- [x] Verify rendering via a view test asserting key markup is present (chips
       container, table, both JSON script ids, `data-initial`).
-- [ ] Run tests — must pass before Task 4.
+- [x] Run tests — must pass before Task 4.
 
 ### Task 4: New stylesheet `teams.css`
 
