@@ -386,9 +386,11 @@ def test_teams_page_renders_key_markup(client):
     assert 'class="cat-chips"' in html
     # sortable table + JS-built body / empty state / foot
     assert 'class="teams-table"' in html
+    assert 'data-sort="num"' in html
     assert 'data-sort="name"' in html
     assert 'data-sort="cat"' in html
     assert 'data-sort="city"' in html
+    assert 'data-sort="cnt"' in html
     assert 'id="teamRows"' in html
     assert 'id="emptyState"' in html
     assert 'id="footCount"' in html
@@ -400,3 +402,26 @@ def test_teams_page_renders_key_markup(client):
     _script_json(html, "categories-data")
     # teams.js wired up
     assert "js/teams.js" in html
+
+
+@pytest.mark.django_db
+def test_embedded_json_escapes_script_closer(client):
+    """A </script> in user-supplied text must not break out of the block."""
+    owner = User.objects.create_user(
+        username="ru9", password="p", email="ru9@example.com"
+    )
+    race = _make_race(slug="ru9", code="ru9")
+    cat = _make_category(race)
+    payload = "</script><script>alert(1)</script>"
+    _make_team(owner, cat, teamname=payload, paid_people=2)
+
+    resp = client.get(reverse("all_teams", args=[race.slug]))
+
+    assert resp.status_code == 200
+    html = resp.content.decode()
+    # The raw payload must be escaped, so it cannot terminate the data block.
+    assert payload not in html
+    assert "<\\/script>" in html
+    # The block still parses and round-trips the original team name.
+    teams = _script_json(html, "teams-data")
+    assert {t["name"] for t in teams} == {payload}

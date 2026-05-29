@@ -22,24 +22,29 @@ def _safe_json(data):
     return mark_safe(json.dumps(data, ensure_ascii=False).replace("</", "<\\/"))
 
 
+def _categories_with_team_count(race):
+    """Active categories for ``race`` annotated with their paid-team count."""
+    return (
+        Category.active_objects.filter(race=race)
+        .order_by("order", "id")
+        .annotate(
+            team_count=Subquery(
+                Team.objects.filter(
+                    category2=OuterRef("id"),
+                    paid_people__gt=0,
+                )
+                .values("category2")
+                .annotate(count=Count("id"))
+                .values("count")[:1]
+            )
+        )
+    )
+
+
 class RacePageView(View):
     @staticmethod
     def build_context(race, user=None):
-        categories = (
-            Category.active_objects.filter(race=race)
-            .order_by("order", "id")
-            .annotate(
-                team_count=Subquery(
-                    Team.objects.filter(
-                        category2=OuterRef("id"),
-                        paid_people__gt=0,
-                    )
-                    .values("category2")
-                    .annotate(count=Count("id"))
-                    .values("count")[:1]
-                )
-            )
-        )
+        categories = _categories_with_team_count(race)
         news_qs = NewsPost.objects.filter(race=race).order_by("-publication_date")
         news_count = news_qs.count()
         news_list = list(news_qs[:10])
@@ -82,25 +87,10 @@ class RaceTeamsView(View):
         is_authenticated = bool(user is not None and user.is_authenticated)
         is_superuser = bool(user is not None and getattr(user, "is_superuser", False))
 
-        categories = list(
-            Category.active_objects.filter(race=race)
-            .order_by("order", "id")
-            .annotate(
-                team_count=Subquery(
-                    Team.objects.filter(
-                        category2=OuterRef("id"),
-                        paid_people__gt=0,
-                    )
-                    .values("category2")
-                    .annotate(count=Count("id"))
-                    .values("count")[:1]
-                )
-            )
-        )
+        categories = list(_categories_with_team_count(race))
         categories_data = []
         for idx, cat in enumerate(categories):
             color_idx = idx % 8
-            cat.color_idx = color_idx
             categories_data.append(
                 {
                     "id": cat.id,
@@ -160,7 +150,7 @@ class RaceTeamsView(View):
                 "catId": team.category2_id,
                 "mine": mine,
             }
-            if is_superuser or (is_authenticated and team.owner_id == user.id):
+            if is_superuser or mine:
                 row["edit"] = f"/team/{team.id}"
             teams_data.append(row)
 

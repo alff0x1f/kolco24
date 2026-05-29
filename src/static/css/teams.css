@@ -92,7 +92,6 @@
 }
 .teams-page .teams-table thead th .arr { opacity: 0; font-size: 9px; margin-left: 3px; }
 .teams-page .teams-table thead th.sorted .arr { opacity: 1; }
-.teams-page .teams-table thead th.col-static { cursor: default; }
 .teams-page .teams-table tbody tr {
   border-bottom: 1px solid var(--line-soft);
   transition: background .1s;
