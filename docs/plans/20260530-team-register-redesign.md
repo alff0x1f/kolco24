@@ -262,13 +262,13 @@ Key design decisions & rationale:
 - [x] run tests — must pass before Task 7 — full suite 111 passed; `make format && make lint` clean
 
 ### Task 7: Verify acceptance criteria
-- [ ] verify add & edit render on base-2 matching the demo (header, form card, sidebar)
-- [ ] verify team sizes come from `Category.min_people/max_people` (segment + `data-counts`)
-- [ ] verify price ladder comes from `RacePriceTier`; `current_price` drives both display and charged amount; `race.cost` fallback works for a tier-less race
-- [ ] verify доплата: edit charges only the delta (ucount grow, maps added); no charge when unchanged; "регистрация закрыта" warning when applicable
-- [ ] verify money path: `Payment.cost_per_person` equals the charged per-person price (so partial-payment `paid_for` back-calc is correct); server rejects out-of-range `ucount` / over-cap `map_count`
-- [ ] run full suite: `uv run pytest --reuse-db`
-- [ ] `make format && make lint`
+- [x] verify add & edit render on base-2 matching the demo (header, form card, sidebar) — `test_add_team_renders_base2_template` / `test_edit_team_renders_base2_template` assert base-2 assets (`team-form.css`/`team-form.js`), scoped `.team-register` wrapper, `#ucountSeg` segmented control, race-chip status, and the `#teamFormConfig` island; pixel-level demo match is manual (Post-Completion)
+- [x] verify team sizes come from `Category.min_people/max_people` (segment + `data-counts`) — `test_category_team_size_defaults`, `test_category_backfill_mapping`, and `test_add_team_renders_base2_template` (asserts `data-counts="4,5,6"` rendered from min/max)
+- [x] verify price ladder comes from `RacePriceTier`; `current_price` drives both display and charged amount; `race.cost` fallback works for a tier-less race — `test_current_price_falls_back_to_cost_without_tiers`, `_picks_active_tier`, `_uses_last_tier_when_all_past`, `_same_day_boundary_is_inclusive`, `test_price_tier_ladder_*`, `test_add_team_config_island_uses_current_price` (island = 1500 tier, not 1000 cost), `test_edit_team_charges_delta_on_ucount_growth` (charges tier price 1500)
+- [x] verify доплата: edit charges only the delta (ucount grow, maps added); no charge when unchanged; "регистрация закрыта" warning when applicable — `test_edit_team_charges_delta_on_ucount_growth` (1×1500), `_charges_delta_on_maps_added` (2×200), `_no_charge_when_nothing_added`, `_closed_but_editable_saves_without_charge`; `reg-closed-warn` rendered in both templates when `reg_status != open`
+- [x] verify money path: `Payment.cost_per_person` equals the charged per-person price (so partial-payment `paid_for` back-calc is correct); server rejects out-of-range `ucount` / over-cap `map_count` — `test_edit_team_charges_delta_on_ucount_growth` asserts `cost_per_person == 1500`; `test_edit_team_rejects_out_of_range_ucount`, `_rejects_over_cap_map_count`, `test_add_team_rejects_out_of_range_ucount`
+- [x] run full suite: `uv run pytest --reuse-db` — 111 passed (run from `src/`)
+- [x] `make format && make lint` — clean: ruff/black/isort/flake8 all pass; `make format` left 142 files unchanged
 
 ### Task 8: [Final] Update documentation
 - [ ] update CLAUDE.md if new patterns are worth recording (e.g. the `team-form.*` shared-asset + JSON-island convention, `RacePriceTier`/`current_price` source of truth)
