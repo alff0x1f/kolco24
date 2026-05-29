@@ -730,21 +730,24 @@ class TeamMemberMoveForm(forms.ModelForm):
         }
 
     def clean_moved_people(self):
+        moved = self.cleaned_data.get("moved_people")
+        from_team = self.cleaned_data.get("from_team")
         if (
-            self.cleaned_data["moved_people"]
-            > self.cleaned_data["from_team"].paid_people
+            moved is not None
+            and from_team is not None
+            and moved > from_team.paid_people
         ):
             raise forms.ValidationError(
                 "Moved people cannot exceed the number of paid people in the from team."
             )
-        return self.cleaned_data["moved_people"]
+        return moved
 
     def clean(self):
-        if (
-            self.cleaned_data["from_team"].category2.race_id
-            != self.cleaned_data["to_team"].category2.race_id
-        ):
-            raise forms.ValidationError("Teams must be in the same Race")
+        from_team = self.cleaned_data.get("from_team")
+        to_team = self.cleaned_data.get("to_team")
+        if from_team and to_team:
+            if from_team.category2.race_id != to_team.category2.race_id:
+                raise forms.ValidationError("Teams must be in the same Race")
         return super().clean()
 
 

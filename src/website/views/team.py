@@ -269,7 +269,7 @@ class TeamMemberMoveView(View):
 
         data = request.POST.copy()
         data["from_team"] = from_team.id
-        form = TeamMemberMoveForm(data)
+        form = TeamMemberMoveForm(data, race_id=from_team.category2.race_id)
         if form.is_valid():
             form.save()
             form.instance.move_people()
