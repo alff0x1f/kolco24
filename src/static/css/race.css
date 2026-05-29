@@ -264,6 +264,63 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* ── Sidebar: categories list with progress bars ─────── */
+/* Mirrors the «По категориям» breakdown panel (teams.css .brk*): short label
+   prominent, full name dim/truncated, single-colour bar. */
+.cats-menu {
+  list-style: none;
+  padding: 8px 12px 12px;
+  margin: 0;
+}
+.cats-menu li a {
+  display: block;
+  padding: 8px 10px;
+  border-radius: 8px;
+  color: var(--ink);
+  text-decoration: none;
+  transition: background .12s;
+}
+.cats-menu li a:hover { background: #f4f6f9; }
+.cat-top {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 13.5px;
+  margin-bottom: 6px;
+}
+.cat-nm { color: var(--ink); font-weight: 500; flex: 0 0 auto; }
+/* Full category name — unobtrusive: dim, smaller, truncated if it doesn't fit
+   (hover shows the full text via title). */
+.cat-full {
+  flex: 1 1 auto;
+  min-width: 0;
+  color: var(--muted-2);
+  font-weight: 400;
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.cat-count {
+  margin-left: auto;
+  flex: 0 0 auto;
+  font-size: 12.5px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.cat-bar {
+  height: 6px;
+  background: #eef1f5;
+  border-radius: 999px;
+  overflow: hidden;
+}
+.cat-bar i {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--primary-2);
+}
+
 /* ── Responsive ──────────────────────────────────────── */
 @media (max-width: 920px) {
   .cover-image { aspect-ratio: 16 / 9; }
