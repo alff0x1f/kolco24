@@ -487,14 +487,9 @@ class TeamForm(forms.Form):
             }
         ),
     )
-    ucount = forms.ChoiceField(
-        choices=[(i, str(i)) for i in range(2, 7)],
-        widget=forms.Select(
-            attrs={
-                "class": "form-control form-control-lg",
-                "placeholder": "Количество участников",
-            },
-        ),
+    ucount = forms.IntegerField(
+        min_value=1,
+        widget=forms.HiddenInput(),
         label="Количество участников",
     )
     dist = forms.CharField(required=False)
