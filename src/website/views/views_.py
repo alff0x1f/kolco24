@@ -1796,7 +1796,7 @@ class AddTeam(View):
         if form.is_valid():
             # save team
             team: Team = Team.objects.create(
-                year=2025,
+                year=race.date.year,
                 owner_id=request.user.id,
                 **form.cleaned_data,
             )
@@ -1815,6 +1815,9 @@ class AddTeam(View):
                 # в теории, не может быть, тк это новая команда и она не
                 # может быть оплачена
                 cost = 0
+
+            if cost == 0:
+                return HttpResponseRedirect(reverse("my_teams", args=[race.slug]))
 
             if payment_method != "sbp2":
                 raise Http404
