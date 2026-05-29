@@ -202,26 +202,26 @@ and `/race/<slug>/teams/my/` (my teams) onto a **single** new-design page.
 - Modify: `src/apps/race/views.py`
 - Modify: `src/apps/race/tests.py` (create if absent)
 
-- [ ] Add `RaceTeamsView(View)` with class attr `initial = None` and
+- [x] Add `RaceTeamsView(View)` with class attr `initial = None` and
       `get(self, request, race_slug, category_id=None)`.
-- [ ] Resolve `race` by slug (404 if missing). Use the model helpers
+- [x] Resolve `race` by slug (404 if missing). Use the model helpers
       `race.team_count()` / `race.people_count()` for summary — do NOT add a
       `Sum("category__team__paid_people")` annotation.
-- [ ] Implement static `build_context(race, user)` returning categories (with
+- [x] Implement static `build_context(race, user)` returning categories (with
       `team_count or 0` + `colorIdx`), `categories_json`, `teams_json`, summary stats —
       per Technical Details. Serialize with `json.dumps(..., ensure_ascii=False)` +
       `mark_safe`. `select_related("category2","owner")`.
-- [ ] Team selection: base `paid_people>0`; union owner's teams if authenticated; all
+- [x] Team selection: base `paid_people>0`; union owner's teams if authenticated; all
       teams if superuser; de-dupe by id; build per-row fields (name built in Python per
       template `teams.html:118`, `parts` clean `", "` join, `cnt`, `mine`, `edit` gating).
-- [ ] Determine `initial_filter`: `str(category_id)` if `category_id` set, else
+- [x] Determine `initial_filter`: `str(category_id)` if `category_id` set, else
       `self.initial or "all"`; if `initial == "mine"` and anon → redirect to login with
       `?next=`. Render `"race/teams.html"`.
-- [ ] Write tests: `build_context` returns expected teams for (a) anon (paid only),
+- [x] Write tests: `build_context` returns expected teams for (a) anon (paid only),
       (b) owner sees own unpaid, (c) superuser sees all; `mine`/`edit` flags correct;
       participants string from `athlet1..6`; name fallback string; `colorIdx` = index % 8;
       **category with zero paid teams → `count == 0` (not None)**.
-- [ ] Run tests — must pass before Task 2.
+- [x] Run tests — must pass before Task 2.
 
 ### Task 2: Repoint URLs to `RaceTeamsView`
 
