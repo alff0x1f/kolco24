@@ -1,0 +1,160 @@
+/* ──────────────────────────────────────────────────────────────────────────
+   team-form.css — shared styling for the add/edit team pages (base-2 design).
+
+   Ported from the demo mockup at src/templates/demo/team-register.html.
+   Everything is scoped under .team-register so it never leaks into other
+   base-2 pages. Tokens, .page, .grid, .card, .btn*, .form-grid, .field,
+   .input/.select, .check, .sidebar and .side-head all come from theme-2.css
+   and are intentionally NOT redefined here.
+   ────────────────────────────────────────────────────────────────────────── */
+
+/* ── Race chip (status header) ──────────────────────────── */
+.team-register .race-chip {
+  display: inline-flex; align-items: center; gap: 10px;
+  background: var(--paper-2); border: 1px solid var(--line); border-radius: 999px;
+  padding: 7px 8px 7px 14px; box-shadow: var(--shadow-sm); font-size: 13px;
+}
+.team-register .race-chip .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--success); box-shadow: 0 0 0 3px rgba(2,184,117,.18); }
+.team-register .race-chip.is-closed .dot { background: var(--muted-2); box-shadow: 0 0 0 3px rgba(153,163,176,.18); }
+.team-register .race-chip b { color: var(--ink); font-weight: 500; }
+.team-register .race-chip .date { color: var(--muted); }
+.team-register .race-chip .tag {
+  background: rgba(2,184,117,.12); color: var(--success-dk); font-weight: 500;
+  border-radius: 999px; padding: 4px 11px; font-size: 12px; letter-spacing: .01em;
+}
+.team-register .race-chip.is-closed .tag { background: rgba(153,163,176,.16); color: var(--muted); }
+
+/* ── Section titles inside the form card ────────────────── */
+.team-register .section-title { font-size: 11px; font-weight: 500; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted-2); margin-bottom: 14px; }
+.team-register .field label .opt { color: var(--muted-2); font-weight: 400; }
+
+/* ── Состав: количество (segmented) ─────────────────────── */
+.team-register .count-row { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin-top: 18px; }
+.team-register .count-row > label { font-size: 13px; font-weight: 500; color: var(--ink-soft); }
+.team-register .seg { display: inline-flex; background: #f1f3f6; border: 1px solid var(--line); border-radius: 10px; padding: 3px; gap: 3px; }
+.team-register .seg button {
+  border: none; background: transparent; cursor: pointer; min-width: 44px; padding: 8px 12px;
+  border-radius: 7px; font-size: 14.5px; font-weight: 500; color: var(--muted); transition: all .14s; line-height: 1;
+}
+.team-register .seg button:hover { color: var(--ink); }
+.team-register .seg button.on { background: var(--paper-2); color: var(--primary); box-shadow: var(--shadow-sm); }
+.team-register .count-cap { font-size: 12.5px; color: var(--muted); }
+
+/* ── Участники ──────────────────────────────────────────── */
+.team-register .members-label { font-size: 13px; font-weight: 500; color: var(--ink-soft); margin: 20px 0 10px; }
+.team-register .members { display: flex; flex-direction: column; gap: 10px; }
+.team-register .member-row { display: grid; grid-template-columns: 30px minmax(0,1fr) 116px; gap: 10px; align-items: center; }
+.team-register .member-row .num { width: 30px; height: 38px; display: grid; place-items: center; color: var(--muted-2); font-weight: 600; font-size: 14px; font-variant-numeric: tabular-nums; }
+.team-register .member-row.filled .num { color: var(--primary); }
+.team-register .member-row.is-hidden { display: none; }
+@keyframes teamFormRowIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+.team-register .member-row.reveal { animation: teamFormRowIn .22s ease both; }
+.team-register .members-foot { font-size: 12.5px; color: var(--muted); margin-top: 12px; display: flex; align-items: center; gap: 7px; }
+.team-register .members-foot svg { width: 14px; height: 14px; color: var(--muted-2); flex-shrink: 0; }
+
+/* ── Доп. карты (лёгкая строка, не коробка) ─────────────── */
+.team-register .maps-row {
+  display: flex; align-items: center; justify-content: space-between; gap: 16px;
+  margin-top: 20px; padding-top: 18px; border-top: 1px dashed var(--line);
+}
+.team-register .maps-row .maps-txt h4 { font-size: 14px; font-weight: 500; }
+.team-register .maps-row .maps-txt p { margin: 3px 0 0; font-size: 12.5px; color: var(--muted); max-width: 380px; }
+.team-register .stepper { display: inline-flex; align-items: center; background: var(--paper-2); border: 1px solid var(--line); border-radius: 9px; overflow: hidden; flex-shrink: 0; }
+.team-register .stepper button { width: 38px; height: 40px; border: none; background: transparent; cursor: pointer; font-size: 20px; color: var(--muted); line-height: 1; transition: background .1s, color .1s; }
+.team-register .stepper button:hover:not(:disabled) { background: #f1f3f6; color: var(--ink); }
+.team-register .stepper button:disabled { color: #d2d7de; cursor: not-allowed; }
+.team-register .stepper .val { min-width: 40px; text-align: center; font-weight: 600; color: var(--ink); font-size: 15px; font-variant-numeric: tabular-nums; }
+
+/* ── Подвал формы: согласие + кнопки вместе ─────────────── */
+.team-register .foot { padding: 20px 24px 22px; border-top: 1px solid var(--line-soft); background: #fafbfc; display: flex; flex-direction: column; gap: 16px; }
+.team-register .foot-actions { display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap; }
+.team-register .foot-actions .small { font-size: 12.5px; color: var(--muted); line-height: 1.45; flex: 1; min-width: 200px; margin: 0; }
+.team-register .foot-actions .actions { display: flex; gap: 8px; flex-shrink: 0; }
+
+/* «Регистрация закрыта» предупреждение (показывается JS, когда есть доплата) */
+.team-register .reg-closed-warn {
+  display: flex; align-items: flex-start; gap: 8px;
+  background: var(--warn-bg); border: 1px solid #f1ddc8; border-radius: var(--radius-sm);
+  padding: 11px 13px; font-size: 13px; color: var(--warn); line-height: 1.45;
+}
+.team-register .reg-closed-warn svg { width: 16px; height: 16px; flex-shrink: 0; margin-top: 1px; }
+
+/* ── Sidebar: sticky summary ────────────────────────────── */
+.team-register .sidebar { position: sticky; top: 78px; }
+.team-register .side-head { display: flex; justify-content: space-between; align-items: center; padding: 16px 22px 0; }
+.team-register .side-head h3 { font-size: 14px; font-weight: 500; color: var(--ink); }
+.team-register .side-head .badge { font-size: 11px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--success-dk); background: rgba(2,184,117,.12); padding: 3px 9px; border-radius: 999px; }
+
+/* summary card */
+.team-register .summary.card { box-shadow: var(--shadow); }
+.team-register .sum-lines { padding: 14px 22px 6px; }
+.team-register .sum-line { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 7px 0; font-size: 14px; }
+.team-register .sum-line .lbl { color: var(--muted); }
+.team-register .sum-line .lbl b { color: var(--ink-soft); font-weight: 500; }
+.team-register .sum-line .amt { color: var(--ink); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.team-register .sum-line.muted .amt, .team-register .sum-line.muted .lbl { color: var(--muted-2); }
+.team-register .sum-total { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 14px 22px; margin-top: 6px; border-top: 1px dashed var(--line); }
+.team-register .sum-total .lbl { font-size: 13px; color: var(--muted); text-transform: uppercase; letter-spacing: .1em; }
+.team-register .sum-total .amt { font-size: 26px; font-weight: 600; color: var(--ink); letter-spacing: -0.01em; font-variant-numeric: tabular-nums; }
+.team-register .sum-total .amt small { font-size: 15px; font-weight: 500; color: var(--muted); margin-left: 2px; }
+.team-register .sum-pay { padding: 4px 18px 18px; }
+.team-register .sum-pay .pay-meta { display: flex; align-items: center; justify-content: center; gap: 7px; margin-top: 11px; font-size: 12px; color: var(--muted); }
+.team-register .sum-pay .sbp { display: inline-flex; align-items: center; gap: 5px; font-weight: 600; color: #1f1f5c; }
+.team-register .sum-pay .sbp i { width: 14px; height: 14px; border-radius: 3px; background: linear-gradient(135deg,#f04438,#7a5cff 45%,#1aa7ec); display: inline-block; }
+
+/* ── Aside notes (второстепенное — заметки на полях) ────── */
+.team-register .aside-notes { padding: 0 4px; }
+.team-register .note { padding: 18px 0; border-top: 1px solid var(--line); }
+.team-register .note:first-child { padding-top: 4px; border-top: none; }
+.team-register .note-title { font-size: 11px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: var(--muted-2); margin-bottom: 13px; }
+.team-register .note > p { margin: 0 0 10px; font-size: 13px; color: var(--muted); line-height: 1.5; }
+.team-register .note a.contact { display: inline-flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 500; }
+.team-register .note a.contact svg { width: 16px; height: 16px; }
+.team-register .note-foot { margin: 13px 0 0; font-size: 12.5px; color: var(--muted); line-height: 1.5; }
+.team-register .note-foot b { color: var(--ink-soft); font-weight: 500; }
+
+/* tiers (price ladder) */
+.team-register .tiers { display: flex; flex-direction: column; }
+.team-register .tier { display: flex; align-items: baseline; gap: 10px; padding: 6px 0; font-size: 13.5px; }
+.team-register .tier .price { font-weight: 500; color: var(--muted); min-width: 70px; font-variant-numeric: tabular-nums; }
+.team-register .tier .when { color: var(--muted-2); flex: 1; }
+.team-register .tier .now { font-size: 12px; color: var(--muted); }
+.team-register .tier.active .price { color: var(--ink); font-weight: 600; }
+.team-register .tier.active .when { color: var(--ink-soft); }
+.team-register .tier.past .price, .team-register .tier.past .when { color: var(--muted-2); text-decoration: line-through; text-decoration-color: var(--line); }
+
+/* ── Edit-only: история оплат / переносы / удаление ─────── */
+.team-register .pay-history { display: flex; flex-direction: column; }
+.team-register .pay-history .pay-row { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; padding: 7px 0; font-size: 13.5px; border-top: 1px solid var(--line-soft); }
+.team-register .pay-history .pay-row:first-child { border-top: none; }
+.team-register .pay-history .pay-row .when { color: var(--muted); }
+.team-register .pay-history .pay-row .amt { color: var(--ink-soft); font-weight: 500; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.team-register .danger-zone { border-color: var(--danger-bg); }
+.team-register .danger-zone .section-title { color: var(--danger); }
+.team-register .btn-danger { background: var(--danger); color: #fff; border-color: var(--danger); }
+.team-register .btn-danger:hover { background: #b92b38; color: #fff; border-color: #b92b38; }
+
+/* ── Page-load stagger ──────────────────────────────────── */
+@keyframes teamFormUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+.team-register .anim { opacity: 0; animation: teamFormUp .5s cubic-bezier(.2,.7,.3,1) forwards; }
+.team-register .anim.d1 { animation-delay: .04s; }
+.team-register .anim.d2 { animation-delay: .10s; }
+.team-register .anim.d3 { animation-delay: .16s; }
+@media (prefers-reduced-motion: reduce) {
+  .team-register .anim { animation: none; opacity: 1; }
+  .team-register .member-row.reveal { animation: none; }
+}
+
+/* ── Responsive (form-specific; grid/sidebar stacking handled by theme-2) ── */
+@media (max-width: 920px) {
+  .team-register .sidebar { position: static; }
+}
+@media (max-width: 600px) {
+  .team-register .foot { padding-left: 16px; padding-right: 16px; }
+  .team-register .sum-lines { padding-left: 16px; padding-right: 16px; }
+  .team-register .aside-notes { padding-left: 16px; padding-right: 16px; }
+  .team-register .member-row { grid-template-columns: 28px minmax(0,1fr) 96px; }
+  .team-register .foot-actions .actions { width: 100%; }
+  .team-register .foot-actions .actions .btn { flex: 1; }
+  .team-register .maps-row { flex-direction: column; align-items: stretch; }
+}

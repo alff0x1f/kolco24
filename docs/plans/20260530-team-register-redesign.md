@@ -226,12 +226,12 @@ Key design decisions & rationale:
 - Create: `src/static/css/team-form.css`
 - Create: `src/static/js/team-form.js`
 
-- [ ] port the demo's CSS into `team-form.css` under a scoped `.team-register` wrapper; do NOT redefine `.page` (theme-2 owns it)
-- [ ] port the demo IIFE into `team-form.js`: read counts from each option's `data-counts` (no `switch`); build the segmented control; show/hide member rows with reveal; maps stepper capped at `max(0, ucount − freeMaps)`
-- [ ] implement доплата-aware live cost reading the `#teamFormConfig` JSON island: `max(0, (ucount − paidPeople) × currentPrice + (maps − mapCountPaid) × mapPrice)`; header "К доплате" + "уже оплачено за N чел." line when `paidPeople > 0`
-- [ ] consent gates submit in add mode; gate skipped in edit mode; show "регистрация закрыта" warning when `reg_status != open` and amount due > 0
-- [ ] write tests: none for static assets directly — behavior is covered via the template/integration tests in Tasks 5–6 (asset presence asserted there)
-- [ ] run tests — must pass before Task 5
+- [x] port the demo's CSS into `team-form.css` under a scoped `.team-register` wrapper; do NOT redefine `.page` (theme-2 owns it) — only the demo's form-specific selectors ported (race-chip, section-title, seg, members, maps-row/stepper, foot, summary/sum/tier/note, reg-closed-warn, edit-only pay-history/danger-zone, anim); tokens/.page/.grid/.card/.btn/.form-grid/.field/.input/.check/.sidebar/.side-head come from theme-2 and are NOT redefined; keyframes renamed `teamFormRowIn`/`teamFormUp` to avoid global collision
+- [x] port the demo IIFE into `team-form.js`: read counts from each option's `data-counts` (no `switch`); build the segmented control; show/hide member rows with reveal; maps stepper capped at `max(0, ucount − freeMaps)` — also syncs hidden `#ucountInput`/`#mapCountInput` so the real form submits the values
+- [x] implement доплата-aware live cost reading the `#teamFormConfig` JSON island: `max(0, (ucount − paidPeople) × currentPrice + (maps − mapCountPaid) × mapPrice)`; header "К доплате" + "уже оплачено за N чел." line when `paidPeople > 0` — credit valued at `currentPrice` to match the backend formula exactly; lines sum to the clamped total
+- [x] consent gates submit in add mode; gate skipped in edit mode; show "регистрация закрыта" warning when `reg_status != open` and amount due > 0 — warning element is rendered only when reg closed (server-driven) and JS toggles it on `due > 0`; optional `data-label-due`/`data-label-zero` on submit buttons swap text for Task 6's "Сохранить и доплатить"
+- [x] write tests: none for static assets directly — behavior is covered via the template/integration tests in Tasks 5–6 (asset presence asserted there)
+- [x] run tests — must pass before Task 5 — full suite 101 passed; `make format && make lint` clean
 
 ### Task 5: Rewrite add_team.html on base-2 (add flow)
 
