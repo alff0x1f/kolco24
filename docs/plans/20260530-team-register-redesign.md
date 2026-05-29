@@ -33,7 +33,8 @@ Files/components involved:
   `is_teams_editable`, `slug`), `class Category` (no team-size field today),
   `class RegStatus` (`upcoming`/`open`/`sold_out`)
 - `src/website/models/models.py` — `class Team` (~302): `ucount`, `paid_people` (Float),
-  `map_count`, `map_count_paid`, `additional_charge`, `can_be_deleted`
+  `map_count`, `map_count_paid`, `can_be_deleted` (`additional_charge` exists but is
+  deprecated — not used by the redesign)
 - Admin: `src/website/admin.py` — `CategoryAdmin` (~232, plain ModelAdmin),
   `RaceModelAdmin` (~219, already uses `inlines=[RaceAdminInline]`)
 - URLs: `src/website/urls.py` — `add_team` (`race/<slug>/teams/add/` → `AddTeam`),
@@ -83,7 +84,6 @@ Dependencies identified:
   edit-only sections present only in edit), `POST` charges the correct delta.
 - **Money-path tests** (critical — added from plan review):
   - `Payment.cost_per_person == race.current_price` after a tier-priced POST.
-  - team with `additional_charge > 0`: displayed/charged total includes it.
   - out-of-range `ucount` and over-cap `map_count` are rejected server-side.
   - `is_teams_editable` vs `reg_status` combinations (closed-but-editable,
     open-but-not-editable) gate consistently.
@@ -141,20 +141,14 @@ Key design decisions & rationale:
   set `cost_now = race.current_price` (one change) so the multiplier and the stored
   per-person price stay identical — otherwise partial payments credit the wrong people
   count. Do NOT leave `cost_per_person = race.cost` while charging `current_price`.
-- **`additional_charge` is a separate component.** `EditTeamView.post` passes
-  `additional_charge=team.additional_charge` into the `Payment`, and `update_team`
-  (models.py:281, 290-291) adds/credits it separately. For brand-new teams (add flow)
-  `additional_charge` is always 0. The full charge is:
-  `(ucount − paid_people) × current_price + (map_count − map_count_paid) × 200
-  + additional_charge`. The live JS total and sidebar MUST include `additionalCharge`
-  (0 in add mode) so the displayed total matches the VTB order.
+- **`additional_charge` is deprecated — do NOT account for it.** The full charge is just
+  `(ucount − paid_people) × current_price + (map_count − map_count_paid) × 200`. Don't
+  add it to the formula, JS config, sidebar, or tests.
 - JS config island `<script type="application/json" id="teamFormConfig">`:
-  `{ currentPrice, paidPeople, mapCountPaid, mapPrice: 200, freeMaps: 2,
-  additionalCharge, isEdit }`.
+  `{ currentPrice, paidPeople, mapCountPaid, mapPrice: 200, freeMaps: 2, isEdit }`.
 - Live total (JS, mirrors backend): `max(0, (ucount − paidPeople) × currentPrice
-  + (maps − mapCountPaid) × mapPrice) + additionalCharge`. When result is a top-up in
-  edit mode, header reads "К доплате" and a "уже оплачено за N чел." line shows when
-  `paidPeople > 0`.
+  + (maps − mapCountPaid) × mapPrice)`. When result is a top-up in edit mode, header
+  reads "К доплате" and a "уже оплачено за N чел." line shows when `paidPeople > 0`.
 - Maps constant: 200 ₽/map, 2 free per team — kept as a hardcoded constant, mirrored in
   the view and the JS config.
 - **Server-side guards (not just client-side).** The segmented control / stepper cap
@@ -217,14 +211,13 @@ Key design decisions & rationale:
 - Modify: `src/website/tests.py`
 
 - [ ] in both views, build category options carrying `data-counts` (expanded from `min_people..max_people`) — pass a list of `{id, label, counts}` to the template (manual `<select>`, not the Django widget)
-- [ ] add context keys to both views: `current_price`, `paid_people`, `map_count_paid`, `additional_charge`, `price_tiers` (from `price_tier_ladder()`), `reg_open`/`is_editable`, `reg_status`, `map_price=200`, `free_maps=2`
+- [ ] add context keys to both views: `current_price`, `paid_people`, `map_count_paid`, `price_tiers` (from `price_tier_ladder()`), `reg_open`/`is_editable`, `reg_status`, `map_price=200`, `free_maps=2`
 - [ ] set `cost_now = race.current_price` in `AddTeam.post` and `EditTeamView.post` so the SAME variable both multiplies the people count and is stored as `Payment.cost_per_person` (do NOT leave `cost_per_person = race.cost`); доплата formula otherwise unchanged
-- [ ] confirm `additional_charge` is still passed to the `Payment` as today; the displayed/JS total includes it (0 for add)
 - [ ] add server-side validation (in `TeamForm` or the view): `ucount ∈ [category.min_people, category.max_people]` and `map_count ≤ max(0, ucount − free_maps)`; reject otherwise. Note `TeamForm.clean_map_count` currently returns a string via `clean_birth` — ensure the value is coerced/capped, not just digit-checked
 - [ ] keep the submit gate on the same flag the server enforces (`is_teams_editable`); the race-chip status tag is driven by `reg_status` (display only)
 - [ ] switch `EditTeamView` `render()` target from `website/add_team.html` to `website/edit_team.html` in `get`, `post` success-invalid branch, and any other render
 - [ ] write tests: `GET add_team` 200 with `current_price`/`price_tiers`/option `data-counts` in context; `GET edit_team` 200 renders `edit_team.html`; `EditTeamView.post` charges the correct delta when ucount grows (e.g. 4→5) and when maps added; no charge when nothing added
-- [ ] write money-path tests: `Payment.cost_per_person == current_price` after a tier-priced POST; team with `additional_charge > 0` charges include it; out-of-range `ucount` and over-cap `map_count` rejected; `is_teams_editable`/`reg_status` gate combinations behave consistently
+- [ ] write money-path tests: `Payment.cost_per_person == current_price` after a tier-priced POST; out-of-range `ucount` and over-cap `map_count` rejected; `is_teams_editable`/`reg_status` gate combinations behave consistently
 - [ ] run tests — must pass before Task 4
 
 ### Task 4: Shared static assets — team-form.css and team-form.js
@@ -273,7 +266,7 @@ Key design decisions & rationale:
 - [ ] verify team sizes come from `Category.min_people/max_people` (segment + `data-counts`)
 - [ ] verify price ladder comes from `RacePriceTier`; `current_price` drives both display and charged amount; `race.cost` fallback works for a tier-less race
 - [ ] verify доплата: edit charges only the delta (ucount grow, maps added); no charge when unchanged; "регистрация закрыта" warning when applicable
-- [ ] verify money path: `Payment.cost_per_person` equals the charged per-person price (so partial-payment `paid_for` back-calc is correct); `additional_charge` included in displayed + charged total; server rejects out-of-range `ucount` / over-cap `map_count`
+- [ ] verify money path: `Payment.cost_per_person` equals the charged per-person price (so partial-payment `paid_for` back-calc is correct); server rejects out-of-range `ucount` / over-cap `map_count`
 - [ ] run full suite: `uv run pytest --reuse-db`
 - [ ] `make format && make lint`
 
