@@ -5,16 +5,10 @@ from django.urls import reverse
 from django.views import View
 
 from vtb.client import VTBClient
-from website.forms import TeamForm, TeamMemberMoveForm
-from website.models import (
-    Payment,
-    PaymentsYa,
-    Team,
-    TeamMemberMove,
-    VTBPayment,
-    VTBPreparedPayment,
-)
+from website.forms import MAP_PRICE, TeamForm, TeamMemberMoveForm
+from website.models import Payment, Team, TeamMemberMove, VTBPayment, VTBPreparedPayment
 from website.models.race import RegStatus
+from website.views.views_ import build_team_form_context
 
 
 class EditTeamView(View):
@@ -57,13 +51,13 @@ class EditTeamView(View):
 
         return render(
             request,
-            "website/add_team.html",
+            "website/edit_team.html",
             {
                 "race_id": team.category2.race_id,
                 "race": race,
                 "team_form": form,
                 "team": team,
-                "cost": race.cost,
+                "cost": race.current_price,
                 "action": reverse("edit_team", args=[team_id]),
                 "payments": Payment.objects.filter(team=team, status="done").order_by(
                     "id"
@@ -72,6 +66,7 @@ class EditTeamView(View):
                     Q(from_team=team) | Q(to_team=team)
                 ).order_by("id"),
                 "team_move_form": TeamMemberMoveForm(race_id=team.category2.race_id),
+                **build_team_form_context(race, team),
             },
         )
 
@@ -122,10 +117,10 @@ class EditTeamView(View):
 
             # payment
             race = team.category2.race
-            cost_now = race.cost
-            cost = (int(team.ucount) - team.paid_people) * race.cost + (
+            cost_now = race.current_price
+            cost = (int(team.ucount) - team.paid_people) * cost_now + (
                 int(team.map_count) - team.map_count_paid
-            ) * 200
+            ) * MAP_PRICE
             if cost > 0:
                 payment = Payment.objects.create(
                     owner=request.user,
@@ -164,13 +159,13 @@ class EditTeamView(View):
         # If form is not valid, re-render the form with errors
         return render(
             request,
-            "website/add_team.html",
+            "website/edit_team.html",
             {
                 "race": race,
                 "race_id": race.id,
                 "team_form": form,
                 "team": team,
-                "cost": PaymentsYa.get_cost(),
+                "cost": race.current_price,
                 "action": reverse("edit_team", args=[team_id]),
                 "payments": Payment.objects.filter(team=team, status="done").order_by(
                     "id"
@@ -179,6 +174,7 @@ class EditTeamView(View):
                     Q(from_team=team) | Q(to_team=team)
                 ).order_by("id"),
                 "team_move_form": TeamMemberMoveForm(race_id=team.category2.race_id),
+                **build_team_form_context(race, team),
             },
         )
 

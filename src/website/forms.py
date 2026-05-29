@@ -20,6 +20,9 @@ from website.models.race import Category, Race
 
 BUS_REGISTRATION_MAX_PASSENGERS = 20
 BREAKFAST_MAX_ATTENDEES = 20
+# Maps pricing — mirrored in the views and the JS config island.
+FREE_MAPS = 2
+MAP_PRICE = 200
 DUPLICATE_EMAIL_MSG = mark_safe(
     "Пользователь с таким email уже зарегистрирован. "
     '<a href="/login/">Войдите</a> в существующий аккаунт.'
@@ -598,6 +601,32 @@ class TeamForm(forms.Form):
             return True
 
     def clean(self):
+        cleaned_data = super().clean()
+
+        # Server-side guards: the segmented control / maps stepper cap values
+        # in the browser only; enforce them here against a crafted POST.
+        category_id = cleaned_data.get("category2_id")
+        ucount = cleaned_data.get("ucount")
+        category = (
+            Category.objects.filter(id=category_id).first() if category_id else None
+        )
+        if category and ucount:
+            ucount_int = int(ucount)
+            if not (category.min_people <= ucount_int <= category.max_people):
+                self.add_error(
+                    "ucount",
+                    "Недопустимое количество участников для выбранной категории.",
+                )
+
+        if ucount:
+            map_count = cleaned_data.get("map_count") or 0
+            max_maps = max(0, int(ucount) - FREE_MAPS)
+            if int(map_count) > max_maps:
+                self.add_error(
+                    "map_count",
+                    "Слишком много дополнительных карт для такого состава.",
+                )
+
         # make invalid forms red:
         if self.errors:
             for f_name in self.fields:
@@ -606,7 +635,7 @@ class TeamForm(forms.Form):
                     classes += " is-invalid"
                     self.fields[f_name].widget.attrs["class"] = classes
             raise forms.ValidationError("Заполните все поля")
-        return self.cleaned_data
+        return cleaned_data
 
     @staticmethod
     def clean_birth(birth):
@@ -635,7 +664,12 @@ class TeamForm(forms.Form):
         return self.clean_birth(self.cleaned_data["birth6"])
 
     def clean_map_count(self):
-        return self.clean_birth(self.cleaned_data["map_count"])
+        value = self.cleaned_data.get("map_count")
+        if not value:
+            return 0
+        if not str(value).isdigit():
+            raise forms.ValidationError("Количество карт должно быть числом.")
+        return int(value)
 
     def save(self):
         if "paymentid" not in self.cleaned_data:

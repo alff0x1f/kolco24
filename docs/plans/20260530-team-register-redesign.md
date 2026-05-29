@@ -210,15 +210,15 @@ Key design decisions & rationale:
 - Modify: `src/website/forms.py` (`TeamForm` server-side guards)
 - Modify: `src/website/tests.py`
 
-- [ ] in both views, build category options carrying `data-counts` (expanded from `min_people..max_people`) — pass a list of `{id, label, counts}` to the template (manual `<select>`, not the Django widget)
-- [ ] add context keys to both views: `current_price`, `paid_people`, `map_count_paid`, `price_tiers` (from `price_tier_ladder()`), `reg_open`/`is_editable`, `reg_status`, `map_price=200`, `free_maps=2`
-- [ ] set `cost_now = race.current_price` in `AddTeam.post` and `EditTeamView.post` so the SAME variable both multiplies the people count and is stored as `Payment.cost_per_person` (do NOT leave `cost_per_person = race.cost`); доплата formula otherwise unchanged
-- [ ] add server-side validation (in `TeamForm` or the view): `ucount ∈ [category.min_people, category.max_people]` and `map_count ≤ max(0, ucount − free_maps)`; reject otherwise. Note `TeamForm.clean_map_count` currently returns a string via `clean_birth` — ensure the value is coerced/capped, not just digit-checked
-- [ ] keep the submit gate on the same flag the server enforces (`is_teams_editable`); the race-chip status tag is driven by `reg_status` (display only)
-- [ ] switch `EditTeamView` `render()` target from `website/add_team.html` to `website/edit_team.html` in `get`, `post` success-invalid branch, and any other render
-- [ ] write tests: `GET add_team` 200 with `current_price`/`price_tiers`/option `data-counts` in context; `GET edit_team` 200 renders `edit_team.html`; `EditTeamView.post` charges the correct delta when ucount grows (e.g. 4→5) and when maps added; no charge when nothing added
-- [ ] write money-path tests: `Payment.cost_per_person == current_price` after a tier-priced POST; out-of-range `ucount` and over-cap `map_count` rejected; `is_teams_editable`/`reg_status` gate combinations behave consistently
-- [ ] run tests — must pass before Task 4
+- [x] in both views, build category options carrying `data-counts` (expanded from `min_people..max_people`) — pass a list of `{id, label, counts}` to the template (manual `<select>`, not the Django widget) — `build_category_options`/`build_team_form_context` in `views_.py`, reused by `EditTeamView`
+- [x] add context keys to both views: `current_price`, `paid_people`, `map_count_paid`, `price_tiers` (from `price_tier_ladder()`), `reg_open`/`is_editable`, `reg_status`, `map_price=200`, `free_maps=2`
+- [x] set `cost_now = race.current_price` in `AddTeam.post` and `EditTeamView.post` so the SAME variable both multiplies the people count and is stored as `Payment.cost_per_person` (do NOT leave `cost_per_person = race.cost`); доплата formula otherwise unchanged
+- [x] add server-side validation (in `TeamForm` or the view): `ucount ∈ [category.min_people, category.max_people]` and `map_count ≤ max(0, ucount − free_maps)`; reject otherwise. `clean_map_count` now coerces to int; cross-field caps live in `TeamForm.clean`
+- [x] keep the submit gate on the same flag the server enforces (`is_teams_editable`); the race-chip status tag is driven by `reg_status` (display only) — context exposes both `is_editable` and `reg_status`
+- [x] switch `EditTeamView` `render()` target from `website/add_team.html` to `website/edit_team.html` in `get`, `post` success-invalid branch, and any other render — `edit_team.html` created as a working copy (Bootstrap) so the render succeeds; Task 6 rewrites it on base-2
+- [x] write tests: `GET add_team` 200 with `current_price`/`price_tiers`/option `data-counts` in context; `GET edit_team` 200 renders `edit_team.html`; `EditTeamView.post` charges the correct delta when ucount grows (e.g. 4→5) and when maps added; no charge when nothing added
+- [x] write money-path tests: `Payment.cost_per_person == current_price` after a tier-priced POST; out-of-range `ucount` and over-cap `map_count` rejected; `is_teams_editable`/`reg_status` gate combinations behave consistently
+- [x] run tests — must pass before Task 4 — full suite 101 passed; `make format && make lint` clean
 
 ### Task 4: Shared static assets — team-form.css and team-form.js
 

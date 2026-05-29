@@ -36,6 +36,8 @@ from openpyxl import load_workbook
 from vtb.client import VTBClient
 from website.forms import (
     DUPLICATE_EMAIL_MSG,
+    FREE_MAPS,
+    MAP_PRICE,
     BreakfastForm,
     ImpersonateForm,
     LoginForm,
@@ -1726,6 +1728,34 @@ def upload_photo(request, race_id):
     return JsonResponse({"success": True})
 
 
+def build_category_options(race_id):
+    """Category options carrying ``data-counts`` expanded from min/max people."""
+    return [
+        {
+            "id": category.id,
+            "label": f"{category.short_name} ({category.name})",
+            "counts": list(range(category.min_people, category.max_people + 1)),
+        }
+        for category in Category.objects.filter(race_id=race_id)
+    ]
+
+
+def build_team_form_context(race, team):
+    """Unified context shared by the add and edit team forms."""
+    return {
+        "current_price": race.current_price,
+        "paid_people": team.paid_people,
+        "map_count_paid": team.map_count_paid,
+        "price_tiers": race.price_tier_ladder(),
+        "reg_open": race.reg_status == RegStatus.OPEN,
+        "is_editable": race.is_teams_editable,
+        "reg_status": race.reg_status,
+        "map_price": MAP_PRICE,
+        "free_maps": FREE_MAPS,
+        "category_options": build_category_options(race.id),
+    }
+
+
 class AddTeam(View):
     def get(self, request, race_slug):
         race = get_object_or_404(Race, slug=race_slug)
@@ -1741,9 +1771,9 @@ class AddTeam(View):
                 "race_id": race.id,
                 "team_form": form,
                 "team": Team(),
-                "cost": race.cost,
+                "cost": race.current_price,
                 "action": reverse("add_team", args=[race.slug]),
-                "reg_open": race.reg_status == RegStatus.OPEN,
+                **build_team_form_context(race, Team()),
             },
         )
 
@@ -1778,10 +1808,10 @@ class AddTeam(View):
 
             # payment
             payment_method = request.GET.get("method", "sbp2")
-            cost_now = race.cost
-            cost = (int(team.ucount) - team.paid_people) * race.cost + (
+            cost_now = race.current_price
+            cost = (int(team.ucount) - team.paid_people) * cost_now + (
                 int(team.map_count) - team.map_count_paid
-            ) * 200
+            ) * MAP_PRICE
 
             if cost < 0:
                 # в теории, не может быть, тк это новая команда и она не
@@ -1860,7 +1890,15 @@ class AddTeam(View):
         return render(
             request,
             "website/add_team.html",
-            {"race_id": race.id, "team_form": form, "cost": PaymentsYa.get_cost()},
+            {
+                "race": race,
+                "race_id": race.id,
+                "team_form": form,
+                "team": Team(),
+                "cost": race.current_price,
+                "action": reverse("add_team", args=[race.slug]),
+                **build_team_form_context(race, Team()),
+            },
         )
 
 

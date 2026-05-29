@@ -1,4 +1,5 @@
 from datetime import timedelta
+from unittest.mock import MagicMock, patch
 
 import pytest
 from django.contrib.auth.models import User
@@ -7,7 +8,7 @@ from django.db import IntegrityError
 from django.urls import reverse
 from django.utils import timezone
 
-from website.models import Race
+from website.models import Payment, Race
 from website.models.models import Team
 from website.models.race import Category, RaceLink, RacePriceTier, RegStatus
 
@@ -665,3 +666,266 @@ def test_price_tier_ladder_all_past_marks_last_active():
 def test_price_tier_ladder_empty_without_tiers():
     race = Race.objects.create(name="Empty", code="e1", slug="empty-1", cost=500)
     assert race.price_tier_ladder() == []
+
+
+# --- Task 3: unified view context, current_price charging, server guards ---
+
+
+def _create_team_for_edit(
+    *,
+    suffix,
+    reg_status=RegStatus.OPEN,
+    is_teams_editable=True,
+    cost=1000,
+    tier_price=None,
+    min_people=4,
+    max_people=6,
+    ucount=4,
+    paid_people=4,
+    map_count=0,
+    map_count_paid=0,
+):
+    user = User.objects.create_user(
+        username=f"owner-{suffix}",
+        password="pass",
+        email=f"owner-{suffix}@example.com",
+    )
+    race = Race.objects.create(
+        name="R",
+        code=f"rc{suffix}",
+        slug=f"slug-{suffix}",
+        cost=cost,
+        reg_status=reg_status,
+        is_teams_editable=is_teams_editable,
+    )
+    if tier_price is not None:
+        RacePriceTier.objects.create(
+            race=race,
+            price=tier_price,
+            active_until=timezone.localdate() + timedelta(days=10),
+        )
+    category = Category.objects.create(
+        code="t",
+        name="Team",
+        short_name="T",
+        race=race,
+        min_people=min_people,
+        max_people=max_people,
+    )
+    team = Team.objects.create(
+        owner=user,
+        paymentid="p",
+        dist="t",
+        category2=category,
+        ucount=ucount,
+        paid_people=paid_people,
+        map_count=map_count,
+        map_count_paid=map_count_paid,
+    )
+    return user, race, category, team
+
+
+def _mock_vtb():
+    """Patch the VTB integration so a charging POST does not hit the network."""
+    client_patch = patch("website.views.team.VTBClient")
+    payment_patch = patch("website.views.team.VTBPayment")
+    prepared_patch = patch("website.views.team.VTBPreparedPayment")
+    return client_patch, payment_patch, prepared_patch
+
+
+@pytest.mark.django_db
+def test_get_add_team_context_has_price_and_counts(client):
+    user = User.objects.create_user(
+        username="adder", password="pass", email="adder@example.com"
+    )
+    race = Race.objects.create(
+        name="Add Race",
+        code="addr1",
+        slug="add-race-1",
+        cost=1000,
+        reg_status=RegStatus.OPEN,
+    )
+    RacePriceTier.objects.create(
+        race=race, price=1500, active_until=timezone.localdate() + timedelta(days=10)
+    )
+    category = Category.objects.create(
+        code="t",
+        name="Team",
+        short_name="T",
+        race=race,
+        min_people=4,
+        max_people=6,
+    )
+    client.force_login(user)
+    response = client.get(reverse("add_team", args=[race.slug]))
+    assert response.status_code == 200
+    # current_price comes from the active tier, not race.cost
+    assert response.context["current_price"] == 1500
+    assert response.context["price_tiers"]  # non-empty ladder
+    assert response.context["map_price"] == 200
+    assert response.context["free_maps"] == 2
+    options = response.context["category_options"]
+    match = next(o for o in options if o["id"] == category.id)
+    assert match["counts"] == [4, 5, 6]
+
+
+@pytest.mark.django_db
+def test_get_edit_team_renders_edit_template(client):
+    user, race, category, team = _create_team_for_edit(suffix="rt", tier_price=1500)
+    client.force_login(user)
+    response = client.get(reverse("edit_team", args=[team.id]))
+    assert response.status_code == 200
+    assert "website/edit_team.html" in [t.name for t in response.templates]
+    assert response.context["current_price"] == 1500
+
+
+@pytest.mark.django_db
+def test_edit_team_charges_delta_on_ucount_growth(client):
+    user, race, category, team = _create_team_for_edit(
+        suffix="grow", tier_price=1500, ucount=4, paid_people=4
+    )
+    client.force_login(user)
+    client_p, payment_p, prepared_p = _mock_vtb()
+    with client_p, payment_p as mock_payment, prepared_p as mock_prepared:
+        mock_payment.from_vtb_payload.return_value = MagicMock(
+            pay_url="https://pay.example/redirect"
+        )
+        mock_prepared.objects.filter.return_value.first.return_value = None
+        response = client.post(
+            reverse("edit_team", args=[team.id]),
+            {"ucount": "5", "category2_id": str(category.id), "map_count": "0"},
+        )
+    assert response.status_code == 302
+    payment = Payment.objects.filter(team=team).order_by("-id").first()
+    # delta = (5 - 4) * 1500 (the tier price, NOT race.cost=1000)
+    assert payment.payment_amount == 1500
+    assert payment.cost_per_person == 1500
+
+
+@pytest.mark.django_db
+def test_edit_team_charges_delta_on_maps_added(client):
+    user, race, category, team = _create_team_for_edit(
+        suffix="maps", tier_price=1500, ucount=4, paid_people=4
+    )
+    client.force_login(user)
+    client_p, payment_p, prepared_p = _mock_vtb()
+    with client_p, payment_p as mock_payment, prepared_p as mock_prepared:
+        mock_payment.from_vtb_payload.return_value = MagicMock(
+            pay_url="https://pay.example/redirect"
+        )
+        mock_prepared.objects.filter.return_value.first.return_value = None
+        response = client.post(
+            reverse("edit_team", args=[team.id]),
+            {"ucount": "4", "category2_id": str(category.id), "map_count": "2"},
+        )
+    assert response.status_code == 302
+    payment = Payment.objects.filter(team=team).order_by("-id").first()
+    # only the 2 extra maps are charged: 2 * 200
+    assert payment.payment_amount == 400
+    assert payment.map == 2
+
+
+@pytest.mark.django_db
+def test_edit_team_no_charge_when_nothing_added(client):
+    user, race, category, team = _create_team_for_edit(
+        suffix="noop", tier_price=1500, ucount=4, paid_people=4
+    )
+    client.force_login(user)
+    response = client.post(
+        reverse("edit_team", args=[team.id]),
+        {"ucount": "4", "category2_id": str(category.id), "map_count": "0"},
+    )
+    assert response.status_code == 302
+    assert Payment.objects.filter(team=team).count() == 0
+
+
+@pytest.mark.django_db
+def test_edit_team_rejects_out_of_range_ucount(client):
+    user, race, category, team = _create_team_for_edit(
+        suffix="oor", min_people=4, max_people=6, ucount=4, paid_people=0
+    )
+    client.force_login(user)
+    response = client.post(
+        reverse("edit_team", args=[team.id]),
+        {"ucount": "2", "category2_id": str(category.id), "map_count": "0"},
+    )
+    assert response.status_code == 200
+    team.refresh_from_db()
+    assert team.ucount == 4  # unchanged — invalid POST rejected
+    assert Payment.objects.filter(team=team).count() == 0
+
+
+@pytest.mark.django_db
+def test_edit_team_rejects_over_cap_map_count(client):
+    user, race, category, team = _create_team_for_edit(
+        suffix="cap", min_people=4, max_people=6, ucount=4, paid_people=0
+    )
+    client.force_login(user)
+    response = client.post(
+        reverse("edit_team", args=[team.id]),
+        # ucount=4 allows max(0, 4-2)=2 maps; 5 must be rejected
+        {"ucount": "4", "category2_id": str(category.id), "map_count": "5"},
+    )
+    assert response.status_code == 200
+    assert Payment.objects.filter(team=team).count() == 0
+
+
+@pytest.mark.django_db
+def test_edit_team_closed_but_editable_saves_without_charge(client):
+    user, race, category, team = _create_team_for_edit(
+        suffix="closed",
+        reg_status=RegStatus.SOLD_OUT,
+        is_teams_editable=True,
+        ucount=4,
+        paid_people=0,
+    )
+    client.force_login(user)
+    response = client.post(
+        reverse("edit_team", args=[team.id]),
+        {"ucount": "5", "category2_id": str(category.id), "map_count": "0"},
+    )
+    # editable gate passes, but reg not open -> saved, no payment
+    assert response.status_code == 302
+    assert Payment.objects.filter(team=team).count() == 0
+
+
+@pytest.mark.django_db
+def test_edit_team_open_but_not_editable_forbidden(client):
+    user, race, category, team = _create_team_for_edit(
+        suffix="ne",
+        reg_status=RegStatus.OPEN,
+        is_teams_editable=False,
+        ucount=4,
+        paid_people=0,
+    )
+    client.force_login(user)
+    response = client.post(
+        reverse("edit_team", args=[team.id]),
+        {"ucount": "5", "category2_id": str(category.id), "map_count": "0"},
+    )
+    assert response.status_code == 403
+
+
+@pytest.mark.django_db
+def test_add_team_rejects_out_of_range_ucount(client):
+    user = User.objects.create_user(
+        username="addoor", password="pass", email="addoor@example.com"
+    )
+    race = Race.objects.create(
+        name="Add OOR",
+        code="addoor1",
+        slug="add-oor-1",
+        cost=1000,
+        reg_status=RegStatus.OPEN,
+        is_teams_editable=True,
+    )
+    category = Category.objects.create(
+        code="t", name="Team", short_name="T", race=race, min_people=4, max_people=6
+    )
+    client.force_login(user)
+    response = client.post(
+        reverse("add_team", args=[race.slug]),
+        {"ucount": "2", "category2_id": str(category.id), "map_count": "0"},
+    )
+    assert response.status_code == 200
+    assert not Team.objects.filter(category2=category).exists()
