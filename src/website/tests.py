@@ -1026,3 +1026,130 @@ def test_add_team_hides_submit_when_not_editable(client):
     assert 'id="payBtn"' not in html
     # status tag is display-only and reflects reg_status
     assert "is-closed" in html
+
+
+# --- Task 6: edit_team.html on base-2 (edit flow + edit-only sections) ---
+
+
+@pytest.mark.django_db
+def test_edit_team_renders_base2_template(client):
+    user, race, category, team = _create_team_for_edit(
+        suffix="b2edit", tier_price=1500, ucount=4, paid_people=0
+    )
+    client.force_login(user)
+    response = client.get(reverse("edit_team", args=[team.id]))
+    assert response.status_code == 200
+    assert "website/edit_team.html" in [t.name for t in response.templates]
+
+    html = response.content.decode()
+    # base-2 design: shared assets are linked
+    assert "/static/css/team-form.css" in html
+    assert "/static/js/team-form.js" in html
+    # segmented count control + scoped wrapper
+    assert 'id="ucountSeg"' in html
+    assert "team-register" in html
+    # JSON config island marks edit mode
+    assert 'id="teamFormConfig"' in html
+    assert '"isEdit": true' in html
+    # consent is pre-checked and disabled in edit mode
+    assert 'name="consent" checked disabled' in html
+    # submit reads "Сохранить" with a доплата label swap available to the JS
+    assert 'data-label-due="Сохранить и&nbsp;доплатить"' in html
+
+
+@pytest.mark.django_db
+def test_edit_team_shows_move_section_when_paid_and_editable(client):
+    user, race, category, team = _create_team_for_edit(
+        suffix="mvshow", ucount=4, paid_people=4, is_teams_editable=True
+    )
+    client.force_login(user)
+    response = client.get(reverse("edit_team", args=[team.id]))
+    html = response.content.decode()
+    # member-transfer section + its dedicated POST target
+    assert "Переносы участников" in html
+    assert reverse("move_team_member", args=[team.id]) in html
+    assert 'name="moved_people"' in html
+
+
+@pytest.mark.django_db
+def test_edit_team_hides_move_section_when_not_paid(client):
+    user, race, category, team = _create_team_for_edit(
+        suffix="mvhide", ucount=4, paid_people=0, is_teams_editable=True
+    )
+    client.force_login(user)
+    response = client.get(reverse("edit_team", args=[team.id]))
+    html = response.content.decode()
+    assert "Переносы участников" not in html
+
+
+@pytest.mark.django_db
+def test_edit_team_shows_delete_section_when_deletable(client):
+    user, race, category, team = _create_team_for_edit(
+        suffix="del", ucount=4, paid_people=0
+    )
+    assert team.can_be_deleted
+    client.force_login(user)
+    response = client.get(reverse("edit_team", args=[team.id]))
+    html = response.content.decode()
+    assert "Удалить команду" in html
+    assert 'name="delete_team"' in html
+
+
+@pytest.mark.django_db
+def test_edit_team_hides_delete_section_when_not_deletable(client):
+    user, race, category, team = _create_team_for_edit(
+        suffix="nodel", ucount=4, paid_people=4
+    )
+    assert not team.can_be_deleted
+    client.force_login(user)
+    response = client.get(reverse("edit_team", args=[team.id]))
+    html = response.content.decode()
+    assert 'name="delete_team"' not in html
+
+
+@pytest.mark.django_db
+def test_edit_team_shows_payment_history(client):
+    user, race, category, team = _create_team_for_edit(
+        suffix="hist", ucount=4, paid_people=4
+    )
+    Payment.objects.create(
+        owner=user,
+        team=team,
+        payment_method="sbp2",
+        payment_amount=6000,
+        paid_for=4,
+        status=Payment.STATUS_DONE,
+        sender_card_number="",
+    )
+    client.force_login(user)
+    response = client.get(reverse("edit_team", args=[team.id]))
+    html = response.content.decode()
+    assert "История оплат" in html
+    assert "6000" in html
+
+
+@pytest.mark.django_db
+def test_add_team_omits_edit_only_sections(client):
+    user = User.objects.create_user(
+        username="addnoedit", password="pass", email="addnoedit@example.com"
+    )
+    race = Race.objects.create(
+        name="Add No Edit",
+        code="ane1",
+        slug="add-no-edit-1",
+        cost=1000,
+        reg_status=RegStatus.OPEN,
+        is_teams_editable=True,
+    )
+    Category.objects.create(
+        code="t", name="Team", short_name="T", race=race, min_people=4, max_people=6
+    )
+    client.force_login(user)
+    response = client.get(reverse("add_team", args=[race.slug]))
+    html = response.content.decode()
+    # the add page is for new teams — no edit-only sections
+    assert "История оплат" not in html
+    assert "Переносы участников" not in html
+    assert "Удалить команду" not in html
+    assert 'name="delete_team"' not in html
+    assert '"isEdit": false' in html

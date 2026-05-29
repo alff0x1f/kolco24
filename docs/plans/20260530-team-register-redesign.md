@@ -253,13 +253,13 @@ Key design decisions & rationale:
 - Create: `src/templates/website/edit_team.html`
 - Modify: `src/website/tests.py`
 
-- [ ] extend `base-2.html` (same assets/wrapper as add); duplicate the shared form body (no include, per decision)
-- [ ] consent pre-checked & disabled; foot copy reflects edit/доплата; submit reads "Сохранить" / "Сохранить и доплатить" when amount due > 0
-- [ ] edit-only section «История оплат» from `payments` (restyled to base-2 note/card idiom)
-- [ ] edit-only section «Переносы участников» from `member_moves` + `team_move_form` (danger style), shown when `paid_people` and editable; posts to `move_team_member`. The view already builds `TeamMemberMoveForm(race_id=...)` — keep that kwarg; hand-render its `to_team`/`moved_people` fields per base-2 rules
-- [ ] edit-only «Удалить команду» when `can_be_deleted` and owner/superuser — POST `delete_team=1` with JS confirm
-- [ ] write tests: `GET edit_team` renders `edit_team.html`, shows edit-only sections (payments/move/delete) per state, consent disabled+checked; add page does NOT contain these sections
-- [ ] run tests — must pass before Task 7
+- [x] extend `base-2.html` (same assets/wrapper as add); duplicate the shared form body (no include, per decision) — full form body duplicated into `edit_team.html`, scoped `.team-register`, loads `team-form.css`/`team-form.js`
+- [x] consent pre-checked & disabled; foot copy reflects edit/доплата; submit reads "Сохранить" / "Сохранить и доплатить" when amount due > 0 — consent `checked disabled`; foot copy edit-specific; submit uses `data-label-due`/`data-label-zero` swapped by the JS on `due`
+- [x] edit-only section «История оплат» from `payments` (restyled to base-2 note/card idiom) — `.pay-history`/`.pay-row` card; deprecated `additional_charge` rows dropped (not displayed)
+- [x] edit-only section «Переносы участников» from `member_moves` + `team_move_form` (danger style), shown when `paid_people` and editable; posts to `move_team_member`. The view already builds `TeamMemberMoveForm(race_id=...)` — keep that kwarg; hand-render its `to_team`/`moved_people` fields per base-2 rules — `.danger-zone` card, gated `paid_people and is_editable`; `to_team`/`moved_people` hand-rendered; JS confirm on submit
+- [x] edit-only «Удалить команду» when `can_be_deleted` and owner/superuser — POST `delete_team=1` with JS confirm — `.danger-zone` card gated `can_be_deleted and (superuser or owner)`
+- [x] write tests: `GET edit_team` renders `edit_team.html`, shows edit-only sections (payments/move/delete) per state, consent disabled+checked; add page does NOT contain these sections — `test_edit_team_renders_base2_template`, `test_edit_team_shows/hides_move_section`, `test_edit_team_shows/hides_delete_section`, `test_edit_team_shows_payment_history`, `test_add_team_omits_edit_only_sections`
+- [x] run tests — must pass before Task 7 — full suite 111 passed; `make format && make lint` clean
 
 ### Task 7: Verify acceptance criteria
 - [ ] verify add & edit render on base-2 matching the demo (header, form card, sidebar)
