@@ -55,10 +55,10 @@
           <div class="teams-head">
             <h2>Команды <span class="total">{{ race_team_count }}</span></h2>
             <div class="search">
-              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true">
                 <circle cx="7" cy="7" r="5"/><path d="m11 11 3 3"/>
               </svg>
-              <input type="search" id="searchInput" placeholder="Команда, город или участник…" autocomplete="off">
+              <input type="search" id="searchInput" aria-label="Поиск: команда, город или участник" placeholder="Команда, город или участник…" autocomplete="off">
             </div>
           </div>
           <div class="cat-chips" id="catChips"></div>
@@ -66,11 +66,21 @@
             <table class="teams-table">
               <thead>
                 <tr>
-                  <th class="col-num" data-sort="num">№ <span class="arr">▼</span></th>
-                  <th data-sort="name">Команда <span class="arr">▼</span></th>
-                  <th class="col-cat" data-sort="cat">Категория <span class="arr">▼</span></th>
-                  <th class="col-city" data-sort="city">Город <span class="arr">▼</span></th>
-                  <th class="col-cnt" data-sort="cnt">Чел. <span class="arr">▼</span></th>
+                  <th class="col-num" scope="col" aria-sort="ascending">
+                    <button type="button" class="th-sort sorted" data-sort="num">№ <span class="arr" aria-hidden="true">▼</span></button>
+                  </th>
+                  <th scope="col" aria-sort="none">
+                    <button type="button" class="th-sort" data-sort="name">Команда <span class="arr" aria-hidden="true">▼</span></button>
+                  </th>
+                  <th class="col-cat" scope="col" aria-sort="none">
+                    <button type="button" class="th-sort" data-sort="cat">Категория <span class="arr" aria-hidden="true">▼</span></button>
+                  </th>
+                  <th class="col-city" scope="col" aria-sort="none">
+                    <button type="button" class="th-sort" data-sort="city">Город <span class="arr" aria-hidden="true">▼</span></button>
+                  </th>
+                  <th class="col-cnt" scope="col" aria-sort="none">
+                    <button type="button" class="th-sort" data-sort="cnt">Чел. <span class="arr" aria-hidden="true">▼</span></button>
+                  </th>
                 </tr>
               </thead>
               <tbody id="teamRows"></tbody>

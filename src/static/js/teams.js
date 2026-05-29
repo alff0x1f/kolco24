@@ -307,23 +307,37 @@
     });
   }
 
-  document.querySelectorAll("th[data-sort]").forEach(function (th) {
-    th.addEventListener("click", function () {
-      var k = th.dataset.sort;
+  function updateSortIndicators(activeBtn) {
+    document.querySelectorAll(".th-sort").forEach(function (b) {
+      var th = b.closest("th");
+      var arr = b.querySelector(".arr");
+      if (b === activeBtn) {
+        b.classList.add("sorted");
+        if (arr) arr.textContent = sortDir === 1 ? "▼" : "▲";
+        if (th) {
+          th.setAttribute(
+            "aria-sort",
+            sortDir === 1 ? "ascending" : "descending"
+          );
+        }
+      } else {
+        b.classList.remove("sorted");
+        if (arr) arr.textContent = "▼";
+        if (th) th.setAttribute("aria-sort", "none");
+      }
+    });
+  }
+
+  document.querySelectorAll(".th-sort").forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      var k = btn.dataset.sort;
       if (sortKey === k) {
         sortDir *= -1;
       } else {
         sortKey = k;
         sortDir = 1;
       }
-      document.querySelectorAll("th[data-sort]").forEach(function (h) {
-        h.classList.remove("sorted");
-        var arr = h.querySelector(".arr");
-        if (arr) arr.textContent = "▼";
-      });
-      th.classList.add("sorted");
-      var arrEl = th.querySelector(".arr");
-      if (arrEl) arrEl.textContent = sortDir === 1 ? "▼" : "▲";
+      updateSortIndicators(btn);
       render();
     });
   });

@@ -133,7 +133,6 @@ class RaceTeamsView(View):
             Team.objects.filter(team_filter)
             .select_related("category2", "owner")
             .order_by("category2__order", "start_number", "id")
-            .distinct()
         )
 
         teams_data = []
