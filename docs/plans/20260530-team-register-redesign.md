@@ -194,13 +194,13 @@ Key design decisions & rationale:
 - Modify: `src/website/admin.py`
 - Modify: `src/website/tests.py`
 
-- [ ] add `class RacePriceTier(Model)` (`race` FK `related_name="price_tiers"`, `price` Int, `active_until` Date, `order` Int default 0; `Meta.ordering = ["active_until", "order"]`)
-- [ ] add `Race.current_price` property: active tier = earliest with `active_until >= today`; if all past, last tier; if no tiers, `self.cost`
-- [ ] add `Race.price_tier_ladder()` returning `[{"tier": t, "status": "past|active|future"}]`
-- [ ] create migration: `uv run python src/manage.py makemigrations website`
-- [ ] register `RacePriceTier` as a `TabularInline` on `RaceModelAdmin`
-- [ ] write tests: `current_price` picks active tier; falls back to `cost` with no tiers; uses last tier when all past; the same-day boundary (`active_until == today`) counts as active (inclusive `>=`); `price_tier_ladder()` flags past/active/future correctly
-- [ ] run tests — must pass before Task 3
+- [x] add `class RacePriceTier(Model)` (`race` FK `related_name="price_tiers"`, `price` Int, `active_until` Date, `order` Int default 0; `Meta.ordering = ["active_until", "order"]`)
+- [x] add `Race.current_price` property: active tier = earliest with `active_until >= today`; if all past, last tier; if no tiers, `self.cost` — uses shared `_active_tier_index` helper
+- [x] add `Race.price_tier_ladder()` returning `[{"tier": t, "status": "past|active|future"}]`
+- [x] create migration: `uv run python src/manage.py makemigrations website` — `0068_racepricetier.py`
+- [x] register `RacePriceTier` as a `TabularInline` on `RaceModelAdmin` — `RacePriceTierInline`
+- [x] write tests: `current_price` picks active tier; falls back to `cost` with no tiers; uses last tier when all past; the same-day boundary (`active_until == today`) counts as active (inclusive `>=`); `price_tier_ladder()` flags past/active/future correctly — also `price_tier_ladder` all-past + empty cases
+- [x] run tests — must pass before Task 3 — full suite 91 passed; `make format && make lint` clean
 
 ### Task 3: Unify view context + switch charged cost to current_price + edit renders new template
 

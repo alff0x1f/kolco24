@@ -84,6 +84,51 @@ class Race(Model):
         )["total"]
         return result or 0
 
+    def _active_tier_index(self, tiers):
+        """Index of the active tier within ``tiers`` (assumed ordered).
+
+        Active tier = earliest with ``active_until >= today``; if all are
+        past, the last tier is treated as active. Returns ``None`` for an
+        empty ladder.
+        """
+        if not tiers:
+            return None
+        today = timezone.localdate()
+        for index, tier in enumerate(tiers):
+            if tier.active_until >= today:
+                return index
+        return len(tiers) - 1
+
+    @property
+    def current_price(self):
+        """Single source of truth for the charged per-person price.
+
+        Returns the active tier's price, falling back to ``self.cost`` when
+        the race has no price tiers.
+        """
+        tiers = list(self.price_tiers.all())
+        index = self._active_tier_index(tiers)
+        if index is None:
+            return self.cost
+        return tiers[index].price
+
+    def price_tier_ladder(self):
+        """Return ``[{"tier": t, "status": "past|active|future"}]`` for display."""
+        tiers = list(self.price_tiers.all())
+        active_index = self._active_tier_index(tiers)
+        if active_index is None:
+            return []
+        ladder = []
+        for index, tier in enumerate(tiers):
+            if index < active_index:
+                status = "past"
+            elif index == active_index:
+                status = "active"
+            else:
+                status = "future"
+            ladder.append({"tier": tier, "status": status})
+        return ladder
+
 
 class RaceLink(Model):
     name = CharField("Название", max_length=50)
@@ -153,3 +198,23 @@ class Category(Model):
 
     def __str__(self):
         return f"{self.code} ({self.race})"
+
+
+class RacePriceTier(Model):
+    race = ForeignKey(
+        "Race",
+        related_name="price_tiers",
+        verbose_name="Гонка",
+        on_delete=CASCADE,
+    )
+    price = IntegerField("Цена за человека")
+    active_until = DateField("Действует по (включительно)")
+    order = IntegerField("Порядок", default=0)
+
+    class Meta:
+        verbose_name = "Ценовой период"
+        verbose_name_plural = "Ценовые периоды"
+        ordering = ["active_until", "order"]
+
+    def __str__(self):
+        return f"{self.race}: {self.price}₽ до {self.active_until}"

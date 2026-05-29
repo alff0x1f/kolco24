@@ -1,12 +1,15 @@
+from datetime import timedelta
+
 import pytest
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError
 from django.urls import reverse
+from django.utils import timezone
 
 from website.models import Race
 from website.models.models import Team
-from website.models.race import Category, RaceLink, RegStatus
+from website.models.race import Category, RaceLink, RacePriceTier, RegStatus
 
 
 @pytest.mark.django_db
@@ -568,3 +571,97 @@ def test_category_backfill_mapping():
     # anything else -> (2, 2)
     assert mapping.get(999, default) == (2, 2)
     assert default == (2, 2)
+
+
+@pytest.mark.django_db
+def test_current_price_falls_back_to_cost_without_tiers():
+    race = Race.objects.create(name="No Tiers", code="nt1", slug="no-tiers", cost=1500)
+    assert race.current_price == 1500
+
+
+@pytest.mark.django_db
+def test_current_price_picks_active_tier():
+    race = Race.objects.create(name="Tiers", code="t1", slug="tiers-1", cost=999)
+    today = timezone.localdate()
+    # earliest tier already past, second still active
+    RacePriceTier.objects.create(
+        race=race, price=1000, active_until=today - timedelta(days=10)
+    )
+    RacePriceTier.objects.create(
+        race=race, price=1500, active_until=today + timedelta(days=10)
+    )
+    RacePriceTier.objects.create(
+        race=race, price=2000, active_until=today + timedelta(days=20)
+    )
+    # earliest tier with active_until >= today is the 1500 one
+    assert race.current_price == 1500
+
+
+@pytest.mark.django_db
+def test_current_price_uses_last_tier_when_all_past():
+    race = Race.objects.create(name="Past", code="p1", slug="past-1", cost=999)
+    today = timezone.localdate()
+    RacePriceTier.objects.create(
+        race=race, price=1000, active_until=today - timedelta(days=20)
+    )
+    RacePriceTier.objects.create(
+        race=race, price=1500, active_until=today - timedelta(days=5)
+    )
+    # all past -> last tier (ordered by active_until) is charged
+    assert race.current_price == 1500
+
+
+@pytest.mark.django_db
+def test_current_price_same_day_boundary_is_inclusive():
+    race = Race.objects.create(name="Today", code="td1", slug="today-1", cost=999)
+    today = timezone.localdate()
+    RacePriceTier.objects.create(race=race, price=1200, active_until=today)
+    RacePriceTier.objects.create(
+        race=race, price=1800, active_until=today + timedelta(days=10)
+    )
+    # active_until == today must still count as active (inclusive >=)
+    assert race.current_price == 1200
+
+
+@pytest.mark.django_db
+def test_price_tier_ladder_flags_statuses():
+    race = Race.objects.create(name="Ladder", code="l1", slug="ladder-1", cost=999)
+    today = timezone.localdate()
+    past = RacePriceTier.objects.create(
+        race=race, price=1000, active_until=today - timedelta(days=10)
+    )
+    active = RacePriceTier.objects.create(
+        race=race, price=1500, active_until=today + timedelta(days=10)
+    )
+    future = RacePriceTier.objects.create(
+        race=race, price=2000, active_until=today + timedelta(days=20)
+    )
+    ladder = race.price_tier_ladder()
+    assert ladder == [
+        {"tier": past, "status": "past"},
+        {"tier": active, "status": "active"},
+        {"tier": future, "status": "future"},
+    ]
+
+
+@pytest.mark.django_db
+def test_price_tier_ladder_all_past_marks_last_active():
+    race = Race.objects.create(name="LadderPast", code="lp1", slug="ladder-past-1")
+    today = timezone.localdate()
+    first = RacePriceTier.objects.create(
+        race=race, price=1000, active_until=today - timedelta(days=20)
+    )
+    last = RacePriceTier.objects.create(
+        race=race, price=1500, active_until=today - timedelta(days=5)
+    )
+    ladder = race.price_tier_ladder()
+    assert ladder == [
+        {"tier": first, "status": "past"},
+        {"tier": last, "status": "active"},
+    ]
+
+
+@pytest.mark.django_db
+def test_price_tier_ladder_empty_without_tiers():
+    race = Race.objects.create(name="Empty", code="e1", slug="empty-1", cost=500)
+    assert race.price_tier_ladder() == []
