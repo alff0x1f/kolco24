@@ -612,9 +612,10 @@ class TeamForm(forms.Form):
         category = (
             Category.objects.filter(id=category_id).first() if category_id else None
         )
-        if category and ucount:
-            ucount_int = int(ucount)
-            if not (category.min_people <= ucount_int <= category.max_people):
+        if ucount is not None:
+            if not category:
+                self.add_error("category2_id", "Выберите категорию.")
+            elif not (category.min_people <= int(ucount) <= category.max_people):
                 self.add_error(
                     "ucount",
                     "Недопустимое количество участников для выбранной категории.",

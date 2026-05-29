@@ -1755,8 +1755,10 @@ def build_category_options(race_id, current_category_id=None):
 def build_team_form_context(race, team, is_edit=False):
     """Unified context shared by the add and edit team forms."""
     current_category_id = getattr(team, "category2_id", None)
+    current_price = race.current_price
+    price_tiers = race.price_tier_ladder()
     config = {
-        "currentPrice": race.current_price,
+        "currentPrice": current_price,
         "paidPeople": team.paid_people,
         "mapCountPaid": team.map_count_paid,
         "mapPrice": MAP_PRICE,
@@ -1764,10 +1766,10 @@ def build_team_form_context(race, team, is_edit=False):
         "isEdit": is_edit,
     }
     return {
-        "current_price": race.current_price,
+        "current_price": current_price,
         "paid_people": team.paid_people,
         "map_count_paid": team.map_count_paid,
-        "price_tiers": race.price_tier_ladder(),
+        "price_tiers": price_tiers,
         "reg_open": race.reg_status == RegStatus.OPEN,
         "is_editable": race.is_teams_editable,
         "reg_status": race.reg_status,

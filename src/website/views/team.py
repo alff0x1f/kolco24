@@ -136,8 +136,6 @@ class EditTeamView(View):
                 if birth_field in form.cleaned_data:
                     setattr(team, birth_field, form.cleaned_data.get(birth_field))
 
-            if "category2_id" in form.cleaned_data:
-                team.category2_id = form.cleaned_data.get("category2_id")
             new_map_count = int(form.cleaned_data.get("map_count") or 0)
             if new_map_count < team.map_count_paid:
                 form.add_error(
@@ -165,6 +163,8 @@ class EditTeamView(View):
                         **build_team_form_context(race, team, is_edit=True),
                     },
                 )
+            if "category2_id" in form.cleaned_data:
+                team.category2_id = form.cleaned_data.get("category2_id")
             if "map_count" in form.cleaned_data:
                 team.map_count = new_map_count
 
