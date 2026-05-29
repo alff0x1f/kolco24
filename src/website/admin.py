@@ -230,7 +230,16 @@ class RaceLinkAdmin(admin.ModelAdmin):
 
 
 class CategoryAdmin(admin.ModelAdmin):
-    list_display = ("id", "code", "name", "short_name", "order", "is_active")
+    list_display = (
+        "id",
+        "code",
+        "name",
+        "short_name",
+        "order",
+        "min_people",
+        "max_people",
+        "is_active",
+    )
     list_filter = ("race__name", "is_active")
     search_fields = ("code", "name")
 

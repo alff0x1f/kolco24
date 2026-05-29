@@ -143,6 +143,8 @@ class Category(Model):
     race = ForeignKey("Race", verbose_name="Гонка", on_delete=CASCADE)
     is_active = BooleanField("Активна", default=True)
     order = IntegerField("Порядок", default=0)
+    min_people = IntegerField("Минимум участников", default=2)
+    max_people = IntegerField("Максимум участников", default=6)
 
     class Meta:
         verbose_name = "Категория"

@@ -178,13 +178,13 @@ Key design decisions & rationale:
 - Modify: `src/website/admin.py`
 - Modify: `src/website/tests.py`
 
-- [ ] ⚠️ first verify contiguity: read the current JS `switch` in `add_team.html` and confirm every produced set is a contiguous range (no `{2,4}`); record the result here. If non-contiguous sets exist, stop and re-raise with the user before using min/max.
-- [ ] add `min_people` (IntegerField, default 2) and `max_people` (IntegerField, default 6) to `Category`
-- [ ] create migration: `uv run python src/manage.py makemigrations website` (schema), then add a `RunPython` data migration that backfills existing rows
-- [ ] make the data migration **self-contained**: use `apps.get_model("website", "Category")` and an inlined mapping dict (ids 8,16→(2,3); 9,13,17,21,24→(4,6); else (2,2)); it is a no-op when those ids are absent (fresh/test DB). Do NOT import a function from `models/race.py` into the migration
-- [ ] add `min_people`, `max_people` to `CategoryAdmin.list_display` and fields
-- [ ] write tests: defaults on a new `Category` (2/6); the backfill mapping returns correct tuples for representative ids (test the mapping dict directly, mirroring the migration)
-- [ ] run tests — must pass before Task 2
+- [x] ⚠️ first verify contiguity: read the current JS `switch` in `add_team.html` and confirm every produced set is a contiguous range (no `{2,4}`); record the result here. If non-contiguous sets exist, stop and re-raise with the user before using min/max. — VERIFIED: switch produces `[2,3]` (ids 8,16), `[4,5,6]` (ids 9,13,17,21,24), default `[2]`; all contiguous, no gaps.
+- [x] add `min_people` (IntegerField, default 2) and `max_people` (IntegerField, default 6) to `Category`
+- [x] create migration: `uv run python src/manage.py makemigrations website` (schema), then add a `RunPython` data migration that backfills existing rows — `0067_category_max_people_category_min_people.py`
+- [x] make the data migration **self-contained**: use `apps.get_model("website", "Category")` and an inlined mapping dict (ids 8,16→(2,3); 9,13,17,21,24→(4,6); else (2,2)); it is a no-op when those ids are absent (fresh/test DB). Do NOT import a function from `models/race.py` into the migration
+- [x] add `min_people`, `max_people` to `CategoryAdmin.list_display` and fields
+- [x] write tests: defaults on a new `Category` (2/6); the backfill mapping returns correct tuples for representative ids (test the mapping dict directly, mirroring the migration) — `test_category_team_size_defaults`, `test_category_backfill_mapping`
+- [x] run tests — must pass before Task 2 — full suite 84 passed; `make format && make lint` clean
 
 ### Task 2: Add RacePriceTier model + Race.current_price + ladder helper (+ migration, admin)
 

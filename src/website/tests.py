@@ -533,3 +533,38 @@ def test_race_link_clean_rejects_invalid_url():
     with pytest.raises(ValidationError) as exc_info:
         link.full_clean()
     assert "url" in exc_info.value.message_dict
+
+
+@pytest.mark.django_db
+def test_category_team_size_defaults():
+    race = Race.objects.create(name="Cat Race", code="cat1", slug="cat-race-1")
+    category = Category.objects.create(
+        code="def",
+        name="Defaults",
+        short_name="def",
+        race=race,
+    )
+    assert category.min_people == 2
+    assert category.max_people == 6
+
+
+def test_category_backfill_mapping():
+    # Mirror the migration's mapping dict; verify representative ids resolve
+    # to the same (min, max) tuples the legacy JS switch produced.
+    import importlib
+
+    migration = importlib.import_module(
+        "website.migrations.0067_category_max_people_category_min_people"
+    )
+    mapping = migration.TEAM_SIZE_BACKFILL
+    default = migration.DEFAULT_TEAM_SIZE
+
+    # ids 8, 16 -> (2, 3)
+    assert mapping[8] == (2, 3)
+    assert mapping[16] == (2, 3)
+    # ids 9, 13, 17, 21, 24 -> (4, 6)
+    for cid in (9, 13, 17, 21, 24):
+        assert mapping[cid] == (4, 6)
+    # anything else -> (2, 2)
+    assert mapping.get(999, default) == (2, 2)
+    assert default == (2, 2)
