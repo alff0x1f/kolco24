@@ -1,0 +1,245 @@
+/* Teams list styles — /race/<slug>/teams/ (+ category / my variants) */
+/* Teams-specific ONLY. Does NOT duplicate the shell:
+   - theme-2.css: .container, .grid, .card, .card-pad, .btn*, .sidebar,
+     .side-head, .crumb, .sep, nav, footer, responsive .grid/.sidebar.
+   - race.css:    .pill, .cover-banner, .cover-image, .cover-meta-card,
+     .cover-meta, .cover-title, .cover-actions, .info-list.
+   Scoped under .teams-page where practical. */
+
+/* ── Wrapper ─────────────────────────────────────────── */
+.teams-page { padding: 0 0 56px; }
+
+/* ── Teams card: sticky head + search ────────────────── */
+.teams-page .teams-card { position: relative; }
+.teams-page .teams-head {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 16px;
+  padding: 18px 22px 16px;
+  border-bottom: 1px solid var(--line);
+  flex-wrap: wrap;
+  position: sticky; top: 58px; z-index: 5;
+  background: var(--paper-2);
+  border-radius: var(--radius) var(--radius) 0 0;
+}
+.teams-page .teams-head h2 {
+  font-size: 18px; font-weight: 600; color: var(--ink);
+  display: flex; align-items: baseline; gap: 9px;
+}
+.teams-page .teams-head h2 .total {
+  font-size: 13px; font-weight: 500; color: var(--muted-2);
+  font-variant-numeric: tabular-nums;
+}
+.teams-page .search { position: relative; flex: 1; max-width: 280px; min-width: 180px; }
+.teams-page .search input {
+  width: 100%;
+  font-family: inherit; font-size: 14px; color: var(--ink);
+  background: #f4f6f9;
+  border: 1px solid transparent; border-radius: 9px;
+  padding: 9px 12px 9px 34px;
+  transition: all .12s;
+}
+.teams-page .search input::placeholder { color: var(--muted-2); }
+.teams-page .search input:focus {
+  outline: none;
+  background: var(--paper-2);
+  border-color: var(--primary-2);
+  box-shadow: 0 0 0 3px rgba(69, 130, 236, .12);
+}
+.teams-page .search svg {
+  position: absolute; left: 11px; top: 50%; transform: translateY(-50%);
+  color: var(--muted-2); pointer-events: none;
+}
+
+/* ── Category chips (renamed from mockup .cat-bar to avoid
+      race.css .cat-bar collision) ─────────────────────── */
+.teams-page .cat-chips {
+  display: flex; flex-wrap: wrap; gap: 8px;
+  padding: 14px 22px;
+  border-bottom: 1px solid var(--line);
+}
+.teams-page .chip {
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 7px 13px;
+  border-radius: 999px;
+  font-size: 13.5px; font-weight: 500;
+  color: var(--ink-soft); background: #f4f6f9;
+  border: 1px solid transparent;
+  cursor: pointer; transition: all .12s; white-space: nowrap;
+  font-family: inherit;
+}
+.teams-page .chip:hover { background: #e9edf2; }
+.teams-page .chip .c {
+  font-size: 12px; font-weight: 500; color: var(--muted-2);
+  font-variant-numeric: tabular-nums;
+}
+.teams-page .chip .dot {
+  width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+}
+.teams-page .chip.is-active { background: var(--ink); color: #fff; }
+.teams-page .chip.is-active .c { color: rgba(255, 255, 255, .6); }
+
+/* ── Teams table ─────────────────────────────────────── */
+.teams-page .teams-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.teams-page .teams-table thead th {
+  text-align: left;
+  font-size: 11px; font-weight: 500; letter-spacing: .1em; text-transform: uppercase;
+  color: var(--muted);
+  padding: 13px 14px;
+  border-bottom: 1px solid var(--line);
+  background: #fafbfc;
+  position: sticky; top: 130px; z-index: 1;
+  cursor: pointer; user-select: none; white-space: nowrap;
+}
+.teams-page .teams-table thead th .arr { opacity: 0; font-size: 9px; margin-left: 3px; }
+.teams-page .teams-table thead th.sorted .arr { opacity: 1; }
+.teams-page .teams-table thead th.col-static { cursor: default; }
+.teams-page .teams-table tbody tr {
+  border-bottom: 1px solid var(--line-soft);
+  transition: background .1s;
+}
+.teams-page .teams-table tbody tr:hover { background: #f7f9fb; }
+.teams-page .teams-table tbody tr:last-child { border-bottom: none; }
+.teams-page .teams-table td { padding: 11px 14px; vertical-align: top; }
+
+.teams-page .bib {
+  display: inline-grid; place-items: center;
+  min-width: 38px; height: 30px; padding: 0 8px;
+  border-radius: 8px;
+  background: #eef1f5; color: var(--ink);
+  font-weight: 600; font-size: 14px;
+  font-variant-numeric: tabular-nums; letter-spacing: .01em;
+}
+.teams-page .t-name {
+  font-weight: 500; color: var(--ink); font-size: 15px; line-height: 1.3;
+  margin-bottom: 2px; overflow-wrap: anywhere;
+}
+.teams-page .t-name .edit {
+  margin-left: 6px; color: var(--muted-2);
+  display: inline-flex; vertical-align: middle;
+}
+.teams-page .t-name .edit:hover { color: var(--primary-2); }
+.teams-page .t-parts {
+  color: var(--muted); font-size: 13px; line-height: 1.4;
+  text-wrap: pretty; overflow-wrap: anywhere;
+}
+.teams-page .t-city { color: var(--ink-soft); overflow-wrap: anywhere; }
+.teams-page .cat-badge {
+  display: inline-flex; align-items: center;
+  padding: 3px 9px; border-radius: 7px;
+  font-size: 11.5px; font-weight: 500; letter-spacing: .01em;
+  white-space: nowrap;
+}
+.teams-page .cnt-badge {
+  display: inline-flex; align-items: center; gap: 5px;
+  color: var(--ink-soft); font-weight: 500;
+  font-variant-numeric: tabular-nums; white-space: nowrap;
+}
+.teams-page .cnt-badge svg { color: var(--muted-2); }
+
+.teams-page .col-team { vertical-align: middle; }
+.teams-page .col-cat,
+.teams-page .col-city,
+.teams-page .col-cnt { vertical-align: middle; }
+.teams-page .col-num { width: 56px; vertical-align: middle; }
+.teams-page .col-cat { width: 1%; white-space: nowrap; }
+.teams-page .teams-table.hide-cat .col-cat { display: none; }
+.teams-page .col-city { width: 1%; min-width: 90px; }
+.teams-page .col-cnt { width: 1%; text-align: center; }
+
+/* ── Foot + empty state ──────────────────────────────── */
+.teams-page .teams-foot {
+  padding: 16px 22px;
+  font-size: 13px; color: var(--muted);
+  border-top: 1px solid var(--line);
+  display: flex; justify-content: space-between; align-items: center;
+  gap: 12px; flex-wrap: wrap;
+  border-radius: 0 0 var(--radius) var(--radius);
+}
+.teams-page .empty { padding: 48px 22px; text-align: center; color: var(--muted); }
+.teams-page .empty strong {
+  display: block; color: var(--ink); font-weight: 500; font-size: 16px;
+  margin-bottom: 4px;
+}
+.teams-page mark {
+  background: rgba(245, 200, 90, .45); color: inherit;
+  border-radius: 2px; padding: 0 1px;
+}
+
+/* ── Sidebar: По категориям breakdown ────────────────── */
+.teams-page .brk { padding: 8px 18px 16px; }
+.teams-page .brk-row {
+  display: block; width: 100%; text-align: left;
+  border: none; background: transparent; font-family: inherit;
+  cursor: pointer;
+  padding: 8px 8px; border-radius: 8px;
+  transition: background .12s;
+}
+.teams-page .brk-row:hover { background: #f4f6f9; }
+.teams-page .brk-row.is-active { background: #f0f3f7; }
+.teams-page .brk-top {
+  display: flex; justify-content: space-between; align-items: baseline;
+  gap: 10px; font-size: 13.5px; margin-bottom: 6px;
+}
+.teams-page .brk-top .nm { color: var(--ink); font-weight: 500; }
+.teams-page .brk-top .vl {
+  color: var(--muted); font-variant-numeric: tabular-nums; font-size: 12.5px;
+}
+.teams-page .brk-bar {
+  height: 6px; border-radius: 999px; background: #eef1f5; overflow: hidden;
+}
+.teams-page .brk-bar i { display: block; height: 100%; border-radius: 999px; }
+
+/* ── Category color palette (chips, badges, breakdown bars) ── */
+.teams-page .cat-0 { color: #1d3a63; background: #e7eef7; }
+.teams-page .cat-1 { color: #8a5a00; background: #faf0db; }
+.teams-page .cat-2 { color: #155e7a; background: #e1f0f5; }
+.teams-page .cat-3 { color: #9a2f6d; background: #f8e6f0; }
+.teams-page .cat-4 { color: #2a5288; background: #e7eef7; }
+.teams-page .cat-5 { color: #01794d; background: #e1f4ec; }
+.teams-page .cat-6 { color: #5b21b6; background: #eee8fb; }
+.teams-page .cat-7 { color: #b5402a; background: #fbe8e1; }
+
+/* ── Responsive: table reflows into cards ────────────── */
+@media (max-width: 720px) {
+  .teams-page .teams-table,
+  .teams-page .teams-table tbody { display: block; width: 100%; }
+  .teams-page .teams-table thead { display: none; }
+  .teams-page .teams-table tbody tr {
+    display: flex; flex-wrap: wrap; align-items: flex-start;
+    column-gap: 11px; row-gap: 7px;
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--line);
+  }
+  .teams-page .teams-table td { display: block; padding: 0; }
+  /* forced line break after the team name so meta wraps regardless of
+     which columns are visible */
+  .teams-page .teams-table tbody tr::after {
+    content: ''; order: 1; flex: 0 0 100%; height: 0; margin: 0;
+  }
+  .teams-page .col-num,
+  .teams-page .col-team { order: 0; }
+  .teams-page .col-cat,
+  .teams-page .col-city,
+  .teams-page .col-cnt { order: 2; }
+  .teams-page .bib { height: 26px; min-width: 34px; font-size: 13px; }
+  .teams-page .col-num { width: auto; }
+  .teams-page .col-team { flex: 1 1 60%; min-width: 0; }
+  .teams-page .col-cat { flex: 0 0 auto; width: auto; min-width: 0; white-space: nowrap; }
+  .teams-page .col-city,
+  .teams-page .col-cnt {
+    display: inline-flex !important; align-items: center; gap: 6px;
+    width: auto; min-width: 0; flex: 0 0 auto; max-width: 100%;
+    color: var(--muted); font-size: 13px;
+  }
+  .teams-page .col-cnt { text-align: left; margin-left: auto; }
+  .teams-page .cnt-badge { color: var(--muted); font-weight: 400; }
+}
+
+@media (max-width: 600px) {
+  .teams-page { padding: 0 0 36px; }
+  .teams-page .teams-head,
+  .teams-page .teams-foot { border-radius: 0; }
+  .teams-page .teams-head { padding: 16px 16px 14px; }
+  .teams-page .search { max-width: none; }
+  .teams-page .cat-chips { padding: 12px 16px; }
+}

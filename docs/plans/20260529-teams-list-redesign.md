@@ -270,12 +270,12 @@ empty file).
 **Files:**
 - Create: `src/static/css/teams.css`
 
-- [ ] Port teams-specific rules from mockup; rename chips container to `.cat-chips`
+- [x] Port teams-specific rules from mockup; rename chips container to `.cat-chips`
       (avoid `race.css` `.cat-bar` collision); scope under `.teams-page` where practical.
-- [ ] Include `.cat-0..7` palette, `.teams-table` `.col-*` + `.hide-cat`, and the mobile
+- [x] Include `.cat-0..7` palette, `.teams-table` `.col-*` + `.hide-cat`, and the mobile
       reflow `@media` (720px / 600px).
-- [ ] Do NOT duplicate cover/pill/info-list/grid/card/btn (from race.css + theme-2.css).
-- [ ] (No unit test — CSS; covered by manual verification in Post-Completion.)
+- [x] Do NOT duplicate cover/pill/info-list/grid/card/btn (from race.css + theme-2.css).
+- [x] (No unit test — CSS; covered by manual verification in Post-Completion.)
 
 ### Task 5: New script `teams.js`
 
