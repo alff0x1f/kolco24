@@ -142,7 +142,6 @@ class EditTeamView(View):
                 return HttpResponseRedirect(reverse("my_teams", args=[race.slug]))
 
             # payment
-            race = team.category2.race
             cost_now = race.current_price
             cost = (int(team.ucount) - team.paid_people) * cost_now + (
                 int(team.map_count) - team.map_count_paid

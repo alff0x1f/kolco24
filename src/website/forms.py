@@ -495,16 +495,11 @@ class TeamForm(forms.Form):
     dist = forms.CharField(required=False)
     paymentid = forms.CharField(widget=forms.HiddenInput(), required=False)
 
-    map_count = forms.ChoiceField(
-        choices=[(i, str(i) if i else "Нет") for i in range(0, 7)],
+    map_count = forms.IntegerField(
+        min_value=0,
         required=False,
         initial=0,
-        widget=forms.Select(
-            attrs={
-                "class": "form-control form-control-lg",
-                "placeholder": "Дополнительные карты",
-            }
-        ),
+        widget=forms.HiddenInput(),
         label="Дополнительные карты",
     )
 
@@ -666,11 +661,9 @@ class TeamForm(forms.Form):
 
     def clean_map_count(self):
         value = self.cleaned_data.get("map_count")
-        if not value:
+        if value is None:
             return 0
-        if not str(value).isdigit():
-            raise forms.ValidationError("Количество карт должно быть числом.")
-        return int(value)
+        return value
 
     def save(self):
         if "paymentid" not in self.cleaned_data:
