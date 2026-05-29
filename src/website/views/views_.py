@@ -1736,7 +1736,7 @@ def build_category_options(race_id):
             "label": f"{category.short_name} ({category.name})",
             "counts": list(range(category.min_people, category.max_people + 1)),
         }
-        for category in Category.objects.filter(race_id=race_id)
+        for category in Category.objects.filter(race_id=race_id, is_active=True)
     ]
 
 
@@ -1771,7 +1771,6 @@ class AddTeam(View):
                 "race_id": race.id,
                 "team_form": form,
                 "team": Team(),
-                "cost": race.current_price,
                 "action": reverse("add_team", args=[race.slug]),
                 **build_team_form_context(race, Team()),
             },
@@ -1819,73 +1818,37 @@ class AddTeam(View):
                 cost = 0
 
             if payment_method != "sbp2":
-                # закрываем другие методы оплаты
                 raise Http404
 
-            if payment_method in ("visamc", "yandexmoney"):
-                payment = Payment.objects.create(
-                    owner=request.user,
-                    team=team,
-                    payment_method=payment_method,
-                    payment_amount=cost,
-                    payment_with_discount=cost,
-                    cost_per_person=cost_now,
-                    paid_for=int(team.ucount) - team.paid_people,
-                    map=int(team.map_count) - team.map_count_paid,
-                    additional_charge=team.additional_charge,
-                    status="draft",
-                )
+            payment = Payment.objects.create(
+                owner=request.user,
+                team=team,
+                payment_method=payment_method,
+                payment_amount=cost,
+                payment_with_discount=cost,
+                cost_per_person=cost_now,
+                paid_for=int(team.ucount) - team.paid_people,
+                additional_charge=team.additional_charge,
+                status="draft",
+                map=int(team.map_count) - team.map_count_paid,
+            )
+            vtb_client = VTBClient()
+            vtb_client._ensure_token()
 
-                paymenttype = "AC"
-                if payment_method == "yandexmoney":
-                    paymenttype = "PC"
-                return render(
-                    request,
-                    "website/yoomoney.html",
-                    context={
-                        "paymenttype": paymenttype,
-                        "yalabel": payment.id,
-                        "paymentid": team.paymentid,
-                        "yandexwallet": settings.YANDEX_WALLET,
-                        "sum": cost,
-                    },
-                )
-            elif payment_method in ("sbp2"):
-                payment = Payment.objects.create(
-                    owner=request.user,
-                    team=team,
-                    payment_method=payment_method,
-                    payment_amount=cost,
-                    payment_with_discount=cost,
-                    cost_per_person=cost_now,
-                    paid_for=int(team.ucount) - team.paid_people,
-                    additional_charge=team.additional_charge,
-                    status="draft",
-                    map=int(team.map_count) - team.map_count_paid,
-                )
-                vtb_client = VTBClient()
-                vtb_client._ensure_token()
+            payload = vtb_client.create_order(
+                order_id=f"ORDER_{payment.id}",
+                order_name=f"Оплата за команду на Кольцо 24 ({payment.id})",
+                amount_value=cost,
+                return_payment_data="sbp",
+            )
+            vtb_payment = VTBPayment.from_vtb_payload(payload)
 
-                payload = vtb_client.create_order(
-                    order_id=f"ORDER_{payment.id}",
-                    order_name=f"Оплата за команду на Кольцо 24 ({payment.id})",
-                    amount_value=cost,
-                    return_payment_data="sbp",
-                )
-                vtb_payment = VTBPayment.from_vtb_payload(payload)
-
-                prepared_payment = VTBPreparedPayment.objects.filter(
-                    payment=vtb_payment
-                ).first()
-                if prepared_payment and prepared_payment.url:
-                    return HttpResponseRedirect(prepared_payment.url)
-                return HttpResponseRedirect(vtb_payment.pay_url)
-
-            else:
-                # redirect
-                return HttpResponseRedirect(
-                    reverse("pay_team", args=[team.id]) + f"?method={payment_method}"
-                )
+            prepared_payment = VTBPreparedPayment.objects.filter(
+                payment=vtb_payment
+            ).first()
+            if prepared_payment and prepared_payment.url:
+                return HttpResponseRedirect(prepared_payment.url)
+            return HttpResponseRedirect(vtb_payment.pay_url)
 
         return render(
             request,
@@ -1895,7 +1858,6 @@ class AddTeam(View):
                 "race_id": race.id,
                 "team_form": form,
                 "team": Team(),
-                "cost": race.current_price,
                 "action": reverse("add_team", args=[race.slug]),
                 **build_team_form_context(race, Team()),
             },

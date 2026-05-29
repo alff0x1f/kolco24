@@ -823,6 +823,8 @@ def test_edit_team_charges_delta_on_maps_added(client):
     # only the 2 extra maps are charged: 2 * 200
     assert payment.payment_amount == 400
     assert payment.map == 2
+    team.refresh_from_db()
+    assert team.map_count == 2
 
 
 @pytest.mark.django_db
@@ -887,6 +889,8 @@ def test_edit_team_closed_but_editable_saves_without_charge(client):
     # editable gate passes, but reg not open -> saved, no payment
     assert response.status_code == 302
     assert Payment.objects.filter(team=team).count() == 0
+    team.refresh_from_db()
+    assert team.ucount == 5
 
 
 @pytest.mark.django_db
@@ -1153,3 +1157,102 @@ def test_add_team_omits_edit_only_sections(client):
     assert "Удалить команду" not in html
     assert 'name="delete_team"' not in html
     assert '"isEdit": false' in html
+
+
+@pytest.mark.django_db
+def test_edit_team_rejects_ucount_above_max(client):
+    user, race, category, team = _create_team_for_edit(
+        suffix="abvmax", min_people=4, max_people=6, ucount=4, paid_people=0
+    )
+    client.force_login(user)
+    response = client.post(
+        reverse("edit_team", args=[team.id]),
+        {"ucount": "7", "category2_id": str(category.id), "map_count": "0"},
+    )
+    assert response.status_code == 200
+    team.refresh_from_db()
+    assert team.ucount == 4  # unchanged — invalid POST rejected
+    assert Payment.objects.filter(team=team).count() == 0
+
+
+@pytest.mark.django_db
+def test_edit_team_redirects_unauthenticated(client):
+    user, race, category, team = _create_team_for_edit(suffix="unauth")
+    response = client.get(reverse("edit_team", args=[team.id]))
+    assert response.status_code == 302
+    assert "/login/" in response["Location"]
+
+
+@pytest.mark.django_db
+def test_delete_team_not_found_for_non_owner(client):
+    user, race, category, team = _create_team_for_edit(
+        suffix="deloth", ucount=4, paid_people=0
+    )
+    other = User.objects.create_user(
+        username="other-deloth", password="pass", email="other-deloth@example.com"
+    )
+    client.force_login(other)
+    response = client.post(
+        reverse("edit_team", args=[team.id]),
+        {"delete_team": "1"},
+    )
+    # get_team filters by owner, so non-owner sees 404
+    assert response.status_code == 404
+    assert Team.objects.filter(pk=team.pk).exists()  # team untouched
+
+
+@pytest.mark.django_db
+def test_delete_team_rejected_when_paid(client):
+    user, race, category, team = _create_team_for_edit(
+        suffix="delpaid", ucount=4, paid_people=4
+    )
+    assert not team.can_be_deleted
+    client.force_login(user)
+    response = client.post(
+        reverse("edit_team", args=[team.id]),
+        {"delete_team": "1"},
+    )
+    assert response.status_code == 400
+    team.refresh_from_db()
+    assert not team.is_deleted
+
+
+@pytest.mark.django_db
+def test_delete_team_soft_deletes_and_redirects(client):
+    user, race, category, team = _create_team_for_edit(
+        suffix="delok", ucount=4, paid_people=0
+    )
+    assert team.can_be_deleted
+    client.force_login(user)
+    response = client.post(
+        reverse("edit_team", args=[team.id]),
+        {"delete_team": "1"},
+    )
+    assert response.status_code == 302
+    assert reverse("my_teams", args=[race.slug]) in response["Location"]
+    # TeamManager filters is_deleted=False, so a deleted team disappears from objects
+    assert not Team.objects.filter(pk=team.pk).exists()
+
+
+@pytest.mark.django_db
+def test_build_category_options_single_size(client):
+    user = User.objects.create_user(
+        username="single", password="pass", email="single@example.com"
+    )
+    race = Race.objects.create(
+        name="Single",
+        code="sng1",
+        slug="single-1",
+        cost=1000,
+        reg_status=RegStatus.OPEN,
+        is_teams_editable=True,
+    )
+    category = Category.objects.create(
+        code="s", name="Solo", short_name="S", race=race, min_people=2, max_people=2
+    )
+    client.force_login(user)
+    response = client.get(reverse("add_team", args=[race.slug]))
+    assert response.status_code == 200
+    options = response.context["category_options"]
+    match = next(o for o in options if o["id"] == category.id)
+    assert match["counts"] == [2]

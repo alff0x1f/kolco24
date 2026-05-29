@@ -57,7 +57,6 @@ class EditTeamView(View):
                 "race": race,
                 "team_form": form,
                 "team": team,
-                "cost": race.current_price,
                 "action": reverse("edit_team", args=[team_id]),
                 "payments": Payment.objects.filter(team=team, status="done").order_by(
                     "id"
@@ -107,8 +106,35 @@ class EditTeamView(View):
 
             if "category2_id" in form.cleaned_data:
                 team.category2_id = form.cleaned_data.get("category2_id")
+            new_map_count = int(form.cleaned_data.get("map_count") or 0)
+            if new_map_count < team.map_count_paid:
+                form.add_error(
+                    "map_count",
+                    "Нельзя уменьшить количество карт: часть уже оплачена.",
+                )
+                return render(
+                    request,
+                    "website/edit_team.html",
+                    {
+                        "race": race,
+                        "race_id": race.id,
+                        "team_form": form,
+                        "team": team,
+                        "action": reverse("edit_team", args=[team_id]),
+                        "payments": Payment.objects.filter(
+                            team=team, status="done"
+                        ).order_by("id"),
+                        "member_moves": TeamMemberMove.objects.filter(
+                            Q(from_team=team) | Q(to_team=team)
+                        ).order_by("id"),
+                        "team_move_form": TeamMemberMoveForm(
+                            race_id=team.category2.race_id
+                        ),
+                        **build_team_form_context(race, team),
+                    },
+                )
             if "map_count" in form.cleaned_data:
-                team.map_count = form.cleaned_data.get("map_count", 0)
+                team.map_count = new_map_count
 
             team.save()
 
@@ -165,7 +191,6 @@ class EditTeamView(View):
                 "race_id": race.id,
                 "team_form": form,
                 "team": team,
-                "cost": race.current_price,
                 "action": reverse("edit_team", args=[team_id]),
                 "payments": Payment.objects.filter(team=team, status="done").order_by(
                     "id"

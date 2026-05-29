@@ -517,7 +517,7 @@ class TeamForm(forms.Form):
         super(TeamForm, self).__init__(*args, **kwargs)
         categories = (
             (category.id, f"{category.short_name} ({category.name})")
-            for category in Category.objects.filter(race_id=race_id)
+            for category in Category.objects.filter(race_id=race_id, is_active=True)
         )
         self.fields["category2_id"] = forms.ChoiceField(
             required=False,

@@ -47,7 +47,7 @@ Django 4.2 project. Source lives entirely under `src/`, with `manage.py` at `src
 - `website` — core domain: team registration, race management, payment processing (VTB, Yandex, Sberbank, SBP), checkpoint tracking, athlete profiles. Models are split into files under `src/website/models/`.
 - `api` — DRF REST API consumed by the mobile app: member tag scanning, checkpoint events, team CRUD, CSV exports.
 - `donate` — donation flow built on top of `VTBPayment`.
-- `demo` — static HTML mockups served at `/demo/home-multiple/`, `/demo/home-offseason/`, `/demo/home-single/` for design review. No models or auth required. Templates live in `src/templates/demo/` (common templates dir), not in the app's own `templates/` folder.
+- `demo` — static HTML mockups served at `/demo/home-multiple/`, `/demo/home-offseason/`, `/demo/home-single/`, `/demo/team-register/` for design review. No models or auth required. Templates live in `src/templates/demo/` (common templates dir), not in the app's own `templates/` folder.
 - `config` — Django project config (settings, urls, wsgi).
 - `apps.race` — race detail page (`/race/<slug>/`) and the unified teams-list page. Views only; no models or migrations — all models remain in `website`. Entry points: `src/apps/race/views.py:RacePageView` and `RaceTeamsView`. Uses `label = "race_app"` in `AppConfig` to avoid Django app-registry collision with the `race` model label. `RacePageView.build_context` is also called by `website.views.views_.AddNewsPostView` via a deferred import to avoid a circular dependency. `RaceTeamsView` (template `src/templates/race/teams.html`, assets `src/static/css/teams.css` + `src/static/js/teams.js`) backs all three teams URL names (`all_teams`, `teams2`, `my_teams`, wired in `website/urls.py`); it embeds teams/categories as JSON `<script>` blocks and does search/filter/sort entirely client-side.
 
@@ -77,4 +77,4 @@ New feature apps that don't fit in `website` live under `src/apps/<name>/`. Each
 
 Black 88-char limit, `isort` with Black profile. `ruff` and `flake8` share ignore rules from `setup.cfg` (`W503`, `E722`; `F401` ignored in `__init__.py`).
 
-Tests use Django `TestCase`, live in `src/<app>/tests.py`. `DJANGO_SETTINGS_MODULE = config.settings` is set automatically by `pyproject.toml`.
+Tests live in `src/<app>/tests.py` and use **pytest-style** functions with `@pytest.mark.django_db` and `client`/`django_user_model` fixtures — not Django `TestCase` subclasses. `DJANGO_SETTINGS_MODULE = config.settings` is set automatically by `pyproject.toml`.
