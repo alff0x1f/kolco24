@@ -1800,7 +1800,6 @@ class AddTeam(View):
                 owner_id=request.user.id,
                 **form.cleaned_data,
             )
-            team.save()
 
             if race.reg_status != RegStatus.OPEN:
                 return HttpResponseRedirect(reverse("my_teams", args=[race.slug]))
@@ -1828,7 +1827,6 @@ class AddTeam(View):
                 payment_with_discount=cost,
                 cost_per_person=cost_now,
                 paid_for=int(team.ucount) - team.paid_people,
-                additional_charge=team.additional_charge,
                 status="draft",
                 map=int(team.map_count) - team.map_count_paid,
             )
