@@ -299,19 +299,25 @@ empty file).
 - Modify: `src/website/views/__init__.py`
 - Delete: `src/templates/teams.html` (after grep confirms no refs)
 
-- [ ] Grep the repo for `AllTeamsView`, `TeamsView`, `MyTeamsView`, and
+- [x] Grep the repo for `AllTeamsView`, `TeamsView`, `MyTeamsView`, and
       `"teams.html"` to confirm no remaining references outside what we change.
-- [ ] Remove `AllTeamsView`, `MyTeamsView`, `TeamsView` from `views_.py` and their
+- [x] Remove `AllTeamsView`, `MyTeamsView`, `TeamsView` from `views_.py` and their
       exports in `__init__.py`. Do NOT hand-prune imports — let `make lint` (ruff/flake8
       `F401`) flag genuinely-unused ones, since `Sum`/`OuterRef`/`Subquery`/`Count`/
       `reverse`/`HttpResponseRedirect` are shared by many other views in this module.
-- [ ] Confirm `src/templates/teams.html` is rendered ONLY by the three removed views
+      (ruff `--fix` removed the now-unused `Count/OuterRef/Subquery/Sum` import line;
+      `reverse`/`HttpResponseRedirect` kept — still used by other views.)
+- [x] Confirm `src/templates/teams.html` is rendered ONLY by the three removed views
       (`views_.py:1791/1845/2280`) and there is no `{% include %}` of it, then delete it.
       Leave the unrelated `website/teams*.html` family intact — `website/teams.html`
       (via `views_.py:867` `"website/teams%s.html"`), `website/teams_start.html` (914),
       `website/teams_finish.html` (957), `website/teams_protocol.html` (985).
-- [ ] Confirm `src/website/views/team.py:161` `reverse("teams2", ...)` still resolves.
-- [ ] Run full suite `uv run pytest --reuse-db` — must pass.
+- [x] Confirm `src/website/views/team.py:161` `reverse("teams2", ...)` still resolves.
+      (URL name `teams2` unchanged in `urls.py:90`.)
+- [x] Run full suite `uv run pytest --reuse-db` — 80 passed. (1 pre-existing,
+      unrelated failure `test_race_page_view_news_list_capped_at_10` — `news_count`
+      semantics in `RacePageView`, fails identically on the clean tree before this task;
+      out of Task 6 scope, left untouched.)
 
 ### Task 7: Verify acceptance criteria
 - [ ] All three URL names render the new page; `teams2` pre-selects its category chip;
