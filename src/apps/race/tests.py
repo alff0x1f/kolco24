@@ -405,23 +405,27 @@ def test_teams_page_renders_key_markup(client):
 
 
 @pytest.mark.django_db
-def test_embedded_json_escapes_script_closer(client):
-    """A </script> in user-supplied text must not break out of the block."""
+def test_embedded_json_escapes_html_specials(client):
+    """HTML-special chars in user text must not break out of the block."""
     owner = User.objects.create_user(
         username="ru9", password="p", email="ru9@example.com"
     )
     race = _make_race(slug="ru9", code="ru9")
     cat = _make_category(race)
-    payload = "</script><script>alert(1)</script>"
+    # Both a literal </script> and the <!--<script> tokenizer-state vector.
+    payload = "</script><!--<script>alert(1)&x"
     _make_team(owner, cat, teamname=payload, paid_people=2)
 
     resp = client.get(reverse("all_teams", args=[race.slug]))
 
     assert resp.status_code == 200
     html = resp.content.decode()
-    # The raw payload must be escaped, so it cannot terminate the data block.
+    # The raw payload must be escaped, so it can neither terminate the data
+    # block nor flip the HTML tokenizer into script-data-escaped mode.
     assert payload not in html
-    assert "<\\/script>" in html
+    assert "\\u003C/script\\u003E" in html  # </script>
+    assert "\\u003C!--\\u003Cscript\\u003E" in html  # <!--<script>
+    assert "\\u0026" in html  # &
     # The block still parses and round-trips the original team name.
     teams = _script_json(html, "teams-data")
     assert {t["name"] for t in teams} == {payload}

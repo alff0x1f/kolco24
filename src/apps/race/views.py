@@ -12,14 +12,27 @@ from website.models import NewsPost, Race, Team
 from website.models.race import Category, RegStatus
 from website.views.views_ import is_race_admin
 
+# Escape the HTML-significant characters as their \uXXXX forms, exactly like
+# Django's ``json_script``. Escaping ``<`` and ``>`` (not just ``</``) also
+# defeats payloads such as ``<!--<script>`` that flip the HTML tokenizer into
+# script-data-(double-)escaped mode, where the template's own ``</script>`` no
+# longer terminates the block.
+_JSON_SCRIPT_ESCAPES = {
+    ord("<"): "\\u003C",
+    ord(">"): "\\u003E",
+    ord("&"): "\\u0026",
+}
+
 
 def _safe_json(data):
     """Serialize ``data`` for embedding inside a <script> block.
 
-    ``ensure_ascii=False`` keeps Cyrillic readable; escaping ``</`` prevents a
-    stray ``</script>`` in user-supplied text from terminating the block.
+    ``ensure_ascii=False`` keeps Cyrillic readable; ``<``, ``>`` and ``&`` are
+    escaped so user-supplied text can neither terminate nor confuse the parser
+    of the surrounding <script> block.
     """
-    return mark_safe(json.dumps(data, ensure_ascii=False).replace("</", "<\\/"))
+    json_str = json.dumps(data, ensure_ascii=False).translate(_JSON_SCRIPT_ESCAPES)
+    return mark_safe(json_str)
 
 
 def _categories_with_team_count(race):
