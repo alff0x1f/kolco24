@@ -282,15 +282,15 @@ empty file).
 **Files:**
 - Create: `src/static/js/teams.js`
 
-- [ ] Adapt mockup IIFE: read both JSON blocks; init state from `data-initial`.
-- [ ] Build chips (Все + Мои[conditional] + per-category) and breakdown bars (colors
+- [x] Adapt mockup IIFE: read both JSON blocks; init state from `data-initial`.
+- [x] Build chips (Все + Мои[conditional] + per-category) and breakdown bars (colors
       from `colorIdx`); wire «Сбросить». Coerce category ids to `String(...)` for chip/
       breakdown `dataset.cat` and when comparing against `t.catId` (`data-initial` is a
       string; JSON `catId` is an int).
-- [ ] Implement `render()`: filter (category/mine) + query substring + sort
+- [x] Implement `render()`: filter (category/mine) + query substring + sort
       (numeric vs `localeCompare('ru')`) + `<mark>` highlight + edit pencil + `.hide-cat`
       + empty state + Russian-plural foot text; debounce search ~120ms.
-- [ ] (No unit test — client JS; covered by manual verification in Post-Completion.)
+- [x] (No unit test — client JS; covered by manual verification in Post-Completion.)
 
 ### Task 6: Remove old views, exports, and orphaned template
 
