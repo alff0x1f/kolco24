@@ -139,17 +139,22 @@
       btn.className = "brk-row" + (val === activeCat ? " is-active" : "");
       btn.dataset.cat = val;
       var pct = maxCount ? Math.round((n / maxCount) * 100) : 0;
+      // Full category name shown dim next to the short label; skip it when the
+      // label already is the full name (no short_name) to avoid duplication.
+      var full = c.name && c.name !== c.label ? c.name : "";
       btn.innerHTML =
         '<div class="brk-top"><span class="nm">' +
         esc(c.label) +
-        '</span><span class="vl">' +
+        "</span>" +
+        (full
+          ? '<span class="brk-full" title="' + esc(full) + '">' + esc(full) + "</span>"
+          : "") +
+        '<span class="vl">' +
         n +
         "</span></div>" +
         '<div class="brk-bar"><i style="width:' +
         pct +
-        "%;background:" +
-        CAT_COLORS[c.colorIdx] +
-        '"></i></div>';
+        '%"></i></div>';
       btn.addEventListener("click", function () {
         setCat(activeCat === val ? "all" : val);
       });

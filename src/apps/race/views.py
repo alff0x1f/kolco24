@@ -57,13 +57,17 @@ def _categories_with_team_count(race):
 class RacePageView(View):
     @staticmethod
     def build_context(race, user=None):
-        categories = _categories_with_team_count(race)
+        categories = list(_categories_with_team_count(race))
+        # Bars in the «Команды» panel are scaled to the largest category (like
+        # the teams-page breakdown), so the biggest one fills the track.
+        category_max_count = max((c.team_count or 0 for c in categories), default=0)
         news_qs = NewsPost.objects.filter(race=race).order_by("-publication_date")
         news_count = news_qs.count()
         news_list = list(news_qs[:10])
         context = {
             "race": race,
             "categories": categories,
+            "category_max_count": category_max_count,
             "links": race.links.order_by("-id"),
             "news_list": news_list,
             "news_count": news_count,
@@ -108,6 +112,7 @@ class RaceTeamsView(View):
                 {
                     "id": cat.id,
                     "label": cat.short_name or cat.name,
+                    "name": cat.name,
                     "count": cat.team_count or 0,
                     "colorIdx": color_idx,
                 }

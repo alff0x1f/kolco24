@@ -199,15 +199,15 @@
             {% for category in categories %}
             <li>
               <a href="{% url 'teams2' race.slug category.id %}">
-                <div class="cat-row">
-                  <span class="cat-label">
-                    <span class="cat-name">{{ category.name }}</span>
-                    {% if category.short_name %}<span class="cat-short">{{ category.short_name }}</span>{% endif %}
-                  </span>
+                <div class="cat-top">
+                  <span class="cat-nm">{{ category.short_name|default:category.name }}</span>
+                  {% if category.short_name and category.short_name != category.name %}
+                  <span class="cat-full" title="{{ category.name }}">{{ category.name }}</span>
+                  {% endif %}
                   <span class="cat-count">{{ category.team_count|default:"0" }}</span>
                 </div>
                 <div class="cat-bar">
-                  <div class="cat-bar-fill" style="--w: {% widthratio category.team_count|default:0 race_team_count|default:1 100 %}%"></div>
+                  <i style="width: {% widthratio category.team_count|default:0 category_max_count|default:1 100 %}%"></i>
                 </div>
               </a>
             </li>

@@ -121,7 +121,11 @@
   color: var(--muted); font-size: 13px; line-height: 1.4;
   text-wrap: pretty; overflow-wrap: anywhere;
 }
-.teams-page .t-city { color: var(--ink-soft); overflow-wrap: anywhere; }
+/* break-word (not "anywhere"): keeps a single word's intrinsic width intact so
+   auto-layout sizes the column to fit it, instead of collapsing to ~1 char and
+   breaking names mid-word (Челяб|инск). Multi-part hyphenated names still wrap
+   at the hyphens (Октябрьский-/Серафимовка-/Приютово). */
+.teams-page .t-city { color: var(--ink-soft); overflow-wrap: break-word; }
 .teams-page .cat-badge {
   display: inline-flex; align-items: center;
   padding: 3px 9px; border-radius: 7px;
@@ -176,17 +180,26 @@
 .teams-page .brk-row:hover { background: #f4f6f9; }
 .teams-page .brk-row.is-active { background: #f0f3f7; }
 .teams-page .brk-top {
-  display: flex; justify-content: space-between; align-items: baseline;
-  gap: 10px; font-size: 13.5px; margin-bottom: 6px;
+  display: flex; align-items: baseline;
+  gap: 8px; font-size: 13.5px; margin-bottom: 6px;
 }
-.teams-page .brk-top .nm { color: var(--ink); font-weight: 500; }
+.teams-page .brk-top .nm { color: var(--ink); font-weight: 500; flex: 0 0 auto; }
+/* Full category name — unobtrusive: dim, smaller, truncated if it doesn't fit
+   (hover shows the full text via title). */
+.teams-page .brk-top .brk-full {
+  flex: 1 1 auto; min-width: 0;
+  color: var(--muted-2); font-weight: 400; font-size: 12px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
 .teams-page .brk-top .vl {
+  margin-left: auto; flex: 0 0 auto;
   color: var(--muted); font-variant-numeric: tabular-nums; font-size: 12.5px;
 }
 .teams-page .brk-bar {
   height: 6px; border-radius: 999px; background: #eef1f5; overflow: hidden;
 }
-.teams-page .brk-bar i { display: block; height: 100%; border-radius: 999px; }
+/* single colour for all bars — category coding lives on the chip dots only */
+.teams-page .brk-bar i { display: block; height: 100%; border-radius: 999px; background: var(--primary-2); }
 
 /* ── Category color palette (chips, badges, breakdown bars) ── */
 .teams-page .cat-0 { color: #1d3a63; background: #e7eef7; }
