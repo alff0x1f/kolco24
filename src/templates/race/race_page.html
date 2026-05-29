@@ -199,7 +199,10 @@
             {% for category in categories %}
             <li>
               <a href="{% url 'teams2' race.slug category.id %}">
-                <span>{{ category.name }}</span>
+                <span class="cat-label">
+                  <span class="cat-name">{{ category.name }}</span>
+                  {% if category.short_name %}<span class="cat-short">{{ category.short_name }}</span>{% endif %}
+                </span>
                 <span class="badge">{{ category.team_count|default:"0" }}</span>
               </a>
             </li>
