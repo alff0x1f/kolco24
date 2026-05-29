@@ -603,6 +603,11 @@ class TeamForm(forms.Form):
     def clean(self):
         cleaned_data = super().clean()
 
+        # Capture whether any required-field errors existed before server guards run,
+        # so the "fill all fields" banner is only shown for those (not for range
+        # violations which have their own field-level messages).
+        had_errors_before_guards = bool(self.errors)
+
         # Server-side guards: the segmented control / maps stepper cap values
         # in the browser only; enforce them here against a crafted POST.
         category_id = cleaned_data.get("category2_id")
@@ -627,14 +632,15 @@ class TeamForm(forms.Form):
                     "Слишком много дополнительных карт для такого состава.",
                 )
 
-        # make invalid forms red:
+        # make invalid fields red:
         if self.errors:
             for f_name in self.fields:
                 if f_name in self.errors:
                     classes = self.fields[f_name].widget.attrs.get("class", "")
                     classes += " is-invalid"
                     self.fields[f_name].widget.attrs["class"] = classes
-            raise forms.ValidationError("Заполните все поля")
+            if had_errors_before_guards:
+                raise forms.ValidationError("Заполните все поля")
         return cleaned_data
 
     @staticmethod
