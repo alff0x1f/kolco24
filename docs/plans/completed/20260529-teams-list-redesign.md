@@ -338,9 +338,11 @@ empty file).
 - [x] `make format && make lint` clean.
 
 ### Task 8: [Final] Docs + housekeeping
-- [ ] Update `CLAUDE.md` if a new convention emerged (e.g. teams page in `apps.race`,
-      `teams.css`/`teams.js` assets) — only if genuinely new.
-- [ ] Move this plan to `docs/plans/completed/`.
+- [x] Update `CLAUDE.md` if a new convention emerged (e.g. teams page in `apps.race`,
+      `teams.css`/`teams.js` assets) — only if genuinely new. (Expanded the `apps.race`
+      bullet: it now hosts `RaceTeamsView` backing all three teams URL names, with
+      `race/teams.html` + `teams.css`/`teams.js` and client-side search/filter/sort.)
+- [x] Move this plan to `docs/plans/completed/`.
 
 ## Post-Completion
 *Items requiring manual intervention or external systems — informational only.*
