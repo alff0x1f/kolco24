@@ -1,561 +1,289 @@
-{% extends "website/base.html" %}
+{% extends "website/base-2.html" %}
+
+{% block title %}Регистрация команды · Кольцо 24{% endblock %}
+{% block head_descr %}Регистрация команды на Кольцо 24 — состав, дистанция и оплата через СБП.{% endblock %}
+{% block og_title %}Регистрация команды · Кольцо 24{% endblock %}
+{% block og_description %}Запишите команду на гонку: состав, категория и стартовый взнос.{% endblock %}
+
+{% block extra_head %}
+<link href="/static/css/team-form.css" rel="stylesheet" type="text/css">
+{% endblock %}
 
 {% block content %}
-    <section class="space-sm">
-        <div class="container">
-            <div class="row flex-md-row card card-lg">
-                <div class="col-12 col-md-7 card-body bg-secondary">
-                    <div class="text-center mb-3">
-                        <h1 class="h2 mb-2">{{ team.teamname|default:"Добавление новой команды" }}</h1>
-                        <span>Данные команды</span>
-                    </div>
-                    <div class="row justify-content-center">
-                        <div class="col-12 col-lg-10">
-                            <form id="teamform" action="{{ action }}" method="POST">
-                                <div class="form-row form-group">
-                                    <div class="col">
-                                        {{ team_form.teamname }}
-                                        {% if team_form.teamname.errors %}
-                                            <div class="invalid-feedback">
-                                                {{ team_form.teamname.errors }}
-                                            </div>
-                                        {% endif %}
-                                    </div>
-                                </div>
-                                <div class="form-row form-group">
-                                    <div class="col">
-                                        {{ team_form.city }}
-                                        {% if team_form.city.errors %}
-                                            <div class="invalid-feedback">
-                                                {{ team_form.city.errors }}
-                                            </div>
-                                        {% endif %}
-                                    </div>
-                                    <div class="col">
-                                        {{ team_form.organization }}
-                                        {% if team_form.organization.errors %}
-                                            <div class="invalid-feedback">
-                                                {{ team_form.organization.errors }}
-                                            </div>
-                                        {% endif %}
-                                    </div>
-                                </div>
-                                <div class="form-row form-group">
-                                    <div class="col-7">
-                                        {{ team_form.category2_id.label_tag }}
-                                        {{ team_form.category2_id }}
-                                        {% if team_form.category2_id.errors %}
-                                            <div class="invalid-feedback">
-                                                {{ team_form.category2_id.errors }}
-                                            </div>
-                                        {% endif %}
-                                    </div>
-                                    <div class="col-5">
-                                        {{ team_form.ucount.label_tag }}
-                                        {{ team_form.ucount }}
-                                        {% if team_form.ucount.errors %}
-                                            <div class="invalid-feedback">
-                                                {{ team_form.ucount.errors }}
-                                            </div>
-                                        {% endif %}
-                                    </div>
-                                </div>
-                                <p>Участники:</p>
+<div class="page team-register">
+    <div class="container">
 
-                                <div class="form-row form-group">
-                                    <div class="col-8">
-                                        {{ team_form.athlet1 }}
-                                        {% if team_form.athlet1.errors %}
-                                            <div class="invalid-feedback">
-                                                {{ team_form.athlet1.errors }}
-                                            </div>
-                                        {% endif %}
-                                    </div>
-                                    <div class="col-4">
-                                        {{ team_form.birth1 }}
-                                        {% if team_form.birth1.errors %}
-                                            <div class="invalid-feedback">
-                                                {{ team_form.birth1.errors }}
-                                            </div>
-                                        {% endif %}
-                                    </div>
-                                </div>
+        <nav class="crumbs anim" aria-label="Хлебные крошки">
+            <a href="/">Главная</a>
+            <span class="sep">/</span>
+            <a href="{% url 'my_teams' race.slug %}">{{ race.name }}</a>
+            <span class="sep">/</span>
+            <span>Регистрация команды</span>
+        </nav>
 
-                                <div class="form-row form-group">
-                                    <div class="col-8">
-                                        {{ team_form.athlet2 }}
-                                        {% if team_form.athlet2.errors %}
-                                            <div class="invalid-feedback">
-                                                {{ team_form.athlet2.errors }}
-                                            </div>
-                                        {% endif %}
-                                    </div>
-                                    <div class="col-4">
-                                        {{ team_form.birth2 }}
-                                        {% if team_form.birth2.errors %}
-                                            <div class="invalid-feedback">
-                                                {{ team_form.birth2.errors }}
-                                            </div>
-                                        {% endif %}
-                                    </div>
-                                </div>
-
-                                <div id="member3" class="form-row form-group">
-                                    <div class="col-8">
-                                        {{ team_form.athlet3 }}
-                                        {% if team_form.athlet3.errors %}
-                                            <div class="invalid-feedback">
-                                                {{ team_form.athlet3.errors }}
-                                            </div>
-                                        {% endif %}
-                                    </div>
-                                    <div class="col-4">
-                                        {{ team_form.birth3 }}
-                                        {% if team_form.birth3.errors %}
-                                            <div class="invalid-feedback">
-                                                {{ team_form.birth3.errors }}
-                                            </div>
-
-                                        {% endif %}
-                                    </div>
-                                </div>
-
-                                <div id="member4" class="form-row form-group">
-                                    <div class="col-8">
-                                        {{ team_form.athlet4 }}
-                                        {% if team_form.athlet4.errors %}
-                                            <div class="invalid-feedback">
-                                                {{ team_form.athlet4.errors }}
-                                            </div>
-                                        {% endif %}
-                                    </div>
-                                    <div class="col-4">
-                                        {{ team_form.birth4 }}
-                                        {% if team_form.birth4.errors %}
-                                            <div class="invalid-feedback">
-                                                {{ team_form.birth4.errors }}
-                                            </div>
-                                        {% endif %}
-                                    </div>
-                                </div>
-
-                                <div id="member5" class="form-row form-group">
-                                    <div class="col-8">
-                                        {{ team_form.athlet5 }}
-                                        {% if team_form.athlet5.errors %}
-                                            <div class="invalid-feedback">
-                                                {{ team_form.athlet5.errors }}
-                                            </div>
-                                        {% endif %}
-                                    </div>
-                                    <div class="col-4">
-                                        {{ team_form.birth5 }}
-                                        {% if team_form.birth5.errors %}
-                                            <div class="invalid-feedback">
-                                                {{ team_form.birth5.errors }}
-                                            </div>
-                                        {% endif %}
-                                    </div>
-                                </div>
-
-                                <div id="member6" class="form-row form-group">
-                                    <div class="col-8">
-                                        {{ team_form.athlet6 }}
-                                        {% if team_form.athlet6.errors %}
-                                            <div class="invalid-feedback">
-                                                {{ team_form.athlet6.errors }}
-                                            </div>
-                                        {% endif %}
-                                    </div>
-                                    <div class="col-4">
-                                        {{ team_form.birth6 }}
-                                        {% if team_form.birth6.errors %}
-                                            <div class="invalid-feedback">
-                                                {{ team_form.birth6.errors }}
-                                            </div>
-                                        {% endif %}
-                                    </div>
-                                </div>
-                                <div id="map_count" class="form-row form-group">
-                                    <div class="col-6">
-                                        {{ team_form.map_count.label_tag }}
-                                        {{ team_form.map_count }}
-                                        {% if team_form.map_count.errors %}
-                                            <div class="invalid-feedback">
-                                                {{ team_form.map_count.errors }}
-                                            </div>
-                                        {% endif %}
-                                    </div>
-                                    <div class="col-12">
-                                        <small>На команду выдаются 2 карты. Если вы хотите купить дополнительные карты,
-                                            отметьте количество (Цена карты - 200 руб)
-                                        </small>
-                                    </div>
-                                </div>
-                                <div class="mb-3 form-check">
-                                  <input class="form-check-input" type="checkbox" id="consent" name="consent" required {% if team.id %}disabled checked{% endif %}>
-                                  <label class="form-check-label" for="consent">
-                                    Я подтверждаю, что ознакомлен(а) с
-                                    <a href="/page/personal_data_consent/" target="_blank" rel="noopener">
-                                      Согласием на обработку персональных данных
-                                    </a>
-                                    и даю согласие на обработку моих персональных данных в соответствии с Федеральным законом от 27.07.2006 № 152-ФЗ «О персональных данных».
-                                  </label>
-                                </div>
-                                {% csrf_token %}
-                                {% if team_form.non_field_errors %}
-                                    <div class="alert alert-danger" role="alert">
-                                        {{ team_form.non_field_errors }}
-                                    </div>
-                                {% endif %}
-                                <div id="team_form_alert" class="alert alert-success" role="alert"
-                                     style="display: none;">
-                                    Text
-                                </div>
-                                <div class="alert alert-danger mb-2" id="reg_close_warning" style="display: none">
-                                    Регистрация закрыта, оплата слотов невозможна.
-                                </div>
-                                {% if team.category2.race.is_teams_editable or not team.id or user.is_superuser %}
-                                    <div class="form-row form-group">
-                                        <div class="col">
-                                            <button class="btn btn-block btn-success" type="submit"
-                                                    id="teamform_submit">
-                                                Сохранить
-                                            </button>
-                                        </div>
-                                    </div>
-                                {% endif %}
-                            </form>
-                            {% if team.id and team.can_be_deleted %}
-                                {% if user.is_superuser or team.owner_id == user.id %}
-                                    <form method="post" action="{{ action }}" onsubmit="return confirm('Вы уверены, что хотите удалить команду?');">
-                                        {% csrf_token %}
-                                        <input type="hidden" name="delete_team" value="1">
-                                        <div class="form-row form-group">
-                                            <div class="col">
-                                                <button class="btn btn-block btn-outline-danger" type="submit">
-                                                    Удалить команду
-                                                </button>
-                                            </div>
-                                        </div>
-                                    </form>
-                                {% endif %}
-                            {% endif %}
-                        </div>
-                    </div>
-                </div>
-                <!--end of col-->
-                <div class="col-12 col-md-5 card-body">
-                    <div>
-                        <div class="mb-3 text-center">
-                            <h3 class="h2 mb-2">Стартовый взнос за участника</h3>
-                        </div>
-                        <ul class="list-unstyled list-spacing-sm mb-3 ">
-                            <li class="row align-items-center">
-                                <div class="col-3 col-md-3">2000 руб</div>
-                                <div class="col-9">С 15 по 17 сентября</div>
-                            </li>
-                            <li class="row align-items-center">
-                                <div class="col-3 col-md-3">2500 руб</div>
-                                <div class="col-9">С 18 по 30 сентября</div>
-                            </li>
-                            <li class="row align-items-center">
-                                <div class="col-3 col-md-3">3000 руб</div>
-                                <div class="col-9">С 1 по 9 октября</div>
-                            </li>
-                        </ul>
-                        <ul class="list-unstyled list-spacing-sm mb-5 ">
-                            <li class="row">
-                                <div class="col-2 col-md-1"><i class="icon-minus h5 text-muted"></i>
-                                </div>
-                                <div class="col-10">При достижении лимита участников, регистрация может прекратиться
-                                    раньше
-                                </div>
-                            </li>
-                            <li class="row align-items-center">
-                                <div class="col-2 col-md-1"><i class="icon-minus h5 text-muted"></i>
-                                </div>
-                                <div class="col-10">Возврат взносов за вычетом понесенных расходов возможен до 1
-                                    октября
-                                </div>
-                            </li>
-                        </ul>
-                        <hr class="short">
-                        {% if team.paid_people %}
-                            <div class="row justify-content-between">
-                                <div class="col-12"><p>Оплачено за {{ team.paid_people | floatformat:"0" }} чел.</p></div>
-                            </div>
-                        {% endif %}
-                        {% if member_moves %}
-                            <hr class="short">
-                            <h4 class="h4 mb-2">Переносы участников</h4>
-                            {% for move in member_moves %}
-                                <div class="row justify-content-between">
-                                    <div class="col-8">
-                                        <p class="mb-0">{{ move.from_team.teamname }} <i class="icon-arrow-right text-muted"></i>  {{ move.to_team.teamname }}</p>
-                                        <p class="mb-0"><small>(id{{ move.from_team_id }} > id{{ move.to_team_id }})</small></p>
-                                    </div>
-                                    <div class="col-4">
-                                        <p class="text-right mb-0">{{ move.moved_people | floatformat    }} чел</p>
-                                        <p class="text-right mb-0"><small> {{ move.move_date | date:"j.m.Y" }}</small></p>
-                                    </div>
-                                </div>
-                            {% endfor %}
-                        {% endif %}
-                        {% if payments %}
-                            <hr class="short">
-                            <h4 class="h4 mb-2">История оплат</h4>
-                            {% for payment in payments %}
-                                {% if payment.payment_amount %}
-                                    <div class="row justify-content-between">
-                                        <div class="col-6"><p>Платеж за {{ payment.paid_for | floatformat:"0" }}
-                                            чел.</p>
-                                        </div>
-                                        <div class="col-6">
-                                            <p class="text-right mb-0"><span>{{ payment.payment_amount }}</span> руб</p>
-                                            <p class="text-right"><small>{{ payment.created_at | date:"j.m.Y" }}</small>
-                                            </p>
-                                        </div>
-                                    </div>
-                                {% endif %}
-                                {% if payment.additional_charge %}
-                                    <div class="row justify-content-between">
-                                        <div class="col-6"><p>Доплата </p></div>
-                                        <div class="col-6">
-                                            <p class="text-right mb-0">{{ payment.additional_charge }} руб</p>
-                                            <p class="text-right"><small>{{ payment.created_at | date:"j.m.Y" }}</small>
-                                            </p>
-                                        </div>
-                                    </div>
-                                {% endif %}
-                            {% endfor %}
-                        {% endif %}
-
-                        <div id="sidecolumn_paid">
-                            <div class="row mb-4 justify-content-between">
-                                <div class="col-6"><p><span id="paidfor_action">К оплате</span> <span
-                                        id="ucountlabel_all">за <span id="ucountlabel">1</span> чел.</span></p></div>
-                                <div class="col-6"><p class="text-right"><span id="sumlabel">1500</span> руб</p></div>
-                            </div>
-                            {% if race.reg_status == "open" %}
-                                <div class="mb-2 text-center ">
-                                    <h4 class="h4 mb-2">Оплата</h4>
-                                    <div class="row justify-content-center">
-                                        <div class="col-6">
-                                                <img alt="sbp" class="card-img-top"
-                                                     src="/static/images/payments/sbp.png">
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="custom-control custom-checkbox-switch">
-                                    <button type="button" class="btn btn-primary float-right mt-3" id="common_paid">
-                                        Оплатить
-                                    </button>
-                                    <script>
-                                        // Attach click event to the button to submit the form
-                                        document.getElementById('common_paid').addEventListener('click', function () {
-                                            // Submit the team_form
-                                            document.getElementById('teamform').submit();
-                                        });
-                                    </script>
-                                </div>
-                            {% elif race.reg_status == "sold_out" %}
-                                <div class="mb-2">
-                                    <h4 class="h4 mb-2">Регистрация закрыта</h4>
-                                    <div class="alert alert-danger" role="alert">
-                                        Регистрация закрыта, оплата невозможна.
-                                    </div>
-                                </div>
-                            {% elif race.reg_status == "sold_out" %}
-                                <div class="mb-2">
-                                    <h4 class="h4 mb-2">Регистрация еще не началась</h4>
-                                    <p>Добавление новых участников невозможно до начала регистрации.</p>
-                                </div>
-                            {% endif %}
-                        </div>
-                        {% if team_move_form and team and team.paid_people and team.category2 and team.category2.race.is_teams_editable %}
-                            <hr class="short">
-                            <div class="card border-danger">
-                                <div class="card-body p-3">
-                                    <h5 class="h5 mb-2 text-danger">Перенести участника</h5>
-                                    <div class="alert alert-danger" role="alert">
-                                        Внимание: слот участника будет безвозвратно передан в другой аккаунт. Вернуть его
-                                        обратно будет невозможно.
-                                    </div>
-                                    <form method="post" action="{% url 'move_team_member' team.id %}"
-                                          onsubmit="return confirm('Подтвердите перенос: слот будет безвозвратно передан другому аккаунту и вернуть его не получится. Продолжить?');">
-                                        {% csrf_token %}
-                                        {{ team_move_form.non_field_errors }}
-                                        <div class="form-group">
-                                            {{ team_move_form.to_team.label_tag }}
-                                            {{ team_move_form.to_team }}
-                                            {% if team_move_form.to_team.errors %}
-                                                <div class="invalid-feedback">
-                                                    {{ team_move_form.to_team.errors }}
-                                                </div>
-                                            {% endif %}
-                                        </div>
-                                        <div class="form-group">
-                                            {{ team_move_form.moved_people.label_tag }}
-                                            {{ team_move_form.moved_people }}
-                                            {% if team_move_form.moved_people.errors %}
-                                                <div class="invalid-feedback">
-                                                    {{ team_move_form.moved_people.errors }}
-                                                </div>
-                                            {% endif %}
-                                        </div>
-                                        <button type="submit" class="btn btn-danger">Перенести</button>
-                                    </form>
-                                </div>
-                            </div>
-                        {% endif %}
-                    </div>
-                </div>
-                <!--end of col-->
+        <header class="page-head anim d1">
+            <div>
+                <h1>Регистрация команды</h1>
             </div>
-            <!--end of row-->
+            <div class="race-chip{% if reg_status != 'open' %} is-closed{% endif %}">
+                <span class="dot"></span>
+                <span><b>{{ race.name }}</b> <span class="date">· {{ race.date }}</span></span>
+                {% if reg_status == 'open' %}
+                <span class="tag">Регистрация открыта</span>
+                {% elif reg_status == 'sold_out' %}
+                <span class="tag">Мест нет</span>
+                {% else %}
+                <span class="tag">Скоро открытие</span>
+                {% endif %}
+            </div>
+        </header>
+
+        <div class="grid">
+
+            <!-- ─────────── MAIN: form ─────────── -->
+            <main>
+                <form class="card anim d1" id="teamForm" action="{{ action }}" method="POST" novalidate>
+                    {% csrf_token %}
+
+                    {% if team_form.non_field_errors %}
+                    <div class="card-section" style="padding-bottom:0;">
+                        <div class="reg-closed-warn">
+                            <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="10" cy="10" r="8"/><path d="M10 6v5M10 13.5v.1"/></svg>
+                            {{ team_form.non_field_errors|join:", " }}
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    <!-- Команда -->
+                    <div class="card-section">
+                        <div class="section-title">Команда</div>
+                        <div class="form-grid">
+                            <div class="field full">
+                                <label for="teamname">Название</label>
+                                <input class="input{% if team_form.teamname.errors %} has-error{% endif %}"
+                                       id="teamname" name="teamname" type="text"
+                                       value="{{ team_form.teamname.value|default:'' }}"
+                                       placeholder="Название команды">
+                                {% if team_form.teamname.errors %}
+                                <span class="hint err">{{ team_form.teamname.errors|join:", " }}</span>
+                                {% endif %}
+                            </div>
+                            <div class="field">
+                                <label for="city">Город</label>
+                                <input class="input{% if team_form.city.errors %} has-error{% endif %}"
+                                       id="city" name="city" type="text"
+                                       value="{{ team_form.city.value|default:'' }}"
+                                       placeholder="Город">
+                                {% if team_form.city.errors %}
+                                <span class="hint err">{{ team_form.city.errors|join:", " }}</span>
+                                {% endif %}
+                            </div>
+                            <div class="field">
+                                <label for="org">Клуб <span class="opt">— необязательно</span></label>
+                                <input class="input{% if team_form.organization.errors %} has-error{% endif %}"
+                                       id="org" name="organization" type="text"
+                                       value="{{ team_form.organization.value|default:'' }}"
+                                       placeholder="Клуб (организация)">
+                                {% if team_form.organization.errors %}
+                                <span class="hint err">{{ team_form.organization.errors|join:", " }}</span>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Дистанция и состав -->
+                    <div class="card-section">
+                        <div class="section-title">Дистанция и состав</div>
+
+                        <div class="field full">
+                            <label for="category">Категория</label>
+                            <select class="select{% if team_form.category2_id.errors %} has-error{% endif %}"
+                                    id="category" name="category2_id">
+                                {% for option in category_options %}
+                                <option value="{{ option.id }}" data-counts="{{ option.counts|join:',' }}"
+                                        {% if team_form.category2_id.value|stringformat:'s' == option.id|stringformat:'s' %}selected{% endif %}>{{ option.label }}</option>
+                                {% endfor %}
+                            </select>
+                            {% if team_form.category2_id.errors %}
+                            <span class="hint err">{{ team_form.category2_id.errors|join:", " }}</span>
+                            {% endif %}
+                        </div>
+
+                        <div class="count-row">
+                            <label>Сколько вас?</label>
+                            <div class="seg" id="ucountSeg" role="group" aria-label="Количество участников"></div>
+                            <span class="count-cap" id="ucountCap"></span>
+                        </div>
+                        <input type="hidden" id="ucountInput" name="ucount" value="{{ team_form.ucount.value|default:'' }}">
+                        {% if team_form.ucount.errors %}
+                        <span class="hint err">{{ team_form.ucount.errors|join:", " }}</span>
+                        {% endif %}
+
+                        <div class="members-label">Участники <span class="opt">— ФИО и год рождения</span></div>
+                        <div class="members" id="members">
+                            <div class="member-row" data-idx="1">
+                                <div class="num">1</div>
+                                <input class="input m-name" name="athlet1" type="text" placeholder="Фамилия Имя" autocomplete="off" value="{{ team_form.athlet1.value|default:'' }}">
+                                <input class="input m-year" name="birth1" type="text" inputmode="numeric" maxlength="4" placeholder="Год рожд." value="{{ team_form.birth1.value|default:'' }}">
+                            </div>
+                            <div class="member-row" data-idx="2">
+                                <div class="num">2</div>
+                                <input class="input m-name" name="athlet2" type="text" placeholder="Фамилия Имя" autocomplete="off" value="{{ team_form.athlet2.value|default:'' }}">
+                                <input class="input m-year" name="birth2" type="text" inputmode="numeric" maxlength="4" placeholder="Год рожд." value="{{ team_form.birth2.value|default:'' }}">
+                            </div>
+                            <div class="member-row is-hidden" data-idx="3">
+                                <div class="num">3</div>
+                                <input class="input m-name" name="athlet3" type="text" placeholder="Фамилия Имя" autocomplete="off" value="{{ team_form.athlet3.value|default:'' }}">
+                                <input class="input m-year" name="birth3" type="text" inputmode="numeric" maxlength="4" placeholder="Год рожд." value="{{ team_form.birth3.value|default:'' }}">
+                            </div>
+                            <div class="member-row is-hidden" data-idx="4">
+                                <div class="num">4</div>
+                                <input class="input m-name" name="athlet4" type="text" placeholder="Фамилия Имя" autocomplete="off" value="{{ team_form.athlet4.value|default:'' }}">
+                                <input class="input m-year" name="birth4" type="text" inputmode="numeric" maxlength="4" placeholder="Год рожд." value="{{ team_form.birth4.value|default:'' }}">
+                            </div>
+                            <div class="member-row is-hidden" data-idx="5">
+                                <div class="num">5</div>
+                                <input class="input m-name" name="athlet5" type="text" placeholder="Фамилия Имя" autocomplete="off" value="{{ team_form.athlet5.value|default:'' }}">
+                                <input class="input m-year" name="birth5" type="text" inputmode="numeric" maxlength="4" placeholder="Год рожд." value="{{ team_form.birth5.value|default:'' }}">
+                            </div>
+                            <div class="member-row is-hidden" data-idx="6">
+                                <div class="num">6</div>
+                                <input class="input m-name" name="athlet6" type="text" placeholder="Фамилия Имя" autocomplete="off" value="{{ team_form.athlet6.value|default:'' }}">
+                                <input class="input m-year" name="birth6" type="text" inputmode="numeric" maxlength="4" placeholder="Год рожд." value="{{ team_form.birth6.value|default:'' }}">
+                            </div>
+                        </div>
+                        <div class="members-foot">
+                            <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="10" cy="10" r="8"/><path d="M10 9v5M10 6.2v.1"/></svg>
+                            Состав можно отредактировать до онлайн-брифинга.
+                        </div>
+
+                        <!-- доп. карты появляются только для команд 3+ -->
+                        <div class="maps-row" id="mapsRow" style="display:none;">
+                            <div class="maps-txt">
+                                <h4>Дополнительные карты</h4>
+                                <p>На&nbsp;команду&nbsp;— <b>{{ free_maps }}&nbsp;карты бесплатно</b>. Закажите ещё, чтобы у&nbsp;каждого была своя. +{{ map_price }}&nbsp;₽ за&nbsp;карту.</p>
+                            </div>
+                            <div class="stepper" id="mapStepper">
+                                <button type="button" data-step="-1" aria-label="Меньше">−</button>
+                                <span class="val" id="mapVal">0</span>
+                                <button type="button" data-step="1" aria-label="Больше">+</button>
+                            </div>
+                        </div>
+                        <input type="hidden" id="mapCountInput" name="map_count" value="{{ team_form.map_count.value|default:0 }}">
+                        {% if team_form.map_count.errors %}
+                        <span class="hint err">{{ team_form.map_count.errors|join:", " }}</span>
+                        {% endif %}
+                    </div>
+
+                    <!-- Подвал: согласие + оплата -->
+                    <div class="foot">
+                        <label class="check">
+                            <input type="checkbox" id="consent" name="consent" required>
+                            <span class="box"></span>
+                            <span>Я&nbsp;ознакомлен(а) с&nbsp;<a href="/page/personal_data_consent/" target="_blank" rel="noopener" onclick="event.stopPropagation()">обработкой персональных данных</a> (ФЗ&nbsp;№152-ФЗ) и&nbsp;подтверждаю, что всем участникам исполнилось 18&nbsp;лет.</span>
+                        </label>
+
+                        {% if reg_status != 'open' %}
+                        <div class="reg-closed-warn" id="regClosedWarn" style="display:none;">
+                            <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="10" cy="10" r="8"/><path d="M10 6v5M10 13.5v.1"/></svg>
+                            Регистрация закрыта — оплата слотов сейчас невозможна.
+                        </div>
+                        {% endif %}
+
+                        <div class="foot-actions">
+                            <p class="small">После сохранения вы&nbsp;перейдёте к&nbsp;оплате через СБП. Команда уже будет в&nbsp;списке участников.</p>
+                            <div class="actions">
+                                <a class="btn btn-ghost" href="{% url 'my_teams' race.slug %}">Отмена</a>
+                                {% if is_editable %}
+                                <button class="btn btn-primary btn-lg" type="submit" id="submitBtn" disabled>Сохранить и&nbsp;оплатить</button>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+
+                </form>
+            </main>
+
+            <!-- ─────────── SIDEBAR ─────────── -->
+            <aside class="sidebar">
+
+                <!-- live cost -->
+                <div class="summary card anim d2">
+                    <div class="side-head">
+                        <h3 id="sumHeading">К оплате</h3>
+                        <span class="badge">СБП</span>
+                    </div>
+                    <div class="sum-lines">
+                        <div class="sum-line">
+                            <span class="lbl">Взнос · <b id="sumCountLbl">0</b>&nbsp;уч. × <span id="sumCost">{{ current_price }}</span>&nbsp;₽</span>
+                            <span class="amt" id="sumPeople">0 ₽</span>
+                        </div>
+                        <div class="sum-line muted" id="sumMapsLine" style="display:none;">
+                            <span class="lbl">Доп. карты · <b id="sumMapsN">0</b> × {{ map_price }}&nbsp;₽</span>
+                            <span class="amt" id="sumMaps">0 ₽</span>
+                        </div>
+                        <div class="sum-line muted" id="sumPaidLine" style="display:none;">
+                            <span class="lbl">Уже оплачено за <b id="sumPaidN">0</b>&nbsp;чел.</span>
+                            <span class="amt" id="sumPaidAmt">0 ₽</span>
+                        </div>
+                    </div>
+                    <div class="sum-total">
+                        <span class="lbl">Итого</span>
+                        <span class="amt"><span id="sumTotal">0</span>&nbsp;<small>₽</small></span>
+                    </div>
+                    <div class="sum-pay">
+                        {% if is_editable %}
+                        <button class="btn btn-primary btn-block btn-lg" type="submit" form="teamForm" id="payBtn" disabled>Перейти к&nbsp;оплате</button>
+                        {% endif %}
+                        <div class="pay-meta">
+                            <span class="sbp"><i></i>СБП</span> · мгновенно · без комиссии
+                        </div>
+                    </div>
+                </div>
+
+                <!-- второстепенное — заметками на полях, без карточек -->
+                <div class="aside-notes anim d3">
+
+                    {% if price_tiers %}
+                    <section class="note">
+                        <div class="note-title">Стартовый взнос</div>
+                        <div class="tiers">
+                            {% for row in price_tiers %}
+                            <div class="tier {{ row.status }}">
+                                <span class="price">{{ row.tier.price }}&nbsp;₽</span>
+                                <span class="when">до {{ row.tier.active_until|date:"j E" }}</span>
+                                {% if row.status == 'active' %}<span class="now">· сейчас</span>{% endif %}
+                            </div>
+                            {% endfor %}
+                        </div>
+                        <p class="note-foot">
+                            <b>Возврат</b> взноса&nbsp;— за&nbsp;вычетом расходов. При&nbsp;достижении лимита регистрация может закрыться раньше.
+                        </p>
+                    </section>
+                    {% endif %}
+
+                    <section class="note">
+                        <div class="note-title">Нужна помощь?</div>
+                        <p>Вопросы по&nbsp;составу, категории или&nbsp;оплате&nbsp;— напишите, поможем.</p>
+                        <a class="contact" href="mailto:org@kolco24.ru">
+                            <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="2.5" y="4.5" width="15" height="11" rx="1.5"/><path d="m3 6 7 5 7-5"/></svg>
+                            org@kolco24.ru
+                        </a>
+                    </section>
+
+                </div>
+
+            </aside>
+
         </div>
-        <!--end of container-->
-    </section>
+    </div>
+
+    <script type="application/json" id="teamFormConfig">
+        {"currentPrice": {{ current_price|default:0 }}, "paidPeople": {{ paid_people|default:0 }}, "mapCountPaid": {{ map_count_paid|default:0 }}, "mapPrice": {{ map_price|default:200 }}, "freeMaps": {{ free_maps|default:2 }}, "isEdit": false}
+    </script>
+</div>
 {% endblock %}
 
 {% block footer_js_include %}
-    <script>
-        document.addEventListener('DOMContentLoaded', function () {
-            // Cache the DOM elements
-            const categorySelect = document.getElementById('id_category2_id');
-            const ucountSelect = document.getElementById('id_ucount');
-            const mapCountSelect = document.getElementById('id_map_count');
-            const mapCountField = document.getElementById('map_count');
-            const ucountlabel = document.getElementById('ucountlabel');
-            const sumlabel = document.getElementById('sumlabel');
-            const paid_block = document.getElementById('sidecolumn_paid');
-            const reg_close_warning = document.getElementById('reg_close_warning');
-
-            const ucount_paid = {{ team.paid_people |default:0| floatformat }};
-            const map_count_paid = {{ team.map_count_paid |default:0| floatformat }};
-
-            // All athlete/birth field wrappers by id
-            const memberFields = {
-                3: document.getElementById('member3'),
-                4: document.getElementById('member4'),
-                5: document.getElementById('member5'),
-                6: document.getElementById('member6')
-            };
-
-            // Function to update the number of visible athlete fields based on ucount value
-            function updateAthleteFields() {
-                const ucount = parseInt(ucountSelect.value); // Get selected ucount
-                let mapCount = parseInt(mapCountSelect.value) || 0;
-                // Loop through all athlete/birth fields and hide/show based on ucount
-                for (let i = 3; i <= 6; i++) {
-                    if (i <= ucount) {
-                        memberFields[i].style.display = 'flex'; // Show the field
-                    } else {
-                        memberFields[i].style.display = 'none'; // Hide the field
-                    }
-                }
-
-                mapCountSelect.innerHTML = '';
-                mapCount = Math.min(mapCount, ucount - 2);
-                for (let i = 0; i <= ucount - 2; i++) {
-                    const option = document.createElement('option');
-                    option.value = i.toString();
-                    option.textContent = i === 0 ? "Нет" : i.toString();
-                    option.selected = i === mapCount;
-                    mapCountSelect.appendChild(option);
-                }
-                if (ucount > 2) {
-                    mapCountField.style.display = 'flex';
-                } else {
-                    mapCountField.style.display = 'none';
-                }
-
-                const sum = {{ cost }} * (ucount - ucount_paid) + 200 * (mapCount - map_count_paid);
-
-                if (sum > 0) {
-                    paid_block.style.display = 'block';
-                    ucountlabel.textContent = ucount - ucount_paid;
-                    sumlabel.textContent = sum;
-                } else {
-                    paid_block.style.display = 'none';
-                }
-                {% if race.reg_status != 'open' %}
-                    const teamform_submit = document.getElementById('teamform_submit');
-                    if (sum > 0) {
-                        reg_close_warning.style.display = 'block';
-                    } else {
-                        reg_close_warning.style.display = 'none';
-                    }
-                {% endif %}
-            }
-
-
-            // Function to update the ucount options based on the category selection
-            function updateUcountOptions() {
-                const defaultUcount = {{ team.ucount }};
-                const selectedCategory = categorySelect.value;
-                ucountSelect.innerHTML = ''; // Clear current options
-
-                // Set ucount options based on category
-                let ucountOptions;
-                switch (selectedCategory) {
-                    case '8':
-                    case '16':
-                        ucountOptions = [2, 3];
-                        break;
-                    case '9':
-                    case '13':
-                    case '17':
-                    case '21':
-                    case '24':
-                        ucountOptions = [4, 5, 6];
-                        break;
-                    default:
-                        ucountOptions = [2];
-                }
-
-                // Populate ucount options dynamically
-                ucountOptions.forEach(function (optionValue) {
-                    const option = document.createElement('option');
-                    option.value = optionValue.toString();
-                    option.textContent = optionValue.toString();
-                    ucountSelect.appendChild(option);
-                });
-
-                // Set the first option as selected and trigger the change event to update athlete fields
-                ucountSelect.value = (ucountOptions.includes(defaultUcount)) ? defaultUcount.toString() : ucountOptions[0].toString();
-                updateAthleteFields();
-            }
-
-            // Event listener for changing the category, update ucount if needed
-            categorySelect.addEventListener('change', updateUcountOptions);
-
-            // Event listener for changing ucount, hide/show athlete fields accordingly
-            ucountSelect.addEventListener('change', updateAthleteFields);
-
-            mapCountSelect.addEventListener("change", updateAthleteFields);
-
-            // Initial setup: Hide all athlete fields above 2 by default
-            updateUcountOptions();
-            updateAthleteFields(); // Set the initial visibility of athlete fields
-
-            // Персональные данные - включение кнопки отправки формы
-            const consent = document.getElementById('consent');
-            const teamform_submit = document.getElementById('teamform_submit');
-            const common_paid = document.getElementById('common_paid');
-
-            {% if not team.id %}
-              {# Если редактирование команды, то кнопку показываем #}
-              function toggleSubmit() {
-                teamform_submit.disabled = !consent.checked;
-                if (common_paid) {
-                    common_paid.disabled = !consent.checked;
-                }
-              }
-              toggleSubmit();                 // первичная инициализация
-              consent.addEventListener('change', toggleSubmit);
-            {% endif %}
-        });
-    </script>
+<script src="/static/js/team-form.js"></script>
 {% endblock %}

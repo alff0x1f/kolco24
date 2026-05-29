@@ -239,13 +239,13 @@ Key design decisions & rationale:
 - Modify: `src/templates/website/add_team.html`
 - Modify: `src/website/tests.py`
 
-- [ ] extend `base-2.html`; load `team-form.css` via `{% block extra_head %}` and `team-form.js` via `{% block footer_js_include %}`; wrap content in `.team-register`
-- [ ] build header: breadcrumbs (→ `my_teams`), page-head, race-chip with real `race.name`/`race.date`/status tag from `reg_status`
-- [ ] hand-render the form card: «Команда» (name/city/club), «Дистанция и состав» (manual category `<select>` with `data-counts`, segmented count, member rows 1–6, maps stepper); inputs use `name=` matching `TeamForm`, errors via `{{ team_form.field.errors|join:", " }}`
-- [ ] render sidebar: live «К оплате» summary, real `price_tiers` ladder, «Нужна помощь?» contact; emit `#teamFormConfig` JSON island
-- [ ] consent checkbox enabled and gating submit; foot copy "После сохранения — оплата через СБП"; `{% csrf_token %}`
-- [ ] write tests: `GET add_team` renders `add_team.html`, contains the segmented control / `data-counts` / consent input / config island, links `team-form.js`+`team-form.css`
-- [ ] run tests — must pass before Task 6
+- [x] extend `base-2.html`; load `team-form.css` via `{% block extra_head %}` and `team-form.js` via `{% block footer_js_include %}`; wrap content in `.team-register`
+- [x] build header: breadcrumbs (→ `my_teams`), page-head, race-chip with real `race.name`/`race.date`/status tag from `reg_status` (open/sold_out/upcoming → `is-closed` chip when not open)
+- [x] hand-render the form card: «Команда» (name/city/club), «Дистанция и состав» (manual category `<select>` with `data-counts` from `category_options`, segmented count + hidden `#ucountInput`, member rows 1–6, maps stepper + hidden `#mapCountInput`); inputs use `name=` matching `TeamForm`, errors via `{{ team_form.field.errors|join:", " }}`
+- [x] render sidebar: live «К оплате» summary (`#sumHeading`/`#sumCountLbl`/`#sumCost`/`#sumPeople`/`#sumMaps*`/`#sumTotal`), real `price_tiers` ladder (shown only when tiers exist), «Нужна помощь?» contact; emit `#teamFormConfig` JSON island (`isEdit: false`, `currentPrice` = active tier)
+- [x] consent checkbox enabled and gating submit; submit/pay buttons gated on `is_editable` (same flag server enforces); `reg-closed-warn` rendered when `reg_status != open`; foot copy + `{% csrf_token %}`
+- [x] write tests: `GET add_team` renders `add_team.html`, contains the segmented control / `data-counts` / consent input / config island, links `team-form.js`+`team-form.css` — `test_add_team_renders_base2_template`, `test_add_team_config_island_uses_current_price`, `test_add_team_hides_submit_when_not_editable`
+- [x] run tests — must pass before Task 6 — full suite 104 passed; `make format && make lint` clean
 
 ### Task 6: Create edit_team.html on base-2 (edit flow + edit-only sections)
 

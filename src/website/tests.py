@@ -929,3 +929,100 @@ def test_add_team_rejects_out_of_range_ucount(client):
     )
     assert response.status_code == 200
     assert not Team.objects.filter(category2=category).exists()
+
+
+# --- Task 5: add_team.html rewritten on base-2 ---
+
+
+@pytest.mark.django_db
+def test_add_team_renders_base2_template(client):
+    user = User.objects.create_user(
+        username="b2add", password="pass", email="b2add@example.com"
+    )
+    race = Race.objects.create(
+        name="Base2 Race",
+        code="b2r1",
+        slug="base2-race-1",
+        cost=1000,
+        reg_status=RegStatus.OPEN,
+        is_teams_editable=True,
+    )
+    RacePriceTier.objects.create(
+        race=race, price=1500, active_until=timezone.localdate() + timedelta(days=10)
+    )
+    Category.objects.create(
+        code="t", name="Team", short_name="T", race=race, min_people=4, max_people=6
+    )
+    client.force_login(user)
+    response = client.get(reverse("add_team", args=[race.slug]))
+    assert response.status_code == 200
+    assert "website/add_team.html" in [t.name for t in response.templates]
+
+    html = response.content.decode()
+    # base-2 design: shared assets are linked
+    assert "/static/css/team-form.css" in html
+    assert "/static/js/team-form.js" in html
+    # segmented count control + category data-counts (from min/max people)
+    assert 'id="ucountSeg"' in html
+    assert 'data-counts="4,5,6"' in html
+    # consent input gates submit in add mode
+    assert 'id="consent"' in html
+    assert 'name="consent"' in html
+    # JSON config island consumed by team-form.js
+    assert 'id="teamFormConfig"' in html
+    assert '"isEdit": false' in html
+    # scoped wrapper so team-form.css never leaks
+    assert "team-register" in html
+
+
+@pytest.mark.django_db
+def test_add_team_config_island_uses_current_price(client):
+    user = User.objects.create_user(
+        username="b2price", password="pass", email="b2price@example.com"
+    )
+    race = Race.objects.create(
+        name="Base2 Price",
+        code="b2p1",
+        slug="base2-price-1",
+        cost=1000,
+        reg_status=RegStatus.OPEN,
+        is_teams_editable=True,
+    )
+    RacePriceTier.objects.create(
+        race=race, price=1500, active_until=timezone.localdate() + timedelta(days=10)
+    )
+    Category.objects.create(
+        code="t", name="Team", short_name="T", race=race, min_people=2, max_people=6
+    )
+    client.force_login(user)
+    response = client.get(reverse("add_team", args=[race.slug]))
+    html = response.content.decode()
+    # config island carries the active-tier price, not race.cost
+    assert '"currentPrice": 1500' in html
+
+
+@pytest.mark.django_db
+def test_add_team_hides_submit_when_not_editable(client):
+    user = User.objects.create_user(
+        username="b2closed", password="pass", email="b2closed@example.com"
+    )
+    race = Race.objects.create(
+        name="Base2 Closed",
+        code="b2c1",
+        slug="base2-closed-1",
+        cost=1000,
+        reg_status=RegStatus.SOLD_OUT,
+        is_teams_editable=False,
+    )
+    Category.objects.create(
+        code="t", name="Team", short_name="T", race=race, min_people=2, max_people=6
+    )
+    client.force_login(user)
+    response = client.get(reverse("add_team", args=[race.slug]))
+    assert response.status_code == 200
+    html = response.content.decode()
+    # submit gate follows the server flag (is_teams_editable)
+    assert 'id="submitBtn"' not in html
+    assert 'id="payBtn"' not in html
+    # status tag is display-only and reflects reg_status
+    assert "is-closed" in html
