@@ -65,7 +65,7 @@ class EditTeamView(View):
                     Q(from_team=team) | Q(to_team=team)
                 ).order_by("id"),
                 "team_move_form": TeamMemberMoveForm(race_id=team.category2.race_id),
-                **build_team_form_context(race, team),
+                **build_team_form_context(race, team, is_edit=True),
             },
         )
 
@@ -84,7 +84,11 @@ class EditTeamView(View):
         if request.POST.get("delete_team"):
             return self.delete_team(request, team)
 
-        form = TeamForm(team.category2.race_id, request.POST)
+        form = TeamForm(
+            team.category2.race_id,
+            request.POST,
+            current_category_id=team.category2_id,
+        )
         if form.is_valid():
             if "teamname" in form.cleaned_data:
                 team.teamname = form.cleaned_data.get("teamname")
@@ -92,8 +96,36 @@ class EditTeamView(View):
                 team.city = form.cleaned_data.get("city")
             if "organization" in form.cleaned_data:
                 team.organization = form.cleaned_data.get("organization")
+
+            new_ucount = int(form.cleaned_data.get("ucount"))
+            if new_ucount < team.paid_people:
+                form.add_error(
+                    "ucount",
+                    "Нельзя уменьшить количество участников: часть уже оплачена.",
+                )
+                return render(
+                    request,
+                    "website/edit_team.html",
+                    {
+                        "race": race,
+                        "race_id": race.id,
+                        "team_form": form,
+                        "team": team,
+                        "action": reverse("edit_team", args=[team_id]),
+                        "payments": Payment.objects.filter(
+                            team=team, status="done"
+                        ).order_by("id"),
+                        "member_moves": TeamMemberMove.objects.filter(
+                            Q(from_team=team) | Q(to_team=team)
+                        ).order_by("id"),
+                        "team_move_form": TeamMemberMoveForm(
+                            race_id=team.category2.race_id
+                        ),
+                        **build_team_form_context(race, team, is_edit=True),
+                    },
+                )
             if "ucount" in form.cleaned_data:
-                team.ucount = int(form.cleaned_data.get("ucount"))
+                team.ucount = new_ucount
 
             # Loop through athlete and birth fields to update them conditionally
             for i in range(1, 7):
@@ -130,7 +162,7 @@ class EditTeamView(View):
                         "team_move_form": TeamMemberMoveForm(
                             race_id=team.category2.race_id
                         ),
-                        **build_team_form_context(race, team),
+                        **build_team_form_context(race, team, is_edit=True),
                     },
                 )
             if "map_count" in form.cleaned_data:
@@ -197,7 +229,7 @@ class EditTeamView(View):
                     Q(from_team=team) | Q(to_team=team)
                 ).order_by("id"),
                 "team_move_form": TeamMemberMoveForm(race_id=team.category2.race_id),
-                **build_team_form_context(race, team),
+                **build_team_form_context(race, team, is_edit=True),
             },
         )
 

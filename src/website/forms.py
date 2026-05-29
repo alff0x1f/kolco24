@@ -503,11 +503,18 @@ class TeamForm(forms.Form):
         label="Дополнительные карты",
     )
 
-    def __init__(self, race_id, *args, **kwargs):
+    def __init__(self, race_id, *args, current_category_id=None, **kwargs):
         super(TeamForm, self).__init__(*args, **kwargs)
+        cats = list(Category.objects.filter(race_id=race_id, is_active=True))
+        if current_category_id is not None:
+            active_ids = {c.id for c in cats}
+            if current_category_id not in active_ids:
+                current_cat = Category.objects.filter(id=current_category_id).first()
+                if current_cat:
+                    cats.insert(0, current_cat)
         categories = (
             (category.id, f"{category.short_name} ({category.name})")
-            for category in Category.objects.filter(race_id=race_id, is_active=True)
+            for category in cats
         )
         self.fields["category2_id"] = forms.ChoiceField(
             required=False,

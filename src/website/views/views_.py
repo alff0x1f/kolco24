@@ -29,6 +29,7 @@ from django.shortcuts import get_object_or_404, render
 from django.urls import reverse
 from django.utils.decorators import method_decorator
 from django.utils.http import url_has_allowed_host_and_scheme
+from django.utils.safestring import mark_safe
 from django.views import View
 from django.views.decorators.csrf import csrf_exempt
 from openpyxl import load_workbook
@@ -1728,20 +1729,40 @@ def upload_photo(request, race_id):
     return JsonResponse({"success": True})
 
 
-def build_category_options(race_id):
-    """Category options carrying ``data-counts`` expanded from min/max people."""
+def build_category_options(race_id, current_category_id=None):
+    """Category options carrying ``data-counts`` expanded from min/max people.
+
+    If current_category_id names an inactive category, it is prepended so that
+    existing teams whose category was later deactivated still render correctly.
+    """
+    cats = list(Category.objects.filter(race_id=race_id, is_active=True))
+    if current_category_id is not None:
+        active_ids = {c.id for c in cats}
+        if current_category_id not in active_ids:
+            current_cat = Category.objects.filter(id=current_category_id).first()
+            if current_cat:
+                cats.insert(0, current_cat)
     return [
         {
             "id": category.id,
             "label": f"{category.short_name} ({category.name})",
             "counts": list(range(category.min_people, category.max_people + 1)),
         }
-        for category in Category.objects.filter(race_id=race_id, is_active=True)
+        for category in cats
     ]
 
 
-def build_team_form_context(race, team):
+def build_team_form_context(race, team, is_edit=False):
     """Unified context shared by the add and edit team forms."""
+    current_category_id = getattr(team, "category2_id", None)
+    config = {
+        "currentPrice": race.current_price,
+        "paidPeople": team.paid_people,
+        "mapCountPaid": team.map_count_paid,
+        "mapPrice": MAP_PRICE,
+        "freeMaps": FREE_MAPS,
+        "isEdit": is_edit,
+    }
     return {
         "current_price": race.current_price,
         "paid_people": team.paid_people,
@@ -1752,7 +1773,8 @@ def build_team_form_context(race, team):
         "reg_status": race.reg_status,
         "map_price": MAP_PRICE,
         "free_maps": FREE_MAPS,
-        "category_options": build_category_options(race.id),
+        "category_options": build_category_options(race.id, current_category_id),
+        "team_form_config_json": mark_safe(json.dumps(config)),
     }
 
 

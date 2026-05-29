@@ -278,9 +278,7 @@
         </div>
     </div>
 
-    <script type="application/json" id="teamFormConfig">
-        {"currentPrice": {{ current_price|default:0 }}, "paidPeople": {{ paid_people|default:0 }}, "mapCountPaid": {{ map_count_paid|default:0 }}, "mapPrice": {{ map_price|default:200 }}, "freeMaps": {{ free_maps|default:2 }}, "isEdit": false}
-    </script>
+    <script type="application/json" id="teamFormConfig">{{ team_form_config_json }}</script>
 </div>
 {% endblock %}
 
