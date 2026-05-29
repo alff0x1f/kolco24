@@ -320,12 +320,22 @@ empty file).
       out of Task 6 scope, left untouched.)
 
 ### Task 7: Verify acceptance criteria
-- [ ] All three URL names render the new page; `teams2` pre-selects its category chip;
+- [x] All three URL names render the new page; `teams2` pre-selects its category chip;
       `my_teams` pre-selects «Мои»; anon `my_teams` redirects to login.
-- [ ] `teams_json` correctness across anon / owner / superuser; participants + name
-      fallback + `cnt` display correct.
-- [ ] Run full test suite: `uv run pytest --reuse-db`.
-- [ ] `make format && make lint` clean.
+      (URL resolution + 200 responses + redirect verified by tests; chip pre-selection is
+      driven by the server `data-initial` attribute, which is asserted per URL name —
+      `"all"`/`"<id>"`/`"mine"`. The visual chip highlight itself is client-side JS,
+      validated manually per Post-Completion.)
+- [x] `teams_json` correctness across anon / owner / superuser; participants + name
+      fallback + `cnt` display correct. (Covered by `test_build_context_*`,
+      `test_participants_string_clean_join`, `test_name_fallback_when_no_teamname`,
+      `test_cnt_display_when_paid_differs_from_ucount`, plus the plain-`"2"` cnt case.)
+- [x] Run full test suite: `uv run pytest --reuse-db` — 80 passed. (1 pre-existing,
+      unrelated failure `test_race_page_view_news_list_capped_at_10`: `news_count`
+      semantics in `RacePageView`; the `news_qs.count()` logic and the `== 10` assertion
+      both exist on `master` (PR #182), so it fails identically on the clean tree — out
+      of scope for this redesign.)
+- [x] `make format && make lint` clean.
 
 ### Task 8: [Final] Docs + housekeeping
 - [ ] Update `CLAUDE.md` if a new convention emerged (e.g. teams page in `apps.race`,
