@@ -229,21 +229,27 @@ and `/race/<slug>/teams/my/` (my teams) onto a **single** new-design page.
 - Modify: `src/website/urls.py`
 - Modify: `src/apps/race/tests.py`
 
-- [ ] Import `RaceTeamsView` from `apps.race.views`.
-- [ ] Point `all_teams`, `my_teams` (`initial="mine"`), `teams2` to `RaceTeamsView`;
+- [x] Import `RaceTeamsView` from `apps.race.views`.
+- [x] Point `all_teams`, `my_teams` (`initial="mine"`), `teams2` to `RaceTeamsView`;
       remove old `views.AllTeamsView/TeamsView/MyTeamsView` references in url patterns.
-- [ ] Write tests: `all_teams`, `teams2`, `my_teams` resolve to `RaceTeamsView` and
+- [x] Write tests: `all_teams`, `teams2`, `my_teams` resolve to `RaceTeamsView` and
       return 200 for a seeded race; anon `my_teams` → 302 to login with `next`;
       `teams2` with valid category renders; invalid race/category → 404.
-- [ ] Write tests: rendered page exposes the right `data-initial`
+- [x] Write tests: rendered page exposes the right `data-initial`
       (`"all"` / `"mine"` / `"<id>"`) per URL name, and both embedded JSON blocks parse
       via `json.loads` (catches escaping/serialization issues).
-- [ ] Run tests — must pass before Task 3.
+- [x] Run tests — must pass before Task 3.
 
 ### Task 3: New template `race/teams.html`
 
 **Files:**
 - Create: `src/templates/race/teams.html`
+
+➕ NOTE (Task 2): a **minimal** `src/templates/race/teams.html` stub already exists
+(extends `base-2.html`, wrapper `.teams-page` with `data-initial`, and the two JSON
+`<script>` blocks `teams-data` / `categories-data`) so Task 2's render tests pass.
+Task 3 should **expand/replace** it with the full design markup below (do not assume an
+empty file).
 
 - [ ] Extend `base-2.html`; `extra_head` loads `race.css` + `teams.css`; wrapper
       `.teams-page` with `data-initial`.

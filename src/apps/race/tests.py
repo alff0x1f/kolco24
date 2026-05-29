@@ -1,12 +1,25 @@
 import json
+import re
 
 import pytest
 from django.contrib.auth.models import AnonymousUser, User
+from django.urls import resolve, reverse
 
 from apps.race.views import RaceTeamsView
 from website.models import Race
 from website.models.models import Team
 from website.models.race import Category
+
+
+def _script_json(html, script_id):
+    """Extract and parse the JSON embedded in a <script id="..."> block."""
+    match = re.search(
+        r'<script id="%s" type="application/json">(.*?)</script>' % script_id,
+        html,
+        re.DOTALL,
+    )
+    assert match, f"script block {script_id!r} not found"
+    return json.loads(match.group(1))
 
 
 def _make_race(slug="teams-race", code="tr-teams"):
@@ -238,3 +251,111 @@ def test_summary_uses_model_helpers():
     assert context["race_people_count"] == 5
     assert context["category_count"] == 1
     assert context["race_date"] == race.date
+
+
+@pytest.mark.django_db
+def test_urls_resolve_to_race_teams_view():
+    race = _make_race(slug="ru1", code="ru1")
+    cat = _make_category(race)
+
+    for url in (
+        reverse("all_teams", args=[race.slug]),
+        reverse("my_teams", args=[race.slug]),
+        reverse("teams2", args=[race.slug, cat.id]),
+    ):
+        assert resolve(url).func.view_class is RaceTeamsView
+
+
+@pytest.mark.django_db
+def test_all_teams_returns_200_with_data_initial_all(client):
+    owner = User.objects.create_user(
+        username="ru2", password="p", email="ru2@example.com"
+    )
+    race = _make_race(slug="ru2", code="ru2")
+    cat = _make_category(race)
+    _make_team(owner, cat, teamname="Paid", paid_people=2)
+
+    resp = client.get(reverse("all_teams", args=[race.slug]))
+
+    assert resp.status_code == 200
+    html = resp.content.decode()
+    assert 'data-initial="all"' in html
+    # both JSON blocks must parse
+    teams = _script_json(html, "teams-data")
+    cats = _script_json(html, "categories-data")
+    assert {t["name"] for t in teams} == {"Paid"}
+    assert {c["id"] for c in cats} == {cat.id}
+
+
+@pytest.mark.django_db
+def test_teams2_returns_200_with_category_data_initial(client):
+    owner = User.objects.create_user(
+        username="ru3", password="p", email="ru3@example.com"
+    )
+    race = _make_race(slug="ru3", code="ru3")
+    cat = _make_category(race)
+    _make_team(owner, cat, teamname="Paid", paid_people=2)
+
+    resp = client.get(reverse("teams2", args=[race.slug, cat.id]))
+
+    assert resp.status_code == 200
+    html = resp.content.decode()
+    assert f'data-initial="{cat.id}"' in html
+    # JSON blocks still parse
+    _script_json(html, "teams-data")
+    _script_json(html, "categories-data")
+
+
+@pytest.mark.django_db
+def test_my_teams_authenticated_returns_200_with_mine_initial(client):
+    owner = User.objects.create_user(
+        username="ru4", password="p", email="ru4@example.com"
+    )
+    race = _make_race(slug="ru4", code="ru4")
+    cat = _make_category(race)
+    _make_team(owner, cat, teamname="Mine", paid_people=2)
+    client.force_login(owner)
+
+    resp = client.get(reverse("my_teams", args=[race.slug]))
+
+    assert resp.status_code == 200
+    html = resp.content.decode()
+    assert 'data-initial="mine"' in html
+
+
+@pytest.mark.django_db
+def test_my_teams_anon_redirects_to_login_with_next(client):
+    race = _make_race(slug="ru5", code="ru5")
+    _make_category(race)
+
+    url = reverse("my_teams", args=[race.slug])
+    resp = client.get(url)
+
+    assert resp.status_code == 302
+    assert reverse("login") in resp.url
+    assert f"next={url}" in resp.url
+
+
+@pytest.mark.django_db
+def test_invalid_race_slug_returns_404(client):
+    resp = client.get(reverse("all_teams", args=["does-not-exist"]))
+    assert resp.status_code == 404
+
+
+@pytest.mark.django_db
+def test_invalid_category_returns_404(client):
+    race = _make_race(slug="ru6", code="ru6")
+    _make_category(race)
+
+    # numeric id that does not exist for this race
+    resp = client.get(reverse("teams2", args=[race.slug, 999999]))
+    assert resp.status_code == 404
+
+
+@pytest.mark.django_db
+def test_non_numeric_category_returns_404(client):
+    race = _make_race(slug="ru7", code="ru7")
+    _make_category(race)
+
+    resp = client.get(f"/race/{race.slug}/category/not-a-number/teams/")
+    assert resp.status_code == 404

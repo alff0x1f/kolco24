@@ -1,0 +1,15 @@
+{% extends "website/base-2.html" %}
+{% load static %}
+{% block title %}Команды · {{ race.name }}{% endblock %}
+{% block content %}
+
+<div class="teams-page" data-initial="{{ initial_filter }}">
+  <div class="container">
+    <h1>Команды · {{ race.name }}</h1>
+  </div>
+</div>
+
+<script id="teams-data" type="application/json">{{ teams_json }}</script>
+<script id="categories-data" type="application/json">{{ categories_json }}</script>
+
+{% endblock %}
