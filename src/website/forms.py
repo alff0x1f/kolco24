@@ -509,7 +509,9 @@ class TeamForm(forms.Form):
         if current_category_id is not None:
             active_ids = {c.id for c in cats}
             if current_category_id not in active_ids:
-                current_cat = Category.objects.filter(id=current_category_id).first()
+                current_cat = Category.objects.filter(
+                    id=current_category_id, race_id=race_id
+                ).first()
                 if current_cat:
                     cats.insert(0, current_cat)
         categories = (

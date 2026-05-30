@@ -1739,7 +1739,9 @@ def build_category_options(race_id, current_category_id=None):
     if current_category_id is not None:
         active_ids = {c.id for c in cats}
         if current_category_id not in active_ids:
-            current_cat = Category.objects.filter(id=current_category_id).first()
+            current_cat = Category.objects.filter(
+                id=current_category_id, race_id=race_id
+            ).first()
             if current_cat:
                 cats.insert(0, current_cat)
     return [
@@ -1813,6 +1815,10 @@ class AddTeam(View):
         if not category2:
             return JsonResponse({"error": "Category not found"}, status=404)
 
+        payment_method = request.GET.get("method", "sbp2")
+        if payment_method != "sbp2":
+            raise Http404
+
         data = request.POST.copy()
         data["dist"] = category2.code
         data["paymentid"] = "%016x" % random.randrange(16**16)  # legacy
@@ -1829,7 +1835,6 @@ class AddTeam(View):
                 return HttpResponseRedirect(reverse("my_teams", args=[race.slug]))
 
             # payment
-            payment_method = request.GET.get("method", "sbp2")
             cost_now = race.current_price
             cost = (int(team.ucount) - team.paid_people) * cost_now + (
                 int(team.map_count) - team.map_count_paid
@@ -1842,9 +1847,6 @@ class AddTeam(View):
 
             if cost == 0:
                 return HttpResponseRedirect(reverse("my_teams", args=[race.slug]))
-
-            if payment_method != "sbp2":
-                raise Http404
 
             payment = Payment.objects.create(
                 owner=request.user,

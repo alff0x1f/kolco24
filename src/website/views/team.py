@@ -209,7 +209,7 @@ class EditTeamView(View):
                 return HttpResponseRedirect(vtb_payment.pay_url)
 
             return HttpResponseRedirect(
-                reverse("teams2", args=[team.category2.race.slug, team.category2_id])
+                reverse("teams2", args=[race.slug, team.category2_id])
             )
 
         # If form is not valid, re-render the form with errors
