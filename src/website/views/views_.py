@@ -1757,8 +1757,9 @@ def build_category_options(race_id, current_category_id=None):
 def build_team_form_context(race, team, is_edit=False):
     """Unified context shared by the add and edit team forms."""
     current_category_id = getattr(team, "category2_id", None)
-    current_price = race.current_price
     price_tiers = race.price_tier_ladder()
+    active = next((item for item in price_tiers if item["status"] == "active"), None)
+    current_price = active["tier"].price if active else race.cost
     config = {
         "currentPrice": current_price,
         "paidPeople": team.paid_people,

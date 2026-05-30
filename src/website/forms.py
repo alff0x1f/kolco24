@@ -614,6 +614,7 @@ class TeamForm(forms.Form):
         category = (
             Category.objects.filter(id=category_id).first() if category_id else None
         )
+        ucount_valid = False
         if ucount is not None:
             if not category:
                 self.add_error("category2_id", "Выберите категорию.")
@@ -622,8 +623,10 @@ class TeamForm(forms.Form):
                     "ucount",
                     "Недопустимое количество участников для выбранной категории.",
                 )
+            else:
+                ucount_valid = True
 
-        if ucount:
+        if ucount_valid:
             map_count = cleaned_data.get("map_count") or 0
             max_maps = max(0, int(ucount) - FREE_MAPS)
             if int(map_count) > max_maps:
