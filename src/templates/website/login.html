@@ -64,7 +64,7 @@
     </form>
 
     <div class="below">
-      Ещё нет аккаунта? <a href="{% url 'register' %}">Зарегистрироваться&nbsp;→</a>
+      Ещё нет аккаунта? <a href="{% url 'register' %}{% if next %}?next={{ next|urlencode }}{% endif %}">Зарегистрироваться&nbsp;→</a>
     </div>
 
   </div>

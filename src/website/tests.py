@@ -361,6 +361,41 @@ def test_register_view_post_duplicate_email_shows_error(client):
 
 
 @pytest.mark.django_db
+def test_login_page_register_link_carries_next(client):
+    response = client.get("/login/?next=/race/foo/teams/add/")
+    assert response.status_code == 200
+    html = response.content.decode()
+    # The «Зарегистрироваться» link must forward next, or it's lost on register.
+    assert "/register/?next=" in html
+
+
+@pytest.mark.django_db
+def test_register_view_get_passes_next_to_context(client):
+    response = client.get("/register/?next=/race/foo/teams/add/")
+    assert response.status_code == 200
+    assert response.context["next"] == "/race/foo/teams/add/"
+
+
+@pytest.mark.django_db
+def test_register_view_post_honors_next_redirect(client):
+    response = client.post(
+        "/register/", {**REG_FORM_BASE, "next": "/race/foo/teams/add/"}
+    )
+    assert response.status_code == 302
+    assert response.url == "/race/foo/teams/add/"
+    assert User.objects.filter(email="ivan@example.com").exists()
+
+
+@pytest.mark.django_db
+def test_register_view_post_blocks_open_redirect(client):
+    response = client.post(
+        "/register/", {**REG_FORM_BASE, "next": "https://evil.com/steal"}
+    )
+    assert response.status_code == 302
+    assert response.url == "/"
+
+
+@pytest.mark.django_db
 def test_race_page_view_shows_form_for_admin(client):
     from website.models.race import RaceAdmin
 

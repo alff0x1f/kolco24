@@ -21,7 +21,7 @@
                 <div class="sub">Создайте аккаунт, чтобы записать команду на&nbsp;гонку и&nbsp;следить за&nbsp;результатами.</div>
             </div>
             <div class="login-hint">
-                Уже есть аккаунт? <a href="{% url 'login' %}">Войти&nbsp;→</a>
+                Уже есть аккаунт? <a href="{% url 'login' %}{% if next %}?next={{ next|urlencode }}{% endif %}">Войти&nbsp;→</a>
             </div>
         </header>
 
@@ -31,6 +31,7 @@
             <main>
                 <form class="card" action="{% url 'register' %}" method="POST" id="regForm" novalidate>
                     {% csrf_token %}
+                    <input type="hidden" name="next" value="{{ next }}">
 
                     {% if reg_form.non_field_errors %}
                     <div class="card-section" style="padding-bottom:0;">

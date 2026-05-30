@@ -187,9 +187,12 @@ class RegisterView(View):
     def get(self, request):
         if request.user.is_authenticated:
             return HttpResponseRedirect("/")
-        return render(request, "website/register.html", self.get_context())
+        context = self.get_context()
+        context["next"] = request.GET.get("next", "")
+        return render(request, "website/register.html", context)
 
     def post(self, request):
+        next_url = request.POST.get("next") or request.GET.get("next", "")
         form = RegForm(request.POST)
         if form.is_valid():
             # Extract cleaned form data
@@ -213,10 +216,20 @@ class RegisterView(View):
             except IntegrityError:
                 if User.objects.filter(email__iexact=email).exists():
                     form.add_error("email", DUPLICATE_EMAIL_MSG)
-                    return render(request, "website/register.html", {"reg_form": form})
+                    return render(
+                        request,
+                        "website/register.html",
+                        {"reg_form": form, "next": next_url},
+                    )
                 raise
 
             auth_login(request, user)
+
+            # A guest who started from a login-gated page (e.g. «Войти и
+            # добавить команду») carries ?next= through login → register; honor
+            # it so they land back where they came from.
+            if next_url:
+                return _safe_redirect(request, next_url)
 
             # todo change it in 2026
             race = Race.objects.filter(id=8).first()  # 2025
@@ -226,7 +239,11 @@ class RegisterView(View):
                 return HttpResponseRedirect(reverse("add_team", args=[race.slug]))
             return HttpResponseRedirect(reverse("my_teams", args=[race.slug]))
 
-        return render(request, "website/register.html", {"reg_form": form})
+        return render(
+            request,
+            "website/register.html",
+            {"reg_form": form, "next": next_url},
+        )
 
     @staticmethod
     def get_next_username(first_name, last_name):
