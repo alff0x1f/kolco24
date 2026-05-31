@@ -497,6 +497,7 @@ class RaceEditView(View):
         race, response = self._load_and_authorize(request, race_slug)
         if response is not None:
             return response
+        is_create = race is None
 
         form = RaceForm(request.POST, instance=race)
         form_valid = form.is_valid()
@@ -549,8 +550,11 @@ class RaceEditView(View):
 
         # On any error: re-render echoing the submitted payloads (so unsaved
         # rows survive) plus per-row errors and the bound form's field errors.
+        # Use the original pre-save race (None on create) so is_create stays correct
+        # even if form.save() ran and was rolled back inside the atomic block.
+        render_race = None if is_create else race
         context = self._build_context(
-            race,
+            render_race,
             form=form,
             categories_data=category_rows or [],
             price_tiers_data=price_tier_rows or [],

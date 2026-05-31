@@ -20,6 +20,16 @@ class RaceForm(forms.ModelForm):
         v = self.cleaned_data.get("cost")
         return v if v is not None else 0
 
+    def clean(self):
+        cleaned = super().clean()
+        date = cleaned.get("date")
+        date_end = cleaned.get("date_end")
+        if date and date_end and date_end < date:
+            self.add_error(
+                "date_end", "Дата окончания не может быть раньше даты начала."
+            )
+        return cleaned
+
     class Meta:
         model = Race
         fields = [
