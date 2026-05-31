@@ -318,6 +318,7 @@ def _validate_price_tier_rows(rows):
     """
     errors = {}
     cleaned = []
+    seen_dates = set()
     for index, row in enumerate(rows):
         if not isinstance(row, dict):
             errors[index] = {"__all__": "Некорректная строка."}
@@ -336,6 +337,11 @@ def _validate_price_tier_rows(rows):
                 active_until = datetime.date.fromisoformat(active_until_raw)
             except ValueError:
                 row_errors["active_until"] = "Некорректная дата (ГГГГ-ММ-ДД)."
+            else:
+                if active_until in seen_dates:
+                    row_errors["active_until"] = "Дата повторяется."
+                else:
+                    seen_dates.add(active_until)
         if row_errors:
             errors[index] = row_errors
             cleaned.append(None)
@@ -373,7 +379,11 @@ def _reconcile_categories(race, cleaned):
         instance.order = index
         instance.save()
         seen.add(instance.id)
-    Category.objects.filter(race=race).exclude(id__in=seen).delete()
+    to_delete = Category.objects.filter(race=race).exclude(id__in=seen)
+    if Team.objects.filter(category2__in=to_delete).exists():
+        names = ", ".join(f"«{c.name}»" for c in to_delete.only("name"))
+        raise ValueError(f"Нельзя удалить категорию, в которой есть команды: {names}.")
+    to_delete.delete()
 
 
 def _reconcile_price_tiers(race, cleaned):
@@ -525,13 +535,17 @@ class RaceEditView(View):
             and not category_errors
             and not price_tier_errors
         ):
-            with transaction.atomic():
-                race = form.save()
-                _reconcile_categories(race, cleaned_categories)
-                _reconcile_price_tiers(race, cleaned_tiers)
-            return HttpResponseRedirect(
-                reverse("race", kwargs={"race_slug": race.slug})
-            )
+            try:
+                with transaction.atomic():
+                    race = form.save()
+                    _reconcile_categories(race, cleaned_categories)
+                    _reconcile_price_tiers(race, cleaned_tiers)
+            except ValueError as exc:
+                form.add_error(None, str(exc))
+            else:
+                return HttpResponseRedirect(
+                    reverse("race", kwargs={"race_slug": race.slug})
+                )
 
         # On any error: re-render echoing the submitted payloads (so unsaved
         # rows survive) plus per-row errors and the bound form's field errors.

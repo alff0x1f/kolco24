@@ -14,6 +14,12 @@ class RaceForm(forms.ModelForm):
     intentionally absent; ``cost`` is now only the fallback price.
     """
 
+    cost = forms.IntegerField(required=False, min_value=0)
+
+    def clean_cost(self):
+        v = self.cleaned_data.get("cost")
+        return v if v is not None else 0
+
     class Meta:
         model = Race
         fields = [

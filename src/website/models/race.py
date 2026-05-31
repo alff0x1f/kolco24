@@ -32,7 +32,7 @@ class Race(Model):
     slug = SlugField("URL-slug", max_length=50, unique=True)
     date = DateField("Дата", default=timezone.now)
     date_end = DateField("Дата окончания", default=timezone.now)
-    place = CharField("Место", max_length=50, default="")
+    place = CharField("Место", max_length=50, blank=True, default="")
     is_active = BooleanField("Активна", default=True)
     cost = IntegerField("Стоимость участия", default=0)
 
