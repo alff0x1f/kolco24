@@ -261,6 +261,8 @@ def _people_limit_int(value):
     """
     if value is None or (isinstance(value, str) and not value.strip()):
         return 0, None
+    if isinstance(value, float) and not value.is_integer():
+        return None, "Введите целое число."
     try:
         ivalue = int(value)
     except (ValueError, TypeError):

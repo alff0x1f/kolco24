@@ -1184,6 +1184,9 @@ class ConfirmPaymentView(View):
         payment.order = pk
 
         team = payment.team
+        if team is None:
+            payment.save(update_fields=["status", "balance", "order", "recipient"])
+            return HttpResponseRedirect("/payments?status=draft_with_info")
         team.paid_people += payment.paid_for
         team.paid_sum += payment.payment_amount
 
