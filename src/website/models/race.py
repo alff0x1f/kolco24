@@ -85,11 +85,18 @@ class Race(Model):
         )["total"]
         return result or 0
 
-    def remaining_people(self):
-        """Свободные слоты гонки или ``None`` при отсутствии лимита."""
+    def remaining_people(self, exclude_team=None):
+        """Свободные слоты гонки или ``None`` при отсутствии лимита.
+
+        ``exclude_team`` вычитается из занятости (само-исключение при
+        редактировании команды).
+        """
         if not self.people_limit:  # 0 → без лимита
             return None
-        return max(0, self.people_limit - self.people_count())
+        occupied = self.people_count()
+        if exclude_team is not None:
+            occupied -= exclude_team.paid_people
+        return max(0, self.people_limit - occupied)
 
     def _active_tier_index(self, tiers):
         """Index of the active tier within ``tiers`` (assumed ordered).

@@ -657,7 +657,7 @@ class TeamForm(forms.Form):
 
             # Гонка — блокирует только рост состава.
             needed = new_ucount - team.paid_people
-            race_remaining = category.race.remaining_people()
+            race_remaining = category.race.remaining_people(exclude_team=team)
             if race_remaining is not None and needed > 0 and needed > race_remaining:
                 self.add_error(
                     "ucount",
