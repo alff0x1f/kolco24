@@ -974,3 +974,13 @@ def test_race_edit_post_admin_create_forbidden():
     resp = _edit_post("/races/new/", user, _post_data(code="brand-new", slug="bn"))
     assert resp.status_code == 403
     assert not Race.objects.filter(slug="bn").exists()
+
+
+def test_add_race_and_edit_race_urls_resolve():
+    add_url = reverse("add_race")
+    assert add_url == "/races/new/"
+    assert resolve(add_url).func.view_class is RaceEditView
+
+    edit_url = reverse("edit_race", kwargs={"race_slug": "kolco24-2026"})
+    assert edit_url == "/race/kolco24-2026/edit/"
+    assert resolve(edit_url).func.view_class is RaceEditView

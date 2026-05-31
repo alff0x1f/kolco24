@@ -254,13 +254,13 @@ blocks, the `base-2.html` template stack, and the `AddNewsPostView` authorizatio
 - Modify: `src/website/urls.py`
 - Modify: `src/apps/race/tests.py`
 
-- [ ] import `RaceEditView`; add `path("races/new/", RaceEditView.as_view(),
+- [x] import `RaceEditView`; add `path("races/new/", RaceEditView.as_view(),
       name="add_race")`
-- [ ] add `path("race/<slug:race_slug>/edit/", RaceEditView.as_view(), name="edit_race")`
+- [x] add `path("race/<slug:race_slug>/edit/", RaceEditView.as_view(), name="edit_race")`
       *before* the `name="race"` route
-- [ ] write test: `reverse("add_race")` and `reverse("edit_race", ...)` resolve to
+- [x] write test: `reverse("add_race")` and `reverse("edit_race", ...)` resolve to
       `RaceEditView`
-- [ ] run tests — must pass before next task
+- [x] run tests — must pass before next task
 
 ### Task 6: `race_form.html` template
 
