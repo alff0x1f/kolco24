@@ -63,6 +63,10 @@ class RacePageView(View):
     @staticmethod
     def build_context(race, user=None):
         categories = list(_categories_with_team_count(race))
+        # Свободные слоты на категорию (``None`` при отсутствии лимита) — для
+        # бейджей «осталось N / мест нет» в списке категорий.
+        for cat in categories:
+            cat.remaining = cat.remaining_people()
         # Bars in the «Команды» panel are scaled to the largest category (like
         # the teams-page breakdown), so the biggest one fills the track.
         category_max_count = max((c.team_count or 0 for c in categories), default=0)
@@ -80,6 +84,7 @@ class RacePageView(View):
             "reg_upcoming": race.reg_status == RegStatus.UPCOMING,
             "race_team_count": race.team_count(),
             "race_people_count": race.people_count(),
+            "race_remaining": race.remaining_people(),
         }
         context["can_edit_race"] = bool(user is not None and can_edit_race(user, race))
         if user is not None and is_race_admin(user, race):
@@ -185,6 +190,7 @@ class RaceTeamsView(View):
             "reg_open": race.reg_status == RegStatus.OPEN,
             "race_team_count": race.team_count(),
             "race_people_count": race.people_count(),
+            "race_remaining": race.remaining_people(),
             "category_count": len(categories),
             "race_date": race.date,
         }

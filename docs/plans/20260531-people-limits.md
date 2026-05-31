@@ -210,10 +210,10 @@ if (race.people_limit and race.reg_status == RegStatus.OPEN
 - Modify: `src/apps/race/views.py` (контекст, если нужно)
 - Modify: `src/apps/race/tests.py`
 
-- [ ] показать «осталось N мест» / «мест нет» на race page через `race.remaining_people()` (скрывать при unlimited)
-- [ ] показать per-category remaining на teams-list/race page (минимальный бейдж)
-- [ ] тест: контекст/рендер содержит ожидаемые значения remaining для гонки с лимитом и без
-- [ ] запустить тесты — должны пройти перед Task 7
+- [x] показать «осталось N мест» / «мест нет» на race page через `race.remaining_people()` (скрывать при unlimited)
+- [x] показать per-category remaining на teams-list/race page (минимальный бейдж)
+- [x] тест: контекст/рендер содержит ожидаемые значения remaining для гонки с лимитом и без
+- [x] запустить тесты — должны пройти перед Task 7
 
 ### Task 7: Verify acceptance criteria
 

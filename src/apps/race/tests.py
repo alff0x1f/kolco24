@@ -9,7 +9,7 @@ from django.urls import resolve, reverse
 
 from apps.race.forms import RaceForm
 from apps.race.permissions import can_edit_race
-from apps.race.views import RaceEditView, RaceTeamsView
+from apps.race.views import RaceEditView, RacePageView, RaceTeamsView
 from website.models import Race
 from website.models.models import Team
 from website.models.race import Category, RaceAdmin, RacePriceTier, RegStatus
@@ -1234,3 +1234,90 @@ def test_race_edit_round_trip_preserves_people_limits():
     cat.refresh_from_db()
     assert race.people_limit == 150
     assert cat.people_limit == 30
+
+
+# --- Task 6: remaining-places badges -----------------------------------------
+
+
+@pytest.mark.django_db
+def test_race_page_context_remaining_with_limit():
+    owner = User.objects.create_user(
+        username="rp1", password="p", email="rp1@example.com"
+    )
+    race = _make_race(slug="rem-race", code="rem")
+    race.people_limit = 10
+    race.save(update_fields=["people_limit"])
+    cat = _make_category(race)
+    cat.people_limit = 6
+    cat.save(update_fields=["people_limit"])
+    _make_team(owner, cat, paid_people=4)
+
+    context = RacePageView.build_context(race)
+
+    # Race: 10 limit − 4 paid = 6 remaining.
+    assert context["race_remaining"] == 6
+    # Category: 6 limit − 4 paid = 2 remaining (attached to the instance).
+    assert context["categories"][0].remaining == 2
+
+
+@pytest.mark.django_db
+def test_race_page_context_remaining_unlimited_is_none():
+    race = _make_race(slug="unl-race", code="unl")
+    _make_category(race)  # both limits default to 0 → unlimited
+
+    context = RacePageView.build_context(race)
+
+    assert context["race_remaining"] is None
+    assert context["categories"][0].remaining is None
+
+
+@pytest.mark.django_db
+def test_race_page_renders_remaining_badge(client):
+    owner = User.objects.create_user(
+        username="rp2", password="p", email="rp2@example.com"
+    )
+    race = _make_race(slug="badge-race", code="badge")
+    race.people_limit = 5
+    race.save(update_fields=["people_limit"])
+    cat = _make_category(race)
+    _make_team(owner, cat, paid_people=2)
+
+    resp = client.get(reverse("race", kwargs={"race_slug": race.slug}))
+    html = resp.content.decode()
+
+    assert resp.status_code == 200
+    assert "осталось 3 мест" in html
+
+
+@pytest.mark.django_db
+def test_race_page_renders_sold_out_badge(client):
+    owner = User.objects.create_user(
+        username="rp3", password="p", email="rp3@example.com"
+    )
+    race = _make_race(slug="full-race", code="full")
+    race.people_limit = 2
+    race.save(update_fields=["people_limit"])
+    cat = _make_category(race)
+    _make_team(owner, cat, paid_people=2)
+
+    resp = client.get(reverse("race", kwargs={"race_slug": race.slug}))
+    html = resp.content.decode()
+
+    assert resp.status_code == 200
+    assert "мест нет" in html
+
+
+@pytest.mark.django_db
+def test_teams_context_includes_race_remaining():
+    owner = User.objects.create_user(
+        username="rp4", password="p", email="rp4@example.com"
+    )
+    race = _make_race(slug="tr-rem", code="trrem")
+    race.people_limit = 8
+    race.save(update_fields=["people_limit"])
+    cat = _make_category(race)
+    _make_team(owner, cat, paid_people=3)
+
+    context = RaceTeamsView.build_context(race, AnonymousUser())
+
+    assert context["race_remaining"] == 5

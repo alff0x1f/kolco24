@@ -308,6 +308,18 @@
   color: var(--muted);
   font-variant-numeric: tabular-nums;
 }
+.cat-remaining {
+  flex: 0 0 auto;
+  font-size: 11.5px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+.cat-remaining.ok { color: var(--primary-2); }
+.cat-remaining.none { color: #c0392b; }
+/* Race-level «осталось N мест / мест нет» badge in the cover sub line. */
+.cover-title .sub .remaining { font-weight: 600; }
+.cover-title .sub .remaining.ok { color: var(--primary-2); }
+.cover-title .sub .remaining.none { color: #c0392b; }
 .cat-bar {
   height: 6px;
   background: #eef1f5;

@@ -33,6 +33,14 @@
             <span>{{ race_people_count|floatformat:0 }} участников</span>
             <span class="dot"></span>
             <span>{{ race_team_count }} команд</span>
+            {% if race_remaining is not None %}
+            <span class="dot"></span>
+            {% if race_remaining > 0 %}
+            <span class="remaining ok">осталось {{ race_remaining|floatformat:0 }} мест</span>
+            {% else %}
+            <span class="remaining none">мест нет</span>
+            {% endif %}
+            {% endif %}
           </div>
         </div>
         <div class="cover-actions">
@@ -204,6 +212,13 @@
                   <span class="cat-full" title="{{ category.name }}">{{ category.name }}</span>
                   {% endif %}
                   <span class="cat-count">{{ category.team_count|default:"0" }}</span>
+                  {% if category.remaining is not None %}
+                  {% if category.remaining > 0 %}
+                  <span class="cat-remaining ok">осталось {{ category.remaining|floatformat:0 }}</span>
+                  {% else %}
+                  <span class="cat-remaining none">мест нет</span>
+                  {% endif %}
+                  {% endif %}
                 </div>
                 <div class="cat-bar">
                   <i style="width: {% widthratio category.team_count|default:0 category_max_count|default:1 100 %}%"></i>
