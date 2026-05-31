@@ -289,7 +289,7 @@ def _validate_category_rows(rows):
             row_errors["max_people"] = max_err
         if not min_err and not max_err and min_people > max_people:
             row_errors["min_people"] = "Минимум больше максимума."
-        if code and "code" not in row_errors:
+        if code:
             seen_codes.add(code)
         if row_errors:
             errors[index] = row_errors
@@ -474,7 +474,7 @@ class RaceEditView(View):
                 "price": tier.price,
                 "active_until": tier.active_until.isoformat(),
             }
-            for tier in race.price_tiers.all()
+            for tier in race.price_tiers.order_by("order", "id")
         ]
 
     def get(self, request, race_slug=None):

@@ -1,3 +1,4 @@
+import datetime
 import json
 import re
 
@@ -898,17 +899,24 @@ def test_race_edit_post_price_tier_reconcile_and_current_price():
     user = User.objects.create_user(username="pt1", password="p", email="pt1@e.com")
     race = _make_race(slug="pt1", code="pt1")
     RaceAdmin.objects.create(race=race, user=user, role=RaceAdmin.Role.ADMIN)
+    today = datetime.date.today()
+    soon = (today + datetime.timedelta(days=30)).isoformat()
+    far = (today + datetime.timedelta(days=180)).isoformat()
     keep = RacePriceTier.objects.create(
-        race=race, price=1500, active_until="2026-08-01"
+        race=race,
+        price=1500,
+        active_until=(today + datetime.timedelta(days=60)).isoformat(),
     )
     drop = RacePriceTier.objects.create(
-        race=race, price=2000, active_until="2026-09-01"
+        race=race,
+        price=2000,
+        active_until=(today + datetime.timedelta(days=90)).isoformat(),
     )
 
     tiers = json.dumps(
         [
-            {"id": keep.id, "price": 1200, "active_until": "2026-07-01"},
-            {"id": None, "price": 1800, "active_until": "2026-10-01"},
+            {"id": keep.id, "price": 1200, "active_until": soon},
+            {"id": None, "price": 1800, "active_until": far},
         ]
     )
     data = _post_data(code="pt1", slug="pt1", price_tiers_json=tiers)
@@ -920,7 +928,7 @@ def test_race_edit_post_price_tier_reconcile_and_current_price():
     assert keep.price == 1200
     assert RacePriceTier.objects.filter(race=race, price=1800).exists()
     race.refresh_from_db()
-    # today (2026-05-31) < 2026-07-01, so the earliest tier is active.
+    # The earliest active tier (soonest active_until >= today) has price 1200.
     assert race.current_price == 1200
 
 
@@ -931,8 +939,9 @@ def test_race_edit_post_cross_race_id_treated_as_new():
     RaceAdmin.objects.create(race=race, user=user, role=RaceAdmin.Role.ADMIN)
     other = _make_race(slug="cr1b", code="cr1b")
     other_cat = _make_category(other, code="oc", short_name="oc", name="Other Cat")
+    future = (datetime.date.today() + datetime.timedelta(days=60)).isoformat()
     other_tier = RacePriceTier.objects.create(
-        race=other, price=999, active_until="2026-08-01"
+        race=other, price=999, active_until=future
     )
 
     categories = json.dumps(
@@ -949,9 +958,7 @@ def test_race_edit_post_cross_race_id_treated_as_new():
             }
         ]
     )
-    tiers = json.dumps(
-        [{"id": other_tier.id, "price": 111, "active_until": "2026-07-01"}]
-    )
+    tiers = json.dumps([{"id": other_tier.id, "price": 111, "active_until": future}])
     data = _post_data(
         code="cr1", slug="cr1", categories_json=categories, price_tiers_json=tiers
     )
