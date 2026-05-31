@@ -135,16 +135,16 @@ if (race.people_limit and race.reg_status == RegStatus.OPEN
 
 **Files:**
 - Modify: `src/website/models/race.py`
-- Create: `src/website/migrations/0066_people_limits.py` (имя по факту `makemigrations`)
+- Create: `src/website/migrations/0067_category_people_limit_race_people_limit.py`
 - Modify: `src/website/tests.py`
 
-- [ ] добавить `Race.people_limit = IntegerField("Лимит участников", default=0)` (0 = без лимита)
-- [ ] добавить `Category.people_limit = IntegerField("Лимит участников", default=0)` (0 = без лимита; отличается от per-team `max_people`)
-- [ ] добавить `Category.people_count()` (Sum `paid_people`) и `Category.remaining_people(exclude_team=None)` с само-исключением
-- [ ] добавить `Race.remaining_people()` (через существующий `people_count()`)
-- [ ] сгенерировать миграцию: `uv run python src/manage.py makemigrations website`
-- [ ] тесты: `Category.people_count`/`remaining_people` (с `exclude_team`, исключение deleted), `Race.remaining_people` (limit=0 → None, limit>0 → корректная разница)
-- [ ] запустить тесты — должны пройти перед Task 2
+- [x] добавить `Race.people_limit = IntegerField("Лимит участников", default=0)` (0 = без лимита)
+- [x] добавить `Category.people_limit = IntegerField("Лимит участников", default=0)` (0 = без лимита; отличается от per-team `max_people`)
+- [x] добавить `Category.people_count()` (Sum `paid_people`) и `Category.remaining_people(exclude_team=None)` с само-исключением
+- [x] добавить `Race.remaining_people()` (через существующий `people_count()`)
+- [x] сгенерировать миграцию: `uv run python src/manage.py makemigrations website`
+- [x] тесты: `Category.people_count`/`remaining_people` (с `exclude_team`, исключение deleted), `Race.remaining_people` (limit=0 → None, limit>0 → корректная разница)
+- [x] запустить тесты — должны пройти перед Task 2
 
 ### Task 2: Gate капасити в TeamForm + проброс из view
 

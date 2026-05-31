@@ -1291,3 +1291,114 @@ def test_build_category_options_single_size(client):
     options = response.context["category_options"]
     match = next(o for o in options if o["id"] == category.id)
     assert match["counts"] == [2]
+
+
+# ---------------------------------------------------------------------------
+# Task 1: people-limit fields & occupancy helpers
+# ---------------------------------------------------------------------------
+
+
+def _pl_user(django_user_model, n=0):
+    return django_user_model.objects.create_user(username=f"pl_owner_{n}", password="x")
+
+
+def _pl_race(**kwargs):
+    kwargs.setdefault("name", "PL Race")
+    kwargs.setdefault("code", "pl-race")
+    kwargs.setdefault("slug", "pl-race")
+    return Race.objects.create(**kwargs)
+
+
+def _pl_category(race, **kwargs):
+    kwargs.setdefault("code", "M")
+    kwargs.setdefault("name", "Men")
+    kwargs.setdefault("short_name", "M")
+    return Category.objects.create(race=race, **kwargs)
+
+
+def _pl_team(category, owner, paid_people=0, is_deleted=False, name="T"):
+    return Team.objects.create(
+        owner=owner,
+        teamname=name,
+        paymentid=f"pay-{name}",
+        dist=category.code,
+        category2=category,
+        ucount=max(paid_people, 1),
+        paid_people=paid_people,
+        is_deleted=is_deleted,
+    )
+
+
+@pytest.mark.django_db
+def test_category_people_count_sums_paid_people(django_user_model):
+    user = _pl_user(django_user_model)
+    race = _pl_race()
+    cat = _pl_category(race)
+    _pl_team(cat, user, paid_people=2, name="A")
+    _pl_team(cat, user, paid_people=3, name="B")
+    _pl_team(cat, user, paid_people=0, name="Draft")
+    assert cat.people_count() == 5
+
+
+@pytest.mark.django_db
+def test_category_people_count_excludes_deleted(django_user_model):
+    user = _pl_user(django_user_model)
+    race = _pl_race()
+    cat = _pl_category(race)
+    _pl_team(cat, user, paid_people=2, name="A")
+    _pl_team(cat, user, paid_people=4, is_deleted=True, name="Gone")
+    assert cat.people_count() == 2
+
+
+@pytest.mark.django_db
+def test_category_remaining_people_unlimited_when_zero(django_user_model):
+    user = _pl_user(django_user_model)
+    race = _pl_race()
+    cat = _pl_category(race, people_limit=0)
+    _pl_team(cat, user, paid_people=2)
+    assert cat.remaining_people() is None
+
+
+@pytest.mark.django_db
+def test_category_remaining_people_with_limit(django_user_model):
+    user = _pl_user(django_user_model)
+    race = _pl_race()
+    cat = _pl_category(race, people_limit=6)
+    _pl_team(cat, user, paid_people=2)
+    assert cat.remaining_people() == 4
+
+
+@pytest.mark.django_db
+def test_category_remaining_people_excludes_self_team(django_user_model):
+    user = _pl_user(django_user_model)
+    race = _pl_race()
+    cat = _pl_category(race, people_limit=6)
+    team = _pl_team(cat, user, paid_people=2, name="self")
+    _pl_team(cat, user, paid_people=3, name="Other")
+    # without exclusion: 6 - 5 = 1
+    assert cat.remaining_people() == 1
+    # excluding the team itself frees its 2 slots: 6 - 3 = 3
+    assert cat.remaining_people(exclude_team=team) == 3
+    # excluding a team from a different category has no effect
+    other_cat = _pl_category(race, code="W", name="Women", short_name="W")
+    foreign = _pl_team(other_cat, user, paid_people=2, name="foreign")
+    assert cat.remaining_people(exclude_team=foreign) == 1
+
+
+@pytest.mark.django_db
+def test_race_remaining_people_unlimited_when_zero(django_user_model):
+    user = _pl_user(django_user_model)
+    race = _pl_race(people_limit=0)
+    cat = _pl_category(race)
+    _pl_team(cat, user, paid_people=2)
+    assert race.remaining_people() is None
+
+
+@pytest.mark.django_db
+def test_race_remaining_people_with_limit(django_user_model):
+    user = _pl_user(django_user_model)
+    race = _pl_race(people_limit=10)
+    cat = _pl_category(race)
+    _pl_team(cat, user, paid_people=2, name="A")
+    _pl_team(cat, user, paid_people=3, name="B")
+    assert race.remaining_people() == 5

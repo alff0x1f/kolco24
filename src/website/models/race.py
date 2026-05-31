@@ -51,6 +51,8 @@ class Race(Model):
     is_teams_editable = BooleanField("Команды редактируемы", default=False)
     is_photo_upload_enabled = BooleanField("Загрузка фото включена", default=False)
 
+    people_limit = IntegerField("Лимит участников", default=0)  # 0 = без лимита
+
     class Meta:
         verbose_name = "Гонка"
         verbose_name_plural = "Гонки"
@@ -82,6 +84,12 @@ class Race(Model):
             total=Sum("paid_people")
         )["total"]
         return result or 0
+
+    def remaining_people(self):
+        """Свободные слоты гонки или ``None`` при отсутствии лимита."""
+        if not self.people_limit:  # 0 → без лимита
+            return None
+        return self.people_limit - self.people_count()
 
     def _active_tier_index(self, tiers):
         """Index of the active tier within ``tiers`` (assumed ordered).
@@ -189,6 +197,7 @@ class Category(Model):
     order = IntegerField("Порядок", default=0)
     min_people = IntegerField("Минимум участников", default=2)
     max_people = IntegerField("Максимум участников", default=6)
+    people_limit = IntegerField("Лимит участников", default=0)  # 0 = без лимита
 
     class Meta:
         verbose_name = "Категория"
@@ -197,6 +206,26 @@ class Category(Model):
 
     def __str__(self):
         return f"{self.code} ({self.race})"
+
+    def people_count(self):
+        Team = apps.get_model("website", "Team")
+        result = Team.objects.filter(category2=self).aggregate(
+            total=Sum("paid_people")
+        )["total"]
+        return result or 0
+
+    def remaining_people(self, exclude_team=None):
+        """Свободные слоты категории или ``None`` при отсутствии лимита.
+
+        ``exclude_team`` вычитается из занятости (само-исключение при
+        редактировании команды, уже состоящей в этой категории).
+        """
+        if not self.people_limit:  # 0 → без лимита
+            return None
+        occupied = self.people_count()
+        if exclude_team and exclude_team.category2_id == self.id:
+            occupied -= exclude_team.paid_people
+        return self.people_limit - occupied
 
 
 class RacePriceTier(Model):
