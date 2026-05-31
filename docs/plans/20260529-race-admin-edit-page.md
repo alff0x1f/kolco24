@@ -299,19 +299,20 @@ blocks, the `base-2.html` template stack, and the `AddNewsPostView` authorizatio
 - Create: `src/static/css/race_form.css`
 - Create: `src/static/js/race_form.js`
 
-- [ ] extract scratch `<style>` into `race_form.css`, scope all rules under
+- [x] extract scratch `<style>` into `race_form.css`, scope all rules under
       `.race-form-page`; reuse tokens already defined in `race.css` where they match,
-      drop duplicates
-- [ ] port scratch JS into `race_form.js`: category repeater reading rows from
+      drop duplicates (only `--primary-tint`/`--success-bg`/`--shadow-lg`/`--mono` —
+      missing from theme-2 — re-declared, scoped to the wrapper)
+- [x] port scratch JS into `race_form.js`: category repeater reading rows from
       `#categories-data` (not the hardcoded seed, incl. `min_people`/`max_people`), char
       counters, slug auto-gen, publish-status toggle, live image preview
-- [ ] add a price-tier repeater reading rows from `#price-tiers-data` (add/remove rows,
+- [x] add a price-tier repeater reading rows from `#price-tiers-data` (add/remove rows,
       `active_until` + `price` inputs)
-- [ ] implement **real** drag-reorder of category rows (scratch handle was decorative)
-- [ ] add a submit handler serializing current category rows (incl. `id`, `min_people`,
+- [x] implement **real** drag-reorder of category rows (scratch handle was decorative)
+- [x] add a submit handler serializing current category rows (incl. `id`, `min_people`,
       `max_people`) into `categories_json` **and** current price-tier rows (incl. `id`,
       `price`, `active_until`) into `price_tiers_json`
-- [ ] (no unit tests — JS verified manually; see Post-Completion)
+- [x] (no unit tests — JS verified manually; see Post-Completion)
 
 ### Task 8: Entry points on the race page
 

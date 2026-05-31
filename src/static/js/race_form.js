@@ -1,0 +1,324 @@
+/* Race admin add/edit form — category + price-tier repeaters, char counters,
+   slug auto-gen, publish-status toggle, live image preview, drag-reorder, and
+   serialize-on-submit into the hidden categories_json / price_tiers_json inputs.
+
+   Reads seed rows from the embedded <script id="categories-data"> and
+   <script id="price-tiers-data"> JSON islands (not a hardcoded seed). */
+(function () {
+  "use strict";
+
+  function readJson(id) {
+    var el = document.getElementById(id);
+    if (!el) return [];
+    try {
+      var data = JSON.parse(el.textContent || "[]");
+      return Array.isArray(data) ? data : [];
+    } catch (e) {
+      return [];
+    }
+  }
+
+  /* ── Categories repeater ─────────────────────────────────── */
+  var catsEl = document.getElementById("cats");
+  var catCountEl = document.getElementById("catCount");
+
+  function makeCatRow(c) {
+    c = c || {};
+    var row = document.createElement("div");
+    row.className = "cat-row" + (c.is_active === false ? " is-inactive" : "");
+    if (c.id != null) row.dataset.id = c.id;
+    row.innerHTML =
+      '<div class="handle" title="Перетащите, чтобы изменить порядок" draggable="true">⠿</div>' +
+      '<input class="control mono c-code" type="text" maxlength="15" placeholder="код">' +
+      '<input class="control c-short" type="text" maxlength="15" placeholder="кратко">' +
+      '<input class="control c-name" type="text" maxlength="50" placeholder="название">' +
+      '<input class="control c-desc" type="text" maxlength="150" placeholder="описание">' +
+      '<input class="control c-min" type="number" min="1" step="1" placeholder="мин">' +
+      '<input class="control c-max" type="number" min="1" step="1" placeholder="макс">' +
+      '<div class="cat-toggle-cell">' +
+      '<label class="switch"><input type="checkbox" class="c-active"><span class="track"></span></label>' +
+      "</div>" +
+      '<button class="cat-del" type="button" title="Удалить категорию">' +
+      '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 4h10M6.5 4V2.8h3V4M5 4l.6 9h4.8L11 4"/></svg>' +
+      "</button>";
+
+    row.querySelector(".c-code").value = c.code || "";
+    row.querySelector(".c-short").value = c.short_name || "";
+    row.querySelector(".c-name").value = c.name || "";
+    row.querySelector(".c-desc").value = c.description || "";
+    row.querySelector(".c-min").value = c.min_people != null ? c.min_people : 2;
+    row.querySelector(".c-max").value = c.max_people != null ? c.max_people : 6;
+    var activeInput = row.querySelector(".c-active");
+    activeInput.checked = c.is_active !== false;
+
+    activeInput.addEventListener("change", function (e) {
+      row.classList.toggle("is-inactive", !e.target.checked);
+    });
+    row.querySelector(".cat-del").addEventListener("click", function () {
+      row.style.transition = "opacity .12s";
+      row.style.opacity = "0";
+      setTimeout(function () {
+        row.remove();
+        refreshCatCount();
+      }, 120);
+    });
+    wireDrag(row);
+    return row;
+  }
+
+  function refreshCatCount() {
+    if (!catsEl) return;
+    var n = catsEl.querySelectorAll(".cat-row").length;
+    if (catCountEl) catCountEl.textContent = n;
+    var empty = catsEl.querySelector(".cats-empty");
+    if (n === 0 && !empty) {
+      empty = document.createElement("div");
+      empty.className = "cats-empty";
+      empty.textContent = "Пока нет категорий — добавьте первую.";
+      catsEl.appendChild(empty);
+    } else if (n > 0 && empty) {
+      empty.remove();
+    }
+  }
+
+  /* ── Drag-reorder of category rows (handle initiates drag) ─ */
+  var dragSrc = null;
+
+  function wireDrag(row) {
+    var handle = row.querySelector(".handle");
+    if (!handle) return;
+    handle.addEventListener("dragstart", function (e) {
+      dragSrc = row;
+      row.classList.add("is-dragging");
+      e.dataTransfer.effectAllowed = "move";
+      try {
+        e.dataTransfer.setData("text/plain", "");
+      } catch (err) {
+        /* IE guard — ignored */
+      }
+    });
+    handle.addEventListener("dragend", function () {
+      if (dragSrc) dragSrc.classList.remove("is-dragging");
+      dragSrc = null;
+      catsEl
+        .querySelectorAll(".drag-over")
+        .forEach(function (r) { r.classList.remove("drag-over"); });
+    });
+    row.addEventListener("dragover", function (e) {
+      if (!dragSrc || dragSrc === row) return;
+      e.preventDefault();
+      e.dataTransfer.dropEffect = "move";
+      row.classList.add("drag-over");
+    });
+    row.addEventListener("dragleave", function () {
+      row.classList.remove("drag-over");
+    });
+    row.addEventListener("drop", function (e) {
+      e.preventDefault();
+      row.classList.remove("drag-over");
+      if (!dragSrc || dragSrc === row) return;
+      var rows = Array.prototype.slice.call(catsEl.querySelectorAll(".cat-row"));
+      var srcIdx = rows.indexOf(dragSrc);
+      var tgtIdx = rows.indexOf(row);
+      if (srcIdx < tgtIdx) {
+        row.parentNode.insertBefore(dragSrc, row.nextSibling);
+      } else {
+        row.parentNode.insertBefore(dragSrc, row);
+      }
+    });
+  }
+
+  if (catsEl) {
+    readJson("categories-data").forEach(function (c) {
+      catsEl.appendChild(makeCatRow(c));
+    });
+    refreshCatCount();
+    var addCat = document.getElementById("addCat");
+    if (addCat) {
+      addCat.addEventListener("click", function () {
+        var row = makeCatRow();
+        catsEl.appendChild(row);
+        refreshCatCount();
+        row.querySelector(".c-code").focus();
+      });
+    }
+  }
+
+  /* ── Price-tiers repeater ────────────────────────────────── */
+  var tiersEl = document.getElementById("tiers");
+  var tierCountEl = document.getElementById("tierCount");
+
+  function makeTierRow(t) {
+    t = t || {};
+    var row = document.createElement("div");
+    row.className = "tier-row";
+    if (t.id != null) row.dataset.id = t.id;
+    row.innerHTML =
+      '<div class="tier-ord">●</div>' +
+      '<input class="control t-until" type="date">' +
+      '<div class="input-affix">' +
+      '<input class="control t-price" type="number" min="1" step="50" placeholder="цена">' +
+      '<span class="suffix">₽</span>' +
+      "</div>" +
+      '<button class="tier-del" type="button" title="Удалить период">' +
+      '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 4h10M6.5 4V2.8h3V4M5 4l.6 9h4.8L11 4"/></svg>' +
+      "</button>";
+    row.querySelector(".t-until").value = t.active_until || "";
+    row.querySelector(".t-price").value = t.price != null ? t.price : "";
+    row.querySelector(".tier-del").addEventListener("click", function () {
+      row.style.transition = "opacity .12s";
+      row.style.opacity = "0";
+      setTimeout(function () {
+        row.remove();
+        refreshTierCount();
+      }, 120);
+    });
+    return row;
+  }
+
+  function refreshTierCount() {
+    if (!tiersEl) return;
+    var n = tiersEl.querySelectorAll(".tier-row").length;
+    if (tierCountEl) tierCountEl.textContent = n;
+    var empty = tiersEl.querySelector(".tiers-empty");
+    if (n === 0 && !empty) {
+      empty = document.createElement("div");
+      empty.className = "tiers-empty";
+      empty.textContent = "Без периодов — цена берётся из «Стоимости участия».";
+      tiersEl.appendChild(empty);
+    } else if (n > 0 && empty) {
+      empty.remove();
+    }
+  }
+
+  if (tiersEl) {
+    readJson("price-tiers-data").forEach(function (t) {
+      tiersEl.appendChild(makeTierRow(t));
+    });
+    refreshTierCount();
+    var addTier = document.getElementById("addTier");
+    if (addTier) {
+      addTier.addEventListener("click", function () {
+        var row = makeTierRow();
+        tiersEl.appendChild(row);
+        refreshTierCount();
+        row.querySelector(".t-until").focus();
+      });
+    }
+  }
+
+  /* ── Char counters ───────────────────────────────────────── */
+  document.querySelectorAll("[data-count-for]").forEach(function (span) {
+    var input = document.getElementById(span.getAttribute("data-count-for"));
+    if (!input) return;
+    var upd = function () {
+      span.textContent = input.value.length;
+    };
+    input.addEventListener("input", upd);
+    upd();
+  });
+
+  /* ── Slug auto-generate ──────────────────────────────────── */
+  function translit(str) {
+    var map = {
+      а: "a", б: "b", в: "v", г: "g", д: "d", е: "e", ё: "e", ж: "zh",
+      з: "z", и: "i", й: "y", к: "k", л: "l", м: "m", н: "n", о: "o",
+      п: "p", р: "r", с: "s", т: "t", у: "u", ф: "f", х: "h", ц: "c",
+      ч: "ch", ш: "sh", щ: "sch", ъ: "", ы: "y", ь: "", э: "e", ю: "yu",
+      я: "ya", " ": "-"
+    };
+    return str
+      .toLowerCase()
+      .split("")
+      .map(function (ch) {
+        return map[ch] !== undefined ? map[ch] : ch;
+      })
+      .join("")
+      .replace(/[^a-z0-9-]/g, "")
+      .replace(/-+/g, "-")
+      .replace(/^-|-$/g, "");
+  }
+  var slugAuto = document.getElementById("slugAuto");
+  if (slugAuto) {
+    slugAuto.addEventListener("click", function (e) {
+      e.preventDefault();
+      var src = document.querySelector("[data-slug-src]");
+      var slug = document.getElementById("f-slug");
+      if (src && slug) slug.value = translit(src.value) || "race";
+    });
+  }
+
+  /* ── Publish status reflects «Активна» ───────────────────── */
+  var activeToggle = document.getElementById("f-active");
+  var pubStatus = document.getElementById("pubStatus");
+  if (activeToggle && pubStatus) {
+    activeToggle.addEventListener("change", function () {
+      var on = activeToggle.checked;
+      pubStatus.classList.toggle("off", !on);
+      var txt = pubStatus.querySelector(".txt");
+      if (txt) {
+        txt.textContent = on
+          ? "Гонка активна и видна на сайте"
+          : "Черновик — гонка скрыта с сайта";
+      }
+    });
+  }
+
+  /* ── Live image preview ──────────────────────────────────── */
+  document.querySelectorAll("[data-preview-for]").forEach(function (input) {
+    var img = document.getElementById(input.getAttribute("data-preview-for"));
+    if (!img) return;
+    var ph = img.parentNode.querySelector(".ph, .lph");
+    var upd = function () {
+      var url = input.value.trim();
+      if (url) {
+        img.src = url;
+        img.hidden = false;
+        if (ph) ph.hidden = true;
+      } else {
+        img.removeAttribute("src");
+        img.hidden = true;
+        if (ph) ph.hidden = false;
+      }
+    };
+    input.addEventListener("input", upd);
+  });
+
+  /* ── Serialize on submit ─────────────────────────────────── */
+  var form = document.getElementById("raceForm");
+  if (form) {
+    form.addEventListener("submit", function () {
+      var cats = [];
+      if (catsEl) {
+        catsEl.querySelectorAll(".cat-row").forEach(function (row) {
+          var idAttr = row.dataset.id;
+          cats.push({
+            id: idAttr != null && idAttr !== "" ? parseInt(idAttr, 10) : null,
+            code: row.querySelector(".c-code").value.trim(),
+            short_name: row.querySelector(".c-short").value.trim(),
+            name: row.querySelector(".c-name").value.trim(),
+            description: row.querySelector(".c-desc").value.trim(),
+            is_active: row.querySelector(".c-active").checked,
+            min_people: parseInt(row.querySelector(".c-min").value, 10) || 0,
+            max_people: parseInt(row.querySelector(".c-max").value, 10) || 0
+          });
+        });
+      }
+      var tiers = [];
+      if (tiersEl) {
+        tiersEl.querySelectorAll(".tier-row").forEach(function (row) {
+          var idAttr = row.dataset.id;
+          tiers.push({
+            id: idAttr != null && idAttr !== "" ? parseInt(idAttr, 10) : null,
+            price: parseInt(row.querySelector(".t-price").value, 10) || 0,
+            active_until: row.querySelector(".t-until").value
+          });
+        });
+      }
+      var catsField = document.getElementById("categoriesJson");
+      var tiersField = document.getElementById("priceTiersJson");
+      if (catsField) catsField.value = JSON.stringify(cats);
+      if (tiersField) tiersField.value = JSON.stringify(tiers);
+    });
+  }
+})();

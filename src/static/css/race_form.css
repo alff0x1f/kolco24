@@ -1,0 +1,357 @@
+/* Race admin add/edit form — /races/new/ and /race/<slug>/edit/ */
+/* Ported from scratch/«Админка - гонка.html», scoped under .race-form-page.
+   Reuses tokens/classes from theme-2.css (:root, .container, .grid, .card,
+   .btn, .btn-primary, .btn-ghost, .btn-block, .btn-lg). Only the tokens NOT
+   in theme-2.css are (re)declared below, scoped to the page wrapper. */
+
+.race-form-page {
+  --primary-tint: #eaf1fd;
+  --success-bg:   #e7f7f0;
+  --shadow-lg:    0 1px 2px rgba(22,26,31,.05), 0 18px 50px rgba(22,26,31,.10);
+  --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  padding: 0 0 72px;
+}
+
+/* ── Breadcrumb ────────────────────────────────────────── */
+.race-form-page .breadcrumb {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 13px; color: var(--muted); padding: 16px 0 0;
+}
+.race-form-page .breadcrumb a { color: var(--muted); }
+.race-form-page .breadcrumb a:hover { color: var(--ink); }
+.race-form-page .breadcrumb .sep { color: var(--muted-2); }
+.race-form-page .breadcrumb .cur { color: var(--ink-soft); }
+
+/* ── Page header / action bar ──────────────────────────── */
+.race-form-page .head {
+  display: flex; align-items: flex-end; justify-content: space-between;
+  gap: 18px; padding: 10px 0 20px; flex-wrap: wrap;
+}
+.race-form-page .head-l { display: flex; flex-direction: column; gap: 7px; min-width: 0; }
+.race-form-page .head-title { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.race-form-page .head h1 { font-size: 26px; font-weight: 600; letter-spacing: -0.015em; }
+.race-form-page .head .sub { font-size: 14px; color: var(--muted); }
+.race-form-page .head .sub code {
+  font-family: var(--mono); font-size: 12.5px; color: var(--ink-soft);
+  background: #fff; border: 1px solid var(--line); padding: 1px 7px; border-radius: 5px;
+}
+.race-form-page .head-actions { display: flex; gap: 9px; align-items: center; flex-shrink: 0; }
+
+.race-form-page .chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 12px; font-weight: 500; padding: 4px 11px; border-radius: 999px;
+}
+.race-form-page .chip.edit { background: var(--primary-tint); color: var(--primary); }
+.race-form-page .chip.edit::before {
+  content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--primary-2);
+}
+
+/* ── Buttons not in theme-2 ────────────────────────────── */
+.race-form-page .btn-outline { background: var(--paper-2); color: var(--ink); border-color: var(--line); }
+.race-form-page .btn-outline:hover { border-color: var(--ink); color: var(--ink); }
+
+/* ── Form-level error banner ───────────────────────────── */
+.race-form-page .form-errors {
+  background: var(--danger-bg); color: var(--danger);
+  border: 1px solid var(--danger); border-radius: var(--radius-sm);
+  padding: 11px 14px; font-size: 13.5px; margin-bottom: 16px;
+}
+
+/* ── Layout ────────────────────────────────────────────── */
+.race-form-page .grid { grid-template-columns: minmax(0, 1fr) 332px; }
+.race-form-page .col-main { display: flex; flex-direction: column; gap: 16px; }
+.race-form-page .sidebar { display: flex; flex-direction: column; gap: 16px; position: sticky; top: 74px; }
+
+/* ── Card (header/body split — theme-2 only ships .card shell) ── */
+.race-form-page .card { margin-bottom: 0; }
+.race-form-page .card-head {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 16px 22px; border-bottom: 1px solid var(--line-soft);
+}
+.race-form-page .card-head h2 {
+  font-size: 13px; font-weight: 600; letter-spacing: 0.1em;
+  text-transform: uppercase; color: var(--muted); margin: 0;
+}
+.race-form-page .card-head .aux { font-size: 12.5px; color: var(--muted); }
+.race-form-page .card-body { padding: 20px 22px 22px; }
+.race-form-page .card-body.tight { padding: 14px 18px 16px; }
+
+/* ── Form fields ───────────────────────────────────────── */
+.race-form-page .field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 18px; }
+.race-form-page .field:last-child { margin-bottom: 0; }
+.race-form-page .field > label {
+  font-size: 13px; font-weight: 500; color: var(--ink);
+  display: flex; align-items: center; gap: 6px;
+}
+.race-form-page .field > label .req { color: var(--danger); font-weight: 600; }
+.race-form-page .field > label .opt { font-size: 11.5px; font-weight: 400; color: var(--muted-2); }
+
+.race-form-page .control {
+  width: 100%; font-family: inherit; font-size: 14.5px; color: var(--ink);
+  background: var(--paper-2); border: 1px solid var(--line); border-radius: var(--radius-sm);
+  padding: 10px 13px; transition: border-color .12s, box-shadow .12s; line-height: 1.4;
+}
+.race-form-page .control::placeholder { color: var(--muted-2); }
+.race-form-page .control:hover { border-color: #cfd6df; }
+.race-form-page .control:focus {
+  outline: none; border-color: var(--primary-2); box-shadow: 0 0 0 3px rgba(69,130,236,.14);
+}
+.race-form-page .control.mono { font-family: var(--mono); font-size: 13px; letter-spacing: .01em; }
+.race-form-page .control.has-error { border-color: var(--danger); }
+.race-form-page .control.has-error:focus { box-shadow: 0 0 0 3px rgba(217,54,68,.14); }
+
+.race-form-page select.control {
+  appearance: none; cursor: pointer;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 14 14' fill='none' stroke='%236b7785' stroke-width='1.5'%3E%3Cpath d='M3 5l4 4 4-4'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 12px center; padding-right: 36px;
+}
+
+.race-form-page .field-hint { font-size: 12px; color: var(--muted); line-height: 1.4; }
+.race-form-page .field-hint code {
+  font-family: var(--mono); font-size: 11.5px; background: var(--line-soft);
+  padding: 1px 5px; border-radius: 4px; color: var(--ink-soft);
+}
+.race-form-page .field-error { font-size: 12px; color: var(--danger); line-height: 1.4; }
+.race-form-page .field-row { display: grid; gap: 16px; }
+.race-form-page .field-row.two { grid-template-columns: 1fr 1fr; }
+.race-form-page .field-row.three { grid-template-columns: 1fr 1fr 1fr; }
+.race-form-page .field-row .field { margin-bottom: 0; }
+
+/* input with prefix (slug) */
+.race-form-page .input-group { display: flex; align-items: stretch; }
+.race-form-page .input-group .prefix {
+  display: flex; align-items: center; padding: 0 11px;
+  background: #f4f6f9; border: 1px solid var(--line); border-right: none;
+  border-radius: var(--radius-sm) 0 0 var(--radius-sm);
+  font-family: var(--mono); font-size: 12.5px; color: var(--muted); white-space: nowrap;
+}
+.race-form-page .input-group .control { border-radius: 0 var(--radius-sm) var(--radius-sm) 0; }
+.race-form-page .input-group:focus-within .prefix { border-color: var(--primary-2); }
+
+/* input with suffix (cost ₽) */
+.race-form-page .input-affix { position: relative; }
+.race-form-page .input-affix .control { padding-right: 64px; }
+.race-form-page .input-affix .suffix {
+  position: absolute; right: 1px; top: 1px; bottom: 1px;
+  display: flex; align-items: center; padding: 0 13px;
+  color: var(--muted); font-size: 13px; border-left: 1px solid var(--line-soft);
+  background: #f9fafc; border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+}
+
+.race-form-page .charcount { font-size: 11.5px; color: var(--muted-2); font-variant-numeric: tabular-nums; }
+.race-form-page .label-row { display: flex; align-items: center; justify-content: space-between; }
+
+/* ── Toggle switch ─────────────────────────────────────── */
+.race-form-page .switch { position: relative; display: inline-block; width: 38px; height: 22px; flex-shrink: 0; }
+.race-form-page .switch input { opacity: 0; width: 0; height: 0; position: absolute; }
+.race-form-page .switch .track {
+  position: absolute; inset: 0; background: #cdd4dd; border-radius: 999px;
+  transition: background .16s; cursor: pointer;
+}
+.race-form-page .switch .track::before {
+  content: ''; position: absolute; left: 3px; top: 3px; width: 16px; height: 16px;
+  background: #fff; border-radius: 50%; transition: transform .16s; box-shadow: 0 1px 2px rgba(0,0,0,.2);
+}
+.race-form-page .switch input:checked + .track { background: var(--primary-2); }
+.race-form-page .switch input:checked + .track::before { transform: translateX(16px); }
+.race-form-page .switch input:focus-visible + .track { box-shadow: 0 0 0 3px rgba(69,130,236,.25); }
+
+/* toggle rows in settings card */
+.race-form-page .toggle-list { display: flex; flex-direction: column; }
+.race-form-page .toggle-row {
+  display: grid; grid-template-columns: 1fr auto; gap: 14px; align-items: center;
+  padding: 14px 0; border-top: 1px solid var(--line-soft);
+}
+.race-form-page .toggle-row:first-child { border-top: none; padding-top: 4px; }
+.race-form-page .toggle-row:last-child { padding-bottom: 2px; }
+.race-form-page .toggle-row .t-label { font-size: 14px; color: var(--ink); font-weight: 500; }
+.race-form-page .toggle-row .t-desc { font-size: 12px; color: var(--muted); margin-top: 2px; line-height: 1.4; }
+
+/* ── Publish card ──────────────────────────────────────── */
+.race-form-page .pub { padding: 18px 20px 20px; }
+.race-form-page .pub-status {
+  display: flex; align-items: center; gap: 10px;
+  padding: 12px 14px; border-radius: var(--radius-sm); margin-bottom: 16px;
+  border: 1px solid var(--success-bg); background: var(--success-bg);
+}
+.race-form-page .pub-status .dot {
+  width: 9px; height: 9px; border-radius: 50%; background: var(--success);
+  box-shadow: 0 0 0 3px rgba(2,184,117,.18); flex-shrink: 0;
+}
+.race-form-page .pub-status .txt { font-size: 13px; color: var(--success-dk); font-weight: 500; }
+.race-form-page .pub-status.off { background: #f4f6f9; border-color: var(--line); }
+.race-form-page .pub-status.off .dot { background: var(--muted-2); box-shadow: none; }
+.race-form-page .pub-status.off .txt { color: var(--muted); }
+
+.race-form-page .pub-line {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 13px 0; border-top: 1px solid var(--line-soft);
+}
+.race-form-page .pub-line:first-of-type { border-top: none; }
+.race-form-page .pub-line .pl-label { font-size: 14px; color: var(--ink); font-weight: 500; }
+.race-form-page .pub-line .pl-desc { font-size: 12px; color: var(--muted); margin-top: 1px; }
+
+.race-form-page .pub-actions { margin-top: 18px; display: flex; flex-direction: column; gap: 9px; }
+.race-form-page .pub-foot {
+  margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--line-soft);
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+}
+.race-form-page .pub-foot a.preview { font-size: 13px; color: var(--primary-2); display: inline-flex; align-items: center; gap: 6px; }
+
+/* ── Image preview slots ───────────────────────────────── */
+.race-form-page .upload {
+  border: 1.5px dashed var(--line); border-radius: var(--radius-sm);
+  background: #fafbfc; overflow: hidden; transition: border-color .12s, background .12s;
+  margin-bottom: 10px;
+}
+.race-form-page .upload:hover { border-color: var(--primary-2); background: var(--primary-tint); }
+.race-form-page .upload.cover .preview {
+  aspect-ratio: 1920/480; min-height: 120px; position: relative;
+  background:
+    linear-gradient(180deg, rgba(0,0,0,0) 40%, rgba(0,0,0,.28) 100%),
+    linear-gradient(145deg, #4a5e74 0%, #5d7388 35%, #8c9aa6 65%, #b6b6a6 100%);
+}
+.race-form-page .upload .preview .preview-img {
+  position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover;
+}
+.race-form-page .upload .preview .ph {
+  position: absolute; left: 50%; top: 50%; transform: translate(-50%,-50%);
+  font-family: var(--mono); font-size: 11px; color: rgba(255,255,255,.85);
+  letter-spacing: .06em; background: rgba(0,0,0,.3); padding: 6px 12px;
+  border: 1px dashed rgba(255,255,255,.4); border-radius: 5px; text-align: center; white-space: nowrap;
+}
+
+.race-form-page .logo-grid { display: grid; grid-template-columns: 96px 1fr; gap: 14px; align-items: stretch; }
+.race-form-page .upload.logo { margin-bottom: 0; }
+.race-form-page .upload.logo .preview {
+  width: 96px; height: 96px; display: grid; place-items: center; position: relative;
+  background: repeating-linear-gradient(135deg, #eceef2 0 8px, #f4f6f9 8px 16px);
+}
+.race-form-page .upload.logo .preview .preview-img { object-fit: contain; }
+.race-form-page .upload.logo .preview .lph { width: 52px; height: 52px; border-radius: 50%; border: 2px solid var(--muted-2); position: relative; }
+.race-form-page .upload.logo .preview .lph::after { content: ''; position: absolute; inset: 7px; border: 2px solid var(--muted-2); border-radius: 50%; }
+.race-form-page .logo-side { display: flex; flex-direction: column; gap: 8px; justify-content: center; }
+
+/* ── Categories repeater ───────────────────────────────── */
+.race-form-page .cats { display: flex; flex-direction: column; }
+.race-form-page .cats-headrow,
+.race-form-page .cat-row {
+  display: grid;
+  grid-template-columns: 30px 104px 88px minmax(0,1fr) minmax(0,1.4fr) 56px 56px 56px 34px;
+  gap: 10px; align-items: center;
+}
+.race-form-page .cats-headrow {
+  padding: 0 4px 10px;
+  font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--muted-2);
+}
+.race-form-page .cat-row {
+  padding: 9px 4px; border-top: 1px solid var(--line-soft); transition: background .12s;
+}
+.race-form-page .cat-row:hover { background: #fafbfc; }
+.race-form-page .cat-row.is-inactive { opacity: .55; }
+.race-form-page .cat-row.is-dragging { opacity: .4; background: var(--primary-tint); }
+.race-form-page .cat-row.drag-over { box-shadow: inset 0 2px 0 var(--primary-2); }
+.race-form-page .cat-row .handle {
+  display: grid; place-items: center; color: var(--muted-2); cursor: grab;
+  font-size: 14px; line-height: 1; user-select: none;
+}
+.race-form-page .cat-row .handle:active { cursor: grabbing; }
+.race-form-page .cat-row .control { padding: 7px 10px; font-size: 13.5px; }
+.race-form-page .cat-row .control.mono { font-size: 12.5px; }
+.race-form-page .cat-toggle-cell { display: grid; place-items: center; }
+.race-form-page .cat-del,
+.race-form-page .tier-del {
+  display: grid; place-items: center; width: 30px; height: 30px; border-radius: 8px;
+  border: none; background: transparent; color: var(--muted-2); cursor: pointer; transition: all .12s;
+}
+.race-form-page .cat-del:hover,
+.race-form-page .tier-del:hover { background: var(--danger-bg); color: var(--danger); }
+.race-form-page .cat-del svg,
+.race-form-page .tier-del svg { width: 16px; height: 16px; }
+.race-form-page .cats-foot,
+.race-form-page .tiers-foot { padding: 14px 4px 2px; }
+.race-form-page .add-cat,
+.race-form-page .add-tier {
+  display: inline-flex; align-items: center; gap: 8px;
+  font-size: 13.5px; font-weight: 500; color: var(--primary-2);
+  background: transparent; border: 1px dashed var(--line); padding: 9px 14px;
+  border-radius: 9px; cursor: pointer; transition: all .12s;
+}
+.race-form-page .add-cat:hover,
+.race-form-page .add-tier:hover { border-color: var(--primary-2); background: var(--primary-tint); }
+.race-form-page .add-cat svg,
+.race-form-page .add-tier svg { width: 15px; height: 15px; }
+.race-form-page .cats-empty,
+.race-form-page .tiers-empty { padding: 22px 4px; text-align: center; color: var(--muted); font-size: 13.5px; }
+
+/* ── Price-tiers repeater (new UI, mirrors categories) ─── */
+.race-form-page .tiers { display: flex; flex-direction: column; }
+.race-form-page .tiers-headrow,
+.race-form-page .tier-row {
+  display: grid;
+  grid-template-columns: 30px minmax(0,1fr) 160px 34px;
+  gap: 10px; align-items: center;
+}
+.race-form-page .tiers-headrow {
+  padding: 0 4px 10px;
+  font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--muted-2);
+}
+.race-form-page .tier-row {
+  padding: 9px 4px; border-top: 1px solid var(--line-soft); transition: background .12s;
+}
+.race-form-page .tier-row:hover { background: #fafbfc; }
+.race-form-page .tier-row .tier-ord {
+  display: grid; place-items: center; color: var(--muted-2);
+  font-size: 12.5px; font-variant-numeric: tabular-nums; user-select: none;
+}
+.race-form-page .tier-row .control { padding: 7px 10px; font-size: 13.5px; }
+
+/* ── Bottom sticky save bar (mobile-friendly) ──────────── */
+.race-form-page .savebar {
+  position: sticky; bottom: 0; z-index: 30; margin-top: 4px;
+  background: rgba(255,255,255,.85); backdrop-filter: blur(10px);
+  border-top: 1px solid var(--line);
+  display: none;
+}
+.race-form-page .savebar-inner { display: flex; gap: 9px; padding: 12px 0; }
+.race-form-page .savebar-inner .btn { flex: 1; }
+
+/* ── Responsive ────────────────────────────────────────── */
+@media (max-width: 980px) {
+  .race-form-page .grid { grid-template-columns: 1fr; }
+  .race-form-page .sidebar { position: static; order: 2; }
+  .race-form-page .col-main { order: 1; }
+  .race-form-page .head-actions { display: none; }
+  .race-form-page .savebar { display: block; }
+}
+@media (max-width: 720px) {
+  .race-form-page .cats-headrow,
+  .race-form-page .tiers-headrow { display: none; }
+  .race-form-page .cat-row {
+    grid-template-columns: 28px 1fr 1fr 34px;
+    grid-template-areas:
+      "handle code  short del"
+      "handle name  name  name"
+      "handle desc  desc  desc"
+      "handle min   max   tog";
+    gap: 8px; padding: 12px 4px; align-items: center;
+  }
+  .race-form-page .cat-row .handle { grid-area: handle; }
+  .race-form-page .cat-row .c-code { grid-area: code; }
+  .race-form-page .cat-row .c-short { grid-area: short; }
+  .race-form-page .cat-row .c-name { grid-area: name; }
+  .race-form-page .cat-row .c-desc { grid-area: desc; }
+  .race-form-page .cat-row .c-min { grid-area: min; }
+  .race-form-page .cat-row .c-max { grid-area: max; }
+  .race-form-page .cat-row .cat-toggle-cell { grid-area: tog; justify-self: start; }
+  .race-form-page .cat-row .cat-del { grid-area: del; justify-self: end; }
+  .race-form-page .tier-row {
+    grid-template-columns: 28px 1fr 120px 34px;
+    gap: 8px; padding: 12px 4px;
+  }
+  .race-form-page .field-row.two,
+  .race-form-page .field-row.three { grid-template-columns: 1fr; }
+}
+@media (max-width: 600px) {
+  .race-form-page .card-body { padding: 16px 16px 18px; }
+}
