@@ -290,6 +290,22 @@ class PaymentsYa(models.Model):
             payment.team.paid_sum += withdraw_amount + payment.additional_charge
             payment.team.additional_charge -= payment.additional_charge
             payment.team.save()
+            # Авто sold_out при достижении лимита гонки (Option B: без
+            # авто-реоткрытия). Caveat: занятость считается по paid_people,
+            # который растёт только при подтверждении оплаты — параллельные
+            # неоплаченные черновики могут кратковременно превысить лимит.
+            from .race import RegStatus
+
+            category = payment.team.category2
+            race = category.race if category else None
+            if (
+                race
+                and race.people_limit
+                and race.reg_status == RegStatus.OPEN
+                and race.people_count() >= race.people_limit
+            ):
+                race.reg_status = RegStatus.SOLD_OUT
+                race.save(update_fields=["reg_status"])
         payment.save()
         return True
 

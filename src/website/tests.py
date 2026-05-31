@@ -10,7 +10,7 @@ from django.utils import timezone
 
 from website.forms import TeamForm
 from website.models import Payment, Race
-from website.models.models import Team
+from website.models.models import PaymentsYa, Team
 from website.models.race import Category, RaceLink, RacePriceTier, RegStatus
 
 
@@ -1528,3 +1528,88 @@ def test_gate_unlimited_does_not_restrict(django_user_model):
     _pl_team(cat, user, paid_people=6, name="filler")
     form = TeamForm(race.id, _gate_data(cat, 6))
     assert form.is_valid(), form.errors
+
+
+# ---------------------------------------------------------------------------
+# Task 3: авто sold_out при подтверждении оплаты
+# ---------------------------------------------------------------------------
+
+
+def _confirm_payment(user, team, paid_for, cost_per_person=1500):
+    """Подтвердить оплату через PaymentsYa.update_team (инкрементит paid_people)."""
+    amount = paid_for * cost_per_person
+    payment = Payment.objects.create(
+        owner=user,
+        team=team,
+        payment_method="ya",
+        payment_amount=amount,
+        payment_with_discount=amount,
+        cost_per_person=cost_per_person,
+        paid_for=paid_for,
+        sender_card_number="",
+    )
+    ya = PaymentsYa.objects.create(
+        notification_type="p2p-incoming",
+        operation_id="op",
+        amount=str(amount),
+        withdraw_amount=str(amount),
+        currency="643",
+        datetime="2026-06-01",
+        sender="",
+        label=str(payment.id),
+        sha1_hash="",
+    )
+    ya.update_team(payment.id)
+
+
+@pytest.mark.django_db
+def test_payment_reaching_cap_flips_sold_out(django_user_model):
+    user = _pl_user(django_user_model)
+    race = _pl_race(people_limit=4, reg_status=RegStatus.OPEN)
+    cat = _pl_category(race)
+    team = _pl_team(cat, user, paid_people=2, name="self")
+    # occupancy 2 → оплата на ещё 2 → 4 >= limit(4) → sold_out
+    _confirm_payment(user, team, paid_for=2)
+    race.refresh_from_db()
+    assert race.reg_status == RegStatus.SOLD_OUT
+
+
+@pytest.mark.django_db
+def test_deleting_team_does_not_reopen(django_user_model):
+    # Option B: после авто sold_out удаление команды не реоткрывает регистрацию.
+    user = _pl_user(django_user_model)
+    race = _pl_race(people_limit=4, reg_status=RegStatus.OPEN)
+    cat = _pl_category(race)
+    team = _pl_team(cat, user, paid_people=2, name="self")
+    _confirm_payment(user, team, paid_for=2)  # 2 + 2 = 4 → sold_out
+    race.refresh_from_db()
+    assert race.reg_status == RegStatus.SOLD_OUT
+    # освобождаем места — авто-реоткрытия нет
+    team.refresh_from_db()
+    team.is_deleted = True
+    team.save()
+    race.refresh_from_db()
+    assert race.reg_status == RegStatus.SOLD_OUT
+
+
+@pytest.mark.django_db
+def test_manual_sold_out_below_cap_untouched(django_user_model):
+    # Ручной sold_out ниже cap триггер не трогает (флип только OPEN → SOLD_OUT).
+    user = _pl_user(django_user_model)
+    race = _pl_race(people_limit=10, reg_status=RegStatus.SOLD_OUT)
+    cat = _pl_category(race)
+    team = _pl_team(cat, user, paid_people=2, name="self")
+    _confirm_payment(user, team, paid_for=2)  # occupancy 4 < 10
+    race.refresh_from_db()
+    assert race.reg_status == RegStatus.SOLD_OUT
+
+
+@pytest.mark.django_db
+def test_race_without_limit_does_not_flip(django_user_model):
+    user = _pl_user(django_user_model)
+    race = _pl_race(people_limit=0, reg_status=RegStatus.OPEN)
+    cat = _pl_category(race)
+    team = _pl_team(cat, user, paid_people=2, name="self")
+    _confirm_payment(user, team, paid_for=10)
+    race.refresh_from_db()
+    assert race.reg_status == RegStatus.OPEN

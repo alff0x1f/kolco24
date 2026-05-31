@@ -167,11 +167,11 @@ if (race.people_limit and race.reg_status == RegStatus.OPEN
 - Modify: `src/website/models/models.py` (`update_team`)
 - Modify: `src/website/tests.py`
 
-- [ ] в `update_team()` сразу после `payment.team.save()` добавить блок флипа `OPEN → SOLD_OUT` (только если `people_limit` задан и достигнут)
-- [ ] импортировать/использовать `RegStatus` без циклов импорта
-- [ ] добавить комментарий-caveat про paid-basis рядом с триггером
-- [ ] тесты: оплата, достигшая cap → `OPEN → SOLD_OUT`; удаление команды после НЕ реоткрывает (Option B); ручной `sold_out` ниже cap триггером не трогается; гонка без лимита не флипается
-- [ ] запустить тесты — должны пройти перед Task 4
+- [x] в `update_team()` сразу после `payment.team.save()` добавить блок флипа `OPEN → SOLD_OUT` (только если `people_limit` задан и достигнут)
+- [x] импортировать/использовать `RegStatus` без циклов импорта
+- [x] добавить комментарий-caveat про paid-basis рядом с триггером
+- [x] тесты: оплата, достигшая cap → `OPEN → SOLD_OUT`; удаление команды после НЕ реоткрывает (Option B); ручной `sold_out` ниже cap триггером не трогается; гонка без лимита не флипается
+- [x] запустить тесты — должны пройти перед Task 4
 
 ### Task 4: Конфиг лимитов на странице редактирования гонки
 
