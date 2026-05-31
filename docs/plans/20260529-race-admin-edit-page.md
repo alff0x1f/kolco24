@@ -332,13 +332,13 @@ blocks, the `base-2.html` template stack, and the `AddNewsPostView` authorizatio
 - [x] run tests — must pass before next task
 
 ### Task 9: Verify acceptance criteria
-- [ ] verify every Overview requirement is implemented (create + edit, all fields,
+- [x] verify every Overview requirement is implemented (create + edit, all fields,
       inline categories incl. min/max people, inline price tiers, access rules, entry points)
-- [ ] verify edge cases: empty category list, empty tier list (price falls back to `cost`),
+- [x] verify edge cases: empty category list, empty tier list (price falls back to `cost`),
       cross-race id (categories + tiers), malformed JSON, duplicate code,
       `min_people > max_people`, bad `active_until`, rollback on row error
-- [ ] run full suite: `uv run pytest`
-- [ ] run `make format && make lint`
+- [x] run full suite: `uv run pytest` (153 passed)
+- [x] run `make format && make lint` (no format changes; lint clean)
 
 ### Task 10: [Final] Documentation
 - [ ] update `CLAUDE.md` `apps.race` description to mention `RaceEditView`,
