@@ -3,13 +3,14 @@ import re
 
 import pytest
 from django.contrib.auth.models import AnonymousUser, User
+from django.test import RequestFactory
 from django.urls import resolve, reverse
 
 from apps.race.forms import RaceForm
-from apps.race.views import RaceTeamsView
+from apps.race.views import RaceEditView, RaceTeamsView
 from website.models import Race
 from website.models.models import Team
-from website.models.race import Category, RaceAdmin, RegStatus
+from website.models.race import Category, RaceAdmin, RacePriceTier, RegStatus
 from website.views.views_ import can_edit_race
 
 
@@ -605,3 +606,86 @@ def test_race_form_invalid_header_image_url():
 
     assert not form.is_valid()
     assert "header_image" in form.errors
+
+
+# --- RaceEditView GET + auth ---
+
+
+def _edit_get(path, user, **kwargs):
+    request = RequestFactory().get(path)
+    request.user = user
+    return RaceEditView.as_view()(request, **kwargs)
+
+
+@pytest.mark.django_db
+def test_race_edit_get_anonymous_redirects_to_login():
+    race = _make_race(slug="re1", code="re1")
+
+    edit = _edit_get(f"/race/{race.slug}/edit/", AnonymousUser(), race_slug=race.slug)
+    create = _edit_get("/races/new/", AnonymousUser())
+
+    for resp in (edit, create):
+        assert resp.status_code == 302
+        assert reverse("login") in resp.url
+        assert "next=" in resp.url
+    assert f"next=/race/{race.slug}/edit/" in edit.url
+
+
+@pytest.mark.django_db
+def test_race_edit_get_regular_user_forbidden():
+    user = User.objects.create_user(username="re2", password="p", email="re2@e.com")
+    race = _make_race(slug="re2", code="re2")
+
+    edit = _edit_get(f"/race/{race.slug}/edit/", user, race_slug=race.slug)
+    create = _edit_get("/races/new/", user)
+
+    assert edit.status_code == 403
+    assert create.status_code == 403
+
+
+@pytest.mark.django_db
+def test_race_edit_get_moderator_forbidden():
+    user = User.objects.create_user(username="re3", password="p", email="re3@e.com")
+    race = _make_race(slug="re3", code="re3")
+    RaceAdmin.objects.create(race=race, user=user, role=RaceAdmin.Role.MODERATOR)
+
+    resp = _edit_get(f"/race/{race.slug}/edit/", user, race_slug=race.slug)
+
+    assert resp.status_code == 403
+
+
+@pytest.mark.django_db
+def test_race_edit_get_superuser_create_returns_200():
+    admin = User.objects.create_superuser(
+        username="re4", password="p", email="re4@e.com"
+    )
+
+    resp = _edit_get("/races/new/", admin)
+
+    assert resp.status_code == 200
+    html = resp.content.decode()
+    assert "Создание гонки" in html
+    # empty race has no categories or tiers
+    assert _script_json(html, "categories-data") == []
+    assert _script_json(html, "price-tiers-data") == []
+
+
+@pytest.mark.django_db
+def test_race_edit_get_admin_edit_returns_200_with_context():
+    user = User.objects.create_user(username="re5", password="p", email="re5@e.com")
+    race = _make_race(slug="re5", code="re5")
+    RaceAdmin.objects.create(race=race, user=user, role=RaceAdmin.Role.ADMIN)
+    cat = _make_category(race, code="6h", short_name="6ч", name="6 часов", order=0)
+    RacePriceTier.objects.create(race=race, price=1500, active_until="2026-08-01")
+
+    resp = _edit_get(f"/race/{race.slug}/edit/", user, race_slug=race.slug)
+
+    assert resp.status_code == 200
+    html = resp.content.decode()
+    assert "Редактирование гонки" in html
+    cats = _script_json(html, "categories-data")
+    assert [c["id"] for c in cats] == [cat.id]
+    assert cats[0]["min_people"] == 2 and cats[0]["max_people"] == 6
+    tiers = _script_json(html, "price-tiers-data")
+    assert tiers[0]["price"] == 1500
+    assert tiers[0]["active_until"] == "2026-08-01"

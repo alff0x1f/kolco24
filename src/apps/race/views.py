@@ -1,16 +1,18 @@
 import json
+from urllib.parse import quote
 
 from django.db.models import Count, OuterRef, Q, Subquery
-from django.http import Http404, HttpResponseRedirect
-from django.shortcuts import render
+from django.http import Http404, HttpResponseForbidden, HttpResponseRedirect
+from django.shortcuts import get_object_or_404, render
 from django.urls import reverse
 from django.utils.safestring import mark_safe
 from django.views import View
 
+from apps.race.forms import RaceForm
 from website.forms import NewsPostForm
 from website.models import NewsPost, Race, Team
 from website.models.race import Category, RegStatus
-from website.views.views_ import is_race_admin
+from website.views.views_ import can_edit_race, is_race_admin
 
 # Escape the HTML-significant characters as their \uXXXX forms, exactly like
 # Django's ``json_script``. Escaping ``<`` and ``>`` (not just ``</``) also
@@ -205,3 +207,90 @@ class RaceTeamsView(View):
         context = self.build_context(race, request.user)
         context["initial_filter"] = initial_filter
         return render(request, "race/teams.html", context)
+
+
+class RaceEditView(View):
+    """Create (``races/new/``) and edit (``race/<slug>/edit/``) a race.
+
+    Create is superuser-only; edit is gated on :func:`can_edit_race`. Auth
+    mirrors ``AddNewsPostView``: anonymous users are bounced to the login page
+    with a ``?next=``, authorized-but-forbidden users get a 403.
+    """
+
+    def _load_and_authorize(self, request, race_slug):
+        """Resolve the race and check access for both GET and POST.
+
+        Returns ``(race, response)``. ``race`` is ``None`` on the create flow.
+        When ``response`` is non-None the caller must return it immediately.
+        """
+        if not request.user.is_authenticated:
+            return None, HttpResponseRedirect(
+                reverse("login") + "?next=" + quote(request.path, safe="/:@")
+            )
+        if race_slug is None:
+            if not request.user.is_superuser:
+                return None, HttpResponseForbidden()
+            return None, None
+        race = get_object_or_404(Race, slug=race_slug)
+        if not can_edit_race(request.user, race):
+            return race, HttpResponseForbidden()
+        return race, None
+
+    def _build_context(
+        self,
+        race,
+        form=None,
+        categories_data=None,
+        price_tiers_data=None,
+        category_errors=None,
+        price_tier_errors=None,
+    ):
+        if form is None:
+            form = RaceForm(instance=race)
+        if categories_data is None:
+            categories_data = [] if race is None else self._existing_categories(race)
+        if price_tiers_data is None:
+            price_tiers_data = [] if race is None else self._existing_price_tiers(race)
+        return {
+            "race": race,
+            "form": form,
+            "is_create": race is None,
+            "categories_data": _safe_json(categories_data),
+            "price_tiers_data": _safe_json(price_tiers_data),
+            "reg_status_choices": RegStatus.choices,
+            "category_errors": category_errors or {},
+            "price_tier_errors": price_tier_errors or {},
+        }
+
+    @staticmethod
+    def _existing_categories(race):
+        return [
+            {
+                "id": cat.id,
+                "code": cat.code,
+                "short_name": cat.short_name,
+                "name": cat.name,
+                "description": cat.description,
+                "is_active": cat.is_active,
+                "min_people": cat.min_people,
+                "max_people": cat.max_people,
+            }
+            for cat in Category.objects.filter(race=race).order_by("order", "id")
+        ]
+
+    @staticmethod
+    def _existing_price_tiers(race):
+        return [
+            {
+                "id": tier.id,
+                "price": tier.price,
+                "active_until": tier.active_until.isoformat(),
+            }
+            for tier in race.price_tiers.all()
+        ]
+
+    def get(self, request, race_slug=None):
+        race, response = self._load_and_authorize(request, race_slug)
+        if response is not None:
+            return response
+        return render(request, "race/race_form.html", self._build_context(race))

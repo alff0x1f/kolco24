@@ -207,19 +207,19 @@ blocks, the `base-2.html` template stack, and the `AddNewsPostView` authorizatio
 - Modify: `src/apps/race/views.py`
 - Modify: `src/apps/race/tests.py`
 
-- [ ] add `RaceEditView(View)` with a `_load_and_authorize(request, race_slug)` helper:
+- [x] add `RaceEditView(View)` with a `_load_and_authorize(request, race_slug)` helper:
       create (no slug) requires `is_superuser`; edit loads `get_object_or_404(Race, ...)`
       and requires `can_edit_race`; anon → login redirect (`reverse("login") + "?next="`),
       forbidden → `HttpResponseForbidden` (mirror `AddNewsPostView`)
-- [ ] implement `get`: build context (`form` = `RaceForm(instance=...)`, `is_create`,
+- [x] implement `get`: build context (`form` = `RaceForm(instance=...)`, `is_create`,
       `categories_data` JSON via `_safe_json` from existing categories ordered by
       `order, id` — each row incl. `min_people`/`max_people`, `price_tiers_data` JSON via
       `_safe_json` from `race.price_tiers.all()` (`active_until` as `"YYYY-MM-DD"`),
       `reg_status_choices`, `race`) and render `race/race_form.html`
-- [ ] write test: anonymous GET on edit and create → redirect to `login?next=`
-- [ ] write test: regular user GET → 403; non-ADMIN RaceAdmin GET edit → 403
-- [ ] write test: superuser GET create + ADMIN GET own-race edit → 200 with form context
-- [ ] run tests — must pass before next task
+- [x] write test: anonymous GET on edit and create → redirect to `login?next=`
+- [x] write test: regular user GET → 403; non-ADMIN RaceAdmin GET edit → 403
+- [x] write test: superuser GET create + ADMIN GET own-race edit → 200 with form context
+- [x] run tests — must pass before next task
 
 ### Task 4: `RaceEditView` — POST save + category reconcile
 
