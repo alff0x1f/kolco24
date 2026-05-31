@@ -1,4 +1,5 @@
 from django import forms
+from django.forms.widgets import DateInput
 
 from website.models.race import Race
 
@@ -32,6 +33,10 @@ class RaceForm(forms.ModelForm):
 
     class Meta:
         model = Race
+        widgets = {
+            "date": DateInput(format="%Y-%m-%d", attrs={"type": "date"}),
+            "date_end": DateInput(format="%Y-%m-%d", attrs={"type": "date"}),
+        }
         fields = [
             "name",
             "code",

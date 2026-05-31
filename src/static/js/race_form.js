@@ -18,6 +18,17 @@
     }
   }
 
+  function readJsonObj(id) {
+    var el = document.getElementById(id);
+    if (!el) return {};
+    try {
+      var data = JSON.parse(el.textContent || "{}");
+      return (data && typeof data === "object" && !Array.isArray(data)) ? data : {};
+    } catch (e) {
+      return {};
+    }
+  }
+
   /* Pre-populate hidden inputs from data islands so that if the submit
      handler fails to wire (mid-IIFE error), the POST still carries data. */
   (function () {
@@ -139,11 +150,36 @@
     });
   }
 
+  function applyRowErrors(container, rowSelector, fieldMap, errorsById) {
+    var rows = container ? container.querySelectorAll(rowSelector) : [];
+    Object.keys(errorsById).forEach(function (idxStr) {
+      var row = rows[parseInt(idxStr, 10)];
+      if (!row) return;
+      var fieldErrors = errorsById[idxStr];
+      row.classList.add("has-error");
+      Object.keys(fieldErrors).forEach(function (field) {
+        var sel = fieldMap[field];
+        if (!sel) return;
+        var input = row.querySelector(sel);
+        if (input) input.classList.add("has-error");
+        var msg = fieldErrors[field];
+        var span = document.createElement("span");
+        span.className = "field-error row-error";
+        span.textContent = msg;
+        if (input && input.parentNode) input.parentNode.appendChild(span);
+      });
+    });
+  }
+
   if (catsEl) {
     readJson("categories-data").forEach(function (c) {
       catsEl.appendChild(makeCatRow(c));
     });
     refreshCatCount();
+    applyRowErrors(catsEl, ".cat-row", {
+      code: ".c-code", short_name: ".c-short", name: ".c-name",
+      description: ".c-desc", min_people: ".c-min", max_people: ".c-max"
+    }, readJsonObj("category-errors"));
     var addCat = document.getElementById("addCat");
     if (addCat) {
       addCat.addEventListener("click", function () {
@@ -207,6 +243,9 @@
       tiersEl.appendChild(makeTierRow(t));
     });
     refreshTierCount();
+    applyRowErrors(tiersEl, ".tier-row", {
+      price: ".t-price", active_until: ".t-until"
+    }, readJsonObj("price-tier-errors"));
     var addTier = document.getElementById("addTier");
     if (addTier) {
       addTier.addEventListener("click", function () {

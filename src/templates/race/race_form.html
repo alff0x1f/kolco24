@@ -10,8 +10,8 @@
 {% block content %}
 <form class="race-form-page" id="raceForm" method="post">
   {% csrf_token %}
-  <input type="hidden" name="categories_json" id="categoriesJson">
-  <input type="hidden" name="price_tiers_json" id="priceTiersJson">
+  <input type="hidden" name="categories_json" id="categoriesJson" value="{{ categories_data|force_escape }}">
+  <input type="hidden" name="price_tiers_json" id="priceTiersJson" value="{{ price_tiers_data|force_escape }}">
   <div class="container">
 
     <!-- Breadcrumb -->
@@ -113,13 +113,13 @@
               <div class="field">
                 <label for="f-date">Дата начала <span class="req">*</span></label>
                 <input class="control{% if form.date.errors %} has-error{% endif %}" id="f-date"
-                       name="date" type="date" value="{{ form.date.value|default_if_none:'' }}">
+                       name="date" type="date" value="{{ form.date.value|date:"Y-m-d"|default:form.date.value }}">
                 {% if form.date.errors %}<span class="field-error">{{ form.date.errors|join:", " }}</span>{% endif %}
               </div>
               <div class="field">
                 <label for="f-date-end">Дата окончания <span class="req">*</span></label>
                 <input class="control{% if form.date_end.errors %} has-error{% endif %}" id="f-date-end"
-                       name="date_end" type="date" value="{{ form.date_end.value|default_if_none:'' }}">
+                       name="date_end" type="date" value="{{ form.date_end.value|date:"Y-m-d"|default:form.date_end.value }}">
                 {% if form.date_end.errors %}<span class="field-error">{{ form.date_end.errors|join:", " }}</span>{% endif %}
               </div>
               <div class="field">
@@ -338,6 +338,8 @@
 
 <script id="categories-data" type="application/json">{{ categories_data }}</script>
 <script id="price-tiers-data" type="application/json">{{ price_tiers_data }}</script>
+<script id="category-errors" type="application/json">{{ category_errors }}</script>
+<script id="price-tier-errors" type="application/json">{{ price_tier_errors }}</script>
 {% endblock %}
 
 {% block footer_js_include %}

@@ -463,9 +463,9 @@ class RaceEditView(View):
             "is_create": race is None,
             "categories_data": _safe_json(categories_data),
             "price_tiers_data": _safe_json(price_tiers_data),
+            "category_errors": _safe_json(category_errors or {}),
+            "price_tier_errors": _safe_json(price_tier_errors or {}),
             "reg_status_choices": RegStatus.choices,
-            "category_errors": category_errors or {},
-            "price_tier_errors": price_tier_errors or {},
         }
 
     @staticmethod
