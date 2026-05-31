@@ -228,8 +228,8 @@ if (race.people_limit and race.reg_status == RegStatus.OPEN
 - Modify: `CLAUDE.md`
 - Modify: `docs/plans/20260531-people-limits.md`
 
-- [ ] обновить `CLAUDE.md`: новые поля `people_limit`, paid-basis занятости, gate в `TeamForm.clean`, авто sold_out (Option B), `0 = unlimited`
-- [ ] перенести план в `docs/plans/completed/`
+- [x] обновить `CLAUDE.md`: новые поля `people_limit`, paid-basis занятости, gate в `TeamForm.clean`, авто sold_out (Option B), `0 = unlimited`
+- [x] перенести план в `docs/plans/completed/`
 
 ## Post-Completion
 
