@@ -289,7 +289,7 @@ def _validate_category_rows(rows):
             row_errors["max_people"] = max_err
         if not min_err and not max_err and min_people > max_people:
             row_errors["min_people"] = "Минимум больше максимума."
-        if code:
+        if code and "code" not in row_errors:
             seen_codes.add(code)
         if row_errors:
             errors[index] = row_errors
@@ -379,7 +379,9 @@ def _reconcile_categories(race, cleaned):
         instance.order = index
         instance.save()
         seen.add(instance.id)
-    to_delete = Category.objects.filter(race=race).exclude(id__in=seen)
+    to_delete = (
+        Category.objects.filter(race=race).exclude(id__in=seen).select_for_update()
+    )
     if Team.objects.filter(category2__in=to_delete).exists():
         names = ", ".join(f"«{c.name}»" for c in to_delete.only("name"))
         raise ValueError(f"Нельзя удалить категорию, в которой есть команды: {names}.")
@@ -542,6 +544,8 @@ class RaceEditView(View):
                     _reconcile_categories(race, cleaned_categories)
                     _reconcile_price_tiers(race, cleaned_tiers)
             except ValueError as exc:
+                if not is_create:
+                    race.refresh_from_db()
                 form.add_error(None, str(exc))
             else:
                 return HttpResponseRedirect(
