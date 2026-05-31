@@ -102,6 +102,7 @@
                                     id="category" name="category2_id">
                                 {% for option in category_options %}
                                 <option value="{{ option.id }}" data-counts="{{ option.counts|join:',' }}"
+                                        data-remaining="{{ option.remaining }}"{% if option.is_current %} data-current="1"{% endif %}
                                         {% if team_form.category2_id.value|stringformat:'s' == option.id|stringformat:'s' %}selected{% endif %}>{{ option.label }}</option>
                                 {% endfor %}
                             </select>

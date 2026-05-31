@@ -196,12 +196,12 @@ if (race.people_limit and race.reg_status == RegStatus.OPEN
 - Modify: `src/static/js/team-form.js`
 - Modify: `src/website/tests.py`
 
-- [ ] в `build_category_options` добавить `data-remaining` per `<option>` (пусто = unlimited)
-- [ ] в `build_team_form_context`/`teamFormConfig` добавить `raceRemaining`
-- [ ] `team-form.js`: disable `<option>` когда `remaining < min_people` (НО никогда не текущую категорию команды)
-- [ ] `team-form.js`: кап segmented size-control до `min(category.max_people, что влезает по category remaining и race remaining)`
-- [ ] тесты: `build_category_options` отдаёт корректный `data-remaining` (incl. unlimited и текущая категория не дизейблится); `build_team_form_context` содержит `raceRemaining`
-- [ ] запустить тесты — должны пройти перед Task 6
+- [x] в `build_category_options` добавить `data-remaining` per `<option>` (пусто = unlimited)
+- [x] в `build_team_form_context`/`teamFormConfig` добавить `raceRemaining`
+- [x] `team-form.js`: disable `<option>` когда `remaining < min_people` (НО никогда не текущую категорию команды)
+- [x] `team-form.js`: кап segmented size-control до `min(category.max_people, что влезает по category remaining и race remaining)`
+- [x] тесты: `build_category_options` отдаёт корректный `data-remaining` (incl. unlimited и текущая категория не дизейблится); `build_team_form_context` содержит `raceRemaining`
+- [x] запустить тесты — должны пройти перед Task 6
 
 ### Task 6: Display бейджей «осталось N / мест нет»
 

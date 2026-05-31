@@ -1746,11 +1746,16 @@ def upload_photo(request, race_id):
     return JsonResponse({"success": True})
 
 
-def build_category_options(race_id, current_category_id=None):
+def build_category_options(race_id, current_category_id=None, team=None):
     """Category options carrying ``data-counts`` expanded from min/max people.
 
     If current_category_id names an inactive category, it is prepended so that
     existing teams whose category was later deactivated still render correctly.
+
+    Each option also carries ``remaining`` — free slots for that category
+    (``""`` when the category is unlimited), self-excluding ``team`` from the
+    occupancy so a team editing within its own category isn't counted against
+    its own limit. The client uses it to disable full categories.
     """
     cats = list(Category.objects.filter(race_id=race_id, is_active=True))
     if current_category_id is not None:
@@ -1761,14 +1766,19 @@ def build_category_options(race_id, current_category_id=None):
             ).first()
             if current_cat:
                 cats.insert(0, current_cat)
-    return [
-        {
-            "id": category.id,
-            "label": f"{category.short_name} ({category.name})",
-            "counts": list(range(category.min_people, category.max_people + 1)),
-        }
-        for category in cats
-    ]
+    options = []
+    for category in cats:
+        remaining = category.remaining_people(exclude_team=team)
+        options.append(
+            {
+                "id": category.id,
+                "label": f"{category.short_name} ({category.name})",
+                "counts": list(range(category.min_people, category.max_people + 1)),
+                "remaining": "" if remaining is None else remaining,
+                "is_current": category.id == current_category_id,
+            }
+        )
+    return options
 
 
 def build_team_form_context(race, team, is_edit=False):
@@ -1776,6 +1786,7 @@ def build_team_form_context(race, team, is_edit=False):
     current_category_id = getattr(team, "category2_id", None)
     price_tiers = race.price_tier_ladder()
     current_price = race.current_price
+    race_remaining = race.remaining_people()
     config = {
         "currentPrice": current_price,
         "paidPeople": team.paid_people,
@@ -1783,6 +1794,8 @@ def build_team_form_context(race, team, is_edit=False):
         "mapPrice": MAP_PRICE,
         "freeMaps": FREE_MAPS,
         "isEdit": is_edit,
+        "raceRemaining": race_remaining,
+        "currentCategoryId": current_category_id,
     }
     return {
         "current_price": current_price,
@@ -1794,7 +1807,9 @@ def build_team_form_context(race, team, is_edit=False):
         "reg_status": race.reg_status,
         "map_price": MAP_PRICE,
         "free_maps": FREE_MAPS,
-        "category_options": build_category_options(race.id, current_category_id),
+        "category_options": build_category_options(
+            race.id, current_category_id, team=team
+        ),
         "team_form_config_json": mark_safe(json.dumps(config)),
     }
 

@@ -12,6 +12,7 @@ from website.forms import TeamForm
 from website.models import Payment, Race
 from website.models.models import PaymentsYa, Team
 from website.models.race import Category, RaceLink, RacePriceTier, RegStatus
+from website.views.views_ import build_category_options, build_team_form_context
 
 
 @pytest.mark.django_db
@@ -1613,3 +1614,74 @@ def test_race_without_limit_does_not_flip(django_user_model):
     _confirm_payment(user, team, paid_for=10)
     race.refresh_from_db()
     assert race.reg_status == RegStatus.OPEN
+
+
+# ---------------------------------------------------------------------------
+# Task 5: team-form UX context (data-remaining / raceRemaining)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.django_db
+def test_build_category_options_remaining_limited_and_unlimited(django_user_model):
+    user = _pl_user(django_user_model)
+    race = _pl_race()
+    limited = _pl_category(race, code="L", name="Lim", short_name="L", people_limit=6)
+    unlimited = _pl_category(race, code="U", name="Unl", short_name="U", people_limit=0)
+    _pl_team(limited, user, paid_people=2, name="A")
+    options = build_category_options(race.id)
+    by_id = {o["id"]: o for o in options}
+    # limited: 6 - 2 = 4 free; unlimited published as "" (no limit)
+    assert by_id[limited.id]["remaining"] == 4
+    assert by_id[unlimited.id]["remaining"] == ""
+
+
+@pytest.mark.django_db
+def test_build_category_options_excludes_own_team(django_user_model):
+    user = _pl_user(django_user_model)
+    race = _pl_race()
+    cat = _pl_category(race, people_limit=6)
+    team = _pl_team(cat, user, paid_people=2, name="self")
+    _pl_team(cat, user, paid_people=3, name="Other")
+    # without exclusion 6 - 5 = 1; excluding own team frees its 2 → 3
+    plain = build_category_options(race.id)
+    assert next(o for o in plain if o["id"] == cat.id)["remaining"] == 1
+    excluded = build_category_options(race.id, cat.id, team=team)
+    assert next(o for o in excluded if o["id"] == cat.id)["remaining"] == 3
+
+
+@pytest.mark.django_db
+def test_build_category_options_marks_current(django_user_model):
+    user = _pl_user(django_user_model)
+    race = _pl_race()
+    cat = _pl_category(race, code="C", name="Cur", short_name="C", people_limit=2)
+    other = _pl_category(race, code="O", name="Oth", short_name="O", people_limit=2)
+    team = _pl_team(cat, user, paid_people=2, name="self")
+    options = build_category_options(race.id, cat.id, team=team)
+    by_id = {o["id"]: o for o in options}
+    # the team's own (full) category is flagged so the client never disables it
+    assert by_id[cat.id]["is_current"] is True
+    assert by_id[other.id]["is_current"] is False
+
+
+@pytest.mark.django_db
+def test_build_team_form_context_includes_race_remaining(django_user_model):
+    import json
+
+    user = _pl_user(django_user_model)
+    race = _pl_race(people_limit=10)
+    cat = _pl_category(race)
+    _pl_team(cat, user, paid_people=4, name="A")
+    ctx = build_team_form_context(race, Team())
+    config = json.loads(str(ctx["team_form_config_json"]))
+    assert config["raceRemaining"] == 6
+    assert config["currentCategoryId"] is None
+
+
+@pytest.mark.django_db
+def test_build_team_form_context_race_remaining_unlimited(django_user_model):
+    import json
+
+    race = _pl_race(people_limit=0)
+    ctx = build_team_form_context(race, Team())
+    config = json.loads(str(ctx["team_form_config_json"]))
+    assert config["raceRemaining"] is None
