@@ -89,7 +89,7 @@ class Race(Model):
         """Свободные слоты гонки или ``None`` при отсутствии лимита."""
         if not self.people_limit:  # 0 → без лимита
             return None
-        return self.people_limit - self.people_count()
+        return max(0, self.people_limit - self.people_count())
 
     def _active_tier_index(self, tiers):
         """Index of the active tier within ``tiers`` (assumed ordered).
@@ -225,7 +225,7 @@ class Category(Model):
         occupied = self.people_count()
         if exclude_team and exclude_team.category2_id == self.id:
             occupied -= exclude_team.paid_people
-        return self.people_limit - occupied
+        return max(0, self.people_limit - occupied)
 
 
 class RacePriceTier(Model):

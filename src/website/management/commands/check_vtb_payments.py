@@ -77,6 +77,18 @@ class Command(BaseCommand):
                         team.save(
                             update_fields=["paid_people", "paid_sum", "map_count_paid"]
                         )
+                        from website.models.race import RegStatus
+
+                        category = team.category2
+                        race = category.race if category else None
+                        if (
+                            race
+                            and race.people_limit
+                            and race.reg_status == RegStatus.OPEN
+                            and race.people_count() >= race.people_limit
+                        ):
+                            race.reg_status = RegStatus.SOLD_OUT
+                            race.save(update_fields=["reg_status"])
                     payment.status = Payment.STATUS_DONE
                     payment.order = payment.pk
                     payment.save(update_fields=["status", "order"])

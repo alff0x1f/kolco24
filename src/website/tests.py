@@ -1353,6 +1353,16 @@ def test_category_people_count_excludes_deleted(django_user_model):
 
 
 @pytest.mark.django_db
+def test_race_people_count_excludes_deleted(django_user_model):
+    user = _pl_user(django_user_model)
+    race = _pl_race(people_limit=10)
+    cat = _pl_category(race)
+    _pl_team(cat, user, paid_people=2, name="A")
+    _pl_team(cat, user, paid_people=4, is_deleted=True, name="Gone")
+    assert race.people_count() == 2
+
+
+@pytest.mark.django_db
 def test_category_remaining_people_unlimited_when_zero(django_user_model):
     user = _pl_user(django_user_model)
     race = _pl_race()
@@ -1529,6 +1539,32 @@ def test_gate_unlimited_does_not_restrict(django_user_model):
     _pl_team(cat, user, paid_people=6, name="filler")
     form = TeamForm(race.id, _gate_data(cat, 6))
     assert form.is_valid(), form.errors
+
+
+@pytest.mark.django_db
+def test_gate_exactly_fills_last_slot(django_user_model):
+    # needed == race_remaining → разрешено (условие > а не >=).
+    user = _pl_user(django_user_model)
+    race = _pl_race(people_limit=5)
+    cat = _pl_category(race)
+    _pl_team(cat, user, paid_people=3, name="filler")
+    team = _pl_team(cat, user, paid_people=0, name="self")
+    form = TeamForm(race.id, _gate_data(cat, 2), team=team)
+    assert form.is_valid(), form.errors
+
+
+@pytest.mark.django_db
+def test_gate_moving_and_growing_in_full_category_blocked(django_user_model):
+    # Переход в другую категорию с одновременным ростом блокируется категорийным гейтом.
+    user = _pl_user(django_user_model)
+    race = _pl_race(people_limit=0)
+    src = _pl_category(race, code="A", name="A", short_name="A")
+    dst = _pl_category(race, code="B", name="B", short_name="B", people_limit=4)
+    _pl_team(dst, user, paid_people=3, name="filler")
+    team = _pl_team(src, user, paid_people=2, name="self")
+    form = TeamForm(race.id, _gate_data(dst, 5), team=team)
+    assert not form.is_valid()
+    assert "category2_id" in form.errors
 
 
 # ---------------------------------------------------------------------------

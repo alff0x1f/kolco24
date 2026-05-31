@@ -155,6 +155,13 @@
   function syncCategoryOptions() {
     if (!category) return;
     Array.prototype.forEach.call(category.options, function (opt) {
+      var isCurrent =
+        opt.dataset.current === "1" ||
+        (CURRENT_CAT_ID != null && String(opt.value) === CURRENT_CAT_ID);
+      if (isCurrent) {
+        opt.disabled = false;
+        return;
+      }
       var sizes = (opt.dataset.counts || "")
         .split(",")
         .map(function (s) {

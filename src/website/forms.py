@@ -624,7 +624,9 @@ class TeamForm(forms.Form):
         category_id = cleaned_data.get("category2_id")
         ucount = cleaned_data.get("ucount")
         category = (
-            Category.objects.filter(id=category_id).first() if category_id else None
+            Category.objects.filter(id=category_id).select_related("race").first()
+            if category_id
+            else None
         )
         ucount_valid = False
         if ucount is not None:
