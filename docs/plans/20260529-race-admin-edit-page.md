@@ -176,13 +176,13 @@ blocks, the `base-2.html` template stack, and the `AddNewsPostView` authorizatio
 - Modify: `src/website/views/views_.py`
 - Modify: `src/apps/race/tests.py`
 
-- [ ] add `can_edit_race(user, race)` next to `is_race_admin`: `False` if not
+- [x] add `can_edit_race(user, race)` next to `is_race_admin`: `False` if not
       authenticated; `True` if `user.is_superuser`; else
       `RaceAdmin.objects.filter(race=race, user=user, role=RaceAdmin.Role.ADMIN).exists()`
-- [ ] write test: superuser → `True` for any race
-- [ ] write test: `RaceAdmin(role=ADMIN)` → `True` for own race, `False` for another race
-- [ ] write test: `RaceAdmin(role=MODERATOR)` → `False`; anonymous/regular user → `False`
-- [ ] run tests — must pass before next task
+- [x] write test: superuser → `True` for any race
+- [x] write test: `RaceAdmin(role=ADMIN)` → `True` for own race, `False` for another race
+- [x] write test: `RaceAdmin(role=MODERATOR)` → `False`; anonymous/regular user → `False`
+- [x] run tests — must pass before next task
 
 ### Task 2: `RaceForm` ModelForm
 

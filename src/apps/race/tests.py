@@ -8,7 +8,8 @@ from django.urls import resolve, reverse
 from apps.race.views import RaceTeamsView
 from website.models import Race
 from website.models.models import Team
-from website.models.race import Category, RegStatus
+from website.models.race import Category, RaceAdmin, RegStatus
+from website.views.views_ import can_edit_race
 
 
 def _script_json(html, script_id):
@@ -476,3 +477,45 @@ def test_race_page_hides_add_button_when_reg_not_open(client):
     assert resp.status_code == 200
     html = resp.content.decode()
     assert "Добавить команду" not in html
+
+
+# --- can_edit_race access-control matrix ---
+
+
+@pytest.mark.django_db
+def test_can_edit_race_superuser_true_for_any_race():
+    admin = User.objects.create_superuser(
+        username="su", password="p", email="su@example.com"
+    )
+    race = _make_race(slug="ce1", code="ce1")
+    other = _make_race(slug="ce1b", code="ce1b")
+
+    assert can_edit_race(admin, race) is True
+    assert can_edit_race(admin, other) is True
+
+
+@pytest.mark.django_db
+def test_can_edit_race_admin_only_for_own_race():
+    user = User.objects.create_user(username="ra", password="p", email="ra@example.com")
+    race = _make_race(slug="ce2", code="ce2")
+    other = _make_race(slug="ce2b", code="ce2b")
+    RaceAdmin.objects.create(race=race, user=user, role=RaceAdmin.Role.ADMIN)
+
+    assert can_edit_race(user, race) is True
+    assert can_edit_race(user, other) is False
+
+
+@pytest.mark.django_db
+def test_can_edit_race_moderator_and_others_false():
+    moderator = User.objects.create_user(
+        username="mod", password="p", email="mod@example.com"
+    )
+    regular = User.objects.create_user(
+        username="reg", password="p", email="reg@example.com"
+    )
+    race = _make_race(slug="ce3", code="ce3")
+    RaceAdmin.objects.create(race=race, user=moderator, role=RaceAdmin.Role.MODERATOR)
+
+    assert can_edit_race(moderator, race) is False
+    assert can_edit_race(regular, race) is False
+    assert can_edit_race(AnonymousUser(), race) is False
