@@ -222,7 +222,7 @@ class RacePriceTierInline(admin.TabularInline):
 
 
 class RaceModelAdmin(admin.ModelAdmin):
-    list_display = ("id", "name", "code", "slug", "date", "is_active", "is_reg_open")
+    list_display = ("id", "name", "code", "slug", "date", "is_active", "reg_status")
     list_filter = ("is_active",)
     search_fields = ("name", "code", "slug")
     prepopulated_fields = {"slug": ("code",)}
