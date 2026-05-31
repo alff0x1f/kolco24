@@ -142,6 +142,14 @@
       // Full category name shown dim next to the short label; skip it when the
       // label already is the full name (no short_name) to avoid duplication.
       var full = c.name && c.name !== c.label ? c.name : "";
+      var remHtml = "";
+      if (c.remaining != null) {
+        if (c.remaining > 0) {
+          remHtml = '<span class="brk-remaining ok">ост. ' + c.remaining + "</span>";
+        } else {
+          remHtml = '<span class="brk-remaining none">мест нет</span>';
+        }
+      }
       btn.innerHTML =
         '<div class="brk-top"><span class="nm">' +
         esc(c.label) +
@@ -151,7 +159,9 @@
           : "") +
         '<span class="vl">' +
         n +
-        "</span></div>" +
+        "</span>" +
+        remHtml +
+        "</div>" +
         '<div class="brk-bar"><i style="width:' +
         pct +
         '%"></i></div>';

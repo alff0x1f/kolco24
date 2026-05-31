@@ -1795,7 +1795,7 @@ def build_category_options(race_id, current_category_id=None, team=None):
     return options
 
 
-def build_team_form_context(race, team, is_edit=False):
+def build_team_form_context(race, team, is_edit=False, bypass_limits=False):
     """Unified context shared by the add and edit team forms."""
     current_category_id = getattr(team, "category2_id", None)
     price_tiers = race.price_tier_ladder()
@@ -1810,6 +1810,7 @@ def build_team_form_context(race, team, is_edit=False):
         "isEdit": is_edit,
         "raceRemaining": race_remaining,
         "currentCategoryId": current_category_id,
+        "bypassLimits": bypass_limits,
     }
     return {
         "current_price": current_price,
@@ -1844,7 +1845,9 @@ class AddTeam(View):
                 "team_form": form,
                 "team": Team(),
                 "action": reverse("add_team", args=[race.slug]),
-                **build_team_form_context(race, Team()),
+                **build_team_form_context(
+                    race, Team(), bypass_limits=request.user.is_superuser
+                ),
             },
         )
 
@@ -1932,7 +1935,9 @@ class AddTeam(View):
                 "team_form": form,
                 "team": Team(),
                 "action": reverse("add_team", args=[race.slug]),
-                **build_team_form_context(race, Team()),
+                **build_team_form_context(
+                    race, Team(), bypass_limits=request.user.is_superuser
+                ),
             },
         )
 

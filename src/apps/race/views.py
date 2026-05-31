@@ -126,6 +126,7 @@ class RaceTeamsView(View):
                     "name": cat.name,
                     "count": cat.team_count or 0,
                     "colorIdx": color_idx,
+                    "remaining": cat.remaining_people(),
                 }
             )
 

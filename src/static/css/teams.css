@@ -205,6 +205,12 @@
   margin-left: auto; flex: 0 0 auto;
   color: var(--muted); font-variant-numeric: tabular-nums; font-size: 12.5px;
 }
+.teams-page .brk-top .brk-remaining {
+  flex: 0 0 auto; font-size: 11px; font-weight: 500;
+  white-space: nowrap; padding-left: 6px;
+}
+.teams-page .brk-top .brk-remaining.ok { color: var(--primary-2); }
+.teams-page .brk-top .brk-remaining.none { color: #c0392b; }
 .teams-page .brk-bar {
   height: 6px; border-radius: 999px; background: #eef1f5; overflow: hidden;
 }

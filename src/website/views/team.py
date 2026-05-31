@@ -65,7 +65,9 @@ class EditTeamView(View):
                     Q(from_team=team) | Q(to_team=team)
                 ).order_by("id"),
                 "team_move_form": TeamMemberMoveForm(race_id=team.category2.race_id),
-                **build_team_form_context(race, team, is_edit=True),
+                **build_team_form_context(
+                    race, team, is_edit=True, bypass_limits=request.user.is_superuser
+                ),
             },
         )
 
@@ -123,7 +125,12 @@ class EditTeamView(View):
                         "team_move_form": TeamMemberMoveForm(
                             race_id=team.category2.race_id
                         ),
-                        **build_team_form_context(race, team, is_edit=True),
+                        **build_team_form_context(
+                            race,
+                            team,
+                            is_edit=True,
+                            bypass_limits=request.user.is_superuser,
+                        ),
                     },
                 )
             if "ucount" in form.cleaned_data:
@@ -162,7 +169,12 @@ class EditTeamView(View):
                         "team_move_form": TeamMemberMoveForm(
                             race_id=team.category2.race_id
                         ),
-                        **build_team_form_context(race, team, is_edit=True),
+                        **build_team_form_context(
+                            race,
+                            team,
+                            is_edit=True,
+                            bypass_limits=request.user.is_superuser,
+                        ),
                     },
                 )
             if "category2_id" in form.cleaned_data:
@@ -231,7 +243,12 @@ class EditTeamView(View):
                     Q(from_team=team) | Q(to_team=team)
                 ).order_by("id"),
                 "team_move_form": TeamMemberMoveForm(race_id=team.category2.race_id),
-                **build_team_form_context(race, team, is_edit=True),
+                **build_team_form_context(
+                    race,
+                    team,
+                    is_edit=True,
+                    bypass_limits=request.user.is_superuser,
+                ),
             },
         )
 

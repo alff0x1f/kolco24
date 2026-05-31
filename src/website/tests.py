@@ -1721,3 +1721,28 @@ def test_build_team_form_context_race_remaining_unlimited(django_user_model):
     ctx = build_team_form_context(race, Team())
     config = json.loads(str(ctx["team_form_config_json"]))
     assert config["raceRemaining"] is None
+
+
+@pytest.mark.django_db
+def test_edit_team_invalid_post_superuser_has_bypass_limits_in_config(
+    client, django_user_model
+):
+    import json
+
+    superuser = django_user_model.objects.create_superuser(
+        username="su_bypass_test", password="x"
+    )
+    race = _pl_race(people_limit=2)
+    cat = _pl_category(race)
+    filler_user = _pl_user(django_user_model, n=77)
+    _pl_team(cat, filler_user, paid_people=2, name="filler77")
+    team = _pl_team(cat, superuser, paid_people=0, name="SuTeam")
+    client.force_login(superuser)
+    # ucount=1 is below min_value=2, so form.is_valid() is False → invalid-POST rerender
+    response = client.post(
+        f"/team/{team.id}/",
+        {"ucount": "1", "category2_id": str(cat.id)},
+    )
+    assert response.status_code == 200
+    config = json.loads(str(response.context["team_form_config_json"]))
+    assert config["bypassLimits"] is True

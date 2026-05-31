@@ -44,6 +44,7 @@
     isEdit: false,
     raceRemaining: null,
     currentCategoryId: null,
+    bypassLimits: false,
   };
   var cfgEl = document.getElementById("teamFormConfig");
   if (cfgEl) {
@@ -65,6 +66,7 @@
   // null/"" => unlimited; mirrors Race.remaining_people()/Category.remaining_people()
   var RACE_REMAINING = cfg.raceRemaining == null ? null : Number(cfg.raceRemaining);
   var CURRENT_CAT_ID = cfg.currentCategoryId == null ? null : String(cfg.currentCategoryId);
+  var BYPASS_LIMITS = !!cfg.bypassLimits;
 
   // ── DOM hooks ─────────────────────────────────────────
   var category = document.getElementById("category");
@@ -131,7 +133,7 @@
   // entering-full / growing-in-full (self-exclusion already baked into
   // data-remaining). The team's own current category is never blocked.
   function countAllowed(opt, n) {
-    if (!opt) return true;
+    if (!opt || BYPASS_LIMITS) return true;
     var isCurrent =
       opt.dataset.current === "1" ||
       (CURRENT_CAT_ID != null && String(opt.value) === CURRENT_CAT_ID);
@@ -155,6 +157,10 @@
   function syncCategoryOptions() {
     if (!category) return;
     Array.prototype.forEach.call(category.options, function (opt) {
+      if (BYPASS_LIMITS) {
+        opt.disabled = false;
+        return;
+      }
       var isCurrent =
         opt.dataset.current === "1" ||
         (CURRENT_CAT_ID != null && String(opt.value) === CURRENT_CAT_ID);
