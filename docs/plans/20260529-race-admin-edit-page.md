@@ -227,26 +227,26 @@ blocks, the `base-2.html` template stack, and the `AddNewsPostView` authorizatio
 - Modify: `src/apps/race/views.py`
 - Modify: `src/apps/race/tests.py`
 
-- [ ] implement `post`: re-run auth; bind `RaceForm(request.POST, instance=...)`; parse
+- [x] implement `post`: re-run auth; bind `RaceForm(request.POST, instance=...)`; parse
       `categories_json` **and** `price_tiers_json`; validate rows; on full validity
       `form.save()` + reconcile categories (incl. `min_people`/`max_people`) **and** price
       tiers (update/create/delete, `order=index`) inside one `transaction.atomic()`;
       redirect to `reverse("race", kwargs={"race_slug": race.slug})`
-- [ ] on any error: re-render with `form`, echoed `categories_json` + `price_tiers_json`,
+- [x] on any error: re-render with `form`, echoed `categories_json` + `price_tiers_json`,
       and `category_errors` + `price_tier_errors`
-- [ ] write test: superuser create flow → `Race` created with correct fields + redirect
-- [ ] write test: edit flow updates scalar fields incl. `reg_status` round-trip
-- [ ] write test: category reconcile — edit one + add one + omit one → update/create/delete
+- [x] write test: superuser create flow → `Race` created with correct fields + redirect
+- [x] write test: edit flow updates scalar fields incl. `reg_status` round-trip
+- [x] write test: category reconcile — edit one + add one + omit one → update/create/delete
       happen, `order` matches array position, and `min_people`/`max_people` round-trip
-- [ ] write test: price-tier reconcile — edit one + add one + omit one → update/create/delete
+- [x] write test: price-tier reconcile — edit one + add one + omit one → update/create/delete
       happen and `Race.current_price` reflects the new active tier
-- [ ] write test: cross-race `id` in either payload → treated as new (not hijacked)
-- [ ] write test: validation rollback — malformed JSON → form-level error, race unchanged;
+- [x] write test: cross-race `id` in either payload → treated as new (not hijacked)
+- [x] write test: validation rollback — malformed JSON → form-level error, race unchanged;
       category row missing `code`/`name` or `min_people > max_people` → row error, full
       rollback; price-tier row with non-positive `price` or bad `active_until` → row error,
       full rollback (race not updated)
-- [ ] write test: non-ADMIN RaceAdmin POST other race → 403; ADMIN POST create → 403
-- [ ] run tests — must pass before next task
+- [x] write test: non-ADMIN RaceAdmin POST other race → 403; ADMIN POST create → 403
+- [x] run tests — must pass before next task
 
 ### Task 5: URL routes
 

@@ -689,3 +689,288 @@ def test_race_edit_get_admin_edit_returns_200_with_context():
     tiers = _script_json(html, "price-tiers-data")
     assert tiers[0]["price"] == 1500
     assert tiers[0]["active_until"] == "2026-08-01"
+
+
+# --- RaceEditView POST save + category/price-tier reconcile ---
+
+
+def _edit_post(path, user, data, **kwargs):
+    request = RequestFactory().post(path, data)
+    request.user = user
+    return RaceEditView.as_view()(request, **kwargs)
+
+
+def _post_data(**overrides):
+    """Race form fields plus empty category/tier payloads, with overrides."""
+    data = _race_form_data()
+    data["categories_json"] = "[]"
+    data["price_tiers_json"] = "[]"
+    data.update(overrides)
+    return data
+
+
+@pytest.mark.django_db
+def test_race_edit_post_superuser_create():
+    admin = User.objects.create_superuser(
+        username="pc1", password="p", email="pc1@e.com"
+    )
+
+    resp = _edit_post("/races/new/", admin, _post_data())
+
+    assert resp.status_code == 302
+    assert resp.url == reverse("race", kwargs={"race_slug": "new-race"})
+    race = Race.objects.get(slug="new-race")
+    assert race.name == "New Race"
+    assert race.code == "nr-1"
+    assert race.cost == 1000
+    assert race.reg_status == RegStatus.UPCOMING
+
+
+@pytest.mark.django_db
+def test_race_edit_post_edit_updates_scalar_fields():
+    user = User.objects.create_user(username="pe1", password="p", email="pe1@e.com")
+    race = _make_race(slug="pe1", code="pe1")
+    RaceAdmin.objects.create(race=race, user=user, role=RaceAdmin.Role.ADMIN)
+
+    data = _post_data(
+        name="Updated Name",
+        code="pe1",
+        slug="pe1",
+        reg_status=RegStatus.OPEN,
+        cost=2500,
+    )
+    resp = _edit_post(f"/race/{race.slug}/edit/", user, data, race_slug=race.slug)
+
+    assert resp.status_code == 302
+    race.refresh_from_db()
+    assert race.name == "Updated Name"
+    assert race.reg_status == RegStatus.OPEN
+    assert race.cost == 2500
+
+
+@pytest.mark.django_db
+def test_race_edit_post_category_reconcile_update_create_delete():
+    user = User.objects.create_user(username="pc2", password="p", email="pc2@e.com")
+    race = _make_race(slug="pc2", code="pc2")
+    RaceAdmin.objects.create(race=race, user=user, role=RaceAdmin.Role.ADMIN)
+    keep = _make_category(race, code="keep", short_name="k", name="Keep", order=0)
+    drop = _make_category(race, code="drop", short_name="d", name="Drop", order=1)
+
+    categories = json.dumps(
+        [
+            {
+                "id": keep.id,
+                "code": "keep",
+                "short_name": "k2",
+                "name": "Keep Renamed",
+                "description": "",
+                "is_active": True,
+                "min_people": 3,
+                "max_people": 5,
+            },
+            {
+                "id": None,
+                "code": "fresh",
+                "short_name": "f",
+                "name": "Fresh",
+                "description": "",
+                "is_active": True,
+                "min_people": 2,
+                "max_people": 4,
+            },
+        ]
+    )
+    data = _post_data(code="pc2", slug="pc2", categories_json=categories)
+    resp = _edit_post(f"/race/{race.slug}/edit/", user, data, race_slug=race.slug)
+
+    assert resp.status_code == 302
+    assert not Category.objects.filter(id=drop.id).exists()
+    keep.refresh_from_db()
+    assert keep.name == "Keep Renamed"
+    assert keep.order == 0
+    assert keep.min_people == 3 and keep.max_people == 5
+    fresh = Category.objects.get(race=race, code="fresh")
+    assert fresh.order == 1
+    assert fresh.min_people == 2 and fresh.max_people == 4
+
+
+@pytest.mark.django_db
+def test_race_edit_post_price_tier_reconcile_and_current_price():
+    user = User.objects.create_user(username="pt1", password="p", email="pt1@e.com")
+    race = _make_race(slug="pt1", code="pt1")
+    RaceAdmin.objects.create(race=race, user=user, role=RaceAdmin.Role.ADMIN)
+    keep = RacePriceTier.objects.create(
+        race=race, price=1500, active_until="2026-08-01"
+    )
+    drop = RacePriceTier.objects.create(
+        race=race, price=2000, active_until="2026-09-01"
+    )
+
+    tiers = json.dumps(
+        [
+            {"id": keep.id, "price": 1200, "active_until": "2026-07-01"},
+            {"id": None, "price": 1800, "active_until": "2026-10-01"},
+        ]
+    )
+    data = _post_data(code="pt1", slug="pt1", price_tiers_json=tiers)
+    resp = _edit_post(f"/race/{race.slug}/edit/", user, data, race_slug=race.slug)
+
+    assert resp.status_code == 302
+    assert not RacePriceTier.objects.filter(id=drop.id).exists()
+    keep.refresh_from_db()
+    assert keep.price == 1200
+    assert RacePriceTier.objects.filter(race=race, price=1800).exists()
+    race.refresh_from_db()
+    # today (2026-05-31) < 2026-07-01, so the earliest tier is active.
+    assert race.current_price == 1200
+
+
+@pytest.mark.django_db
+def test_race_edit_post_cross_race_id_treated_as_new():
+    user = User.objects.create_user(username="cr1", password="p", email="cr1@e.com")
+    race = _make_race(slug="cr1", code="cr1")
+    RaceAdmin.objects.create(race=race, user=user, role=RaceAdmin.Role.ADMIN)
+    other = _make_race(slug="cr1b", code="cr1b")
+    other_cat = _make_category(other, code="oc", short_name="oc", name="Other Cat")
+    other_tier = RacePriceTier.objects.create(
+        race=other, price=999, active_until="2026-08-01"
+    )
+
+    categories = json.dumps(
+        [
+            {
+                "id": other_cat.id,
+                "code": "hijack",
+                "short_name": "h",
+                "name": "Hijack",
+                "description": "",
+                "is_active": True,
+                "min_people": 2,
+                "max_people": 6,
+            }
+        ]
+    )
+    tiers = json.dumps(
+        [{"id": other_tier.id, "price": 111, "active_until": "2026-07-01"}]
+    )
+    data = _post_data(
+        code="cr1", slug="cr1", categories_json=categories, price_tiers_json=tiers
+    )
+    resp = _edit_post(f"/race/{race.slug}/edit/", user, data, race_slug=race.slug)
+
+    assert resp.status_code == 302
+    # The other race's rows are untouched.
+    other_cat.refresh_from_db()
+    assert other_cat.race_id == other.id and other_cat.code == "oc"
+    other_tier.refresh_from_db()
+    assert other_tier.race_id == other.id and other_tier.price == 999
+    # Our race got a brand-new category/tier instead of hijacking theirs.
+    new_cat = Category.objects.get(race=race, code="hijack")
+    assert new_cat.id != other_cat.id
+    new_tier = RacePriceTier.objects.get(race=race, price=111)
+    assert new_tier.id != other_tier.id
+
+
+@pytest.mark.django_db
+def test_race_edit_post_malformed_json_rolls_back():
+    user = User.objects.create_user(username="mj1", password="p", email="mj1@e.com")
+    race = _make_race(slug="mj1", code="mj1")
+    RaceAdmin.objects.create(race=race, user=user, role=RaceAdmin.Role.ADMIN)
+
+    data = _post_data(code="mj1", slug="mj1", categories_json="{not json")
+    resp = _edit_post(f"/race/{race.slug}/edit/", user, data, race_slug=race.slug)
+
+    assert resp.status_code == 200
+    race.refresh_from_db()
+    # The form name "New Race" was NOT applied — full rollback.
+    assert race.name == "Teams Race"
+
+
+@pytest.mark.django_db
+def test_race_edit_post_invalid_category_row_rolls_back():
+    user = User.objects.create_user(username="iv1", password="p", email="iv1@e.com")
+    race = _make_race(slug="iv1", code="iv1")
+    RaceAdmin.objects.create(race=race, user=user, role=RaceAdmin.Role.ADMIN)
+
+    # Missing code + name.
+    bad_missing = json.dumps(
+        [{"id": None, "code": "", "name": "", "min_people": 2, "max_people": 6}]
+    )
+    resp = _edit_post(
+        f"/race/{race.slug}/edit/",
+        user,
+        _post_data(code="iv1", slug="iv1", categories_json=bad_missing),
+        race_slug=race.slug,
+    )
+    assert resp.status_code == 200
+
+    # min_people > max_people.
+    bad_range = json.dumps(
+        [{"id": None, "code": "c", "name": "n", "min_people": 5, "max_people": 2}]
+    )
+    resp = _edit_post(
+        f"/race/{race.slug}/edit/",
+        user,
+        _post_data(code="iv1", slug="iv1", categories_json=bad_range),
+        race_slug=race.slug,
+    )
+    assert resp.status_code == 200
+
+    race.refresh_from_db()
+    assert race.name == "Teams Race"
+    assert not Category.objects.filter(race=race).exists()
+
+
+@pytest.mark.django_db
+def test_race_edit_post_invalid_price_tier_row_rolls_back():
+    user = User.objects.create_user(username="iv2", password="p", email="iv2@e.com")
+    race = _make_race(slug="iv2", code="iv2")
+    RaceAdmin.objects.create(race=race, user=user, role=RaceAdmin.Role.ADMIN)
+
+    # Non-positive price.
+    bad_price = json.dumps([{"id": None, "price": -5, "active_until": "2026-08-01"}])
+    resp = _edit_post(
+        f"/race/{race.slug}/edit/",
+        user,
+        _post_data(code="iv2", slug="iv2", price_tiers_json=bad_price),
+        race_slug=race.slug,
+    )
+    assert resp.status_code == 200
+
+    # Bad active_until.
+    bad_date = json.dumps([{"id": None, "price": 100, "active_until": "not-a-date"}])
+    resp = _edit_post(
+        f"/race/{race.slug}/edit/",
+        user,
+        _post_data(code="iv2", slug="iv2", price_tiers_json=bad_date),
+        race_slug=race.slug,
+    )
+    assert resp.status_code == 200
+
+    race.refresh_from_db()
+    assert race.name == "Teams Race"
+    assert not RacePriceTier.objects.filter(race=race).exists()
+
+
+@pytest.mark.django_db
+def test_race_edit_post_moderator_other_race_forbidden():
+    user = User.objects.create_user(username="pf1", password="p", email="pf1@e.com")
+    race = _make_race(slug="pf1", code="pf1")
+    RaceAdmin.objects.create(race=race, user=user, role=RaceAdmin.Role.MODERATOR)
+
+    resp = _edit_post(
+        f"/race/{race.slug}/edit/", user, _post_data(), race_slug=race.slug
+    )
+    assert resp.status_code == 403
+
+
+@pytest.mark.django_db
+def test_race_edit_post_admin_create_forbidden():
+    # A RaceAdmin(ADMIN) is not a superuser, so they cannot create a race.
+    user = User.objects.create_user(username="pf2", password="p", email="pf2@e.com")
+    race = _make_race(slug="pf2", code="pf2")
+    RaceAdmin.objects.create(race=race, user=user, role=RaceAdmin.Role.ADMIN)
+
+    resp = _edit_post("/races/new/", user, _post_data(code="brand-new", slug="bn"))
+    assert resp.status_code == 403
+    assert not Race.objects.filter(slug="bn").exists()

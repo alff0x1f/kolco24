@@ -1,6 +1,8 @@
+import datetime
 import json
 from urllib.parse import quote
 
+from django.db import transaction
 from django.db.models import Count, OuterRef, Q, Subquery
 from django.http import Http404, HttpResponseForbidden, HttpResponseRedirect
 from django.shortcuts import get_object_or_404, render
@@ -11,7 +13,7 @@ from django.views import View
 from apps.race.forms import RaceForm
 from website.forms import NewsPostForm
 from website.models import NewsPost, Race, Team
-from website.models.race import Category, RegStatus
+from website.models.race import Category, RacePriceTier, RegStatus
 from website.views.views_ import can_edit_race, is_race_admin
 
 # Escape the HTML-significant characters as their \uXXXX forms, exactly like
@@ -209,6 +211,191 @@ class RaceTeamsView(View):
         return render(request, "race/teams.html", context)
 
 
+def _parse_json_list(raw):
+    """Parse a JSON array from ``raw`` text.
+
+    Raises ``ValueError`` on malformed JSON or a non-list top-level value so
+    the caller can surface a form-level error and roll back.
+    """
+    try:
+        data = json.loads(raw or "[]")
+    except (ValueError, TypeError):
+        raise ValueError("Некорректные данные.")
+    if not isinstance(data, list):
+        raise ValueError("Ожидался список.")
+    return data
+
+
+def _row_id(value):
+    """Coerce a row ``id`` to ``int`` or ``None`` (new row / unparseable)."""
+    try:
+        return int(value)
+    except (ValueError, TypeError):
+        return None
+
+
+def _positive_int(value):
+    """Return ``(int, None)`` for a positive integer, else ``(None, msg)``."""
+    try:
+        ivalue = int(value)
+    except (ValueError, TypeError):
+        return None, "Введите целое число."
+    if ivalue <= 0:
+        return None, "Должно быть больше нуля."
+    return ivalue, None
+
+
+def _validate_category_rows(rows):
+    """Validate parsed category rows.
+
+    Returns ``(cleaned, errors)`` where ``cleaned`` is a list aligned with
+    ``rows`` (``None`` for invalid rows) and ``errors`` is
+    ``{row_index: {field: msg}}``. Duplicate ``code`` within the payload is a
+    row-level error on the second occurrence.
+    """
+    errors = {}
+    cleaned = []
+    seen_codes = set()
+    for index, row in enumerate(rows):
+        if not isinstance(row, dict):
+            errors[index] = {"__all__": "Некорректная строка."}
+            cleaned.append(None)
+            continue
+        row_errors = {}
+        code = str(row.get("code") or "").strip()
+        name = str(row.get("name") or "").strip()
+        short_name = str(row.get("short_name") or "").strip()
+        description = str(row.get("description") or "").strip()
+        if not code:
+            row_errors["code"] = "Укажите код."
+        elif len(code) > 15:
+            row_errors["code"] = "Не длиннее 15 символов."
+        elif code in seen_codes:
+            row_errors["code"] = "Код повторяется."
+        if not name:
+            row_errors["name"] = "Укажите название."
+        elif len(name) > 50:
+            row_errors["name"] = "Не длиннее 50 символов."
+        if len(short_name) > 15:
+            row_errors["short_name"] = "Не длиннее 15 символов."
+        if len(description) > 150:
+            row_errors["description"] = "Не длиннее 150 символов."
+        min_people, min_err = _positive_int(row.get("min_people"))
+        max_people, max_err = _positive_int(row.get("max_people"))
+        if min_err:
+            row_errors["min_people"] = min_err
+        if max_err:
+            row_errors["max_people"] = max_err
+        if not min_err and not max_err and min_people > max_people:
+            row_errors["min_people"] = "Минимум больше максимума."
+        if code and "code" not in row_errors:
+            seen_codes.add(code)
+        if row_errors:
+            errors[index] = row_errors
+            cleaned.append(None)
+        else:
+            cleaned.append(
+                {
+                    "id": _row_id(row.get("id")),
+                    "code": code,
+                    "short_name": short_name,
+                    "name": name,
+                    "description": description,
+                    "is_active": bool(row.get("is_active", True)),
+                    "min_people": min_people,
+                    "max_people": max_people,
+                }
+            )
+    return cleaned, errors
+
+
+def _validate_price_tier_rows(rows):
+    """Validate parsed price-tier rows.
+
+    Returns ``(cleaned, errors)`` like :func:`_validate_category_rows`.
+    ``price`` must be a positive int; ``active_until`` a valid ``YYYY-MM-DD``.
+    """
+    errors = {}
+    cleaned = []
+    for index, row in enumerate(rows):
+        if not isinstance(row, dict):
+            errors[index] = {"__all__": "Некорректная строка."}
+            cleaned.append(None)
+            continue
+        row_errors = {}
+        price, price_err = _positive_int(row.get("price"))
+        if price_err:
+            row_errors["price"] = price_err
+        active_until = None
+        active_until_raw = str(row.get("active_until") or "").strip()
+        if not active_until_raw:
+            row_errors["active_until"] = "Укажите дату."
+        else:
+            try:
+                active_until = datetime.date.fromisoformat(active_until_raw)
+            except ValueError:
+                row_errors["active_until"] = "Некорректная дата (ГГГГ-ММ-ДД)."
+        if row_errors:
+            errors[index] = row_errors
+            cleaned.append(None)
+        else:
+            cleaned.append(
+                {
+                    "id": _row_id(row.get("id")),
+                    "price": price,
+                    "active_until": active_until,
+                }
+            )
+    return cleaned, errors
+
+
+def _reconcile_categories(race, cleaned):
+    """Update/create/delete this race's categories from ``cleaned`` rows.
+
+    A row ``id`` not belonging to ``race`` is treated as a new row (never an
+    update or delete of another race's category). ``order`` is the array index.
+    """
+    existing = {cat.id: cat for cat in Category.objects.filter(race=race)}
+    seen = set()
+    for index, row in enumerate(cleaned):
+        row_id = row["id"]
+        instance = existing.get(row_id) if row_id is not None else None
+        if instance is None:
+            instance = Category(race=race)
+        instance.code = row["code"]
+        instance.short_name = row["short_name"]
+        instance.name = row["name"]
+        instance.description = row["description"]
+        instance.is_active = row["is_active"]
+        instance.min_people = row["min_people"]
+        instance.max_people = row["max_people"]
+        instance.order = index
+        instance.save()
+        seen.add(instance.id)
+    Category.objects.filter(race=race).exclude(id__in=seen).delete()
+
+
+def _reconcile_price_tiers(race, cleaned):
+    """Update/create/delete this race's price tiers from ``cleaned`` rows.
+
+    Cross-race ``id`` guard and ``order = index`` as in
+    :func:`_reconcile_categories`.
+    """
+    existing = {tier.id: tier for tier in race.price_tiers.all()}
+    seen = set()
+    for index, row in enumerate(cleaned):
+        row_id = row["id"]
+        instance = existing.get(row_id) if row_id is not None else None
+        if instance is None:
+            instance = RacePriceTier(race=race)
+        instance.price = row["price"]
+        instance.active_until = row["active_until"]
+        instance.order = index
+        instance.save()
+        seen.add(instance.id)
+    race.price_tiers.exclude(id__in=seen).delete()
+
+
 class RaceEditView(View):
     """Create (``races/new/``) and edit (``race/<slug>/edit/``) a race.
 
@@ -294,3 +481,58 @@ class RaceEditView(View):
         if response is not None:
             return response
         return render(request, "race/race_form.html", self._build_context(race))
+
+    def post(self, request, race_slug=None):
+        race, response = self._load_and_authorize(request, race_slug)
+        if response is not None:
+            return response
+
+        form = RaceForm(request.POST, instance=race)
+        form_valid = form.is_valid()
+
+        category_rows = price_tier_rows = None
+        try:
+            category_rows = _parse_json_list(request.POST.get("categories_json"))
+        except ValueError as exc:
+            form.add_error(None, f"Категории: {exc}")
+        try:
+            price_tier_rows = _parse_json_list(request.POST.get("price_tiers_json"))
+        except ValueError as exc:
+            form.add_error(None, f"Ценовые периоды: {exc}")
+
+        category_errors = {}
+        price_tier_errors = {}
+        cleaned_categories = cleaned_tiers = None
+        if category_rows is not None:
+            cleaned_categories, category_errors = _validate_category_rows(category_rows)
+        if price_tier_rows is not None:
+            cleaned_tiers, price_tier_errors = _validate_price_tier_rows(
+                price_tier_rows
+            )
+
+        if (
+            form_valid
+            and category_rows is not None
+            and price_tier_rows is not None
+            and not category_errors
+            and not price_tier_errors
+        ):
+            with transaction.atomic():
+                race = form.save()
+                _reconcile_categories(race, cleaned_categories)
+                _reconcile_price_tiers(race, cleaned_tiers)
+            return HttpResponseRedirect(
+                reverse("race", kwargs={"race_slug": race.slug})
+            )
+
+        # On any error: re-render echoing the submitted payloads (so unsaved
+        # rows survive) plus per-row errors and the bound form's field errors.
+        context = self._build_context(
+            race,
+            form=form,
+            categories_data=category_rows or [],
+            price_tiers_data=price_tier_rows or [],
+            category_errors=category_errors,
+            price_tier_errors=price_tier_errors,
+        )
+        return render(request, "race/race_form.html", context)
