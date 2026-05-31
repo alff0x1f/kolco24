@@ -76,11 +76,11 @@ Three coordinated edits keep the model, admin, and DB schema in sync:
 - Modify: `src/website/admin.py`
 - Create: `src/website/migrations/0069_remove_race_is_reg_open.py`
 
-- [ ] Delete line `is_reg_open = BooleanField("Регистрация открыта", default=False)` from `src/website/models/race.py`
-- [ ] In `src/website/admin.py`, `RaceModelAdmin.list_display`: replace `is_reg_open` with `reg_status` → `("id", "name", "code", "slug", "date", "is_active", "reg_status")`
-- [ ] Create `src/website/migrations/0069_remove_race_is_reg_open.py` with a single `migrations.RemoveField(model_name="race", name="is_reg_open")`, dependency `("website", "0068_racepricetier")`
-- [ ] Run `uv run python src/manage.py makemigrations --check --dry-run` — must report no changes (confirms model and migration agree)
-- [ ] Run `uv run python src/manage.py migrate` against the local DB — must apply cleanly
+- [x] Delete line `is_reg_open = BooleanField("Регистрация открыта", default=False)` from `src/website/models/race.py`
+- [x] In `src/website/admin.py`, `RaceModelAdmin.list_display`: replace `is_reg_open` with `reg_status` → `("id", "name", "code", "slug", "date", "is_active", "reg_status")`
+- [x] Create `src/website/migrations/0069_remove_race_is_reg_open.py` with a single `migrations.RemoveField(model_name="race", name="is_reg_open")`, dependency `("website", "0068_racepricetier")`
+- [x] Run `uv run python src/manage.py makemigrations --check --dry-run` — must report no changes (confirms model and migration agree)
+- [x] Run `uv run python src/manage.py migrate` against the local DB — must apply cleanly
 
 ### Task 2: Verify acceptance criteria
 

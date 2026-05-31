@@ -48,7 +48,6 @@ class Race(Model):
     header_logo = CharField("Логотип в шапке", max_length=255, blank=True, default="")
 
     is_legend_visible = BooleanField("Легенда открыта", default=False)
-    is_reg_open = BooleanField("Регистрация открыта", default=False)
     is_teams_editable = BooleanField("Команды редактируемы", default=False)
     is_photo_upload_enabled = BooleanField("Загрузка фото включена", default=False)
 
