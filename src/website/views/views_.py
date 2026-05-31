@@ -1800,7 +1800,7 @@ def build_team_form_context(race, team, is_edit=False, bypass_limits=False):
     current_category_id = getattr(team, "category2_id", None)
     price_tiers = race.price_tier_ladder()
     current_price = race.current_price
-    race_remaining = race.remaining_people()
+    race_remaining = race.remaining_people(exclude_team=team)
     config = {
         "currentPrice": current_price,
         "paidPeople": team.paid_people,
