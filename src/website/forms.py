@@ -661,7 +661,7 @@ class TeamForm(forms.Form):
             if race_remaining is not None and needed > 0 and needed > race_remaining:
                 self.add_error(
                     "ucount",
-                    f"В гонке закончились места: осталось {race_remaining}.",
+                    f"В гонке закончились места: осталось {int(race_remaining)}.",
                 )
 
             # Категория — блокирует вход в полную и рост в полной.
@@ -675,7 +675,7 @@ class TeamForm(forms.Form):
             ):
                 self.add_error(
                     "category2_id",
-                    f"В категории нет мест: осталось {cat_remaining}.",
+                    f"В категории нет мест: осталось {int(cat_remaining)}.",
                 )
 
         # make invalid fields red:

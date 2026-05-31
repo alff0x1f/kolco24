@@ -1784,7 +1784,7 @@ def build_category_options(race_id, current_category_id=None, team=None):
                 "id": category.id,
                 "label": f"{category.short_name} ({category.name})",
                 "counts": list(range(category.min_people, category.max_people + 1)),
-                "remaining": "" if remaining is None else remaining,
+                "remaining": "" if remaining is None else int(remaining),
                 "is_current": category.id == current_category_id,
             }
         )
