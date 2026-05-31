@@ -91,8 +91,8 @@ Three coordinated edits keep the model, admin, and DB schema in sync:
 
 ### Task 3: [Final] Wrap up
 
-- [ ] Confirm no CLAUDE.md update needed (no new pattern introduced)
-- [ ] Move this plan to `docs/plans/completed/`
+- [x] Confirm no CLAUDE.md update needed (no new pattern introduced)
+- [x] Move this plan to `docs/plans/completed/`
 
 ## Post-Completion
 *Items requiring manual intervention or external systems — no checkboxes, informational only*
