@@ -8,11 +8,11 @@ from django.test import RequestFactory
 from django.urls import resolve, reverse
 
 from apps.race.forms import RaceForm
+from apps.race.permissions import can_edit_race
 from apps.race.views import RaceEditView, RaceTeamsView
 from website.models import Race
 from website.models.models import Team
 from website.models.race import Category, RaceAdmin, RacePriceTier, RegStatus
-from website.views.views_ import can_edit_race
 
 
 def _script_json(html, script_id):

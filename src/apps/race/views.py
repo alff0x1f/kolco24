@@ -11,10 +11,11 @@ from django.utils.safestring import mark_safe
 from django.views import View
 
 from apps.race.forms import RaceForm
+from apps.race.permissions import can_edit_race
 from website.forms import NewsPostForm
 from website.models import NewsPost, Race, Team
 from website.models.race import Category, RacePriceTier, RegStatus
-from website.views.views_ import can_edit_race, is_race_admin
+from website.views.views_ import is_race_admin
 
 # Escape the HTML-significant characters as their \uXXXX forms, exactly like
 # Django's ``json_script``. Escaping ``<`` and ``>`` (not just ``</``) also
