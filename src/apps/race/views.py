@@ -512,11 +512,17 @@ class RaceEditView(View):
 
         category_rows = price_tier_rows = None
         try:
-            category_rows = _parse_json_list(request.POST.get("categories_json"))
+            raw_cats = request.POST.get("categories_json")
+            if not raw_cats:
+                raise ValueError("Данные не переданы.")
+            category_rows = _parse_json_list(raw_cats)
         except ValueError as exc:
             form.add_error(None, f"Категории: {exc}")
         try:
-            price_tier_rows = _parse_json_list(request.POST.get("price_tiers_json"))
+            raw_tiers = request.POST.get("price_tiers_json")
+            if not raw_tiers:
+                raise ValueError("Данные не переданы.")
+            price_tier_rows = _parse_json_list(raw_tiers)
         except ValueError as exc:
             form.add_error(None, f"Ценовые периоды: {exc}")
 
