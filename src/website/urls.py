@@ -3,7 +3,7 @@ from django.conf.urls.static import static
 from django.shortcuts import redirect
 from django.urls import include, path, re_path
 
-from apps.race.views import RacePageView, RaceTeamsView
+from apps.race.views import RaceEditView, RacePageView, RaceTeamsView
 
 from . import views
 from .views import (
@@ -70,11 +70,17 @@ urlpatterns = [
     path("race/<int:race_id>/breakfast/admin/", RaceIdRedirectView.as_view()),
     path("race/<int:race_id>/breakfast/list/", RaceIdRedirectView.as_view()),
     path("race/<int:race_id>/member_logs/", RaceIdRedirectView.as_view()),
+    path("races/new/", RaceEditView.as_view(), name="add_race"),
     # Slug-based (primary)
     path(
         "race/<slug:race_slug>/post/add/",
         views.AddNewsPostView.as_view(),
         name="add_post",
+    ),
+    path(
+        "race/<slug:race_slug>/edit/",
+        RaceEditView.as_view(),
+        name="edit_race",
     ),
     path("race/<slug:race_slug>/", RacePageView.as_view(), name="race"),
     path("race/<slug:race_slug>/teams/", RaceTeamsView.as_view(), name="all_teams"),

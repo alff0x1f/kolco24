@@ -1,0 +1,347 @@
+{% extends "website/base-2.html" %}
+{% load static %}
+
+{% block title %}{% if is_create %}Создание гонки{% else %}Редактирование гонки{% endif %} — Кольцо 24{% endblock %}
+
+{% block extra_head %}
+<link href="{% static 'css/race_form.css' %}" rel="stylesheet">
+{% endblock %}
+
+{% block content %}
+<form class="race-form-page" id="raceForm" method="post">
+  {% csrf_token %}
+  <input type="hidden" name="categories_json" id="categoriesJson">
+  <input type="hidden" name="price_tiers_json" id="priceTiersJson">
+  <div class="container">
+
+    <!-- Breadcrumb -->
+    <nav class="breadcrumb">
+      <a href="/">Кольцо&nbsp;24</a>
+      <span class="sep">/</span>
+      <span>Гонки</span>
+      <span class="sep">/</span>
+      <span class="cur">{% if is_create %}Новая гонка{% else %}{{ race.name }}{% endif %}</span>
+    </nav>
+
+    <!-- Header / actions -->
+    <div class="head">
+      <div class="head-l">
+        <div class="head-title">
+          <h1>{% if is_create %}Создание&nbsp;гонки{% else %}Редактирование&nbsp;гонки{% endif %}</h1>
+          <span class="chip edit">{% if is_create %}Новая{% else %}Изменение{% endif %}</span>
+        </div>
+        {% if not is_create %}
+        <div class="sub">ID&nbsp;{{ race.id }} · код&nbsp;<code>{{ race.code }}</code></div>
+        {% endif %}
+      </div>
+      <div class="head-actions">
+        {% if not is_create %}
+        <a class="btn btn-outline" href="{% url 'race' race.slug %}">Открыть&nbsp;страницу</a>
+        {% endif %}
+        <button class="btn btn-primary" type="submit">Сохранить</button>
+      </div>
+    </div>
+
+    {% if form.non_field_errors %}
+    <div class="form-errors">{{ form.non_field_errors|join:", " }}</div>
+    {% endif %}
+
+    <div class="grid">
+
+      <!-- ─────────── MAIN COLUMN ─────────── -->
+      <div class="col-main">
+
+        <!-- ── Основное ── -->
+        <section class="card">
+          <div class="card-head"><h2>Основное</h2></div>
+          <div class="card-body">
+            <div class="field">
+              <div class="label-row">
+                <label for="f-name">Название <span class="req">*</span></label>
+                <span class="charcount"><span data-count-for="f-name">0</span>/50</span>
+              </div>
+              <input class="control{% if form.name.errors %} has-error{% endif %}" id="f-name"
+                     name="name" type="text" maxlength="50"
+                     value="{{ form.name.value|default_if_none:'' }}"
+                     data-slug-src placeholder="Например, Кольцо 24">
+              {% if form.name.errors %}<span class="field-error">{{ form.name.errors|join:", " }}</span>{% endif %}
+            </div>
+
+            <div class="field-row two">
+              <div class="field">
+                <div class="label-row">
+                  <label for="f-code">Код <span class="req">*</span></label>
+                  <span class="charcount"><span data-count-for="f-code">0</span>/15</span>
+                </div>
+                <input class="control mono{% if form.code.errors %} has-error{% endif %}" id="f-code"
+                       name="code" type="text" maxlength="15"
+                       value="{{ form.code.value|default_if_none:'' }}" placeholder="k24-2025">
+                {% if form.code.errors %}<span class="field-error">{{ form.code.errors|join:", " }}</span>
+                {% else %}<span class="field-hint">Уникальный, для внутренних ссылок и API.</span>{% endif %}
+              </div>
+              <div class="field">
+                <label for="f-slug">URL-slug <span class="req">*</span></label>
+                <div class="input-group">
+                  <span class="prefix">/race/</span>
+                  <input class="control mono{% if form.slug.errors %} has-error{% endif %}" id="f-slug"
+                         name="slug" type="text" maxlength="50"
+                         value="{{ form.slug.value|default_if_none:'' }}" placeholder="kolco24-2025">
+                </div>
+                {% if form.slug.errors %}<span class="field-error">{{ form.slug.errors|join:", " }}</span>
+                {% else %}<span class="field-hint">Адрес страницы. <a href="#" id="slugAuto">Сгенерировать из названия</a></span>{% endif %}
+              </div>
+            </div>
+
+            <div class="field">
+              <div class="label-row">
+                <label for="f-place">Место</label>
+                <span class="charcount"><span data-count-for="f-place">0</span>/50</span>
+              </div>
+              <input class="control{% if form.place.errors %} has-error{% endif %}" id="f-place"
+                     name="place" type="text" maxlength="50"
+                     value="{{ form.place.value|default_if_none:'' }}" placeholder="окрестности Макарово">
+              {% if form.place.errors %}<span class="field-error">{{ form.place.errors|join:", " }}</span>{% endif %}
+            </div>
+          </div>
+        </section>
+
+        <!-- ── Даты и стоимость ── -->
+        <section class="card">
+          <div class="card-head"><h2>Даты и стоимость</h2></div>
+          <div class="card-body">
+            <div class="field-row three">
+              <div class="field">
+                <label for="f-date">Дата начала <span class="req">*</span></label>
+                <input class="control{% if form.date.errors %} has-error{% endif %}" id="f-date"
+                       name="date" type="date" value="{{ form.date.value|date:"Y-m-d"|default:form.date.value }}">
+                {% if form.date.errors %}<span class="field-error">{{ form.date.errors|join:", " }}</span>{% endif %}
+              </div>
+              <div class="field">
+                <label for="f-date-end">Дата окончания <span class="req">*</span></label>
+                <input class="control{% if form.date_end.errors %} has-error{% endif %}" id="f-date-end"
+                       name="date_end" type="date" value="{{ form.date_end.value|date:"Y-m-d"|default:form.date_end.value }}">
+                {% if form.date_end.errors %}<span class="field-error">{{ form.date_end.errors|join:", " }}</span>{% endif %}
+              </div>
+              <div class="field">
+                <label for="f-cost">Стоимость участия</label>
+                <div class="input-affix">
+                  <input class="control{% if form.cost.errors %} has-error{% endif %}" id="f-cost"
+                         name="cost" type="number" min="0" step="50"
+                         value="{{ form.cost.value|default_if_none:'' }}">
+                  <span class="suffix">₽ / уч.</span>
+                </div>
+                {% if form.cost.errors %}<span class="field-error">{{ form.cost.errors|join:", " }}</span>{% endif %}
+              </div>
+            </div>
+            <div class="field" style="margin-top: 16px; margin-bottom: 0;">
+              <span class="field-hint">Однодневная гонка — поставьте одинаковые даты. Запасная цена, когда нет ценовых периодов.</span>
+            </div>
+          </div>
+        </section>
+
+        <!-- ── Шапка страницы ── -->
+        <section class="card">
+          <div class="card-head">
+            <h2>Шапка страницы</h2>
+            <span class="aux">header_image · header_logo</span>
+          </div>
+          <div class="card-body">
+            <div class="field">
+              <label for="f-header-image">Картинка в шапке <span class="opt">— URL</span></label>
+              <div class="upload cover">
+                <div class="preview">
+                  <img class="preview-img" id="coverPreview"
+                       src="{{ form.header_image.value|default_if_none:'' }}"
+                       alt=""{% if not form.header_image.value %} hidden{% endif %}>
+                  <div class="ph"{% if form.header_image.value %} hidden{% endif %}>1920×480 · обложка / фото с выезда</div>
+                </div>
+              </div>
+              <input class="control mono{% if form.header_image.errors %} has-error{% endif %}" id="f-header-image"
+                     name="header_image" type="url" data-preview-for="coverPreview" data-preview-ph
+                     value="{{ form.header_image.value|default_if_none:'' }}"
+                     placeholder="https://…/cover.jpg">
+              {% if form.header_image.errors %}<span class="field-error">{{ form.header_image.errors|join:", " }}</span>
+              {% else %}<span class="field-hint">Рекомендуемое соотношение 4:1. Хранится как URL в&nbsp;поле <code>header_image</code>.</span>{% endif %}
+            </div>
+
+            <div class="field" style="margin-bottom: 0;">
+              <label for="f-header-logo">Логотип в шапке <span class="opt">— необязательно, URL</span></label>
+              <div class="logo-grid">
+                <div class="upload logo">
+                  <div class="preview">
+                    <img class="preview-img" id="logoPreview"
+                         src="{{ form.header_logo.value|default_if_none:'' }}"
+                         alt=""{% if not form.header_logo.value %} hidden{% endif %}>
+                    <div class="lph"{% if form.header_logo.value %} hidden{% endif %}></div>
+                  </div>
+                </div>
+                <div class="logo-side">
+                  <input class="control mono{% if form.header_logo.errors %} has-error{% endif %}" id="f-header-logo"
+                         name="header_logo" type="url" data-preview-for="logoPreview" data-preview-ph
+                         value="{{ form.header_logo.value|default_if_none:'' }}"
+                         placeholder="https://…/logo.svg">
+                  {% if form.header_logo.errors %}<span class="field-error">{{ form.header_logo.errors|join:", " }}</span>
+                  {% else %}<span class="field-hint">Прозрачный PNG или SVG, выводится поверх обложки.</span>{% endif %}
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ── Категории ── -->
+        <section class="card">
+          <div class="card-head">
+            <h2>Категории и дистанции</h2>
+            <span class="aux"><span id="catCount">0</span> категорий</span>
+          </div>
+          <div class="card-body">
+            <div class="cats" id="cats">
+              <div class="cats-headrow">
+                <span></span>
+                <span>Код</span>
+                <span>Кратко</span>
+                <span>Название</span>
+                <span>Описание</span>
+                <span>Мин</span>
+                <span>Макс</span>
+                <span>Активна</span>
+                <span></span>
+              </div>
+              <!-- rows injected by race_form.js from #categories-data -->
+            </div>
+            <div class="cats-foot">
+              <button class="add-cat" type="button" id="addCat">
+                <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M8 3.5v9M3.5 8h9"/></svg>
+                Добавить категорию
+              </button>
+            </div>
+          </div>
+        </section>
+
+        <!-- ── Ценовые периоды ── -->
+        <section class="card">
+          <div class="card-head">
+            <h2>Ценовые периоды</h2>
+            <span class="aux"><span id="tierCount">0</span> периодов</span>
+          </div>
+          <div class="card-body">
+            <div class="tiers" id="tiers">
+              <div class="tiers-headrow">
+                <span></span>
+                <span>Действует до (вкл.)</span>
+                <span>Цена, ₽ / уч.</span>
+                <span></span>
+              </div>
+              <!-- rows injected by race_form.js from #price-tiers-data -->
+            </div>
+            <div class="tiers-foot">
+              <button class="add-tier" type="button" id="addTier">
+                <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M8 3.5v9M3.5 8h9"/></svg>
+                Добавить период
+              </button>
+            </div>
+            <div class="field" style="margin: 14px 0 0;">
+              <span class="field-hint">Цена участника — активный период (самый ранний с датой ≥ сегодня). Без периодов берётся «Стоимость участия».</span>
+            </div>
+          </div>
+        </section>
+
+      </div>
+
+      <!-- ─────────── SIDEBAR ─────────── -->
+      <aside class="sidebar">
+
+        <!-- ── Публикация ── -->
+        <section class="card">
+          <div class="card-head"><h2>Публикация</h2></div>
+          <div class="pub">
+            <div class="pub-status{% if not form.is_active.value %} off{% endif %}" id="pubStatus">
+              <span class="dot"></span>
+              <span class="txt">{% if form.is_active.value %}Гонка активна и видна на сайте{% else %}Черновик — гонка скрыта с сайта{% endif %}</span>
+            </div>
+
+            <div class="pub-line">
+              <div>
+                <div class="pl-label">Активна</div>
+                <div class="pl-desc">Показывать гонку в&nbsp;списках</div>
+              </div>
+              <label class="switch">
+                <input type="checkbox" id="f-active" name="is_active"{% if form.is_active.value %} checked{% endif %}>
+                <span class="track"></span>
+              </label>
+            </div>
+
+            <div class="field" style="margin: 6px 0 0;">
+              <label for="f-regstatus">Статус регистрации</label>
+              <select class="control" id="f-regstatus" name="reg_status">
+                {% for value, label in reg_status_choices %}
+                <option value="{{ value }}"{% if value == form.reg_status.value %} selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+              </select>
+              <span class="field-hint">Управляет надписью-плашкой в&nbsp;шапке страницы.</span>
+            </div>
+
+            <div class="pub-actions">
+              <button class="btn btn-primary btn-block btn-lg" type="submit">Сохранить изменения</button>
+            </div>
+
+            {% if not is_create %}
+            <div class="pub-foot">
+              <a class="preview" href="{% url 'race' race.slug %}">Предпросмотр</a>
+            </div>
+            {% endif %}
+          </div>
+        </section>
+
+        <!-- ── Настройки страницы ── -->
+        <section class="card">
+          <div class="card-head"><h2>Настройки страницы</h2></div>
+          <div class="card-body tight">
+            <div class="toggle-list">
+              <div class="toggle-row">
+                <div>
+                  <div class="t-label">Легенда открыта</div>
+                  <div class="t-desc">Список КП доступен участникам</div>
+                </div>
+                <label class="switch"><input type="checkbox" name="is_legend_visible"{% if form.is_legend_visible.value %} checked{% endif %}><span class="track"></span></label>
+              </div>
+              <div class="toggle-row">
+                <div>
+                  <div class="t-label">Команды редактируемы</div>
+                  <div class="t-desc">Капитаны меняют состав</div>
+                </div>
+                <label class="switch"><input type="checkbox" name="is_teams_editable"{% if form.is_teams_editable.value %} checked{% endif %}><span class="track"></span></label>
+              </div>
+              <div class="toggle-row">
+                <div>
+                  <div class="t-label">Загрузка фото включена</div>
+                  <div class="t-desc">Участники добавляют фото в&nbsp;галерею</div>
+                </div>
+                <label class="switch"><input type="checkbox" name="is_photo_upload_enabled"{% if form.is_photo_upload_enabled.value %} checked{% endif %}><span class="track"></span></label>
+              </div>
+            </div>
+          </div>
+        </section>
+
+      </aside>
+
+    </div>
+  </div>
+
+  <!-- bottom sticky bar for mobile -->
+  <div class="savebar">
+    <div class="container savebar-inner">
+      <button class="btn btn-primary" type="submit">Сохранить</button>
+    </div>
+  </div>
+</form>
+
+<script id="categories-data" type="application/json">{{ categories_data }}</script>
+<script id="price-tiers-data" type="application/json">{{ price_tiers_data }}</script>
+<script id="category-errors" type="application/json">{{ category_errors }}</script>
+<script id="price-tier-errors" type="application/json">{{ price_tier_errors }}</script>
+{% endblock %}
+
+{% block footer_js_include %}
+<script src="{% static 'js/race_form.js' %}"></script>
+{% endblock %}

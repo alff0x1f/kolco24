@@ -40,6 +40,12 @@
             <a class="btn btn-primary" href="{% url 'add_team' race.slug %}">{% if user.is_authenticated %}Добавить команду{% else %}Войти и добавить команду{% endif %}</a>
           {% endif %}
           <a class="btn btn-ghost" href="{% url 'all_teams' race.slug %}">Все команды</a>
+          {% if can_edit_race %}
+            <a class="btn btn-ghost" href="{% url 'edit_race' race.slug %}">Редактировать</a>
+          {% endif %}
+          {% if user.is_superuser %}
+            <a class="btn btn-ghost" href="{% url 'add_race' %}">+ Новая гонка</a>
+          {% endif %}
         </div>
       </div>
     </section>
