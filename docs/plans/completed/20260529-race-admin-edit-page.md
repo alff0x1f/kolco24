@@ -341,11 +341,11 @@ blocks, the `base-2.html` template stack, and the `AddNewsPostView` authorizatio
 - [x] run `make format && make lint` (no format changes; lint clean)
 
 ### Task 10: [Final] Documentation
-- [ ] update `CLAUDE.md` `apps.race` description to mention `RaceEditView`,
+- [x] update `CLAUDE.md` `apps.race` description to mention `RaceEditView`,
       `race_form.html`, `race_form.css`/`race_form.js`, the `add_race`/`edit_race` URL
       names, and that the page inline-edits categories (incl. min/max people) and
       `RacePriceTier` rows
-- [ ] move this plan to `docs/plans/completed/`
+- [x] move this plan to `docs/plans/completed/`
 
 ## Post-Completion
 *Items requiring manual intervention or external systems — informational only.*
