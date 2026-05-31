@@ -1,12 +1,16 @@
+from datetime import timedelta
+from unittest.mock import MagicMock, patch
+
 import pytest
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError
 from django.urls import reverse
+from django.utils import timezone
 
-from website.models import Race
+from website.models import Payment, Race
 from website.models.models import Team
-from website.models.race import Category, RaceLink, RegStatus
+from website.models.race import Category, RaceLink, RacePriceTier, RegStatus
 
 
 @pytest.mark.django_db
@@ -357,6 +361,41 @@ def test_register_view_post_duplicate_email_shows_error(client):
 
 
 @pytest.mark.django_db
+def test_login_page_register_link_carries_next(client):
+    response = client.get("/login/?next=/race/foo/teams/add/")
+    assert response.status_code == 200
+    html = response.content.decode()
+    # The «Зарегистрироваться» link must forward next, or it's lost on register.
+    assert "/register/?next=" in html
+
+
+@pytest.mark.django_db
+def test_register_view_get_passes_next_to_context(client):
+    response = client.get("/register/?next=/race/foo/teams/add/")
+    assert response.status_code == 200
+    assert response.context["next"] == "/race/foo/teams/add/"
+
+
+@pytest.mark.django_db
+def test_register_view_post_honors_next_redirect(client):
+    response = client.post(
+        "/register/", {**REG_FORM_BASE, "next": "/race/foo/teams/add/"}
+    )
+    assert response.status_code == 302
+    assert response.url == "/race/foo/teams/add/"
+    assert User.objects.filter(email="ivan@example.com").exists()
+
+
+@pytest.mark.django_db
+def test_register_view_post_blocks_open_redirect(client):
+    response = client.post(
+        "/register/", {**REG_FORM_BASE, "next": "https://evil.com/steal"}
+    )
+    assert response.status_code == 302
+    assert response.url == "/"
+
+
+@pytest.mark.django_db
 def test_race_page_view_shows_form_for_admin(client):
     from website.models.race import RaceAdmin
 
@@ -533,3 +572,722 @@ def test_race_link_clean_rejects_invalid_url():
     with pytest.raises(ValidationError) as exc_info:
         link.full_clean()
     assert "url" in exc_info.value.message_dict
+
+
+@pytest.mark.django_db
+def test_category_team_size_defaults():
+    race = Race.objects.create(name="Cat Race", code="cat1", slug="cat-race-1")
+    category = Category.objects.create(
+        code="def",
+        name="Defaults",
+        short_name="def",
+        race=race,
+    )
+    assert category.min_people == 2
+    assert category.max_people == 6
+
+
+def test_category_backfill_mapping():
+    # Mirror the migration's mapping dict; verify representative ids resolve
+    # to the same (min, max) tuples the legacy JS switch produced.
+    import importlib
+
+    migration = importlib.import_module(
+        "website.migrations.0067_category_max_people_category_min_people"
+    )
+    mapping = migration.TEAM_SIZE_BACKFILL
+    default = migration.DEFAULT_TEAM_SIZE
+
+    # ids 8, 16 -> (2, 3)
+    assert mapping[8] == (2, 3)
+    assert mapping[16] == (2, 3)
+    # ids 9, 13, 17, 21, 24 -> (4, 6)
+    for cid in (9, 13, 17, 21, 24):
+        assert mapping[cid] == (4, 6)
+    # anything else -> (2, 2)
+    assert mapping.get(999, default) == (2, 2)
+    assert default == (2, 2)
+
+
+@pytest.mark.django_db
+def test_current_price_falls_back_to_cost_without_tiers():
+    race = Race.objects.create(name="No Tiers", code="nt1", slug="no-tiers", cost=1500)
+    assert race.current_price == 1500
+
+
+@pytest.mark.django_db
+def test_current_price_picks_active_tier():
+    race = Race.objects.create(name="Tiers", code="t1", slug="tiers-1", cost=999)
+    today = timezone.localdate()
+    # earliest tier already past, second still active
+    RacePriceTier.objects.create(
+        race=race, price=1000, active_until=today - timedelta(days=10)
+    )
+    RacePriceTier.objects.create(
+        race=race, price=1500, active_until=today + timedelta(days=10)
+    )
+    RacePriceTier.objects.create(
+        race=race, price=2000, active_until=today + timedelta(days=20)
+    )
+    # earliest tier with active_until >= today is the 1500 one
+    assert race.current_price == 1500
+
+
+@pytest.mark.django_db
+def test_current_price_uses_last_tier_when_all_past():
+    race = Race.objects.create(name="Past", code="p1", slug="past-1", cost=999)
+    today = timezone.localdate()
+    RacePriceTier.objects.create(
+        race=race, price=1000, active_until=today - timedelta(days=20)
+    )
+    RacePriceTier.objects.create(
+        race=race, price=1500, active_until=today - timedelta(days=5)
+    )
+    # all past -> last tier (ordered by active_until) is charged
+    assert race.current_price == 1500
+
+
+@pytest.mark.django_db
+def test_current_price_same_day_boundary_is_inclusive():
+    race = Race.objects.create(name="Today", code="td1", slug="today-1", cost=999)
+    today = timezone.localdate()
+    RacePriceTier.objects.create(race=race, price=1200, active_until=today)
+    RacePriceTier.objects.create(
+        race=race, price=1800, active_until=today + timedelta(days=10)
+    )
+    # active_until == today must still count as active (inclusive >=)
+    assert race.current_price == 1200
+
+
+@pytest.mark.django_db
+def test_price_tier_ladder_flags_statuses():
+    race = Race.objects.create(name="Ladder", code="l1", slug="ladder-1", cost=999)
+    today = timezone.localdate()
+    past = RacePriceTier.objects.create(
+        race=race, price=1000, active_until=today - timedelta(days=10)
+    )
+    active = RacePriceTier.objects.create(
+        race=race, price=1500, active_until=today + timedelta(days=10)
+    )
+    future = RacePriceTier.objects.create(
+        race=race, price=2000, active_until=today + timedelta(days=20)
+    )
+    ladder = race.price_tier_ladder()
+    assert ladder == [
+        {"tier": past, "status": "past"},
+        {"tier": active, "status": "active"},
+        {"tier": future, "status": "future"},
+    ]
+
+
+@pytest.mark.django_db
+def test_price_tier_ladder_all_past_marks_last_active():
+    race = Race.objects.create(name="LadderPast", code="lp1", slug="ladder-past-1")
+    today = timezone.localdate()
+    first = RacePriceTier.objects.create(
+        race=race, price=1000, active_until=today - timedelta(days=20)
+    )
+    last = RacePriceTier.objects.create(
+        race=race, price=1500, active_until=today - timedelta(days=5)
+    )
+    ladder = race.price_tier_ladder()
+    assert ladder == [
+        {"tier": first, "status": "past"},
+        {"tier": last, "status": "active"},
+    ]
+
+
+@pytest.mark.django_db
+def test_price_tier_ladder_empty_without_tiers():
+    race = Race.objects.create(name="Empty", code="e1", slug="empty-1", cost=500)
+    assert race.price_tier_ladder() == []
+
+
+# --- Task 3: unified view context, current_price charging, server guards ---
+
+
+def _create_team_for_edit(
+    *,
+    suffix,
+    reg_status=RegStatus.OPEN,
+    is_teams_editable=True,
+    cost=1000,
+    tier_price=None,
+    min_people=4,
+    max_people=6,
+    ucount=4,
+    paid_people=4,
+    map_count=0,
+    map_count_paid=0,
+):
+    user = User.objects.create_user(
+        username=f"owner-{suffix}",
+        password="pass",
+        email=f"owner-{suffix}@example.com",
+    )
+    race = Race.objects.create(
+        name="R",
+        code=f"rc{suffix}",
+        slug=f"slug-{suffix}",
+        cost=cost,
+        reg_status=reg_status,
+        is_teams_editable=is_teams_editable,
+    )
+    if tier_price is not None:
+        RacePriceTier.objects.create(
+            race=race,
+            price=tier_price,
+            active_until=timezone.localdate() + timedelta(days=10),
+        )
+    category = Category.objects.create(
+        code="t",
+        name="Team",
+        short_name="T",
+        race=race,
+        min_people=min_people,
+        max_people=max_people,
+    )
+    team = Team.objects.create(
+        owner=user,
+        paymentid="p",
+        dist="t",
+        category2=category,
+        ucount=ucount,
+        paid_people=paid_people,
+        map_count=map_count,
+        map_count_paid=map_count_paid,
+    )
+    return user, race, category, team
+
+
+def _mock_vtb():
+    """Patch the VTB integration so a charging POST does not hit the network."""
+    client_patch = patch("website.views.team.VTBClient")
+    payment_patch = patch("website.views.team.VTBPayment")
+    prepared_patch = patch("website.views.team.VTBPreparedPayment")
+    return client_patch, payment_patch, prepared_patch
+
+
+@pytest.mark.django_db
+def test_get_add_team_context_has_price_and_counts(client):
+    user = User.objects.create_user(
+        username="adder", password="pass", email="adder@example.com"
+    )
+    race = Race.objects.create(
+        name="Add Race",
+        code="addr1",
+        slug="add-race-1",
+        cost=1000,
+        reg_status=RegStatus.OPEN,
+    )
+    RacePriceTier.objects.create(
+        race=race, price=1500, active_until=timezone.localdate() + timedelta(days=10)
+    )
+    category = Category.objects.create(
+        code="t",
+        name="Team",
+        short_name="T",
+        race=race,
+        min_people=4,
+        max_people=6,
+    )
+    client.force_login(user)
+    response = client.get(reverse("add_team", args=[race.slug]))
+    assert response.status_code == 200
+    # current_price comes from the active tier, not race.cost
+    assert response.context["current_price"] == 1500
+    assert response.context["price_tiers"]  # non-empty ladder
+    assert response.context["map_price"] == 200
+    assert response.context["free_maps"] == 2
+    options = response.context["category_options"]
+    match = next(o for o in options if o["id"] == category.id)
+    assert match["counts"] == [4, 5, 6]
+
+
+@pytest.mark.django_db
+def test_get_edit_team_renders_edit_template(client):
+    user, race, category, team = _create_team_for_edit(suffix="rt", tier_price=1500)
+    client.force_login(user)
+    response = client.get(reverse("edit_team", args=[team.id]))
+    assert response.status_code == 200
+    assert "website/edit_team.html" in [t.name for t in response.templates]
+    assert response.context["current_price"] == 1500
+
+
+@pytest.mark.django_db
+def test_edit_team_charges_delta_on_ucount_growth(client):
+    user, race, category, team = _create_team_for_edit(
+        suffix="grow", tier_price=1500, ucount=4, paid_people=4
+    )
+    client.force_login(user)
+    client_p, payment_p, prepared_p = _mock_vtb()
+    with client_p, payment_p as mock_payment, prepared_p as mock_prepared:
+        mock_payment.from_vtb_payload.return_value = MagicMock(
+            pay_url="https://pay.example/redirect"
+        )
+        mock_prepared.objects.filter.return_value.first.return_value = None
+        response = client.post(
+            reverse("edit_team", args=[team.id]),
+            {"ucount": "5", "category2_id": str(category.id), "map_count": "0"},
+        )
+    assert response.status_code == 302
+    payment = Payment.objects.filter(team=team).order_by("-id").first()
+    # delta = (5 - 4) * 1500 (the tier price, NOT race.cost=1000)
+    assert payment.payment_amount == 1500
+    assert payment.cost_per_person == 1500
+
+
+@pytest.mark.django_db
+def test_edit_team_charges_delta_on_maps_added(client):
+    user, race, category, team = _create_team_for_edit(
+        suffix="maps", tier_price=1500, ucount=4, paid_people=4
+    )
+    client.force_login(user)
+    client_p, payment_p, prepared_p = _mock_vtb()
+    with client_p, payment_p as mock_payment, prepared_p as mock_prepared:
+        mock_payment.from_vtb_payload.return_value = MagicMock(
+            pay_url="https://pay.example/redirect"
+        )
+        mock_prepared.objects.filter.return_value.first.return_value = None
+        response = client.post(
+            reverse("edit_team", args=[team.id]),
+            {"ucount": "4", "category2_id": str(category.id), "map_count": "2"},
+        )
+    assert response.status_code == 302
+    payment = Payment.objects.filter(team=team).order_by("-id").first()
+    # only the 2 extra maps are charged: 2 * 200
+    assert payment.payment_amount == 400
+    assert payment.map == 2
+    team.refresh_from_db()
+    assert team.map_count == 2
+
+
+@pytest.mark.django_db
+def test_edit_team_no_charge_when_nothing_added(client):
+    user, race, category, team = _create_team_for_edit(
+        suffix="noop", tier_price=1500, ucount=4, paid_people=4
+    )
+    client.force_login(user)
+    response = client.post(
+        reverse("edit_team", args=[team.id]),
+        {"ucount": "4", "category2_id": str(category.id), "map_count": "0"},
+    )
+    assert response.status_code == 302
+    assert Payment.objects.filter(team=team).count() == 0
+
+
+@pytest.mark.django_db
+def test_edit_team_rejects_out_of_range_ucount(client):
+    user, race, category, team = _create_team_for_edit(
+        suffix="oor", min_people=4, max_people=6, ucount=4, paid_people=0
+    )
+    client.force_login(user)
+    response = client.post(
+        reverse("edit_team", args=[team.id]),
+        {"ucount": "2", "category2_id": str(category.id), "map_count": "0"},
+    )
+    assert response.status_code == 200
+    team.refresh_from_db()
+    assert team.ucount == 4  # unchanged — invalid POST rejected
+    assert Payment.objects.filter(team=team).count() == 0
+
+
+@pytest.mark.django_db
+def test_edit_team_rejects_over_cap_map_count(client):
+    user, race, category, team = _create_team_for_edit(
+        suffix="cap", min_people=4, max_people=6, ucount=4, paid_people=0
+    )
+    client.force_login(user)
+    response = client.post(
+        reverse("edit_team", args=[team.id]),
+        # ucount=4 allows max(0, 4-2)=2 maps; 5 must be rejected
+        {"ucount": "4", "category2_id": str(category.id), "map_count": "5"},
+    )
+    assert response.status_code == 200
+    assert Payment.objects.filter(team=team).count() == 0
+
+
+@pytest.mark.django_db
+def test_edit_team_closed_but_editable_saves_without_charge(client):
+    user, race, category, team = _create_team_for_edit(
+        suffix="closed",
+        reg_status=RegStatus.SOLD_OUT,
+        is_teams_editable=True,
+        ucount=4,
+        paid_people=0,
+    )
+    client.force_login(user)
+    response = client.post(
+        reverse("edit_team", args=[team.id]),
+        {"ucount": "5", "category2_id": str(category.id), "map_count": "0"},
+    )
+    # editable gate passes, but reg not open -> saved, no payment
+    assert response.status_code == 302
+    assert Payment.objects.filter(team=team).count() == 0
+    team.refresh_from_db()
+    assert team.ucount == 5
+
+
+@pytest.mark.django_db
+def test_edit_team_open_but_not_editable_forbidden(client):
+    user, race, category, team = _create_team_for_edit(
+        suffix="ne",
+        reg_status=RegStatus.OPEN,
+        is_teams_editable=False,
+        ucount=4,
+        paid_people=0,
+    )
+    client.force_login(user)
+    response = client.post(
+        reverse("edit_team", args=[team.id]),
+        {"ucount": "5", "category2_id": str(category.id), "map_count": "0"},
+    )
+    assert response.status_code == 403
+
+
+@pytest.mark.django_db
+def test_add_team_rejects_out_of_range_ucount(client):
+    user = User.objects.create_user(
+        username="addoor", password="pass", email="addoor@example.com"
+    )
+    race = Race.objects.create(
+        name="Add OOR",
+        code="addoor1",
+        slug="add-oor-1",
+        cost=1000,
+        reg_status=RegStatus.OPEN,
+        is_teams_editable=True,
+    )
+    category = Category.objects.create(
+        code="t", name="Team", short_name="T", race=race, min_people=4, max_people=6
+    )
+    client.force_login(user)
+    response = client.post(
+        reverse("add_team", args=[race.slug]),
+        {"ucount": "2", "category2_id": str(category.id), "map_count": "0"},
+    )
+    assert response.status_code == 200
+    assert not Team.objects.filter(category2=category).exists()
+
+
+# --- Task 5: add_team.html rewritten on base-2 ---
+
+
+@pytest.mark.django_db
+def test_add_team_renders_base2_template(client):
+    user = User.objects.create_user(
+        username="b2add", password="pass", email="b2add@example.com"
+    )
+    race = Race.objects.create(
+        name="Base2 Race",
+        code="b2r1",
+        slug="base2-race-1",
+        cost=1000,
+        reg_status=RegStatus.OPEN,
+        is_teams_editable=True,
+    )
+    RacePriceTier.objects.create(
+        race=race, price=1500, active_until=timezone.localdate() + timedelta(days=10)
+    )
+    Category.objects.create(
+        code="t", name="Team", short_name="T", race=race, min_people=4, max_people=6
+    )
+    client.force_login(user)
+    response = client.get(reverse("add_team", args=[race.slug]))
+    assert response.status_code == 200
+    assert "website/add_team.html" in [t.name for t in response.templates]
+
+    html = response.content.decode()
+    # base-2 design: shared assets are linked
+    assert "/static/css/team-form.css" in html
+    assert "/static/js/team-form.js" in html
+    # segmented count control + category data-counts (from min/max people)
+    assert 'id="ucountSeg"' in html
+    assert 'data-counts="4,5,6"' in html
+    # consent input gates submit in add mode
+    assert 'id="consent"' in html
+    assert 'name="consent"' in html
+    # JSON config island consumed by team-form.js
+    assert 'id="teamFormConfig"' in html
+    assert '"isEdit": false' in html
+    # scoped wrapper so team-form.css never leaks
+    assert "team-register" in html
+
+
+@pytest.mark.django_db
+def test_add_team_config_island_uses_current_price(client):
+    user = User.objects.create_user(
+        username="b2price", password="pass", email="b2price@example.com"
+    )
+    race = Race.objects.create(
+        name="Base2 Price",
+        code="b2p1",
+        slug="base2-price-1",
+        cost=1000,
+        reg_status=RegStatus.OPEN,
+        is_teams_editable=True,
+    )
+    RacePriceTier.objects.create(
+        race=race, price=1500, active_until=timezone.localdate() + timedelta(days=10)
+    )
+    Category.objects.create(
+        code="t", name="Team", short_name="T", race=race, min_people=2, max_people=6
+    )
+    client.force_login(user)
+    response = client.get(reverse("add_team", args=[race.slug]))
+    html = response.content.decode()
+    # config island carries the active-tier price, not race.cost
+    assert '"currentPrice": 1500' in html
+
+
+@pytest.mark.django_db
+def test_add_team_hides_submit_when_not_editable(client):
+    user = User.objects.create_user(
+        username="b2closed", password="pass", email="b2closed@example.com"
+    )
+    race = Race.objects.create(
+        name="Base2 Closed",
+        code="b2c1",
+        slug="base2-closed-1",
+        cost=1000,
+        reg_status=RegStatus.SOLD_OUT,
+        is_teams_editable=False,
+    )
+    Category.objects.create(
+        code="t", name="Team", short_name="T", race=race, min_people=2, max_people=6
+    )
+    client.force_login(user)
+    response = client.get(reverse("add_team", args=[race.slug]))
+    assert response.status_code == 200
+    html = response.content.decode()
+    # submit gate follows the server flag (is_teams_editable)
+    assert 'id="submitBtn"' not in html
+    assert 'id="payBtn"' not in html
+    # status tag is display-only and reflects reg_status
+    assert "is-closed" in html
+
+
+# --- Task 6: edit_team.html on base-2 (edit flow + edit-only sections) ---
+
+
+@pytest.mark.django_db
+def test_edit_team_renders_base2_template(client):
+    user, race, category, team = _create_team_for_edit(
+        suffix="b2edit", tier_price=1500, ucount=4, paid_people=0
+    )
+    client.force_login(user)
+    response = client.get(reverse("edit_team", args=[team.id]))
+    assert response.status_code == 200
+    assert "website/edit_team.html" in [t.name for t in response.templates]
+
+    html = response.content.decode()
+    # base-2 design: shared assets are linked
+    assert "/static/css/team-form.css" in html
+    assert "/static/js/team-form.js" in html
+    # segmented count control + scoped wrapper
+    assert 'id="ucountSeg"' in html
+    assert "team-register" in html
+    # JSON config island marks edit mode
+    assert 'id="teamFormConfig"' in html
+    assert '"isEdit": true' in html
+    # consent is pre-checked and disabled in edit mode
+    assert 'name="consent" checked disabled' in html
+    # submit reads "Сохранить" with a доплата label swap available to the JS
+    assert 'data-label-due="Сохранить и&nbsp;доплатить"' in html
+
+
+@pytest.mark.django_db
+def test_edit_team_shows_move_section_when_paid_and_editable(client):
+    user, race, category, team = _create_team_for_edit(
+        suffix="mvshow", ucount=4, paid_people=4, is_teams_editable=True
+    )
+    client.force_login(user)
+    response = client.get(reverse("edit_team", args=[team.id]))
+    html = response.content.decode()
+    # member-transfer section + its dedicated POST target
+    assert "Переносы участников" in html
+    assert reverse("move_team_member", args=[team.id]) in html
+    assert 'name="moved_people"' in html
+
+
+@pytest.mark.django_db
+def test_edit_team_hides_move_section_when_not_paid(client):
+    user, race, category, team = _create_team_for_edit(
+        suffix="mvhide", ucount=4, paid_people=0, is_teams_editable=True
+    )
+    client.force_login(user)
+    response = client.get(reverse("edit_team", args=[team.id]))
+    html = response.content.decode()
+    assert "Переносы участников" not in html
+
+
+@pytest.mark.django_db
+def test_edit_team_shows_delete_section_when_deletable(client):
+    user, race, category, team = _create_team_for_edit(
+        suffix="del", ucount=4, paid_people=0
+    )
+    assert team.can_be_deleted
+    client.force_login(user)
+    response = client.get(reverse("edit_team", args=[team.id]))
+    html = response.content.decode()
+    assert "Удалить команду" in html
+    assert 'name="delete_team"' in html
+
+
+@pytest.mark.django_db
+def test_edit_team_hides_delete_section_when_not_deletable(client):
+    user, race, category, team = _create_team_for_edit(
+        suffix="nodel", ucount=4, paid_people=4
+    )
+    assert not team.can_be_deleted
+    client.force_login(user)
+    response = client.get(reverse("edit_team", args=[team.id]))
+    html = response.content.decode()
+    assert 'name="delete_team"' not in html
+
+
+@pytest.mark.django_db
+def test_edit_team_shows_payment_history(client):
+    user, race, category, team = _create_team_for_edit(
+        suffix="hist", ucount=4, paid_people=4
+    )
+    Payment.objects.create(
+        owner=user,
+        team=team,
+        payment_method="sbp2",
+        payment_amount=6000,
+        paid_for=4,
+        status=Payment.STATUS_DONE,
+        sender_card_number="",
+    )
+    client.force_login(user)
+    response = client.get(reverse("edit_team", args=[team.id]))
+    html = response.content.decode()
+    assert "История оплат" in html
+    assert "6000" in html
+
+
+@pytest.mark.django_db
+def test_add_team_omits_edit_only_sections(client):
+    user = User.objects.create_user(
+        username="addnoedit", password="pass", email="addnoedit@example.com"
+    )
+    race = Race.objects.create(
+        name="Add No Edit",
+        code="ane1",
+        slug="add-no-edit-1",
+        cost=1000,
+        reg_status=RegStatus.OPEN,
+        is_teams_editable=True,
+    )
+    Category.objects.create(
+        code="t", name="Team", short_name="T", race=race, min_people=4, max_people=6
+    )
+    client.force_login(user)
+    response = client.get(reverse("add_team", args=[race.slug]))
+    html = response.content.decode()
+    # the add page is for new teams — no edit-only sections
+    assert "История оплат" not in html
+    assert "Переносы участников" not in html
+    assert "Удалить команду" not in html
+    assert 'name="delete_team"' not in html
+    assert '"isEdit": false' in html
+
+
+@pytest.mark.django_db
+def test_edit_team_rejects_ucount_above_max(client):
+    user, race, category, team = _create_team_for_edit(
+        suffix="abvmax", min_people=4, max_people=6, ucount=4, paid_people=0
+    )
+    client.force_login(user)
+    response = client.post(
+        reverse("edit_team", args=[team.id]),
+        {"ucount": "7", "category2_id": str(category.id), "map_count": "0"},
+    )
+    assert response.status_code == 200
+    team.refresh_from_db()
+    assert team.ucount == 4  # unchanged — invalid POST rejected
+    assert Payment.objects.filter(team=team).count() == 0
+
+
+@pytest.mark.django_db
+def test_edit_team_redirects_unauthenticated(client):
+    user, race, category, team = _create_team_for_edit(suffix="unauth")
+    response = client.get(reverse("edit_team", args=[team.id]))
+    assert response.status_code == 302
+    assert "/login/" in response["Location"]
+
+
+@pytest.mark.django_db
+def test_delete_team_not_found_for_non_owner(client):
+    user, race, category, team = _create_team_for_edit(
+        suffix="deloth", ucount=4, paid_people=0
+    )
+    other = User.objects.create_user(
+        username="other-deloth", password="pass", email="other-deloth@example.com"
+    )
+    client.force_login(other)
+    response = client.post(
+        reverse("edit_team", args=[team.id]),
+        {"delete_team": "1"},
+    )
+    # get_team filters by owner, so non-owner sees 404
+    assert response.status_code == 404
+    assert Team.objects.filter(pk=team.pk).exists()  # team untouched
+
+
+@pytest.mark.django_db
+def test_delete_team_rejected_when_paid(client):
+    user, race, category, team = _create_team_for_edit(
+        suffix="delpaid", ucount=4, paid_people=4
+    )
+    assert not team.can_be_deleted
+    client.force_login(user)
+    response = client.post(
+        reverse("edit_team", args=[team.id]),
+        {"delete_team": "1"},
+    )
+    assert response.status_code == 400
+    team.refresh_from_db()
+    assert not team.is_deleted
+
+
+@pytest.mark.django_db
+def test_delete_team_soft_deletes_and_redirects(client):
+    user, race, category, team = _create_team_for_edit(
+        suffix="delok", ucount=4, paid_people=0
+    )
+    assert team.can_be_deleted
+    client.force_login(user)
+    response = client.post(
+        reverse("edit_team", args=[team.id]),
+        {"delete_team": "1"},
+    )
+    assert response.status_code == 302
+    assert reverse("my_teams", args=[race.slug]) in response["Location"]
+    # TeamManager filters is_deleted=False, so a deleted team disappears from objects
+    assert not Team.objects.filter(pk=team.pk).exists()
+
+
+@pytest.mark.django_db
+def test_build_category_options_single_size(client):
+    user = User.objects.create_user(
+        username="single", password="pass", email="single@example.com"
+    )
+    race = Race.objects.create(
+        name="Single",
+        code="sng1",
+        slug="single-1",
+        cost=1000,
+        reg_status=RegStatus.OPEN,
+        is_teams_editable=True,
+    )
+    category = Category.objects.create(
+        code="s", name="Solo", short_name="S", race=race, min_people=2, max_people=2
+    )
+    client.force_login(user)
+    response = client.get(reverse("add_team", args=[race.slug]))
+    assert response.status_code == 200
+    options = response.context["category_options"]
+    match = next(o for o in options if o["id"] == category.id)
+    assert match["counts"] == [2]

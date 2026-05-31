@@ -22,7 +22,7 @@ from .models import (
     TeamStartLog,
     Transfer,
 )
-from .models.race import Category, RaceLink
+from .models.race import Category, RaceLink, RacePriceTier
 
 
 @admin.register(MenuItem)
@@ -216,12 +216,17 @@ class RaceAdminInline(admin.TabularInline):
     extra = 1
 
 
+class RacePriceTierInline(admin.TabularInline):
+    model = RacePriceTier
+    extra = 1
+
+
 class RaceModelAdmin(admin.ModelAdmin):
     list_display = ("id", "name", "code", "slug", "date", "is_active", "is_reg_open")
     list_filter = ("is_active",)
     search_fields = ("name", "code", "slug")
     prepopulated_fields = {"slug": ("code",)}
-    inlines = [RaceAdminInline]
+    inlines = [RaceAdminInline, RacePriceTierInline]
 
 
 class RaceLinkAdmin(admin.ModelAdmin):
@@ -230,7 +235,16 @@ class RaceLinkAdmin(admin.ModelAdmin):
 
 
 class CategoryAdmin(admin.ModelAdmin):
-    list_display = ("id", "code", "name", "short_name", "order", "is_active")
+    list_display = (
+        "id",
+        "code",
+        "name",
+        "short_name",
+        "order",
+        "min_people",
+        "max_people",
+        "is_active",
+    )
     list_filter = ("race__name", "is_active")
     search_fields = ("code", "name")
 

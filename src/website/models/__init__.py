@@ -16,6 +16,6 @@ from .models import (
 )
 from .news import MenuItem, NewsPost, Page
 from .payment import SbpPaymentRecipient
-from .race import Race, RaceAdmin, RaceLink
+from .race import Race, RaceAdmin, RaceLink, RacePriceTier
 from .tag import Tag
 from .vtb import VTBPayment, VTBPreparedPayment

@@ -20,6 +20,9 @@ from website.models.race import Category, Race
 
 BUS_REGISTRATION_MAX_PASSENGERS = 20
 BREAKFAST_MAX_ATTENDEES = 20
+# Maps pricing — mirrored in the views and the JS config island.
+FREE_MAPS = 2
+MAP_PRICE = 200
 DUPLICATE_EMAIL_MSG = mark_safe(
     "Пользователь с таким email уже зарегистрирован. "
     '<a href="/login/">Войдите</a> в существующий аккаунт.'
@@ -484,37 +487,36 @@ class TeamForm(forms.Form):
             }
         ),
     )
-    ucount = forms.ChoiceField(
-        choices=[(i, str(i)) for i in range(2, 7)],
-        widget=forms.Select(
-            attrs={
-                "class": "form-control form-control-lg",
-                "placeholder": "Количество участников",
-            },
-        ),
+    ucount = forms.IntegerField(
+        min_value=2,
+        widget=forms.HiddenInput(),
         label="Количество участников",
     )
     dist = forms.CharField(required=False)
     paymentid = forms.CharField(widget=forms.HiddenInput(), required=False)
 
-    map_count = forms.ChoiceField(
-        choices=[(i, str(i) if i else "Нет") for i in range(0, 7)],
+    map_count = forms.IntegerField(
+        min_value=0,
         required=False,
         initial=0,
-        widget=forms.Select(
-            attrs={
-                "class": "form-control form-control-lg",
-                "placeholder": "Дополнительные карты",
-            }
-        ),
+        widget=forms.HiddenInput(),
         label="Дополнительные карты",
     )
 
-    def __init__(self, race_id, *args, **kwargs):
+    def __init__(self, race_id, *args, current_category_id=None, **kwargs):
         super(TeamForm, self).__init__(*args, **kwargs)
+        cats = list(Category.objects.filter(race_id=race_id, is_active=True))
+        if current_category_id is not None:
+            active_ids = {c.id for c in cats}
+            if current_category_id not in active_ids:
+                current_cat = Category.objects.filter(
+                    id=current_category_id, race_id=race_id
+                ).first()
+                if current_cat:
+                    cats.insert(0, current_cat)
         categories = (
             (category.id, f"{category.short_name} ({category.name})")
-            for category in Category.objects.filter(race_id=race_id)
+            for category in cats
         )
         self.fields["category2_id"] = forms.ChoiceField(
             required=False,
@@ -598,15 +600,51 @@ class TeamForm(forms.Form):
             return True
 
     def clean(self):
-        # make invalid forms red:
+        cleaned_data = super().clean()
+
+        # Capture whether any required-field errors existed before server guards run,
+        # so the "fill all fields" banner is only shown for those (not for range
+        # violations which have their own field-level messages).
+        had_errors_before_guards = bool(self.errors)
+
+        # Server-side guards: the segmented control / maps stepper cap values
+        # in the browser only; enforce them here against a crafted POST.
+        category_id = cleaned_data.get("category2_id")
+        ucount = cleaned_data.get("ucount")
+        category = (
+            Category.objects.filter(id=category_id).first() if category_id else None
+        )
+        ucount_valid = False
+        if ucount is not None:
+            if not category:
+                self.add_error("category2_id", "Выберите категорию.")
+            elif not (category.min_people <= int(ucount) <= category.max_people):
+                self.add_error(
+                    "ucount",
+                    "Недопустимое количество участников для выбранной категории.",
+                )
+            else:
+                ucount_valid = True
+
+        if ucount_valid:
+            map_count = cleaned_data.get("map_count") or 0
+            max_maps = max(0, int(ucount) - FREE_MAPS)
+            if int(map_count) > max_maps:
+                self.add_error(
+                    "map_count",
+                    "Слишком много дополнительных карт для такого состава.",
+                )
+
+        # make invalid fields red:
         if self.errors:
             for f_name in self.fields:
                 if f_name in self.errors:
                     classes = self.fields[f_name].widget.attrs.get("class", "")
                     classes += " is-invalid"
                     self.fields[f_name].widget.attrs["class"] = classes
-            raise forms.ValidationError("Заполните все поля")
-        return self.cleaned_data
+            if had_errors_before_guards:
+                raise forms.ValidationError("Заполните все поля")
+        return cleaned_data
 
     @staticmethod
     def clean_birth(birth):
@@ -635,7 +673,10 @@ class TeamForm(forms.Form):
         return self.clean_birth(self.cleaned_data["birth6"])
 
     def clean_map_count(self):
-        return self.clean_birth(self.cleaned_data["map_count"])
+        value = self.cleaned_data.get("map_count")
+        if value is None:
+            return 0
+        return value
 
     def save(self):
         if "paymentid" not in self.cleaned_data:
@@ -694,21 +735,24 @@ class TeamMemberMoveForm(forms.ModelForm):
         }
 
     def clean_moved_people(self):
+        moved = self.cleaned_data.get("moved_people")
+        from_team = self.cleaned_data.get("from_team")
         if (
-            self.cleaned_data["moved_people"]
-            > self.cleaned_data["from_team"].paid_people
+            moved is not None
+            and from_team is not None
+            and moved > from_team.paid_people
         ):
             raise forms.ValidationError(
                 "Moved people cannot exceed the number of paid people in the from team."
             )
-        return self.cleaned_data["moved_people"]
+        return moved
 
     def clean(self):
-        if (
-            self.cleaned_data["from_team"].category2.race_id
-            != self.cleaned_data["to_team"].category2.race_id
-        ):
-            raise forms.ValidationError("Teams must be in the same Race")
+        from_team = self.cleaned_data.get("from_team")
+        to_team = self.cleaned_data.get("to_team")
+        if from_team and to_team:
+            if from_team.category2.race_id != to_team.category2.race_id:
+                raise forms.ValidationError("Teams must be in the same Race")
         return super().clean()
 
 

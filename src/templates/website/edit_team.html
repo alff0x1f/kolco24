@@ -1,9 +1,9 @@
 {% extends "website/base-2.html" %}
 
-{% block title %}Регистрация команды · Кольцо 24{% endblock %}
-{% block head_descr %}Регистрация команды на Кольцо 24 — состав, дистанция и оплата через СБП.{% endblock %}
-{% block og_title %}Регистрация команды · Кольцо 24{% endblock %}
-{% block og_description %}Запишите команду на гонку: состав, категория и стартовый взнос.{% endblock %}
+{% block title %}Редактирование команды · Кольцо 24{% endblock %}
+{% block head_descr %}Редактирование команды на Кольцо 24 — состав, дистанция и доплата через СБП.{% endblock %}
+{% block og_title %}Редактирование команды · Кольцо 24{% endblock %}
+{% block og_description %}Измените состав или категорию команды; при необходимости — доплата.{% endblock %}
 
 {% block extra_head %}
 <link href="/static/css/team-form.css" rel="stylesheet" type="text/css">
@@ -18,12 +18,13 @@
             <span class="sep">/</span>
             <a href="{% url 'my_teams' race.slug %}">{{ race.name }}</a>
             <span class="sep">/</span>
-            <span>Регистрация команды</span>
+            <span>Редактирование команды</span>
         </nav>
 
         <header class="page-head anim d1">
             <div>
-                <h1>Регистрация команды</h1>
+                <h1>Редактирование команды</h1>
+                {% if team.teamname %}<div class="sub">{{ team.teamname }}</div>{% endif %}
             </div>
             <div class="race-chip{% if reg_status != 'open' %} is-closed{% endif %}">
                 <span class="dot"></span>
@@ -175,33 +176,133 @@
                         {% endif %}
                     </div>
 
-                    <!-- Подвал: согласие + оплата -->
+                    <!-- Подвал: согласие + сохранение/доплата -->
                     <div class="foot">
                         <label class="check">
-                            <input type="checkbox" id="consent" name="consent" required>
+                            <input type="checkbox" id="consent" name="consent" checked disabled>
                             <span class="box"></span>
-                            <span>Я&nbsp;ознакомлен(а) с&nbsp;<a href="/page/personal_data_consent/" target="_blank" rel="noopener" onclick="event.stopPropagation()">обработкой персональных данных</a> (ФЗ&nbsp;№152-ФЗ) и&nbsp;подтверждаю, что всем участникам исполнилось 18&nbsp;лет.</span>
+                            <span>Согласие на&nbsp;<a href="/page/personal_data_consent/" target="_blank" rel="noopener" onclick="event.stopPropagation()">обработку персональных данных</a> (ФЗ&nbsp;№152-ФЗ) уже подтверждено при&nbsp;регистрации команды.</span>
                         </label>
 
                         {% if reg_status != 'open' %}
                         <div class="reg-closed-warn" id="regClosedWarn" style="display:none;">
                             <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="10" cy="10" r="8"/><path d="M10 6v5M10 13.5v.1"/></svg>
-                            Регистрация закрыта — оплата слотов сейчас невозможна.
+                            Регистрация закрыта — доплата слотов сейчас невозможна.
                         </div>
                         {% endif %}
 
                         <div class="foot-actions">
-                            <p class="small">После сохранения вы&nbsp;перейдёте к&nbsp;оплате через СБП. Команда уже будет в&nbsp;списке участников.</p>
+                            <p class="small">Изменения состава сохранятся сразу. Если команда выросла или добавлены карты&nbsp;— перейдёте к&nbsp;доплате через&nbsp;СБП.</p>
                             <div class="actions">
                                 <a class="btn btn-ghost" href="{% url 'my_teams' race.slug %}">Отмена</a>
-                                {% if is_editable %}
-                                <button class="btn btn-primary btn-lg" type="submit" id="submitBtn" disabled>Сохранить и&nbsp;оплатить</button>
+                                {% if is_editable or user.is_superuser %}
+                                <button class="btn btn-primary btn-lg" type="submit" id="submitBtn"
+                                        data-label-due="Сохранить и&nbsp;доплатить" data-label-zero="Сохранить">Сохранить</button>
                                 {% endif %}
                             </div>
                         </div>
                     </div>
 
                 </form>
+
+                <!-- ─────────── EDIT-ONLY: история оплат ─────────── -->
+                {% if payments %}
+                <div class="card anim d2">
+                    <div class="card-section">
+                        <div class="section-title">История оплат</div>
+                        <div class="pay-history">
+                            {% for payment in payments %}
+                            {% if payment.payment_amount %}
+                            <div class="pay-row">
+                                <span class="when">Платёж за&nbsp;{{ payment.paid_for|floatformat:"0" }}&nbsp;чел. · {{ payment.created_at|date:"j.m.Y" }}</span>
+                                <span class="amt">{{ payment.payment_amount }}&nbsp;₽</span>
+                            </div>
+                            {% endif %}
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+
+                <!-- ─────────── EDIT-ONLY: переносы участников ─────────── -->
+                {% if paid_people and is_editable %}
+                <div class="card danger-zone anim d2">
+                    <div class="card-section">
+                        <div class="section-title">Переносы участников</div>
+
+                        {% if member_moves %}
+                        <div class="pay-history" style="margin-bottom:16px;">
+                            {% for move in member_moves %}
+                            <div class="pay-row">
+                                <span class="when">{{ move.from_team.teamname }} → {{ move.to_team.teamname }} · {{ move.move_date|date:"j.m.Y" }}</span>
+                                <span class="amt">{{ move.moved_people|floatformat:"0" }}&nbsp;чел.</span>
+                            </div>
+                            {% endfor %}
+                        </div>
+                        {% endif %}
+
+                        {% if team_move_form %}
+                        <div class="reg-closed-warn" style="margin-bottom:14px;">
+                            <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="10" cy="10" r="8"/><path d="M10 6v5M10 13.5v.1"/></svg>
+                            Внимание: слот участника будет безвозвратно передан в&nbsp;другой аккаунт. Вернуть его обратно невозможно.
+                        </div>
+                        <form method="post" action="{% url 'move_team_member' team.id %}"
+                              onsubmit="return confirm('Подтвердите перенос: слот будет безвозвратно передан другому аккаунту и вернуть его не получится. Продолжить?');">
+                            {% csrf_token %}
+                            {% if team_move_form.non_field_errors %}
+                            <span class="hint err">{{ team_move_form.non_field_errors|join:", " }}</span>
+                            {% endif %}
+                            <div class="form-grid">
+                                <div class="field full">
+                                    <label for="moveToTeam">Команда назначения</label>
+                                    <select class="select{% if team_move_form.to_team.errors %} has-error{% endif %}"
+                                            id="moveToTeam" name="to_team">
+                                        {% for value, label in team_move_form.fields.to_team.choices %}
+                                        <option value="{{ value }}"
+                                                {% if team_move_form.to_team.value|stringformat:'s' == value|stringformat:'s' %}selected{% endif %}>{{ label }}</option>
+                                        {% endfor %}
+                                    </select>
+                                    {% if team_move_form.to_team.errors %}
+                                    <span class="hint err">{{ team_move_form.to_team.errors|join:", " }}</span>
+                                    {% endif %}
+                                </div>
+                                <div class="field full">
+                                    <label for="movedPeople">Количество переносимых участников</label>
+                                    <input class="input{% if team_move_form.moved_people.errors %} has-error{% endif %}"
+                                           id="movedPeople" name="moved_people" type="number" min="1"
+                                           value="{{ team_move_form.moved_people.value|default:1 }}">
+                                    {% if team_move_form.moved_people.errors %}
+                                    <span class="hint err">{{ team_move_form.moved_people.errors|join:", " }}</span>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <div class="foot-actions" style="margin-top:14px;">
+                                <p class="small">Перенос доступен только владельцу команды.</p>
+                                <div class="actions">
+                                    <button class="btn btn-danger" type="submit">Перенести</button>
+                                </div>
+                            </div>
+                        </form>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endif %}
+
+                <!-- ─────────── EDIT-ONLY: удалить команду ─────────── -->
+                {% if team.can_be_deleted and user.is_superuser or team.can_be_deleted and team.owner_id == user.id %}
+                <div class="card danger-zone anim d3">
+                    <div class="card-section">
+                        <div class="section-title">Удалить команду</div>
+                        <p class="small" style="margin:0 0 14px;">Команда будет удалена из&nbsp;списка участников. Это действие необратимо.</p>
+                        <form method="post" action="{{ action }}"
+                              onsubmit="return confirm('Вы уверены, что хотите удалить команду?');">
+                            {% csrf_token %}
+                            <input type="hidden" name="delete_team" value="1">
+                            <button class="btn btn-danger" type="submit">Удалить команду</button>
+                        </form>
+                    </div>
+                </div>
+                {% endif %}
             </main>
 
             <!-- ─────────── SIDEBAR ─────────── -->
@@ -232,8 +333,9 @@
                         <span class="amt"><span id="sumTotal">0</span>&nbsp;<small>₽</small></span>
                     </div>
                     <div class="sum-pay">
-                        {% if is_editable %}
-                        <button class="btn btn-primary btn-block btn-lg" type="submit" form="teamForm" id="payBtn" disabled>Перейти к&nbsp;оплате</button>
+                        {% if is_editable or user.is_superuser %}
+                        <button class="btn btn-primary btn-block btn-lg" type="submit" form="teamForm" id="payBtn"
+                                data-label-due="Перейти к&nbsp;оплате" data-label-zero="Сохранить изменения">Сохранить изменения</button>
                         {% endif %}
                         <div class="pay-meta">
                             <span class="sbp"><i></i>СБП</span> · мгновенно · без комиссии

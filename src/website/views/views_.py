@@ -29,6 +29,7 @@ from django.shortcuts import get_object_or_404, render
 from django.urls import reverse
 from django.utils.decorators import method_decorator
 from django.utils.http import url_has_allowed_host_and_scheme
+from django.utils.safestring import mark_safe
 from django.views import View
 from django.views.decorators.csrf import csrf_exempt
 from openpyxl import load_workbook
@@ -36,6 +37,8 @@ from openpyxl import load_workbook
 from vtb.client import VTBClient
 from website.forms import (
     DUPLICATE_EMAIL_MSG,
+    FREE_MAPS,
+    MAP_PRICE,
     BreakfastForm,
     ImpersonateForm,
     LoginForm,
@@ -184,9 +187,12 @@ class RegisterView(View):
     def get(self, request):
         if request.user.is_authenticated:
             return HttpResponseRedirect("/")
-        return render(request, "website/register.html", self.get_context())
+        context = self.get_context()
+        context["next"] = request.GET.get("next", "")
+        return render(request, "website/register.html", context)
 
     def post(self, request):
+        next_url = request.POST.get("next") or request.GET.get("next", "")
         form = RegForm(request.POST)
         if form.is_valid():
             # Extract cleaned form data
@@ -210,10 +216,20 @@ class RegisterView(View):
             except IntegrityError:
                 if User.objects.filter(email__iexact=email).exists():
                     form.add_error("email", DUPLICATE_EMAIL_MSG)
-                    return render(request, "website/register.html", {"reg_form": form})
+                    return render(
+                        request,
+                        "website/register.html",
+                        {"reg_form": form, "next": next_url},
+                    )
                 raise
 
             auth_login(request, user)
+
+            # A guest who started from a login-gated page (e.g. «Войти и
+            # добавить команду») carries ?next= through login → register; honor
+            # it so they land back where they came from.
+            if next_url:
+                return _safe_redirect(request, next_url)
 
             # todo change it in 2026
             race = Race.objects.filter(id=8).first()  # 2025
@@ -223,7 +239,11 @@ class RegisterView(View):
                 return HttpResponseRedirect(reverse("add_team", args=[race.slug]))
             return HttpResponseRedirect(reverse("my_teams", args=[race.slug]))
 
-        return render(request, "website/register.html", {"reg_form": form})
+        return render(
+            request,
+            "website/register.html",
+            {"reg_form": form, "next": next_url},
+        )
 
     @staticmethod
     def get_next_username(first_name, last_name):
@@ -1726,6 +1746,59 @@ def upload_photo(request, race_id):
     return JsonResponse({"success": True})
 
 
+def build_category_options(race_id, current_category_id=None):
+    """Category options carrying ``data-counts`` expanded from min/max people.
+
+    If current_category_id names an inactive category, it is prepended so that
+    existing teams whose category was later deactivated still render correctly.
+    """
+    cats = list(Category.objects.filter(race_id=race_id, is_active=True))
+    if current_category_id is not None:
+        active_ids = {c.id for c in cats}
+        if current_category_id not in active_ids:
+            current_cat = Category.objects.filter(
+                id=current_category_id, race_id=race_id
+            ).first()
+            if current_cat:
+                cats.insert(0, current_cat)
+    return [
+        {
+            "id": category.id,
+            "label": f"{category.short_name} ({category.name})",
+            "counts": list(range(category.min_people, category.max_people + 1)),
+        }
+        for category in cats
+    ]
+
+
+def build_team_form_context(race, team, is_edit=False):
+    """Unified context shared by the add and edit team forms."""
+    current_category_id = getattr(team, "category2_id", None)
+    price_tiers = race.price_tier_ladder()
+    current_price = race.current_price
+    config = {
+        "currentPrice": current_price,
+        "paidPeople": team.paid_people,
+        "mapCountPaid": team.map_count_paid,
+        "mapPrice": MAP_PRICE,
+        "freeMaps": FREE_MAPS,
+        "isEdit": is_edit,
+    }
+    return {
+        "current_price": current_price,
+        "paid_people": team.paid_people,
+        "map_count_paid": team.map_count_paid,
+        "price_tiers": price_tiers,
+        "reg_open": race.reg_status == RegStatus.OPEN,
+        "is_editable": race.is_teams_editable,
+        "reg_status": race.reg_status,
+        "map_price": MAP_PRICE,
+        "free_maps": FREE_MAPS,
+        "category_options": build_category_options(race.id, current_category_id),
+        "team_form_config_json": mark_safe(json.dumps(config)),
+    }
+
+
 class AddTeam(View):
     def get(self, request, race_slug):
         race = get_object_or_404(Race, slug=race_slug)
@@ -1741,9 +1814,8 @@ class AddTeam(View):
                 "race_id": race.id,
                 "team_form": form,
                 "team": Team(),
-                "cost": race.cost,
                 "action": reverse("add_team", args=[race.slug]),
-                "reg_open": race.reg_status == RegStatus.OPEN,
+                **build_team_form_context(race, Team()),
             },
         )
 
@@ -1760,6 +1832,10 @@ class AddTeam(View):
         if not category2:
             return JsonResponse({"error": "Category not found"}, status=404)
 
+        payment_method = request.GET.get("method", "sbp2")
+        if payment_method != "sbp2":
+            raise Http404
+
         data = request.POST.copy()
         data["dist"] = category2.code
         data["paymentid"] = "%016x" % random.randrange(16**16)  # legacy
@@ -1767,100 +1843,68 @@ class AddTeam(View):
         if form.is_valid():
             # save team
             team: Team = Team.objects.create(
-                year=2025,
+                year=race.date.year,
                 owner_id=request.user.id,
                 **form.cleaned_data,
             )
-            team.save()
 
             if race.reg_status != RegStatus.OPEN:
                 return HttpResponseRedirect(reverse("my_teams", args=[race.slug]))
 
             # payment
-            payment_method = request.GET.get("method", "sbp2")
-            cost_now = race.cost
-            cost = (int(team.ucount) - team.paid_people) * race.cost + (
+            cost_now = race.current_price
+            cost = (int(team.ucount) - team.paid_people) * cost_now + (
                 int(team.map_count) - team.map_count_paid
-            ) * 200
+            ) * MAP_PRICE
 
             if cost < 0:
                 # в теории, не может быть, тк это новая команда и она не
                 # может быть оплачена
                 cost = 0
 
-            if payment_method != "sbp2":
-                # закрываем другие методы оплаты
-                raise Http404
+            if cost == 0:
+                return HttpResponseRedirect(reverse("my_teams", args=[race.slug]))
 
-            if payment_method in ("visamc", "yandexmoney"):
-                payment = Payment.objects.create(
-                    owner=request.user,
-                    team=team,
-                    payment_method=payment_method,
-                    payment_amount=cost,
-                    payment_with_discount=cost,
-                    cost_per_person=cost_now,
-                    paid_for=int(team.ucount) - team.paid_people,
-                    map=int(team.map_count) - team.map_count_paid,
-                    additional_charge=team.additional_charge,
-                    status="draft",
-                )
+            payment = Payment.objects.create(
+                owner=request.user,
+                team=team,
+                payment_method=payment_method,
+                payment_amount=cost,
+                payment_with_discount=cost,
+                cost_per_person=cost_now,
+                paid_for=int(team.ucount) - team.paid_people,
+                status="draft",
+                map=int(team.map_count) - team.map_count_paid,
+            )
+            vtb_client = VTBClient()
+            vtb_client._ensure_token()
 
-                paymenttype = "AC"
-                if payment_method == "yandexmoney":
-                    paymenttype = "PC"
-                return render(
-                    request,
-                    "website/yoomoney.html",
-                    context={
-                        "paymenttype": paymenttype,
-                        "yalabel": payment.id,
-                        "paymentid": team.paymentid,
-                        "yandexwallet": settings.YANDEX_WALLET,
-                        "sum": cost,
-                    },
-                )
-            elif payment_method in ("sbp2"):
-                payment = Payment.objects.create(
-                    owner=request.user,
-                    team=team,
-                    payment_method=payment_method,
-                    payment_amount=cost,
-                    payment_with_discount=cost,
-                    cost_per_person=cost_now,
-                    paid_for=int(team.ucount) - team.paid_people,
-                    additional_charge=team.additional_charge,
-                    status="draft",
-                    map=int(team.map_count) - team.map_count_paid,
-                )
-                vtb_client = VTBClient()
-                vtb_client._ensure_token()
+            payload = vtb_client.create_order(
+                order_id=f"ORDER_{payment.id}",
+                order_name=f"Оплата за команду на Кольцо 24 ({payment.id})",
+                amount_value=cost,
+                return_payment_data="sbp",
+            )
+            vtb_payment = VTBPayment.from_vtb_payload(payload)
 
-                payload = vtb_client.create_order(
-                    order_id=f"ORDER_{payment.id}",
-                    order_name=f"Оплата за команду на Кольцо 24 ({payment.id})",
-                    amount_value=cost,
-                    return_payment_data="sbp",
-                )
-                vtb_payment = VTBPayment.from_vtb_payload(payload)
-
-                prepared_payment = VTBPreparedPayment.objects.filter(
-                    payment=vtb_payment
-                ).first()
-                if prepared_payment and prepared_payment.url:
-                    return HttpResponseRedirect(prepared_payment.url)
-                return HttpResponseRedirect(vtb_payment.pay_url)
-
-            else:
-                # redirect
-                return HttpResponseRedirect(
-                    reverse("pay_team", args=[team.id]) + f"?method={payment_method}"
-                )
+            prepared_payment = VTBPreparedPayment.objects.filter(
+                payment=vtb_payment
+            ).first()
+            if prepared_payment and prepared_payment.url:
+                return HttpResponseRedirect(prepared_payment.url)
+            return HttpResponseRedirect(vtb_payment.pay_url)
 
         return render(
             request,
             "website/add_team.html",
-            {"race_id": race.id, "team_form": form, "cost": PaymentsYa.get_cost()},
+            {
+                "race": race,
+                "race_id": race.id,
+                "team_form": form,
+                "team": Team(),
+                "action": reverse("add_team", args=[race.slug]),
+                **build_team_form_context(race, Team()),
+            },
         )
 
 

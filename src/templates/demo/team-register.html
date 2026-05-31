@@ -1,0 +1,669 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>Регистрация команды — Кольцо 24</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="description" content="Регистрация команды на Кольцо 24 — соревновательный 24-часовой рогейн.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Rubik:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  /* ── Tokens (общие с новым дизайном, theme-2) ─────────── */
+  :root {
+    --ink:        #161a1f;
+    --ink-soft:   #2c333c;
+    --muted:      #6b7785;
+    --muted-2:    #99a3b0;
+    --paper:      #eef0f3;
+    --paper-2:    #ffffff;
+    --line:       #e2e6eb;
+    --line-soft:  #eef0f3;
+    --primary:    #2a5288;
+    --primary-2:  #4582EC;
+    --primary-dk: #1d3a63;
+    --success:    #02B875;
+    --success-dk: #018655;
+    --warn:       #c75a26;
+    --warn-bg:    #fbeee4;
+    --danger:     #d93644;
+    --danger-bg:  #fdecee;
+    --dark:       #1d242d;
+    --shadow-sm:  0 1px 2px rgba(22,26,31,.04);
+    --shadow:     0 1px 2px rgba(22,26,31,.04), 0 8px 24px rgba(22,26,31,.05);
+    --radius:     14px;
+    --radius-sm:  10px;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    font-family: "Rubik", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    color: var(--ink-soft);
+    background: var(--paper);
+    font-size: 15px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+  h1, h2, h3, h4 { color: var(--ink); font-weight: 500; margin: 0; line-height: 1.2; letter-spacing: -0.005em; }
+  a { color: var(--primary-2); text-decoration: none; transition: color .12s; }
+  a:hover { color: var(--primary-dk); }
+  img { max-width: 100%; display: block; }
+  button { font-family: inherit; }
+
+  .container { max-width: 1180px; margin: 0 auto; padding: 0 20px; }
+  .main-container { min-height: calc(100vh - 57px - 280px); }
+
+  /* ── Nav (slim, как в base-2) ─────────────────────────── */
+  .nav { background: var(--dark); color: #fff; position: sticky; top: 0; z-index: 50; }
+  .nav-inner { display: flex; align-items: center; justify-content: space-between; padding: 12px 0; gap: 14px; }
+  .brand { display: flex; align-items: center; gap: 11px; color: #fff; font-weight: 500; font-size: 16px; }
+  .brand:hover { color: #fff; }
+  .brand-mark {
+    width: 30px; height: 30px; border-radius: 8px; flex-shrink: 0;
+    background: radial-gradient(circle at 30% 28%, #5b95f0, var(--primary) 70%);
+    position: relative; box-shadow: inset 0 0 0 1px rgba(255,255,255,.14);
+  }
+  .brand-mark::after {
+    content: ""; position: absolute; inset: 8px; border-radius: 50%;
+    border: 2px solid rgba(255,255,255,.85); border-right-color: transparent;
+  }
+  .nav-actions { display: flex; align-items: center; gap: 12px; }
+  .nav-user-btn {
+    display: flex; align-items: center; gap: 7px; color: rgba(255,255,255,.9);
+    background: transparent; border: 1px solid rgba(255,255,255,.22); border-radius: 8px;
+    padding: 6px 12px; font-size: 14px; font-weight: 500; cursor: pointer;
+  }
+  .nav-user-btn:hover { background: rgba(255,255,255,.07); border-color: rgba(255,255,255,.4); color: #fff; }
+  .nav-user-btn .chevron {
+    width: 11px; height: 11px; border-right: 1.5px solid currentColor; border-bottom: 1.5px solid currentColor;
+    transform: rotate(45deg) translateY(-2px); display: inline-block;
+  }
+
+  /* ── Page layout ──────────────────────────────────────── */
+  .page { padding: 22px 0 60px; }
+  .crumbs { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); margin-bottom: 16px; }
+  .crumbs a { color: var(--muted); }
+  .crumbs a:hover { color: var(--ink); }
+  .crumbs .sep { color: var(--muted-2); }
+
+  .page-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 20px; }
+  .page-head h1 { font-size: 28px; font-weight: 600; letter-spacing: -0.01em; }
+  .page-head .sub { font-size: 14px; color: var(--muted); margin-top: 6px; }
+
+  .race-chip {
+    display: inline-flex; align-items: center; gap: 10px;
+    background: var(--paper-2); border: 1px solid var(--line); border-radius: 999px;
+    padding: 7px 8px 7px 14px; box-shadow: var(--shadow-sm); font-size: 13px;
+  }
+  .race-chip .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--success); box-shadow: 0 0 0 3px rgba(2,184,117,.18); }
+  .race-chip b { color: var(--ink); font-weight: 500; }
+  .race-chip .date { color: var(--muted); }
+  .race-chip .tag {
+    background: rgba(2,184,117,.12); color: var(--success-dk); font-weight: 500;
+    border-radius: 999px; padding: 4px 11px; font-size: 12px; letter-spacing: .01em;
+  }
+
+  .grid { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 16px; align-items: start; }
+
+  /* ── Card / sections ──────────────────────────────────── */
+  .card { background: var(--paper-2); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow-sm); margin-bottom: 16px; overflow: hidden; }
+  .card-section { padding: 24px; border-top: 1px solid var(--line-soft); }
+  .card-section:first-child { border-top: none; }
+  .section-title { font-size: 11px; font-weight: 500; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted-2); margin-bottom: 14px; }
+
+  /* ── Form ─────────────────────────────────────────────── */
+  .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px 16px; }
+  .field { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+  .field.full { grid-column: 1 / -1; }
+  .field label { font-size: 13px; color: var(--ink-soft); font-weight: 500; }
+  .field label .opt { color: var(--muted-2); font-weight: 400; }
+  .field .hint { font-size: 12px; color: var(--muted); line-height: 1.4; }
+  .input, .select {
+    appearance: none; width: 100%; background: var(--paper-2); border: 1px solid var(--line);
+    border-radius: 8px; padding: 10px 12px; font: inherit; color: var(--ink); font-size: 14.5px;
+    line-height: 1.4; transition: border-color .12s, box-shadow .12s;
+  }
+  .input::placeholder { color: var(--muted-2); }
+  .input:hover, .select:hover { border-color: #c7cdd6; }
+  .input:focus, .select:focus { outline: none; border-color: var(--primary-2); box-shadow: 0 0 0 3px rgba(69,130,236,.15); }
+  .select {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 20 20' fill='none' stroke='%236b7785' stroke-width='1.8'%3E%3Cpath d='m5 8 5 5 5-5'/%3E%3C/svg%3E");
+    background-repeat: no-repeat; background-position: right 12px center; padding-right: 38px; cursor: pointer;
+  }
+
+  /* ── Состав: количество (segmented) ───────────────────── */
+  .count-row { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin-top: 18px; }
+  .count-row > label { font-size: 13px; font-weight: 500; color: var(--ink-soft); }
+  .seg { display: inline-flex; background: #f1f3f6; border: 1px solid var(--line); border-radius: 10px; padding: 3px; gap: 3px; }
+  .seg button {
+    border: none; background: transparent; cursor: pointer; min-width: 44px; padding: 8px 12px;
+    border-radius: 7px; font-size: 14.5px; font-weight: 500; color: var(--muted); transition: all .14s; line-height: 1;
+  }
+  .seg button:hover { color: var(--ink); }
+  .seg button.on { background: var(--paper-2); color: var(--primary); box-shadow: var(--shadow-sm); }
+  .count-cap { font-size: 12.5px; color: var(--muted); }
+
+  /* ── Участники ────────────────────────────────────────── */
+  .members-label { font-size: 13px; font-weight: 500; color: var(--ink-soft); margin: 20px 0 10px; }
+  .members { display: flex; flex-direction: column; gap: 10px; }
+  .member-row { display: grid; grid-template-columns: 30px minmax(0,1fr) 116px; gap: 10px; align-items: center; }
+  .member-row .num { width: 30px; height: 38px; display: grid; place-items: center; color: var(--muted-2); font-weight: 600; font-size: 14px; font-variant-numeric: tabular-nums; }
+  .member-row.filled .num { color: var(--primary); }
+  .member-row.is-hidden { display: none; }
+  @keyframes rowIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+  .member-row.reveal { animation: rowIn .22s ease both; }
+  .members-foot { font-size: 12.5px; color: var(--muted); margin-top: 12px; display: flex; align-items: center; gap: 7px; }
+  .members-foot svg { width: 14px; height: 14px; color: var(--muted-2); flex-shrink: 0; }
+
+  /* ── Доп. карты (лёгкая строка, не коробка) ───────────── */
+  .maps-row {
+    display: flex; align-items: center; justify-content: space-between; gap: 16px;
+    margin-top: 20px; padding-top: 18px; border-top: 1px dashed var(--line);
+  }
+  .maps-row .maps-txt h4 { font-size: 14px; font-weight: 500; }
+  .maps-row .maps-txt p { margin: 3px 0 0; font-size: 12.5px; color: var(--muted); max-width: 380px; }
+  .stepper { display: inline-flex; align-items: center; background: var(--paper-2); border: 1px solid var(--line); border-radius: 9px; overflow: hidden; flex-shrink: 0; }
+  .stepper button { width: 38px; height: 40px; border: none; background: transparent; cursor: pointer; font-size: 20px; color: var(--muted); line-height: 1; transition: background .1s, color .1s; }
+  .stepper button:hover:not(:disabled) { background: #f1f3f6; color: var(--ink); }
+  .stepper button:disabled { color: #d2d7de; cursor: not-allowed; }
+  .stepper .val { min-width: 40px; text-align: center; font-weight: 600; color: var(--ink); font-size: 15px; font-variant-numeric: tabular-nums; }
+
+  /* ── Checkbox ─────────────────────────────────────────── */
+  .check { display: grid; grid-template-columns: 18px 1fr; gap: 11px; align-items: start; font-size: 13.5px; color: var(--ink-soft); cursor: pointer; line-height: 1.45; position: relative; }
+  .check input { position: absolute; opacity: 0; pointer-events: none; }
+  .check .box { width: 18px; height: 18px; border: 1.5px solid #c7cdd6; border-radius: 5px; background: var(--paper-2); position: relative; transition: all .12s; margin-top: 1px; }
+  .check:hover .box { border-color: var(--primary-2); }
+  .check input:checked + .box { background: var(--primary-2); border-color: var(--primary-2); }
+  .check input:checked + .box::after { content:''; position: absolute; left: 5px; top: 1px; width: 5px; height: 10px; border-right: 2px solid #fff; border-bottom: 2px solid #fff; transform: rotate(45deg); }
+
+  /* ── Buttons ──────────────────────────────────────────── */
+  .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 10px 18px; border-radius: 8px; font-weight: 500; font-size: 14px; border: 1px solid transparent; cursor: pointer; transition: all .12s; text-decoration: none; line-height: 1.4; white-space: nowrap; }
+  .btn-primary { background: var(--primary-2); color: #fff; border-color: var(--primary-2); }
+  .btn-primary:hover { background: var(--primary-dk); color: #fff; border-color: var(--primary-dk); }
+  .btn-primary[disabled] { background: #b6cdf2; border-color: #b6cdf2; cursor: not-allowed; }
+  .btn-ghost { background: #f4f6f9; color: var(--ink); }
+  .btn-ghost:hover { background: #e7ebf0; color: var(--ink); }
+  .btn-block { width: 100%; }
+  .btn-lg { padding: 12px 22px; font-size: 15px; }
+
+  /* ── Подвал формы: согласие + кнопки вместе ───────────── */
+  .foot { padding: 20px 24px 22px; border-top: 1px solid var(--line-soft); background: #fafbfc; display: flex; flex-direction: column; gap: 16px; }
+  .foot-actions { display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap; }
+  .foot-actions .small { font-size: 12.5px; color: var(--muted); line-height: 1.45; flex: 1; min-width: 200px; margin: 0; }
+  .foot-actions .actions { display: flex; gap: 8px; flex-shrink: 0; }
+
+  /* ── Sidebar ──────────────────────────────────────────── */
+  .sidebar { display: flex; flex-direction: column; gap: 16px; position: sticky; top: 78px; }
+  .side-head { display: flex; justify-content: space-between; align-items: center; padding: 16px 22px 0; }
+  .side-head h3 { font-size: 14px; font-weight: 500; color: var(--ink); }
+  .side-head .badge { font-size: 11px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--success-dk); background: rgba(2,184,117,.12); padding: 3px 9px; border-radius: 999px; }
+
+  /* второстепенное — «заметки на полях», без карточной коробки */
+  .aside-notes { padding: 0 4px; }
+  .note { padding: 18px 0; border-top: 1px solid var(--line); }
+  .note:first-child { padding-top: 4px; border-top: none; }
+  .note-title { font-size: 11px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: var(--muted-2); margin-bottom: 13px; }
+  .note > p { margin: 0 0 10px; font-size: 13px; color: var(--muted); line-height: 1.5; }
+  .note a.contact { display: inline-flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 500; }
+  .note a.contact svg { width: 16px; height: 16px; }
+
+  /* summary */
+  .summary.card { box-shadow: var(--shadow); }
+  .sum-lines { padding: 14px 22px 6px; }
+  .sum-line { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 7px 0; font-size: 14px; }
+  .sum-line .lbl { color: var(--muted); }
+  .sum-line .lbl b { color: var(--ink-soft); font-weight: 500; }
+  .sum-line .amt { color: var(--ink); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .sum-line.muted .amt, .sum-line.muted .lbl { color: var(--muted-2); }
+  .sum-total { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 14px 22px; margin-top: 6px; border-top: 1px dashed var(--line); }
+  .sum-total .lbl { font-size: 13px; color: var(--muted); text-transform: uppercase; letter-spacing: .1em; }
+  .sum-total .amt { font-size: 26px; font-weight: 600; color: var(--ink); letter-spacing: -0.01em; font-variant-numeric: tabular-nums; }
+  .sum-total .amt small { font-size: 15px; font-weight: 500; color: var(--muted); margin-left: 2px; }
+  .sum-pay { padding: 4px 18px 18px; }
+  .sum-pay .pay-meta { display: flex; align-items: center; justify-content: center; gap: 7px; margin-top: 11px; font-size: 12px; color: var(--muted); }
+  .sum-pay .sbp { display: inline-flex; align-items: center; gap: 5px; font-weight: 600; color: #1f1f5c; }
+  .sum-pay .sbp i { width: 14px; height: 14px; border-radius: 3px; background: linear-gradient(135deg,#f04438,#7a5cff 45%,#1aa7ec); display: inline-block; }
+
+  /* tiers */
+  .tiers { display: flex; flex-direction: column; }
+  .tier { display: flex; align-items: baseline; gap: 10px; padding: 6px 0; font-size: 13.5px; }
+  .tier .price { font-weight: 500; color: var(--muted); min-width: 70px; font-variant-numeric: tabular-nums; }
+  .tier .when { color: var(--muted-2); flex: 1; }
+  .tier .now { font-size: 12px; color: var(--muted); }
+  .tier.active .price { color: var(--ink); font-weight: 600; }
+  .tier.active .when { color: var(--ink-soft); }
+  .tier.past .price, .tier.past .when { color: var(--muted-2); text-decoration: line-through; text-decoration-color: var(--line); }
+  .note-foot { margin: 13px 0 0; font-size: 12.5px; color: var(--muted); line-height: 1.5; }
+  .note-foot b { color: var(--ink-soft); font-weight: 500; }
+
+  /* ── Footer ───────────────────────────────────────────── */
+  .footer-dark { background: var(--dark); color: rgba(255,255,255,.55); font-size: 14px; padding: 44px 0 0; margin-top: 8px; }
+  .footer-dark .footer-bottom { padding: 20px 0; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; font-size: 13px; color: rgba(255,255,255,.4); }
+  .footer-dark .footer-bottom a { color: rgba(255,255,255,.45); }
+  .footer-dark .footer-bottom a:hover { color: #fff; }
+
+  /* ── Demo banner ──────────────────────────────────────── */
+  .demo-flag { background: #fff7ec; border-bottom: 1px solid #f1e3cc; color: #8a5a16; font-size: 12.5px; text-align: center; padding: 7px 16px; }
+  .demo-flag b { font-weight: 600; }
+
+  /* ── Page-load stagger ────────────────────────────────── */
+  @keyframes up { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+  .anim { opacity: 0; animation: up .5s cubic-bezier(.2,.7,.3,1) forwards; }
+  .anim.d1 { animation-delay: .04s; }
+  .anim.d2 { animation-delay: .10s; }
+  .anim.d3 { animation-delay: .16s; }
+  @media (prefers-reduced-motion: reduce) { .anim { animation: none; opacity: 1; } .member-row.reveal { animation: none; } }
+
+  /* ── Responsive ───────────────────────────────────────── */
+  @media (max-width: 940px) {
+    .grid { grid-template-columns: 1fr; }
+    .sidebar { position: static; order: 2; }
+  }
+  @media (max-width: 600px) {
+    .container { padding: 0 12px; }
+    .page { padding: 14px 0 36px; }
+    .page-head h1 { font-size: 22px; }
+    .card { border-radius: 0; border-left: none; border-right: none; }
+    .card-section, .foot { padding-left: 16px; padding-right: 16px; }
+    .sum-lines { padding-left: 16px; padding-right: 16px; }
+    .aside-notes { padding-left: 16px; padding-right: 16px; }
+    .form-grid { grid-template-columns: 1fr; }
+    .member-row { grid-template-columns: 28px minmax(0,1fr) 96px; }
+    .foot-actions .actions { width: 100%; }
+    .foot-actions .actions .btn { flex: 1; }
+    .maps-row { flex-direction: column; align-items: stretch; }
+  }
+</style>
+</head>
+<body>
+
+<header class="nav">
+  <div class="container nav-inner">
+    <a class="brand" href="/">
+      <span class="brand-mark"></span>
+      <span>Кольцо&nbsp;24</span>
+    </a>
+    <div class="nav-actions">
+      <button class="nav-user-btn" type="button">Иванов Алексей <span class="chevron"></span></button>
+    </div>
+  </div>
+</header>
+
+<div class="demo-flag">
+  <b>DEMO.</b> Макет страницы регистрации команды (<code>race/&lt;slug&gt;/teams/add/</code>). Данные подставлены для примера, оплата не производится.
+</div>
+
+<div class="main-container">
+<div class="page">
+  <div class="container">
+
+    <nav class="crumbs anim" aria-label="Хлебные крошки">
+      <a href="/">Главная</a>
+      <span class="sep">/</span>
+      <a href="#">Кольцо&nbsp;24</a>
+      <span class="sep">/</span>
+      <span>Регистрация команды</span>
+    </nav>
+
+    <header class="page-head anim d1">
+      <div>
+        <h1>Регистрация команды</h1>
+      </div>
+      <div class="race-chip">
+        <span class="dot"></span>
+        <span><b>Кольцо&nbsp;24</b> <span class="date">· 11&nbsp;окт&nbsp;2025</span></span>
+        <span class="tag">Регистрация открыта</span>
+      </div>
+    </header>
+
+    <div class="grid">
+
+      <!-- ─────────── MAIN: form ─────────── -->
+      <main>
+        <form class="card anim d1" id="teamForm" action="#" method="POST" novalidate>
+
+          <!-- Команда -->
+          <div class="card-section">
+            <div class="section-title">Команда</div>
+            <div class="form-grid">
+              <div class="field full">
+                <label for="teamname">Название</label>
+                <input class="input" id="teamname" name="teamname" type="text">
+              </div>
+              <div class="field">
+                <label for="city">Город</label>
+                <input class="input" id="city" name="city" type="text">
+              </div>
+              <div class="field">
+                <label for="org">Клуб <span class="opt">— необязательно</span></label>
+                <input class="input" id="org" name="organization" type="text">
+              </div>
+            </div>
+          </div>
+
+          <!-- Дистанция и состав -->
+          <div class="card-section">
+            <div class="section-title">Дистанция и состав</div>
+
+            <div class="field full">
+              <label for="category">Категория</label>
+              <select class="select" id="category" name="category2_id">
+                <optgroup label="Пешие">
+                  <option value="16" data-counts="2,3">6 часов · пеший — Бегущий человек</option>
+                  <option value="17" data-counts="4,5,6">12 часов · команда — Долгая прогулка</option>
+                  <option value="18" data-counts="2">12 часов · пара М+Ж — Долгая прогулка</option>
+                  <option value="19" data-counts="2">12 часов · пара М+М</option>
+                  <option value="20" data-counts="2">12 часов · пара Ж+Ж</option>
+                  <option value="21" data-counts="4,5,6">24 часа · команда — Ловец снов</option>
+                </optgroup>
+                <optgroup label="Велоориентирование">
+                  <option value="22" data-counts="2">8 часов · вело, пара М+М — Сияние</option>
+                  <option value="23" data-counts="2">8 часов · вело, пара М+Ж / Ж+Ж — Сияние</option>
+                </optgroup>
+              </select>
+            </div>
+
+            <div class="count-row">
+              <label>Сколько вас?</label>
+              <div class="seg" id="ucountSeg" role="group" aria-label="Количество участников"></div>
+              <span class="count-cap" id="ucountCap"></span>
+            </div>
+
+            <div class="members-label">Участники <span class="opt" style="color:var(--muted-2);font-weight:400">— ФИО и год рождения</span></div>
+            <div class="members" id="members">
+              <div class="member-row" data-idx="1">
+                <div class="num">1</div>
+                <input class="input m-name" name="athlet1" type="text" placeholder="Фамилия Имя" autocomplete="off">
+                <input class="input m-year" name="birth1" type="text" inputmode="numeric" maxlength="4" placeholder="Год рожд.">
+              </div>
+              <div class="member-row" data-idx="2">
+                <div class="num">2</div>
+                <input class="input m-name" name="athlet2" type="text" placeholder="Фамилия Имя" autocomplete="off">
+                <input class="input m-year" name="birth2" type="text" inputmode="numeric" maxlength="4" placeholder="Год рожд.">
+              </div>
+              <div class="member-row is-hidden" data-idx="3">
+                <div class="num">3</div>
+                <input class="input m-name" name="athlet3" type="text" placeholder="Фамилия Имя" autocomplete="off">
+                <input class="input m-year" name="birth3" type="text" inputmode="numeric" maxlength="4" placeholder="Год рожд.">
+              </div>
+              <div class="member-row is-hidden" data-idx="4">
+                <div class="num">4</div>
+                <input class="input m-name" name="athlet4" type="text" placeholder="Фамилия Имя" autocomplete="off">
+                <input class="input m-year" name="birth4" type="text" inputmode="numeric" maxlength="4" placeholder="Год рожд.">
+              </div>
+              <div class="member-row is-hidden" data-idx="5">
+                <div class="num">5</div>
+                <input class="input m-name" name="athlet5" type="text" placeholder="Фамилия Имя" autocomplete="off">
+                <input class="input m-year" name="birth5" type="text" inputmode="numeric" maxlength="4" placeholder="Год рожд.">
+              </div>
+              <div class="member-row is-hidden" data-idx="6">
+                <div class="num">6</div>
+                <input class="input m-name" name="athlet6" type="text" placeholder="Фамилия Имя" autocomplete="off">
+                <input class="input m-year" name="birth6" type="text" inputmode="numeric" maxlength="4" placeholder="Год рожд.">
+              </div>
+            </div>
+            <div class="members-foot">
+              <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="10" cy="10" r="8"/><path d="M10 9v5M10 6.2v.1"/></svg>
+              Состав можно отредактировать до онлайн-брифинга.
+            </div>
+
+            <!-- доп. карты появляются только для команд 3+ -->
+            <div class="maps-row" id="mapsRow">
+              <div class="maps-txt">
+                <h4>Дополнительные карты</h4>
+                <p>На&nbsp;команду&nbsp;— <b>2&nbsp;карты бесплатно</b>. Закажите ещё, чтобы у&nbsp;каждого была своя. +200&nbsp;₽ за&nbsp;карту.</p>
+              </div>
+              <div class="stepper" id="mapStepper">
+                <button type="button" data-step="-1" aria-label="Меньше">−</button>
+                <span class="val" id="mapVal">0</span>
+                <button type="button" data-step="1" aria-label="Больше">+</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Подвал: согласие + оплата -->
+          <div class="foot">
+            <label class="check">
+              <input type="checkbox" id="consent">
+              <span class="box"></span>
+              <span>Я&nbsp;ознакомлен(а) с&nbsp;<a href="#" onclick="event.preventDefault()">обработкой персональных данных</a> (ФЗ&nbsp;№152-ФЗ) и&nbsp;подтверждаю, что всем участникам исполнилось 18&nbsp;лет.</span>
+            </label>
+            <div class="foot-actions">
+              <p class="small">После сохранения вы&nbsp;перейдёте к&nbsp;оплате через СБП. Команда уже будет в&nbsp;списке участников.</p>
+              <div class="actions">
+                <a class="btn btn-ghost" href="#">Отмена</a>
+                <button class="btn btn-primary btn-lg" type="submit" id="submitBtn" disabled>Сохранить и&nbsp;оплатить</button>
+              </div>
+            </div>
+          </div>
+
+        </form>
+      </main>
+
+      <!-- ─────────── SIDEBAR ─────────── -->
+      <aside class="sidebar">
+
+        <!-- live cost -->
+        <div class="summary card anim d2">
+          <div class="side-head">
+            <h3>К оплате</h3>
+            <span class="badge">СБП</span>
+          </div>
+          <div class="sum-lines">
+            <div class="sum-line">
+              <span class="lbl">Взнос · <b id="sumCountLbl">2</b>&nbsp;уч. × <span id="sumCost">3000</span>&nbsp;₽</span>
+              <span class="amt" id="sumPeople">6 000 ₽</span>
+            </div>
+            <div class="sum-line muted" id="sumMapsLine" style="display:none;">
+              <span class="lbl">Доп. карты · <b id="sumMapsN">0</b> × 200&nbsp;₽</span>
+              <span class="amt" id="sumMaps">0 ₽</span>
+            </div>
+          </div>
+          <div class="sum-total">
+            <span class="lbl">Итого</span>
+            <span class="amt"><span id="sumTotal">6 000</span>&nbsp;<small>₽</small></span>
+          </div>
+          <div class="sum-pay">
+            <button class="btn btn-primary btn-block btn-lg" type="submit" form="teamForm" id="payBtn" disabled>Перейти к&nbsp;оплате</button>
+            <div class="pay-meta">
+              <span class="sbp"><i></i>СБП</span> · мгновенно · без комиссии
+            </div>
+          </div>
+        </div>
+
+        <!-- второстепенное — заметками на полях, без карточек -->
+        <div class="aside-notes anim d3">
+
+          <section class="note">
+            <div class="note-title">Стартовый взнос</div>
+            <div class="tiers">
+              <div class="tier past">
+                <span class="price">2 000 ₽</span>
+                <span class="when">до 17 сентября</span>
+              </div>
+              <div class="tier past">
+                <span class="price">2 500 ₽</span>
+                <span class="when">18–30 сентября</span>
+              </div>
+              <div class="tier active">
+                <span class="price">3 000 ₽</span>
+                <span class="when">1–9 октября</span>
+                <span class="now">· сейчас</span>
+              </div>
+            </div>
+            <p class="note-foot">
+              <b>Возврат</b> взноса&nbsp;— до&nbsp;1&nbsp;октября за&nbsp;вычетом расходов. При&nbsp;достижении лимита регистрация может закрыться раньше.
+            </p>
+          </section>
+
+          <section class="note">
+            <div class="note-title">Нужна помощь?</div>
+            <p>Вопросы по&nbsp;составу, категории или&nbsp;оплате&nbsp;— напишите, поможем.</p>
+            <a class="contact" href="mailto:org@kolco24.ru">
+              <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="2.5" y="4.5" width="15" height="11" rx="1.5"/><path d="m3 6 7 5 7-5"/></svg>
+              org@kolco24.ru
+            </a>
+          </section>
+
+        </div>
+
+      </aside>
+
+    </div>
+  </div>
+</div>
+</div>
+
+<footer class="footer-dark">
+  <div class="container">
+    <div class="footer-bottom">
+      <span>© 2015–2026 Турклуб «Спутник» · Кольцо&nbsp;24</span>
+      <div><a href="mailto:org@kolco24.ru">org@kolco24.ru</a></div>
+    </div>
+  </div>
+</footer>
+
+<script>
+(function () {
+  "use strict";
+
+  var COST   = 3000;   // ₽ за участника (race id=8)
+  var MAP    = 200;    // ₽ за доп. карту
+  var FREE_MAPS = 2;   // карт на команду бесплатно
+
+  var category = document.getElementById("category");
+  var seg      = document.getElementById("ucountSeg");
+  var segCap   = document.getElementById("ucountCap");
+  var rows     = Array.prototype.slice.call(document.querySelectorAll(".member-row"));
+  var mapsRow  = document.getElementById("mapsRow");
+  var mapStepper = document.getElementById("mapStepper");
+  var mapVal   = document.getElementById("mapVal");
+  var consent  = document.getElementById("consent");
+  var submitBtn = document.getElementById("submitBtn");
+  var payBtn   = document.getElementById("payBtn");
+  var form     = document.getElementById("teamForm");
+
+  var sumCountLbl = document.getElementById("sumCountLbl");
+  var sumPeople   = document.getElementById("sumPeople");
+  var sumMapsLine = document.getElementById("sumMapsLine");
+  var sumMapsN    = document.getElementById("sumMapsN");
+  var sumMaps     = document.getElementById("sumMaps");
+  var sumTotal    = document.getElementById("sumTotal");
+
+  var ucount = 2;
+  var maps   = 0;
+
+  function fmt(n) { return n.toLocaleString("ru-RU").replace(/,/g, " "); }
+
+  function counts() {
+    return (category.selectedOptions[0].dataset.counts || "2")
+      .split(",").map(function (s) { return parseInt(s, 10); });
+  }
+
+  function buildSeg() {
+    var opts = counts();
+    seg.innerHTML = "";
+    opts.forEach(function (n) {
+      var b = document.createElement("button");
+      b.type = "button";
+      b.textContent = n;
+      b.dataset.n = n;
+      b.addEventListener("click", function () { setCount(n); });
+      seg.appendChild(b);
+    });
+    if (opts.length === 1) {
+      segCap.textContent = "состав фиксирован: " + opts[0] + " чел.";
+    } else {
+      segCap.textContent = "от " + opts[0] + " до " + opts[opts.length - 1] + " человек";
+    }
+    setCount(opts.indexOf(ucount) >= 0 ? ucount : opts[0]);
+  }
+
+  function setCount(n) {
+    ucount = n;
+    Array.prototype.forEach.call(seg.children, function (b) {
+      b.classList.toggle("on", parseInt(b.dataset.n, 10) === n);
+    });
+    rows.forEach(function (row) {
+      var idx = parseInt(row.dataset.idx, 10);
+      var show = idx <= n;
+      var wasHidden = row.classList.contains("is-hidden");
+      row.classList.toggle("is-hidden", !show);
+      if (show && wasHidden) {
+        row.classList.add("reveal");
+        setTimeout(function () { row.classList.remove("reveal"); }, 240);
+      }
+    });
+    var maxMaps = Math.max(0, n - FREE_MAPS);
+    if (maps > maxMaps) maps = maxMaps;
+    mapsRow.style.display = maxMaps > 0 ? "" : "none";
+    render();
+  }
+
+  function setMaps(v) {
+    var maxMaps = Math.max(0, ucount - FREE_MAPS);
+    maps = Math.min(Math.max(0, v), maxMaps);
+    render();
+  }
+
+  function render() {
+    rows.forEach(function (row) {
+      var name = row.querySelector(".m-name");
+      row.classList.toggle("filled", name.value.trim().length > 0);
+    });
+
+    var maxMaps = Math.max(0, ucount - FREE_MAPS);
+    mapVal.textContent = maps;
+    mapStepper.querySelector('[data-step="-1"]').disabled = maps <= 0;
+    mapStepper.querySelector('[data-step="1"]').disabled  = maps >= maxMaps;
+
+    var people = ucount * COST;
+    var mapsSum = maps * MAP;
+    var total = people + mapsSum;
+
+    sumCountLbl.textContent = ucount;
+    document.getElementById("sumCost").textContent = fmt(COST);
+    sumPeople.textContent = fmt(people) + " ₽";
+
+    if (maps > 0) {
+      sumMapsLine.style.display = "";
+      sumMapsN.textContent = maps;
+      sumMaps.textContent = fmt(mapsSum) + " ₽";
+    } else {
+      sumMapsLine.style.display = "none";
+    }
+    sumTotal.textContent = fmt(total);
+  }
+
+  category.addEventListener("change", buildSeg);
+  mapStepper.addEventListener("click", function (e) {
+    var step = e.target.dataset.step;
+    if (step) setMaps(maps + parseInt(step, 10));
+  });
+  document.getElementById("members").addEventListener("input", function (e) {
+    if (e.target.classList.contains("m-year")) {
+      e.target.value = e.target.value.replace(/\D/g, "").slice(0, 4);
+    }
+    render();
+  });
+
+  function toggleSubmit() {
+    submitBtn.disabled = !consent.checked;
+    payBtn.disabled = !consent.checked;
+  }
+  consent.addEventListener("change", toggleSubmit);
+
+  form.addEventListener("submit", function (e) {
+    e.preventDefault(); // demo — без отправки
+    payBtn.textContent = "Демо: оплата не подключена";
+    setTimeout(function () { payBtn.textContent = "Перейти к оплате"; }, 1800);
+  });
+
+  buildSeg();
+  toggleSubmit();
+})();
+</script>
+</body>
+</html>

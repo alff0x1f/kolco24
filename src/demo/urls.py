@@ -17,4 +17,9 @@ urlpatterns = [
         TemplateView.as_view(template_name="demo/home-single.html"),
         name="demo-home-single",
     ),
+    path(
+        "team-register/",
+        TemplateView.as_view(template_name="demo/team-register.html"),
+        name="demo-team-register",
+    ),
 ]

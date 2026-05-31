@@ -5,16 +5,10 @@ from django.urls import reverse
 from django.views import View
 
 from vtb.client import VTBClient
-from website.forms import TeamForm, TeamMemberMoveForm
-from website.models import (
-    Payment,
-    PaymentsYa,
-    Team,
-    TeamMemberMove,
-    VTBPayment,
-    VTBPreparedPayment,
-)
+from website.forms import MAP_PRICE, TeamForm, TeamMemberMoveForm
+from website.models import Payment, Team, TeamMemberMove, VTBPayment, VTBPreparedPayment
 from website.models.race import RegStatus
+from website.views.views_ import build_team_form_context
 
 
 class EditTeamView(View):
@@ -57,13 +51,12 @@ class EditTeamView(View):
 
         return render(
             request,
-            "website/add_team.html",
+            "website/edit_team.html",
             {
                 "race_id": team.category2.race_id,
                 "race": race,
                 "team_form": form,
                 "team": team,
-                "cost": race.cost,
                 "action": reverse("edit_team", args=[team_id]),
                 "payments": Payment.objects.filter(team=team, status="done").order_by(
                     "id"
@@ -72,6 +65,7 @@ class EditTeamView(View):
                     Q(from_team=team) | Q(to_team=team)
                 ).order_by("id"),
                 "team_move_form": TeamMemberMoveForm(race_id=team.category2.race_id),
+                **build_team_form_context(race, team, is_edit=True),
             },
         )
 
@@ -90,7 +84,11 @@ class EditTeamView(View):
         if request.POST.get("delete_team"):
             return self.delete_team(request, team)
 
-        form = TeamForm(team.category2.race_id, request.POST)
+        form = TeamForm(
+            team.category2.race_id,
+            request.POST,
+            current_category_id=team.category2_id,
+        )
         if form.is_valid():
             if "teamname" in form.cleaned_data:
                 team.teamname = form.cleaned_data.get("teamname")
@@ -98,8 +96,36 @@ class EditTeamView(View):
                 team.city = form.cleaned_data.get("city")
             if "organization" in form.cleaned_data:
                 team.organization = form.cleaned_data.get("organization")
+
+            new_ucount = int(form.cleaned_data.get("ucount"))
+            if new_ucount < team.paid_people:
+                form.add_error(
+                    "ucount",
+                    "Нельзя уменьшить количество участников: часть уже оплачена.",
+                )
+                return render(
+                    request,
+                    "website/edit_team.html",
+                    {
+                        "race": race,
+                        "race_id": race.id,
+                        "team_form": form,
+                        "team": team,
+                        "action": reverse("edit_team", args=[team_id]),
+                        "payments": Payment.objects.filter(
+                            team=team, status="done"
+                        ).order_by("id"),
+                        "member_moves": TeamMemberMove.objects.filter(
+                            Q(from_team=team) | Q(to_team=team)
+                        ).order_by("id"),
+                        "team_move_form": TeamMemberMoveForm(
+                            race_id=team.category2.race_id
+                        ),
+                        **build_team_form_context(race, team, is_edit=True),
+                    },
+                )
             if "ucount" in form.cleaned_data:
-                team.ucount = form.cleaned_data.get("ucount")
+                team.ucount = new_ucount
 
             # Loop through athlete and birth fields to update them conditionally
             for i in range(1, 7):
@@ -110,10 +136,37 @@ class EditTeamView(View):
                 if birth_field in form.cleaned_data:
                     setattr(team, birth_field, form.cleaned_data.get(birth_field))
 
+            new_map_count = int(form.cleaned_data.get("map_count") or 0)
+            if new_map_count < team.map_count_paid:
+                form.add_error(
+                    "map_count",
+                    "Нельзя уменьшить количество карт: часть уже оплачена.",
+                )
+                return render(
+                    request,
+                    "website/edit_team.html",
+                    {
+                        "race": race,
+                        "race_id": race.id,
+                        "team_form": form,
+                        "team": team,
+                        "action": reverse("edit_team", args=[team_id]),
+                        "payments": Payment.objects.filter(
+                            team=team, status="done"
+                        ).order_by("id"),
+                        "member_moves": TeamMemberMove.objects.filter(
+                            Q(from_team=team) | Q(to_team=team)
+                        ).order_by("id"),
+                        "team_move_form": TeamMemberMoveForm(
+                            race_id=team.category2.race_id
+                        ),
+                        **build_team_form_context(race, team, is_edit=True),
+                    },
+                )
             if "category2_id" in form.cleaned_data:
                 team.category2_id = form.cleaned_data.get("category2_id")
             if "map_count" in form.cleaned_data:
-                team.map_count = form.cleaned_data.get("map_count", 0)
+                team.map_count = new_map_count
 
             team.save()
 
@@ -121,11 +174,10 @@ class EditTeamView(View):
                 return HttpResponseRedirect(reverse("my_teams", args=[race.slug]))
 
             # payment
-            race = team.category2.race
-            cost_now = race.cost
-            cost = (int(team.ucount) - team.paid_people) * race.cost + (
+            cost_now = race.current_price
+            cost = (int(team.ucount) - team.paid_people) * cost_now + (
                 int(team.map_count) - team.map_count_paid
-            ) * 200
+            ) * MAP_PRICE
             if cost > 0:
                 payment = Payment.objects.create(
                     owner=request.user,
@@ -135,7 +187,6 @@ class EditTeamView(View):
                     payment_with_discount=cost,
                     cost_per_person=cost_now,
                     paid_for=int(team.ucount) - team.paid_people,
-                    additional_charge=team.additional_charge,
                     status="draft",
                     map=int(team.map_count) - team.map_count_paid,
                 )
@@ -158,19 +209,18 @@ class EditTeamView(View):
                 return HttpResponseRedirect(vtb_payment.pay_url)
 
             return HttpResponseRedirect(
-                reverse("teams2", args=[team.category2.race.slug, team.category2_id])
+                reverse("teams2", args=[race.slug, team.category2_id])
             )
 
         # If form is not valid, re-render the form with errors
         return render(
             request,
-            "website/add_team.html",
+            "website/edit_team.html",
             {
                 "race": race,
                 "race_id": race.id,
                 "team_form": form,
                 "team": team,
-                "cost": PaymentsYa.get_cost(),
                 "action": reverse("edit_team", args=[team_id]),
                 "payments": Payment.objects.filter(team=team, status="done").order_by(
                     "id"
@@ -179,6 +229,7 @@ class EditTeamView(View):
                     Q(from_team=team) | Q(to_team=team)
                 ).order_by("id"),
                 "team_move_form": TeamMemberMoveForm(race_id=team.category2.race_id),
+                **build_team_form_context(race, team, is_edit=True),
             },
         )
 
@@ -218,7 +269,7 @@ class TeamMemberMoveView(View):
 
         data = request.POST.copy()
         data["from_team"] = from_team.id
-        form = TeamMemberMoveForm(data)
+        form = TeamMemberMoveForm(data, race_id=from_team.category2.race_id)
         if form.is_valid():
             form.save()
             form.instance.move_people()

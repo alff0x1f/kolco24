@@ -305,11 +305,13 @@ button { font-family: inherit; }
   border-color: var(--primary-2);
   box-shadow: 0 0 0 3px rgba(69, 130, 236, .15);
 }
-.input.has-error {
+.input.has-error,
+.select.has-error {
   border-color: var(--danger);
   background: var(--danger-bg);
 }
-.input.has-error:focus { box-shadow: 0 0 0 3px rgba(217,54,68,.15); }
+.input.has-error:focus,
+.select.has-error:focus { box-shadow: 0 0 0 3px rgba(217,54,68,.15); }
 
 /* input with adornment */
 .input-wrap { position: relative; }

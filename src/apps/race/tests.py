@@ -8,7 +8,7 @@ from django.urls import resolve, reverse
 from apps.race.views import RaceTeamsView
 from website.models import Race
 from website.models.models import Team
-from website.models.race import Category
+from website.models.race import Category, RegStatus
 
 
 def _script_json(html, script_id):
@@ -429,3 +429,50 @@ def test_embedded_json_escapes_html_specials(client):
     # The block still parses and round-trips the original team name.
     teams = _script_json(html, "teams-data")
     assert {t["name"] for t in teams} == {payload}
+
+
+@pytest.mark.django_db
+def test_race_page_anon_sees_login_and_add_button(client):
+    """Logged-out visitors get an «add team» CTA that routes through login."""
+    race = _make_race(slug="reg-open", code="reg-open")
+    race.reg_status = RegStatus.OPEN
+    race.save(update_fields=["reg_status"])
+
+    resp = client.get(reverse("race", args=[race.slug]))
+
+    assert resp.status_code == 200
+    html = resp.content.decode()
+    assert "Войти и добавить команду" in html
+    assert "Добавить команду" not in html.replace("Войти и добавить команду", "")
+    # The button points at add_team; the view redirects anon users to login.
+    assert reverse("add_team", args=[race.slug]) in html
+
+
+@pytest.mark.django_db
+def test_race_page_authenticated_sees_plain_add_button(client):
+    member = User.objects.create_user(
+        username="member", password="p", email="member@example.com"
+    )
+    client.force_login(member)
+    race = _make_race(slug="reg-open2", code="reg-open2")
+    race.reg_status = RegStatus.OPEN
+    race.save(update_fields=["reg_status"])
+
+    resp = client.get(reverse("race", args=[race.slug]))
+
+    assert resp.status_code == 200
+    html = resp.content.decode()
+    assert "Добавить команду" in html
+    assert "Войти и добавить команду" not in html
+
+
+@pytest.mark.django_db
+def test_race_page_hides_add_button_when_reg_not_open(client):
+    race = _make_race(slug="reg-upcoming", code="reg-upcoming")
+    # default reg_status is UPCOMING, so no add-team CTA at all.
+
+    resp = client.get(reverse("race", args=[race.slug]))
+
+    assert resp.status_code == 200
+    html = resp.content.decode()
+    assert "Добавить команду" not in html
