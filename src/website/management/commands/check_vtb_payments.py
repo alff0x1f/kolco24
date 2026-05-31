@@ -1,6 +1,7 @@
 from time import sleep
 
 from django.core.management.base import BaseCommand
+from django.db import transaction
 from django.utils import timezone
 
 from donate.models import ClubMember, DonateRequest, DonationPeriod, MemberDonation
@@ -70,28 +71,33 @@ class Command(BaseCommand):
                     if not payment or payment.status == Payment.STATUS_DONE:
                         continue
                     team: Team = payment.team
-                    if team:
-                        team.paid_people += payment.paid_for
-                        team.paid_sum += payment.payment_amount
-                        team.map_count_paid += payment.map
-                        team.save(
-                            update_fields=["paid_people", "paid_sum", "map_count_paid"]
-                        )
-                        from website.models.race import RegStatus
+                    with transaction.atomic():
+                        if team:
+                            team.paid_people += payment.paid_for
+                            team.paid_sum += payment.payment_amount
+                            team.map_count_paid += payment.map
+                            team.save(
+                                update_fields=[
+                                    "paid_people",
+                                    "paid_sum",
+                                    "map_count_paid",
+                                ]
+                            )
+                            from website.models.race import RegStatus
 
-                        category = team.category2
-                        race = category.race if category else None
-                        if (
-                            race
-                            and race.people_limit
-                            and race.reg_status == RegStatus.OPEN
-                            and race.people_count() >= race.people_limit
-                        ):
-                            race.reg_status = RegStatus.SOLD_OUT
-                            race.save(update_fields=["reg_status"])
-                    payment.status = Payment.STATUS_DONE
-                    payment.order = payment.pk
-                    payment.save(update_fields=["status", "order"])
+                            category = team.category2
+                            race = category.race if category else None
+                            if (
+                                race
+                                and race.people_limit
+                                and race.reg_status == RegStatus.OPEN
+                                and race.people_count() >= race.people_limit
+                            ):
+                                race.reg_status = RegStatus.SOLD_OUT
+                                race.save(update_fields=["reg_status"])
+                        payment.status = Payment.STATUS_DONE
+                        payment.order = payment.pk
+                        payment.save(update_fields=["status", "order"])
                     self.stdout.write(f"Payment {payment.pk} marked as paid")
             sleep(60)
 
