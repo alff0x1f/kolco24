@@ -84,10 +84,10 @@ Three coordinated edits keep the model, admin, and DB schema in sync:
 
 ### Task 2: Verify acceptance criteria
 
-- [ ] `grep -rn "is_reg_open" src/` returns no matches except the new `0069` and the original `0044` migration files
-- [ ] Run `make format && make lint` — must pass
-- [ ] Run full test suite: `uv run pytest` — must pass
-- [ ] Manually confirm the Race admin changelist renders with the `reg_status` column (Django system checks pass via the test run / `manage.py check`)
+- [x] `grep -rn "is_reg_open" src/` returns no matches except the new `0069` and the original `0044` migration files
+- [x] Run `make format && make lint` — must pass
+- [x] Run full test suite: `uv run pytest` — must pass (124 passed)
+- [x] Manually confirm the Race admin changelist renders with the `reg_status` column (Django system checks pass via the test run / `manage.py check`)
 
 ### Task 3: [Final] Wrap up
 
