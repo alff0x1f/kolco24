@@ -219,8 +219,8 @@ if (race.people_limit and race.reg_status == RegStatus.OPEN
 
 - [x] проверить все требования из Overview (полная категория, переход без роста, запрет роста при полной гонке, авто sold_out) — покрыто тестами `test_category_full_blocks_entry`, `test_pure_category_move_without_growth_allowed`, `test_race_full_blocks_growth_on_edit`, `test_growth_in_full_category_blocked`, `test_auto_sold_out_*`
 - [x] проверить edge cases (paid_people=0, deleted teams, supruser bypass, limit=0) — покрыто `test_draft_teams_do_not_occupy_slot`, `test_category_people_count_excludes_deleted_teams`, `test_bypass_limits_skips_gate`, `test_people_limit_zero_does_not_restrict`
-- [x] полный прогон: `uv run pytest` — 365 passed (был выявлен и откачен спурьёзный незакоммиченный no-op в `Team.save` `self.category2.race.price_tiers_qty`, ломавший 2 теста)
-- [x] `make format && make lint` — чисто
+- [x] полный прогон: тесты запускаются `cd src && uv run pytest` (или `PYTHONPATH=src uv run pytest`) — плейн `uv run pytest` из корня репозитория падает с `No module named 'config'`, т.к. `manage.py` лежит в `src/` и pytest-django не находит проект
+- [x] `make format && make lint` — чисто (ruff/black/isort/flake8 без замечаний)
 
 ### Task 8: Документация и финализация
 
