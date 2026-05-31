@@ -10,8 +10,8 @@
 {% block content %}
 <form class="race-form-page" id="raceForm" method="post">
   {% csrf_token %}
-  <input type="hidden" name="categories_json" id="categoriesJson" value="{{ categories_data }}">
-  <input type="hidden" name="price_tiers_json" id="priceTiersJson" value="{{ price_tiers_data }}">
+  <input type="hidden" name="categories_json" id="categoriesJson">
+  <input type="hidden" name="price_tiers_json" id="priceTiersJson">
   <div class="container">
 
     <!-- Breadcrumb -->
