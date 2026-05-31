@@ -691,6 +691,50 @@ def test_race_edit_get_admin_edit_returns_200_with_context():
     assert tiers[0]["active_until"] == "2026-08-01"
 
 
+@pytest.mark.django_db
+def test_race_form_template_renders_fields_and_data(client):
+    user = User.objects.create_user(username="tpl", password="p", email="tpl@e.com")
+    race = Race.objects.create(
+        name="Шаблонная гонка",
+        code="tpl-1",
+        slug="tpl-1",
+        place="Москва",
+        cost=0,
+        reg_status=RegStatus.OPEN,
+    )
+    RaceAdmin.objects.create(race=race, user=user, role=RaceAdmin.Role.ADMIN)
+    cat = _make_category(race, code="6h", short_name="6ч", name="6 часов", order=0)
+    tier = RacePriceTier.objects.create(
+        race=race, price=1500, active_until="2026-08-01"
+    )
+    client.force_login(user)
+
+    resp = client.get(reverse("edit_race", kwargs={"race_slug": race.slug}))
+
+    assert resp.status_code == 200
+    html = resp.content.decode()
+    # Scalar fields render their current values into manual inputs.
+    assert 'name="name"' in html and 'value="Шаблонная гонка"' in html
+    assert 'name="code"' in html and 'value="tpl-1"' in html
+    # reg_status select marks the current choice selected.
+    assert f'value="{RegStatus.OPEN}" selected' in html
+    # cost=0 must survive (not blanked by a `default` filter).
+    assert 'name="cost"' in html and 'value="0"' in html
+    # The repeaters and hidden serialization inputs the JS hydrates are present.
+    assert 'id="categoriesJson"' in html
+    assert 'id="priceTiersJson"' in html
+    assert 'id="addCat"' in html
+    assert 'id="addTier"' in html
+    # Both data blocks parse and carry the existing rows.
+    cats = _script_json(html, "categories-data")
+    assert [c["id"] for c in cats] == [cat.id]
+    tiers = _script_json(html, "price-tiers-data")
+    assert [t["id"] for t in tiers] == [tier.id]
+    assert tiers[0]["active_until"] == "2026-08-01"
+    # race_form.js is wired up.
+    assert "js/race_form.js" in html
+
+
 # --- RaceEditView POST save + category/price-tier reconcile ---
 
 

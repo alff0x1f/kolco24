@@ -268,29 +268,30 @@ blocks, the `base-2.html` template stack, and the `AddNewsPostView` authorizatio
 - Create: `src/templates/race/race_form.html`
 - Modify: `src/apps/race/tests.py`
 
-- [ ] port `scratch/Админка - гонка.html` body into `{% block content %}`; drop its
+- [x] port `scratch/Админка - гонка.html` body into `{% block content %}`; drop its
       `<nav>`/`<footer>`/`<style>`/`<script>`; `{% extends "website/base-2.html" %}`;
       link CSS in `{% block extra_head %}`, JS in `{% block footer_js_include %}`
-- [ ] rename the form's `page` class to `.race-form-page` (scoped wrapper, never bare
+- [x] rename the form's `page` class to `.race-form-page` (scoped wrapper, never bare
       `.page`); add CSRF token and `method="post"`
-- [ ] render every `Race` field manually with `value="{{ form.field.value|default:'' }}"`,
+- [x] render every `Race` field manually with `value="{{ form.field.value|default:'' }}"`,
       `class="control{% if form.field.errors %} has-error{% endif %}"`, errors via
-      `{{ form.field.errors|join:", " }}` beneath each input
-- [ ] render `reg_status` `<select>` looping `reg_status_choices` (`RegStatus.choices`, not
+      `{{ form.field.errors|join:", " }}` beneath each input (used `default_if_none` so
+      `cost=0` survives)
+- [x] render `reg_status` `<select>` looping `reg_status_choices` (`RegStatus.choices`, not
       the scratch options) with `selected` on the current value; image fields as URL
       `<input>` + live `<img>` preview pane
-- [ ] extend the category repeater header + JS row template with `min_people`/`max_people`
+- [x] extend the category repeater header + JS row template with `min_people`/`max_people`
       number inputs; do **not** port the scratch "Регистрация открыта" toggle (field removed)
-- [ ] add a new "Ценовые периоды" `<section>` (repeater with `active_until` date + `price`
+- [x] add a new "Ценовые периоды" `<section>` (repeater with `active_until` date + `price`
       number inputs and an "Добавить период" button) mirroring the categories card layout
-- [ ] embed categories as `<script id="categories-data" type="application/json">`
+- [x] embed categories as `<script id="categories-data" type="application/json">`
       ({{ categories_data }}) and price tiers as
       `<script id="price-tiers-data" type="application/json">` ({{ price_tiers_data }}); add
       hidden `<input name="categories_json">` and `<input name="price_tiers_json">`; toggle
       title/breadcrumb/sub-line by `is_create`
-- [ ] write test: edit GET renders the form with current values and both the
+- [x] write test: edit GET renders the form with current values and both the
       `categories-data` and `price-tiers-data` JSON (use `_script_json` helper)
-- [ ] run tests — must pass before next task
+- [x] run tests — must pass before next task
 
 ### Task 7: `race_form.css` + `race_form.js`
 
