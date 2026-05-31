@@ -1192,6 +1192,16 @@ class ConfirmPaymentView(View):
             payment.recipient = SbpPaymentRecipient.objects.get(pk=recipient)
 
         team.save(update_fields=["paid_people", "paid_sum"])
+        category = team.category2
+        race = category.race if category else None
+        if (
+            race
+            and race.people_limit
+            and race.reg_status == RegStatus.OPEN
+            and race.people_count() >= race.people_limit
+        ):
+            race.reg_status = RegStatus.SOLD_OUT
+            race.save(update_fields=["reg_status"])
         payment.save(update_fields=["status", "balance", "order", "recipient"])
         return HttpResponseRedirect("/payments?status=draft_with_info")
 

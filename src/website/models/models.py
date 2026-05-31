@@ -501,6 +501,18 @@ class TeamMemberMove(models.Model):
         with transaction.atomic():
             self.from_team.save(update_fields=["paid_people"])
             self.to_team.save(update_fields=["paid_people"])
+            from .race import RegStatus
+
+            category = self.to_team.category2
+            race = category.race if category else None
+            if (
+                race
+                and race.people_limit
+                and race.reg_status == RegStatus.OPEN
+                and race.people_count() >= race.people_limit
+            ):
+                race.reg_status = RegStatus.SOLD_OUT
+                race.save(update_fields=["reg_status"])
 
 
 class TeamAdminLog(models.Model):
