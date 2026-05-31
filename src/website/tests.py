@@ -8,6 +8,7 @@ from django.db import IntegrityError
 from django.urls import reverse
 from django.utils import timezone
 
+from website.forms import TeamForm
 from website.models import Payment, Race
 from website.models.models import Team
 from website.models.race import Category, RaceLink, RacePriceTier, RegStatus
@@ -1402,3 +1403,128 @@ def test_race_remaining_people_with_limit(django_user_model):
     _pl_team(cat, user, paid_people=2, name="A")
     _pl_team(cat, user, paid_people=3, name="B")
     assert race.remaining_people() == 5
+
+
+# ---------------------------------------------------------------------------
+# Task 2: capacity gate in TeamForm
+# ---------------------------------------------------------------------------
+
+
+def _gate_data(category, ucount, map_count=0):
+    return {
+        "ucount": str(ucount),
+        "category2_id": str(category.id),
+        "map_count": str(map_count),
+        "dist": category.code,
+    }
+
+
+@pytest.mark.django_db
+def test_gate_race_full_blocks_growth(django_user_model):
+    # Гонка полная (лимит достигнут); рост состава 2→3 блокируется.
+    user = _pl_user(django_user_model)
+    race = _pl_race(people_limit=5)
+    cat = _pl_category(race)
+    _pl_team(cat, user, paid_people=5, name="filler")
+    team = _pl_team(cat, user, paid_people=2, name="self")
+    form = TeamForm(race.id, _gate_data(cat, 3), team=team)
+    assert not form.is_valid()
+    assert "ucount" in form.errors
+
+
+@pytest.mark.django_db
+def test_gate_pure_transfer_allowed_when_race_full(django_user_model):
+    # Гонка полная, но в целевой категории есть места: чистый переход 2→2 ок.
+    user = _pl_user(django_user_model)
+    race = _pl_race(people_limit=4)
+    src = _pl_category(race, code="A", name="A", short_name="A", people_limit=0)
+    dst = _pl_category(race, code="B", name="B", short_name="B", people_limit=10)
+    _pl_team(dst, user, paid_people=2, name="filler")  # race now at 4 (full)
+    team = _pl_team(src, user, paid_people=2, name="self")
+    form = TeamForm(race.id, _gate_data(dst, 2), team=team)
+    assert form.is_valid(), form.errors
+
+
+@pytest.mark.django_db
+def test_gate_category_full_blocks_entry(django_user_model):
+    # Перейти в полную категорию нельзя.
+    user = _pl_user(django_user_model)
+    race = _pl_race(people_limit=0)
+    src = _pl_category(race, code="A", name="A", short_name="A")
+    dst = _pl_category(race, code="B", name="B", short_name="B", people_limit=2)
+    _pl_team(dst, user, paid_people=2, name="filler")  # category full
+    team = _pl_team(src, user, paid_people=2, name="self")
+    form = TeamForm(race.id, _gate_data(dst, 2), team=team)
+    assert not form.is_valid()
+    assert "category2_id" in form.errors
+
+
+@pytest.mark.django_db
+def test_gate_edit_self_no_growth_in_full_category_allowed(django_user_model):
+    # Категория полная за счёт самой команды: edit без роста разрешён.
+    user = _pl_user(django_user_model)
+    race = _pl_race(people_limit=0)
+    cat = _pl_category(race, people_limit=4)
+    _pl_team(cat, user, paid_people=2, name="other")
+    team = _pl_team(cat, user, paid_people=2, name="self")  # category at 4 (full)
+    form = TeamForm(race.id, _gate_data(cat, 2), team=team, current_category_id=cat.id)
+    assert form.is_valid(), form.errors
+
+
+@pytest.mark.django_db
+def test_gate_growth_in_full_category_blocked(django_user_model):
+    # Рост состава в полной категории блокируется.
+    user = _pl_user(django_user_model)
+    race = _pl_race(people_limit=0)
+    cat = _pl_category(race, people_limit=4)
+    _pl_team(cat, user, paid_people=2, name="other")
+    team = _pl_team(cat, user, paid_people=2, name="self")
+    form = TeamForm(race.id, _gate_data(cat, 3), team=team, current_category_id=cat.id)
+    assert not form.is_valid()
+    assert "category2_id" in form.errors
+
+
+@pytest.mark.django_db
+def test_gate_new_registration_into_full_race_blocked(django_user_model):
+    # Новая регистрация (team=Team()) в полную гонку блокируется.
+    user = _pl_user(django_user_model)
+    race = _pl_race(people_limit=4)
+    cat = _pl_category(race)
+    _pl_team(cat, user, paid_people=4, name="filler")
+    form = TeamForm(race.id, _gate_data(cat, 2))  # team defaults to Team()
+    assert not form.is_valid()
+    assert "ucount" in form.errors
+
+
+@pytest.mark.django_db
+def test_gate_draft_teams_do_not_occupy_slots(django_user_model):
+    # paid_people=0 черновики не занимают слот → регистрация проходит.
+    user = _pl_user(django_user_model)
+    race = _pl_race(people_limit=4)
+    cat = _pl_category(race)
+    _pl_team(cat, user, paid_people=0, name="draft1")
+    _pl_team(cat, user, paid_people=0, name="draft2")
+    form = TeamForm(race.id, _gate_data(cat, 3))
+    assert form.is_valid(), form.errors
+
+
+@pytest.mark.django_db
+def test_gate_bypass_limits_skips_gate(django_user_model):
+    # bypass_limits (суперюзер) пропускает gate несмотря на полную гонку.
+    user = _pl_user(django_user_model)
+    race = _pl_race(people_limit=2)
+    cat = _pl_category(race)
+    _pl_team(cat, user, paid_people=2, name="filler")
+    form = TeamForm(race.id, _gate_data(cat, 4), bypass_limits=True)
+    assert form.is_valid(), form.errors
+
+
+@pytest.mark.django_db
+def test_gate_unlimited_does_not_restrict(django_user_model):
+    # people_limit=0 (гонка и категория) не ограничивает.
+    user = _pl_user(django_user_model)
+    race = _pl_race(people_limit=0)
+    cat = _pl_category(race, people_limit=0)
+    _pl_team(cat, user, paid_people=6, name="filler")
+    form = TeamForm(race.id, _gate_data(cat, 6))
+    assert form.is_valid(), form.errors

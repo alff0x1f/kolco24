@@ -1839,7 +1839,7 @@ class AddTeam(View):
         data = request.POST.copy()
         data["dist"] = category2.code
         data["paymentid"] = "%016x" % random.randrange(16**16)  # legacy
-        form = TeamForm(race.id, data)
+        form = TeamForm(race.id, data, bypass_limits=request.user.is_superuser)
         if form.is_valid():
             # save team
             team: Team = Team.objects.create(

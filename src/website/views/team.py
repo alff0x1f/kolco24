@@ -88,6 +88,8 @@ class EditTeamView(View):
             team.category2.race_id,
             request.POST,
             current_category_id=team.category2_id,
+            team=team,
+            bypass_limits=request.user.is_superuser,
         )
         if form.is_valid():
             if "teamname" in form.cleaned_data:

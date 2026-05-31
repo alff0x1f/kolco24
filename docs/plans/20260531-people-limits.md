@@ -154,12 +154,12 @@ if (race.people_limit and race.reg_status == RegStatus.OPEN
 - Modify: `src/website/views/team.py` (EditTeamView)
 - Modify: `src/website/tests.py`
 
-- [ ] расширить `TeamForm.__init__` параметрами `team=None` и `bypass_limits=False` (на add — `Team()`, paid_people=0)
-- [ ] в `TeamForm.clean()` после существующих size/maps-проверок добавить race-check (блокирует только рост: `needed = new_ucount − team.paid_people`)
-- [ ] добавить category-check (`moving_in or growing`, `remaining_people(exclude_team=team)`); пропуск всего gate при `bypass_limits`
-- [ ] прокинуть `team` + `bypass_limits=request.user.is_superuser` в `TeamForm(...)` в `AddTeam.post` и `EditTeamView.post`
-- [ ] тесты (ядро): race full → 2→3 рост блокируется; 2→2 переход в категорию-с-местом разрешён; category full → вход блокируется; edit-self без роста в полной категории разрешён; рост-в-полной блокируется; новая регистрация в полную гонку/категорию блокируется; `paid_people=0` черновики не занимают слот; `bypass_limits` пропускает; `people_limit=0` не ограничивает
-- [ ] запустить тесты — должны пройти перед Task 3
+- [x] расширить `TeamForm.__init__` параметрами `team=None` и `bypass_limits=False` (на add — `Team()`, paid_people=0)
+- [x] в `TeamForm.clean()` после существующих size/maps-проверок добавить race-check (блокирует только рост: `needed = new_ucount − team.paid_people`)
+- [x] добавить category-check (`moving_in or growing`, `remaining_people(exclude_team=team)`); пропуск всего gate при `bypass_limits`
+- [x] прокинуть `team` + `bypass_limits=request.user.is_superuser` в `TeamForm(...)` в `AddTeam.post` и `EditTeamView.post`
+- [x] тесты (ядро): race full → 2→3 рост блокируется; 2→2 переход в категорию-с-местом разрешён; category full → вход блокируется; edit-self без роста в полной категории разрешён; рост-в-полной блокируется; новая регистрация в полную гонку/категорию блокируется; `paid_people=0` черновики не занимают слот; `bypass_limits` пропускает; `people_limit=0` не ограничивает
+- [x] запустить тесты — должны пройти перед Task 3
 
 ### Task 3: Авто sold_out при подтверждении оплаты
 
