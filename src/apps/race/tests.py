@@ -481,6 +481,61 @@ def test_race_page_hides_add_button_when_reg_not_open(client):
     assert "Добавить команду" not in html
 
 
+@pytest.mark.django_db
+def test_race_page_admin_sees_edit_button(client):
+    user = User.objects.create_user(
+        username="raedit", password="p", email="raedit@example.com"
+    )
+    race = _make_race(slug="edit-btn", code="edit-btn")
+    RaceAdmin.objects.create(race=race, user=user, role=RaceAdmin.Role.ADMIN)
+    client.force_login(user)
+
+    resp = client.get(reverse("race", args=[race.slug]))
+
+    assert resp.status_code == 200
+    assert resp.context["can_edit_race"] is True
+    html = resp.content.decode()
+    assert reverse("edit_race", args=[race.slug]) in html
+    assert "Редактировать" in html
+    # A non-superuser ADMIN does not get the «new race» link.
+    assert "+ Новая гонка" not in html
+
+
+@pytest.mark.django_db
+def test_race_page_regular_user_no_edit_button(client):
+    user = User.objects.create_user(
+        username="plain", password="p", email="plain@example.com"
+    )
+    race = _make_race(slug="no-edit-btn", code="no-edit-btn")
+    client.force_login(user)
+
+    resp = client.get(reverse("race", args=[race.slug]))
+
+    assert resp.status_code == 200
+    assert resp.context["can_edit_race"] is False
+    html = resp.content.decode()
+    assert "Редактировать" not in html
+    assert "+ Новая гонка" not in html
+
+
+@pytest.mark.django_db
+def test_race_page_superuser_sees_edit_and_new_buttons(client):
+    admin = User.objects.create_superuser(
+        username="su-buttons", password="p", email="su-buttons@example.com"
+    )
+    race = _make_race(slug="su-btn", code="su-btn")
+    client.force_login(admin)
+
+    resp = client.get(reverse("race", args=[race.slug]))
+
+    assert resp.status_code == 200
+    assert resp.context["can_edit_race"] is True
+    html = resp.content.decode()
+    assert reverse("edit_race", args=[race.slug]) in html
+    assert reverse("add_race") in html
+    assert "+ Новая гонка" in html
+
+
 # --- can_edit_race access-control matrix ---
 
 

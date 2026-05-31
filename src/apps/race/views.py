@@ -80,6 +80,7 @@ class RacePageView(View):
             "race_team_count": race.team_count(),
             "race_people_count": race.people_count(),
         }
+        context["can_edit_race"] = bool(user is not None and can_edit_race(user, race))
         if user is not None and is_race_admin(user, race):
             context["post_form"] = NewsPostForm()
         return context

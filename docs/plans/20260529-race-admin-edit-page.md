@@ -321,15 +321,15 @@ blocks, the `base-2.html` template stack, and the `AddNewsPostView` authorizatio
 - Modify: `src/templates/race/race_page.html`
 - Modify: `src/apps/race/tests.py`
 
-- [ ] in `RacePageView.build_context`, set `context["can_edit_race"] =
+- [x] in `RacePageView.build_context`, set `context["can_edit_race"] =
       can_edit_race(user, race)` (guard `user is not None`; an admin block keyed on
       `is_race_admin` already exists there — extend it rather than adding a second check)
-- [ ] in `race_page.html`, show an "Редактировать" button (→ `edit_race`) when
+- [x] in `race_page.html`, show an "Редактировать" button (→ `edit_race`) when
       `can_edit_race`, and a "+ Новая гонка" link (→ `add_race`) when `user.is_superuser`
       (place them in the `cover-actions` block — markup was restructured in #183)
-- [ ] write test: admin context → `can_edit_race=True` and button renders; regular user →
+- [x] write test: admin context → `can_edit_race=True` and button renders; regular user →
       `False`/absent and no button
-- [ ] run tests — must pass before next task
+- [x] run tests — must pass before next task
 
 ### Task 9: Verify acceptance criteria
 - [ ] verify every Overview requirement is implemented (create + edit, all fields,
