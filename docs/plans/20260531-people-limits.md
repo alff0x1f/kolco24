@@ -182,12 +182,12 @@ if (race.people_limit and race.reg_status == RegStatus.OPEN
 - Modify: `src/static/js/race_form.js`
 - Modify: `src/apps/race/tests.py`
 
-- [ ] добавить `people_limit` в `RaceForm.Meta.fields` и ручной `<input type="number" min="0">` в `race_form.html` (base-2 convention, с выводом ошибок)
-- [ ] парсить+валидировать `people_limit` в `_validate_category_rows` (неотрицательный int; пусто/0 = unlimited)
-- [ ] сохранять `people_limit` в `_reconcile_categories`; добавить поле в контекст рядов категорий (views.py ~478)
-- [ ] отрисовать number-input `people_limit` в ряду категории в `race_form.js`
-- [ ] тесты (`apps/race/tests.py`): `RaceForm`/category-row принимает и сохраняет `people_limit`; негатив отклоняется; 0 принимается; round-trip edit гонки сохраняет лимиты
-- [ ] запустить тесты — должны пройти перед Task 5
+- [x] добавить `people_limit` в `RaceForm.Meta.fields` и ручной `<input type="number" min="0">` в `race_form.html` (base-2 convention, с выводом ошибок)
+- [x] парсить+валидировать `people_limit` в `_validate_category_rows` (неотрицательный int; пусто/0 = unlimited)
+- [x] сохранять `people_limit` в `_reconcile_categories`; добавить поле в контекст рядов категорий (views.py ~478)
+- [x] отрисовать number-input `people_limit` в ряду категории в `race_form.js`
+- [x] тесты (`apps/race/tests.py`): `RaceForm`/category-row принимает и сохраняет `people_limit`; негатив отклоняется; 0 принимается; round-trip edit гонки сохраняет лимиты
+- [x] запустить тесты — должны пройти перед Task 5
 
 ### Task 5: UX team-формы (disable полных категорий, кап размера)
 

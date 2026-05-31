@@ -57,6 +57,7 @@
       '<input class="control c-desc" type="text" maxlength="150" placeholder="описание">' +
       '<input class="control c-min" type="number" min="1" step="1" placeholder="мин">' +
       '<input class="control c-max" type="number" min="1" step="1" placeholder="макс">' +
+      '<input class="control c-limit" type="number" min="0" step="1" placeholder="лимит" title="Лимит участников категории (0 — без лимита)">' +
       '<div class="cat-toggle-cell">' +
       '<label class="switch"><input type="checkbox" class="c-active"><span class="track"></span></label>' +
       "</div>" +
@@ -70,6 +71,7 @@
     row.querySelector(".c-desc").value = c.description || "";
     row.querySelector(".c-min").value = c.min_people != null ? c.min_people : 2;
     row.querySelector(".c-max").value = c.max_people != null ? c.max_people : 6;
+    row.querySelector(".c-limit").value = c.people_limit != null ? c.people_limit : 0;
     var activeInput = row.querySelector(".c-active");
     activeInput.checked = c.is_active !== false;
 
@@ -178,7 +180,8 @@
     refreshCatCount();
     applyRowErrors(catsEl, ".cat-row", {
       code: ".c-code", short_name: ".c-short", name: ".c-name",
-      description: ".c-desc", min_people: ".c-min", max_people: ".c-max"
+      description: ".c-desc", min_people: ".c-min", max_people: ".c-max",
+      people_limit: ".c-limit"
     }, readJsonObj("category-errors"));
     var addCat = document.getElementById("addCat");
     if (addCat) {
@@ -350,7 +353,8 @@
             description: row.querySelector(".c-desc").value.trim(),
             is_active: row.querySelector(".c-active").checked,
             min_people: parseInt(row.querySelector(".c-min").value, 10) || 0,
-            max_people: parseInt(row.querySelector(".c-max").value, 10) || 0
+            max_people: parseInt(row.querySelector(".c-max").value, 10) || 0,
+            people_limit: parseInt(row.querySelector(".c-limit").value, 10) || 0
           });
         });
       }

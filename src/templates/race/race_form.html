@@ -133,6 +133,14 @@
                 {% if form.cost.errors %}<span class="field-error">{{ form.cost.errors|join:", " }}</span>{% endif %}
               </div>
             </div>
+            <div class="field" style="margin-top: 16px;">
+              <label for="f-people-limit">Лимит участников гонки</label>
+              <input class="control{% if form.people_limit.errors %} has-error{% endif %}" id="f-people-limit"
+                     name="people_limit" type="number" min="0" step="1"
+                     value="{{ form.people_limit.value|default_if_none:'' }}" placeholder="0">
+              {% if form.people_limit.errors %}<span class="field-error">{{ form.people_limit.errors|join:", " }}</span>
+              {% else %}<span class="field-hint">Максимум оплаченных участников на всю гонку. 0 — без лимита.</span>{% endif %}
+            </div>
             <div class="field" style="margin-top: 16px; margin-bottom: 0;">
               <span class="field-hint">Однодневная гонка — поставьте одинаковые даты. Запасная цена, когда нет ценовых периодов.</span>
             </div>
@@ -204,6 +212,7 @@
                 <span>Описание</span>
                 <span>Мин</span>
                 <span>Макс</span>
+                <span>Лимит</span>
                 <span>Активна</span>
                 <span></span>
               </div>

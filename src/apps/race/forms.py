@@ -16,9 +16,14 @@ class RaceForm(forms.ModelForm):
     """
 
     cost = forms.IntegerField(required=False, min_value=0)
+    people_limit = forms.IntegerField(required=False, min_value=0)
 
     def clean_cost(self):
         v = self.cleaned_data.get("cost")
+        return v if v is not None else 0
+
+    def clean_people_limit(self):
+        v = self.cleaned_data.get("people_limit")
         return v if v is not None else 0
 
     def clean(self):
@@ -45,6 +50,7 @@ class RaceForm(forms.ModelForm):
             "date",
             "date_end",
             "cost",
+            "people_limit",
             "header_image",
             "header_logo",
             "reg_status",

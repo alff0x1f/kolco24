@@ -247,6 +247,23 @@ def _positive_int(value):
     return ivalue, None
 
 
+def _people_limit_int(value):
+    """Parse a people-limit value (``0``/empty = unlimited).
+
+    Returns ``(int, None)`` for a non-negative integer (empty → ``0``), else
+    ``(None, msg)``. Negative values are rejected.
+    """
+    if value is None or (isinstance(value, str) and not value.strip()):
+        return 0, None
+    try:
+        ivalue = int(value)
+    except (ValueError, TypeError):
+        return None, "Введите целое число."
+    if ivalue < 0:
+        return None, "Не может быть отрицательным."
+    return ivalue, None
+
+
 def _validate_category_rows(rows):
     """Validate parsed category rows.
 
@@ -284,10 +301,13 @@ def _validate_category_rows(rows):
             row_errors["description"] = "Не длиннее 150 символов."
         min_people, min_err = _positive_int(row.get("min_people"))
         max_people, max_err = _positive_int(row.get("max_people"))
+        people_limit, limit_err = _people_limit_int(row.get("people_limit"))
         if min_err:
             row_errors["min_people"] = min_err
         if max_err:
             row_errors["max_people"] = max_err
+        if limit_err:
+            row_errors["people_limit"] = limit_err
         if not min_err and not max_err and min_people > max_people:
             row_errors["min_people"] = "Минимум больше максимума."
         if code and "code" not in row_errors:
@@ -306,6 +326,7 @@ def _validate_category_rows(rows):
                     "is_active": bool(row.get("is_active", True)),
                     "min_people": min_people,
                     "max_people": max_people,
+                    "people_limit": people_limit,
                 }
             )
     return cleaned, errors
@@ -377,6 +398,7 @@ def _reconcile_categories(race, cleaned):
         instance.is_active = row["is_active"]
         instance.min_people = row["min_people"]
         instance.max_people = row["max_people"]
+        instance.people_limit = row["people_limit"]
         instance.order = index
         instance.save()
         seen.add(instance.id)
@@ -481,6 +503,7 @@ class RaceEditView(View):
                 "is_active": cat.is_active,
                 "min_people": cat.min_people,
                 "max_people": cat.max_people,
+                "people_limit": cat.people_limit,
             }
             for cat in Category.objects.filter(race=race).order_by("order", "id")
         ]

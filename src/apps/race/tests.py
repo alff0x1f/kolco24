@@ -1090,3 +1090,147 @@ def test_add_race_and_edit_race_urls_resolve():
     edit_url = reverse("edit_race", kwargs={"race_slug": "kolco24-2026"})
     assert edit_url == "/race/kolco24-2026/edit/"
     assert resolve(edit_url).func.view_class is RaceEditView
+
+
+# --- People-limit config on the race edit page (Task 4) ---
+
+
+def _cat_row(**overrides):
+    """A valid category-row dict for the categories_json payload."""
+    row = {
+        "id": None,
+        "code": "c",
+        "short_name": "c",
+        "name": "Cat",
+        "description": "",
+        "is_active": True,
+        "min_people": 2,
+        "max_people": 6,
+        "people_limit": 0,
+    }
+    row.update(overrides)
+    return row
+
+
+@pytest.mark.django_db
+def test_race_form_people_limit_field_present_and_saves():
+    form = RaceForm(data=_race_form_data(people_limit=120))
+
+    assert "people_limit" in form.fields
+    assert form.is_valid(), form.errors
+    race = form.save()
+    assert race.people_limit == 120
+
+
+@pytest.mark.django_db
+def test_race_form_people_limit_empty_defaults_to_zero():
+    data = _race_form_data()
+    data.pop("people_limit", None)
+    form = RaceForm(data=data)
+
+    assert form.is_valid(), form.errors
+    race = form.save()
+    assert race.people_limit == 0
+
+
+@pytest.mark.django_db
+def test_race_form_people_limit_negative_rejected():
+    form = RaceForm(data=_race_form_data(people_limit=-5))
+
+    assert not form.is_valid()
+    assert "people_limit" in form.errors
+
+
+@pytest.mark.django_db
+def test_race_form_people_limit_zero_accepted():
+    form = RaceForm(data=_race_form_data(people_limit=0))
+
+    assert form.is_valid(), form.errors
+    race = form.save()
+    assert race.people_limit == 0
+
+
+@pytest.mark.django_db
+def test_race_edit_post_saves_race_and_category_people_limit():
+    user = User.objects.create_user(username="pl1", password="p", email="pl1@e.com")
+    race = _make_race(slug="pl1", code="pl1")
+    RaceAdmin.objects.create(race=race, user=user, role=RaceAdmin.Role.ADMIN)
+
+    categories = json.dumps([_cat_row(code="six", name="Six", people_limit=40)])
+    data = _post_data(
+        code="pl1", slug="pl1", people_limit=200, categories_json=categories
+    )
+    resp = _edit_post(f"/race/{race.slug}/edit/", user, data, race_slug=race.slug)
+
+    assert resp.status_code == 302
+    race.refresh_from_db()
+    assert race.people_limit == 200
+    cat = Category.objects.get(race=race, code="six")
+    assert cat.people_limit == 40
+
+
+@pytest.mark.django_db
+def test_race_edit_post_category_people_limit_zero_accepted():
+    user = User.objects.create_user(username="pl2", password="p", email="pl2@e.com")
+    race = _make_race(slug="pl2", code="pl2")
+    RaceAdmin.objects.create(race=race, user=user, role=RaceAdmin.Role.ADMIN)
+
+    categories = json.dumps([_cat_row(code="z", name="Zero", people_limit=0)])
+    data = _post_data(code="pl2", slug="pl2", categories_json=categories)
+    resp = _edit_post(f"/race/{race.slug}/edit/", user, data, race_slug=race.slug)
+
+    assert resp.status_code == 302
+    cat = Category.objects.get(race=race, code="z")
+    assert cat.people_limit == 0
+
+
+@pytest.mark.django_db
+def test_race_edit_post_category_people_limit_negative_rolls_back():
+    user = User.objects.create_user(username="pl3", password="p", email="pl3@e.com")
+    race = _make_race(slug="pl3", code="pl3")
+    RaceAdmin.objects.create(race=race, user=user, role=RaceAdmin.Role.ADMIN)
+
+    categories = json.dumps([_cat_row(code="neg", name="Neg", people_limit=-1)])
+    data = _post_data(code="pl3", slug="pl3", categories_json=categories)
+    resp = _edit_post(f"/race/{race.slug}/edit/", user, data, race_slug=race.slug)
+
+    assert resp.status_code == 200
+    assert not Category.objects.filter(race=race, code="neg").exists()
+
+
+@pytest.mark.django_db
+def test_race_edit_round_trip_preserves_people_limits():
+    user = User.objects.create_user(username="pl4", password="p", email="pl4@e.com")
+    race = _make_race(slug="pl4", code="pl4")
+    race.people_limit = 150
+    race.save(update_fields=["people_limit"])
+    RaceAdmin.objects.create(race=race, user=user, role=RaceAdmin.Role.ADMIN)
+    cat = _make_category(race, code="6h", short_name="6ч", name="6 часов", order=0)
+    cat.people_limit = 30
+    cat.save(update_fields=["people_limit"])
+
+    # GET emits the current limits into the form + category-data island.
+    resp = _edit_get(f"/race/{race.slug}/edit/", user, race_slug=race.slug)
+    html = resp.content.decode()
+    assert 'name="people_limit"' in html and 'value="150"' in html
+    cats = _script_json(html, "categories-data")
+    assert cats[0]["people_limit"] == 30
+
+    # POST the same limits back (id preserved) and confirm they survive.
+    categories = json.dumps(
+        [
+            _cat_row(
+                id=cat.id, code="6h", short_name="6ч", name="6 часов", people_limit=30
+            )
+        ]
+    )
+    data = _post_data(
+        code="pl4", slug="pl4", people_limit=150, categories_json=categories
+    )
+    resp = _edit_post(f"/race/{race.slug}/edit/", user, data, race_slug=race.slug)
+
+    assert resp.status_code == 302
+    race.refresh_from_db()
+    cat.refresh_from_db()
+    assert race.people_limit == 150
+    assert cat.people_limit == 30
