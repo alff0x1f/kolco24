@@ -379,13 +379,19 @@ def _reconcile_categories(race, cleaned):
         instance.order = index
         instance.save()
         seen.add(instance.id)
-    to_delete = (
-        Category.objects.filter(race=race).exclude(id__in=seen).select_for_update()
+    to_delete_ids = list(
+        Category.objects.filter(race=race)
+        .exclude(id__in=seen)
+        .select_for_update()
+        .values_list("id", flat=True)
     )
-    if Team.objects.filter(category2__in=to_delete).exists():
-        names = ", ".join(f"«{c.name}»" for c in to_delete.only("name"))
+    if Team.objects.filter(category2__in=to_delete_ids).exists():
+        names = ", ".join(
+            f"«{c.name}»"
+            for c in Category.objects.filter(id__in=to_delete_ids).only("name")
+        )
         raise ValueError(f"Нельзя удалить категорию, в которой есть команды: {names}.")
-    to_delete.delete()
+    Category.objects.filter(id__in=to_delete_ids).delete()
 
 
 def _reconcile_price_tiers(race, cleaned):
