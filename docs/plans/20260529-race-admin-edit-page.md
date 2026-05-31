@@ -190,16 +190,16 @@ blocks, the `base-2.html` template stack, and the `AddNewsPostView` authorizatio
 - Create: `src/apps/race/forms.py`
 - Modify: `src/apps/race/tests.py`
 
-- [ ] create `RaceForm(forms.ModelForm)` with `Meta.model = Race` and fields: `name`,
+- [x] create `RaceForm(forms.ModelForm)` with `Meta.model = Race` and fields: `name`,
       `code`, `slug`, `place`, `date`, `date_end`, `cost` (fallback price), `header_image`,
       `header_logo`, `reg_status`, `is_active`, `is_legend_visible`, `is_teams_editable`,
       `is_photo_upload_enabled` (no widget `attrs` — manual rendering in template; **do not
       include the removed `is_reg_open`**)
-- [ ] write test: valid data → `form.is_valid()` and `save()` creates a `Race`
-- [ ] write test: duplicate `code`/`slug` (vs another race) → form invalid with field error
-- [ ] write test: editing an instance keeps its own `code`/`slug` valid (self-exclusion)
-- [ ] write test: invalid `header_image` URL → field error (via `Race.clean()`)
-- [ ] run tests — must pass before next task
+- [x] write test: valid data → `form.is_valid()` and `save()` creates a `Race`
+- [x] write test: duplicate `code`/`slug` (vs another race) → form invalid with field error
+- [x] write test: editing an instance keeps its own `code`/`slug` valid (self-exclusion)
+- [x] write test: invalid `header_image` URL → field error (via `Race.clean()`)
+- [x] run tests — must pass before next task
 
 ### Task 3: `RaceEditView` — GET + auth
 

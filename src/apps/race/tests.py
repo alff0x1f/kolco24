@@ -5,6 +5,7 @@ import pytest
 from django.contrib.auth.models import AnonymousUser, User
 from django.urls import resolve, reverse
 
+from apps.race.forms import RaceForm
 from apps.race.views import RaceTeamsView
 from website.models import Race
 from website.models.models import Team
@@ -519,3 +520,88 @@ def test_can_edit_race_moderator_and_others_false():
     assert can_edit_race(moderator, race) is False
     assert can_edit_race(regular, race) is False
     assert can_edit_race(AnonymousUser(), race) is False
+
+
+# --- RaceForm ---
+
+
+def _race_form_data(**overrides):
+    data = {
+        "name": "New Race",
+        "code": "nr-1",
+        "slug": "new-race",
+        "place": "Москва",
+        "date": "2026-09-01",
+        "date_end": "2026-09-02",
+        "cost": 1000,
+        "header_image": "",
+        "header_logo": "",
+        "reg_status": RegStatus.UPCOMING,
+        "is_active": True,
+        "is_legend_visible": False,
+        "is_teams_editable": False,
+        "is_photo_upload_enabled": False,
+    }
+    data.update(overrides)
+    return data
+
+
+@pytest.mark.django_db
+def test_race_form_valid_data_creates_race():
+    form = RaceForm(data=_race_form_data())
+
+    assert form.is_valid(), form.errors
+    race = form.save()
+    assert Race.objects.filter(pk=race.pk).exists()
+    assert race.name == "New Race"
+    assert race.code == "nr-1"
+    assert race.slug == "new-race"
+    assert race.cost == 1000
+    assert race.reg_status == RegStatus.UPCOMING
+
+
+@pytest.mark.django_db
+def test_race_form_does_not_include_is_reg_open():
+    form = RaceForm()
+    assert "is_reg_open" not in form.fields
+
+
+@pytest.mark.django_db
+def test_race_form_duplicate_code_invalid():
+    _make_race(slug="existing", code="dup-code")
+    form = RaceForm(data=_race_form_data(code="dup-code", slug="fresh-slug"))
+
+    assert not form.is_valid()
+    assert "code" in form.errors
+
+
+@pytest.mark.django_db
+def test_race_form_duplicate_slug_invalid():
+    _make_race(slug="dup-slug", code="some-code")
+    form = RaceForm(data=_race_form_data(code="fresh-code", slug="dup-slug"))
+
+    assert not form.is_valid()
+    assert "slug" in form.errors
+
+
+@pytest.mark.django_db
+def test_race_form_edit_keeps_own_code_and_slug_valid():
+    race = _make_race(slug="own-slug", code="own-code")
+    form = RaceForm(
+        data=_race_form_data(code="own-code", slug="own-slug"),
+        instance=race,
+    )
+
+    assert form.is_valid(), form.errors
+    saved = form.save()
+    assert saved.pk == race.pk
+    assert saved.code == "own-code"
+    assert saved.slug == "own-slug"
+
+
+@pytest.mark.django_db
+def test_race_form_invalid_header_image_url():
+    form = RaceForm(data=_race_form_data(header_image="not-a-url"))
+
+    assert not form.is_valid()
+    assert "header_image" in form.errors
