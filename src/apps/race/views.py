@@ -511,6 +511,13 @@ class RaceEditView(View):
                 price_tier_rows
             )
 
+        if category_errors:
+            bad = ", ".join(str(i + 1) for i in sorted(category_errors))
+            form.add_error(None, f"Ошибки в категориях (строки: {bad}).")
+        if price_tier_errors:
+            bad = ", ".join(str(i + 1) for i in sorted(price_tier_errors))
+            form.add_error(None, f"Ошибки в ценовых периодах (строки: {bad}).")
+
         if (
             form_valid
             and category_rows is not None

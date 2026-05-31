@@ -18,6 +18,17 @@
     }
   }
 
+  /* Pre-populate hidden inputs from data islands so that if the submit
+     handler fails to wire (mid-IIFE error), the POST still carries data. */
+  (function () {
+    var catsField = document.getElementById("categoriesJson");
+    var tiersField = document.getElementById("priceTiersJson");
+    var catsIsland = document.getElementById("categories-data");
+    var tiersIsland = document.getElementById("price-tiers-data");
+    if (catsField && catsIsland) catsField.value = catsIsland.textContent.trim();
+    if (tiersField && tiersIsland) tiersField.value = tiersIsland.textContent.trim();
+  })();
+
   /* ── Categories repeater ─────────────────────────────────── */
   var catsEl = document.getElementById("cats");
   var catCountEl = document.getElementById("catCount");
