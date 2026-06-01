@@ -1,5 +1,5 @@
 from datetime import timedelta
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 from django.contrib.auth.models import User
@@ -834,8 +834,9 @@ def test_edit_team_charges_delta_on_ucount_growth(client):
     client.force_login(user)
     client_p, payment_p, prepared_p = _mock_vtb()
     with client_p, payment_p as mock_payment, prepared_p as mock_prepared:
-        mock_payment.from_vtb_payload.return_value = MagicMock(
-            pay_url="https://pay.example/redirect"
+        mock_payment.new_order_id.return_value = VTBPayment.new_order_id("ORDER")
+        mock_payment.from_vtb_payload.return_value = _make_vtb_payment(
+            VTBPayment.new_order_id("ORDER"), pay_url="https://pay.example/redirect"
         )
         mock_prepared.objects.filter.return_value.first.return_value = None
         response = client.post(
@@ -857,8 +858,9 @@ def test_edit_team_charges_delta_on_maps_added(client):
     client.force_login(user)
     client_p, payment_p, prepared_p = _mock_vtb()
     with client_p, payment_p as mock_payment, prepared_p as mock_prepared:
-        mock_payment.from_vtb_payload.return_value = MagicMock(
-            pay_url="https://pay.example/redirect"
+        mock_payment.new_order_id.return_value = VTBPayment.new_order_id("ORDER")
+        mock_payment.from_vtb_payload.return_value = _make_vtb_payment(
+            VTBPayment.new_order_id("ORDER"), pay_url="https://pay.example/redirect"
         )
         mock_prepared.objects.filter.return_value.first.return_value = None
         response = client.post(
@@ -1042,11 +1044,12 @@ def test_add_team_mints_ulid_order_id_and_links_fk(
 # --- Reconciliation: _resolve_race_payment (FK + legacy fallback) ---
 
 
-def _make_vtb_payment(order_id):
+def _make_vtb_payment(order_id, pay_url=""):
     return VTBPayment.objects.create(
         order_id=order_id,
         amount_value="1000.00",
         status="PAID",
+        pay_url=pay_url,
     )
 
 

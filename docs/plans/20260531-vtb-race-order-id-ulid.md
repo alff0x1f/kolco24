@@ -222,13 +222,16 @@ the `except` catches the "no FK set" case. The `SPUTNIK_` donation branch is unc
 
 ### Task 5: Verify acceptance criteria
 
-- [ ] `grep -rn "ORDER_{payment.id}\|f\"ORDER_{" src/` returns no matches (both mint sites converted).
-- [ ] `grep -rn "_ulid\|_CROCKFORD" src/donate/` returns no matches (helper fully moved).
-- [ ] `grep -rn "order_id.split" src/` shows the only remaining int-parse is inside
-      `_resolve_race_payment`'s fallback.
-- [ ] Run `make format && make lint` — must pass.
-- [ ] Run full test suite: `uv run pytest` — must pass.
-- [ ] `uv run python src/manage.py makemigrations --check --dry-run` — no drift.
+- [x] `grep -rn "ORDER_{payment.id}\|f\"ORDER_{" src/` returns no matches at mint sites (only an
+      intentional legacy-format test fixture in `website/tests.py` remains; both mint sites converted).
+- [x] `grep -rn "_ulid\|_CROCKFORD" src/donate/` returns no matches (helper fully moved).
+- [x] `grep -rn "order_id.split" src/` shows the only remaining int-parse is inside
+      `_resolve_race_payment`'s fallback (the `website/tests.py` match is an assertion, not a parse).
+- [x] Run `make format && make lint` — passes.
+- [x] Run full test suite: `uv run pytest` — 216 passed. Fixed two pre-existing edit-team charge
+      tests whose `from_vtb_payload` MagicMock could not be assigned to the new `Payment.vtb_payment`
+      FK; they now return a real `VTBPayment` via `_make_vtb_payment(..., pay_url=...)`.
+- [x] `uv run python src/manage.py makemigrations --check --dry-run` — no drift.
 
 ### Task 6: [Final] Documentation & wrap-up
 
