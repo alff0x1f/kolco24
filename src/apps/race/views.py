@@ -4,7 +4,7 @@ import re
 from urllib.parse import quote
 
 from django.db import transaction
-from django.db.models import Count, OuterRef, Q, Subquery
+from django.db.models import Count, OuterRef, ProtectedError, Q, Subquery
 from django.http import Http404, HttpResponseForbidden, HttpResponseRedirect
 from django.shortcuts import get_object_or_404, render
 from django.urls import reverse
@@ -480,13 +480,20 @@ def _reconcile_extras(race, cleaned):
         instance.save()
         seen.add(instance.id)
     for extra in race.extras.exclude(id__in=seen):
-        in_use = extra.team_extras.exists() or extra.payment_extras.exists()
+        in_use = (
+            extra.team_extras.filter(Q(count__gt=0) | Q(count_paid__gt=0)).exists()
+            or extra.payment_extras.exists()
+        )
         if in_use:
             if extra.is_active:
                 extra.is_active = False
                 extra.save(update_fields=["is_active"])
         else:
-            extra.delete()
+            try:
+                extra.delete()
+            except ProtectedError:
+                extra.is_active = False
+                extra.save(update_fields=["is_active"])
 
 
 def _reconcile_categories(race, cleaned):
