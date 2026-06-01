@@ -239,11 +239,11 @@ PENDING_NEXT_KEY, ""))` and add `"race": race`. `MagicLinkView` unchanged.
 - Modify: `CLAUDE.md`
 - Modify: `docs/plans/20260601-add-team-passwordless-entry.md` (this file)
 
-- [ ] add to the CLAUDE.md "Auth" note: the race-page «Войти и добавить команду» path —
+- [x] add to the CLAUDE.md "Auth" note: the race-page «Войти и добавить команду» path —
       `AddTeam`'s anon redirect — now enters the passwordless `account_start` (not
       password `login`); `start`/`verify` derive race context from the `next` path via
       `_race_from_next`. Note other login-gated team actions still use password `login`.
-- [ ] move this plan: `mv docs/plans/20260601-add-team-passwordless-entry.md
+- [x] move this plan: `mv docs/plans/20260601-add-team-passwordless-entry.md
       docs/plans/completed/`
 
 ## Post-Completion
