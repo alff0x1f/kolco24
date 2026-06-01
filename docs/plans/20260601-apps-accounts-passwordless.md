@@ -212,14 +212,14 @@ appended as a query param. Send failure is logged; the user still reaches verify
 - Create: `src/apps/accounts/forms.py`
 - Modify: `src/website/forms.py`
 
-- [ ] move `LoginForm`, `RegForm`, `CustomPasswordResetForm`, `CustomSetPasswordForm`,
+- [x] move `LoginForm`, `RegForm`, `CustomPasswordResetForm`, `CustomSetPasswordForm`,
       `ImpersonateForm` (and their imports/helpers) into `apps/accounts/forms.py`
-- [ ] fix the hardcoded `/login/` (was `website/forms.py:28`) to `/accounts/login/`
-- [ ] re-export from `src/website/forms.py`:
+- [x] fix the hardcoded `/login/` (was `website/forms.py:28`) to `/accounts/login/`
+- [x] re-export from `src/website/forms.py`:
       `from apps.accounts.forms import (LoginForm, RegForm, CustomPasswordResetForm,
       CustomSetPasswordForm, ImpersonateForm)  # noqa: F401`
-- [ ] run `uv run python src/manage.py check` — no errors
-- [ ] regression: `uv run pytest` — full suite green (existing form imports unaffected)
+- [x] run `uv run python src/manage.py check` — no errors
+- [x] regression: `uv run pytest` — full suite green (existing form imports unaffected)
 
 ### Task 3: Move auth views + helpers + templates; rewire URLs (pure refactor)
 
