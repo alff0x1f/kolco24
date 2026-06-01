@@ -952,6 +952,20 @@ class ConfirmPaymentView(View):
 
         with transaction.atomic():
             team.save(update_fields=["paid_people", "paid_sum"])
+            # Credit add-ons from per-payment snapshots.
+            from django.db.models import F
+            from django.db.models.functions import Greatest
+
+            from apps.race.models import TeamExtra
+
+            for pe in payment.extras.all():
+                te, _ = TeamExtra.objects.get_or_create(
+                    team=team, race_extra=pe.race_extra
+                )
+                TeamExtra.objects.filter(pk=te.pk).update(
+                    count_paid=F("count_paid") + pe.count,
+                    count=Greatest(F("count"), F("count_paid") + pe.count),
+                )
             category = team.category2
             race = category.race if category else None
             if (

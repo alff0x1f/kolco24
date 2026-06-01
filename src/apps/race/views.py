@@ -71,9 +71,12 @@ class RacePageView(View):
         # дёргать ``people_count()`` повторно внутри ``remaining_people()``.
         for cat in categories:
             cat.people = cat.people_count()
-            cat.remaining = (
-                None if not cat.people_limit else max(0, cat.people_limit - cat.people)
-            )
+            if not cat.people_limit:
+                cat.remaining = None
+            else:
+                cat.remaining = max(
+                    0, cat.people_limit - cat.people - cat.reserved_people()
+                )
         news_qs = NewsPost.objects.filter(race=race).order_by("-publication_date")
         news_count = news_qs.count()
         news_list = list(news_qs[:10])

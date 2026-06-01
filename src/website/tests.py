@@ -1785,6 +1785,7 @@ def test_reserved_people_partial_paid_team(django_user_model):
     team = _pl_team(cat, user, paid_people=2, ucount=5, name="A")
     _draft_payment(team)
     assert race.reserved_people() == 3
+    assert cat.reserved_people() == 3
 
 
 @pytest.mark.django_db
@@ -1820,6 +1821,7 @@ def test_reserved_people_counts_team_once(django_user_model):
     _draft_payment(team)
     _draft_payment(team)
     assert race.reserved_people() == 3
+    assert cat.reserved_people() == 3
 
 
 @pytest.mark.django_db
@@ -1860,6 +1862,20 @@ def test_gate_blocks_when_reservation_fills_race(django_user_model):
     form = TeamForm(race.id, _gate_data(cat, 2))
     assert not form.is_valid()
     assert "ucount" in form.errors
+
+
+@pytest.mark.django_db
+def test_gate_blocks_when_reservation_fills_category(django_user_model):
+    # Category-level: бронь занимает слоты категории → вход новой команды блокируется.
+    user = _pl_user(django_user_model)
+    race = _pl_race(people_limit=0)  # гонка без лимита
+    cat = _pl_category(race, people_limit=4)
+    reserver = _pl_team(cat, user, paid_people=0, ucount=3, name="reserver")
+    _draft_payment(reserver)  # бронь 3 из 4
+    # Новая регистрация на 2: нужно 2, свободно 1 → блок по категории.
+    form = TeamForm(race.id, _gate_data(cat, 2))
+    assert not form.is_valid()
+    assert "category2_id" in form.errors
 
 
 @pytest.mark.django_db
