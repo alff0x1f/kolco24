@@ -128,6 +128,26 @@
 }
 .btn-outline:hover { border-color: var(--ink); color: var(--ink); }
 
+/* ── Sidebar: admin management panel («Управление», can_edit_race) ──
+   Shared by race_page.html and teams.html (both load race.css). */
+.card-admin {
+  border-color: #c5d6f3;
+  box-shadow: 0 1px 2px rgba(69, 130, 236, .08),
+              0 8px 24px rgba(69, 130, 236, .06);
+}
+.card-admin .side-head h3 { color: var(--primary); }
+.card-admin .side-head h3::before {
+  content: "";
+  display: inline-block; width: 7px; height: 7px;
+  margin-right: 8px; border-radius: 50%;
+  background: var(--primary-2); vertical-align: middle;
+}
+.admin-actions {
+  display: flex; flex-direction: column; gap: 8px;
+  padding-top: 12px;
+}
+.admin-actions .btn { width: 100%; justify-content: center; }
+
 /* ── Tabs card ───────────────────────────────────────── */
 .tabs-card { padding-bottom: 6px; }
 .tabs-head {

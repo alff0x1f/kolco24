@@ -1,5 +1,6 @@
 {% extends "website/base-2.html" %}
 {% load static %}
+{% load custom_filters %}
 {% block title %}Команды · {{ race.name }}{% endblock %}
 {% block extra_head %}
 <link href="{% static 'css/race.css' %}" rel="stylesheet">
@@ -13,6 +14,8 @@
     <div class="cover-status">
       {% if reg_open %}
         <span class="pill success">Регистрация открыта</span>
+      {% elif reg_upcoming %}
+        <span class="pill muted">Регистрация скоро</span>
       {% else %}
         <span class="pill">Регистрация окончена</span>
       {% endif %}
@@ -26,25 +29,23 @@
     <section class="cover-meta-card">
       <div class="cover-meta">
         <div class="cover-title">
-          <div class="crumb">
-            <a href="{% url 'race' race.slug %}">Кольцо&nbsp;24</a>
-            <span class="sep">/</span>
-            <span>Команды</span>
-          </div>
-          <h1>{{ race.name }}</h1>
+          <nav class="crumbs cover-crumbs" aria-label="Хлебные крошки">
+            <a href="{% url 'race' race.slug %}">{{ race.name }}</a>
+            <span class="sep" aria-hidden="true">›</span>
+            <h1 aria-current="page">Команды</h1>
+          </nav>
           <div class="sub">
             {% if race.place %}<span>📍 {{ race.place }}</span><span class="dot"></span>{% endif %}
             <span>{{ race.date }}</span>
             <span class="dot"></span>
-            <span>{{ category_count }} категорий</span>
+            <span>{{ category_count }} {{ category_count|ru_plural:"категория,категории,категорий" }}</span>
           </div>
         </div>
+        {% if reg_open and user.is_authenticated %}
         <div class="cover-actions">
-          {% if reg_open and user.is_authenticated %}
-            <a class="btn btn-primary" href="{% url 'add_team' race.slug %}">Добавить команду</a>
-          {% endif %}
-          <a class="btn btn-ghost" href="{% url 'race' race.slug %}">К&nbsp;гонке</a>
+          <a class="btn btn-primary" href="{% url 'add_team' race.slug %}">Добавить команду</a>
         </div>
+        {% endif %}
       </div>
     </section>
 
@@ -98,6 +99,17 @@
       </main>
 
       <aside class="sidebar">
+
+        {% if can_edit_race %}
+        <div class="card card-admin">
+          <div class="side-head">
+            <h3>Управление</h3>
+          </div>
+          <div class="card-pad admin-actions">
+            <a class="btn btn-primary" href="{% url 'add_team' race.slug %}">+ Команда</a>
+          </div>
+        </div>
+        {% endif %}
 
         <div class="card card-summary">
           <div class="side-head">

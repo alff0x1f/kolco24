@@ -189,11 +189,13 @@ class RaceTeamsView(View):
             "categories_json": _safe_json(categories_data),
             "teams_json": _safe_json(teams_data),
             "reg_open": race.reg_status == RegStatus.OPEN,
+            "reg_upcoming": race.reg_status == RegStatus.UPCOMING,
             "race_team_count": race.team_count(),
             "race_people_count": race.people_count(),
             "race_remaining": race.remaining_people(),
             "category_count": len(categories),
             "race_date": race.date,
+            "can_edit_race": bool(user is not None and can_edit_race(user, race)),
         }
 
     def get(self, request, race_slug, category_id=None):
