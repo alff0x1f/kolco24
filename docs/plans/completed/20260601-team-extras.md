@@ -255,9 +255,9 @@ class PaymentExtra(models.Model):
 - Modify: `CLAUDE.md`
 - Modify: `src/apps/race/__init__.py` (if a default_app_config note is needed — likely not)
 
-- [ ] update `CLAUDE.md`: `apps.race` now owns models/migrations (note the cross-app FKs to `website`); document the add-ons system (RaceExtra/TeamExtra/PaymentExtra, `max = ucount − free`, the shared `compute_team_charge`/`create_team_payment` helpers, snapshot-based reconciliation, deprecated-but-present maps columns)
-- [ ] note in `CLAUDE.md` that maps are now the `code="map"` extra and the legacy `map_count`/`map_count_paid`/`Payment.map`/`FREE_MAPS`/`MAP_PRICE` are pending removal (deferred migration)
-- [ ] move this plan to `docs/plans/completed/`
+- [x] update `CLAUDE.md`: `apps.race` now owns models/migrations (note the cross-app FKs to `website`); document the add-ons system (RaceExtra/TeamExtra/PaymentExtra, `max = ucount − free`, the shared `compute_team_charge`/`create_team_payment` helpers, snapshot-based reconciliation, deprecated-but-present maps columns)
+- [x] note in `CLAUDE.md` that maps are now the `code="map"` extra and the legacy `map_count`/`map_count_paid`/`Payment.map`/`FREE_MAPS`/`MAP_PRICE` are pending removal (deferred migration)
+- [x] move this plan to `docs/plans/completed/`
 
 ## Post-Completion
 
