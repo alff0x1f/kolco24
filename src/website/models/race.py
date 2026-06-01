@@ -1,3 +1,5 @@
+from datetime import timedelta
+
 from django.apps import apps
 from django.conf import settings
 from django.core.exceptions import ValidationError
@@ -18,6 +20,13 @@ from django.db.models import (
 from django.utils import timezone
 
 _url_validator = URLValidator(schemes=["http", "https"])
+
+# «Живая бронь» места: команда создала draft-платёж (ушла на оплату), но ещё не
+# подтверждена. Такой черновик держит её места занятыми в течение этого окна,
+# после чего слот освобождается для других (см. ``reserved_people``). Перекрывает
+# реальное окно оплаты VTB (~5–10 мин) с запасом; fail-safe — расхождение TTL и
+# фактического срока заказа ограничено этим интервалом.
+RESERVATION_TTL = timedelta(minutes=20)
 
 
 class RegStatus(TextChoices):
@@ -91,18 +100,49 @@ class Race(Model):
         )["total"]
         return result or 0
 
+    def reserved_people(self, exclude_team=None):
+        """Σ забронированных, но ещё не оплаченных мест гонки.
+
+        «Живая бронь» команды — наличие ``Payment`` со ``status="draft"``,
+        созданного не раньше ``RESERVATION_TTL`` назад (команда ушла на оплату,
+        но ещё не подтверждена). Считается по командам (``distinct`` — повторный
+        сабмит не множит бронь); для каждой резервируется
+        ``max(0, ucount − paid_people)`` — места, которые платёж добьёт до
+        полного состава. ``exclude_team`` само-исключается.
+        """
+        Team = apps.get_model("website", "Team")
+        Payment = apps.get_model("website", "Payment")
+        cutoff = timezone.now() - RESERVATION_TTL
+        teams = (
+            Team.objects.filter(
+                category2__race=self,
+                payment__status=Payment.STATUS_DRAFT,
+                payment__created_at__gt=cutoff,
+            )
+            .distinct()
+            .only("id", "ucount", "paid_people")
+        )
+        reserved = 0
+        for team in teams:
+            if exclude_team is not None and team.id == exclude_team.id:
+                continue
+            reserved += max(0, int(team.ucount) - team.paid_people)
+        return reserved
+
     def remaining_people(self, exclude_team=None):
         """Свободные слоты гонки или ``None`` при отсутствии лимита.
 
-        ``exclude_team`` вычитается из занятости (само-исключение при
-        редактировании команды).
+        Занятость = оплаченные (``people_count``) + забронированные
+        (``reserved_people`` — живые draft-платежи). ``exclude_team`` вычитается
+        из обеих составляющих (само-исключение при редактировании команды).
         """
         if not self.people_limit:  # 0 → без лимита
             return None
         occupied = self.people_count()
         if exclude_team is not None:
             occupied -= exclude_team.paid_people
-        return max(0, self.people_limit - occupied)
+        reserved = self.reserved_people(exclude_team=exclude_team)
+        return max(0, self.people_limit - occupied - reserved)
 
     def _active_tier_index(self, tiers):
         """Index of the active tier within ``tiers`` (assumed ordered).
@@ -227,18 +267,47 @@ class Category(Model):
         )["total"]
         return result or 0
 
+    def reserved_people(self, exclude_team=None):
+        """Σ забронированных, но ещё не оплаченных мест категории.
+
+        Зеркало ``Race.reserved_people`` в разрезе категории: живые draft-платежи
+        команд этой категории, ``max(0, ucount − paid_people)`` на команду,
+        ``distinct`` по командам, ``exclude_team`` само-исключается.
+        """
+        Team = apps.get_model("website", "Team")
+        Payment = apps.get_model("website", "Payment")
+        cutoff = timezone.now() - RESERVATION_TTL
+        teams = (
+            Team.objects.filter(
+                category2=self,
+                payment__status=Payment.STATUS_DRAFT,
+                payment__created_at__gt=cutoff,
+            )
+            .distinct()
+            .only("id", "ucount", "paid_people")
+        )
+        reserved = 0
+        for team in teams:
+            if exclude_team is not None and team.id == exclude_team.id:
+                continue
+            reserved += max(0, int(team.ucount) - team.paid_people)
+        return reserved
+
     def remaining_people(self, exclude_team=None):
         """Свободные слоты категории или ``None`` при отсутствии лимита.
 
-        ``exclude_team`` вычитается из занятости (само-исключение при
-        редактировании команды, уже состоящей в этой категории).
+        Занятость = оплаченные (``people_count``) + забронированные
+        (``reserved_people`` — живые draft-платежи). ``exclude_team`` вычитается
+        из обеих составляющих (само-исключение при редактировании команды, уже
+        состоящей в этой категории).
         """
         if not self.people_limit:  # 0 → без лимита
             return None
         occupied = self.people_count()
         if exclude_team and exclude_team.category2_id == self.id:
             occupied -= exclude_team.paid_people
-        return max(0, self.people_limit - occupied)
+        reserved = self.reserved_people(exclude_team=exclude_team)
+        return max(0, self.people_limit - occupied - reserved)
 
 
 class RacePriceTier(Model):

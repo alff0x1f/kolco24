@@ -10,7 +10,7 @@ from .views import CancelPaymentView, ConfirmPaymentView, RaceIdRedirectView
 from .views.team import EditTeamView, TeamMemberMoveView
 
 urlpatterns = [
-    path("", lambda request: redirect("race", race_slug="kolco24_2025"), name="index"),
+    path("", lambda request: redirect("race", race_slug="kolco12-2025"), name="index"),
     # path("index_hidden/", views.IndexView.as_view(), name="index"),
     # auth now lives in apps.accounts (mounted at /accounts/ in config/urls.py)
     path("race/8/transfer/", views.TransferView.as_view(), name="transfer"),
