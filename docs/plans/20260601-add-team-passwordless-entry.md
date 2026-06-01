@@ -224,14 +224,14 @@ PENDING_NEXT_KEY, ""))` and add `"race": race`. `MagicLinkView` unchanged.
 
 **Files:** —
 
-- [ ] verify Overview requirements: anon `add_team` enters `account_start` (not
+- [x] verify Overview requirements: anon `add_team` enters `account_start` (not
       password `login`); `?next=` round-trips so login lands back on `add_team`;
       start/verify show race context + back link when entered via a race and generic
       copy otherwise
-- [ ] verify scope guard: `TeamPayment`, `EditTeamView`, transfer/delete and other
+- [x] verify scope guard: `TeamPayment`, `EditTeamView`, transfer/delete and other
       `reverse("login")` sites are unchanged; `LOGIN_URL` is unchanged
-- [ ] run full suite from `src/`: `uv run pytest`
-- [ ] run `make format && make lint` — clean
+- [x] run full suite from `src/`: `uv run pytest` — 276 passed
+- [x] run `make format && make lint` — clean
 
 ### Task 6: [Final] Update documentation
 
