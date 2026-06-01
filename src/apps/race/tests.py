@@ -512,8 +512,8 @@ def test_race_page_anon_sees_login_and_add_button(client):
 
     assert resp.status_code == 200
     html = resp.content.decode()
-    assert "Войти и добавить команду" in html
-    assert "Добавить команду" not in html.replace("Войти и добавить команду", "")
+    assert "Зарегистрировать команду" in html
+    assert "Добавить команду" not in html
     # The button points at add_team; the view routes anon users through the
     # passwordless account_start flow (not password login).
     assert reverse("add_team", args=[race.slug]) in html
@@ -534,7 +534,7 @@ def test_race_page_authenticated_sees_plain_add_button(client):
     assert resp.status_code == 200
     html = resp.content.decode()
     assert "Добавить команду" in html
-    assert "Войти и добавить команду" not in html
+    assert "Зарегистрировать команду" not in html
 
 
 @pytest.mark.django_db
