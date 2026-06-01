@@ -238,11 +238,11 @@ the `except` catches the "no FK set" case. The `SPUTNIK_` donation branch is unc
 **Files:**
 - Modify: `CLAUDE.md` (Payments section)
 
-- [ ] Add a short note to the **Payments** section of `CLAUDE.md`: race-fee and donation VTB
+- [x] Add a short note to the **Payments** section of `CLAUDE.md`: race-fee and donation VTB
       `order_id`s are random ULIDs (`ORDER_<ulid>` / `SPUTNIK_<ulid>`) minted by
       `VTBPayment.new_order_id(prefix)`; reconciliation follows the `Payment.vtb_payment` /
       `DonateRequest.payment` FK (the `ORDER_<int>` int-parse remains only as a legacy fallback).
-- [ ] Move this plan to `docs/plans/completed/`.
+- [x] Move this plan to `docs/plans/completed/`.
 
 ## Post-Completion
 *Items requiring manual intervention or external systems — no checkboxes, informational only*
