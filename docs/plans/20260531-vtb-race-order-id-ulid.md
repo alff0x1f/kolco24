@@ -133,8 +133,8 @@ The reverse OneToOne raises `RelatedObjectDoesNotExist`, a subclass of `Payment.
 the `except` catches the "no FK set" case. The `SPUTNIK_` donation branch is unchanged.
 
 ### Migration
-`0071_payment_vtb_payment.py`, `AddField` for `Payment.vtb_payment`, dependency
-`("website", "0070_alter_race_place")`. Nullable → no data backfill.
+`0072_payment_vtb_payment.py`, `AddField` for `Payment.vtb_payment`, dependency
+`("website", "0071_category_people_limit_race_people_limit")`. Nullable → no data backfill.
 
 ## What Goes Where
 - **Implementation Steps**: model field + migration, generator method, donate refactor, the two race
@@ -171,15 +171,15 @@ the `except` catches the "no FK set" case. The `SPUTNIK_` donation branch is unc
 - Modify: `src/website/models/models.py`
 - Create: `src/website/migrations/0071_payment_vtb_payment.py`
 
-- [ ] Add the `vtb_payment` OneToOneField to `Payment` (`src/website/models/models.py:519`, see
+- [x] Add the `vtb_payment` OneToOneField to `Payment` (`src/website/models/models.py:519`, see
       Technical Details): `on_delete=SET_NULL`, `null=True`, `blank=True`,
       `related_name="race_payment"`.
-- [ ] Generate the migration: `uv run python src/manage.py makemigrations website` → expect
-      `0071_payment_vtb_payment.py` with dependency `("website", "0070_alter_race_place")`.
-- [ ] Run `uv run python src/manage.py makemigrations --check --dry-run` — must report no further
-      changes (model and migration agree).
-- [ ] Run `uv run python src/manage.py migrate` against the local DB — must apply cleanly.
-- [ ] (No new unit test for the field itself; it's covered indirectly by Task 4's FK-resolution
+- [x] Generate the migration: `uv run python src/manage.py makemigrations website` → produced
+      `0072_payment_vtb_payment.py` (not `0071` — the intervening `0071_category_people_limit_race_people_limit`
+      merged after this plan was written) with dependency `("website", "0071_category_people_limit_race_people_limit")`.
+- [x] Run `uv run python src/manage.py makemigrations --check --dry-run` — reports "No changes detected".
+- [x] Run `uv run python src/manage.py migrate` against the local DB — applied cleanly.
+- [x] (No new unit test for the field itself; it's covered indirectly by Task 4's FK-resolution
       test.)
 
 ### Task 3: Switch both race mint sites to ULID order ids + set the FK
