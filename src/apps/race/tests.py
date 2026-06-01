@@ -514,7 +514,8 @@ def test_race_page_anon_sees_login_and_add_button(client):
     html = resp.content.decode()
     assert "Войти и добавить команду" in html
     assert "Добавить команду" not in html.replace("Войти и добавить команду", "")
-    # The button points at add_team; the view redirects anon users to login.
+    # The button points at add_team; the view routes anon users through the
+    # passwordless account_start flow (not password login).
     assert reverse("add_team", args=[race.slug]) in html
 
 

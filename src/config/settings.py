@@ -80,6 +80,7 @@ INSTALLED_APPS = [
     "demo",
     "mailer",
     "apps.race",
+    "apps.accounts",
 ]
 
 MIDDLEWARE = [
@@ -157,7 +158,7 @@ REST_FRAMEWORK = {
 
 AUTHENTICATION_BACKENDS = [
     # "django.contrib.auth.backends.ModelBackend",  # Default backend
-    "website.auth.EmailBackend",  # Custom email backend
+    "apps.accounts.backends.EmailBackend",  # Custom email backend
 ]
 
 LOGIN_URL = "login"

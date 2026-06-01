@@ -1,0 +1,59 @@
+{% extends "website/base-2.html" %}
+
+{% block title %}Вход по коду · Кольцо 24{% endblock %}
+{% block head_descr %}Вход в личный кабинет Кольцо 24 по коду из письма.{% endblock %}
+
+{% block content %}
+<main class="page login-page">
+  <div class="login-wrap">
+
+    <header class="page-head">
+      <h1>Вход или регистрация</h1>
+      {% if race %}
+      <p class="sub">чтобы добавить команду на «{{ race.name }}». Введите email — мы пришлём код и ссылку для входа. Аккаунт создастся автоматически, если его ещё нет.</p>
+      {% else %}
+      <p class="sub">Введите email — мы пришлём код и ссылку для входа. Аккаунт создастся автоматически, если его ещё нет.</p>
+      {% endif %}
+    </header>
+
+    <form class="card" action="{% url 'account_start' %}" method="POST" novalidate>
+      {% csrf_token %}
+      <input type="hidden" name="next" value="{{ next }}">
+      <div class="card-pad">
+
+        {% if form.non_field_errors %}
+        <div class="err-banner show">
+          {% for error in form.non_field_errors %}{{ error }}{% if not forloop.last %}<br>{% endif %}{% endfor %}
+        </div>
+        {% endif %}
+
+        <div class="form">
+          <div class="field">
+            <label for="email">E-mail</label>
+            <input
+              class="input{% if form.email.errors %} has-error{% endif %}"
+              id="email" name="email" type="email"
+              autocomplete="email" placeholder="you@example.ru"
+              value="{{ form.email.value|default:'' }}"
+              autofocus
+            >
+            {% if form.email.errors %}
+            <span class="hint err">{{ form.email.errors|join:", " }}</span>
+            {% endif %}
+          </div>
+
+          <button class="btn btn-primary btn-lg btn-block" type="submit">Получить код</button>
+        </div>
+      </div>
+    </form>
+
+    <div class="below">
+      <a href="{% url 'login' %}{% if next %}?next={{ next|urlencode }}{% endif %}">Войти по паролю</a>
+      {% if race %}
+      <div><a class="back-link" href="{% url 'race' race.slug %}">← Назад к гонке</a></div>
+      {% endif %}
+    </div>
+
+  </div>
+</main>
+{% endblock %}
