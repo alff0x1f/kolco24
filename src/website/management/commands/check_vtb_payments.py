@@ -72,14 +72,18 @@ class Command(BaseCommand):
     def _settle_race_payment(self, payment) -> bool:
         """Credit a confirmed race Payment exactly once.
 
-        The ``status == STATUS_DONE`` guard makes this idempotent: a second
-        call for the same payment short-circuits and credits nothing. Returns
-        ``True`` only when the payment was settled on this call.
+        The ``status == STATUS_DONE`` guard (re-checked inside the transaction
+        with select_for_update) makes this idempotent: concurrent poller
+        instances serialize on the row lock and only the first one credits.
+        Returns ``True`` only when the payment was settled on this call.
         """
-        if not payment or payment.status == Payment.STATUS_DONE:
+        if not payment:
             return False
-        team: Team = payment.team
         with transaction.atomic():
+            payment = Payment.objects.select_for_update().get(pk=payment.pk)
+            if payment.status == Payment.STATUS_DONE:
+                return False
+            team: Team = payment.team
             if team:
                 # Atomic SQL-level increment avoids a lost-update race when
                 # two poller instances process different payments for the same team.

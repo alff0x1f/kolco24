@@ -948,13 +948,13 @@ class ConfirmPaymentView(View):
             payment.balance = balance
             payment.order = pk
 
+            if recipient_pk:
+                payment.recipient = SbpPaymentRecipient.objects.get(pk=recipient_pk)
+
             team = payment.team
             if team is None:
                 payment.save(update_fields=["status", "balance", "order", "recipient"])
                 return HttpResponseRedirect("/payments?status=draft_with_info")
-
-            if recipient_pk:
-                payment.recipient = SbpPaymentRecipient.objects.get(pk=recipient_pk)
 
             from django.db.models import F
             from django.db.models.functions import Greatest
@@ -988,13 +988,6 @@ class ConfirmPaymentView(View):
                 race.save(update_fields=["reg_status"])
             payment.save(update_fields=["status", "balance", "order", "recipient"])
         return HttpResponseRedirect("/payments?status=draft_with_info")
-
-    def update_only_balance(self, payment, balance):
-        payment.balance = balance
-        payment.save(update_fields=["balance"])
-        return HttpResponseRedirect(
-            f"/payments?status=done&method=sbp#order{payment.pk}"
-        )
 
 
 class CancelPaymentView(View):

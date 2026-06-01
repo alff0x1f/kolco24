@@ -274,8 +274,6 @@ class PaymentsYa(models.Model):
         return paid
 
     def update_team(self, paymentid):
-        if not Payment.objects.filter(id=int(paymentid)).exists():
-            return False
         with transaction.atomic():
             try:
                 payment = Payment.objects.select_for_update().get(id=int(paymentid))
