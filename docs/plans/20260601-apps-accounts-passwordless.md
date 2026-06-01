@@ -344,14 +344,15 @@ appended as a query param. Send failure is logged; the user still reaches verify
 
 **Files:** —
 
-- [ ] verify Overview requirements: email-first entry, code + link from one row,
+- [x] verify Overview requirements: email-first entry, code + link from one row,
       inline create-or-login, `?next=` preserved end-to-end, no enumeration
-- [ ] verify regression: `reverse("login"/"register"/"logout"/"password_reset")`
+- [x] verify regression: `reverse("login"/"register"/"logout"/"password_reset")`
       resolve under `/accounts/`; password login still authenticates; impersonate
       still works; `apps/race/tests.py` "Войти и добавить команду" + anon-redirect
       tests still pass
-- [ ] run full suite: `uv run pytest`
-- [ ] run `make format && make lint` — clean
+- [x] run full suite: `uv run pytest` (251 passed — run from `src/`; repo-root
+      invocation lacks a `pythonpath`/`conftest`, so `cd src` first)
+- [x] run `make format && make lint` — clean
 
 ### Task 8: [Final] Update documentation
 
