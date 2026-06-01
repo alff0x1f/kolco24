@@ -139,7 +139,7 @@ the `except` catches the "no FK set" case. The `SPUTNIK_` donation branch is unc
 ## What Goes Where
 - **Implementation Steps**: model field + migration, generator method, donate refactor, the two race
   mint-site edits, the reconciliation helper, and all unit tests — all in this repo.
-- **Post-Completion**: apply migration `0071` to staging/production at deploy; the dev↔prod VTB
+- **Post-Completion**: apply migration `0072` to staging/production at deploy; the dev↔prod VTB
   collision is resolved going forward (no retroactive cleanup of already-reserved VTB order ids is
   required — they simply age out).
 

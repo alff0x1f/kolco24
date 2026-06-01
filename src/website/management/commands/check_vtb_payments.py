@@ -103,6 +103,8 @@ class Command(BaseCommand):
         except Payment.DoesNotExist:
             pass
         # Legacy fallback: order_id == "ORDER_<payment_id>".
+        if not vtb_payment.order_id.startswith("ORDER_"):
+            return None
         try:
             payment_id = int(vtb_payment.order_id.split("_")[-1])
         except (ValueError, AttributeError):
