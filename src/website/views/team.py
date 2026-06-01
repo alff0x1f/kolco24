@@ -1,3 +1,4 @@
+from django.db import transaction
 from django.db.models import Q
 from django.http import Http404, HttpResponse, HttpResponseRedirect
 from django.shortcuts import render
@@ -213,9 +214,10 @@ class EditTeamView(View):
                     amount_value=cost,
                     return_payment_data="sbp",
                 )
-                vtb_payment = VTBPayment.from_vtb_payload(payload)
-                payment.vtb_payment = vtb_payment
-                payment.save(update_fields=["vtb_payment"])
+                with transaction.atomic():
+                    vtb_payment = VTBPayment.from_vtb_payload(payload)
+                    payment.vtb_payment = vtb_payment
+                    payment.save(update_fields=["vtb_payment"])
 
                 prepared_payment = VTBPreparedPayment.objects.filter(
                     payment=vtb_payment

@@ -248,7 +248,7 @@ the `except` catches the "no FK set" case. The `SPUTNIK_` donation branch is unc
 *Items requiring manual intervention or external systems — no checkboxes, informational only*
 
 **External system updates**:
-- Apply migration `0071_payment_vtb_payment` to staging and production databases at deploy time.
+- Apply migration `0072_payment_vtb_payment` to staging and production databases at deploy time.
 - After deploy, any race payments created *before* the deploy (old `ORDER_<int>` order ids, no FK)
   reconcile through the legacy fallback in `_resolve_race_payment`. Once those have all settled
   (PAID/EXPIRED), the fallback branch can be removed in a future cleanup — optional, not required.
