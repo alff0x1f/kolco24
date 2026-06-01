@@ -109,10 +109,13 @@ def _complete_login(request, email, next_url):
             if user is None:
                 # Username collision with a concurrent user sharing the same local-part.
                 # Fall back to a random username that won't collide.
-                with transaction.atomic():
-                    user = User.objects.create_user(
-                        get_random_string(12), email, get_random_string(32)
-                    )
+                try:
+                    with transaction.atomic():
+                        user = User.objects.create_user(
+                            get_random_string(12), email, get_random_string(32)
+                        )
+                except IntegrityError:
+                    user = User.objects.filter(email__iexact=email).first()
     auth_login(request, user, backend="apps.accounts.backends.EmailBackend")
     return _safe_redirect(request, next_url or "/")
 
@@ -403,7 +406,7 @@ class VerifyView(View):
             .order_by("-created_at")
             .first()
         )
-        if verification is None or not verification.verify_code(
+        if verification is None or not verification.atomic_consume_if_valid(
             form.cleaned_data["code"]
         ):
             messages.error(request, "Неверный или устаревший код. Попробуйте ещё раз.")
@@ -413,7 +416,6 @@ class VerifyView(View):
                 {"form": form, "email": email, "next": next_url},
             )
 
-        verification.mark_consumed()
         request.session.pop(PENDING_EMAIL_KEY, None)
         request.session.pop(PENDING_NEXT_KEY, None)
         return _complete_login(request, verification.email, next_url)

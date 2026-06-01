@@ -104,3 +104,27 @@ class EmailVerification(models.Model):
         if self.consumed_at is None:
             self.consumed_at = timezone.now()
             self.save(update_fields=["consumed_at"])
+
+    def atomic_consume_if_valid(self, raw_code):
+        """Verify ``raw_code`` and mark this row consumed in one atomic DB operation.
+
+        Returns ``True`` only if this call was the one that consumed the row.
+        A wrong code atomically increments ``attempts``. Concurrent callers with
+        the same correct code all pass ``check_password`` but only one wins the
+        ``UPDATE … WHERE consumed_at IS NULL`` race — the others get ``False``.
+        """
+        if not self.is_alive:
+            return False
+        if not check_password(raw_code, self.code_hash):
+            EmailVerification.objects.filter(pk=self.pk).update(
+                attempts=models.F("attempts") + 1
+            )
+            return False
+        now = timezone.now()
+        updated = EmailVerification.objects.filter(
+            pk=self.pk,
+            consumed_at__isnull=True,
+            expires_at__gt=now,
+            attempts__lt=self.MAX_ATTEMPTS,
+        ).update(consumed_at=now)
+        return updated == 1
