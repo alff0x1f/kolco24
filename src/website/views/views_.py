@@ -1676,6 +1676,9 @@ class AddTeam(View):
         data["paymentid"] = "%016x" % random.randrange(16**16)  # legacy
         form = TeamForm(race.id, data, bypass_limits=request.user.is_superuser)
         if form.is_valid():
+            if race.reg_status != RegStatus.OPEN:
+                return HttpResponseRedirect(reverse("my_teams", args=[race.slug]))
+
             # save team (extra_<code> fields are add-ons, not Team columns)
             team_fields = {
                 k: v for k, v in form.cleaned_data.items() if not k.startswith("extra_")
@@ -1687,9 +1690,6 @@ class AddTeam(View):
             )
 
             upsert_team_extras(team, form.cleaned_data, race)
-
-            if race.reg_status != RegStatus.OPEN:
-                return HttpResponseRedirect(reverse("my_teams", args=[race.slug]))
 
             # payment (race fee + add-on deltas, one VTB/SBP order)
             response = create_team_payment(request, team, race)

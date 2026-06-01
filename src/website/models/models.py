@@ -278,6 +278,8 @@ class PaymentsYa(models.Model):
         if not payment:
             return False
         payment = payment.get()
+        if payment.status == Payment.STATUS_DONE:
+            return False
         withdraw_amount = float(self.withdraw_amount) - payment.additional_charge
         paid_for = payment.paid_for
         if payment.payment_with_discount <= withdraw_amount:
