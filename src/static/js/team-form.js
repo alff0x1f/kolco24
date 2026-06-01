@@ -5,10 +5,18 @@
    the hardcoded constants replaced by a JSON config island and доплата-aware
    live totals that mirror the server formula.
 
+   This file is the CLIENT mirror of the charge formula in
+   src/apps/race/pricing.py (compute_team_charge). Any change to the add-on
+   math here must be reflected there, and vice versa:
+
+       due = max(0, (ucount − paidPeople) × currentPrice
+                  + Σ active extras: max(0, count − countPaid) × price)
+
    Config island (rendered by the template):
      <script type="application/json" id="teamFormConfig">
-       { "currentPrice": 3000, "paidPeople": 0, "mapCountPaid": 0,
-         "mapPrice": 200, "freeMaps": 2, "isEdit": false }
+       { "currentPrice": 3000, "paidPeople": 0, "isEdit": false,
+         "extras": [{ "code": "map", "name": "Доп. карты", "price": 200,
+                      "freePerTeam": 2, "count": 0, "countPaid": 0 }] }
      </script>
 
    DOM contract the template MUST provide (everything else is optional and
@@ -18,13 +26,13 @@
      #ucountSeg, #ucountCap      — segmented control container + caption
      input#ucountInput           — hidden, name="ucount" (kept in sync by JS)
      #members > .member-row[data-idx]  with .m-name / .m-year inputs
-     #mapsRow, #mapStepper ([data-step]) , #mapVal
-     input#mapCountInput         — hidden, name="map_count" (kept in sync)
+     #extrasRows                 — container; JS builds one stepper per extra,
+                                   each with a hidden input name="extra_<code>"
      #consent                    — consent checkbox (add mode only)
      #submitBtn / #payBtn        — submit buttons (gated on consent in add mode)
    Sidebar (optional): #sumHeading, #sumCountLbl, #sumCost, #sumPeople,
-     #sumMapsLine/#sumMapsN/#sumMaps, #sumPaidLine/#sumPaidN/#sumPaidAmt,
-     #sumTotal, #regClosedWarn.
+     #sumExtras (container for per-extra lines), #sumPaidLine/#sumPaidN/
+     #sumPaidAmt, #sumTotal, #regClosedWarn.
    Submit buttons may carry data-label-due / data-label-zero to swap their text
    when an amount is / isn't due (used by edit: "Сохранить и доплатить").
    ────────────────────────────────────────────────────────────────────────── */
@@ -38,9 +46,7 @@
   var cfg = {
     currentPrice: 0,
     paidPeople: 0,
-    mapCountPaid: 0,
-    mapPrice: 200,
-    freeMaps: 2,
+    extras: [],
     isEdit: false,
     raceRemaining: null,
     currentCategoryId: null,
@@ -58,10 +64,7 @@
     }
   }
   var COST = Number(cfg.currentPrice) || 0;
-  var MAP = Number(cfg.mapPrice) || 0;
-  var FREE_MAPS = Number(cfg.freeMaps) || 0;
   var PAID_PEOPLE = Number(cfg.paidPeople) || 0;
-  var MAPS_PAID = Number(cfg.mapCountPaid) || 0;
   var IS_EDIT = !!cfg.isEdit;
   // null/"" => unlimited; mirrors Race.remaining_people()/Category.remaining_people()
   var RACE_REMAINING = cfg.raceRemaining == null ? null : Number(cfg.raceRemaining);
@@ -75,10 +78,7 @@
   var ucountInput = document.getElementById("ucountInput");
   var rows = Array.prototype.slice.call(document.querySelectorAll(".member-row"));
   var membersEl = document.getElementById("members");
-  var mapsRow = document.getElementById("mapsRow");
-  var mapStepper = document.getElementById("mapStepper");
-  var mapVal = document.getElementById("mapVal");
-  var mapCountInput = document.getElementById("mapCountInput");
+  var extrasRows = document.getElementById("extrasRows");
   var consent = document.getElementById("consent");
   var submitBtn = document.getElementById("submitBtn");
   var payBtn = document.getElementById("payBtn");
@@ -89,9 +89,7 @@
   var sumCountLbl = document.getElementById("sumCountLbl");
   var sumCost = document.getElementById("sumCost");
   var sumPeople = document.getElementById("sumPeople");
-  var sumMapsLine = document.getElementById("sumMapsLine");
-  var sumMapsN = document.getElementById("sumMapsN");
-  var sumMaps = document.getElementById("sumMaps");
+  var sumExtras = document.getElementById("sumExtras");
   var sumPaidLine = document.getElementById("sumPaidLine");
   var sumPaidN = document.getElementById("sumPaidN");
   var sumPaidAmt = document.getElementById("sumPaidAmt");
@@ -106,8 +104,137 @@
 
   // initial state (read back from the hidden inputs the template renders)
   var ucount = parseInt(ucountInput && ucountInput.value, 10);
-  var maps = parseInt(mapCountInput && mapCountInput.value, 10);
-  if (isNaN(maps) || maps < 0) maps = 0;
+
+  // ── Add-ons (one stepper per active extra) ────────────
+  // Each entry mirrors one RaceExtra; the live total sums their deltas
+  // exactly like compute_team_charge in src/apps/race/pricing.py.
+  var extras = [];
+  (cfg.extras || []).forEach(function (e) {
+    var code = String(e.code);
+    var price = Number(e.price) || 0;
+    var free = Number(e.freePerTeam) || 0;
+    var countPaid = Number(e.countPaid) || 0;
+    var count = Number(e.count);
+    if (isNaN(count) || count < countPaid) count = countPaid;
+
+    var hidden = document.createElement("input");
+    hidden.type = "hidden";
+    hidden.name = "extra_" + code;
+    hidden.value = count;
+
+    var item = {
+      code: code,
+      name: String(e.name || code),
+      price: price,
+      free: free,
+      count: count,
+      countPaid: countPaid,
+      input: hidden,
+      valEl: null,
+      decBtn: null,
+      incBtn: null,
+      row: null,
+      sumLine: null,
+      sumN: null,
+      sumAmt: null,
+    };
+
+    if (extrasRows) {
+      var row = document.createElement("div");
+      row.className = "maps-row";
+      row.dataset.code = code;
+      row.style.display = "none";
+
+      var txt = document.createElement("div");
+      txt.className = "maps-txt";
+      var h4 = document.createElement("h4");
+      h4.textContent = item.name;
+      var p = document.createElement("p");
+      var freeNote = free > 0 ? "На команду — " + free + " бесплатно. " : "";
+      p.innerHTML = freeNote + "+" + fmt(price) + " ₽ за штуку.";
+      txt.appendChild(h4);
+      txt.appendChild(p);
+
+      var stepper = document.createElement("div");
+      stepper.className = "stepper";
+      var dec = document.createElement("button");
+      dec.type = "button";
+      dec.setAttribute("data-step", "-1");
+      dec.setAttribute("aria-label", "Меньше");
+      dec.textContent = "−";
+      var val = document.createElement("span");
+      val.className = "val";
+      val.textContent = count;
+      var inc = document.createElement("button");
+      inc.type = "button";
+      inc.setAttribute("data-step", "1");
+      inc.setAttribute("aria-label", "Больше");
+      inc.textContent = "+";
+      stepper.appendChild(dec);
+      stepper.appendChild(val);
+      stepper.appendChild(inc);
+
+      row.appendChild(txt);
+      row.appendChild(stepper);
+      extrasRows.appendChild(row);
+
+      item.row = row;
+      item.valEl = val;
+      item.decBtn = dec;
+      item.incBtn = inc;
+
+      stepper.addEventListener("click", function (ev) {
+        var step = ev.target.dataset.step;
+        if (step) setExtra(item, item.count + parseInt(step, 10));
+      });
+    }
+    // hidden input always lives in the form (even without a visible stepper)
+    (extrasRows || form).appendChild(hidden);
+
+    if (sumExtras) {
+      var line = document.createElement("div");
+      line.className = "sum-line muted";
+      line.dataset.code = code;
+      line.style.display = "none";
+      var lbl = document.createElement("span");
+      lbl.className = "lbl";
+      var sumN = document.createElement("b");
+      sumN.textContent = "0";
+      lbl.appendChild(document.createTextNode(item.name + " · "));
+      lbl.appendChild(sumN);
+      lbl.appendChild(document.createTextNode(" × " + fmt(price) + " ₽"));
+      var amt = document.createElement("span");
+      amt.className = "amt";
+      amt.textContent = "0 ₽";
+      line.appendChild(lbl);
+      line.appendChild(amt);
+      sumExtras.appendChild(line);
+      item.sumLine = line;
+      item.sumN = sumN;
+      item.sumAmt = amt;
+    }
+
+    extras.push(item);
+  });
+
+  function extraMax(item) {
+    return Math.max(0, ucount - item.free);
+  }
+
+  function setExtra(item, v) {
+    var max = extraMax(item);
+    item.count = Math.min(Math.max(item.countPaid, v), max);
+    render();
+  }
+
+  function clampExtras() {
+    // recompute caps after a team-size change
+    extras.forEach(function (item) {
+      var max = extraMax(item);
+      if (item.count > max) item.count = max;
+      if (item.count < item.countPaid) item.count = item.countPaid;
+    });
+  }
 
   function counts() {
     var opt = category && category.selectedOptions[0];
@@ -239,15 +366,7 @@
         }, 240);
       }
     });
-    var maxMaps = Math.max(0, n - FREE_MAPS);
-    if (maps > maxMaps) maps = maxMaps;
-    if (mapsRow) mapsRow.style.display = maxMaps > 0 ? "" : "none";
-    render();
-  }
-
-  function setMaps(v) {
-    var maxMaps = Math.max(0, ucount - FREE_MAPS);
-    maps = Math.min(Math.max(0, v), maxMaps);
+    clampExtras();
     render();
   }
 
@@ -257,38 +376,41 @@
       if (name) row.classList.toggle("filled", name.value.trim().length > 0);
     });
 
-    var maxMaps = Math.max(0, ucount - FREE_MAPS);
-    if (mapVal) mapVal.textContent = maps;
-    if (mapCountInput) mapCountInput.value = maps;
-    if (mapStepper) {
-      var dec = mapStepper.querySelector('[data-step="-1"]');
-      var inc = mapStepper.querySelector('[data-step="1"]');
-      if (dec) dec.disabled = maps <= 0;
-      if (inc) inc.disabled = maps >= maxMaps;
-    }
-
     var peopleGross = ucount * COST;
-    var mapsGross = maps * MAP;
     // already-paid credit, valued at the current price (mirrors the backend
-    // formula: (ucount − paidPeople)·price + (maps − mapsPaid)·mapPrice)
-    var credit = PAID_PEOPLE * COST + MAPS_PAID * MAP;
-    var due = Math.max(0, peopleGross + mapsGross - credit);
+    // race-fee term: (ucount − paidPeople)·price)
+    var due = Math.max(0, peopleGross - PAID_PEOPLE * COST);
+
+    extras.forEach(function (item) {
+      var max = extraMax(item);
+      if (item.count > max) item.count = max;
+      if (item.count < item.countPaid) item.count = item.countPaid;
+      if (item.input) item.input.value = item.count;
+      if (item.valEl) item.valEl.textContent = item.count;
+      if (item.row) item.row.style.display = max > 0 ? "" : "none";
+      if (item.decBtn) item.decBtn.disabled = item.count <= item.countPaid;
+      if (item.incBtn) item.incBtn.disabled = item.count >= max;
+
+      var delta = Math.max(0, item.count - item.countPaid);
+      var lineAmt = delta * item.price;
+      due += lineAmt;
+      if (item.sumLine) {
+        if (delta > 0) {
+          item.sumLine.style.display = "";
+          if (item.sumN) item.sumN.textContent = delta;
+          if (item.sumAmt) item.sumAmt.textContent = fmt(lineAmt) + " ₽";
+        } else {
+          item.sumLine.style.display = "none";
+        }
+      }
+    });
 
     if (sumCountLbl) sumCountLbl.textContent = ucount;
     if (sumCost) sumCost.textContent = fmt(COST);
     if (sumPeople) sumPeople.textContent = fmt(peopleGross) + " ₽";
 
-    if (sumMapsLine) {
-      if (maps > 0) {
-        sumMapsLine.style.display = "";
-        if (sumMapsN) sumMapsN.textContent = maps;
-        if (sumMaps) sumMaps.textContent = fmt(mapsGross) + " ₽";
-      } else {
-        sumMapsLine.style.display = "none";
-      }
-    }
-
     // edit mode: "уже оплачено за N чел." credit line
+    var credit = PAID_PEOPLE * COST;
     if (sumPaidLine) {
       if (PAID_PEOPLE > 0 && credit > 0) {
         sumPaidLine.style.display = "";
@@ -325,12 +447,6 @@
 
   // ── Wiring ────────────────────────────────────────────
   if (category) category.addEventListener("change", buildSeg);
-  if (mapStepper) {
-    mapStepper.addEventListener("click", function (e) {
-      var step = e.target.dataset.step;
-      if (step) setMaps(maps + parseInt(step, 10));
-    });
-  }
   if (membersEl) {
     membersEl.addEventListener("input", function (e) {
       if (e.target.classList.contains("m-year")) {

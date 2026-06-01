@@ -9,6 +9,7 @@ from django.db import IntegrityError
 from django.urls import reverse
 from django.utils import timezone
 
+from apps.race.models import PaymentExtra, RaceExtra, TeamExtra
 from website.forms import TeamForm
 from website.models import Payment, Race, VTBPayment
 from website.models.models import PaymentsYa, Team
@@ -778,10 +779,14 @@ def _create_team_for_edit(
 
 
 def _mock_vtb():
-    """Patch the VTB integration so a charging POST does not hit the network."""
-    client_patch = patch("website.views.team.VTBClient")
-    payment_patch = patch("website.views.team.VTBPayment")
-    prepared_patch = patch("website.views.team.VTBPreparedPayment")
+    """Patch the VTB integration so a charging POST does not hit the network.
+
+    Payment creation now lives in ``apps.race.pricing.create_team_payment``,
+    so the VTB names are patched there (not in the views).
+    """
+    client_patch = patch("apps.race.pricing.VTBClient")
+    payment_patch = patch("apps.race.pricing.VTBPayment")
+    prepared_patch = patch("apps.race.pricing.VTBPreparedPayment")
     return client_patch, payment_patch, prepared_patch
 
 
@@ -808,14 +813,23 @@ def test_get_add_team_context_has_price_and_counts(client):
         min_people=4,
         max_people=6,
     )
+    RaceExtra.objects.create(
+        race=race, code="map", name="Доп. карты", price=200, free_per_team=2
+    )
     client.force_login(user)
     response = client.get(reverse("add_team", args=[race.slug]))
     assert response.status_code == 200
     # current_price comes from the active tier, not race.cost
     assert response.context["current_price"] == 1500
     assert response.context["price_tiers"]  # non-empty ladder
-    assert response.context["map_price"] == 200
-    assert response.context["free_maps"] == 2
+    # add-ons surface as the generic `extras` config (maps is just code="map")
+    extras = response.context["extras"]
+    assert len(extras) == 1
+    assert extras[0]["code"] == "map"
+    assert extras[0]["price"] == 200
+    assert extras[0]["freePerTeam"] == 2
+    assert extras[0]["count"] == 0
+    assert extras[0]["countPaid"] == 0
     options = response.context["category_options"]
     match = next(o for o in options if o["id"] == category.id)
     assert match["counts"] == [4, 5, 6]
@@ -862,6 +876,9 @@ def test_edit_team_charges_delta_on_maps_added(client):
     user, race, category, team = _create_team_for_edit(
         suffix="maps", tier_price=1500, ucount=4, paid_people=4
     )
+    extra = RaceExtra.objects.create(
+        race=race, code="map", name="Доп. карты", price=200, free_per_team=2
+    )
     client.force_login(user)
     client_p, payment_p, prepared_p = _mock_vtb()
     with client_p, payment_p as mock_payment, prepared_p as mock_prepared:
@@ -873,16 +890,19 @@ def test_edit_team_charges_delta_on_maps_added(client):
         mock_prepared.objects.filter.return_value.first.return_value = None
         response = client.post(
             reverse("edit_team", args=[team.id]),
-            {"ucount": "4", "category2_id": str(category.id), "map_count": "2"},
+            {"ucount": "4", "category2_id": str(category.id), "extra_map": "2"},
         )
     assert response.status_code == 302
     payment = Payment.objects.filter(team=team).order_by("-id").first()
     # only the 2 extra maps are charged: 2 * 200
     assert payment.payment_amount == 400
-    assert payment.map == 2
     assert payment.vtb_payment is not None
-    team.refresh_from_db()
-    assert team.map_count == 2
+    pe = PaymentExtra.objects.get(payment=payment, race_extra=extra)
+    assert pe.count == 2
+    assert pe.unit_price == 200
+    te = TeamExtra.objects.get(team=team, race_extra=extra)
+    assert te.count == 2
+    assert te.count_paid == 0  # only credited at reconciliation
 
 
 @pytest.mark.django_db
@@ -920,11 +940,14 @@ def test_edit_team_rejects_over_cap_map_count(client):
     user, race, category, team = _create_team_for_edit(
         suffix="cap", min_people=4, max_people=6, ucount=4, paid_people=0
     )
+    RaceExtra.objects.create(
+        race=race, code="map", name="Доп. карты", price=200, free_per_team=2
+    )
     client.force_login(user)
     response = client.post(
         reverse("edit_team", args=[team.id]),
         # ucount=4 allows max(0, 4-2)=2 maps; 5 must be rejected
-        {"ucount": "4", "category2_id": str(category.id), "map_count": "5"},
+        {"ucount": "4", "category2_id": str(category.id), "extra_map": "5"},
     )
     assert response.status_code == 200
     assert Payment.objects.filter(team=team).count() == 0
@@ -1014,8 +1037,8 @@ def _echo_order_payload(order_id, order_name, amount_value, return_payment_data)
 
 
 @pytest.mark.django_db
-@patch("website.views.views_.VTBClient._ensure_token", return_value=None)
-@patch("website.views.views_.VTBClient.create_order", side_effect=_echo_order_payload)
+@patch("apps.race.pricing.VTBClient._ensure_token", return_value=None)
+@patch("apps.race.pricing.VTBClient.create_order", side_effect=_echo_order_payload)
 def test_add_team_mints_ulid_order_id_and_links_fk(
     create_order_mock, _token_mock, client
 ):
@@ -1913,3 +1936,271 @@ def test_ru_plural_picks_correct_form(n, expected):
     from website.templatetags.custom_filters import ru_plural
 
     assert ru_plural(n, "команда,команды,команд") == expected
+
+
+# ---------------------------------------------------------------------------
+# Task 4: generic add-ons cutover (extras replace the hardcoded maps feature)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.django_db
+def test_add_team_with_transfer_creates_payment_and_extra(client):
+    user = User.objects.create_user(
+        username="trf", password="pass", email="trf@example.com"
+    )
+    race = Race.objects.create(
+        name="Trf Race",
+        code="trf1",
+        slug="trf-race-1",
+        cost=1000,
+        reg_status=RegStatus.OPEN,
+        is_teams_editable=True,
+    )
+    category = Category.objects.create(
+        code="t", name="Team", short_name="T", race=race, min_people=2, max_people=6
+    )
+    extra = RaceExtra.objects.create(
+        race=race, code="transfer", name="Трансфер", price=500, free_per_team=0
+    )
+    client.force_login(user)
+    client_p, payment_p, prepared_p = _mock_vtb()
+    with client_p, payment_p as mock_payment, prepared_p as mock_prepared:
+        oid = VTBPayment.new_order_id("ORDER")
+        mock_payment.new_order_id.return_value = oid
+        mock_payment.from_vtb_payload.return_value = _make_vtb_payment(
+            oid, pay_url="https://pay.example/redirect"
+        )
+        mock_prepared.objects.filter.return_value.first.return_value = None
+        response = client.post(
+            reverse("add_team", args=[race.slug]),
+            {"ucount": "2", "category2_id": str(category.id), "extra_transfer": "2"},
+        )
+    assert response.status_code == 302
+    team = Team.objects.get(category2=category)
+    payment = Payment.objects.get(team=team)
+    # fee (2 × 1000) + transfer (2 × 500)
+    assert payment.payment_amount == 3000
+    pe = PaymentExtra.objects.get(payment=payment, race_extra=extra)
+    assert pe.count == 2
+    assert pe.unit_price == 500
+    te = TeamExtra.objects.get(team=team, race_extra=extra)
+    assert te.count == 2
+    assert te.count_paid == 0
+
+
+@pytest.mark.django_db
+def test_edit_team_charges_only_extra_delta(client):
+    user, race, category, team = _create_team_for_edit(
+        suffix="delta", tier_price=1500, ucount=4, paid_people=4
+    )
+    extra = RaceExtra.objects.create(
+        race=race, code="transfer", name="Трансфер", price=300, free_per_team=0
+    )
+    TeamExtra.objects.create(team=team, race_extra=extra, count=1, count_paid=1)
+    client.force_login(user)
+    client_p, payment_p, prepared_p = _mock_vtb()
+    with client_p, payment_p as mock_payment, prepared_p as mock_prepared:
+        oid = VTBPayment.new_order_id("ORDER")
+        mock_payment.new_order_id.return_value = oid
+        mock_payment.from_vtb_payload.return_value = _make_vtb_payment(
+            oid, pay_url="https://pay.example/redirect"
+        )
+        mock_prepared.objects.filter.return_value.first.return_value = None
+        response = client.post(
+            reverse("edit_team", args=[team.id]),
+            {"ucount": "4", "category2_id": str(category.id), "extra_transfer": "3"},
+        )
+    assert response.status_code == 302
+    payment = Payment.objects.filter(team=team).order_by("-id").first()
+    # only the 2-unit delta (3 desired − 1 paid) at 300 each
+    assert payment.payment_amount == 600
+    pe = PaymentExtra.objects.get(payment=payment, race_extra=extra)
+    assert pe.count == 2
+    assert pe.unit_price == 300
+
+
+@pytest.mark.django_db
+def test_add_team_rejects_over_cap_extra(client):
+    user = User.objects.create_user(
+        username="ovc", password="pass", email="ovc@example.com"
+    )
+    race = Race.objects.create(
+        name="OverCap",
+        code="ovc1",
+        slug="overcap-1",
+        cost=1000,
+        reg_status=RegStatus.OPEN,
+        is_teams_editable=True,
+    )
+    category = Category.objects.create(
+        code="t", name="Team", short_name="T", race=race, min_people=2, max_people=6
+    )
+    RaceExtra.objects.create(
+        race=race, code="map", name="Доп. карты", price=200, free_per_team=2
+    )
+    client.force_login(user)
+    response = client.post(
+        reverse("add_team", args=[race.slug]),
+        # ucount=4 allows max(0, 4-2)=2 maps; 10 must be rejected
+        {"ucount": "4", "category2_id": str(category.id), "extra_map": "10"},
+    )
+    assert response.status_code == 200
+    assert not Team.objects.filter(category2=category).exists()
+
+
+@pytest.mark.django_db
+def test_edit_team_rejects_extra_drop_below_paid(client):
+    user, race, category, team = _create_team_for_edit(
+        suffix="dropbelow", tier_price=1500, ucount=4, paid_people=4
+    )
+    extra = RaceExtra.objects.create(
+        race=race, code="transfer", name="Трансфер", price=300, free_per_team=0
+    )
+    TeamExtra.objects.create(team=team, race_extra=extra, count=2, count_paid=2)
+    client.force_login(user)
+    response = client.post(
+        reverse("edit_team", args=[team.id]),
+        {"ucount": "4", "category2_id": str(category.id), "extra_transfer": "1"},
+    )
+    assert response.status_code == 200
+    assert Payment.objects.filter(team=team).count() == 0
+
+
+@pytest.mark.django_db
+def test_superuser_bypass_capacity_but_extra_cap_still_applies(django_user_model):
+    # bypass_limits skips the capacity gate but per-extra caps still bind.
+    su = django_user_model.objects.create_superuser(
+        username="su-cap", email="su-cap@example.com", password="pass"
+    )
+    race = Race.objects.create(
+        name="SUcap",
+        code="sucap1",
+        slug="sucap-1",
+        cost=1000,
+        reg_status=RegStatus.OPEN,
+        people_limit=2,
+    )
+    cat = Category.objects.create(
+        code="t", name="Team", short_name="T", race=race, min_people=2, max_people=6
+    )
+    Team.objects.create(
+        owner=su, paymentid="f1", dist="t", category2=cat, ucount=2, paid_people=2
+    )
+    RaceExtra.objects.create(
+        race=race, code="map", name="Доп. карты", price=200, free_per_team=2
+    )
+    data = {
+        "ucount": "4",
+        "category2_id": str(cat.id),
+        "extra_map": "10",
+        "dist": cat.code,
+    }
+    form = TeamForm(race.id, data, bypass_limits=True)
+    assert not form.is_valid()
+    assert "extra_map" in form.errors  # cap still enforced
+    assert "ucount" not in form.errors  # capacity bypassed
+
+
+@pytest.mark.django_db
+def test_my_team_post_does_not_500(client):
+    # The legacy my_team view calls TeamForm(request.POST or None) — the
+    # defensive __init__ must not 500 when race_id is a QueryDict/None.
+    user = User.objects.create_user(
+        username="mtp", password="pass", email="mtp@example.com"
+    )
+    client.force_login(user)
+    response = client.post(reverse("my_team"), {"ucount": "2"})
+    assert response.status_code != 500
+
+
+@pytest.mark.django_db
+def test_team_form_defensive_init_with_querydict():
+    from django.http import QueryDict
+
+    qd = QueryDict("ucount=2&teamname=x")
+    form = TeamForm(qd)  # race_id is a QueryDict, as my_team passes it
+    assert form.extras == []
+    assert not any(name.startswith("extra_") for name in form.fields)
+
+
+@pytest.mark.django_db
+def test_reconciliation_credits_extras_once_idempotent():
+    from website.management.commands.check_vtb_payments import Command
+
+    user = User.objects.create_user(
+        username="rec", password="pass", email="rec@example.com"
+    )
+    race = Race.objects.create(
+        name="Rec", code="rec1", slug="rec-1", cost=1000, reg_status=RegStatus.OPEN
+    )
+    cat = Category.objects.create(
+        code="t", name="Team", short_name="T", race=race, min_people=2, max_people=6
+    )
+    team = Team.objects.create(
+        owner=user, paymentid="r1", dist="t", category2=cat, ucount=4, paid_people=2
+    )
+    extra = RaceExtra.objects.create(
+        race=race, code="transfer", name="Трансфер", price=300, free_per_team=0
+    )
+    payment = Payment.objects.create(
+        owner=user,
+        team=team,
+        payment_method="sbp2",
+        payment_amount=2600,
+        paid_for=2,
+        status=Payment.STATUS_DRAFT,
+    )
+    PaymentExtra.objects.create(
+        payment=payment, race_extra=extra, count=2, unit_price=300
+    )
+
+    cmd = Command()
+    # first pass settles (no TeamExtra exists yet → get_or_create)
+    assert cmd._settle_race_payment(payment) is True
+    te = TeamExtra.objects.get(team=team, race_extra=extra)
+    assert te.count_paid == 2
+    assert te.count == 2  # clamped up from default 0
+    team.refresh_from_db()
+    assert team.paid_people == 4
+
+    # second pass short-circuits on status == done → no double credit
+    assert cmd._settle_race_payment(payment) is False
+    te.refresh_from_db()
+    assert te.count_paid == 2
+    team.refresh_from_db()
+    assert team.paid_people == 4
+
+
+@pytest.mark.django_db
+def test_config_island_mirrors_compute_team_charge(client):
+    import json
+
+    from apps.race.pricing import compute_team_charge
+
+    user, race, category, team = _create_team_for_edit(
+        suffix="mirror", tier_price=1500, ucount=4, paid_people=2
+    )
+    extra = RaceExtra.objects.create(
+        race=race, code="transfer", name="Трансфер", price=500, free_per_team=0
+    )
+    TeamExtra.objects.create(team=team, race_extra=extra, count=3, count_paid=1)
+
+    client.force_login(user)
+    response = client.get(reverse("edit_team", args=[team.id]))
+    config = json.loads(str(response.context["team_form_config_json"]))
+    # the island carries exactly the fields the JS live-total needs
+    assert config["currentPrice"] == 1500
+    assert config["paidPeople"] == 2
+    assert len(config["extras"]) == 1
+    e = config["extras"][0]
+    assert {"code", "name", "price", "freePerTeam", "count", "countPaid"} <= set(e)
+    assert e["price"] == 500
+    assert e["count"] == 3
+    assert e["countPaid"] == 1
+
+    # server formula: (4−2)×1500 + (3−1)×500 = 3000 + 1000 = 4000
+    total, lines = compute_team_charge(team, race)
+    assert total == 4000
+    assert len(lines) == 1
+    assert lines[0].count == 2
+    assert lines[0].unit_price == 500

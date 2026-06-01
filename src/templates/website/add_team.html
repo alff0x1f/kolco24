@@ -158,22 +158,9 @@
                             Состав можно отредактировать до онлайн-брифинга.
                         </div>
 
-                        <!-- доп. карты появляются только для команд 3+ -->
-                        <div class="maps-row" id="mapsRow" style="display:none;">
-                            <div class="maps-txt">
-                                <h4>Дополнительные карты</h4>
-                                <p>На&nbsp;команду&nbsp;— <b>{{ free_maps }}&nbsp;карты бесплатно</b>. Закажите ещё, чтобы у&nbsp;каждого была своя. +{{ map_price }}&nbsp;₽ за&nbsp;карту.</p>
-                            </div>
-                            <div class="stepper" id="mapStepper">
-                                <button type="button" data-step="-1" aria-label="Меньше">−</button>
-                                <span class="val" id="mapVal">0</span>
-                                <button type="button" data-step="1" aria-label="Больше">+</button>
-                            </div>
-                        </div>
-                        <input type="hidden" id="mapCountInput" name="map_count" value="{{ team_form.map_count.value|default:0 }}">
-                        {% if team_form.map_count.errors %}
-                        <span class="hint err">{{ team_form.map_count.errors|join:", " }}</span>
-                        {% endif %}
+                        <!-- доп-услуги: один степпер на каждую активную услугу,
+                             отрисовывается team-form.js из конфиг-острова -->
+                        <div class="extras" id="extrasRows"></div>
                     </div>
 
                     <!-- Подвал: согласие + оплата -->
@@ -219,10 +206,7 @@
                             <span class="lbl">Взнос · <b id="sumCountLbl">0</b>&nbsp;уч. × <span id="sumCost">{{ current_price }}</span>&nbsp;₽</span>
                             <span class="amt" id="sumPeople">0 ₽</span>
                         </div>
-                        <div class="sum-line muted" id="sumMapsLine" style="display:none;">
-                            <span class="lbl">Доп. карты · <b id="sumMapsN">0</b> × {{ map_price }}&nbsp;₽</span>
-                            <span class="amt" id="sumMaps">0 ₽</span>
-                        </div>
+                        <div id="sumExtras"></div>
                         <div class="sum-line muted" id="sumPaidLine" style="display:none;">
                             <span class="lbl">Уже оплачено за <b id="sumPaidN">0</b>&nbsp;чел.</span>
                             <span class="amt" id="sumPaidAmt">0 ₽</span>

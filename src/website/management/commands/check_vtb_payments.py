@@ -63,38 +63,64 @@ class Command(BaseCommand):
                         continue
 
                     payment = self._resolve_race_payment(vtb_payment)
-                    if not payment or payment.status == Payment.STATUS_DONE:
-                        continue
-                    team: Team = payment.team
-                    with transaction.atomic():
-                        if team:
-                            team.paid_people += payment.paid_for
-                            team.paid_sum += payment.payment_amount
-                            team.map_count_paid += payment.map
-                            team.save(
-                                update_fields=[
-                                    "paid_people",
-                                    "paid_sum",
-                                    "map_count_paid",
-                                ]
-                            )
-                            from website.models.race import RegStatus
-
-                            category = team.category2
-                            race = category.race if category else None
-                            if (
-                                race
-                                and race.people_limit
-                                and race.reg_status == RegStatus.OPEN
-                                and race.people_count() >= race.people_limit
-                            ):
-                                race.reg_status = RegStatus.SOLD_OUT
-                                race.save(update_fields=["reg_status"])
-                        payment.status = Payment.STATUS_DONE
-                        payment.order = payment.pk
-                        payment.save(update_fields=["status", "order"])
-                    self.stdout.write(f"Payment {payment.pk} marked as paid")
+                    if self._settle_race_payment(payment):
+                        self.stdout.write(f"Payment {payment.pk} marked as paid")
             sleep(60)
+
+    def _settle_race_payment(self, payment) -> bool:
+        """Credit a confirmed race Payment exactly once.
+
+        The ``status == STATUS_DONE`` guard makes this idempotent: a second
+        call for the same payment short-circuits and credits nothing. Returns
+        ``True`` only when the payment was settled on this call.
+        """
+        if not payment or payment.status == Payment.STATUS_DONE:
+            return False
+        team: Team = payment.team
+        with transaction.atomic():
+            if team:
+                team.paid_people += payment.paid_for
+                team.paid_sum += payment.payment_amount
+                team.save(
+                    update_fields=[
+                        "paid_people",
+                        "paid_sum",
+                    ]
+                )
+                # Credit add-ons from the per-payment snapshots.
+                self._credit_extras(team, payment)
+                from website.models.race import RegStatus
+
+                category = team.category2
+                race = category.race if category else None
+                if (
+                    race
+                    and race.people_limit
+                    and race.reg_status == RegStatus.OPEN
+                    and race.people_count() >= race.people_limit
+                ):
+                    race.reg_status = RegStatus.SOLD_OUT
+                    race.save(update_fields=["reg_status"])
+            payment.status = Payment.STATUS_DONE
+            payment.order = payment.pk
+            payment.save(update_fields=["status", "order"])
+        return True
+
+    def _credit_extras(self, team: Team, payment: Payment) -> None:
+        """Credit add-on counts from this payment's PaymentExtra snapshots.
+
+        Idempotency lives in the command (the outer loop excludes already-PAID
+        VTB payments and the `status == STATUS_DONE` guard short-circuits), not
+        in PaymentExtra — so this must only ever run once per payment.
+        """
+        from apps.race.models import TeamExtra
+
+        for pe in payment.extras.all():
+            te, _ = TeamExtra.objects.get_or_create(team=team, race_extra=pe.race_extra)
+            te.count_paid += pe.count
+            if te.count < te.count_paid:
+                te.count = te.count_paid
+            te.save(update_fields=["count", "count_paid"])
 
     def _resolve_race_payment(self, vtb_payment: VTBPayment):
         # New ORDER_<ulid> payments link via the explicit FK.

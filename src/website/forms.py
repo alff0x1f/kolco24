@@ -342,14 +342,6 @@ class TeamForm(forms.Form):
     dist = forms.CharField(required=False)
     paymentid = forms.CharField(widget=forms.HiddenInput(), required=False)
 
-    map_count = forms.IntegerField(
-        min_value=0,
-        required=False,
-        initial=0,
-        widget=forms.HiddenInput(),
-        label="Дополнительные карты",
-    )
-
     def __init__(
         self,
         race_id,
@@ -364,12 +356,49 @@ class TeamForm(forms.Form):
         # на add передаётся Team() (paid_people=0, category2_id=None).
         self.team = team if team is not None else Team()
         self.bypass_limits = bypass_limits
-        cats = list(Category.objects.filter(race_id=race_id, is_active=True))
-        if current_category_id is not None:
+
+        # Resolve the race defensively: the legacy `my_team` view calls
+        # TeamForm(request.POST or None) — so race_id may be a QueryDict/None.
+        # On a bad id, expose no add-ons and add no extra fields so my_team
+        # never 500s.
+        try:
+            resolved_race_id = int(race_id)
+        except (TypeError, ValueError):
+            resolved_race_id = None
+
+        self.extras = []
+        # count_paid per RaceExtra id, used by clean() to block reductions.
+        self._extra_paid = {}
+        if resolved_race_id is not None:
+            from apps.race.models import RaceExtra
+
+            self.extras = list(
+                RaceExtra.objects.filter(race_id=resolved_race_id, is_active=True)
+            )
+            team_counts = {}
+            if self.team and self.team.pk:
+                for te in self.team.extras.all():
+                    team_counts[te.race_extra_id] = te.count
+                    self._extra_paid[te.race_extra_id] = te.count_paid
+            for extra in self.extras:
+                self.fields[f"extra_{extra.code}"] = forms.IntegerField(
+                    min_value=0,
+                    required=False,
+                    initial=team_counts.get(extra.id, 0),
+                    widget=forms.HiddenInput(),
+                    label=extra.name,
+                )
+
+        cats = list(
+            Category.objects.filter(race_id=resolved_race_id, is_active=True)
+            if resolved_race_id is not None
+            else []
+        )
+        if current_category_id is not None and resolved_race_id is not None:
             active_ids = {c.id for c in cats}
             if current_category_id not in active_ids:
                 current_cat = Category.objects.filter(
-                    id=current_category_id, race_id=race_id
+                    id=current_category_id, race_id=resolved_race_id
                 ).first()
                 if current_cat:
                     cats.insert(0, current_cat)
@@ -441,7 +470,6 @@ class TeamForm(forms.Form):
         self.initial["birth4"] = team.birth4 if team.birth4 else ""
         self.initial["birth5"] = team.birth5 if team.birth5 else ""
         self.initial["birth6"] = team.birth6 if team.birth6 else ""
-        self.initial["map_count"] = team.map_count
         self.initial["dist"] = team.dist
         self.initial["ucount"] = team.ucount
         self.initial["paymentid"] = team.paymentid
@@ -466,8 +494,8 @@ class TeamForm(forms.Form):
         # violations which have their own field-level messages).
         had_errors_before_guards = bool(self.errors)
 
-        # Server-side guards: the segmented control / maps stepper cap values
-        # in the browser only; enforce them here against a crafted POST.
+        # Server-side guards: the segmented control / add-on steppers cap
+        # values in the browser only; enforce them here against a crafted POST.
         category_id = cleaned_data.get("category2_id")
         ucount = cleaned_data.get("ucount")
         category = (
@@ -488,13 +516,24 @@ class TeamForm(forms.Form):
                 ucount_valid = True
 
         if ucount_valid:
-            map_count = cleaned_data.get("map_count") or 0
-            max_maps = max(0, int(ucount) - FREE_MAPS)
-            if int(map_count) > max_maps:
-                self.add_error(
-                    "map_count",
-                    "Слишком много дополнительных карт для такого состава.",
-                )
+            # Per add-on caps: count ≤ max(0, ucount − free_per_team); on edit
+            # the count cannot drop below what's already paid.
+            for extra in self.extras:
+                field = f"extra_{extra.code}"
+                count = int(cleaned_data.get(field) or 0)
+                max_count = max(0, int(ucount) - extra.free_per_team)
+                if count > max_count:
+                    self.add_error(
+                        field,
+                        f"Слишком много «{extra.name}» для такого состава.",
+                    )
+                    continue
+                count_paid = self._extra_paid.get(extra.id, 0)
+                if count < count_paid:
+                    self.add_error(
+                        field,
+                        f"Нельзя уменьшить «{extra.name}»: часть оплачена.",
+                    )
 
         # Capacity gate: лимиты гонки/категории. Суперюзер (bypass_limits)
         # пропускает. Занятость считается по paid_people (см. caveat в плане).
@@ -562,12 +601,6 @@ class TeamForm(forms.Form):
     def clean_birth6(self):
         return self.clean_birth(self.cleaned_data["birth6"])
 
-    def clean_map_count(self):
-        value = self.cleaned_data.get("map_count")
-        if value is None:
-            return 0
-        return value
-
     def save(self):
         if "paymentid" not in self.cleaned_data:
             return False
@@ -594,7 +627,6 @@ class TeamForm(forms.Form):
             team.birth4 = d["birth4"] if d["birth4"].isdigit() else "0"
             team.birth5 = d["birth5"] if d["birth5"].isdigit() else "0"
             team.birth6 = d["birth6"] if d["birth6"].isdigit() else "0"
-            team.map_count = d.get("map_count", 0)
             team.category2 = category2_from_dist(team.dist, team.ucount)
             team.save()
             return team
