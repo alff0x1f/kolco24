@@ -943,18 +943,22 @@ class ConfirmPaymentView(View):
         if team is None:
             payment.save(update_fields=["status", "balance", "order", "recipient"])
             return HttpResponseRedirect("/payments?status=draft_with_info")
-        team.paid_people += payment.paid_for
-        team.paid_sum += payment.payment_amount
 
         recipient = request.POST.get("recipient", "")
         if recipient:
             payment.recipient = SbpPaymentRecipient.objects.get(pk=recipient)
 
         with transaction.atomic():
-            team.save(update_fields=["paid_people", "paid_sum"])
-            # Credit add-ons from per-payment snapshots.
             from django.db.models import F
             from django.db.models.functions import Greatest
+
+            # Atomic SQL-level increment avoids a lost-update race when two
+            # admins confirm different payments for the same team concurrently.
+            Team.objects.filter(pk=team.pk).update(
+                paid_people=F("paid_people") + payment.paid_for,
+                paid_sum=F("paid_sum") + payment.payment_amount,
+            )
+            # Credit add-ons from per-payment snapshots.
 
             from apps.race.models import TeamExtra
 

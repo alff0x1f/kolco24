@@ -289,10 +289,18 @@ class PaymentsYa(models.Model):
             paid_for = withdraw_amount / payment.cost_per_person
         with transaction.atomic():
             if payment.team:
-                payment.team.paid_people += paid_for
-                payment.team.paid_sum += withdraw_amount + payment.additional_charge
-                payment.team.additional_charge -= payment.additional_charge
-                payment.team.save()
+                from django.db.models import F
+
+                # Atomic SQL-level increment avoids a lost-update race if two
+                # Yandex IPN callbacks arrive for payments on the same team.
+                Team.objects.filter(pk=payment.team.pk).update(
+                    paid_people=F("paid_people") + paid_for,
+                    paid_sum=F("paid_sum")
+                    + withdraw_amount
+                    + payment.additional_charge,
+                    additional_charge=F("additional_charge")
+                    - payment.additional_charge,
+                )
                 # Авто sold_out при достижении лимита гонки (Option B: без
                 # авто-реоткрытия). Caveat: занятость считается по paid_people,
                 # который растёт только при подтверждении оплаты — параллельные

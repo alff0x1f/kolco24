@@ -81,13 +81,11 @@ class Command(BaseCommand):
         team: Team = payment.team
         with transaction.atomic():
             if team:
-                team.paid_people += payment.paid_for
-                team.paid_sum += payment.payment_amount
-                team.save(
-                    update_fields=[
-                        "paid_people",
-                        "paid_sum",
-                    ]
+                # Atomic SQL-level increment avoids a lost-update race when
+                # two poller instances process different payments for the same team.
+                Team.objects.filter(pk=team.pk).update(
+                    paid_people=F("paid_people") + payment.paid_for,
+                    paid_sum=F("paid_sum") + payment.payment_amount,
                 )
                 # Credit add-ons from the per-payment snapshots.
                 self._credit_extras(team, payment)
