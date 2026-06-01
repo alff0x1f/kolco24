@@ -596,3 +596,36 @@ def test_email_backend_authenticates_active_user(django_user_model):
 
     assert result is not None
     assert result.email == "active@example.com"
+
+
+# ── AddTeam anon redirect → passwordless start ──────────────────────────
+
+
+@pytest.mark.django_db
+def test_add_team_anon_get_redirects_to_account_start(client):
+    from website.models import Race
+
+    race = Race.objects.create(name="Anon Race", code=900, slug="anon-race")
+    add_url = reverse("add_team", args=[race.slug])
+
+    resp = client.get(add_url)
+
+    assert resp.status_code == 302
+    assert resp.url.startswith(reverse("account_start"))
+    assert f"next={add_url}" in resp.url
+    assert not resp.url.startswith(reverse("login"))
+
+
+@pytest.mark.django_db
+def test_add_team_anon_post_redirects_to_account_start(client):
+    from website.models import Race
+
+    race = Race.objects.create(name="Anon Race", code=901, slug="anon-race-post")
+    add_url = reverse("add_team", args=[race.slug])
+
+    resp = client.post(add_url, {})
+
+    assert resp.status_code == 302
+    assert resp.url.startswith(reverse("account_start"))
+    assert f"next={add_url}" in resp.url
+    assert not resp.url.startswith(reverse("login"))

@@ -147,13 +147,13 @@ PENDING_NEXT_KEY, ""))` and add `"race": race`. `MagicLinkView` unchanged.
 - Modify: `src/website/views/views_.py`
 - Modify: `src/apps/accounts/tests.py`
 
-- [ ] in `AddTeam.get` (~1596) change the anon redirect target from `reverse("login")`
+- [x] in `AddTeam.get` (~1596) change the anon redirect target from `reverse("login")`
       to `reverse("account_start")`, keeping `+ f"?next={request.path}"`
-- [ ] in `AddTeam.post` (~1615) make the same change
-- [ ] write test: anon `GET add_team` now 302s to a URL containing
+- [x] in `AddTeam.post` (~1615) make the same change
+- [x] write test: anon `GET add_team` now 302s to a URL containing
       `reverse("account_start")` and `?next=<add_team path>` (and NOT `reverse("login")`)
-- [ ] write test: anon `POST add_team` likewise 302s to `account_start` with `?next=`
-- [ ] run `uv run pytest src/apps/accounts/tests.py` (from `src/`) — must pass before
+- [x] write test: anon `POST add_team` likewise 302s to `account_start` with `?next=`
+- [x] run `uv run pytest src/apps/accounts/tests.py` (from `src/`) — must pass before
       next task
 
 ### Task 2: Add `_race_from_next` helper + wire race context into start/verify views

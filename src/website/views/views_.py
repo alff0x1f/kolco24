@@ -1593,7 +1593,9 @@ class AddTeam(View):
         race = get_object_or_404(Race, slug=race_slug)
 
         if not request.user.is_authenticated:
-            return HttpResponseRedirect(reverse("login") + f"?next={request.path}")
+            return HttpResponseRedirect(
+                reverse("account_start") + f"?next={request.path}"
+            )
         form = TeamForm(race.id)
         return render(
             request,
@@ -1612,7 +1614,9 @@ class AddTeam(View):
 
     def post(self, request, race_slug):
         if not request.user.is_authenticated:
-            return HttpResponseRedirect(reverse("login") + f"?next={request.path}")
+            return HttpResponseRedirect(
+                reverse("account_start") + f"?next={request.path}"
+            )
 
         race = get_object_or_404(Race, slug=race_slug)
         if not race.is_teams_editable:
