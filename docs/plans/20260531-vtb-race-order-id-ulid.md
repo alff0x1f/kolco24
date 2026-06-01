@@ -207,18 +207,18 @@ the `except` catches the "no FK set" case. The `SPUTNIK_` donation branch is unc
 - Modify: `src/website/management/commands/check_vtb_payments.py`
 - Modify: `src/website/tests.py`
 
-- [ ] Add `_resolve_race_payment(self, vtb_payment)` to the command (see Technical Details).
-- [ ] Replace the inline parse block (lines 64-69: the `# order_id has format ORDER_<payment_id>`
+- [x] Add `_resolve_race_payment(self, vtb_payment)` to the command (see Technical Details).
+- [x] Replace the inline parse block (lines 64-69: the `# order_id has format ORDER_<payment_id>`
       comment + `int(order_id.split("_")[-1])` + `Payment.objects.filter(pk=...).first()`) with
       `payment = self._resolve_race_payment(vtb_payment)`; keep the existing
       `if not payment or payment.status == Payment.STATUS_DONE: continue` guard and the team-update
       logic that follows. The `SPUTNIK_` donation branch stays unchanged.
-- [ ] Write a test: `Payment` linked to a PAID `VTBPayment` via the FK (ULID order_id) →
+- [x] Write a test: `Payment` linked to a PAID `VTBPayment` via the FK (ULID order_id) →
       `_resolve_race_payment` returns that `Payment`.
-- [ ] Write a test: legacy `VTBPayment(order_id="ORDER_<id>")` with **no** FK set →
+- [x] Write a test: legacy `VTBPayment(order_id="ORDER_<id>")` with **no** FK set →
       `_resolve_race_payment` falls back to the int parse and returns the matching `Payment`;
       an unparseable order_id (e.g. a stray non-numeric tail) returns `None`.
-- [ ] Run the new tests — must pass.
+- [x] Run the new tests — must pass.
 
 ### Task 5: Verify acceptance criteria
 

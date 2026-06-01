@@ -1039,6 +1039,59 @@ def test_add_team_mints_ulid_order_id_and_links_fk(
     assert payment.vtb_payment.order_id == order_id
 
 
+# --- Reconciliation: _resolve_race_payment (FK + legacy fallback) ---
+
+
+def _make_vtb_payment(order_id):
+    return VTBPayment.objects.create(
+        order_id=order_id,
+        amount_value="1000.00",
+        status="PAID",
+    )
+
+
+@pytest.mark.django_db
+def test_resolve_race_payment_via_fk():
+    from website.management.commands.check_vtb_payments import Command
+
+    vtb_payment = _make_vtb_payment(VTBPayment.new_order_id("ORDER"))
+    payment = Payment.objects.create(
+        payment_method="sbp2",
+        payment_amount=1000,
+        paid_for=2,
+        status=Payment.STATUS_DRAFT,
+        vtb_payment=vtb_payment,
+    )
+
+    resolved = Command()._resolve_race_payment(vtb_payment)
+    assert resolved == payment
+
+
+@pytest.mark.django_db
+def test_resolve_race_payment_legacy_fallback():
+    from website.management.commands.check_vtb_payments import Command
+
+    payment = Payment.objects.create(
+        payment_method="sbp2",
+        payment_amount=1000,
+        paid_for=2,
+        status=Payment.STATUS_DRAFT,
+    )
+    vtb_payment = _make_vtb_payment(f"ORDER_{payment.id}")
+
+    resolved = Command()._resolve_race_payment(vtb_payment)
+    assert resolved == payment
+
+
+@pytest.mark.django_db
+def test_resolve_race_payment_unparseable_returns_none():
+    from website.management.commands.check_vtb_payments import Command
+
+    vtb_payment = _make_vtb_payment("ORDER_notanumber")
+
+    assert Command()._resolve_race_payment(vtb_payment) is None
+
+
 # --- Task 5: add_team.html rewritten on base-2 ---
 
 

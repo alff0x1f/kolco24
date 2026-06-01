@@ -62,12 +62,7 @@ class Command(BaseCommand):
                         self._process_donation(vtb_payment)
                         continue
 
-                    # order_id has format ORDER_<payment_id>
-                    try:
-                        payment_id = int(vtb_payment.order_id.split("_")[-1])
-                    except (ValueError, AttributeError):
-                        continue
-                    payment: Payment = Payment.objects.filter(pk=payment_id).first()
+                    payment = self._resolve_race_payment(vtb_payment)
                     if not payment or payment.status == Payment.STATUS_DONE:
                         continue
                     team: Team = payment.team
@@ -100,6 +95,19 @@ class Command(BaseCommand):
                         payment.save(update_fields=["status", "order"])
                     self.stdout.write(f"Payment {payment.pk} marked as paid")
             sleep(60)
+
+    def _resolve_race_payment(self, vtb_payment: VTBPayment):
+        # New ORDER_<ulid> payments link via the explicit FK.
+        try:
+            return vtb_payment.race_payment
+        except Payment.DoesNotExist:
+            pass
+        # Legacy fallback: order_id == "ORDER_<payment_id>".
+        try:
+            payment_id = int(vtb_payment.order_id.split("_")[-1])
+        except (ValueError, AttributeError):
+            return None
+        return Payment.objects.filter(pk=payment_id).first()
 
     def _process_donation(self, vtb_payment: VTBPayment) -> None:
         """Create or update MemberDonation when a SPUTNIK_* payment is confirmed."""
