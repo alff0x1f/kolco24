@@ -360,12 +360,12 @@ appended as a query param. Send failure is logged; the user still reaches verify
 - Modify: `CLAUDE.md`
 - Modify: `docs/plans/20260601-apps-accounts-passwordless.md` (this file)
 
-- [ ] add a CLAUDE.md "Auth" note: auth now lives in `apps.accounts` (paths
+- [x] add a CLAUDE.md "Auth" note: auth now lives in `apps.accounts` (paths
       `/accounts/*`, flat URL names unchanged); the passwordless flow
       (`account_start`/`account_verify`/`magic_link`), `EmailVerification` model, and
       the `website/auth.py` + `website/forms.py` re-export shims
-- [ ] update the CLAUDE.md "Architecture/Apps" list to mention `apps.accounts`
-- [ ] move this plan: `mkdir -p docs/plans/completed && mv
+- [x] update the CLAUDE.md "Architecture/Apps" list to mention `apps.accounts`
+- [x] move this plan: `mkdir -p docs/plans/completed && mv
       docs/plans/20260601-apps-accounts-passwordless.md docs/plans/completed/`
 
 ## Post-Completion
