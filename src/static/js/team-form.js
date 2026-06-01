@@ -227,15 +227,6 @@
     render();
   }
 
-  function clampExtras() {
-    // recompute caps after a team-size change
-    extras.forEach(function (item) {
-      var max = extraMax(item);
-      if (item.count > max) item.count = max;
-      if (item.count < item.countPaid) item.count = item.countPaid;
-    });
-  }
-
   function counts() {
     var opt = category && category.selectedOptions[0];
     return ((opt && opt.dataset.counts) || "2")
@@ -366,7 +357,6 @@
         }, 240);
       }
     });
-    clampExtras();
     render();
   }
 
@@ -377,9 +367,9 @@
     });
 
     var peopleGross = ucount * COST;
-    // already-paid credit, valued at the current price (mirrors the backend
-    // race-fee term: (ucount − paidPeople)·price)
-    var due = Math.max(0, peopleGross - PAID_PEOPLE * COST);
+    // race-fee term (may be negative when overpaid); max(0,...) applied after
+    // all extras are summed, mirroring compute_team_charge in pricing.py
+    var due = peopleGross - PAID_PEOPLE * COST;
 
     extras.forEach(function (item) {
       var max = extraMax(item);
@@ -404,6 +394,7 @@
         }
       }
     });
+    due = Math.max(0, due);
 
     if (sumCountLbl) sumCountLbl.textContent = ucount;
     if (sumCost) sumCost.textContent = fmt(COST);

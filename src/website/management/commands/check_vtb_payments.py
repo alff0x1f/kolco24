@@ -56,7 +56,7 @@ class Command(BaseCommand):
                         .get("description", "")
                     )
                     vtb_payment.save(update_fields=["status", "status_description"])
-                    self.stdout.write(f"Payment {vtb_payment.pk} marked as paid")
+                    self.stdout.write(f"VTBPayment {vtb_payment.pk} status→PAID")
 
                     if vtb_payment.order_id.startswith(f"{self.donate_prefix}_"):
                         self._process_donation(vtb_payment)

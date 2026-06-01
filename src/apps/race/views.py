@@ -470,7 +470,8 @@ def _reconcile_extras(race, cleaned):
             instance = by_code.get(row["code"])
         if instance is None:
             instance = RaceExtra(race=race, code=row["code"])
-        instance.code = row["code"]
+        if not instance.pk:
+            instance.code = row["code"]
         instance.name = row["name"]
         instance.price = row["price"]
         instance.free_per_team = row["free_per_team"]

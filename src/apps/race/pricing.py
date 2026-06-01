@@ -97,8 +97,6 @@ def create_team_payment(request, team, race):
         paid_for=int(team.ucount) - team.paid_people,
         status="draft",
     )
-    assert payment.payment_method == "sbp2"
-
     for line in lines:
         PaymentExtra.objects.create(
             payment=payment,

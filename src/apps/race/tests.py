@@ -1850,11 +1850,25 @@ def test_upsert_team_extras_missing_field_defaults_zero():
     transfer = RaceExtra.objects.create(
         race=race, code="transfer", name="Трансфер", price=500
     )
+    # Pre-create with a non-zero count to prove the absent key zeroes it out.
+    TeamExtra.objects.create(team=team, race_extra=transfer, count=5)
 
-    # No "extra_transfer" key, and a None value, both coerce to 0.
+    # No "extra_transfer" key → count must be written back to 0.
     upsert_team_extras(team, {}, race)
     te = TeamExtra.objects.get(team=team, race_extra=transfer)
     assert te.count == 0
+
+
+@pytest.mark.django_db
+def test_upsert_team_extras_skips_inactive_extras():
+    _, race, team = _priced_team("up3", cost=1000)
+    inactive = RaceExtra.objects.create(
+        race=race, code="transfer", name="Трансфер", price=500, is_active=False
+    )
+
+    # Submitting a value for an inactive extra must not create a TeamExtra row.
+    upsert_team_extras(team, {"extra_transfer": 2}, race)
+    assert not TeamExtra.objects.filter(team=team, race_extra=inactive).exists()
 
 
 @pytest.mark.django_db
@@ -1944,6 +1958,42 @@ def test_race_edit_post_extra_in_use_deactivated_not_deleted():
     extra.refresh_from_db()
     # In-use row is softly deactivated, never deleted (PROTECT backstop).
     assert extra.is_active is False
+
+
+@pytest.mark.django_db
+def test_race_edit_post_extra_cross_race_id_treated_as_new():
+    user = User.objects.create_user(username="xr1", password="p", email="xr1@e.com")
+    race = _make_race(slug="xr1", code="xr1")
+    RaceAdmin.objects.create(race=race, user=user, role=RaceAdmin.Role.ADMIN)
+    other = _make_race(slug="xr1b", code="xr1b")
+    other_extra = RaceExtra.objects.create(
+        race=other, code="transfer", name="Трансфер", price=500
+    )
+
+    # Submit the other race's extra id — must create a new row, not hijack theirs.
+    extras = json.dumps(
+        [
+            {
+                "id": other_extra.id,
+                "code": "transfer",
+                "name": "Трансфер",
+                "price": 100,
+                "free_per_team": 0,
+                "is_active": True,
+            }
+        ]
+    )
+    data = _post_data(code="xr1", slug="xr1", extras_json=extras)
+    resp = _edit_post(f"/race/{race.slug}/edit/", user, data, race_slug=race.slug)
+
+    assert resp.status_code == 302
+    # The other race's extra is untouched.
+    other_extra.refresh_from_db()
+    assert other_extra.race_id == other.id and other_extra.price == 500
+    # Our race got a brand-new extra instead of hijacking the other's.
+    new_extra = RaceExtra.objects.get(race=race, code="transfer")
+    assert new_extra.id != other_extra.id
+    assert new_extra.price == 100
 
 
 @pytest.mark.django_db
