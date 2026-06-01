@@ -12,6 +12,7 @@
   {% csrf_token %}
   <input type="hidden" name="categories_json" id="categoriesJson">
   <input type="hidden" name="price_tiers_json" id="priceTiersJson">
+  <input type="hidden" name="extras_json" id="extrasJson">
   <div class="container">
 
     <!-- Breadcrumb -->
@@ -255,6 +256,37 @@
           </div>
         </section>
 
+        <!-- ── Доп-услуги ── -->
+        <section class="card">
+          <div class="card-head">
+            <h2>Доп-услуги</h2>
+            <span class="aux"><span id="extraCount">0</span> услуг</span>
+          </div>
+          <div class="card-body">
+            <div class="extras" id="extras">
+              <div class="extras-headrow">
+                <span></span>
+                <span>Код</span>
+                <span>Название</span>
+                <span>Цена, ₽</span>
+                <span>Бесплатно</span>
+                <span>Активна</span>
+                <span></span>
+              </div>
+              <!-- rows injected by race_form.js from #extras-data -->
+            </div>
+            <div class="extras-foot">
+              <button class="add-extra" type="button" id="addExtra">
+                <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M8 3.5v9M3.5 8h9"/></svg>
+                Добавить услугу
+              </button>
+            </div>
+            <div class="field" style="margin: 14px 0 0;">
+              <span class="field-hint">Код — латиница и «_» (например <code>transfer</code>), задаётся при создании и потом не меняется. «Бесплатно» — сколько штук входит в&nbsp;команду бесплатно (карты — 2). Услугу, которую уже купили, нельзя удалить — она деактивируется.</span>
+            </div>
+          </div>
+        </section>
+
       </div>
 
       <!-- ─────────── SIDEBAR ─────────── -->
@@ -347,8 +379,10 @@
 
 <script id="categories-data" type="application/json">{{ categories_data }}</script>
 <script id="price-tiers-data" type="application/json">{{ price_tiers_data }}</script>
+<script id="extras-data" type="application/json">{{ extras_data }}</script>
 <script id="category-errors" type="application/json">{{ category_errors }}</script>
 <script id="price-tier-errors" type="application/json">{{ price_tier_errors }}</script>
+<script id="extra-errors" type="application/json">{{ extra_errors }}</script>
 {% endblock %}
 
 {% block footer_js_include %}

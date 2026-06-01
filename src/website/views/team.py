@@ -5,9 +5,9 @@ from django.shortcuts import render
 from django.urls import reverse
 from django.views import View
 
-from vtb.client import VTBClient
-from website.forms import MAP_PRICE, TeamForm, TeamMemberMoveForm
-from website.models import Payment, Team, TeamMemberMove, VTBPayment, VTBPreparedPayment
+from apps.race.pricing import create_team_payment, upsert_team_extras
+from website.forms import TeamForm, TeamMemberMoveForm
+from website.models import Payment, Team, TeamMemberMove
 from website.models.race import RegStatus
 from website.views.views_ import build_team_form_context
 
@@ -41,9 +41,8 @@ class EditTeamView(View):
             "birth4": team.birth4,
             "birth5": team.birth5,
             "birth6": team.birth6,
-            "map_count": team.map_count,
         }
-        form = TeamForm(team.category2.race_id, initial=initial)
+        form = TeamForm(team.category2.race_id, initial=initial, team=team)
 
         # Disable all form fields
         if not team.category2.race.is_teams_editable and not request.user.is_superuser:
@@ -131,6 +130,7 @@ class EditTeamView(View):
                             team,
                             is_edit=True,
                             bypass_limits=request.user.is_superuser,
+                            form=form,
                         ),
                     },
                 )
@@ -146,85 +146,20 @@ class EditTeamView(View):
                 if birth_field in form.cleaned_data:
                     setattr(team, birth_field, form.cleaned_data.get(birth_field))
 
-            new_map_count = int(form.cleaned_data.get("map_count") or 0)
-            if new_map_count < team.map_count_paid:
-                form.add_error(
-                    "map_count",
-                    "Нельзя уменьшить количество карт: часть уже оплачена.",
-                )
-                return render(
-                    request,
-                    "website/edit_team.html",
-                    {
-                        "race": race,
-                        "race_id": race.id,
-                        "team_form": form,
-                        "team": team,
-                        "action": reverse("edit_team", args=[team_id]),
-                        "payments": Payment.objects.filter(
-                            team=team, status="done"
-                        ).order_by("id"),
-                        "member_moves": TeamMemberMove.objects.filter(
-                            Q(from_team=team) | Q(to_team=team)
-                        ).order_by("id"),
-                        "team_move_form": TeamMemberMoveForm(
-                            race_id=team.category2.race_id
-                        ),
-                        **build_team_form_context(
-                            race,
-                            team,
-                            is_edit=True,
-                            bypass_limits=request.user.is_superuser,
-                        ),
-                    },
-                )
             if "category2_id" in form.cleaned_data:
                 team.category2_id = form.cleaned_data.get("category2_id")
-            if "map_count" in form.cleaned_data:
-                team.map_count = new_map_count
 
-            team.save()
+            with transaction.atomic():
+                team.save()
+                upsert_team_extras(team, form.cleaned_data, race)
 
             if race.reg_status != RegStatus.OPEN:
                 return HttpResponseRedirect(reverse("my_teams", args=[race.slug]))
 
-            # payment
-            cost_now = race.current_price
-            cost = (int(team.ucount) - team.paid_people) * cost_now + (
-                int(team.map_count) - team.map_count_paid
-            ) * MAP_PRICE
-            if cost > 0:
-                payment = Payment.objects.create(
-                    owner=request.user,
-                    team=team,
-                    payment_method="sbp2",
-                    payment_amount=cost,
-                    payment_with_discount=cost,
-                    cost_per_person=cost_now,
-                    paid_for=int(team.ucount) - team.paid_people,
-                    status="draft",
-                    map=int(team.map_count) - team.map_count_paid,
-                )
-                vtb_client = VTBClient()
-                vtb_client._ensure_token()
-
-                payload = vtb_client.create_order(
-                    order_id=VTBPayment.new_order_id("ORDER"),
-                    order_name=f"Оплата за команду на Кольцо 24 ({payment.id})",
-                    amount_value=cost,
-                    return_payment_data="sbp",
-                )
-                with transaction.atomic():
-                    vtb_payment = VTBPayment.from_vtb_payload(payload)
-                    payment.vtb_payment = vtb_payment
-                    payment.save(update_fields=["vtb_payment"])
-
-                prepared_payment = VTBPreparedPayment.objects.filter(
-                    payment=vtb_payment
-                ).first()
-                if prepared_payment and prepared_payment.url:
-                    return HttpResponseRedirect(prepared_payment.url)
-                return HttpResponseRedirect(vtb_payment.pay_url)
+            # payment (race fee + add-on deltas, one VTB/SBP order)
+            response = create_team_payment(request, team, race)
+            if response is not None:
+                return response
 
             return HttpResponseRedirect(
                 reverse("teams2", args=[race.slug, team.category2_id])
@@ -252,6 +187,7 @@ class EditTeamView(View):
                     team,
                     is_edit=True,
                     bypass_limits=request.user.is_superuser,
+                    form=form,
                 ),
             },
         )

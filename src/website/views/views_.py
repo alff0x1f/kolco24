@@ -29,11 +29,9 @@ from django.views import View
 from django.views.decorators.csrf import csrf_exempt
 from openpyxl import load_workbook
 
-from vtb.client import VTBClient
+from apps.race.pricing import create_team_payment, upsert_team_extras
 from website.forms import (
     DUPLICATE_EMAIL_MSG,
-    FREE_MAPS,
-    MAP_PRICE,
     BreakfastForm,
     NewsPostForm,
     PageForm,
@@ -63,7 +61,6 @@ from website.models.race import Category, RegStatus
 from website.sync_xlsx import import_file_xlsx
 
 from ..models.news import MenuItem, Page
-from ..models.vtb import VTBPayment, VTBPreparedPayment
 
 logger = logging.getLogger(__name__)
 
@@ -1554,18 +1551,49 @@ def build_category_options(race_id, current_category_id=None, team=None):
     return options
 
 
-def build_team_form_context(race, team, is_edit=False, bypass_limits=False):
-    """Unified context shared by the add and edit team forms."""
+def build_team_form_context(race, team, is_edit=False, bypass_limits=False, form=None):
+    """Unified context shared by the add and edit team forms.
+
+    The ``extras`` list (config island) mirrors ``compute_team_charge`` —
+    see ``apps/race/pricing.py``. Keep the per-extra ``price``/``freePerTeam``/
+    ``count``/``countPaid`` fields and the live-total formula in sync with
+    ``src/static/js/team-form.js``.
+    """
     current_category_id = getattr(team, "category2_id", None)
     price_tiers = race.price_tier_ladder()
     current_price = race.current_price
     race_remaining = race.remaining_people(exclude_team=team)
+
+    team_extra_map = {}
+    if team and team.pk:
+        team_extra_map = {te.race_extra_id: te for te in team.extras.all()}
+    extras_config = []
+    for extra in race.extras.filter(is_active=True):
+        te = team_extra_map.get(extra.id)
+        count = te.count if te else 0
+        # Preserve a submitted/invalid POST value across re-render when bound.
+        if form is not None:
+            field = f"extra_{extra.code}"
+            if field in form.fields:
+                try:
+                    count = int(form[field].value() or 0)
+                except (TypeError, ValueError):
+                    count = te.count if te else 0
+        extras_config.append(
+            {
+                "code": extra.code,
+                "name": extra.name,
+                "price": extra.price,
+                "freePerTeam": extra.free_per_team,
+                "count": count,
+                "countPaid": te.count_paid if te else 0,
+            }
+        )
+
     config = {
         "currentPrice": current_price,
         "paidPeople": team.paid_people,
-        "mapCountPaid": team.map_count_paid,
-        "mapPrice": MAP_PRICE,
-        "freeMaps": FREE_MAPS,
+        "extras": extras_config,
         "isEdit": is_edit,
         "raceRemaining": race_remaining,
         "currentCategoryId": current_category_id,
@@ -1574,13 +1602,11 @@ def build_team_form_context(race, team, is_edit=False, bypass_limits=False):
     return {
         "current_price": current_price,
         "paid_people": team.paid_people,
-        "map_count_paid": team.map_count_paid,
         "price_tiers": price_tiers,
         "reg_open": race.reg_status == RegStatus.OPEN,
         "is_editable": race.is_teams_editable,
         "reg_status": race.reg_status,
-        "map_price": MAP_PRICE,
-        "free_maps": FREE_MAPS,
+        "extras": extras_config,
         "category_options": build_category_options(
             race.id, current_category_id, team=team
         ),
@@ -1636,61 +1662,26 @@ class AddTeam(View):
         data["paymentid"] = "%016x" % random.randrange(16**16)  # legacy
         form = TeamForm(race.id, data, bypass_limits=request.user.is_superuser)
         if form.is_valid():
-            # save team
+            # save team (extra_<code> fields are add-ons, not Team columns)
+            team_fields = {
+                k: v for k, v in form.cleaned_data.items() if not k.startswith("extra_")
+            }
             team: Team = Team.objects.create(
                 year=race.date.year,
                 owner_id=request.user.id,
-                **form.cleaned_data,
+                **team_fields,
             )
+
+            upsert_team_extras(team, form.cleaned_data, race)
 
             if race.reg_status != RegStatus.OPEN:
                 return HttpResponseRedirect(reverse("my_teams", args=[race.slug]))
 
-            # payment
-            cost_now = race.current_price
-            cost = (int(team.ucount) - team.paid_people) * cost_now + (
-                int(team.map_count) - team.map_count_paid
-            ) * MAP_PRICE
-
-            if cost < 0:
-                # в теории, не может быть, тк это новая команда и она не
-                # может быть оплачена
-                cost = 0
-
-            if cost == 0:
+            # payment (race fee + add-on deltas, one VTB/SBP order)
+            response = create_team_payment(request, team, race)
+            if response is None:
                 return HttpResponseRedirect(reverse("my_teams", args=[race.slug]))
-
-            payment = Payment.objects.create(
-                owner=request.user,
-                team=team,
-                payment_method=payment_method,
-                payment_amount=cost,
-                payment_with_discount=cost,
-                cost_per_person=cost_now,
-                paid_for=int(team.ucount) - team.paid_people,
-                status="draft",
-                map=int(team.map_count) - team.map_count_paid,
-            )
-            vtb_client = VTBClient()
-            vtb_client._ensure_token()
-
-            payload = vtb_client.create_order(
-                order_id=VTBPayment.new_order_id("ORDER"),
-                order_name=f"Оплата за команду на Кольцо 24 ({payment.id})",
-                amount_value=cost,
-                return_payment_data="sbp",
-            )
-            with transaction.atomic():
-                vtb_payment = VTBPayment.from_vtb_payload(payload)
-                payment.vtb_payment = vtb_payment
-                payment.save(update_fields=["vtb_payment"])
-
-            prepared_payment = VTBPreparedPayment.objects.filter(
-                payment=vtb_payment
-            ).first()
-            if prepared_payment and prepared_payment.url:
-                return HttpResponseRedirect(prepared_payment.url)
-            return HttpResponseRedirect(vtb_payment.pay_url)
+            return response
 
         return render(
             request,
@@ -1702,7 +1693,7 @@ class AddTeam(View):
                 "team": Team(),
                 "action": reverse("add_team", args=[race.slug]),
                 **build_team_form_context(
-                    race, Team(), bypass_limits=request.user.is_superuser
+                    race, Team(), bypass_limits=request.user.is_superuser, form=form
                 ),
             },
         )

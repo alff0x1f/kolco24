@@ -512,8 +512,8 @@ def test_race_page_anon_sees_login_and_add_button(client):
 
     assert resp.status_code == 200
     html = resp.content.decode()
-    assert "Войти и добавить команду" in html
-    assert "Добавить команду" not in html.replace("Войти и добавить команду", "")
+    assert "Зарегистрировать команду" in html
+    assert "Добавить команду" not in html
     # The button points at add_team; the view routes anon users through the
     # passwordless account_start flow (not password login).
     assert reverse("add_team", args=[race.slug]) in html
@@ -534,7 +534,7 @@ def test_race_page_authenticated_sees_plain_add_button(client):
     assert resp.status_code == 200
     html = resp.content.decode()
     assert "Добавить команду" in html
-    assert "Войти и добавить команду" not in html
+    assert "Зарегистрировать команду" not in html
 
 
 @pytest.mark.django_db
@@ -1461,3 +1461,666 @@ def test_teams_context_includes_race_remaining():
     context = RaceTeamsView.build_context(race, AnonymousUser())
 
     assert context["race_remaining"] == 5
+
+
+# --- Add-on models (RaceExtra / TeamExtra / PaymentExtra) ---
+
+import pytest as _pytest  # noqa: E402
+from django.db import IntegrityError  # noqa: E402
+from django.db.models import ProtectedError  # noqa: E402
+
+from apps.race.models import PaymentExtra, RaceExtra, TeamExtra  # noqa: E402
+from website.models.models import Payment  # noqa: E402
+
+
+@pytest.mark.django_db
+def test_race_extra_create_and_str():
+    race = _make_race(slug="ex-race", code="exrace")
+    extra = RaceExtra.objects.create(
+        race=race, code="transfer", name="Трансфер", price=500, free_per_team=0
+    )
+    assert extra.is_active is True
+    assert extra.order == 0
+    assert "Трансфер" in str(extra)
+    assert "transfer" in str(extra)
+
+
+@pytest.mark.django_db
+def test_race_extra_unique_together():
+    race = _make_race(slug="ex-uniq", code="exuniq")
+    RaceExtra.objects.create(race=race, code="map", name="Карты", price=200)
+    with _pytest.raises(IntegrityError):
+        RaceExtra.objects.create(race=race, code="map", name="Карты 2", price=300)
+
+
+@pytest.mark.django_db
+def test_race_extra_default_ordering():
+    race = _make_race(slug="ex-ord", code="exord")
+    RaceExtra.objects.create(race=race, code="b", name="B", order=2)
+    RaceExtra.objects.create(race=race, code="a", name="A", order=1)
+    RaceExtra.objects.create(race=race, code="c", name="C", order=0)
+    codes = list(race.extras.values_list("code", flat=True))
+    assert codes == ["c", "a", "b"]
+
+
+@pytest.mark.django_db
+def test_team_extra_create_and_unique_together():
+    owner = User.objects.create_user(
+        username="te1", password="p", email="te1@example.com"
+    )
+    race = _make_race(slug="te-race", code="terace")
+    cat = _make_category(race)
+    team = _make_team(owner, cat)
+    extra = RaceExtra.objects.create(race=race, code="map", name="Карты", price=200)
+    te = TeamExtra.objects.create(team=team, race_extra=extra, count=3, count_paid=1)
+    assert str(te)
+    with _pytest.raises(IntegrityError):
+        TeamExtra.objects.create(team=team, race_extra=extra, count=1)
+
+
+@pytest.mark.django_db
+def test_team_extra_protect_blocks_race_extra_delete():
+    owner = User.objects.create_user(
+        username="te2", password="p", email="te2@example.com"
+    )
+    race = _make_race(slug="te-prot", code="teprot")
+    cat = _make_category(race)
+    team = _make_team(owner, cat)
+    extra = RaceExtra.objects.create(race=race, code="map", name="Карты", price=200)
+    TeamExtra.objects.create(team=team, race_extra=extra, count=2)
+    with _pytest.raises(ProtectedError):
+        extra.delete()
+
+
+@pytest.mark.django_db
+def test_payment_extra_create_and_str():
+    owner = User.objects.create_user(
+        username="pe1", password="p", email="pe1@example.com"
+    )
+    race = _make_race(slug="pe-race", code="perace")
+    cat = _make_category(race)
+    team = _make_team(owner, cat)
+    extra = RaceExtra.objects.create(race=race, code="map", name="Карты", price=200)
+    payment = Payment.objects.create(owner=owner, team=team, payment_method="sbp2")
+    pe = PaymentExtra.objects.create(
+        payment=payment, race_extra=extra, count=2, unit_price=200
+    )
+    assert str(pe)
+    assert pe.unit_price == 200
+
+
+@pytest.mark.django_db
+def test_payment_extra_protect_blocks_race_extra_delete():
+    owner = User.objects.create_user(
+        username="pe2", password="p", email="pe2@example.com"
+    )
+    race = _make_race(slug="pe-prot", code="peprot")
+    cat = _make_category(race)
+    team = _make_team(owner, cat)
+    extra = RaceExtra.objects.create(race=race, code="map", name="Карты", price=200)
+    payment = Payment.objects.create(owner=owner, team=team, payment_method="sbp2")
+    PaymentExtra.objects.create(payment=payment, race_extra=extra, count=2)
+    with _pytest.raises(ProtectedError):
+        extra.delete()
+
+
+# --- Data migration: maps → extras (0002) ---
+
+import importlib  # noqa: E402
+
+from django.apps import apps as _django_apps  # noqa: E402
+
+_maps_mig = importlib.import_module("apps.race.migrations.0002_migrate_maps_to_extras")
+
+
+def _run_maps_forward():
+    _maps_mig.forward(_django_apps, None)
+
+
+def _run_maps_reverse():
+    _maps_mig.reverse(_django_apps, None)
+
+
+@pytest.mark.django_db
+def test_maps_migration_backfills_race_team_payment_extras():
+    owner = User.objects.create_user(
+        username="mm1", password="p", email="mm1@example.com"
+    )
+    race = _make_race(slug="mm-race", code="mmrace")
+    cat = _make_category(race)
+    team = _make_team(owner, cat, map_count=3, map_count_paid=1)
+    payment = Payment.objects.create(
+        owner=owner, team=team, payment_method="sbp2", map=2
+    )
+
+    _run_maps_forward()
+
+    extra = RaceExtra.objects.get(race=race, code="map")
+    assert extra.name == "Доп. карты"
+    assert extra.price == 200
+    assert extra.free_per_team == 2
+    assert extra.is_active is True
+
+    te = TeamExtra.objects.get(team=team, race_extra=extra)
+    assert te.count == 3
+    assert te.count_paid == 1
+
+    pe = PaymentExtra.objects.get(payment=payment, race_extra=extra)
+    assert pe.count == 2
+    assert pe.unit_price == 200
+
+
+@pytest.mark.django_db
+def test_maps_migration_skips_team_without_category():
+    owner = User.objects.create_user(
+        username="mm2", password="p", email="mm2@example.com"
+    )
+    # category2 is nullable; build a team with maps but no category.
+    team = Team.objects.create(
+        owner=owner,
+        category2=None,
+        paid_people=2,
+        ucount=2,
+        start_number="1",
+        map_count=4,
+        map_count_paid=0,
+    )
+
+    # Must not raise even though the team has no resolvable race.
+    _run_maps_forward()
+
+    assert not TeamExtra.objects.filter(team=team).exists()
+
+
+@pytest.mark.django_db
+def test_maps_migration_skips_payment_without_team():
+    owner = User.objects.create_user(
+        username="mm3", password="p", email="mm3@example.com"
+    )
+    payment = Payment.objects.create(
+        owner=owner, team=None, payment_method="sbp2", map=2
+    )
+
+    # Must not raise even though the payment has no team/category2.
+    _run_maps_forward()
+
+    assert not PaymentExtra.objects.filter(payment=payment).exists()
+
+
+@pytest.mark.django_db
+def test_maps_migration_reuses_existing_map_extra_without_error():
+    owner = User.objects.create_user(
+        username="mm4", password="p", email="mm4@example.com"
+    )
+    race = _make_race(slug="mm-pre", code="mmpre")
+    cat = _make_category(race)
+    team = _make_team(owner, cat, map_count=2, map_count_paid=0)
+    # A pre-existing map extra with a *custom* price must be reused, not
+    # overwritten by the migration defaults, and must not raise IntegrityError.
+    existing = RaceExtra.objects.create(
+        race=race, code="map", name="Свои карты", price=300, free_per_team=1
+    )
+
+    _run_maps_forward()
+
+    assert RaceExtra.objects.filter(race=race, code="map").count() == 1
+    existing.refresh_from_db()
+    assert existing.price == 300
+    assert existing.name == "Свои карты"
+    te = TeamExtra.objects.get(team=team)
+    assert te.race_extra_id == existing.id
+
+
+@pytest.mark.django_db
+def test_maps_migration_reverse_removes_map_rows():
+    owner = User.objects.create_user(
+        username="mm5", password="p", email="mm5@example.com"
+    )
+    race = _make_race(slug="mm-rev", code="mmrev")
+    cat = _make_category(race)
+    team = _make_team(owner, cat, map_count=3, map_count_paid=1)
+    payment = Payment.objects.create(
+        owner=owner, team=team, payment_method="sbp2", map=2
+    )
+
+    _run_maps_forward()
+    assert RaceExtra.objects.filter(code="map").exists()
+    assert TeamExtra.objects.exists()
+    assert PaymentExtra.objects.exists()
+
+    _run_maps_reverse()
+
+    assert not RaceExtra.objects.filter(code="map").exists()
+    assert not TeamExtra.objects.filter(team=team).exists()
+    assert not PaymentExtra.objects.filter(payment=payment).exists()
+    # Legacy columns remain untouched, so the data is recoverable.
+    team.refresh_from_db()
+    payment.refresh_from_db()
+    assert team.map_count == 3
+    assert payment.map == 2
+
+
+# --- Pricing helpers (compute_team_charge / upsert_team_extras / payment) ---
+
+from apps.race.pricing import (  # noqa: E402
+    ExtraCharge,
+    compute_team_charge,
+    create_team_payment,
+    upsert_team_extras,
+)
+
+
+def _priced_team(username, *, cost=1000, ucount=3, paid_people=1, slug=None):
+    """Owner + race (with a flat fee) + category + team, for charge tests."""
+    owner = User.objects.create_user(
+        username=username, password="p", email=f"{username}@example.com"
+    )
+    slug = slug or f"pr-{username}"
+    race = _make_race(slug=slug, code=slug)
+    race.cost = cost
+    race.save(update_fields=["cost"])
+    cat = _make_category(race)
+    team = _make_team(owner, cat, ucount=ucount, paid_people=paid_people)
+    return owner, race, team
+
+
+@pytest.mark.django_db
+def test_compute_team_charge_fee_only():
+    _, race, team = _priced_team("ch1", cost=1000, ucount=3, paid_people=1)
+
+    total, lines = compute_team_charge(team, race)
+
+    # (3 − 1) × 1000, no extras.
+    assert total == 2000
+    assert lines == []
+
+
+@pytest.mark.django_db
+def test_compute_team_charge_single_extra():
+    _, race, team = _priced_team("ch2", cost=1000, ucount=3, paid_people=1)
+    transfer = RaceExtra.objects.create(
+        race=race, code="transfer", name="Трансфер", price=500
+    )
+    TeamExtra.objects.create(team=team, race_extra=transfer, count=2, count_paid=0)
+
+    total, lines = compute_team_charge(team, race)
+
+    # fee 2000 + 2 × 500 = 3000.
+    assert total == 3000
+    assert lines == [ExtraCharge(race_extra=transfer, count=2, unit_price=500)]
+
+
+@pytest.mark.django_db
+def test_compute_team_charge_multiple_extras_summed():
+    _, race, team = _priced_team("ch3", cost=1000, ucount=4, paid_people=2)
+    transfer = RaceExtra.objects.create(
+        race=race, code="transfer", name="Трансфер", price=500, order=0
+    )
+    maps = RaceExtra.objects.create(
+        race=race, code="map", name="Карты", price=200, free_per_team=2, order=1
+    )
+    TeamExtra.objects.create(team=team, race_extra=transfer, count=1)
+    TeamExtra.objects.create(team=team, race_extra=maps, count=2)
+
+    total, lines = compute_team_charge(team, race)
+
+    # fee (4−2)×1000 + transfer 1×500 + maps 2×200 = 2000 + 500 + 400.
+    assert total == 2900
+    assert [line.race_extra for line in lines] == [transfer, maps]
+    assert [line.count for line in lines] == [1, 2]
+
+
+@pytest.mark.django_db
+def test_compute_team_charge_no_delta_when_fully_paid():
+    _, race, team = _priced_team("ch4", cost=1000, ucount=2, paid_people=2)
+    transfer = RaceExtra.objects.create(
+        race=race, code="transfer", name="Трансфер", price=500
+    )
+    TeamExtra.objects.create(team=team, race_extra=transfer, count=2, count_paid=2)
+
+    total, lines = compute_team_charge(team, race)
+
+    # Fully paid people and extra → nothing to charge.
+    assert total == 0
+    assert lines == []
+
+
+@pytest.mark.django_db
+def test_compute_team_charge_partial_extra_delta():
+    _, race, team = _priced_team("ch5", cost=1000, ucount=2, paid_people=2)
+    transfer = RaceExtra.objects.create(
+        race=race, code="transfer", name="Трансфер", price=500
+    )
+    # Wants 3, already paid for 1 → charge the 2-unit delta only.
+    TeamExtra.objects.create(team=team, race_extra=transfer, count=3, count_paid=1)
+
+    total, lines = compute_team_charge(team, race)
+
+    assert total == 1000  # 2 × 500
+    assert lines == [ExtraCharge(race_extra=transfer, count=2, unit_price=500)]
+
+
+@pytest.mark.django_db
+def test_compute_team_charge_floors_at_zero():
+    # Over-paid people (refund-like) must not produce a negative total.
+    _, race, team = _priced_team("ch6", cost=1000, ucount=1, paid_people=3)
+
+    total, lines = compute_team_charge(team, race)
+
+    assert total == 0
+    assert lines == []
+
+
+@pytest.mark.django_db
+def test_compute_team_charge_ignores_inactive_extra():
+    _, race, team = _priced_team("ch7", cost=1000, ucount=2, paid_people=2)
+    transfer = RaceExtra.objects.create(
+        race=race, code="transfer", name="Трансфер", price=500, is_active=False
+    )
+    TeamExtra.objects.create(team=team, race_extra=transfer, count=2, count_paid=0)
+
+    total, lines = compute_team_charge(team, race)
+
+    assert total == 0
+    assert lines == []
+
+
+@pytest.mark.django_db
+def test_upsert_team_extras_creates_then_updates():
+    _, race, team = _priced_team("up1", cost=1000)
+    transfer = RaceExtra.objects.create(
+        race=race, code="transfer", name="Трансфер", price=500
+    )
+
+    upsert_team_extras(team, {"extra_transfer": 2}, race)
+    te = TeamExtra.objects.get(team=team, race_extra=transfer)
+    assert te.count == 2
+    assert te.count_paid == 0
+
+    # Second call updates the same row, not a duplicate.
+    upsert_team_extras(team, {"extra_transfer": 5}, race)
+    assert TeamExtra.objects.filter(team=team, race_extra=transfer).count() == 1
+    te.refresh_from_db()
+    assert te.count == 5
+
+
+@pytest.mark.django_db
+def test_upsert_team_extras_missing_field_defaults_zero():
+    _, race, team = _priced_team("up2", cost=1000)
+    transfer = RaceExtra.objects.create(
+        race=race, code="transfer", name="Трансфер", price=500
+    )
+    # Pre-create with a non-zero count to prove the absent key zeroes it out.
+    TeamExtra.objects.create(team=team, race_extra=transfer, count=5)
+
+    # No "extra_transfer" key → count must be written back to 0.
+    upsert_team_extras(team, {}, race)
+    te = TeamExtra.objects.get(team=team, race_extra=transfer)
+    assert te.count == 0
+
+
+@pytest.mark.django_db
+def test_upsert_team_extras_skips_inactive_extras():
+    _, race, team = _priced_team("up3", cost=1000)
+    inactive = RaceExtra.objects.create(
+        race=race, code="transfer", name="Трансфер", price=500, is_active=False
+    )
+
+    # Submitting a value for an inactive extra must not create a TeamExtra row.
+    upsert_team_extras(team, {"extra_transfer": 2}, race)
+    assert not TeamExtra.objects.filter(team=team, race_extra=inactive).exists()
+
+
+@pytest.mark.django_db
+def test_create_team_payment_returns_none_when_cost_zero(rf):
+    owner, race, team = _priced_team("cp1", cost=1000, ucount=2, paid_people=2)
+    request = rf.post("/")
+    request.user = owner
+
+    # Fully paid people, no extras → cost 0 → no payment, no redirect.
+    result = create_team_payment(request, team, race)
+
+    assert result is None
+    assert not Payment.objects.filter(team=team).exists()
+
+
+# --- Race edit page: «Доп-услуги» (add-on) configuration (Task 5) ---
+
+
+@pytest.mark.django_db
+def test_race_edit_post_extras_reconcile_add_update_delete():
+    user = User.objects.create_user(username="xa1", password="p", email="xa1@e.com")
+    race = _make_race(slug="xa1", code="xa1")
+    RaceAdmin.objects.create(race=race, user=user, role=RaceAdmin.Role.ADMIN)
+    keep = RaceExtra.objects.create(
+        race=race, code="map", name="Карты", price=200, free_per_team=2, order=0
+    )
+    drop = RaceExtra.objects.create(
+        race=race, code="transfer", name="Трансфер", price=500, order=1
+    )
+
+    extras = json.dumps(
+        [
+            {
+                "id": keep.id,
+                "code": "map",
+                "name": "Доп. карты",
+                "price": 250,
+                "free_per_team": 2,
+                "is_active": True,
+            },
+            {
+                "id": None,
+                "code": "breakfast",
+                "name": "Завтрак",
+                "price": 300,
+                "free_per_team": 0,
+                "is_active": True,
+            },
+        ]
+    )
+    data = _post_data(code="xa1", slug="xa1", extras_json=extras)
+    resp = _edit_post(f"/race/{race.slug}/edit/", user, data, race_slug=race.slug)
+
+    assert resp.status_code == 302
+    # Unused row omitted from the payload is hard-deleted.
+    assert not RaceExtra.objects.filter(id=drop.id).exists()
+    keep.refresh_from_db()
+    assert keep.name == "Доп. карты"
+    assert keep.price == 250
+    assert keep.order == 0
+    breakfast = RaceExtra.objects.get(race=race, code="breakfast")
+    assert breakfast.price == 300
+    assert breakfast.order == 1
+
+
+@pytest.mark.django_db
+def test_race_edit_post_extra_in_use_deactivated_not_deleted():
+    user = User.objects.create_user(username="xu1", password="p", email="xu1@e.com")
+    race = _make_race(slug="xu1", code="xu1")
+    RaceAdmin.objects.create(race=race, user=user, role=RaceAdmin.Role.ADMIN)
+    cat = _make_category(race)
+    team = _make_team(user, cat)
+    extra = RaceExtra.objects.create(
+        race=race, code="transfer", name="Трансфер", price=500
+    )
+    TeamExtra.objects.create(team=team, race_extra=extra, count=1)
+
+    # Keep the team's category in the payload (so the category reconcile does
+    # not abort), but omit the extra entirely — it must deactivate, not delete.
+    keep_cat = json.dumps([_cat_row(id=cat.id, code=cat.code, name=cat.name)])
+    data = _post_data(
+        code="xu1", slug="xu1", categories_json=keep_cat, extras_json="[]"
+    )
+    resp = _edit_post(f"/race/{race.slug}/edit/", user, data, race_slug=race.slug)
+
+    assert resp.status_code == 302
+    extra.refresh_from_db()
+    # In-use row is softly deactivated, never deleted (PROTECT backstop).
+    assert extra.is_active is False
+
+
+@pytest.mark.django_db
+def test_race_edit_post_extra_cross_race_id_treated_as_new():
+    user = User.objects.create_user(username="xr1", password="p", email="xr1@e.com")
+    race = _make_race(slug="xr1", code="xr1")
+    RaceAdmin.objects.create(race=race, user=user, role=RaceAdmin.Role.ADMIN)
+    other = _make_race(slug="xr1b", code="xr1b")
+    other_extra = RaceExtra.objects.create(
+        race=other, code="transfer", name="Трансфер", price=500
+    )
+
+    # Submit the other race's extra id — must create a new row, not hijack theirs.
+    extras = json.dumps(
+        [
+            {
+                "id": other_extra.id,
+                "code": "transfer",
+                "name": "Трансфер",
+                "price": 100,
+                "free_per_team": 0,
+                "is_active": True,
+            }
+        ]
+    )
+    data = _post_data(code="xr1", slug="xr1", extras_json=extras)
+    resp = _edit_post(f"/race/{race.slug}/edit/", user, data, race_slug=race.slug)
+
+    assert resp.status_code == 302
+    # The other race's extra is untouched.
+    other_extra.refresh_from_db()
+    assert other_extra.race_id == other.id and other_extra.price == 500
+    # Our race got a brand-new extra instead of hijacking the other's.
+    new_extra = RaceExtra.objects.get(race=race, code="transfer")
+    assert new_extra.id != other_extra.id
+    assert new_extra.price == 100
+
+
+@pytest.mark.django_db
+def test_race_edit_post_extra_duplicate_code_rejected():
+    user = User.objects.create_user(username="xd1", password="p", email="xd1@e.com")
+    race = _make_race(slug="xd1", code="xd1")
+    RaceAdmin.objects.create(race=race, user=user, role=RaceAdmin.Role.ADMIN)
+
+    dup = json.dumps(
+        [
+            {
+                "id": None,
+                "code": "transfer",
+                "name": "A",
+                "price": 1,
+                "is_active": True,
+            },
+            {
+                "id": None,
+                "code": "transfer",
+                "name": "B",
+                "price": 2,
+                "is_active": True,
+            },
+        ]
+    )
+    resp = _edit_post(
+        f"/race/{race.slug}/edit/",
+        user,
+        _post_data(code="xd1", slug="xd1", extras_json=dup),
+        race_slug=race.slug,
+    )
+    assert resp.status_code == 200
+    race.refresh_from_db()
+    assert race.name == "Teams Race"
+    assert not RaceExtra.objects.filter(race=race).exists()
+
+
+@pytest.mark.django_db
+def test_race_edit_post_extra_invalid_code_rejected():
+    user = User.objects.create_user(username="xc1", password="p", email="xc1@e.com")
+    race = _make_race(slug="xc1", code="xc1")
+    RaceAdmin.objects.create(race=race, user=user, role=RaceAdmin.Role.ADMIN)
+
+    # Blank code.
+    blank = json.dumps([{"id": None, "code": "", "name": "X", "price": 1}])
+    resp = _edit_post(
+        f"/race/{race.slug}/edit/",
+        user,
+        _post_data(code="xc1", slug="xc1", extras_json=blank),
+        race_slug=race.slug,
+    )
+    assert resp.status_code == 200
+
+    # Code with disallowed characters (uppercase / digits).
+    bad = json.dumps([{"id": None, "code": "Map1", "name": "X", "price": 1}])
+    resp = _edit_post(
+        f"/race/{race.slug}/edit/",
+        user,
+        _post_data(code="xc1", slug="xc1", extras_json=bad),
+        race_slug=race.slug,
+    )
+    assert resp.status_code == 200
+
+    # Missing name.
+    noname = json.dumps([{"id": None, "code": "transfer", "name": "", "price": 1}])
+    resp = _edit_post(
+        f"/race/{race.slug}/edit/",
+        user,
+        _post_data(code="xc1", slug="xc1", extras_json=noname),
+        race_slug=race.slug,
+    )
+    assert resp.status_code == 200
+
+    race.refresh_from_db()
+    assert race.name == "Teams Race"
+    assert not RaceExtra.objects.filter(race=race).exists()
+
+
+@pytest.mark.django_db
+def test_race_edit_post_extra_negative_values_rejected():
+    user = User.objects.create_user(username="xn1", password="p", email="xn1@e.com")
+    race = _make_race(slug="xn1", code="xn1")
+    RaceAdmin.objects.create(race=race, user=user, role=RaceAdmin.Role.ADMIN)
+
+    neg_price = json.dumps(
+        [{"id": None, "code": "transfer", "name": "X", "price": -5, "free_per_team": 0}]
+    )
+    resp = _edit_post(
+        f"/race/{race.slug}/edit/",
+        user,
+        _post_data(code="xn1", slug="xn1", extras_json=neg_price),
+        race_slug=race.slug,
+    )
+    assert resp.status_code == 200
+
+    neg_free = json.dumps(
+        [{"id": None, "code": "transfer", "name": "X", "price": 0, "free_per_team": -1}]
+    )
+    resp = _edit_post(
+        f"/race/{race.slug}/edit/",
+        user,
+        _post_data(code="xn1", slug="xn1", extras_json=neg_free),
+        race_slug=race.slug,
+    )
+    assert resp.status_code == 200
+
+    race.refresh_from_db()
+    assert race.name == "Teams Race"
+    assert not RaceExtra.objects.filter(race=race).exists()
+
+
+@pytest.mark.django_db
+def test_race_edit_get_serializes_existing_extras_with_usage_flag():
+    user = User.objects.create_user(username="xg1", password="p", email="xg1@e.com")
+    race = _make_race(slug="xg1", code="xg1")
+    RaceAdmin.objects.create(race=race, user=user, role=RaceAdmin.Role.ADMIN)
+    cat = _make_category(race)
+    team = _make_team(user, cat)
+    used = RaceExtra.objects.create(
+        race=race, code="transfer", name="Трансфер", price=500, order=0
+    )
+    TeamExtra.objects.create(team=team, race_extra=used, count=1)
+    RaceExtra.objects.create(race=race, code="breakfast", name="Завтрак", order=1)
+
+    rows = RaceEditView._existing_extras(race)
+
+    assert [r["code"] for r in rows] == ["transfer", "breakfast"]
+    assert rows[0]["has_teams"] is True
+    assert rows[1]["has_teams"] is False

@@ -1,9 +1,10 @@
 import datetime
 import json
+import re
 from urllib.parse import quote
 
 from django.db import transaction
-from django.db.models import Count, OuterRef, Q, Subquery
+from django.db.models import Count, OuterRef, ProtectedError, Q, Subquery
 from django.http import Http404, HttpResponseForbidden, HttpResponseRedirect
 from django.shortcuts import get_object_or_404, render
 from django.urls import reverse
@@ -11,6 +12,7 @@ from django.utils.safestring import mark_safe
 from django.views import View
 
 from apps.race.forms import RaceForm
+from apps.race.models import RaceExtra
 from apps.race.permissions import can_edit_race
 from website.forms import NewsPostForm
 from website.models import NewsPost, Race, Team
@@ -389,6 +391,111 @@ def _validate_price_tier_rows(rows):
     return cleaned, errors
 
 
+_EXTRA_CODE_RE = re.compile(r"^[a-z_]+$")
+
+
+def _validate_extra_rows(rows):
+    """Validate parsed add-on («Доп-услуги») rows.
+
+    Returns ``(cleaned, errors)`` like :func:`_validate_category_rows`.
+    ``code`` must be non-empty, unique within the race and match ``[a-z_]+``;
+    ``name`` non-empty; ``price`` and ``free_per_team`` non-negative integers.
+    """
+    errors = {}
+    cleaned = []
+    seen_codes = set()
+    for index, row in enumerate(rows):
+        if not isinstance(row, dict):
+            errors[index] = {"__all__": "Некорректная строка."}
+            cleaned.append(None)
+            continue
+        row_errors = {}
+        code = str(row.get("code") or "").strip()
+        name = str(row.get("name") or "").strip()
+        if not code:
+            row_errors["code"] = "Укажите код."
+        elif len(code) > 32:
+            row_errors["code"] = "Не длиннее 32 символов."
+        elif not _EXTRA_CODE_RE.match(code):
+            row_errors["code"] = "Только строчные латинские буквы и «_»."
+        elif code in seen_codes:
+            row_errors["code"] = "Код повторяется."
+        if not name:
+            row_errors["name"] = "Укажите название."
+        elif len(name) > 100:
+            row_errors["name"] = "Не длиннее 100 символов."
+        price, price_err = _people_limit_int(row.get("price"))
+        free_per_team, free_err = _people_limit_int(row.get("free_per_team"))
+        if price_err:
+            row_errors["price"] = price_err
+        if free_err:
+            row_errors["free_per_team"] = free_err
+        if code and "code" not in row_errors:
+            seen_codes.add(code)
+        if row_errors:
+            errors[index] = row_errors
+            cleaned.append(None)
+        else:
+            cleaned.append(
+                {
+                    "id": _row_id(row.get("id")),
+                    "code": code,
+                    "name": name,
+                    "price": price,
+                    "free_per_team": free_per_team,
+                    "is_active": bool(row.get("is_active", True)),
+                }
+            )
+    return cleaned, errors
+
+
+def _reconcile_extras(race, cleaned):
+    """Update/create/delete this race's add-ons from ``cleaned`` rows.
+
+    Matches existing rows by ``id`` (cross-race ids treated as new) or, failing
+    that, by ``code`` (so the catalogue's ``unique_together(race, code)`` is
+    never violated when the JS omits the id of a reactivated row). ``order`` is
+    the array index. Rows missing from the payload are **hard-deleted only when
+    unused** — a row referenced by any ``TeamExtra``/``PaymentExtra`` is instead
+    softly deactivated (``is_active=False``), the deliberately softer policy than
+    :func:`_reconcile_categories`; ``PROTECT`` on the FKs is the backstop.
+    """
+    existing = {extra.id: extra for extra in race.extras.all()}
+    by_code = {extra.code: extra for extra in existing.values()}
+    seen = set()
+    for index, row in enumerate(cleaned):
+        row_id = row["id"]
+        instance = existing.get(row_id) if row_id is not None else None
+        if instance is None:
+            instance = by_code.get(row["code"])
+        if instance is None:
+            instance = RaceExtra(race=race, code=row["code"])
+        if not instance.pk:
+            instance.code = row["code"]
+        instance.name = row["name"]
+        instance.price = row["price"]
+        instance.free_per_team = row["free_per_team"]
+        instance.is_active = row["is_active"]
+        instance.order = index
+        instance.save()
+        seen.add(instance.id)
+    for extra in race.extras.exclude(id__in=seen):
+        in_use = (
+            extra.team_extras.filter(Q(count__gt=0) | Q(count_paid__gt=0)).exists()
+            or extra.payment_extras.exists()
+        )
+        if in_use:
+            if extra.is_active:
+                extra.is_active = False
+                extra.save(update_fields=["is_active"])
+        else:
+            try:
+                extra.delete()
+            except ProtectedError:
+                extra.is_active = False
+                extra.save(update_fields=["is_active"])
+
+
 def _reconcile_categories(race, cleaned):
     """Update/create/delete this race's categories from ``cleaned`` rows.
 
@@ -482,8 +589,10 @@ class RaceEditView(View):
         form=None,
         categories_data=None,
         price_tiers_data=None,
+        extras_data=None,
         category_errors=None,
         price_tier_errors=None,
+        extra_errors=None,
     ):
         if form is None:
             form = RaceForm(instance=race)
@@ -491,14 +600,18 @@ class RaceEditView(View):
             categories_data = [] if race is None else self._existing_categories(race)
         if price_tiers_data is None:
             price_tiers_data = [] if race is None else self._existing_price_tiers(race)
+        if extras_data is None:
+            extras_data = [] if race is None else self._existing_extras(race)
         return {
             "race": race,
             "form": form,
             "is_create": race is None,
             "categories_data": _safe_json(categories_data),
             "price_tiers_data": _safe_json(price_tiers_data),
+            "extras_data": _safe_json(extras_data),
             "category_errors": _safe_json(category_errors or {}),
             "price_tier_errors": _safe_json(price_tier_errors or {}),
+            "extra_errors": _safe_json(extra_errors or {}),
             "reg_status_choices": RegStatus.choices,
         }
 
@@ -528,6 +641,25 @@ class RaceEditView(View):
                 "active_until": tier.active_until.isoformat(),
             }
             for tier in race.price_tiers.order_by("order", "id")
+        ]
+
+    @staticmethod
+    def _existing_extras(race):
+        # ``has_teams`` lets the JS show «remove → deactivate» (the row is in
+        # use and ``PROTECT``-guarded) instead of a hard delete.
+        return [
+            {
+                "id": extra.id,
+                "code": extra.code,
+                "name": extra.name,
+                "price": extra.price,
+                "free_per_team": extra.free_per_team,
+                "is_active": extra.is_active,
+                "has_teams": (
+                    extra.team_extras.exists() or extra.payment_extras.exists()
+                ),
+            }
+            for extra in race.extras.order_by("order", "id")
         ]
 
     def get(self, request, race_slug=None):
@@ -561,15 +693,26 @@ class RaceEditView(View):
         except ValueError as exc:
             form.add_error(None, f"Ценовые периоды: {exc}")
 
+        # Add-ons are optional: a missing/empty payload means «no add-ons» (not
+        # an error like categories/tiers), so a race can have none.
+        extra_rows = None
+        try:
+            extra_rows = _parse_json_list(request.POST.get("extras_json") or "[]")
+        except ValueError as exc:
+            form.add_error(None, f"Доп-услуги: {exc}")
+
         category_errors = {}
         price_tier_errors = {}
-        cleaned_categories = cleaned_tiers = None
+        extra_errors = {}
+        cleaned_categories = cleaned_tiers = cleaned_extras = None
         if category_rows is not None:
             cleaned_categories, category_errors = _validate_category_rows(category_rows)
         if price_tier_rows is not None:
             cleaned_tiers, price_tier_errors = _validate_price_tier_rows(
                 price_tier_rows
             )
+        if extra_rows is not None:
+            cleaned_extras, extra_errors = _validate_extra_rows(extra_rows)
 
         if category_errors:
             bad = ", ".join(str(i + 1) for i in sorted(category_errors))
@@ -577,19 +720,25 @@ class RaceEditView(View):
         if price_tier_errors:
             bad = ", ".join(str(i + 1) for i in sorted(price_tier_errors))
             form.add_error(None, f"Ошибки в ценовых периодах (строки: {bad}).")
+        if extra_errors:
+            bad = ", ".join(str(i + 1) for i in sorted(extra_errors))
+            form.add_error(None, f"Ошибки в доп-услугах (строки: {bad}).")
 
         if (
             form_valid
             and category_rows is not None
             and price_tier_rows is not None
+            and extra_rows is not None
             and not category_errors
             and not price_tier_errors
+            and not extra_errors
         ):
             try:
                 with transaction.atomic():
                     race = form.save()
                     _reconcile_categories(race, cleaned_categories)
                     _reconcile_price_tiers(race, cleaned_tiers)
+                    _reconcile_extras(race, cleaned_extras)
             except ValueError as exc:
                 if not is_create:
                     race.refresh_from_db()
@@ -604,12 +753,25 @@ class RaceEditView(View):
         # Use the original pre-save race (None on create) so is_create stays correct
         # even if form.save() ran and was rolled back inside the atomic block.
         render_race = None if is_create else race
+
+        # Re-attach has_teams from the DB so the JS still shows «deactivate»
+        # (not «delete») for extras that are already referenced by teams.
+        if render_race is not None and extra_rows:
+            existing_map = {
+                e["id"]: e["has_teams"] for e in self._existing_extras(render_race)
+            }
+            for row in extra_rows:
+                if row.get("id") in existing_map:
+                    row["has_teams"] = existing_map[row["id"]]
+
         context = self._build_context(
             render_race,
             form=form,
             categories_data=category_rows or [],
             price_tiers_data=price_tier_rows or [],
+            extras_data=extra_rows or [],
             category_errors=category_errors,
             price_tier_errors=price_tier_errors,
+            extra_errors=extra_errors,
         )
         return render(request, "race/race_form.html", context)

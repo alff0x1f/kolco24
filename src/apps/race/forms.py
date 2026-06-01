@@ -17,6 +17,10 @@ class RaceForm(forms.ModelForm):
 
     cost = forms.IntegerField(required=False, min_value=0)
     people_limit = forms.IntegerField(required=False, min_value=0)
+    # Add-ons («Доп-услуги») are posted as a JSON array in this hidden field and
+    # reconciled by the view (see ``_reconcile_extras``), like categories and
+    # price tiers. Not a model field — parsed/validated in ``RaceEditView.post``.
+    extras_json = forms.CharField(required=False, widget=forms.HiddenInput)
 
     def clean_cost(self):
         v = self.cleaned_data.get("cost")

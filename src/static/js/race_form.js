@@ -34,10 +34,13 @@
   (function () {
     var catsField = document.getElementById("categoriesJson");
     var tiersField = document.getElementById("priceTiersJson");
+    var extrasField = document.getElementById("extrasJson");
     var catsIsland = document.getElementById("categories-data");
     var tiersIsland = document.getElementById("price-tiers-data");
+    var extrasIsland = document.getElementById("extras-data");
     if (catsField && catsIsland) catsField.value = catsIsland.textContent.trim();
     if (tiersField && tiersIsland) tiersField.value = tiersIsland.textContent.trim();
+    if (extrasField && extrasIsland) extrasField.value = extrasIsland.textContent.trim();
   })();
 
   /* ── Categories repeater ─────────────────────────────────── */
@@ -260,6 +263,100 @@
     }
   }
 
+  /* ── Add-ons (Доп-услуги) repeater ───────────────────────── */
+  var extrasEl = document.getElementById("extras");
+  var extraCountEl = document.getElementById("extraCount");
+
+  function makeExtraRow(e) {
+    e = e || {};
+    var saved = e.id != null;
+    var inUse = e.has_teams === true;
+    var row = document.createElement("div");
+    row.className = "extra-row" + (e.is_active === false ? " is-inactive" : "");
+    if (saved) row.dataset.id = e.id;
+    if (inUse) row.dataset.hasTeams = "1";
+    row.innerHTML =
+      '<div class="extra-ord">●</div>' +
+      '<input class="control mono e-code" type="text" maxlength="32" placeholder="код">' +
+      '<input class="control e-name" type="text" maxlength="100" placeholder="название">' +
+      '<input class="control e-price" type="number" min="0" step="50" placeholder="цена">' +
+      '<input class="control e-free" type="number" min="0" step="1" placeholder="0" title="Сколько входит в команду бесплатно">' +
+      '<div class="extra-toggle-cell">' +
+      '<label class="switch"><input type="checkbox" class="e-active"><span class="track"></span></label>' +
+      "</div>" +
+      '<button class="extra-del" type="button" title="Удалить услугу">' +
+      '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 4h10M6.5 4V2.8h3V4M5 4l.6 9h4.8L11 4"/></svg>' +
+      "</button>";
+
+    var codeInput = row.querySelector(".e-code");
+    codeInput.value = e.code || "";
+    // Code is the natural key; once saved it must not change (unique per race).
+    if (saved) codeInput.readOnly = true;
+    row.querySelector(".e-name").value = e.name || "";
+    row.querySelector(".e-price").value = e.price != null ? e.price : 0;
+    row.querySelector(".e-free").value = e.free_per_team != null ? e.free_per_team : 0;
+    var activeInput = row.querySelector(".e-active");
+    activeInput.checked = e.is_active !== false;
+
+    activeInput.addEventListener("change", function (ev) {
+      row.classList.toggle("is-inactive", !ev.target.checked);
+    });
+    var delBtn = row.querySelector(".extra-del");
+    if (inUse) {
+      // An add-on teams already bought can't be deleted — «remove» deactivates.
+      delBtn.title = "Услуга используется — деактивировать";
+      delBtn.addEventListener("click", function () {
+        activeInput.checked = false;
+        row.classList.add("is-inactive");
+      });
+    } else {
+      delBtn.addEventListener("click", function () {
+        row.style.transition = "opacity .12s";
+        row.style.opacity = "0";
+        setTimeout(function () {
+          row.remove();
+          refreshExtraCount();
+        }, 120);
+      });
+    }
+    return row;
+  }
+
+  function refreshExtraCount() {
+    if (!extrasEl) return;
+    var n = extrasEl.querySelectorAll(".extra-row").length;
+    if (extraCountEl) extraCountEl.textContent = n;
+    var empty = extrasEl.querySelector(".extras-empty");
+    if (n === 0 && !empty) {
+      empty = document.createElement("div");
+      empty.className = "extras-empty";
+      empty.textContent = "Доп-услуг нет — добавьте первую при необходимости.";
+      extrasEl.appendChild(empty);
+    } else if (n > 0 && empty) {
+      empty.remove();
+    }
+  }
+
+  if (extrasEl) {
+    readJson("extras-data").forEach(function (e) {
+      extrasEl.appendChild(makeExtraRow(e));
+    });
+    refreshExtraCount();
+    applyRowErrors(extrasEl, ".extra-row", {
+      code: ".e-code", name: ".e-name", price: ".e-price",
+      free_per_team: ".e-free"
+    }, readJsonObj("extra-errors"));
+    var addExtra = document.getElementById("addExtra");
+    if (addExtra) {
+      addExtra.addEventListener("click", function () {
+        var row = makeExtraRow();
+        extrasEl.appendChild(row);
+        refreshExtraCount();
+        row.querySelector(".e-code").focus();
+      });
+    }
+  }
+
   /* ── Char counters ───────────────────────────────────────── */
   document.querySelectorAll("[data-count-for]").forEach(function (span) {
     var input = document.getElementById(span.getAttribute("data-count-for"));
@@ -369,10 +466,26 @@
           });
         });
       }
+      var extras = [];
+      if (extrasEl) {
+        extrasEl.querySelectorAll(".extra-row").forEach(function (row) {
+          var idAttr = row.dataset.id;
+          extras.push({
+            id: idAttr != null && idAttr !== "" ? parseInt(idAttr, 10) : null,
+            code: row.querySelector(".e-code").value.trim(),
+            name: row.querySelector(".e-name").value.trim(),
+            price: parseInt(row.querySelector(".e-price").value, 10) || 0,
+            free_per_team: parseInt(row.querySelector(".e-free").value, 10) || 0,
+            is_active: row.querySelector(".e-active").checked
+          });
+        });
+      }
       var catsField = document.getElementById("categoriesJson");
       var tiersField = document.getElementById("priceTiersJson");
+      var extrasField = document.getElementById("extrasJson");
       if (catsField) catsField.value = JSON.stringify(cats);
       if (tiersField) tiersField.value = JSON.stringify(tiers);
+      if (extrasField) extrasField.value = JSON.stringify(extras);
     });
   }
 })();
