@@ -118,6 +118,8 @@ def _complete_login(request, email, next_url):
                     user = User.objects.filter(email__iexact=email).first()
     if user is None:
         return _safe_redirect(request, "/accounts/start/")
+    if not user.is_active:
+        return _safe_redirect(request, "/accounts/start/")
     auth_login(request, user, backend="apps.accounts.backends.EmailBackend")
     return _safe_redirect(request, next_url or "/")
 

@@ -17,7 +17,7 @@ class EmailBackend(ModelBackend):
         except (UserModel.DoesNotExist, UserModel.MultipleObjectsReturned):
             return None
 
-        # If user is found, check if the password is correct
-        if user.check_password(password):
+        # If user is found, check password and active status
+        if user.check_password(password) and self.user_can_authenticate(user):
             return user
         return None

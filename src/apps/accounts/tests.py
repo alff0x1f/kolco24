@@ -132,6 +132,44 @@ def test_create_for_after_cooldown_issues_new_row():
     assert second.pk != first.pk
     assert raw_code2 is not None
     assert EmailVerification.objects.count() == 2
+    # the old row must be revoked so its magic link can no longer be used
+    first.refresh_from_db()
+    assert first.consumed_at is not None
+
+
+@pytest.mark.django_db
+def test_create_for_after_cooldown_revokes_older_unconsumed_rows():
+    first, _ = EmailVerification.create_for("user@example.com")
+    EmailVerification.objects.filter(pk=first.pk).update(
+        created_at=timezone.now()
+        - EmailVerification.RESEND_COOLDOWN
+        - timedelta(seconds=1)
+    )
+
+    EmailVerification.create_for("user@example.com")
+
+    first.refresh_from_db()
+    assert first.consumed_at is not None
+    assert not first.is_alive
+
+
+@pytest.mark.django_db
+def test_create_for_after_expiry_issues_new_row_without_constraint_error():
+    # Regression: an expired unconsumed row must not block a fresh create_for().
+    # The unique partial index covers consumed_at IS NULL regardless of expires_at,
+    # so the expired row must be revoked before the INSERT, not after.
+    first, _ = EmailVerification.create_for("user@example.com")
+    EmailVerification.objects.filter(pk=first.pk).update(
+        expires_at=timezone.now() - timedelta(seconds=1)
+    )
+
+    second, raw_code2 = EmailVerification.create_for("user@example.com")
+
+    assert second.pk != first.pk
+    assert raw_code2 is not None
+    assert second.is_alive
+    first.refresh_from_db()
+    assert first.consumed_at is not None
 
 
 @pytest.mark.django_db
@@ -415,6 +453,21 @@ def test_verify_expired_row_is_rejected(client, django_user_model):
     assert not _is_logged_in(client)
 
 
+@pytest.mark.django_db
+def test_verify_inactive_user_is_not_logged_in(client, django_user_model):
+    user = django_user_model.objects.create_user("u", "u@example.com", "pw")
+    user.is_active = False
+    user.save()
+    obj, raw_code = EmailVerification.create_for("u@example.com")
+    session = client.session
+    session["accounts_pending_email"] = "u@example.com"
+    session.save()
+
+    client.post(reverse("account_verify"), {"code": raw_code})
+
+    assert not _is_logged_in(client)
+
+
 # ── Passwordless views: magic link ─────────────────────────────────────
 
 
@@ -486,6 +539,19 @@ def test_magic_link_consumed_or_reused_row_is_rejected(client, django_user_model
 
 
 @pytest.mark.django_db
+def test_magic_link_inactive_user_is_not_logged_in(client, django_user_model):
+    user = django_user_model.objects.create_user("u", "u@example.com", "pw")
+    user.is_active = False
+    user.save()
+    obj, _ = EmailVerification.create_for("u@example.com")
+    signed = build_magic_link_signature(obj)
+
+    client.get(reverse("magic_link", args=[signed]))
+
+    assert not _is_logged_in(client)
+
+
+@pytest.mark.django_db
 def test_magic_link_off_host_next_falls_back_to_root(client, django_user_model):
     django_user_model.objects.create_user("u", "u@example.com", "pw")
     obj, _ = EmailVerification.create_for("u@example.com")
@@ -498,3 +564,35 @@ def test_magic_link_off_host_next_falls_back_to_root(client, django_user_model):
     assert response.status_code == 302
     assert response.url == "/"
     assert _is_logged_in(client)
+
+
+# ── EmailBackend ────────────────────────────────────────────────────────
+
+
+@pytest.mark.django_db
+def test_email_backend_rejects_inactive_user(django_user_model):
+    from apps.accounts.backends import EmailBackend
+
+    user = django_user_model.objects.create_user("u", "inactive@example.com", "pw")
+    user.is_active = False
+    user.save()
+
+    result = EmailBackend().authenticate(
+        None, username="inactive@example.com", password="pw"
+    )
+
+    assert result is None
+
+
+@pytest.mark.django_db
+def test_email_backend_authenticates_active_user(django_user_model):
+    from apps.accounts.backends import EmailBackend
+
+    django_user_model.objects.create_user("u", "active@example.com", "pw")
+
+    result = EmailBackend().authenticate(
+        None, username="active@example.com", password="pw"
+    )
+
+    assert result is not None
+    assert result.email == "active@example.com"

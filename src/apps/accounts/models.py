@@ -3,7 +3,7 @@ from datetime import timedelta
 
 from django.contrib.auth.hashers import check_password, make_password
 from django.contrib.auth.models import BaseUserManager
-from django.db import models
+from django.db import IntegrityError, models, transaction
 from django.utils import timezone
 
 
@@ -35,6 +35,13 @@ class EmailVerification(models.Model):
         indexes = [
             models.Index(fields=["email", "purpose", "consumed_at"]),
         ]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["email", "purpose"],
+                condition=models.Q(consumed_at__isnull=True),
+                name="unique_active_email_verification",
+            )
+        ]
 
     def __str__(self):
         return f"EmailVerification({self.email}, {self.purpose})"
@@ -51,30 +58,64 @@ class EmailVerification(models.Model):
         email/purpose was created less than ``RESEND_COOLDOWN`` ago, no new code is
         issued and ``(existing, None)`` is returned (the raw code is unrecoverable
         since only the hash is stored).
+
+        Concurrent callers are serialized: ``select_for_update`` locks any existing
+        alive rows; a unique partial index on ``(email, purpose) WHERE consumed_at IS
+        NULL`` prevents two simultaneous inserts from both creating live rows.
         """
         email = _normalize_email(email)
         now = timezone.now()
-        existing = (
-            cls.objects.filter(
-                email=email,
-                purpose=purpose,
-                consumed_at__isnull=True,
-                expires_at__gt=now,
-                created_at__gt=now - cls.RESEND_COOLDOWN,
-            )
-            .order_by("-created_at")
-            .first()
-        )
-        if existing is not None and existing.is_alive:
-            return existing, None
 
-        raw_code = cls.generate_code()
-        obj = cls.objects.create(
-            email=email,
-            code_hash=make_password(raw_code),
-            purpose=purpose,
-            expires_at=now + cls.CODE_TTL,
-        )
+        with transaction.atomic():
+            # Lock ALL unconsumed rows (alive or expired) to serialize concurrent
+            # callers and prevent INSERT conflicts against the partial unique index on
+            # (email, purpose) WHERE consumed_at IS NULL. An expired row still holds
+            # that index slot until it is explicitly consumed.
+            existing_rows = list(
+                cls.objects.filter(
+                    email=email,
+                    purpose=purpose,
+                    consumed_at__isnull=True,
+                )
+                .select_for_update()
+                .order_by("-created_at")
+            )
+
+            if existing_rows:
+                newest = existing_rows[0]
+                if newest.is_alive and newest.created_at > now - cls.RESEND_COOLDOWN:
+                    return newest, None
+                # Past cooldown or attempts exhausted: revoke all and fall through.
+                cls.objects.filter(pk__in=[r.pk for r in existing_rows]).update(
+                    consumed_at=now
+                )
+
+            raw_code = cls.generate_code()
+            try:
+                with transaction.atomic():  # savepoint for unique-constraint race
+                    obj = cls.objects.create(
+                        email=email,
+                        code_hash=make_password(raw_code),
+                        purpose=purpose,
+                        expires_at=now + cls.CODE_TTL,
+                    )
+            except IntegrityError:
+                # A concurrent request (also seeing no alive rows) won the INSERT race.
+                # Return its row without a raw code so the caller skips sending email.
+                winner = (
+                    cls.objects.filter(
+                        email=email,
+                        purpose=purpose,
+                        consumed_at__isnull=True,
+                        expires_at__gt=now,
+                    )
+                    .order_by("-created_at")
+                    .first()
+                )
+                if winner is not None:
+                    return winner, None
+                # Extremely unlikely: winner was consumed before we read it.
+                return cls.create_for(email, purpose)
         return obj, raw_code
 
     @property
