@@ -226,6 +226,10 @@ class TeamMemberMoveView(View):
         if not (request.user.is_superuser or from_team.owner_id == request.user.id):
             return HttpResponse("Перенос доступен только владельцу команды", status=403)
 
+        race = from_team.category2.race
+        if not race.is_teams_editable and not request.user.is_superuser:
+            return HttpResponse("Редактирование команд запрещено", status=403)
+
         data = request.POST.copy()
         data["from_team"] = from_team.id
         form = TeamMemberMoveForm(data, race_id=from_team.category2.race_id)

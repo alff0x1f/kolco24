@@ -658,6 +658,10 @@ class TeamMemberMoveForm(forms.ModelForm):
 
     def clean_moved_people(self):
         moved = self.cleaned_data.get("moved_people")
+        if moved is not None and moved < 1:
+            raise forms.ValidationError(
+                "Количество переносимых участников должно быть не менее 1."
+            )
         from_team = self.cleaned_data.get("from_team")
         if (
             moved is not None
@@ -672,9 +676,17 @@ class TeamMemberMoveForm(forms.ModelForm):
     def clean(self):
         from_team = self.cleaned_data.get("from_team")
         to_team = self.cleaned_data.get("to_team")
+        moved = self.cleaned_data.get("moved_people")
         if from_team and to_team:
             if from_team.category2.race_id != to_team.category2.race_id:
                 raise forms.ValidationError("Teams must be in the same Race")
+            if moved is not None and from_team.category2_id != to_team.category2_id:
+                remaining = to_team.category2.remaining_people()
+                if remaining is not None and moved > remaining:
+                    raise forms.ValidationError(
+                        "Категория назначения заполнена: осталось"
+                        f" {int(remaining)} мест."
+                    )
         return super().clean()
 
 

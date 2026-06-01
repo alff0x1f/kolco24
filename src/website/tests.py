@@ -10,7 +10,7 @@ from django.urls import reverse
 from django.utils import timezone
 
 from apps.race.models import PaymentExtra, RaceExtra, TeamExtra
-from website.forms import TeamForm
+from website.forms import TeamForm, TeamMemberMoveForm
 from website.models import Payment, Race, VTBPayment
 from website.models.models import PaymentsYa, Team
 from website.models.race import (
@@ -1876,6 +1876,109 @@ def test_gate_blocks_when_reservation_fills_category(django_user_model):
     form = TeamForm(race.id, _gate_data(cat, 2))
     assert not form.is_valid()
     assert "category2_id" in form.errors
+
+
+@pytest.mark.django_db
+def test_member_move_blocked_when_destination_category_full(django_user_model):
+    # Moving paid members into a full destination category must be rejected by
+    # TeamMemberMoveForm.clean() even though TeamForm is not involved.
+    user = _pl_user(django_user_model)
+    race = _pl_race(people_limit=0)
+    src_cat = _pl_category(race, code="A", name="A", short_name="A")
+    dst_cat = _pl_category(race, code="B", name="B", short_name="B", people_limit=3)
+    # Fill destination category to its limit.
+    _pl_team(dst_cat, user, paid_people=3, name="filler")
+    # Source team has paid people to move.
+    from_team = _pl_team(src_cat, user, paid_people=2, name="src")
+    to_team = _pl_team(dst_cat, user, paid_people=0, name="dst")
+    data = {
+        "from_team": from_team.id,
+        "to_team": to_team.id,
+        "moved_people": 1,
+    }
+    form = TeamMemberMoveForm(data, race_id=race.id)
+    assert not form.is_valid()
+    assert any("заполнена" in e for e in form.non_field_errors())
+
+
+@pytest.mark.django_db
+def test_member_move_allowed_when_destination_category_has_space(django_user_model):
+    # Moving members into a category with remaining capacity must succeed.
+    user = _pl_user(django_user_model)
+    race = _pl_race(people_limit=0)
+    src_cat = _pl_category(race, code="A", name="A", short_name="A")
+    dst_cat = _pl_category(race, code="B", name="B", short_name="B", people_limit=5)
+    _pl_team(dst_cat, user, paid_people=2, name="filler")  # 3 slots remain
+    from_team = _pl_team(src_cat, user, paid_people=2, name="src")
+    to_team = _pl_team(dst_cat, user, paid_people=0, name="dst")
+    data = {
+        "from_team": from_team.id,
+        "to_team": to_team.id,
+        "moved_people": 2,
+    }
+    form = TeamMemberMoveForm(data, race_id=race.id)
+    assert form.is_valid(), form.errors
+
+
+@pytest.mark.django_db
+def test_member_move_same_category_skips_capacity_check(django_user_model):
+    # Moving between teams in the same category never blocks (net zero change).
+    user = _pl_user(django_user_model)
+    race = _pl_race(people_limit=0)
+    cat = _pl_category(race, code="M", name="M", short_name="M", people_limit=2)
+    # Category already at limit.
+    from_team = _pl_team(cat, user, paid_people=2, name="src")
+    to_team = _pl_team(cat, user, paid_people=0, name="dst")
+    data = {
+        "from_team": from_team.id,
+        "to_team": to_team.id,
+        "moved_people": 1,
+    }
+    form = TeamMemberMoveForm(data, race_id=race.id)
+    assert form.is_valid(), form.errors
+
+
+@pytest.mark.django_db
+def test_member_move_rejects_non_positive_moved_people(django_user_model):
+    # A crafted POST with moved_people <= 0 must be rejected server-side;
+    # the HTML min="1" is not sufficient protection.
+    user = _pl_user(django_user_model)
+    race = _pl_race(people_limit=0)
+    src_cat = _pl_category(race, code="S1", name="S1", short_name="S1")
+    dst_cat = _pl_category(race, code="D1", name="D1", short_name="D1")
+    from_team = _pl_team(src_cat, user, paid_people=3, name="src1")
+    to_team = _pl_team(dst_cat, user, paid_people=0, name="dst1")
+    for bad_value in (0, -1, -5):
+        data = {
+            "from_team": from_team.id,
+            "to_team": to_team.id,
+            "moved_people": bad_value,
+        }
+        form = TeamMemberMoveForm(data, race_id=race.id)
+        assert not form.is_valid(), f"expected invalid for moved_people={bad_value}"
+        assert "moved_people" in form.errors
+
+
+@pytest.mark.django_db
+def test_member_move_view_blocked_when_not_editable(client, django_user_model):
+    # A direct POST to the transfer URL must be rejected when is_teams_editable=False,
+    # even though the template hides the UI in that case.
+    user = _pl_user(django_user_model)
+    race = _pl_race(people_limit=0)
+    race.is_teams_editable = False
+    race.save(update_fields=["is_teams_editable"])
+    src_cat = _pl_category(race, code="S2", name="S2", short_name="S2")
+    dst_cat = _pl_category(race, code="D2", name="D2", short_name="D2")
+    from_team = _pl_team(src_cat, user, paid_people=3, name="src2")
+    to_team = _pl_team(dst_cat, user, paid_people=0, name="dst2")
+    client.force_login(user)
+    response = client.post(
+        reverse("move_team_member", args=[from_team.id]),
+        {"to_team": to_team.id, "moved_people": 1},
+    )
+    assert response.status_code == 403
+    from_team.refresh_from_db()
+    assert from_team.paid_people == 3  # unchanged
 
 
 @pytest.mark.django_db
