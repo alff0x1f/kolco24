@@ -930,25 +930,32 @@ class ConfirmPaymentView(View):
             raise Http404("Not found")
 
         balance = Decimal(request.POST.get("balance", 0))
-
-        payment = Payment.objects.get(pk=pk)
-        if payment.status == "done":
-            return self.update_only_balance(payment, balance)
-
-        payment.status = "done"
-        payment.balance = balance
-        payment.order = pk
-
-        team = payment.team
-        if team is None:
-            payment.save(update_fields=["status", "balance", "order", "recipient"])
-            return HttpResponseRedirect("/payments?status=draft_with_info")
-
-        recipient = request.POST.get("recipient", "")
-        if recipient:
-            payment.recipient = SbpPaymentRecipient.objects.get(pk=recipient)
+        recipient_pk = request.POST.get("recipient", "")
 
         with transaction.atomic():
+            try:
+                payment = Payment.objects.select_for_update().get(pk=pk)
+            except Payment.DoesNotExist:
+                raise Http404
+            if payment.status == "done":
+                payment.balance = balance
+                payment.save(update_fields=["balance"])
+                return HttpResponseRedirect(
+                    f"/payments?status=done&method=sbp#order{payment.pk}"
+                )
+
+            payment.status = "done"
+            payment.balance = balance
+            payment.order = pk
+
+            team = payment.team
+            if team is None:
+                payment.save(update_fields=["status", "balance", "order", "recipient"])
+                return HttpResponseRedirect("/payments?status=draft_with_info")
+
+            if recipient_pk:
+                payment.recipient = SbpPaymentRecipient.objects.get(pk=recipient_pk)
+
             from django.db.models import F
             from django.db.models.functions import Greatest
 
@@ -959,7 +966,6 @@ class ConfirmPaymentView(View):
                 paid_sum=F("paid_sum") + payment.payment_amount,
             )
             # Credit add-ons from per-payment snapshots.
-
             from apps.race.models import TeamExtra
 
             for pe in payment.extras.all():

@@ -292,10 +292,12 @@ class PaymentsYa(models.Model):
                 paid_for = withdraw_amount / payment.cost_per_person
             if payment.team:
                 from django.db.models import F
+                from django.db.models.functions import Greatest
 
+                team = payment.team
                 # Atomic SQL-level increment avoids a lost-update race if two
                 # Yandex IPN callbacks arrive for payments on the same team.
-                Team.objects.filter(pk=payment.team.pk).update(
+                Team.objects.filter(pk=team.pk).update(
                     paid_people=F("paid_people") + paid_for,
                     paid_sum=F("paid_sum")
                     + withdraw_amount
@@ -303,13 +305,24 @@ class PaymentsYa(models.Model):
                     additional_charge=F("additional_charge")
                     - payment.additional_charge,
                 )
+                # Credit add-ons from per-payment snapshots.
+                from apps.race.models import TeamExtra
+
+                for pe in payment.extras.all():
+                    te, _ = TeamExtra.objects.get_or_create(
+                        team=team, race_extra=pe.race_extra
+                    )
+                    TeamExtra.objects.filter(pk=te.pk).update(
+                        count_paid=F("count_paid") + pe.count,
+                        count=Greatest(F("count"), F("count_paid") + pe.count),
+                    )
                 # Авто sold_out при достижении лимита гонки (Option B: без
                 # авто-реоткрытия). Caveat: занятость считается по paid_people,
                 # который растёт только при подтверждении оплаты — параллельные
                 # неоплаченные черновики могут кратковременно превысить лимит.
                 from .race import RegStatus
 
-                category = payment.team.category2
+                category = team.category2
                 race = category.race if category else None
                 if (
                     race
@@ -319,7 +332,7 @@ class PaymentsYa(models.Model):
                 ):
                     race.reg_status = RegStatus.SOLD_OUT
                     race.save(update_fields=["reg_status"])
-            payment.save()
+            payment.save(update_fields=["status"])
         return True
 
 
