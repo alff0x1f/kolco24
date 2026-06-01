@@ -195,16 +195,16 @@ appended as a query param. Send failure is logged; the user still reaches verify
 - Modify: `src/website/auth.py`
 - Modify: `src/config/settings.py`
 
-- [ ] create `apps.py` → `AccountsConfig(name="apps.accounts", label="accounts",
+- [x] create `apps.py` → `AccountsConfig(name="apps.accounts", label="accounts",
       verbose_name="Accounts")`
-- [ ] move `EmailBackend` from `src/website/auth.py` into
+- [x] move `EmailBackend` from `src/website/auth.py` into
       `src/apps/accounts/backends.py` verbatim
-- [ ] replace `src/website/auth.py` body with shim:
+- [x] replace `src/website/auth.py` body with shim:
       `from apps.accounts.backends import EmailBackend  # noqa: F401`
-- [ ] `settings.py`: add `"apps.accounts"` to `INSTALLED_APPS`; change
+- [x] `settings.py`: add `"apps.accounts"` to `INSTALLED_APPS`; change
       `AUTHENTICATION_BACKENDS` entry to `"apps.accounts.backends.EmailBackend"`
-- [ ] run `uv run python src/manage.py check` — no errors
-- [ ] regression: `uv run pytest` — full suite green (auth still works via shim)
+- [x] run `uv run python src/manage.py check` — no errors
+- [x] regression: `uv run pytest` — full suite green (auth still works via shim)
 
 ### Task 2: Move auth forms with re-exports
 
