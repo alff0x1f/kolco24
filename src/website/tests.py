@@ -9,10 +9,20 @@ from django.urls import reverse
 from django.utils import timezone
 
 from website.forms import TeamForm
-from website.models import Payment, Race
+from website.models import Payment, Race, VTBPayment
 from website.models.models import PaymentsYa, Team
 from website.models.race import Category, RaceLink, RacePriceTier, RegStatus
+from website.models.vtb import _CROCKFORD
 from website.views.views_ import build_category_options, build_team_form_context
+
+
+def test_new_order_id_shape_and_uniqueness():
+    order_id = VTBPayment.new_order_id("ORDER")
+    prefix, _, suffix = order_id.partition("_")
+    assert prefix == "ORDER"
+    assert len(suffix) == 26
+    assert all(ch in _CROCKFORD for ch in suffix)
+    assert VTBPayment.new_order_id("ORDER") != order_id
 
 
 @pytest.mark.django_db

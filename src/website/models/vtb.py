@@ -1,7 +1,11 @@
+import os
+import time
 from decimal import Decimal
 
 from django.db import models, transaction
 from django.utils.dateparse import parse_datetime
+
+_CROCKFORD = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"
 
 
 class VTBPayment(models.Model):
@@ -39,6 +43,17 @@ class VTBPayment(models.Model):
 
     def __str__(self):
         return f"VTB Payment {self.order_id} ({self.status})"
+
+    @staticmethod
+    def new_order_id(prefix: str) -> str:
+        """Return a globally-unique order id of the form ``<prefix>_<ulid>``.
+
+        The 26-char suffix is a ULID encoded with Crockford's base32, so it is
+        collision-free across environments that share VTB credentials.
+        """
+        val = (int(time.time() * 1000) << 80) | int.from_bytes(os.urandom(10), "big")
+        ulid = "".join(_CROCKFORD[(val >> (5 * i)) & 0x1F] for i in range(25, -1, -1))
+        return f"{prefix}_{ulid}"
 
     @classmethod
     @transaction.atomic

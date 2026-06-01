@@ -152,17 +152,17 @@ the `except` catches the "no FK set" case. The `SPUTNIK_` donation branch is unc
 - Modify: `src/donate/views.py`
 - Modify: `src/donate/tests.py` (only if a new generator test is added here)
 
-- [ ] In `src/website/models/vtb.py`: add `import os` and `import time`, the module-level
+- [x] In `src/website/models/vtb.py`: add `import os` and `import time`, the module-level
       `_CROCKFORD = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"`, and the `new_order_id(prefix)` static method
       on `VTBPayment` (see Technical Details).
-- [ ] In `src/donate/views.py`: replace `donate_order_id = f"SPUTNIK_{_ulid()}"` (line 105) with
+- [x] In `src/donate/views.py`: replace `donate_order_id = f"SPUTNIK_{_ulid()}"` (line 105) with
       `donate_order_id = VTBPayment.new_order_id("SPUTNIK")` (`VTBPayment` already imported, line 12).
-- [ ] Delete the now-unused `_CROCKFORD` and `_ulid()` (lines 14-19) and the unused `import os` /
+- [x] Delete the now-unused `_CROCKFORD` and `_ulid()` (lines 14-19) and the unused `import os` /
       `import time` from `src/donate/views.py`; confirm via grep that nothing else in that file uses
       them.
-- [ ] Write a test for `VTBPayment.new_order_id`: asserts `"PREFIX_"` prefix + 26-char Crockford
+- [x] Write a test for `VTBPayment.new_order_id`: asserts `"PREFIX_"` prefix + 26-char Crockford
       suffix (all chars ∈ `_CROCKFORD`), and that two calls return different values.
-- [ ] Run the new test + `src/donate/tests.py` — must pass (donate payload mocks use literal
+- [x] Run the new test + `src/donate/tests.py` — must pass (donate payload mocks use literal
       order_ids, so they should be unaffected).
 
 ### Task 2: Add the `Payment.vtb_payment` FK and migration

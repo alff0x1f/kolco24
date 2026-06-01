@@ -1,5 +1,3 @@
-import os
-import time
 from decimal import Decimal, InvalidOperation
 
 from django.contrib import messages
@@ -10,13 +8,6 @@ from django.views import View
 from donate.models import ClubMember, DonateRequest, DonationPeriod, MemberDonation
 from vtb.client import VTBClient
 from website.models import VTBPayment, VTBPreparedPayment
-
-_CROCKFORD = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"
-
-
-def _ulid():
-    val = (int(time.time() * 1000) << 80) | int.from_bytes(os.urandom(10), "big")
-    return "".join(_CROCKFORD[(val >> (5 * i)) & 0x1F] for i in range(25, -1, -1))
 
 
 class DonateView(View):
@@ -102,7 +93,7 @@ class DonateView(View):
                 ),
             )
 
-        donate_order_id = f"SPUTNIK_{_ulid()}"
+        donate_order_id = VTBPayment.new_order_id("SPUTNIK")
         try:
             payload = VTBClient().create_order(
                 order_id=donate_order_id,
