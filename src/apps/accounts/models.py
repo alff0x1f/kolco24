@@ -105,6 +105,17 @@ class EmailVerification(models.Model):
             self.consumed_at = timezone.now()
             self.save(update_fields=["consumed_at"])
 
+    def mark_consumed_atomic(self):
+        """Atomically mark this row consumed. Returns True only if this call won."""
+        now = timezone.now()
+        updated = EmailVerification.objects.filter(
+            pk=self.pk,
+            consumed_at__isnull=True,
+            expires_at__gt=now,
+            attempts__lt=self.MAX_ATTEMPTS,
+        ).update(consumed_at=now)
+        return updated == 1
+
     def atomic_consume_if_valid(self, raw_code):
         """Verify ``raw_code`` and mark this row consumed in one atomic DB operation.
 

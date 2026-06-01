@@ -116,6 +116,8 @@ def _complete_login(request, email, next_url):
                         )
                 except IntegrityError:
                     user = User.objects.filter(email__iexact=email).first()
+    if user is None:
+        return _safe_redirect(request, "/accounts/start/")
     auth_login(request, user, backend="apps.accounts.backends.EmailBackend")
     return _safe_redirect(request, next_url or "/")
 
@@ -438,7 +440,8 @@ class MagicLinkView(View):
         if verification is None or not verification.is_alive:
             raise Http404("Invalid link")
         next_url = request.GET.get("next", "")
-        verification.mark_consumed()
+        if not verification.mark_consumed_atomic():
+            raise Http404("Invalid link")
         return _complete_login(request, verification.email, next_url)
 
 
