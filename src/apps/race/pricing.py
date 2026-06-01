@@ -87,23 +87,24 @@ def create_team_payment(request, team, race):
         return None
 
     cost_now = race.current_price
-    payment = Payment.objects.create(
-        owner=request.user,
-        team=team,
-        payment_method="sbp2",
-        payment_amount=cost,
-        payment_with_discount=cost,
-        cost_per_person=cost_now,
-        paid_for=int(team.ucount) - team.paid_people,
-        status="draft",
-    )
-    for line in lines:
-        PaymentExtra.objects.create(
-            payment=payment,
-            race_extra=line.race_extra,
-            count=line.count,
-            unit_price=line.unit_price,
+    with transaction.atomic():
+        payment = Payment.objects.create(
+            owner=request.user,
+            team=team,
+            payment_method="sbp2",
+            payment_amount=cost,
+            payment_with_discount=cost,
+            cost_per_person=cost_now,
+            paid_for=int(team.ucount) - team.paid_people,
+            status="draft",
         )
+        for line in lines:
+            PaymentExtra.objects.create(
+                payment=payment,
+                race_extra=line.race_extra,
+                count=line.count,
+                unit_price=line.unit_price,
+            )
 
     vtb_client = VTBClient()
     vtb_client._ensure_token()
