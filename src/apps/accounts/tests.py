@@ -45,9 +45,10 @@ def test_verify_code_accepts_correct_code():
     obj, raw_code = EmailVerification.create_for("user@example.com")
 
     assert obj.verify_code(raw_code) is True
-    # accepting does not consume
+    # accepting does not consume and does not increment attempts
     obj.refresh_from_db()
     assert obj.consumed_at is None
+    assert obj.attempts == 0
 
 
 @pytest.mark.django_db
@@ -274,7 +275,70 @@ def test_authed_user_at_start_is_bounced_to_next(client, django_user_model):
     assert response.url == "/race/foo/"
 
 
+@pytest.mark.django_db
+def test_start_post_invalid_email_rerenders_form(client):
+    response = client.post(reverse("account_start"), {"email": "not-an-email"})
+
+    assert response.status_code == 200
+    assert EmailVerification.objects.count() == 0
+
+
+@override_settings(EMAIL_BACKEND=LOCMEM_EMAIL)
+@pytest.mark.django_db
+def test_start_post_stores_next_url_in_session(client):
+    response = client.post(
+        reverse("account_start"), {"email": "u@example.com", "next": "/race/foo/"}
+    )
+
+    assert response.status_code == 302
+    assert client.session["accounts_next"] == "/race/foo/"
+
+
 # ── Passwordless views: verify (code path) ─────────────────────────────
+
+
+@pytest.mark.django_db
+def test_verify_get_no_session_redirects_to_start(client):
+    response = client.get(reverse("account_verify"))
+
+    assert response.status_code == 302
+    assert response.url == reverse("account_start")
+
+
+@pytest.mark.django_db
+def test_verify_get_authenticated_user_redirects(client, django_user_model):
+    django_user_model.objects.create_user("u", "u@example.com", "pw")
+    client.login(username="u@example.com", password="pw")
+
+    response = client.get(reverse("account_verify"))
+
+    assert response.status_code == 302
+    assert response.url == "/"
+
+
+@pytest.mark.django_db
+def test_verify_post_no_session_redirects_to_start(client):
+    response = client.post(reverse("account_verify"), {"code": "123456"})
+
+    assert response.status_code == 302
+    assert response.url == reverse("account_start")
+
+
+@pytest.mark.django_db
+def test_verify_post_locked_out_row_is_rejected(client, django_user_model):
+    django_user_model.objects.create_user("u", "u@example.com", "pw")
+    obj, raw_code = EmailVerification.create_for("u@example.com")
+    EmailVerification.objects.filter(pk=obj.pk).update(
+        attempts=EmailVerification.MAX_ATTEMPTS
+    )
+    session = client.session
+    session["accounts_pending_email"] = "u@example.com"
+    session.save()
+
+    response = client.post(reverse("account_verify"), {"code": raw_code})
+
+    assert response.status_code == 200
+    assert not _is_logged_in(client)
 
 
 @pytest.mark.django_db
