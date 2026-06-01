@@ -13,7 +13,13 @@ from apps.race.models import PaymentExtra, RaceExtra, TeamExtra
 from website.forms import TeamForm
 from website.models import Payment, Race, VTBPayment
 from website.models.models import PaymentsYa, Team
-from website.models.race import Category, RaceLink, RacePriceTier, RegStatus
+from website.models.race import (
+    RESERVATION_TTL,
+    Category,
+    RaceLink,
+    RacePriceTier,
+    RegStatus,
+)
 from website.views.views_ import build_category_options, build_team_form_context
 
 
@@ -1483,14 +1489,14 @@ def _pl_category(race, **kwargs):
     return Category.objects.create(race=race, **kwargs)
 
 
-def _pl_team(category, owner, paid_people=0, is_deleted=False, name="T"):
+def _pl_team(category, owner, paid_people=0, is_deleted=False, name="T", ucount=None):
     return Team.objects.create(
         owner=owner,
         teamname=name,
         paymentid=f"pay-{name}",
         dist=category.code,
         category2=category,
-        ucount=max(paid_people, 1),
+        ucount=ucount if ucount is not None else max(paid_people, 1),
         paid_people=paid_people,
         is_deleted=is_deleted,
     )
@@ -1730,6 +1736,142 @@ def test_gate_moving_and_growing_in_full_category_blocked(django_user_model):
     form = TeamForm(race.id, _gate_data(dst, 5), team=team)
     assert not form.is_valid()
     assert "category2_id" in form.errors
+
+
+# ---------------------------------------------------------------------------
+# Seat reservation: живые draft-платежи держат места занятыми (RESERVATION_TTL)
+# ---------------------------------------------------------------------------
+
+
+def _draft_payment(team, *, age_minutes=0, status=Payment.STATUS_DRAFT):
+    """Создать Payment для команды и при необходимости состарить ``created_at``.
+
+    ``created_at`` — ``auto_now_add``, поэтому возраст задаётся отдельным
+    ``update`` (в обход auto_now_add).
+    """
+    payment = Payment.objects.create(
+        owner=team.owner,
+        team=team,
+        payment_method="sbp2",
+        payment_amount=0,
+        paid_for=max(0, int(team.ucount) - team.paid_people),
+        status=status,
+    )
+    if age_minutes:
+        Payment.objects.filter(pk=payment.pk).update(
+            created_at=timezone.now() - timedelta(minutes=age_minutes)
+        )
+    return payment
+
+
+@pytest.mark.django_db
+def test_reserved_people_counts_live_draft(django_user_model):
+    # Живой draft резервирует max(0, ucount − paid_people) мест.
+    user = _pl_user(django_user_model)
+    race = _pl_race(people_limit=10)
+    cat = _pl_category(race, people_limit=10)
+    team = _pl_team(cat, user, paid_people=0, ucount=3, name="A")
+    _draft_payment(team)
+    assert race.reserved_people() == 3
+    assert cat.reserved_people() == 3
+
+
+@pytest.mark.django_db
+def test_reserved_people_partial_paid_team(django_user_model):
+    # Доплата: бронируется только остаток до полного состава (ucount − paid).
+    user = _pl_user(django_user_model)
+    race = _pl_race(people_limit=10)
+    cat = _pl_category(race, people_limit=10)
+    team = _pl_team(cat, user, paid_people=2, ucount=5, name="A")
+    _draft_payment(team)
+    assert race.reserved_people() == 3
+
+
+@pytest.mark.django_db
+def test_reserved_people_ignores_stale_draft(django_user_model):
+    # Черновик старше RESERVATION_TTL место не держит.
+    user = _pl_user(django_user_model)
+    race = _pl_race(people_limit=10)
+    cat = _pl_category(race, people_limit=10)
+    team = _pl_team(cat, user, paid_people=0, ucount=3, name="A")
+    stale = int(RESERVATION_TTL.total_seconds() // 60) + 1
+    _draft_payment(team, age_minutes=stale)
+    assert race.reserved_people() == 0
+
+
+@pytest.mark.django_db
+def test_reserved_people_ignores_non_draft(django_user_model):
+    # Оплаченный (done) платёж не считается бронью.
+    user = _pl_user(django_user_model)
+    race = _pl_race(people_limit=10)
+    cat = _pl_category(race, people_limit=10)
+    team = _pl_team(cat, user, paid_people=0, ucount=3, name="A")
+    _draft_payment(team, status=Payment.STATUS_DONE)
+    assert race.reserved_people() == 0
+
+
+@pytest.mark.django_db
+def test_reserved_people_counts_team_once(django_user_model):
+    # Несколько живых черновиков одной команды → бронь не множится (distinct).
+    user = _pl_user(django_user_model)
+    race = _pl_race(people_limit=10)
+    cat = _pl_category(race, people_limit=10)
+    team = _pl_team(cat, user, paid_people=0, ucount=3, name="A")
+    _draft_payment(team)
+    _draft_payment(team)
+    assert race.reserved_people() == 3
+
+
+@pytest.mark.django_db
+def test_reserved_people_self_exclusion(django_user_model):
+    # exclude_team снимает собственную бронь команды.
+    user = _pl_user(django_user_model)
+    race = _pl_race(people_limit=10)
+    cat = _pl_category(race, people_limit=10)
+    team = _pl_team(cat, user, paid_people=0, ucount=3, name="A")
+    _draft_payment(team)
+    assert race.reserved_people() == 3
+    assert race.reserved_people(exclude_team=team) == 0
+    assert cat.reserved_people(exclude_team=team) == 0
+
+
+@pytest.mark.django_db
+def test_remaining_people_subtracts_reservations(django_user_model):
+    # Остаток = лимит − оплаченные − забронированные.
+    user = _pl_user(django_user_model)
+    race = _pl_race(people_limit=10)
+    cat = _pl_category(race, people_limit=10)
+    _pl_team(cat, user, paid_people=4, name="paid")  # оплачено 4
+    reserver = _pl_team(cat, user, paid_people=0, ucount=3, name="reserver")
+    _draft_payment(reserver)  # бронь 3
+    assert race.remaining_people() == 3  # 10 − 4 − 3
+    assert cat.remaining_people() == 3
+
+
+@pytest.mark.django_db
+def test_gate_blocks_when_reservation_fills_race(django_user_model):
+    # Суть фикса: бронь первой команды занимает места → вторая упирается в лимит.
+    user = _pl_user(django_user_model)
+    race = _pl_race(people_limit=4)
+    cat = _pl_category(race, people_limit=0)
+    reserver = _pl_team(cat, user, paid_people=0, ucount=3, name="reserver")
+    _draft_payment(reserver)  # бронь 3 из 4
+    # Новая регистрация на 2 человека: нужно 2, свободно 1 → блок.
+    form = TeamForm(race.id, _gate_data(cat, 2))
+    assert not form.is_valid()
+    assert "ucount" in form.errors
+
+
+@pytest.mark.django_db
+def test_gate_own_reservation_does_not_block_edit(django_user_model):
+    # Владелец редактирует свою команду с собственным живым черновиком — не блок.
+    user = _pl_user(django_user_model)
+    race = _pl_race(people_limit=4)
+    cat = _pl_category(race, people_limit=0)
+    team = _pl_team(cat, user, paid_people=0, ucount=4, name="self")
+    _draft_payment(team)  # бронь 4 — гонка «полна» собственной бронью
+    form = TeamForm(race.id, _gate_data(cat, 4), team=team, current_category_id=cat.id)
+    assert form.is_valid(), form.errors
 
 
 # ---------------------------------------------------------------------------
