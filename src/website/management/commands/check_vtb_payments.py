@@ -2,6 +2,8 @@ from time import sleep
 
 from django.core.management.base import BaseCommand
 from django.db import transaction
+from django.db.models import F
+from django.db.models.functions import Greatest
 from django.utils import timezone
 
 from donate.models import ClubMember, DonateRequest, DonationPeriod, MemberDonation
@@ -117,10 +119,12 @@ class Command(BaseCommand):
 
         for pe in payment.extras.all():
             te, _ = TeamExtra.objects.get_or_create(team=team, race_extra=pe.race_extra)
-            te.count_paid += pe.count
-            if te.count < te.count_paid:
-                te.count = te.count_paid
-            te.save(update_fields=["count", "count_paid"])
+            # Atomic SQL-level increment avoids a read-modify-write race when
+            # two command instances process different payments for the same team.
+            TeamExtra.objects.filter(pk=te.pk).update(
+                count_paid=F("count_paid") + pe.count,
+                count=Greatest(F("count"), F("count_paid") + pe.count),
+            )
 
     def _resolve_race_payment(self, vtb_payment: VTBPayment):
         # New ORDER_<ulid> payments link via the explicit FK.
