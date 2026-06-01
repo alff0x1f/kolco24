@@ -151,7 +151,8 @@
           : "") +
         '<span class="vl">' +
         n +
-        "</span></div>" +
+        "</span>" +
+        "</div>" +
         '<div class="brk-bar"><i style="width:' +
         pct +
         '%"></i></div>';

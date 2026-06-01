@@ -285,12 +285,29 @@ class PaymentsYa(models.Model):
         if payment.payment_with_discount > withdraw_amount:
             payment.status = "partial (" + str(withdraw_amount) + ")"
             paid_for = withdraw_amount / payment.cost_per_person
-        if payment.team:
-            payment.team.paid_people += paid_for
-            payment.team.paid_sum += withdraw_amount + payment.additional_charge
-            payment.team.additional_charge -= payment.additional_charge
-            payment.team.save()
-        payment.save()
+        with transaction.atomic():
+            if payment.team:
+                payment.team.paid_people += paid_for
+                payment.team.paid_sum += withdraw_amount + payment.additional_charge
+                payment.team.additional_charge -= payment.additional_charge
+                payment.team.save()
+                # Авто sold_out при достижении лимита гонки (Option B: без
+                # авто-реоткрытия). Caveat: занятость считается по paid_people,
+                # который растёт только при подтверждении оплаты — параллельные
+                # неоплаченные черновики могут кратковременно превысить лимит.
+                from .race import RegStatus
+
+                category = payment.team.category2
+                race = category.race if category else None
+                if (
+                    race
+                    and race.people_limit
+                    and race.reg_status == RegStatus.OPEN
+                    and race.people_count() >= race.people_limit
+                ):
+                    race.reg_status = RegStatus.SOLD_OUT
+                    race.save(update_fields=["reg_status"])
+            payment.save()
         return True
 
 
@@ -485,6 +502,18 @@ class TeamMemberMove(models.Model):
         with transaction.atomic():
             self.from_team.save(update_fields=["paid_people"])
             self.to_team.save(update_fields=["paid_people"])
+            from .race import RegStatus
+
+            category = self.to_team.category2
+            race = category.race if category else None
+            if (
+                race
+                and race.people_limit
+                and race.reg_status == RegStatus.OPEN
+                and race.people_count() >= race.people_limit
+            ):
+                race.reg_status = RegStatus.SOLD_OUT
+                race.save(update_fields=["reg_status"])
 
 
 class TeamAdminLog(models.Model):

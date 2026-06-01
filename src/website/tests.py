@@ -8,9 +8,11 @@ from django.db import IntegrityError
 from django.urls import reverse
 from django.utils import timezone
 
+from website.forms import TeamForm
 from website.models import Payment, Race
-from website.models.models import Team
+from website.models.models import PaymentsYa, Team
 from website.models.race import Category, RaceLink, RacePriceTier, RegStatus
+from website.views.views_ import build_category_options, build_team_form_context
 
 
 @pytest.mark.django_db
@@ -1291,3 +1293,481 @@ def test_build_category_options_single_size(client):
     options = response.context["category_options"]
     match = next(o for o in options if o["id"] == category.id)
     assert match["counts"] == [2]
+
+
+# ---------------------------------------------------------------------------
+# Task 1: people-limit fields & occupancy helpers
+# ---------------------------------------------------------------------------
+
+
+def _pl_user(django_user_model, n=0):
+    return django_user_model.objects.create_user(username=f"pl_owner_{n}", password="x")
+
+
+def _pl_race(**kwargs):
+    kwargs.setdefault("name", "PL Race")
+    kwargs.setdefault("code", "pl-race")
+    kwargs.setdefault("slug", "pl-race")
+    return Race.objects.create(**kwargs)
+
+
+def _pl_category(race, **kwargs):
+    kwargs.setdefault("code", "M")
+    kwargs.setdefault("name", "Men")
+    kwargs.setdefault("short_name", "M")
+    return Category.objects.create(race=race, **kwargs)
+
+
+def _pl_team(category, owner, paid_people=0, is_deleted=False, name="T"):
+    return Team.objects.create(
+        owner=owner,
+        teamname=name,
+        paymentid=f"pay-{name}",
+        dist=category.code,
+        category2=category,
+        ucount=max(paid_people, 1),
+        paid_people=paid_people,
+        is_deleted=is_deleted,
+    )
+
+
+@pytest.mark.django_db
+def test_category_people_count_sums_paid_people(django_user_model):
+    user = _pl_user(django_user_model)
+    race = _pl_race()
+    cat = _pl_category(race)
+    _pl_team(cat, user, paid_people=2, name="A")
+    _pl_team(cat, user, paid_people=3, name="B")
+    _pl_team(cat, user, paid_people=0, name="Draft")
+    assert cat.people_count() == 5
+
+
+@pytest.mark.django_db
+def test_category_people_count_excludes_deleted(django_user_model):
+    user = _pl_user(django_user_model)
+    race = _pl_race()
+    cat = _pl_category(race)
+    _pl_team(cat, user, paid_people=2, name="A")
+    _pl_team(cat, user, paid_people=4, is_deleted=True, name="Gone")
+    assert cat.people_count() == 2
+
+
+@pytest.mark.django_db
+def test_race_people_count_excludes_deleted(django_user_model):
+    user = _pl_user(django_user_model)
+    race = _pl_race(people_limit=10)
+    cat = _pl_category(race)
+    _pl_team(cat, user, paid_people=2, name="A")
+    _pl_team(cat, user, paid_people=4, is_deleted=True, name="Gone")
+    assert race.people_count() == 2
+
+
+@pytest.mark.django_db
+def test_category_remaining_people_unlimited_when_zero(django_user_model):
+    user = _pl_user(django_user_model)
+    race = _pl_race()
+    cat = _pl_category(race, people_limit=0)
+    _pl_team(cat, user, paid_people=2)
+    assert cat.remaining_people() is None
+
+
+@pytest.mark.django_db
+def test_category_remaining_people_with_limit(django_user_model):
+    user = _pl_user(django_user_model)
+    race = _pl_race()
+    cat = _pl_category(race, people_limit=6)
+    _pl_team(cat, user, paid_people=2)
+    assert cat.remaining_people() == 4
+
+
+@pytest.mark.django_db
+def test_category_remaining_people_excludes_self_team(django_user_model):
+    user = _pl_user(django_user_model)
+    race = _pl_race()
+    cat = _pl_category(race, people_limit=6)
+    team = _pl_team(cat, user, paid_people=2, name="self")
+    _pl_team(cat, user, paid_people=3, name="Other")
+    # without exclusion: 6 - 5 = 1
+    assert cat.remaining_people() == 1
+    # excluding the team itself frees its 2 slots: 6 - 3 = 3
+    assert cat.remaining_people(exclude_team=team) == 3
+    # excluding a team from a different category has no effect
+    other_cat = _pl_category(race, code="W", name="Women", short_name="W")
+    foreign = _pl_team(other_cat, user, paid_people=2, name="foreign")
+    assert cat.remaining_people(exclude_team=foreign) == 1
+
+
+@pytest.mark.django_db
+def test_race_remaining_people_unlimited_when_zero(django_user_model):
+    user = _pl_user(django_user_model)
+    race = _pl_race(people_limit=0)
+    cat = _pl_category(race)
+    _pl_team(cat, user, paid_people=2)
+    assert race.remaining_people() is None
+
+
+@pytest.mark.django_db
+def test_race_remaining_people_with_limit(django_user_model):
+    user = _pl_user(django_user_model)
+    race = _pl_race(people_limit=10)
+    cat = _pl_category(race)
+    _pl_team(cat, user, paid_people=2, name="A")
+    _pl_team(cat, user, paid_people=3, name="B")
+    assert race.remaining_people() == 5
+
+
+# ---------------------------------------------------------------------------
+# Task 2: capacity gate in TeamForm
+# ---------------------------------------------------------------------------
+
+
+def _gate_data(category, ucount, map_count=0):
+    return {
+        "ucount": str(ucount),
+        "category2_id": str(category.id),
+        "map_count": str(map_count),
+        "dist": category.code,
+    }
+
+
+@pytest.mark.django_db
+def test_gate_race_full_blocks_growth(django_user_model):
+    # Гонка полная (лимит достигнут); рост состава 2→3 блокируется.
+    user = _pl_user(django_user_model)
+    race = _pl_race(people_limit=5)
+    cat = _pl_category(race)
+    _pl_team(cat, user, paid_people=5, name="filler")
+    team = _pl_team(cat, user, paid_people=2, name="self")
+    form = TeamForm(race.id, _gate_data(cat, 3), team=team)
+    assert not form.is_valid()
+    assert "ucount" in form.errors
+
+
+@pytest.mark.django_db
+def test_gate_pure_transfer_allowed_when_race_full(django_user_model):
+    # Гонка полная, но в целевой категории есть места: чистый переход 2→2 ок.
+    user = _pl_user(django_user_model)
+    race = _pl_race(people_limit=4)
+    src = _pl_category(race, code="A", name="A", short_name="A", people_limit=0)
+    dst = _pl_category(race, code="B", name="B", short_name="B", people_limit=10)
+    _pl_team(dst, user, paid_people=2, name="filler")  # race now at 4 (full)
+    team = _pl_team(src, user, paid_people=2, name="self")
+    form = TeamForm(race.id, _gate_data(dst, 2), team=team)
+    assert form.is_valid(), form.errors
+
+
+@pytest.mark.django_db
+def test_gate_category_full_blocks_entry(django_user_model):
+    # Перейти в полную категорию нельзя.
+    user = _pl_user(django_user_model)
+    race = _pl_race(people_limit=0)
+    src = _pl_category(race, code="A", name="A", short_name="A")
+    dst = _pl_category(race, code="B", name="B", short_name="B", people_limit=2)
+    _pl_team(dst, user, paid_people=2, name="filler")  # category full
+    team = _pl_team(src, user, paid_people=2, name="self")
+    form = TeamForm(race.id, _gate_data(dst, 2), team=team)
+    assert not form.is_valid()
+    assert "category2_id" in form.errors
+
+
+@pytest.mark.django_db
+def test_gate_edit_self_no_growth_in_full_category_allowed(django_user_model):
+    # Категория полная за счёт самой команды: edit без роста разрешён.
+    user = _pl_user(django_user_model)
+    race = _pl_race(people_limit=0)
+    cat = _pl_category(race, people_limit=4)
+    _pl_team(cat, user, paid_people=2, name="other")
+    team = _pl_team(cat, user, paid_people=2, name="self")  # category at 4 (full)
+    form = TeamForm(race.id, _gate_data(cat, 2), team=team, current_category_id=cat.id)
+    assert form.is_valid(), form.errors
+
+
+@pytest.mark.django_db
+def test_gate_growth_in_full_category_blocked(django_user_model):
+    # Рост состава в полной категории блокируется.
+    user = _pl_user(django_user_model)
+    race = _pl_race(people_limit=0)
+    cat = _pl_category(race, people_limit=4)
+    _pl_team(cat, user, paid_people=2, name="other")
+    team = _pl_team(cat, user, paid_people=2, name="self")
+    form = TeamForm(race.id, _gate_data(cat, 3), team=team, current_category_id=cat.id)
+    assert not form.is_valid()
+    assert "category2_id" in form.errors
+
+
+@pytest.mark.django_db
+def test_gate_new_registration_into_full_race_blocked(django_user_model):
+    # Новая регистрация (team=Team()) в полную гонку блокируется.
+    user = _pl_user(django_user_model)
+    race = _pl_race(people_limit=4)
+    cat = _pl_category(race)
+    _pl_team(cat, user, paid_people=4, name="filler")
+    form = TeamForm(race.id, _gate_data(cat, 2))  # team defaults to Team()
+    assert not form.is_valid()
+    assert "ucount" in form.errors
+
+
+@pytest.mark.django_db
+def test_gate_draft_teams_do_not_occupy_slots(django_user_model):
+    # paid_people=0 черновики не занимают слот → регистрация проходит.
+    user = _pl_user(django_user_model)
+    race = _pl_race(people_limit=4)
+    cat = _pl_category(race)
+    _pl_team(cat, user, paid_people=0, name="draft1")
+    _pl_team(cat, user, paid_people=0, name="draft2")
+    form = TeamForm(race.id, _gate_data(cat, 3))
+    assert form.is_valid(), form.errors
+
+
+@pytest.mark.django_db
+def test_gate_bypass_limits_skips_gate(django_user_model):
+    # bypass_limits (суперюзер) пропускает gate несмотря на полную гонку.
+    user = _pl_user(django_user_model)
+    race = _pl_race(people_limit=2)
+    cat = _pl_category(race)
+    _pl_team(cat, user, paid_people=2, name="filler")
+    form = TeamForm(race.id, _gate_data(cat, 4), bypass_limits=True)
+    assert form.is_valid(), form.errors
+
+
+@pytest.mark.django_db
+def test_gate_unlimited_does_not_restrict(django_user_model):
+    # people_limit=0 (гонка и категория) не ограничивает.
+    user = _pl_user(django_user_model)
+    race = _pl_race(people_limit=0)
+    cat = _pl_category(race, people_limit=0)
+    _pl_team(cat, user, paid_people=6, name="filler")
+    form = TeamForm(race.id, _gate_data(cat, 6))
+    assert form.is_valid(), form.errors
+
+
+@pytest.mark.django_db
+def test_gate_exactly_fills_last_slot(django_user_model):
+    # needed == race_remaining → разрешено (условие > а не >=).
+    user = _pl_user(django_user_model)
+    race = _pl_race(people_limit=5)
+    cat = _pl_category(race)
+    _pl_team(cat, user, paid_people=3, name="filler")
+    team = _pl_team(cat, user, paid_people=0, name="self")
+    form = TeamForm(race.id, _gate_data(cat, 2), team=team)
+    assert form.is_valid(), form.errors
+
+
+@pytest.mark.django_db
+def test_gate_moving_and_growing_in_full_category_blocked(django_user_model):
+    # Переход в другую категорию с одновременным ростом блокируется категорийным гейтом.
+    user = _pl_user(django_user_model)
+    race = _pl_race(people_limit=0)
+    src = _pl_category(race, code="A", name="A", short_name="A")
+    dst = _pl_category(race, code="B", name="B", short_name="B", people_limit=4)
+    _pl_team(dst, user, paid_people=3, name="filler")
+    team = _pl_team(src, user, paid_people=2, name="self")
+    form = TeamForm(race.id, _gate_data(dst, 5), team=team)
+    assert not form.is_valid()
+    assert "category2_id" in form.errors
+
+
+# ---------------------------------------------------------------------------
+# Task 3: авто sold_out при подтверждении оплаты
+# ---------------------------------------------------------------------------
+
+
+def _confirm_payment(user, team, paid_for, cost_per_person=1500):
+    """Подтвердить оплату через PaymentsYa.update_team (инкрементит paid_people)."""
+    amount = paid_for * cost_per_person
+    payment = Payment.objects.create(
+        owner=user,
+        team=team,
+        payment_method="ya",
+        payment_amount=amount,
+        payment_with_discount=amount,
+        cost_per_person=cost_per_person,
+        paid_for=paid_for,
+        sender_card_number="",
+    )
+    ya = PaymentsYa.objects.create(
+        notification_type="p2p-incoming",
+        operation_id="op",
+        amount=str(amount),
+        withdraw_amount=str(amount),
+        currency="643",
+        datetime="2026-06-01",
+        sender="",
+        label=str(payment.id),
+        sha1_hash="",
+    )
+    ya.update_team(payment.id)
+
+
+@pytest.mark.django_db
+def test_payment_reaching_cap_flips_sold_out(django_user_model):
+    user = _pl_user(django_user_model)
+    race = _pl_race(people_limit=4, reg_status=RegStatus.OPEN)
+    cat = _pl_category(race)
+    team = _pl_team(cat, user, paid_people=2, name="self")
+    # occupancy 2 → оплата на ещё 2 → 4 >= limit(4) → sold_out
+    _confirm_payment(user, team, paid_for=2)
+    race.refresh_from_db()
+    assert race.reg_status == RegStatus.SOLD_OUT
+
+
+@pytest.mark.django_db
+def test_deleting_team_does_not_reopen(django_user_model):
+    # Option B: после авто sold_out удаление команды не реоткрывает регистрацию.
+    user = _pl_user(django_user_model)
+    race = _pl_race(people_limit=4, reg_status=RegStatus.OPEN)
+    cat = _pl_category(race)
+    team = _pl_team(cat, user, paid_people=2, name="self")
+    _confirm_payment(user, team, paid_for=2)  # 2 + 2 = 4 → sold_out
+    race.refresh_from_db()
+    assert race.reg_status == RegStatus.SOLD_OUT
+    # освобождаем места — авто-реоткрытия нет
+    team.refresh_from_db()
+    team.is_deleted = True
+    team.save()
+    race.refresh_from_db()
+    assert race.reg_status == RegStatus.SOLD_OUT
+
+
+@pytest.mark.django_db
+def test_manual_sold_out_below_cap_untouched(django_user_model):
+    # Ручной sold_out ниже cap триггер не трогает (флип только OPEN → SOLD_OUT).
+    user = _pl_user(django_user_model)
+    race = _pl_race(people_limit=10, reg_status=RegStatus.SOLD_OUT)
+    cat = _pl_category(race)
+    team = _pl_team(cat, user, paid_people=2, name="self")
+    _confirm_payment(user, team, paid_for=2)  # occupancy 4 < 10
+    race.refresh_from_db()
+    assert race.reg_status == RegStatus.SOLD_OUT
+
+
+@pytest.mark.django_db
+def test_race_without_limit_does_not_flip(django_user_model):
+    user = _pl_user(django_user_model)
+    race = _pl_race(people_limit=0, reg_status=RegStatus.OPEN)
+    cat = _pl_category(race)
+    team = _pl_team(cat, user, paid_people=2, name="self")
+    _confirm_payment(user, team, paid_for=10)
+    race.refresh_from_db()
+    assert race.reg_status == RegStatus.OPEN
+
+
+# ---------------------------------------------------------------------------
+# Task 5: team-form UX context (data-remaining / raceRemaining)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.django_db
+def test_build_category_options_remaining_limited_and_unlimited(django_user_model):
+    user = _pl_user(django_user_model)
+    race = _pl_race()
+    limited = _pl_category(race, code="L", name="Lim", short_name="L", people_limit=6)
+    unlimited = _pl_category(race, code="U", name="Unl", short_name="U", people_limit=0)
+    _pl_team(limited, user, paid_people=2, name="A")
+    options = build_category_options(race.id)
+    by_id = {o["id"]: o for o in options}
+    # limited: 6 - 2 = 4 free; unlimited published as "" (no limit)
+    assert by_id[limited.id]["remaining"] == 4
+    assert by_id[unlimited.id]["remaining"] == ""
+
+
+@pytest.mark.django_db
+def test_build_category_options_excludes_own_team(django_user_model):
+    user = _pl_user(django_user_model)
+    race = _pl_race()
+    cat = _pl_category(race, people_limit=6)
+    team = _pl_team(cat, user, paid_people=2, name="self")
+    _pl_team(cat, user, paid_people=3, name="Other")
+    # without exclusion 6 - 5 = 1; excluding own team frees its 2 → 3
+    plain = build_category_options(race.id)
+    assert next(o for o in plain if o["id"] == cat.id)["remaining"] == 1
+    excluded = build_category_options(race.id, cat.id, team=team)
+    assert next(o for o in excluded if o["id"] == cat.id)["remaining"] == 3
+
+
+@pytest.mark.django_db
+def test_build_category_options_marks_current(django_user_model):
+    user = _pl_user(django_user_model)
+    race = _pl_race()
+    cat = _pl_category(race, code="C", name="Cur", short_name="C", people_limit=2)
+    other = _pl_category(race, code="O", name="Oth", short_name="O", people_limit=2)
+    team = _pl_team(cat, user, paid_people=2, name="self")
+    options = build_category_options(race.id, cat.id, team=team)
+    by_id = {o["id"]: o for o in options}
+    # the team's own (full) category is flagged so the client never disables it
+    assert by_id[cat.id]["is_current"] is True
+    assert by_id[other.id]["is_current"] is False
+
+
+@pytest.mark.django_db
+def test_build_team_form_context_includes_race_remaining(django_user_model):
+    import json
+
+    user = _pl_user(django_user_model)
+    race = _pl_race(people_limit=10)
+    cat = _pl_category(race)
+    _pl_team(cat, user, paid_people=4, name="A")
+    ctx = build_team_form_context(race, Team())
+    config = json.loads(str(ctx["team_form_config_json"]))
+    assert config["raceRemaining"] == 6
+    assert config["currentCategoryId"] is None
+
+
+@pytest.mark.django_db
+def test_build_team_form_context_race_remaining_unlimited(django_user_model):
+    import json
+
+    race = _pl_race(people_limit=0)
+    ctx = build_team_form_context(race, Team())
+    config = json.loads(str(ctx["team_form_config_json"]))
+    assert config["raceRemaining"] is None
+
+
+@pytest.mark.django_db
+def test_edit_team_invalid_post_superuser_has_bypass_limits_in_config(
+    client, django_user_model
+):
+    import json
+
+    superuser = django_user_model.objects.create_superuser(
+        username="su_bypass_test", password="x"
+    )
+    race = _pl_race(people_limit=2)
+    cat = _pl_category(race)
+    filler_user = _pl_user(django_user_model, n=77)
+    _pl_team(cat, filler_user, paid_people=2, name="filler77")
+    team = _pl_team(cat, superuser, paid_people=0, name="SuTeam")
+    client.force_login(superuser)
+    # ucount=1 is below min_value=2, so form.is_valid() is False → invalid-POST rerender
+    response = client.post(
+        f"/team/{team.id}/",
+        {"ucount": "1", "category2_id": str(cat.id)},
+    )
+    assert response.status_code == 200
+    config = json.loads(str(response.context["team_form_config_json"]))
+    assert config["bypassLimits"] is True
+
+
+@pytest.mark.parametrize(
+    "n,expected",
+    [
+        (0, "команд"),
+        (1, "команда"),
+        (2, "команды"),
+        (4, "команды"),
+        (5, "команд"),
+        (11, "команд"),  # 11–14 are the «many» exception
+        (12, "команд"),
+        (14, "команд"),
+        (21, "команда"),
+        (22, "команды"),
+        (25, "команд"),
+        (111, "команд"),
+        (2.0, "команды"),  # FloatField counts coerce via float→int
+        (None, "команд"),  # bad input falls back to «many»
+    ],
+)
+def test_ru_plural_picks_correct_form(n, expected):
+    from website.templatetags.custom_filters import ru_plural
+
+    assert ru_plural(n, "команда,команды,команд") == expected

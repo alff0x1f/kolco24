@@ -503,8 +503,20 @@ class TeamForm(forms.Form):
         label="Дополнительные карты",
     )
 
-    def __init__(self, race_id, *args, current_category_id=None, **kwargs):
+    def __init__(
+        self,
+        race_id,
+        *args,
+        current_category_id=None,
+        team=None,
+        bypass_limits=False,
+        **kwargs,
+    ):
         super(TeamForm, self).__init__(*args, **kwargs)
+        # team = редактируемая команда (для само-исключения и расчёта роста);
+        # на add передаётся Team() (paid_people=0, category2_id=None).
+        self.team = team if team is not None else Team()
+        self.bypass_limits = bypass_limits
         cats = list(Category.objects.filter(race_id=race_id, is_active=True))
         if current_category_id is not None:
             active_ids = {c.id for c in cats}
@@ -612,7 +624,9 @@ class TeamForm(forms.Form):
         category_id = cleaned_data.get("category2_id")
         ucount = cleaned_data.get("ucount")
         category = (
-            Category.objects.filter(id=category_id).first() if category_id else None
+            Category.objects.filter(id=category_id).select_related("race").first()
+            if category_id
+            else None
         )
         ucount_valid = False
         if ucount is not None:
@@ -633,6 +647,35 @@ class TeamForm(forms.Form):
                 self.add_error(
                     "map_count",
                     "Слишком много дополнительных карт для такого состава.",
+                )
+
+        # Capacity gate: лимиты гонки/категории. Суперюзер (bypass_limits)
+        # пропускает. Занятость считается по paid_people (см. caveat в плане).
+        if ucount_valid and not self.bypass_limits:
+            team = self.team
+            new_ucount = int(ucount)
+
+            # Гонка — блокирует только рост состава.
+            needed = new_ucount - team.paid_people
+            race_remaining = category.race.remaining_people(exclude_team=team)
+            if race_remaining is not None and needed > 0 and needed > race_remaining:
+                self.add_error(
+                    "ucount",
+                    f"В гонке закончились места: осталось {int(race_remaining)}.",
+                )
+
+            # Категория — блокирует вход в полную и рост в полной.
+            cat_remaining = category.remaining_people(exclude_team=team)
+            moving_in = category.id != team.category2_id
+            growing = new_ucount > team.paid_people
+            if (
+                cat_remaining is not None
+                and (moving_in or growing)
+                and new_ucount > cat_remaining
+            ):
+                self.add_error(
+                    "category2_id",
+                    f"В категории нет мест: осталось {int(cat_remaining)}.",
                 )
 
         # make invalid fields red:

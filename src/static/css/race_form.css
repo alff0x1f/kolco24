@@ -237,7 +237,7 @@
 .race-form-page .cats-headrow,
 .race-form-page .cat-row {
   display: grid;
-  grid-template-columns: 30px 104px 88px minmax(0,1fr) minmax(0,1.4fr) 56px 56px 56px 34px;
+  grid-template-columns: 30px 104px 88px minmax(0,1fr) minmax(0,1.4fr) 56px 56px 56px 56px 34px;
   gap: 10px; align-items: center;
 }
 .race-form-page .cats-headrow {
@@ -333,7 +333,8 @@
       "handle code  short del"
       "handle name  name  name"
       "handle desc  desc  desc"
-      "handle min   max   tog";
+      "handle min   max   lim"
+      "handle tog   tog   tog";
     gap: 8px; padding: 12px 4px; align-items: center;
   }
   .race-form-page .cat-row .handle { grid-area: handle; }
@@ -343,6 +344,7 @@
   .race-form-page .cat-row .c-desc { grid-area: desc; }
   .race-form-page .cat-row .c-min { grid-area: min; }
   .race-form-page .cat-row .c-max { grid-area: max; }
+  .race-form-page .cat-row .c-limit { grid-area: lim; }
   .race-form-page .cat-row .cat-toggle-cell { grid-area: tog; justify-self: start; }
   .race-form-page .cat-row .cat-del { grid-area: del; justify-self: end; }
   .race-form-page .tier-row {

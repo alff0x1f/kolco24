@@ -1184,6 +1184,9 @@ class ConfirmPaymentView(View):
         payment.order = pk
 
         team = payment.team
+        if team is None:
+            payment.save(update_fields=["status", "balance", "order", "recipient"])
+            return HttpResponseRedirect("/payments?status=draft_with_info")
         team.paid_people += payment.paid_for
         team.paid_sum += payment.payment_amount
 
@@ -1191,8 +1194,19 @@ class ConfirmPaymentView(View):
         if recipient:
             payment.recipient = SbpPaymentRecipient.objects.get(pk=recipient)
 
-        team.save(update_fields=["paid_people", "paid_sum"])
-        payment.save(update_fields=["status", "balance", "order", "recipient"])
+        with transaction.atomic():
+            team.save(update_fields=["paid_people", "paid_sum"])
+            category = team.category2
+            race = category.race if category else None
+            if (
+                race
+                and race.people_limit
+                and race.reg_status == RegStatus.OPEN
+                and race.people_count() >= race.people_limit
+            ):
+                race.reg_status = RegStatus.SOLD_OUT
+                race.save(update_fields=["reg_status"])
+            payment.save(update_fields=["status", "balance", "order", "recipient"])
         return HttpResponseRedirect("/payments?status=draft_with_info")
 
     def update_only_balance(self, payment, balance):
@@ -1746,11 +1760,16 @@ def upload_photo(request, race_id):
     return JsonResponse({"success": True})
 
 
-def build_category_options(race_id, current_category_id=None):
+def build_category_options(race_id, current_category_id=None, team=None):
     """Category options carrying ``data-counts`` expanded from min/max people.
 
     If current_category_id names an inactive category, it is prepended so that
     existing teams whose category was later deactivated still render correctly.
+
+    Each option also carries ``remaining`` — free slots for that category
+    (``""`` when the category is unlimited), self-excluding ``team`` from the
+    occupancy so a team editing within its own category isn't counted against
+    its own limit. The client uses it to disable full categories.
     """
     cats = list(Category.objects.filter(race_id=race_id, is_active=True))
     if current_category_id is not None:
@@ -1761,21 +1780,27 @@ def build_category_options(race_id, current_category_id=None):
             ).first()
             if current_cat:
                 cats.insert(0, current_cat)
-    return [
-        {
-            "id": category.id,
-            "label": f"{category.short_name} ({category.name})",
-            "counts": list(range(category.min_people, category.max_people + 1)),
-        }
-        for category in cats
-    ]
+    options = []
+    for category in cats:
+        remaining = category.remaining_people(exclude_team=team)
+        options.append(
+            {
+                "id": category.id,
+                "label": f"{category.short_name} ({category.name})",
+                "counts": list(range(category.min_people, category.max_people + 1)),
+                "remaining": "" if remaining is None else int(remaining),
+                "is_current": category.id == current_category_id,
+            }
+        )
+    return options
 
 
-def build_team_form_context(race, team, is_edit=False):
+def build_team_form_context(race, team, is_edit=False, bypass_limits=False):
     """Unified context shared by the add and edit team forms."""
     current_category_id = getattr(team, "category2_id", None)
     price_tiers = race.price_tier_ladder()
     current_price = race.current_price
+    race_remaining = race.remaining_people(exclude_team=team)
     config = {
         "currentPrice": current_price,
         "paidPeople": team.paid_people,
@@ -1783,6 +1808,9 @@ def build_team_form_context(race, team, is_edit=False):
         "mapPrice": MAP_PRICE,
         "freeMaps": FREE_MAPS,
         "isEdit": is_edit,
+        "raceRemaining": race_remaining,
+        "currentCategoryId": current_category_id,
+        "bypassLimits": bypass_limits,
     }
     return {
         "current_price": current_price,
@@ -1794,7 +1822,9 @@ def build_team_form_context(race, team, is_edit=False):
         "reg_status": race.reg_status,
         "map_price": MAP_PRICE,
         "free_maps": FREE_MAPS,
-        "category_options": build_category_options(race.id, current_category_id),
+        "category_options": build_category_options(
+            race.id, current_category_id, team=team
+        ),
         "team_form_config_json": mark_safe(json.dumps(config)),
     }
 
@@ -1815,7 +1845,9 @@ class AddTeam(View):
                 "team_form": form,
                 "team": Team(),
                 "action": reverse("add_team", args=[race.slug]),
-                **build_team_form_context(race, Team()),
+                **build_team_form_context(
+                    race, Team(), bypass_limits=request.user.is_superuser
+                ),
             },
         )
 
@@ -1839,7 +1871,7 @@ class AddTeam(View):
         data = request.POST.copy()
         data["dist"] = category2.code
         data["paymentid"] = "%016x" % random.randrange(16**16)  # legacy
-        form = TeamForm(race.id, data)
+        form = TeamForm(race.id, data, bypass_limits=request.user.is_superuser)
         if form.is_valid():
             # save team
             team: Team = Team.objects.create(
@@ -1903,7 +1935,9 @@ class AddTeam(View):
                 "team_form": form,
                 "team": Team(),
                 "action": reverse("add_team", args=[race.slug]),
-                **build_team_form_context(race, Team()),
+                **build_team_form_context(
+                    race, Team(), bypass_limits=request.user.is_superuser
+                ),
             },
         )
 

@@ -264,9 +264,10 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* ── Sidebar: categories list with progress bars ─────── */
-/* Mirrors the «По категориям» breakdown panel (teams.css .brk*): short label
-   prominent, full name dim/truncated, single-colour bar. */
+/* ── Sidebar: categories list ────────────────────────── */
+/* Short label prominent, full name dim/truncated, then two clearly-labelled
+   stats («N команд · M участников») and a separate «осталось K из L / мест
+   нет» line — teams and participants never share a unit. */
 .cats-menu {
   list-style: none;
   padding: 8px 12px 12px;
@@ -274,7 +275,7 @@
 }
 .cats-menu li a {
   display: block;
-  padding: 8px 10px;
+  padding: 9px 10px;
   border-radius: 8px;
   color: var(--ink);
   text-decoration: none;
@@ -286,7 +287,7 @@
   align-items: baseline;
   gap: 8px;
   font-size: 13.5px;
-  margin-bottom: 6px;
+  margin-bottom: 3px;
 }
 .cat-nm { color: var(--ink); font-weight: 500; flex: 0 0 auto; }
 /* Full category name — unobtrusive: dim, smaller, truncated if it doesn't fit
@@ -301,25 +302,34 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.cat-count {
-  margin-left: auto;
-  flex: 0 0 auto;
+/* Stat line: «12 команд · 48 участников». Numbers are emphasised, the unit
+   words stay muted so the eye never confuses one count for the other. */
+.cat-stats {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 5px;
   font-size: 12.5px;
   color: var(--muted);
+}
+.cat-stat b {
+  font-weight: 600;
+  color: var(--ink-soft);
   font-variant-numeric: tabular-nums;
 }
-.cat-bar {
-  height: 6px;
-  background: #eef1f5;
-  border-radius: 999px;
-  overflow: hidden;
+.cat-sep { color: var(--muted-2); }
+.cat-remaining {
+  margin-top: 3px;
+  font-size: 11.5px;
+  font-weight: 500;
+  white-space: nowrap;
 }
-.cat-bar i {
-  display: block;
-  height: 100%;
-  border-radius: 999px;
-  background: var(--primary-2);
-}
+.cat-remaining.ok { color: var(--primary-2); }
+.cat-remaining.none { color: #c0392b; }
+/* Race-level «осталось N мест / мест нет» badge in the cover sub line. */
+.cover-title .sub .remaining { font-weight: 600; }
+.cover-title .sub .remaining.ok { color: var(--primary-2); }
+.cover-title .sub .remaining.none { color: #c0392b; }
 
 /* ── Responsive ──────────────────────────────────────── */
 @media (max-width: 920px) {

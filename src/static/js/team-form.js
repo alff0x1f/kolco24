@@ -42,6 +42,9 @@
     mapPrice: 200,
     freeMaps: 2,
     isEdit: false,
+    raceRemaining: null,
+    currentCategoryId: null,
+    bypassLimits: false,
   };
   var cfgEl = document.getElementById("teamFormConfig");
   if (cfgEl) {
@@ -60,6 +63,10 @@
   var PAID_PEOPLE = Number(cfg.paidPeople) || 0;
   var MAPS_PAID = Number(cfg.mapCountPaid) || 0;
   var IS_EDIT = !!cfg.isEdit;
+  // null/"" => unlimited; mirrors Race.remaining_people()/Category.remaining_people()
+  var RACE_REMAINING = cfg.raceRemaining == null ? null : Number(cfg.raceRemaining);
+  var CURRENT_CAT_ID = cfg.currentCategoryId == null ? null : String(cfg.currentCategoryId);
+  var BYPASS_LIMITS = !!cfg.bypassLimits;
 
   // ── DOM hooks ─────────────────────────────────────────
   var category = document.getElementById("category");
@@ -114,7 +121,68 @@
       });
   }
 
+  // Free slots for an option (null = unlimited), as published by the server.
+  function optRemaining(opt) {
+    if (!opt) return null;
+    var raw = opt.dataset.remaining;
+    return raw === "" || raw == null ? null : Number(raw);
+  }
+
+  // Whether team size `n` is allowed for the selected option, mirroring the
+  // server gate in TeamForm.clean(): race blocks only growth, category blocks
+  // entering-full / growing-in-full (self-exclusion already baked into
+  // data-remaining). The team's own current category is never blocked.
+  function countAllowed(opt, n) {
+    if (!opt || BYPASS_LIMITS) return true;
+    var isCurrent =
+      opt.dataset.current === "1" ||
+      (CURRENT_CAT_ID != null && String(opt.value) === CURRENT_CAT_ID);
+    // race: needed > 0 must fit into RACE_REMAINING
+    if (RACE_REMAINING != null) {
+      var needed = n - PAID_PEOPLE;
+      if (needed > 0 && needed > RACE_REMAINING) return false;
+    }
+    // category: only when entering a new category or growing
+    var catRem = optRemaining(opt);
+    if (catRem != null) {
+      var movingIn = !isCurrent;
+      var growing = n > PAID_PEOPLE;
+      if ((movingIn || growing) && n > catRem) return false;
+    }
+    return true;
+  }
+
+  // An option is "full" (and disabled in the dropdown) when even its smallest
+  // allowed team size can't fit. The team's own category is never disabled.
+  function syncCategoryOptions() {
+    if (!category) return;
+    Array.prototype.forEach.call(category.options, function (opt) {
+      if (BYPASS_LIMITS) {
+        opt.disabled = false;
+        return;
+      }
+      var isCurrent =
+        opt.dataset.current === "1" ||
+        (CURRENT_CAT_ID != null && String(opt.value) === CURRENT_CAT_ID);
+      if (isCurrent) {
+        opt.disabled = false;
+        return;
+      }
+      var sizes = (opt.dataset.counts || "")
+        .split(",")
+        .map(function (s) {
+          return parseInt(s, 10);
+        })
+        .filter(function (x) {
+          return !isNaN(x);
+        });
+      var minN = sizes.length ? sizes[0] : 2;
+      opt.disabled = !countAllowed(opt, minN);
+    });
+  }
+
   function buildSeg() {
+    var opt = category && category.selectedOptions[0];
     var opts = counts();
     seg.innerHTML = "";
     opts.forEach(function (n) {
@@ -122,7 +190,9 @@
       b.type = "button";
       b.textContent = n;
       b.dataset.n = n;
+      b.disabled = !countAllowed(opt, n);
       b.addEventListener("click", function () {
+        if (b.disabled) return;
         setCount(n);
       });
       seg.appendChild(b);
@@ -133,7 +203,20 @@
           ? "состав фиксирован: " + opts[0] + " чел."
           : "от " + opts[0] + " до " + opts[opts.length - 1] + " человек";
     }
-    setCount(opts.indexOf(ucount) >= 0 ? ucount : opts[0]);
+    // prefer the current size if still allowed, else the largest allowed size,
+    // else fall back to the smallest size (server still has final say)
+    var allowed = opts.filter(function (n) {
+      return countAllowed(opt, n);
+    });
+    var pick;
+    if (opts.indexOf(ucount) >= 0 && countAllowed(opt, ucount)) {
+      pick = ucount;
+    } else if (allowed.length) {
+      pick = allowed[allowed.length - 1];
+    } else {
+      pick = opts[0];
+    }
+    setCount(pick);
   }
 
   function setCount(n) {
@@ -260,6 +343,7 @@
 
   // ── Init ──────────────────────────────────────────────
   if (seg && category) {
+    syncCategoryOptions();
     buildSeg();
   } else {
     setCount(isNaN(ucount) ? counts()[0] || 2 : ucount);

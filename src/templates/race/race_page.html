@@ -1,5 +1,6 @@
 {% extends "website/base-2.html" %}
 {% load static %}
+{% load custom_filters %}
 {% block title %}{{ race.name }} · {{ race.date }}{% endblock %}
 {% block extra_head %}
 <link href="{% static 'css/race.css' %}" rel="stylesheet">
@@ -30,9 +31,17 @@
           <h1>{{ race.name }} · {{ race.date }}</h1>
           <div class="sub">
             {% if race.place %}<span>📍 {{ race.place }}</span><span class="dot"></span>{% endif %}
-            <span>{{ race_people_count|floatformat:0 }} участников</span>
+            <span>{{ race_people_count|floatformat:0 }} {{ race_people_count|ru_plural:"участник,участника,участников" }}</span>
             <span class="dot"></span>
-            <span>{{ race_team_count }} команд</span>
+            <span>{{ race_team_count }} {{ race_team_count|ru_plural:"команда,команды,команд" }}</span>
+            {% if race_remaining is not None %}
+            <span class="dot"></span>
+            {% if race_remaining > 0 %}
+            <span class="remaining ok">осталось {{ race_remaining|floatformat:0 }} {{ race_remaining|ru_plural:"место,места,мест" }}</span>
+            {% else %}
+            <span class="remaining none">мест нет</span>
+            {% endif %}
+            {% endif %}
           </div>
         </div>
         <div class="cover-actions">
@@ -203,11 +212,19 @@
                   {% if category.short_name and category.short_name != category.name %}
                   <span class="cat-full" title="{{ category.name }}">{{ category.name }}</span>
                   {% endif %}
-                  <span class="cat-count">{{ category.team_count|default:"0" }}</span>
                 </div>
-                <div class="cat-bar">
-                  <i style="width: {% widthratio category.team_count|default:0 category_max_count|default:1 100 %}%"></i>
+                <div class="cat-stats">
+                  <span class="cat-stat"><b>{{ category.team_count|default:"0" }}</b> {{ category.team_count|default:0|ru_plural:"команда,команды,команд" }}</span>
+                  <span class="cat-sep" aria-hidden="true">·</span>
+                  <span class="cat-stat"><b>{{ category.people|floatformat:0 }}</b> {{ category.people|ru_plural:"участник,участника,участников" }}</span>
                 </div>
+                {% if category.remaining is not None %}
+                {% if category.remaining > 0 %}
+                <div class="cat-remaining ok">осталось {{ category.remaining|floatformat:0 }} из {{ category.people_limit }}</div>
+                {% else %}
+                <div class="cat-remaining none">мест нет</div>
+                {% endif %}
+                {% endif %}
               </a>
             </li>
             {% endfor %}

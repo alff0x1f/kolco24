@@ -9,7 +9,7 @@ from django.urls import resolve, reverse
 
 from apps.race.forms import RaceForm
 from apps.race.permissions import can_edit_race
-from apps.race.views import RaceEditView, RaceTeamsView
+from apps.race.views import RaceEditView, RacePageView, RaceTeamsView
 from website.models import Race
 from website.models.models import Team
 from website.models.race import Category, RaceAdmin, RacePriceTier, RegStatus
@@ -1090,3 +1090,289 @@ def test_add_race_and_edit_race_urls_resolve():
     edit_url = reverse("edit_race", kwargs={"race_slug": "kolco24-2026"})
     assert edit_url == "/race/kolco24-2026/edit/"
     assert resolve(edit_url).func.view_class is RaceEditView
+
+
+# --- People-limit config on the race edit page (Task 4) ---
+
+
+def _cat_row(**overrides):
+    """A valid category-row dict for the categories_json payload."""
+    row = {
+        "id": None,
+        "code": "c",
+        "short_name": "c",
+        "name": "Cat",
+        "description": "",
+        "is_active": True,
+        "min_people": 2,
+        "max_people": 6,
+        "people_limit": 0,
+    }
+    row.update(overrides)
+    return row
+
+
+@pytest.mark.django_db
+def test_race_form_people_limit_field_present_and_saves():
+    form = RaceForm(data=_race_form_data(people_limit=120))
+
+    assert "people_limit" in form.fields
+    assert form.is_valid(), form.errors
+    race = form.save()
+    assert race.people_limit == 120
+
+
+@pytest.mark.django_db
+def test_race_form_people_limit_empty_defaults_to_zero():
+    data = _race_form_data()
+    data.pop("people_limit", None)
+    form = RaceForm(data=data)
+
+    assert form.is_valid(), form.errors
+    race = form.save()
+    assert race.people_limit == 0
+
+
+@pytest.mark.django_db
+def test_race_form_people_limit_negative_rejected():
+    form = RaceForm(data=_race_form_data(people_limit=-5))
+
+    assert not form.is_valid()
+    assert "people_limit" in form.errors
+
+
+@pytest.mark.django_db
+def test_race_form_people_limit_zero_accepted():
+    form = RaceForm(data=_race_form_data(people_limit=0))
+
+    assert form.is_valid(), form.errors
+    race = form.save()
+    assert race.people_limit == 0
+
+
+@pytest.mark.django_db
+def test_race_edit_post_saves_race_and_category_people_limit():
+    user = User.objects.create_user(username="pl1", password="p", email="pl1@e.com")
+    race = _make_race(slug="pl1", code="pl1")
+    RaceAdmin.objects.create(race=race, user=user, role=RaceAdmin.Role.ADMIN)
+
+    categories = json.dumps([_cat_row(code="six", name="Six", people_limit=40)])
+    data = _post_data(
+        code="pl1", slug="pl1", people_limit=200, categories_json=categories
+    )
+    resp = _edit_post(f"/race/{race.slug}/edit/", user, data, race_slug=race.slug)
+
+    assert resp.status_code == 302
+    race.refresh_from_db()
+    assert race.people_limit == 200
+    cat = Category.objects.get(race=race, code="six")
+    assert cat.people_limit == 40
+
+
+@pytest.mark.django_db
+def test_race_edit_post_category_people_limit_zero_accepted():
+    user = User.objects.create_user(username="pl2", password="p", email="pl2@e.com")
+    race = _make_race(slug="pl2", code="pl2")
+    RaceAdmin.objects.create(race=race, user=user, role=RaceAdmin.Role.ADMIN)
+
+    categories = json.dumps([_cat_row(code="z", name="Zero", people_limit=0)])
+    data = _post_data(code="pl2", slug="pl2", categories_json=categories)
+    resp = _edit_post(f"/race/{race.slug}/edit/", user, data, race_slug=race.slug)
+
+    assert resp.status_code == 302
+    cat = Category.objects.get(race=race, code="z")
+    assert cat.people_limit == 0
+
+
+@pytest.mark.django_db
+def test_race_edit_post_category_people_limit_negative_rolls_back():
+    user = User.objects.create_user(username="pl3", password="p", email="pl3@e.com")
+    race = _make_race(slug="pl3", code="pl3")
+    RaceAdmin.objects.create(race=race, user=user, role=RaceAdmin.Role.ADMIN)
+
+    categories = json.dumps([_cat_row(code="neg", name="Neg", people_limit=-1)])
+    data = _post_data(code="pl3", slug="pl3", categories_json=categories)
+    resp = _edit_post(f"/race/{race.slug}/edit/", user, data, race_slug=race.slug)
+
+    assert resp.status_code == 200
+    assert not Category.objects.filter(race=race, code="neg").exists()
+
+
+@pytest.mark.django_db
+def test_race_edit_round_trip_preserves_people_limits():
+    user = User.objects.create_user(username="pl4", password="p", email="pl4@e.com")
+    race = _make_race(slug="pl4", code="pl4")
+    race.people_limit = 150
+    race.save(update_fields=["people_limit"])
+    RaceAdmin.objects.create(race=race, user=user, role=RaceAdmin.Role.ADMIN)
+    cat = _make_category(race, code="6h", short_name="6ч", name="6 часов", order=0)
+    cat.people_limit = 30
+    cat.save(update_fields=["people_limit"])
+
+    # GET emits the current limits into the form + category-data island.
+    resp = _edit_get(f"/race/{race.slug}/edit/", user, race_slug=race.slug)
+    html = resp.content.decode()
+    assert 'name="people_limit"' in html and 'value="150"' in html
+    cats = _script_json(html, "categories-data")
+    assert cats[0]["people_limit"] == 30
+
+    # POST the same limits back (id preserved) and confirm they survive.
+    categories = json.dumps(
+        [
+            _cat_row(
+                id=cat.id, code="6h", short_name="6ч", name="6 часов", people_limit=30
+            )
+        ]
+    )
+    data = _post_data(
+        code="pl4", slug="pl4", people_limit=150, categories_json=categories
+    )
+    resp = _edit_post(f"/race/{race.slug}/edit/", user, data, race_slug=race.slug)
+
+    assert resp.status_code == 302
+    race.refresh_from_db()
+    cat.refresh_from_db()
+    assert race.people_limit == 150
+    assert cat.people_limit == 30
+
+
+# --- Task 6: remaining-places badges -----------------------------------------
+
+
+@pytest.mark.django_db
+def test_race_page_context_remaining_with_limit():
+    owner = User.objects.create_user(
+        username="rp1", password="p", email="rp1@example.com"
+    )
+    race = _make_race(slug="rem-race", code="rem")
+    race.people_limit = 10
+    race.save(update_fields=["people_limit"])
+    cat = _make_category(race)
+    cat.people_limit = 6
+    cat.save(update_fields=["people_limit"])
+    _make_team(owner, cat, paid_people=4)
+
+    context = RacePageView.build_context(race)
+
+    # Race: 10 limit − 4 paid = 6 remaining.
+    assert context["race_remaining"] == 6
+    # Category: 6 limit − 4 paid = 2 remaining (attached to the instance).
+    assert context["categories"][0].remaining == 2
+
+
+@pytest.mark.django_db
+def test_race_page_context_remaining_unlimited_is_none():
+    race = _make_race(slug="unl-race", code="unl")
+    _make_category(race)  # both limits default to 0 → unlimited
+
+    context = RacePageView.build_context(race)
+
+    assert context["race_remaining"] is None
+    assert context["categories"][0].remaining is None
+
+
+@pytest.mark.django_db
+def test_race_page_renders_remaining_badge(client):
+    owner = User.objects.create_user(
+        username="rp2", password="p", email="rp2@example.com"
+    )
+    race = _make_race(slug="badge-race", code="badge")
+    race.people_limit = 5
+    race.save(update_fields=["people_limit"])
+    cat = _make_category(race)
+    _make_team(owner, cat, paid_people=2)
+
+    resp = client.get(reverse("race", kwargs={"race_slug": race.slug}))
+    html = resp.content.decode()
+
+    assert resp.status_code == 200
+    assert "осталось 3 мест" in html
+
+
+@pytest.mark.django_db
+def test_race_page_renders_sold_out_badge(client):
+    owner = User.objects.create_user(
+        username="rp3", password="p", email="rp3@example.com"
+    )
+    race = _make_race(slug="full-race", code="full")
+    race.people_limit = 2
+    race.save(update_fields=["people_limit"])
+    cat = _make_category(race)
+    _make_team(owner, cat, paid_people=2)
+
+    resp = client.get(reverse("race", kwargs={"race_slug": race.slug}))
+    html = resp.content.decode()
+
+    assert resp.status_code == 200
+    assert "мест нет" in html
+
+
+@pytest.mark.django_db
+def test_race_page_category_card_shows_labelled_stats(client):
+    """Category card states teams and participants in their own units.
+
+    The race itself is unlimited (no cover-line badge), so «осталось K из L»
+    can only come from the category row — it must read participants, not teams.
+    """
+    owner = User.objects.create_user(
+        username="rp5", password="p", email="rp5@example.com"
+    )
+    race = _make_race(slug="stats-race", code="stats")  # race unlimited
+    cat = _make_category(race)
+    cat.people_limit = 10
+    cat.save(update_fields=["people_limit"])
+    _make_team(owner, cat, paid_people=2, start_number="1")
+    _make_team(owner, cat, paid_people=3, start_number="2")
+
+    context = RacePageView.build_context(race)
+    assert context["categories"][0].team_count == 2
+    assert context["categories"][0].people == 5
+    assert context["categories"][0].remaining == 5  # 10 − 5
+
+    resp = client.get(reverse("race", kwargs={"race_slug": race.slug}))
+    html = resp.content.decode()
+
+    assert resp.status_code == 200
+    # 2 → few form «команды», 5 → many form «участников».
+    assert "<b>2</b> команды" in html
+    assert "<b>5</b> участников" in html
+    assert "осталось 5 из 10" in html
+
+
+@pytest.mark.django_db
+def test_race_page_category_card_unlimited_hides_remaining(client):
+    owner = User.objects.create_user(
+        username="rp6", password="p", email="rp6@example.com"
+    )
+    race = _make_race(slug="stats-unl", code="statsunl")
+    cat = _make_category(race)  # people_limit defaults to 0 → unlimited
+    _make_team(owner, cat, paid_people=2, start_number="1")
+
+    context = RacePageView.build_context(race)
+    assert context["categories"][0].remaining is None
+
+    resp = client.get(reverse("race", kwargs={"race_slug": race.slug}))
+    html = resp.content.decode()
+
+    assert resp.status_code == 200
+    # 1 → one form «команда», 2 → few form «участника».
+    assert "<b>1</b> команда" in html
+    assert "<b>2</b> участника" in html
+    # No limit → no «осталось …» line in this category row.
+    assert "осталось" not in html
+
+
+@pytest.mark.django_db
+def test_teams_context_includes_race_remaining():
+    owner = User.objects.create_user(
+        username="rp4", password="p", email="rp4@example.com"
+    )
+    race = _make_race(slug="tr-rem", code="trrem")
+    race.people_limit = 8
+    race.save(update_fields=["people_limit"])
+    cat = _make_category(race)
+    _make_team(owner, cat, paid_people=3)
+
+    context = RaceTeamsView.build_context(race, AnonymousUser())
+
+    assert context["race_remaining"] == 5

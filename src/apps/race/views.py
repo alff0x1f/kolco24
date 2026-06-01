@@ -63,16 +63,21 @@ class RacePageView(View):
     @staticmethod
     def build_context(race, user=None):
         categories = list(_categories_with_team_count(race))
-        # Bars in the «Команды» panel are scaled to the largest category (like
-        # the teams-page breakdown), so the biggest one fills the track.
-        category_max_count = max((c.team_count or 0 for c in categories), default=0)
+        # Занятость (paid_people) и свободные слоты на категорию — для строки
+        # «N команд · M участников» и бейджа «осталось K из L / мест нет».
+        # ``remaining`` выводится из уже посчитанного ``people``, чтобы не
+        # дёргать ``people_count()`` повторно внутри ``remaining_people()``.
+        for cat in categories:
+            cat.people = cat.people_count()
+            cat.remaining = (
+                None if not cat.people_limit else max(0, cat.people_limit - cat.people)
+            )
         news_qs = NewsPost.objects.filter(race=race).order_by("-publication_date")
         news_count = news_qs.count()
         news_list = list(news_qs[:10])
         context = {
             "race": race,
             "categories": categories,
-            "category_max_count": category_max_count,
             "links": race.links.order_by("-id"),
             "news_list": news_list,
             "news_count": news_count,
@@ -80,6 +85,7 @@ class RacePageView(View):
             "reg_upcoming": race.reg_status == RegStatus.UPCOMING,
             "race_team_count": race.team_count(),
             "race_people_count": race.people_count(),
+            "race_remaining": race.remaining_people(),
         }
         context["can_edit_race"] = bool(user is not None and can_edit_race(user, race))
         if user is not None and is_race_admin(user, race):
@@ -185,6 +191,7 @@ class RaceTeamsView(View):
             "reg_open": race.reg_status == RegStatus.OPEN,
             "race_team_count": race.team_count(),
             "race_people_count": race.people_count(),
+            "race_remaining": race.remaining_people(),
             "category_count": len(categories),
             "race_date": race.date,
         }
@@ -247,6 +254,25 @@ def _positive_int(value):
     return ivalue, None
 
 
+def _people_limit_int(value):
+    """Parse a people-limit value (``0``/empty = unlimited).
+
+    Returns ``(int, None)`` for a non-negative integer (empty → ``0``), else
+    ``(None, msg)``. Negative values are rejected.
+    """
+    if value is None or (isinstance(value, str) and not value.strip()):
+        return 0, None
+    if isinstance(value, float) and not value.is_integer():
+        return None, "Введите целое число."
+    try:
+        ivalue = int(value)
+    except (ValueError, TypeError):
+        return None, "Введите целое число."
+    if ivalue < 0:
+        return None, "Не может быть отрицательным."
+    return ivalue, None
+
+
 def _validate_category_rows(rows):
     """Validate parsed category rows.
 
@@ -284,10 +310,13 @@ def _validate_category_rows(rows):
             row_errors["description"] = "Не длиннее 150 символов."
         min_people, min_err = _positive_int(row.get("min_people"))
         max_people, max_err = _positive_int(row.get("max_people"))
+        people_limit, limit_err = _people_limit_int(row.get("people_limit"))
         if min_err:
             row_errors["min_people"] = min_err
         if max_err:
             row_errors["max_people"] = max_err
+        if limit_err:
+            row_errors["people_limit"] = limit_err
         if not min_err and not max_err and min_people > max_people:
             row_errors["min_people"] = "Минимум больше максимума."
         if code and "code" not in row_errors:
@@ -306,6 +335,7 @@ def _validate_category_rows(rows):
                     "is_active": bool(row.get("is_active", True)),
                     "min_people": min_people,
                     "max_people": max_people,
+                    "people_limit": people_limit,
                 }
             )
     return cleaned, errors
@@ -377,6 +407,7 @@ def _reconcile_categories(race, cleaned):
         instance.is_active = row["is_active"]
         instance.min_people = row["min_people"]
         instance.max_people = row["max_people"]
+        instance.people_limit = row["people_limit"]
         instance.order = index
         instance.save()
         seen.add(instance.id)
@@ -481,6 +512,7 @@ class RaceEditView(View):
                 "is_active": cat.is_active,
                 "min_people": cat.min_people,
                 "max_people": cat.max_people,
+                "people_limit": cat.people_limit,
             }
             for cat in Category.objects.filter(race=race).order_by("order", "id")
         ]
