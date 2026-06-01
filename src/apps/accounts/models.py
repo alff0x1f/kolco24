@@ -83,9 +83,9 @@ class EmailVerification(models.Model):
 
             if existing_rows:
                 newest = existing_rows[0]
-                if newest.is_alive and newest.created_at > now - cls.RESEND_COOLDOWN:
+                if newest.created_at > now - cls.RESEND_COOLDOWN:
                     return newest, None
-                # Past cooldown or attempts exhausted: revoke all and fall through.
+                # Past cooldown: revoke all and fall through.
                 cls.objects.filter(pk__in=[r.pk for r in existing_rows]).update(
                     consumed_at=now
                 )

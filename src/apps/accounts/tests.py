@@ -118,6 +118,24 @@ def test_create_for_within_cooldown_reuses_row_without_new_code():
 
 
 @pytest.mark.django_db
+def test_create_for_within_cooldown_blocks_even_after_attempts_exhausted():
+    # Exhaust all attempts on the first row.
+    first, raw_code = EmailVerification.create_for("user@example.com")
+    wrong = "000000" if raw_code != "000000" else "111111"
+    for _ in range(EmailVerification.MAX_ATTEMPTS):
+        first.verify_code(wrong)
+    first.refresh_from_db()
+    assert first.attempts == EmailVerification.MAX_ATTEMPTS
+    assert first.is_alive is False
+
+    # Within the cooldown window: must not issue a new code regardless of is_alive.
+    second, raw_code2 = EmailVerification.create_for("user@example.com")
+
+    assert second.pk == first.pk
+    assert raw_code2 is None
+
+
+@pytest.mark.django_db
 def test_create_for_after_cooldown_issues_new_row():
     first, _ = EmailVerification.create_for("user@example.com")
     # age the first row past the cooldown
@@ -158,9 +176,14 @@ def test_create_for_after_expiry_issues_new_row_without_constraint_error():
     # Regression: an expired unconsumed row must not block a fresh create_for().
     # The unique partial index covers consumed_at IS NULL regardless of expires_at,
     # so the expired row must be revoked before the INSERT, not after.
+    # In practice a row only expires after CODE_TTL (15 min), which is well beyond
+    # the 60 s RESEND_COOLDOWN, so both created_at and expires_at must be backdated.
     first, _ = EmailVerification.create_for("user@example.com")
     EmailVerification.objects.filter(pk=first.pk).update(
-        expires_at=timezone.now() - timedelta(seconds=1)
+        created_at=timezone.now()
+        - EmailVerification.RESEND_COOLDOWN
+        - timedelta(seconds=1),
+        expires_at=timezone.now() - timedelta(seconds=1),
     )
 
     second, raw_code2 = EmailVerification.create_for("user@example.com")
