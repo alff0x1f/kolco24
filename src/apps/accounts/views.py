@@ -107,7 +107,12 @@ def _complete_login(request, email, next_url):
         except IntegrityError:
             user = User.objects.filter(email__iexact=email).first()
             if user is None:
-                raise
+                # Username collision with a concurrent user sharing the same local-part.
+                # Fall back to a random username that won't collide.
+                with transaction.atomic():
+                    user = User.objects.create_user(
+                        get_random_string(12), email, get_random_string(32)
+                    )
     auth_login(request, user, backend="apps.accounts.backends.EmailBackend")
     return _safe_redirect(request, next_url or "/")
 

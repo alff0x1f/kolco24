@@ -180,7 +180,10 @@ class CodeForm(forms.Form):
     code = forms.CharField(label="Код из письма", max_length=6, min_length=6)
 
     def clean_code(self):
-        return self.cleaned_data["code"].strip()
+        value = self.cleaned_data["code"].strip()
+        if not value.isdigit():
+            raise forms.ValidationError("Код должен состоять из шести цифр.")
+        return value
 
 
 class ImpersonateForm(forms.Form):
