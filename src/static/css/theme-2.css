@@ -541,6 +541,11 @@ button { font-family: inherit; }
   border: 1px solid rgba(217,54,68,.2); margin-bottom: 4px;
 }
 .err-banner.show { display: block; }
+.info-banner {
+  padding: 10px 12px; border-radius: 8px;
+  background: #eaf4ee; color: var(--success-dk); font-size: 13px;
+  border: 1px solid rgba(2,184,117,.2); margin-bottom: 4px;
+}
 .form { display: flex; flex-direction: column; gap: 14px; }
 .field-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
 .field-head .forgot { font-size: 12.5px; color: var(--muted); }

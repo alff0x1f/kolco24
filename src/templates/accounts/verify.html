@@ -17,9 +17,11 @@
       <input type="hidden" name="next" value="{{ next }}">
       <div class="card-pad">
 
-        {% if messages or form.non_field_errors %}
+        {% for message in messages %}
+        <div class="{% if 'error' in message.tags %}err-banner show{% else %}info-banner{% endif %}">{{ message }}</div>
+        {% endfor %}
+        {% if form.non_field_errors %}
         <div class="err-banner show">
-          {% for message in messages %}{{ message }}{% if not forloop.last %}<br>{% endif %}{% endfor %}
           {% for error in form.non_field_errors %}{{ error }}{% if not forloop.last %}<br>{% endif %}{% endfor %}
         </div>
         {% endif %}
