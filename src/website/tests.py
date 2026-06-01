@@ -1746,3 +1746,28 @@ def test_edit_team_invalid_post_superuser_has_bypass_limits_in_config(
     assert response.status_code == 200
     config = json.loads(str(response.context["team_form_config_json"]))
     assert config["bypassLimits"] is True
+
+
+@pytest.mark.parametrize(
+    "n,expected",
+    [
+        (0, "команд"),
+        (1, "команда"),
+        (2, "команды"),
+        (4, "команды"),
+        (5, "команд"),
+        (11, "команд"),  # 11–14 are the «many» exception
+        (12, "команд"),
+        (14, "команд"),
+        (21, "команда"),
+        (22, "команды"),
+        (25, "команд"),
+        (111, "команд"),
+        (2.0, "команды"),  # FloatField counts coerce via float→int
+        (None, "команд"),  # bad input falls back to «many»
+    ],
+)
+def test_ru_plural_picks_correct_form(n, expected):
+    from website.templatetags.custom_filters import ru_plural
+
+    assert ru_plural(n, "команда,команды,команд") == expected

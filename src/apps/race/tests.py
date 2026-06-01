@@ -1333,7 +1333,8 @@ def test_race_page_category_card_shows_labelled_stats(client):
     html = resp.content.decode()
 
     assert resp.status_code == 200
-    assert "<b>2</b> команд" in html
+    # 2 → few form «команды», 5 → many form «участников».
+    assert "<b>2</b> команды" in html
     assert "<b>5</b> участников" in html
     assert "осталось 5 из 10" in html
 
@@ -1354,8 +1355,9 @@ def test_race_page_category_card_unlimited_hides_remaining(client):
     html = resp.content.decode()
 
     assert resp.status_code == 200
-    assert "<b>1</b> команд" in html
-    assert "<b>2</b> участников" in html
+    # 1 → one form «команда», 2 → few form «участника».
+    assert "<b>1</b> команда" in html
+    assert "<b>2</b> участника" in html
     # No limit → no «осталось …» line in this category row.
     assert "осталось" not in html
 
