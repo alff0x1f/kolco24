@@ -274,20 +274,22 @@ class PaymentsYa(models.Model):
         return paid
 
     def update_team(self, paymentid):
-        payment = Payment.objects.filter(id=int(paymentid))[:1]
-        if not payment:
+        if not Payment.objects.filter(id=int(paymentid)).exists():
             return False
-        payment = payment.get()
-        if payment.status == Payment.STATUS_DONE:
-            return False
-        withdraw_amount = float(self.withdraw_amount) - payment.additional_charge
-        paid_for = payment.paid_for
-        if payment.payment_with_discount <= withdraw_amount:
-            payment.status = "done"
-        if payment.payment_with_discount > withdraw_amount:
-            payment.status = "partial (" + str(withdraw_amount) + ")"
-            paid_for = withdraw_amount / payment.cost_per_person
         with transaction.atomic():
+            try:
+                payment = Payment.objects.select_for_update().get(id=int(paymentid))
+            except Payment.DoesNotExist:
+                return False
+            if payment.status == Payment.STATUS_DONE:
+                return False
+            withdraw_amount = float(self.withdraw_amount) - payment.additional_charge
+            paid_for = payment.paid_for
+            if payment.payment_with_discount <= withdraw_amount:
+                payment.status = "done"
+            if payment.payment_with_discount > withdraw_amount:
+                payment.status = "partial (" + str(withdraw_amount) + ")"
+                paid_for = withdraw_amount / payment.cost_per_person
             if payment.team:
                 from django.db.models import F
 
@@ -506,12 +508,15 @@ class TeamMemberMove(models.Model):
     move_date = models.DateTimeField(auto_now_add=True)
 
     def move_people(self):
-        self.from_team.paid_people -= self.moved_people
-        self.to_team.paid_people += self.moved_people
-
         with transaction.atomic():
-            self.from_team.save(update_fields=["paid_people"])
-            self.to_team.save(update_fields=["paid_people"])
+            from django.db.models import F
+
+            Team.objects.filter(pk=self.from_team.pk).update(
+                paid_people=F("paid_people") - self.moved_people
+            )
+            Team.objects.filter(pk=self.to_team.pk).update(
+                paid_people=F("paid_people") + self.moved_people
+            )
             from .race import RegStatus
 
             category = self.to_team.category2
