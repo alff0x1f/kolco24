@@ -190,13 +190,13 @@ class PaymentExtra(models.Model):
 - Create: `src/apps/race/pricing.py`
 - Modify: `src/apps/race/tests.py`
 
-- [ ] implement `compute_team_charge(team, race)` returning `(max(0, int(total)), lines)`: race-fee term `(ucount − paid_people) × race.current_price` plus, for each `race.extras.filter(is_active=True)`, `delta = max(0, count − count_paid)` at the extra's current `price`; emit an `ExtraCharge(race_extra, count=delta, unit_price=price)` per nonzero delta
-- [ ] implement `upsert_team_extras(team, cleaned_data, race)` — get_or_create a `TeamExtra` per active extra and set `count` from `cleaned_data["extra_<code>"]`
-- [ ] implement `create_team_payment(request, team, race)` — `cost, lines = compute_team_charge(...)`; if `cost == 0` return `None`; else create `Payment(... cost_per_person=race.current_price, paid_for=ucount − paid_people, payment_amount=cost, payment_with_discount=cost, status="draft", payment_method="sbp2")`, create a `PaymentExtra` per line, mint the VTB order (`VTBClient`, `VTBPayment.new_order_id("ORDER")`, `VTBPreparedPayment`) exactly as the current views do, return the redirect `HttpResponse`
-- [ ] do NOT write `Payment.map` from the helper (left default 0; dropped later)
-- [ ] write tests for `compute_team_charge`: no extras (fee only); one extra; multiple extras summed; `count == count_paid` → no add-on charge; partial delta (count 3, paid 1 → charge 2×price); `max(0)` floor when fully paid; `max = ucount − free` boundary respected by the value the caller passes (helper trusts validated counts)
-- [ ] write tests for `upsert_team_extras` (creates then updates the same row) and `create_team_payment` cost==0 → `None`
-- [ ] run tests — must pass before Task 4
+- [x] implement `compute_team_charge(team, race)` returning `(max(0, int(total)), lines)`: race-fee term `(ucount − paid_people) × race.current_price` plus, for each `race.extras.filter(is_active=True)`, `delta = max(0, count − count_paid)` at the extra's current `price`; emit an `ExtraCharge(race_extra, count=delta, unit_price=price)` per nonzero delta
+- [x] implement `upsert_team_extras(team, cleaned_data, race)` — get_or_create a `TeamExtra` per active extra and set `count` from `cleaned_data["extra_<code>"]`
+- [x] implement `create_team_payment(request, team, race)` — `cost, lines = compute_team_charge(...)`; if `cost == 0` return `None`; else create `Payment(... cost_per_person=race.current_price, paid_for=ucount − paid_people, payment_amount=cost, payment_with_discount=cost, status="draft", payment_method="sbp2")`, create a `PaymentExtra` per line, mint the VTB order (`VTBClient`, `VTBPayment.new_order_id("ORDER")`, `VTBPreparedPayment`) exactly as the current views do, return the redirect `HttpResponse`
+- [x] do NOT write `Payment.map` from the helper (left default 0; dropped later)
+- [x] write tests for `compute_team_charge`: no extras (fee only); one extra; multiple extras summed; `count == count_paid` → no add-on charge; partial delta (count 3, paid 1 → charge 2×price); `max(0)` floor when fully paid; `max = ucount − free` boundary respected by the value the caller passes (helper trusts validated counts)
+- [x] write tests for `upsert_team_extras` (creates then updates the same row) and `create_team_payment` cost==0 → `None`
+- [x] run tests — must pass before Task 4
 
 ### Task 4: Cutover — generic `TeamForm`, view wiring, reconciliation, JS/templates, maps-test rewrite
 

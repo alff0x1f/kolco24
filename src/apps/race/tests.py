@@ -1698,3 +1698,173 @@ def test_maps_migration_reverse_removes_map_rows():
     payment.refresh_from_db()
     assert team.map_count == 3
     assert payment.map == 2
+
+
+# --- Pricing helpers (compute_team_charge / upsert_team_extras / payment) ---
+
+from apps.race.pricing import (  # noqa: E402
+    ExtraCharge,
+    compute_team_charge,
+    create_team_payment,
+    upsert_team_extras,
+)
+
+
+def _priced_team(username, *, cost=1000, ucount=3, paid_people=1, slug=None):
+    """Owner + race (with a flat fee) + category + team, for charge tests."""
+    owner = User.objects.create_user(
+        username=username, password="p", email=f"{username}@example.com"
+    )
+    slug = slug or f"pr-{username}"
+    race = _make_race(slug=slug, code=slug)
+    race.cost = cost
+    race.save(update_fields=["cost"])
+    cat = _make_category(race)
+    team = _make_team(owner, cat, ucount=ucount, paid_people=paid_people)
+    return owner, race, team
+
+
+@pytest.mark.django_db
+def test_compute_team_charge_fee_only():
+    _, race, team = _priced_team("ch1", cost=1000, ucount=3, paid_people=1)
+
+    total, lines = compute_team_charge(team, race)
+
+    # (3 − 1) × 1000, no extras.
+    assert total == 2000
+    assert lines == []
+
+
+@pytest.mark.django_db
+def test_compute_team_charge_single_extra():
+    _, race, team = _priced_team("ch2", cost=1000, ucount=3, paid_people=1)
+    transfer = RaceExtra.objects.create(
+        race=race, code="transfer", name="Трансфер", price=500
+    )
+    TeamExtra.objects.create(team=team, race_extra=transfer, count=2, count_paid=0)
+
+    total, lines = compute_team_charge(team, race)
+
+    # fee 2000 + 2 × 500 = 3000.
+    assert total == 3000
+    assert lines == [ExtraCharge(race_extra=transfer, count=2, unit_price=500)]
+
+
+@pytest.mark.django_db
+def test_compute_team_charge_multiple_extras_summed():
+    _, race, team = _priced_team("ch3", cost=1000, ucount=4, paid_people=2)
+    transfer = RaceExtra.objects.create(
+        race=race, code="transfer", name="Трансфер", price=500, order=0
+    )
+    maps = RaceExtra.objects.create(
+        race=race, code="map", name="Карты", price=200, free_per_team=2, order=1
+    )
+    TeamExtra.objects.create(team=team, race_extra=transfer, count=1)
+    TeamExtra.objects.create(team=team, race_extra=maps, count=2)
+
+    total, lines = compute_team_charge(team, race)
+
+    # fee (4−2)×1000 + transfer 1×500 + maps 2×200 = 2000 + 500 + 400.
+    assert total == 2900
+    assert [line.race_extra for line in lines] == [transfer, maps]
+    assert [line.count for line in lines] == [1, 2]
+
+
+@pytest.mark.django_db
+def test_compute_team_charge_no_delta_when_fully_paid():
+    _, race, team = _priced_team("ch4", cost=1000, ucount=2, paid_people=2)
+    transfer = RaceExtra.objects.create(
+        race=race, code="transfer", name="Трансфер", price=500
+    )
+    TeamExtra.objects.create(team=team, race_extra=transfer, count=2, count_paid=2)
+
+    total, lines = compute_team_charge(team, race)
+
+    # Fully paid people and extra → nothing to charge.
+    assert total == 0
+    assert lines == []
+
+
+@pytest.mark.django_db
+def test_compute_team_charge_partial_extra_delta():
+    _, race, team = _priced_team("ch5", cost=1000, ucount=2, paid_people=2)
+    transfer = RaceExtra.objects.create(
+        race=race, code="transfer", name="Трансфер", price=500
+    )
+    # Wants 3, already paid for 1 → charge the 2-unit delta only.
+    TeamExtra.objects.create(team=team, race_extra=transfer, count=3, count_paid=1)
+
+    total, lines = compute_team_charge(team, race)
+
+    assert total == 1000  # 2 × 500
+    assert lines == [ExtraCharge(race_extra=transfer, count=2, unit_price=500)]
+
+
+@pytest.mark.django_db
+def test_compute_team_charge_floors_at_zero():
+    # Over-paid people (refund-like) must not produce a negative total.
+    _, race, team = _priced_team("ch6", cost=1000, ucount=1, paid_people=3)
+
+    total, lines = compute_team_charge(team, race)
+
+    assert total == 0
+    assert lines == []
+
+
+@pytest.mark.django_db
+def test_compute_team_charge_ignores_inactive_extra():
+    _, race, team = _priced_team("ch7", cost=1000, ucount=2, paid_people=2)
+    transfer = RaceExtra.objects.create(
+        race=race, code="transfer", name="Трансфер", price=500, is_active=False
+    )
+    TeamExtra.objects.create(team=team, race_extra=transfer, count=2, count_paid=0)
+
+    total, lines = compute_team_charge(team, race)
+
+    assert total == 0
+    assert lines == []
+
+
+@pytest.mark.django_db
+def test_upsert_team_extras_creates_then_updates():
+    _, race, team = _priced_team("up1", cost=1000)
+    transfer = RaceExtra.objects.create(
+        race=race, code="transfer", name="Трансфер", price=500
+    )
+
+    upsert_team_extras(team, {"extra_transfer": 2}, race)
+    te = TeamExtra.objects.get(team=team, race_extra=transfer)
+    assert te.count == 2
+    assert te.count_paid == 0
+
+    # Second call updates the same row, not a duplicate.
+    upsert_team_extras(team, {"extra_transfer": 5}, race)
+    assert TeamExtra.objects.filter(team=team, race_extra=transfer).count() == 1
+    te.refresh_from_db()
+    assert te.count == 5
+
+
+@pytest.mark.django_db
+def test_upsert_team_extras_missing_field_defaults_zero():
+    _, race, team = _priced_team("up2", cost=1000)
+    transfer = RaceExtra.objects.create(
+        race=race, code="transfer", name="Трансфер", price=500
+    )
+
+    # No "extra_transfer" key, and a None value, both coerce to 0.
+    upsert_team_extras(team, {}, race)
+    te = TeamExtra.objects.get(team=team, race_extra=transfer)
+    assert te.count == 0
+
+
+@pytest.mark.django_db
+def test_create_team_payment_returns_none_when_cost_zero(rf):
+    owner, race, team = _priced_team("cp1", cost=1000, ucount=2, paid_people=2)
+    request = rf.post("/")
+    request.user = owner
+
+    # Fully paid people, no extras → cost 0 → no payment, no redirect.
+    result = create_team_payment(request, team, race)
+
+    assert result is None
+    assert not Payment.objects.filter(team=team).exists()
