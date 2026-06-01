@@ -214,11 +214,11 @@ PENDING_NEXT_KEY, ""))` and add `"race": race`. `MagicLinkView` unchanged.
 **Files:**
 - Modify: `src/apps/race/tests.py`
 
-- [ ] in `test_race_page_anon_sees_login_and_add_button` (~505) update the stale comment
+- [x] in `test_race_page_anon_sees_login_and_add_button` (~505) update the stale comment
       «The button points at add_team; the view redirects anon users to login.» to say the
       view now routes anon users through passwordless `account_start` (assertions
       unchanged — the button still targets `add_team`)
-- [ ] run `uv run pytest src/apps/race/tests.py` (from `src/`) — must pass
+- [x] run `uv run pytest src/apps/race/tests.py` (from `src/`) — must pass
 
 ### Task 5: Verify acceptance criteria
 
