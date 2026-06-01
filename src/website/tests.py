@@ -1,5 +1,6 @@
+import re
 from datetime import timedelta
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 from django.contrib.auth.models import User
@@ -9,10 +10,20 @@ from django.urls import reverse
 from django.utils import timezone
 
 from website.forms import TeamForm
-from website.models import Payment, Race
+from website.models import Payment, Race, VTBPayment
 from website.models.models import PaymentsYa, Team
 from website.models.race import Category, RaceLink, RacePriceTier, RegStatus
 from website.views.views_ import build_category_options, build_team_form_context
+
+
+def test_new_order_id_shape_and_uniqueness():
+    order_id = VTBPayment.new_order_id("ORDER")
+    prefix, _, suffix = order_id.partition("_")
+    assert prefix == "ORDER"
+    assert len(suffix) == 26
+    assert re.fullmatch(r"[0-9A-HJKMNP-TV-Z]{26}", suffix)
+    assert VTBPayment.new_order_id("ORDER") != order_id
+    assert VTBPayment.new_order_id("SPUTNIK").startswith("SPUTNIK_")
 
 
 @pytest.mark.django_db
@@ -824,8 +835,10 @@ def test_edit_team_charges_delta_on_ucount_growth(client):
     client.force_login(user)
     client_p, payment_p, prepared_p = _mock_vtb()
     with client_p, payment_p as mock_payment, prepared_p as mock_prepared:
-        mock_payment.from_vtb_payload.return_value = MagicMock(
-            pay_url="https://pay.example/redirect"
+        oid = VTBPayment.new_order_id("ORDER")
+        mock_payment.new_order_id.return_value = oid
+        mock_payment.from_vtb_payload.return_value = _make_vtb_payment(
+            oid, pay_url="https://pay.example/redirect"
         )
         mock_prepared.objects.filter.return_value.first.return_value = None
         response = client.post(
@@ -837,6 +850,7 @@ def test_edit_team_charges_delta_on_ucount_growth(client):
     # delta = (5 - 4) * 1500 (the tier price, NOT race.cost=1000)
     assert payment.payment_amount == 1500
     assert payment.cost_per_person == 1500
+    assert payment.vtb_payment is not None
 
 
 @pytest.mark.django_db
@@ -847,8 +861,10 @@ def test_edit_team_charges_delta_on_maps_added(client):
     client.force_login(user)
     client_p, payment_p, prepared_p = _mock_vtb()
     with client_p, payment_p as mock_payment, prepared_p as mock_prepared:
-        mock_payment.from_vtb_payload.return_value = MagicMock(
-            pay_url="https://pay.example/redirect"
+        oid = VTBPayment.new_order_id("ORDER")
+        mock_payment.new_order_id.return_value = oid
+        mock_payment.from_vtb_payload.return_value = _make_vtb_payment(
+            oid, pay_url="https://pay.example/redirect"
         )
         mock_prepared.objects.filter.return_value.first.return_value = None
         response = client.post(
@@ -860,6 +876,7 @@ def test_edit_team_charges_delta_on_maps_added(client):
     # only the 2 extra maps are charged: 2 * 200
     assert payment.payment_amount == 400
     assert payment.map == 2
+    assert payment.vtb_payment is not None
     team.refresh_from_db()
     assert team.map_count == 2
 
@@ -970,6 +987,127 @@ def test_add_team_rejects_out_of_range_ucount(client):
     )
     assert response.status_code == 200
     assert not Team.objects.filter(category2=category).exists()
+
+
+def _echo_order_payload(order_id, order_name, amount_value, return_payment_data):
+    """create_order stub that echoes the minted order_id back in the payload."""
+    return {
+        "object": {
+            "orderId": order_id,
+            "orderCode": f"CODE_{order_id}",
+            "amount": {"value": str(amount_value), "code": "RUB"},
+            "status": {
+                "value": "CREATED",
+                "description": "CREATED",
+                "changedAt": "2026-03-08T12:00:00Z",
+            },
+            "createdAt": "2026-03-08T11:59:00Z",
+            "expire": "2026-03-09T11:59:00Z",
+            "payUrl": "https://pay.example/sbp",
+            "preparedPayments": [],
+        }
+    }
+
+
+@pytest.mark.django_db
+@patch("website.views.views_.VTBClient._ensure_token", return_value=None)
+@patch("website.views.views_.VTBClient.create_order", side_effect=_echo_order_payload)
+def test_add_team_mints_ulid_order_id_and_links_fk(
+    create_order_mock, _token_mock, client
+):
+    user = User.objects.create_user(
+        username="ulidadd", password="pass", email="ulidadd@example.com"
+    )
+    race = Race.objects.create(
+        name="ULID Add",
+        code="ulidadd1",
+        slug="ulid-add-1",
+        cost=1000,
+        reg_status=RegStatus.OPEN,
+        is_teams_editable=True,
+    )
+    category = Category.objects.create(
+        code="t", name="Team", short_name="T", race=race, min_people=2, max_people=6
+    )
+    client.force_login(user)
+    response = client.post(
+        reverse("add_team", args=[race.slug]),
+        {"ucount": "2", "category2_id": str(category.id), "map_count": "0"},
+    )
+
+    assert response.status_code == 302
+    # create_order was called with a ULID order id (ORDER_<ulid>), not ORDER_<int>.
+    order_id = create_order_mock.call_args.kwargs["order_id"]
+    assert order_id.startswith("ORDER_")
+    assert not order_id.split("_", 1)[1].isdigit()
+
+    payment = Payment.objects.get(team__category2=category)
+    assert payment.vtb_payment is not None
+    assert payment.vtb_payment.order_id == order_id
+
+
+# --- Reconciliation: _resolve_race_payment (FK + legacy fallback) ---
+
+
+def _make_vtb_payment(order_id, pay_url=""):
+    return VTBPayment.objects.create(
+        order_id=order_id,
+        amount_value="1000.00",
+        status="PAID",
+        pay_url=pay_url,
+    )
+
+
+@pytest.mark.django_db
+def test_resolve_race_payment_via_fk():
+    from website.management.commands.check_vtb_payments import Command
+
+    vtb_payment = _make_vtb_payment(VTBPayment.new_order_id("ORDER"))
+    payment = Payment.objects.create(
+        payment_method="sbp2",
+        payment_amount=1000,
+        paid_for=2,
+        status=Payment.STATUS_DRAFT,
+        vtb_payment=vtb_payment,
+    )
+
+    resolved = Command()._resolve_race_payment(vtb_payment)
+    assert resolved == payment
+
+
+@pytest.mark.django_db
+def test_resolve_race_payment_legacy_fallback():
+    from website.management.commands.check_vtb_payments import Command
+
+    payment = Payment.objects.create(
+        payment_method="sbp2",
+        payment_amount=1000,
+        paid_for=2,
+        status=Payment.STATUS_DRAFT,
+    )
+    vtb_payment = _make_vtb_payment(f"ORDER_{payment.id}")
+
+    resolved = Command()._resolve_race_payment(vtb_payment)
+    assert resolved == payment
+
+
+@pytest.mark.django_db
+def test_resolve_race_payment_unparseable_returns_none():
+    from website.management.commands.check_vtb_payments import Command
+
+    vtb_payment = _make_vtb_payment("ORDER_notanumber")
+
+    assert Command()._resolve_race_payment(vtb_payment) is None
+
+
+@pytest.mark.django_db
+def test_resolve_race_payment_legacy_fallback_no_row_returns_none():
+    from website.management.commands.check_vtb_payments import Command
+
+    # Integer suffix that parses, but no Payment row with that pk exists.
+    vtb_payment = _make_vtb_payment("ORDER_999999999")
+
+    assert Command()._resolve_race_payment(vtb_payment) is None
 
 
 # --- Task 5: add_team.html rewritten on base-2 ---
