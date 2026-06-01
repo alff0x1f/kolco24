@@ -234,13 +234,13 @@ class PaymentExtra(models.Model):
 - Modify: `src/static/css/race_form.css`
 - Modify: `src/apps/race/tests.py`
 
-- [ ] `RaceForm`: add hidden `extras_json` field
-- [ ] `views.py`: add `_validate_extra_rows` (code non-empty + unique-within-race + `^[a-z_]+$`; `price ≥ 0`; `free_per_team ≥ 0`) and `_reconcile_extras(race, cleaned)` mirroring `_reconcile_price_tiers` (match by id/code, `order=index`, update scalar fields); delete only rows with zero `TeamExtra` usage, otherwise force `is_active=False`
-- [ ] wire parse → validate → `_reconcile_extras` into `post` inside the existing `transaction.atomic()` (alongside categories/price tiers), with the same per-row error echo on failure
-- [ ] add `extras` to `_build_context`/`build_context` and serialize existing rows for the editor (incl. each row's `has_teams`/usage flag so JS shows deactivate-not-delete)
-- [ ] `race_form.js` + `race_form.html` + `race_form.css`: add an "Доп-услуги" row editor (name/code/price/free_per_team/active toggle) serialized to `extras_json`; `code` editable on create, read-only once saved; "remove" maps to deactivate for in-use rows
-- [ ] write tests: `extras_json` add/update/deactivate reconciliation; in-use extra (`PROTECT`) is deactivated not deleted; duplicate code rejected; blank/invalid code rejected; `price`/`free_per_team` negative rejected; unused row hard-deleted
-- [ ] run tests — must pass before Task 6
+- [x] `RaceForm`: add hidden `extras_json` field
+- [x] `views.py`: add `_validate_extra_rows` (code non-empty + unique-within-race + `^[a-z_]+$`; `price ≥ 0`; `free_per_team ≥ 0`) and `_reconcile_extras(race, cleaned)` mirroring `_reconcile_price_tiers` (match by id/code, `order=index`, update scalar fields); delete only rows with zero `TeamExtra` usage, otherwise force `is_active=False`
+- [x] wire parse → validate → `_reconcile_extras` into `post` inside the existing `transaction.atomic()` (alongside categories/price tiers), with the same per-row error echo on failure
+- [x] add `extras` to `_build_context`/`build_context` and serialize existing rows for the editor (incl. each row's `has_teams`/usage flag so JS shows deactivate-not-delete)
+- [x] `race_form.js` + `race_form.html` + `race_form.css`: add an "Доп-услуги" row editor (name/code/price/free_per_team/active toggle) serialized to `extras_json`; `code` editable on create, read-only once saved; "remove" maps to deactivate for in-use rows
+- [x] write tests: `extras_json` add/update/deactivate reconciliation; in-use extra (`PROTECT`) is deactivated not deleted; duplicate code rejected; blank/invalid code rejected; `price`/`free_per_team` negative rejected; unused row hard-deleted
+- [x] run tests — must pass before Task 6
 
 ### Task 6: Verify acceptance criteria
 

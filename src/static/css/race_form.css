@@ -260,29 +260,36 @@
 .race-form-page .cat-row .control.mono { font-size: 12.5px; }
 .race-form-page .cat-toggle-cell { display: grid; place-items: center; }
 .race-form-page .cat-del,
-.race-form-page .tier-del {
+.race-form-page .tier-del,
+.race-form-page .extra-del {
   display: grid; place-items: center; width: 30px; height: 30px; border-radius: 8px;
   border: none; background: transparent; color: var(--muted-2); cursor: pointer; transition: all .12s;
 }
 .race-form-page .cat-del:hover,
-.race-form-page .tier-del:hover { background: var(--danger-bg); color: var(--danger); }
+.race-form-page .tier-del:hover,
+.race-form-page .extra-del:hover { background: var(--danger-bg); color: var(--danger); }
 .race-form-page .cat-del svg,
 .race-form-page .tier-del svg { width: 16px; height: 16px; }
 .race-form-page .cats-foot,
-.race-form-page .tiers-foot { padding: 14px 4px 2px; }
+.race-form-page .tiers-foot,
+.race-form-page .extras-foot { padding: 14px 4px 2px; }
 .race-form-page .add-cat,
-.race-form-page .add-tier {
+.race-form-page .add-tier,
+.race-form-page .add-extra {
   display: inline-flex; align-items: center; gap: 8px;
   font-size: 13.5px; font-weight: 500; color: var(--primary-2);
   background: transparent; border: 1px dashed var(--line); padding: 9px 14px;
   border-radius: 9px; cursor: pointer; transition: all .12s;
 }
 .race-form-page .add-cat:hover,
-.race-form-page .add-tier:hover { border-color: var(--primary-2); background: var(--primary-tint); }
+.race-form-page .add-tier:hover,
+.race-form-page .add-extra:hover { border-color: var(--primary-2); background: var(--primary-tint); }
 .race-form-page .add-cat svg,
-.race-form-page .add-tier svg { width: 15px; height: 15px; }
+.race-form-page .add-tier svg,
+.race-form-page .add-extra svg { width: 15px; height: 15px; }
 .race-form-page .cats-empty,
-.race-form-page .tiers-empty { padding: 22px 4px; text-align: center; color: var(--muted); font-size: 13.5px; }
+.race-form-page .tiers-empty,
+.race-form-page .extras-empty { padding: 22px 4px; text-align: center; color: var(--muted); font-size: 13.5px; }
 
 /* ── Price-tiers repeater (new UI, mirrors categories) ─── */
 .race-form-page .tiers { display: flex; flex-direction: column; }
@@ -306,6 +313,32 @@
 }
 .race-form-page .tier-row .control { padding: 7px 10px; font-size: 13.5px; }
 
+/* ── Add-ons repeater (mirrors categories/price tiers) ─── */
+.race-form-page .extras { display: flex; flex-direction: column; }
+.race-form-page .extras-headrow,
+.race-form-page .extra-row {
+  display: grid;
+  grid-template-columns: 30px 120px minmax(0,1fr) 90px 80px 56px 34px;
+  gap: 10px; align-items: center;
+}
+.race-form-page .extras-headrow {
+  padding: 0 4px 10px;
+  font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--muted-2);
+}
+.race-form-page .extra-row {
+  padding: 9px 4px; border-top: 1px solid var(--line-soft); transition: background .12s;
+}
+.race-form-page .extra-row:hover { background: #fafbfc; }
+.race-form-page .extra-row.is-inactive { opacity: .55; }
+.race-form-page .extra-row .extra-ord {
+  display: grid; place-items: center; color: var(--muted-2);
+  font-size: 12.5px; font-variant-numeric: tabular-nums; user-select: none;
+}
+.race-form-page .extra-row .control { padding: 7px 10px; font-size: 13.5px; }
+.race-form-page .extra-row .control.mono { font-size: 12.5px; }
+.race-form-page .extra-row .control[readonly] { background: var(--line-soft); color: var(--muted); }
+.race-form-page .extra-toggle-cell { display: grid; place-items: center; }
+
 /* ── Bottom sticky save bar (mobile-friendly) ──────────── */
 .race-form-page .savebar {
   position: sticky; bottom: 0; z-index: 30; margin-top: 4px;
@@ -326,7 +359,8 @@
 }
 @media (max-width: 720px) {
   .race-form-page .cats-headrow,
-  .race-form-page .tiers-headrow { display: none; }
+  .race-form-page .tiers-headrow,
+  .race-form-page .extras-headrow { display: none; }
   .race-form-page .cat-row {
     grid-template-columns: 28px 1fr 1fr 34px;
     grid-template-areas:
@@ -351,6 +385,21 @@
     grid-template-columns: 28px 1fr 120px 34px;
     gap: 8px; padding: 12px 4px;
   }
+  .race-form-page .extra-row {
+    grid-template-columns: 28px 1fr 1fr 34px;
+    grid-template-areas:
+      "ord  code  code  del"
+      "ord  name  name  name"
+      "ord  price free  tog";
+    gap: 8px; padding: 12px 4px; align-items: center;
+  }
+  .race-form-page .extra-row .extra-ord { grid-area: ord; }
+  .race-form-page .extra-row .e-code { grid-area: code; }
+  .race-form-page .extra-row .e-name { grid-area: name; }
+  .race-form-page .extra-row .e-price { grid-area: price; }
+  .race-form-page .extra-row .e-free { grid-area: free; }
+  .race-form-page .extra-row .extra-toggle-cell { grid-area: tog; justify-self: start; }
+  .race-form-page .extra-row .extra-del { grid-area: del; justify-self: end; }
   .race-form-page .field-row.two,
   .race-form-page .field-row.three { grid-template-columns: 1fr; }
 }

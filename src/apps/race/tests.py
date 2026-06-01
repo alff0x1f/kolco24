@@ -1868,3 +1868,209 @@ def test_create_team_payment_returns_none_when_cost_zero(rf):
 
     assert result is None
     assert not Payment.objects.filter(team=team).exists()
+
+
+# --- Race edit page: «Доп-услуги» (add-on) configuration (Task 5) ---
+
+
+@pytest.mark.django_db
+def test_race_edit_post_extras_reconcile_add_update_delete():
+    user = User.objects.create_user(username="xa1", password="p", email="xa1@e.com")
+    race = _make_race(slug="xa1", code="xa1")
+    RaceAdmin.objects.create(race=race, user=user, role=RaceAdmin.Role.ADMIN)
+    keep = RaceExtra.objects.create(
+        race=race, code="map", name="Карты", price=200, free_per_team=2, order=0
+    )
+    drop = RaceExtra.objects.create(
+        race=race, code="transfer", name="Трансфер", price=500, order=1
+    )
+
+    extras = json.dumps(
+        [
+            {
+                "id": keep.id,
+                "code": "map",
+                "name": "Доп. карты",
+                "price": 250,
+                "free_per_team": 2,
+                "is_active": True,
+            },
+            {
+                "id": None,
+                "code": "breakfast",
+                "name": "Завтрак",
+                "price": 300,
+                "free_per_team": 0,
+                "is_active": True,
+            },
+        ]
+    )
+    data = _post_data(code="xa1", slug="xa1", extras_json=extras)
+    resp = _edit_post(f"/race/{race.slug}/edit/", user, data, race_slug=race.slug)
+
+    assert resp.status_code == 302
+    # Unused row omitted from the payload is hard-deleted.
+    assert not RaceExtra.objects.filter(id=drop.id).exists()
+    keep.refresh_from_db()
+    assert keep.name == "Доп. карты"
+    assert keep.price == 250
+    assert keep.order == 0
+    breakfast = RaceExtra.objects.get(race=race, code="breakfast")
+    assert breakfast.price == 300
+    assert breakfast.order == 1
+
+
+@pytest.mark.django_db
+def test_race_edit_post_extra_in_use_deactivated_not_deleted():
+    user = User.objects.create_user(username="xu1", password="p", email="xu1@e.com")
+    race = _make_race(slug="xu1", code="xu1")
+    RaceAdmin.objects.create(race=race, user=user, role=RaceAdmin.Role.ADMIN)
+    cat = _make_category(race)
+    team = _make_team(user, cat)
+    extra = RaceExtra.objects.create(
+        race=race, code="transfer", name="Трансфер", price=500
+    )
+    TeamExtra.objects.create(team=team, race_extra=extra, count=1)
+
+    # Keep the team's category in the payload (so the category reconcile does
+    # not abort), but omit the extra entirely — it must deactivate, not delete.
+    keep_cat = json.dumps([_cat_row(id=cat.id, code=cat.code, name=cat.name)])
+    data = _post_data(
+        code="xu1", slug="xu1", categories_json=keep_cat, extras_json="[]"
+    )
+    resp = _edit_post(f"/race/{race.slug}/edit/", user, data, race_slug=race.slug)
+
+    assert resp.status_code == 302
+    extra.refresh_from_db()
+    # In-use row is softly deactivated, never deleted (PROTECT backstop).
+    assert extra.is_active is False
+
+
+@pytest.mark.django_db
+def test_race_edit_post_extra_duplicate_code_rejected():
+    user = User.objects.create_user(username="xd1", password="p", email="xd1@e.com")
+    race = _make_race(slug="xd1", code="xd1")
+    RaceAdmin.objects.create(race=race, user=user, role=RaceAdmin.Role.ADMIN)
+
+    dup = json.dumps(
+        [
+            {
+                "id": None,
+                "code": "transfer",
+                "name": "A",
+                "price": 1,
+                "is_active": True,
+            },
+            {
+                "id": None,
+                "code": "transfer",
+                "name": "B",
+                "price": 2,
+                "is_active": True,
+            },
+        ]
+    )
+    resp = _edit_post(
+        f"/race/{race.slug}/edit/",
+        user,
+        _post_data(code="xd1", slug="xd1", extras_json=dup),
+        race_slug=race.slug,
+    )
+    assert resp.status_code == 200
+    race.refresh_from_db()
+    assert race.name == "Teams Race"
+    assert not RaceExtra.objects.filter(race=race).exists()
+
+
+@pytest.mark.django_db
+def test_race_edit_post_extra_invalid_code_rejected():
+    user = User.objects.create_user(username="xc1", password="p", email="xc1@e.com")
+    race = _make_race(slug="xc1", code="xc1")
+    RaceAdmin.objects.create(race=race, user=user, role=RaceAdmin.Role.ADMIN)
+
+    # Blank code.
+    blank = json.dumps([{"id": None, "code": "", "name": "X", "price": 1}])
+    resp = _edit_post(
+        f"/race/{race.slug}/edit/",
+        user,
+        _post_data(code="xc1", slug="xc1", extras_json=blank),
+        race_slug=race.slug,
+    )
+    assert resp.status_code == 200
+
+    # Code with disallowed characters (uppercase / digits).
+    bad = json.dumps([{"id": None, "code": "Map1", "name": "X", "price": 1}])
+    resp = _edit_post(
+        f"/race/{race.slug}/edit/",
+        user,
+        _post_data(code="xc1", slug="xc1", extras_json=bad),
+        race_slug=race.slug,
+    )
+    assert resp.status_code == 200
+
+    # Missing name.
+    noname = json.dumps([{"id": None, "code": "transfer", "name": "", "price": 1}])
+    resp = _edit_post(
+        f"/race/{race.slug}/edit/",
+        user,
+        _post_data(code="xc1", slug="xc1", extras_json=noname),
+        race_slug=race.slug,
+    )
+    assert resp.status_code == 200
+
+    race.refresh_from_db()
+    assert race.name == "Teams Race"
+    assert not RaceExtra.objects.filter(race=race).exists()
+
+
+@pytest.mark.django_db
+def test_race_edit_post_extra_negative_values_rejected():
+    user = User.objects.create_user(username="xn1", password="p", email="xn1@e.com")
+    race = _make_race(slug="xn1", code="xn1")
+    RaceAdmin.objects.create(race=race, user=user, role=RaceAdmin.Role.ADMIN)
+
+    neg_price = json.dumps(
+        [{"id": None, "code": "transfer", "name": "X", "price": -5, "free_per_team": 0}]
+    )
+    resp = _edit_post(
+        f"/race/{race.slug}/edit/",
+        user,
+        _post_data(code="xn1", slug="xn1", extras_json=neg_price),
+        race_slug=race.slug,
+    )
+    assert resp.status_code == 200
+
+    neg_free = json.dumps(
+        [{"id": None, "code": "transfer", "name": "X", "price": 0, "free_per_team": -1}]
+    )
+    resp = _edit_post(
+        f"/race/{race.slug}/edit/",
+        user,
+        _post_data(code="xn1", slug="xn1", extras_json=neg_free),
+        race_slug=race.slug,
+    )
+    assert resp.status_code == 200
+
+    race.refresh_from_db()
+    assert race.name == "Teams Race"
+    assert not RaceExtra.objects.filter(race=race).exists()
+
+
+@pytest.mark.django_db
+def test_race_edit_get_serializes_existing_extras_with_usage_flag():
+    user = User.objects.create_user(username="xg1", password="p", email="xg1@e.com")
+    race = _make_race(slug="xg1", code="xg1")
+    RaceAdmin.objects.create(race=race, user=user, role=RaceAdmin.Role.ADMIN)
+    cat = _make_category(race)
+    team = _make_team(user, cat)
+    used = RaceExtra.objects.create(
+        race=race, code="transfer", name="Трансфер", price=500, order=0
+    )
+    TeamExtra.objects.create(team=team, race_extra=used, count=1)
+    RaceExtra.objects.create(race=race, code="breakfast", name="Завтрак", order=1)
+
+    rows = RaceEditView._existing_extras(race)
+
+    assert [r["code"] for r in rows] == ["transfer", "breakfast"]
+    assert rows[0]["has_teams"] is True
+    assert rows[1]["has_teams"] is False
