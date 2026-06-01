@@ -6,48 +6,19 @@ from django.urls import include, path, re_path
 from apps.race.views import RaceEditView, RacePageView, RaceTeamsView
 
 from . import views
-from .views import (
-    CancelPaymentView,
-    ConfirmPaymentView,
-    CustomPasswordResetCompleteView,
-    CustomPasswordResetConfirmView,
-    CustomPasswordResetDoneView,
-    CustomPasswordResetView,
-    RaceIdRedirectView,
-)
+from .views import CancelPaymentView, ConfirmPaymentView, RaceIdRedirectView
 from .views.team import EditTeamView, TeamMemberMoveView
 
 urlpatterns = [
     path("", lambda request: redirect("race", race_slug="kolco24_2025"), name="index"),
     # path("index_hidden/", views.IndexView.as_view(), name="index"),
-    # auth
-    path("register/", views.RegisterView.as_view(), name="register"),
+    # auth now lives in apps.accounts (mounted at /accounts/ in config/urls.py)
     path("race/8/transfer/", views.TransferView.as_view(), name="transfer"),
     path(
         "race/8/transfer/list/",
         views.TransferPaidListView.as_view(),
         name="transfer_paid_list",
     ),
-    path("password_reset/", CustomPasswordResetView.as_view(), name="password_reset"),
-    path(
-        "password_reset/done/",
-        CustomPasswordResetDoneView.as_view(),
-        name="password_reset_done",
-    ),
-    path(
-        "reset/<uidb64>/<token>/",
-        CustomPasswordResetConfirmView.as_view(),
-        name="password_reset_confirm",
-    ),
-    path(
-        "reset/done/",
-        CustomPasswordResetCompleteView.as_view(),
-        name="password_reset_complete",
-    ),
-    path("login/", views.LoginView.as_view(), name="login"),
-    path("logout/", views.LogoutUserView.as_view(), name="logout"),
-    path("impersonate/", views.impersonate, name="impersonate"),
-    path("impersonate/stop/", views.stop_impersonate, name="stop_impersonate"),
     path("team/", views.my_team, name="my_team"),
     path("team/<team_id>/", EditTeamView.as_view(), name="edit_team"),
     path("team/<team_id>/move/", TeamMemberMoveView.as_view(), name="move_team_member"),

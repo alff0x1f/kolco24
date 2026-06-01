@@ -234,31 +234,31 @@ appended as a query param. Send failure is logged; the user still reaches verify
 - Delete: `src/website/views/auth.py`
 - Delete: `src/templates/website/{login,register,password_reset*,impersonate}.html`
 
-- [ ] move `LoginView`, `RegisterView`, `LogoutUserView`, `impersonate`,
+- [x] move `LoginView`, `RegisterView`, `LogoutUserView`, `impersonate`,
       `stop_impersonate` + the password-reset CBVs into `apps/accounts/views.py`
-- [ ] move the private helpers (`_safe_redirect`, `_get_auth_backend`,
+- [x] move the private helpers (`_safe_redirect`, `_get_auth_backend`,
       `_login_without_credentials`, `_find_user_for_impersonation`,
       `_mark_field_invalid`) wholly into the app and delete them from
       `website/views/views_.py` (verified: no `website` view calls them — all 7
       `_safe_redirect` sites are in the moved auth views)
-- [ ] move the auth templates to `src/templates/accounts/`; point reset CBV
+- [x] move the auth templates to `src/templates/accounts/`; point reset CBV
       `template_name` attrs at the new paths (keep `registration/password_reset_email.*`
       where Django's reset machinery expects them)
-- [ ] create `apps/accounts/urls.py` with the auth routes using **flat unchanged
+- [x] create `apps/accounts/urls.py` with the auth routes using **flat unchanged
       names** (`login`, `register`, `logout`, `password_reset`, `password_reset_done`,
       `password_reset_confirm`, `password_reset_complete`, `impersonate`,
       `stop_impersonate`)
-- [ ] `config/urls.py`: add `path("accounts/", include("apps.accounts.urls"))`
-- [ ] `website/urls.py`: remove the auth `path()` entries and now-unused imports
+- [x] `config/urls.py`: add `path("accounts/", include("apps.accounts.urls"))`
+- [x] `website/urls.py`: remove the auth `path()` entries and now-unused imports
       (`CustomPasswordReset*`, etc.)
-- [ ] `website/views/__init__.py`: drop the moved names from the export list; delete
+- [x] `website/views/__init__.py`: drop the moved names from the export list; delete
       `website/views/auth.py`; delete the moved classes/functions from `views_.py`
-- [ ] update the ~15 hardcoded auth path literals in `src/website/tests.py` (lines
+- [x] update the ~15 hardcoded auth path literals in `src/website/tests.py` (lines
       231, 300, 307, 315, 326, 336, 351, 362, 370, 378, 382, 387, 395, 405, 1358):
       `/login/` → `/accounts/login/`, `/register/` → `/accounts/register/` (or switch
       to `reverse(...)`) — expected, mechanical change from the path move
-- [ ] run `uv run python src/manage.py check` and `make lint` — catches dead imports
-- [ ] regression: `uv run pytest` — full suite green; spot-check
+- [x] run `uv run python src/manage.py check` and `make lint` — catches dead imports
+- [x] regression: `uv run pytest` — full suite green; spot-check
       `reverse("login")`/`reverse("password_reset")` resolve under `/accounts/`. This
       green run marks the pure-refactor portion complete.
 

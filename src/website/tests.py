@@ -228,7 +228,7 @@ def test_add_post_unauthorized(client):
         {"title": "Should fail", "content": "No auth"},
     )
     assert response.status_code == 302
-    assert "/login/" in response["Location"]
+    assert "/accounts/login/" in response["Location"]
 
 
 @pytest.mark.django_db
@@ -297,14 +297,14 @@ def test_reg_form_rejects_duplicate_email_case_insensitive():
 
 @pytest.mark.django_db
 def test_register_view_post_creates_user(client):
-    response = client.post("/register/", REG_FORM_BASE)
+    response = client.post("/accounts/register/", REG_FORM_BASE)
     assert response.status_code == 302
     assert User.objects.filter(email="ivan@example.com").exists()
 
 
 @pytest.mark.django_db
 def test_login_view_get(client):
-    response = client.get("/login/")
+    response = client.get("/accounts/login/")
     assert response.status_code == 200
     assert "form" in response.context
 
@@ -312,7 +312,9 @@ def test_login_view_get(client):
 @pytest.mark.django_db
 def test_login_view_post_valid_credentials(client):
     User.objects.create_user(username="u", password="pass", email="u@example.com")
-    response = client.post("/login/", {"email": "u@example.com", "password": "pass"})
+    response = client.post(
+        "/accounts/login/", {"email": "u@example.com", "password": "pass"}
+    )
     assert response.status_code == 302
     assert response.url == "/"
     assert "_auth_user_id" in client.session
@@ -323,7 +325,7 @@ def test_login_view_post_valid_credentials_next_redirect(client):
     # Simulate real browser flow: form action is /login/, ?next= comes from hidden field
     User.objects.create_user(username="u2", password="pass", email="u2@example.com")
     response = client.post(
-        "/login/",
+        "/accounts/login/",
         {"email": "u2@example.com", "password": "pass", "next": "/race/kolco24_2025/"},
     )
     assert response.status_code == 302
@@ -333,7 +335,9 @@ def test_login_view_post_valid_credentials_next_redirect(client):
 @pytest.mark.django_db
 def test_login_view_post_invalid_credentials(client):
     User.objects.create_user(username="u3", password="pass", email="u3@example.com")
-    response = client.post("/login/", {"email": "u3@example.com", "password": "wrong"})
+    response = client.post(
+        "/accounts/login/", {"email": "u3@example.com", "password": "wrong"}
+    )
     assert response.status_code == 200
     assert "_auth_user_id" not in client.session
 
@@ -348,7 +352,7 @@ def test_passlogin_url_returns_404(client):
 def test_login_view_post_blocks_open_redirect(client):
     User.objects.create_user(username="u4", password="pass", email="u4@example.com")
     response = client.post(
-        "/login/?next=https://evil.com/steal",
+        "/accounts/login/?next=https://evil.com/steal",
         {"email": "u4@example.com", "password": "pass"},
     )
     assert response.status_code == 302
@@ -359,7 +363,7 @@ def test_login_view_post_blocks_open_redirect(client):
 def test_login_required_redirects_to_login_url(client):
     response = client.get("/team/")
     assert response.status_code == 302
-    assert "/login/" in response.url
+    assert "/accounts/login/" in response.url
 
 
 @pytest.mark.django_db
@@ -367,7 +371,7 @@ def test_register_view_post_duplicate_email_shows_error(client):
     User.objects.create_user(
         username="existing", email="ivan@example.com", password="x"
     )
-    response = client.post("/register/", REG_FORM_BASE)
+    response = client.post("/accounts/register/", REG_FORM_BASE)
     assert response.status_code == 200
     assert "reg_form" in response.context
     assert response.context["reg_form"].non_field_errors()
@@ -375,16 +379,16 @@ def test_register_view_post_duplicate_email_shows_error(client):
 
 @pytest.mark.django_db
 def test_login_page_register_link_carries_next(client):
-    response = client.get("/login/?next=/race/foo/teams/add/")
+    response = client.get("/accounts/login/?next=/race/foo/teams/add/")
     assert response.status_code == 200
     html = response.content.decode()
     # The «Зарегистрироваться» link must forward next, or it's lost on register.
-    assert "/register/?next=" in html
+    assert "/accounts/register/?next=" in html
 
 
 @pytest.mark.django_db
 def test_register_view_get_passes_next_to_context(client):
-    response = client.get("/register/?next=/race/foo/teams/add/")
+    response = client.get("/accounts/register/?next=/race/foo/teams/add/")
     assert response.status_code == 200
     assert response.context["next"] == "/race/foo/teams/add/"
 
@@ -392,7 +396,7 @@ def test_register_view_get_passes_next_to_context(client):
 @pytest.mark.django_db
 def test_register_view_post_honors_next_redirect(client):
     response = client.post(
-        "/register/", {**REG_FORM_BASE, "next": "/race/foo/teams/add/"}
+        "/accounts/register/", {**REG_FORM_BASE, "next": "/race/foo/teams/add/"}
     )
     assert response.status_code == 302
     assert response.url == "/race/foo/teams/add/"
@@ -402,7 +406,7 @@ def test_register_view_post_honors_next_redirect(client):
 @pytest.mark.django_db
 def test_register_view_post_blocks_open_redirect(client):
     response = client.post(
-        "/register/", {**REG_FORM_BASE, "next": "https://evil.com/steal"}
+        "/accounts/register/", {**REG_FORM_BASE, "next": "https://evil.com/steal"}
     )
     assert response.status_code == 302
     assert response.url == "/"
@@ -1355,7 +1359,7 @@ def test_edit_team_redirects_unauthenticated(client):
     user, race, category, team = _create_team_for_edit(suffix="unauth")
     response = client.get(reverse("edit_team", args=[team.id]))
     assert response.status_code == 302
-    assert "/login/" in response["Location"]
+    assert "/accounts/login/" in response["Location"]
 
 
 @pytest.mark.django_db
