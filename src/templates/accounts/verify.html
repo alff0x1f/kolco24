@@ -9,7 +9,11 @@
 
     <header class="page-head">
       <h1>Введите код</h1>
+      {% if race %}
+      <p class="sub">чтобы добавить команду на «{{ race.name }}». Код отправлен на <strong>{{ email }}</strong>. Также в письме есть ссылка для входа в один клик. Код и ссылка действуют 15 минут.</p>
+      {% else %}
       <p class="sub">Код отправлен на <strong>{{ email }}</strong>. Также в письме есть ссылка для входа в один клик. Код и ссылка действуют 15 минут.</p>
+      {% endif %}
     </header>
 
     <form class="card" action="{% url 'account_verify' %}" method="POST" novalidate>
@@ -53,6 +57,12 @@
       <input type="hidden" name="action" value="resend">
       Не пришло письмо? <button class="link-btn" type="submit">Отправить ещё раз</button>
     </form>
+
+    {% if race %}
+    <div class="below">
+      <a class="back-link" href="{% url 'race' race.slug %}">← Назад к гонке</a>
+    </div>
+    {% endif %}
 
   </div>
 </main>

@@ -9,7 +9,11 @@
 
     <header class="page-head">
       <h1>Вход или регистрация</h1>
+      {% if race %}
+      <p class="sub">чтобы добавить команду на «{{ race.name }}». Введите email — мы пришлём код и ссылку для входа. Аккаунт создастся автоматически, если его ещё нет.</p>
+      {% else %}
       <p class="sub">Введите email — мы пришлём код и ссылку для входа. Аккаунт создастся автоматически, если его ещё нет.</p>
+      {% endif %}
     </header>
 
     <form class="card" action="{% url 'account_start' %}" method="POST" novalidate>
@@ -45,6 +49,9 @@
 
     <div class="below">
       <a href="{% url 'login' %}{% if next %}?next={{ next|urlencode }}{% endif %}">Войти по паролю</a>
+      {% if race %}
+      <div><a class="back-link" href="{% url 'race' race.slug %}">← Назад к гонке</a></div>
+      {% endif %}
     </div>
 
   </div>

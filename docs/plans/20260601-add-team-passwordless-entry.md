@@ -189,23 +189,24 @@ PENDING_NEXT_KEY, ""))` and add `"race": race`. `MagicLinkView` unchanged.
 - Modify: `src/static/css/theme-2.css` (only if a `.back-link` rule is needed)
 - Modify: `src/apps/accounts/tests.py`
 
-- [ ] `start.html`: in `.page-head`, `{% if race %}` show
+- [x] `start.html`: in `.page-head`, `{% if race %}` show
       `чтобы добавить команду на «{{ race.name }}»` else keep the current generic `.sub`
-- [ ] `start.html`: in the `.below` area, `{% if race %}` add
+- [x] `start.html`: in the `.below` area, `{% if race %}` add
       `<a class="back-link" href="{% url 'race' race.slug %}">← Назад к гонке</a>`
-- [ ] `verify.html`: apply the same two `{% if race %}` additions (contextual sub-line +
+- [x] `verify.html`: apply the same two `{% if race %}` additions (contextual sub-line +
       back link), keeping the existing «Код отправлен на …» line
-- [ ] add a minimal `.back-link` rule to `theme-2.css` only if spacing/color needs it
-      (no new stylesheet, no bare `.page` override)
-- [ ] write test: `GET account_start?next=<add_team url>` renders both the contextual
+- [x] add a minimal `.back-link` rule to `theme-2.css` only if spacing/color needs it
+      (no new stylesheet, no bare `.page` override) — not needed: `.below a` already
+      styles the link (centering/color/weight); back link wrapped in `.below`
+- [x] write test: `GET account_start?next=<add_team url>` renders both the contextual
       sub-line text and the `reverse("race", args=[slug])` href; with no/garbage `next`
       neither appears and the page is 200
-- [ ] write test (end-to-end, pattern (a) from Testing Strategy): under
+- [x] write test (end-to-end, pattern (a) from Testing Strategy): under
       `@override_settings(EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend")`,
       anon `GET add_team` → follow to `account_start` → `POST` the email → extract the
       6-digit code from `mail.outbox[0].body` → `POST` it to `account_verify` → assert the
       final redirect lands on the `add_team` path and the session is authenticated
-- [ ] run `uv run pytest src/apps/accounts/tests.py` (from `src/`) — must pass before
+- [x] run `uv run pytest src/apps/accounts/tests.py` (from `src/`) — must pass before
       next task
 
 ### Task 4: Update the race-app regression test comment

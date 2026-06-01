@@ -690,3 +690,100 @@ def test_start_get_with_garbage_next_renders_without_race(client):
 
     assert resp.status_code == 200
     assert resp.context["race"] is None
+
+
+# ── Race-aware copy rendered in start.html / verify.html ─────────────────
+
+
+@pytest.mark.django_db
+def test_start_renders_race_copy_and_back_link(client):
+    from website.models import Race
+
+    race = Race.objects.create(name="Copy Race", code=920, slug="copy-race")
+    add_url = reverse("add_team", args=[race.slug])
+
+    resp = client.get(reverse("account_start") + f"?next={add_url}")
+    html = resp.content.decode()
+
+    assert resp.status_code == 200
+    assert "добавить команду на «Copy Race»" in html
+    assert reverse("race", args=[race.slug]) in html
+
+
+@pytest.mark.django_db
+def test_start_garbage_next_renders_no_race_copy_or_back_link(client):
+    resp = client.get(reverse("account_start") + "?next=/no/such/path/")
+    html = resp.content.decode()
+
+    assert resp.status_code == 200
+    assert "добавить команду на" not in html
+    assert "Назад к гонке" not in html
+
+
+@pytest.mark.django_db
+def test_verify_renders_race_copy_and_back_link(client):
+    from website.models import Race
+
+    race = Race.objects.create(name="Verify Race", code=921, slug="verify-race")
+    add_url = reverse("add_team", args=[race.slug])
+
+    session = client.session
+    session["accounts_pending_email"] = "u@example.com"
+    session["accounts_next"] = add_url
+    session.save()
+
+    resp = client.get(reverse("account_verify"))
+    html = resp.content.decode()
+
+    assert resp.status_code == 200
+    assert "добавить команду на «Verify Race»" in html
+    assert reverse("race", args=[race.slug]) in html
+
+
+@pytest.mark.django_db
+def test_verify_no_race_renders_generic_copy(client):
+    session = client.session
+    session["accounts_pending_email"] = "u@example.com"
+    session["accounts_next"] = ""
+    session.save()
+
+    resp = client.get(reverse("account_verify"))
+    html = resp.content.decode()
+
+    assert resp.status_code == 200
+    assert "добавить команду на" not in html
+    assert "Назад к гонке" not in html
+
+
+@pytest.mark.django_db
+@override_settings(EMAIL_BACKEND=LOCMEM_EMAIL)
+def test_add_team_passwordless_round_trip_lands_back_on_add_team(client):
+    """End-to-end: anon add_team → start → code → verify → back on add_team."""
+    import re
+
+    from website.models import Race
+
+    race = Race.objects.create(name="E2E Race", code=922, slug="e2e-race")
+    add_url = reverse("add_team", args=[race.slug])
+
+    # Anon hits add_team → redirected to passwordless start carrying ?next=.
+    resp = client.get(add_url)
+    assert resp.status_code == 302
+    assert resp.url.startswith(reverse("account_start"))
+
+    # Submit email at start → one code email is queued.
+    resp = client.post(
+        reverse("account_start"),
+        {"email": "racer@example.com", "next": add_url},
+    )
+    assert resp.status_code == 302
+    assert resp.url == reverse("account_verify")
+    assert len(mail.outbox) == 1
+
+    code = re.search(r"\b(\d{6})\b", mail.outbox[0].body).group(1)
+
+    # Submit the code at verify → lands back on the add_team path, authenticated.
+    resp = client.post(reverse("account_verify"), {"code": code})
+    assert resp.status_code == 302
+    assert resp.url == add_url
+    assert _is_logged_in(client)
