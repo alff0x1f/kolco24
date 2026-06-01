@@ -26,6 +26,7 @@ urlpatterns = [
         views.CustomPasswordResetCompleteView.as_view(),
         name="password_reset_complete",
     ),
+    path("link/<signed>/", views.MagicLinkView.as_view(), name="magic_link"),
     path("impersonate/", views.impersonate, name="impersonate"),
     path("impersonate/stop/", views.stop_impersonate, name="stop_impersonate"),
 ]

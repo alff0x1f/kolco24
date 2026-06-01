@@ -293,16 +293,20 @@ appended as a query param. Send failure is logged; the user still reaches verify
 - Create: `src/templates/accounts/email/login_code.html`
 - Modify: `src/apps/accounts/tests.py`
 
-- [ ] implement `send_login_email(request, verification, code, next_url)` building the
+- [x] implement `send_login_email(request, verification, code, next_url)` building the
       signed magic-link absolute URL (with `next` query param) and rendering both alts
-- [ ] write the three templates: prominent 6-digit code, magic-link button, "ссылка и
+- [x] write the three templates: prominent 6-digit code, magic-link button, "ссылка и
       код действуют 15 минут", "если вы не запрашивали — проигнорируйте"
-- [ ] wrap `send()` so a send failure is logged but does not raise
-- [ ] write tests (under `@override_settings(EMAIL_BACKEND=
+- [x] wrap `send()` so a send failure is logged but does not raise
+- [x] write tests (under `@override_settings(EMAIL_BACKEND=
       "django.core.mail.backends.locmem.EmailBackend")`): the helper queues exactly one
       message in `mail.outbox`; body contains the code and the signed link URL; the
       link round-trips through `TimestampSigner().unsign` to the row pk
-- [ ] run `uv run pytest src/apps/accounts/tests.py` — must pass before next task
+- [x] run `uv run pytest src/apps/accounts/tests.py` — must pass before next task
+
+➕ Wired a minimal `magic_link` URL route + `MagicLinkView` placeholder (raises Http404)
+  so `send_login_email` can `reverse("magic_link", ...)`; the full view logic remains
+  Task 6.
 
 ### Task 6: Passwordless views + URLs + templates + secondary-path links
 

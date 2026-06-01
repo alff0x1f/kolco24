@@ -1,9 +1,15 @@
 from datetime import timedelta
 
 import pytest
+from django.core import mail
+from django.core.signing import TimestampSigner
+from django.test import RequestFactory, override_settings
 from django.utils import timezone
 
+from apps.accounts.emails import send_login_email
 from apps.accounts.models import EmailVerification
+
+LOCMEM_EMAIL = "django.core.mail.backends.locmem.EmailBackend"
 
 
 @pytest.mark.django_db
@@ -131,3 +137,66 @@ def test_create_for_after_consumed_issues_new_row():
 
     assert second.pk != first.pk
     assert raw_code2 is not None
+
+
+@override_settings(EMAIL_BACKEND=LOCMEM_EMAIL)
+@pytest.mark.django_db
+def test_send_login_email_queues_one_message_with_code_and_link():
+    obj, raw_code = EmailVerification.create_for("user@example.com")
+    request = RequestFactory().get("/accounts/start/")
+
+    send_login_email(request, obj, raw_code, next_url="/race/foo/")
+
+    assert len(mail.outbox) == 1
+    message = mail.outbox[0]
+    assert message.to == ["user@example.com"]
+    # plain-text body carries the code and the link
+    assert raw_code in message.body
+    assert "/accounts/link/" in message.body
+    # an HTML alternative is attached
+    assert any(alt[1] == "text/html" for alt in message.alternatives)
+    html = message.alternatives[0][0]
+    assert raw_code in html
+
+
+@override_settings(EMAIL_BACKEND=LOCMEM_EMAIL)
+@pytest.mark.django_db
+def test_send_login_email_link_round_trips_to_row_pk():
+    obj, raw_code = EmailVerification.create_for("user@example.com")
+    request = RequestFactory().get("/accounts/start/")
+
+    send_login_email(request, obj, raw_code, next_url="/race/foo/")
+
+    body = mail.outbox[0].body
+    # extract the signed token between /accounts/link/ and the next slash
+    marker = "/accounts/link/"
+    start = body.index(marker) + len(marker)
+    signed = body[start:].split("/", 1)[0]
+
+    assert TimestampSigner().unsign(signed) == str(obj.pk)
+
+
+@override_settings(EMAIL_BACKEND=LOCMEM_EMAIL)
+@pytest.mark.django_db
+def test_send_login_email_includes_next_query_param():
+    obj, raw_code = EmailVerification.create_for("user@example.com")
+    request = RequestFactory().get("/accounts/start/")
+
+    send_login_email(request, obj, raw_code, next_url="/race/foo/")
+
+    assert "next=%2Frace%2Ffoo%2F" in mail.outbox[0].body
+
+
+@override_settings(EMAIL_BACKEND=LOCMEM_EMAIL)
+@pytest.mark.django_db
+def test_send_login_email_swallows_send_failure(monkeypatch):
+    obj, raw_code = EmailVerification.create_for("user@example.com")
+    request = RequestFactory().get("/accounts/start/")
+
+    def boom(self):
+        raise RuntimeError("smtp down")
+
+    monkeypatch.setattr("django.core.mail.EmailMultiAlternatives.send", boom)
+
+    # must not raise
+    send_login_email(request, obj, raw_code, next_url="/race/foo/")

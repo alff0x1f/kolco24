@@ -267,6 +267,17 @@ def stop_impersonate(request):
     return _safe_redirect(request, next_url)
 
 
+class MagicLinkView(View):
+    """Magic-link login entry point.
+
+    Placeholder: the route exists so ``send_login_email`` can ``reverse`` it; the
+    full unsign/login logic is implemented in a later task.
+    """
+
+    def get(self, request, signed, *args, **kwargs):
+        raise Http404("Not implemented yet")
+
+
 class CustomPasswordResetView(PasswordResetView):
     """Password Reset View"""
 
