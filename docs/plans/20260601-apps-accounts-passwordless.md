@@ -269,20 +269,20 @@ appended as a query param. Send failure is logged; the user still reaches verify
 - Create: `src/apps/accounts/migrations/0001_initial.py`
 - Create: `src/apps/accounts/tests.py`
 
-- [ ] implement `EmailVerification` with the fields, constants, and `Meta.indexes`
+- [x] implement `EmailVerification` with the fields, constants, and `Meta.indexes`
       from Technical Details
-- [ ] implement `create_for` (with 60 s resend cooldown reuse), `verify_code`
+- [x] implement `create_for` (with 60 s resend cooldown reuse), `verify_code`
       (attempt counting, dead-row rejection), `mark_consumed`, `is_alive`, and email
       normalization
-- [ ] `uv run python src/manage.py makemigrations accounts` →
+- [x] `uv run python src/manage.py makemigrations accounts` →
       `0001_initial`; review it (`CreateModel` + index)
-- [ ] `uv run python src/manage.py migrate`
-- [ ] write tests: `create_for` issues a hashed 6-digit code; `verify_code` accepts the
+- [x] `uv run python src/manage.py migrate`
+- [x] write tests: `create_for` issues a hashed 6-digit code; `verify_code` accepts the
       right code, rejects wrong code while incrementing `attempts`, rejects after
       `MAX_ATTEMPTS`, rejects when expired, rejects when consumed
-- [ ] write tests: second `create_for` within 60 s reuses the row and returns no new
+- [x] write tests: second `create_for` within 60 s reuses the row and returns no new
       raw code; email is normalized lower-case
-- [ ] run `uv run pytest src/apps/accounts/tests.py` — must pass before next task
+- [x] run `uv run pytest src/apps/accounts/tests.py` — must pass before next task
 
 ### Task 5: Email helper + templates
 
