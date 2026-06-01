@@ -109,12 +109,16 @@ def create_team_payment(request, team, race):
     vtb_client = VTBClient()
     vtb_client._ensure_token()
 
-    payload = vtb_client.create_order(
-        order_id=VTBPayment.new_order_id("ORDER"),
-        order_name=f"Оплата за команду на Кольцо 24 ({payment.id})",
-        amount_value=cost,
-        return_payment_data="sbp",
-    )
+    try:
+        payload = vtb_client.create_order(
+            order_id=VTBPayment.new_order_id("ORDER"),
+            order_name=f"Оплата за команду на Кольцо 24 ({payment.id})",
+            amount_value=cost,
+            return_payment_data="sbp",
+        )
+    except Exception:
+        payment.delete()
+        raise
     with transaction.atomic():
         vtb_payment = VTBPayment.from_vtb_payload(payload)
         payment.vtb_payment = vtb_payment

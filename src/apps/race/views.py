@@ -753,6 +753,17 @@ class RaceEditView(View):
         # Use the original pre-save race (None on create) so is_create stays correct
         # even if form.save() ran and was rolled back inside the atomic block.
         render_race = None if is_create else race
+
+        # Re-attach has_teams from the DB so the JS still shows «deactivate»
+        # (not «delete») for extras that are already referenced by teams.
+        if render_race is not None and extra_rows:
+            existing_map = {
+                e["id"]: e["has_teams"] for e in self._existing_extras(render_race)
+            }
+            for row in extra_rows:
+                if row.get("id") in existing_map:
+                    row["has_teams"] = existing_map[row["id"]]
+
         context = self._build_context(
             render_race,
             form=form,

@@ -1,3 +1,4 @@
+from django.db import transaction
 from django.db.models import Q
 from django.http import Http404, HttpResponse, HttpResponseRedirect
 from django.shortcuts import render
@@ -148,9 +149,9 @@ class EditTeamView(View):
             if "category2_id" in form.cleaned_data:
                 team.category2_id = form.cleaned_data.get("category2_id")
 
-            team.save()
-
-            upsert_team_extras(team, form.cleaned_data, race)
+            with transaction.atomic():
+                team.save()
+                upsert_team_extras(team, form.cleaned_data, race)
 
             if race.reg_status != RegStatus.OPEN:
                 return HttpResponseRedirect(reverse("my_teams", args=[race.slug]))
