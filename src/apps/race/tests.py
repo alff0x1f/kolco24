@@ -1562,3 +1562,139 @@ def test_payment_extra_protect_blocks_race_extra_delete():
     PaymentExtra.objects.create(payment=payment, race_extra=extra, count=2)
     with _pytest.raises(ProtectedError):
         extra.delete()
+
+
+# --- Data migration: maps → extras (0002) ---
+
+import importlib  # noqa: E402
+
+from django.apps import apps as _django_apps  # noqa: E402
+
+_maps_mig = importlib.import_module("apps.race.migrations.0002_migrate_maps_to_extras")
+
+
+def _run_maps_forward():
+    _maps_mig.forward(_django_apps, None)
+
+
+def _run_maps_reverse():
+    _maps_mig.reverse(_django_apps, None)
+
+
+@pytest.mark.django_db
+def test_maps_migration_backfills_race_team_payment_extras():
+    owner = User.objects.create_user(
+        username="mm1", password="p", email="mm1@example.com"
+    )
+    race = _make_race(slug="mm-race", code="mmrace")
+    cat = _make_category(race)
+    team = _make_team(owner, cat, map_count=3, map_count_paid=1)
+    payment = Payment.objects.create(
+        owner=owner, team=team, payment_method="sbp2", map=2
+    )
+
+    _run_maps_forward()
+
+    extra = RaceExtra.objects.get(race=race, code="map")
+    assert extra.name == "Доп. карты"
+    assert extra.price == 200
+    assert extra.free_per_team == 2
+    assert extra.is_active is True
+
+    te = TeamExtra.objects.get(team=team, race_extra=extra)
+    assert te.count == 3
+    assert te.count_paid == 1
+
+    pe = PaymentExtra.objects.get(payment=payment, race_extra=extra)
+    assert pe.count == 2
+    assert pe.unit_price == 200
+
+
+@pytest.mark.django_db
+def test_maps_migration_skips_team_without_category():
+    owner = User.objects.create_user(
+        username="mm2", password="p", email="mm2@example.com"
+    )
+    # category2 is nullable; build a team with maps but no category.
+    team = Team.objects.create(
+        owner=owner,
+        category2=None,
+        paid_people=2,
+        ucount=2,
+        start_number="1",
+        map_count=4,
+        map_count_paid=0,
+    )
+
+    # Must not raise even though the team has no resolvable race.
+    _run_maps_forward()
+
+    assert not TeamExtra.objects.filter(team=team).exists()
+
+
+@pytest.mark.django_db
+def test_maps_migration_skips_payment_without_team():
+    owner = User.objects.create_user(
+        username="mm3", password="p", email="mm3@example.com"
+    )
+    payment = Payment.objects.create(
+        owner=owner, team=None, payment_method="sbp2", map=2
+    )
+
+    # Must not raise even though the payment has no team/category2.
+    _run_maps_forward()
+
+    assert not PaymentExtra.objects.filter(payment=payment).exists()
+
+
+@pytest.mark.django_db
+def test_maps_migration_reuses_existing_map_extra_without_error():
+    owner = User.objects.create_user(
+        username="mm4", password="p", email="mm4@example.com"
+    )
+    race = _make_race(slug="mm-pre", code="mmpre")
+    cat = _make_category(race)
+    team = _make_team(owner, cat, map_count=2, map_count_paid=0)
+    # A pre-existing map extra with a *custom* price must be reused, not
+    # overwritten by the migration defaults, and must not raise IntegrityError.
+    existing = RaceExtra.objects.create(
+        race=race, code="map", name="Свои карты", price=300, free_per_team=1
+    )
+
+    _run_maps_forward()
+
+    assert RaceExtra.objects.filter(race=race, code="map").count() == 1
+    existing.refresh_from_db()
+    assert existing.price == 300
+    assert existing.name == "Свои карты"
+    te = TeamExtra.objects.get(team=team)
+    assert te.race_extra_id == existing.id
+
+
+@pytest.mark.django_db
+def test_maps_migration_reverse_removes_map_rows():
+    owner = User.objects.create_user(
+        username="mm5", password="p", email="mm5@example.com"
+    )
+    race = _make_race(slug="mm-rev", code="mmrev")
+    cat = _make_category(race)
+    team = _make_team(owner, cat, map_count=3, map_count_paid=1)
+    payment = Payment.objects.create(
+        owner=owner, team=team, payment_method="sbp2", map=2
+    )
+
+    _run_maps_forward()
+    assert RaceExtra.objects.filter(code="map").exists()
+    assert TeamExtra.objects.exists()
+    assert PaymentExtra.objects.exists()
+
+    _run_maps_reverse()
+
+    assert not RaceExtra.objects.filter(code="map").exists()
+    assert not TeamExtra.objects.filter(team=team).exists()
+    assert not PaymentExtra.objects.filter(payment=payment).exists()
+    # Legacy columns remain untouched, so the data is recoverable.
+    team.refresh_from_db()
+    payment.refresh_from_db()
+    assert team.map_count == 3
+    assert payment.map == 2

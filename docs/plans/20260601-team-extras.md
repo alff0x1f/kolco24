@@ -176,13 +176,13 @@ class PaymentExtra(models.Model):
 - Create: `src/apps/race/migrations/0002_migrate_maps_to_extras.py`
 - Modify: `src/apps/race/tests.py`
 
-- [ ] create a data migration with `dependencies = [("race_app", "0001_initial"), ("website", "0072_payment_vtb_payment")]`, using `apps.get_model` for `Race`/`Team`/`Payment`/`RaceExtra`/`TeamExtra`/`PaymentExtra` (no live-code imports)
-- [ ] forward: for every `Race` having ≥1 non-deleted team with `map_count>0` OR `map_count_paid>0`, `get_or_create(race=race, code="map", defaults={"name": "Доп. карты", "price": 200, "free_per_team": 2, "order": 0, "is_active": True})` — key the lookup on `(race, code)` only, everything else under `defaults=`, so a pre-existing `code="map"` row never triggers an `IntegrityError` against `unique_together` (hardcode 200/2 in the migration)
-- [ ] forward: for each such team, create `TeamExtra(team, race_extra=<race's map extra>, count=map_count, count_paid=map_count_paid)`; resolve the team's race via `team.category2.race` — if `category2 is None` (or its race is missing), skip + `print`/log the team id (don't crash)
-- [ ] forward: for each `Payment` with `map>0`, create `PaymentExtra(payment, race_extra=<map extra for payment.team's race>, count=payment.map, unit_price=200)`; **guard the nullable `Payment.team` AND `team.category2`** — if either is `None` (orphaned/legacy payment), skip + log the payment id rather than `AttributeError`
-- [ ] reverse: delete `PaymentExtra`/`TeamExtra`/`RaceExtra` rows with `code="map"` (data recoverable from still-present legacy columns)
-- [ ] write tests: seed a race + team with `map_count`/`map_count_paid` and a `Payment.map>0`, run the migration logic, assert the expected `RaceExtra`/`TeamExtra`/`PaymentExtra` rows; assert a team with `map_count>0` but no `category2` is skipped without raising; assert a `Payment.map>0` with `team=None` is skipped without raising; assert a race that already has a `code="map"` row doesn't raise (defaults-only); assert reverse removes the `code="map"` rows
-- [ ] run tests — must pass before Task 3
+- [x] create a data migration with `dependencies = [("race_app", "0001_initial"), ("website", "0072_payment_vtb_payment")]`, using `apps.get_model` for `Race`/`Team`/`Payment`/`RaceExtra`/`TeamExtra`/`PaymentExtra` (no live-code imports)
+- [x] forward: for every `Race` having ≥1 non-deleted team with `map_count>0` OR `map_count_paid>0`, `get_or_create(race=race, code="map", defaults={"name": "Доп. карты", "price": 200, "free_per_team": 2, "order": 0, "is_active": True})` — key the lookup on `(race, code)` only, everything else under `defaults=`, so a pre-existing `code="map"` row never triggers an `IntegrityError` against `unique_together` (hardcode 200/2 in the migration)
+- [x] forward: for each such team, create `TeamExtra(team, race_extra=<race's map extra>, count=map_count, count_paid=map_count_paid)`; resolve the team's race via `team.category2.race` — if `category2 is None` (or its race is missing), skip + `print`/log the team id (don't crash)
+- [x] forward: for each `Payment` with `map>0`, create `PaymentExtra(payment, race_extra=<map extra for payment.team's race>, count=payment.map, unit_price=200)`; **guard the nullable `Payment.team` AND `team.category2`** — if either is `None` (orphaned/legacy payment), skip + log the payment id rather than `AttributeError`
+- [x] reverse: delete `PaymentExtra`/`TeamExtra`/`RaceExtra` rows with `code="map"` (data recoverable from still-present legacy columns)
+- [x] write tests: seed a race + team with `map_count`/`map_count_paid` and a `Payment.map>0`, run the migration logic, assert the expected `RaceExtra`/`TeamExtra`/`PaymentExtra` rows; assert a team with `map_count>0` but no `category2` is skipped without raising; assert a `Payment.map>0` with `team=None` is skipped without raising; assert a race that already has a `code="map"` row doesn't raise (defaults-only); assert reverse removes the `code="map"` rows
+- [x] run tests — must pass before Task 3
 
 ### Task 3: Pricing + payment-creation helpers (`apps/race/pricing.py`)
 
