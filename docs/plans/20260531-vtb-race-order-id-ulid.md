@@ -188,18 +188,18 @@ the `except` catches the "no FK set" case. The `SPUTNIK_` donation branch is unc
 - Modify: `src/website/views/views_.py`
 - Modify: `src/website/views/team.py`
 
-- [ ] `src/website/views/views_.py` (`AddTeam`, ~line 1892-1898): change
+- [x] `src/website/views/views_.py` (`AddTeam`, ~line 1892-1898): change
       `order_id=f"ORDER_{payment.id}"` → `order_id=VTBPayment.new_order_id("ORDER")`; after
       `vtb_payment = VTBPayment.from_vtb_payload(payload)` add
       `payment.vtb_payment = vtb_payment` and `payment.save(update_fields=["vtb_payment"])`. Leave
       `order_name=f"...({payment.id})"` untouched (human-readable, not used for matching).
-- [ ] `src/website/views/team.py` (`EditTeamView`, ~line 196-202): same two edits.
-- [ ] Confirm `VTBPayment` is imported in both modules (already used for `from_vtb_payload`).
-- [ ] Add/extend a view test (or a focused unit assertion) confirming a created race `Payment` has
+- [x] `src/website/views/team.py` (`EditTeamView`, ~line 196-202): same two edits.
+- [x] Confirm `VTBPayment` is imported in both modules (already used for `from_vtb_payload`).
+- [x] Add/extend a view test (or a focused unit assertion) confirming a created race `Payment` has
       `vtb_payment` set and the minted `order_id` starts with `"ORDER_"` and is **not** `ORDER_<int>`
       — mock `VTBClient.create_order`/`_ensure_token` so no network call is made (follow the mocking
       style in `src/donate/tests.py`).
-- [ ] Run the new test(s) — must pass.
+- [x] Run the new test(s) — must pass.
 
 ### Task 4: Reconcile via the FK with a legacy fallback
 
