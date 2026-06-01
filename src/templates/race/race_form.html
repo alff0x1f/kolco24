@@ -155,7 +155,7 @@
           </div>
           <div class="card-body">
             <div class="field">
-              <label for="f-header-image">Картинка в шапке <span class="opt">— URL</span></label>
+              <label for="f-header-image">Картинка в шапке <span class="opt">— URL или путь</span></label>
               <div class="upload cover">
                 <div class="preview">
                   <img class="preview-img" id="coverPreview"
@@ -165,9 +165,9 @@
                 </div>
               </div>
               <input class="control mono{% if form.header_image.errors %} has-error{% endif %}" id="f-header-image"
-                     name="header_image" type="url" data-preview-for="coverPreview" data-preview-ph
+                     name="header_image" type="text" data-preview-for="coverPreview" data-preview-ph
                      value="{{ form.header_image.value|default_if_none:'' }}"
-                     placeholder="https://…/cover.jpg">
+                     placeholder="https://…/cover.jpg или /static/…/cover.jpg">
               {% if form.header_image.errors %}<span class="field-error">{{ form.header_image.errors|join:", " }}</span>
               {% else %}<span class="field-hint">Рекомендуемое соотношение 4:1. Хранится как URL в&nbsp;поле <code>header_image</code>.</span>{% endif %}
             </div>
@@ -185,9 +185,9 @@
                 </div>
                 <div class="logo-side">
                   <input class="control mono{% if form.header_logo.errors %} has-error{% endif %}" id="f-header-logo"
-                         name="header_logo" type="url" data-preview-for="logoPreview" data-preview-ph
+                         name="header_logo" type="text" data-preview-for="logoPreview" data-preview-ph
                          value="{{ form.header_logo.value|default_if_none:'' }}"
-                         placeholder="https://…/logo.svg">
+                         placeholder="https://…/logo.svg или /static/…/logo.svg">
                   {% if form.header_logo.errors %}<span class="field-error">{{ form.header_logo.errors|join:", " }}</span>
                   {% else %}<span class="field-hint">Прозрачный PNG или SVG, выводится поверх обложки.</span>{% endif %}
                 </div>

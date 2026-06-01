@@ -66,11 +66,17 @@ class Race(Model):
         errors = {}
         for field in ("header_image", "header_logo"):
             value = getattr(self, field)
-            if value:
+            # Root-relative paths (e.g. /static/images/cover.jpg) are rendered
+            # directly into <img src> and are valid; only full URLs are
+            # validated against the http/https scheme.
+            if value and not value.startswith("/"):
                 try:
                     _url_validator(value)
                 except ValidationError:
-                    errors[field] = "Введите корректный URL (http/https)."
+                    errors[field] = (
+                        "Введите корректный URL (http/https) "
+                        "или путь от корня (/static/…)."
+                    )
         if errors:
             raise ValidationError(errors)
 

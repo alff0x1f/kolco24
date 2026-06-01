@@ -1,13 +1,29 @@
 /* Teams list styles — /race/<slug>/teams/ (+ category / my variants) */
 /* Teams-specific ONLY. Does NOT duplicate the shell:
    - theme-2.css: .container, .grid, .card, .card-pad, .btn*, .sidebar,
-     .side-head, .crumb, .sep, nav, footer, responsive .grid/.sidebar.
+     .side-head, .crumbs, .sep, nav, footer, responsive .grid/.sidebar.
    - race.css:    .pill, .cover-banner, .cover-image, .cover-meta-card,
      .cover-meta, .cover-title, .cover-actions, .info-list.
    Scoped under .teams-page where practical. */
 
 /* ── Wrapper ─────────────────────────────────────────── */
 .teams-page { padding: 0 0 56px; }
+
+/* ── Cover title as a single breadcrumb trail (race › Команды) ──
+   The leaf «Команды» stays an <h1> for semantics but inherits the
+   breadcrumb's size instead of the 24px .cover-title h1 from race.css. */
+.teams-page .cover-crumbs {
+  margin-bottom: 4px; flex-wrap: wrap;
+  align-items: baseline; font-size: 14px;
+}
+.teams-page .cover-crumbs h1 {
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  line-height: 1.2;
+  color: var(--ink);
+  margin: 0;
+}
 
 /* ── Teams card: sticky head + search ────────────────── */
 .teams-page .teams-card { position: relative; }
@@ -264,4 +280,5 @@
   .teams-page .teams-head { padding: 16px 16px 14px; }
   .teams-page .search { max-width: none; }
   .teams-page .cat-chips { padding: 12px 16px; }
+  .teams-page .cover-crumbs h1 { font-size: 19px; }
 }

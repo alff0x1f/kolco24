@@ -51,6 +51,51 @@ def _make_team(owner, category, **kwargs):
 
 
 @pytest.mark.django_db
+def test_build_context_reg_status_flags():
+    race = _make_race()  # defaults to RegStatus.UPCOMING
+
+    ctx = RaceTeamsView.build_context(race, AnonymousUser())
+    assert ctx["reg_open"] is False
+    assert ctx["reg_upcoming"] is True
+
+    race.reg_status = RegStatus.OPEN
+    race.save()
+    ctx = RaceTeamsView.build_context(race, AnonymousUser())
+    assert ctx["reg_open"] is True
+    assert ctx["reg_upcoming"] is False
+
+    race.reg_status = RegStatus.SOLD_OUT
+    race.save()
+    ctx = RaceTeamsView.build_context(race, AnonymousUser())
+    assert ctx["reg_open"] is False
+    assert ctx["reg_upcoming"] is False
+
+
+@pytest.mark.django_db
+def test_build_context_can_edit_race_flag():
+    race = _make_race()
+
+    anon_ctx = RaceTeamsView.build_context(race, AnonymousUser())
+    assert anon_ctx["can_edit_race"] is False
+
+    plain = User.objects.create_user(
+        username="plain", password="p", email="plain@example.com"
+    )
+    assert RaceTeamsView.build_context(race, plain)["can_edit_race"] is False
+
+    admin = User.objects.create_user(
+        username="radmin", password="p", email="radmin@example.com"
+    )
+    RaceAdmin.objects.create(race=race, user=admin, role=RaceAdmin.Role.ADMIN)
+    assert RaceTeamsView.build_context(race, admin)["can_edit_race"] is True
+
+    superuser = User.objects.create_superuser(
+        username="su", password="p", email="su@example.com"
+    )
+    assert RaceTeamsView.build_context(race, superuser)["can_edit_race"] is True
+
+
+@pytest.mark.django_db
 def test_build_context_anon_sees_paid_only():
     owner = User.objects.create_user(
         username="o1", password="p", email="o1@example.com"
@@ -292,6 +337,25 @@ def test_all_teams_returns_200_with_data_initial_all(client):
 
 
 @pytest.mark.django_db
+def test_all_teams_renders_admin_panel_for_superuser(client, django_user_model):
+    race = _make_race(slug="ru2a", code="ru2a")
+    superuser = django_user_model.objects.create_superuser(
+        username="su2", password="p", email="su2@example.com"
+    )
+    client.force_login(superuser)
+
+    resp = client.get(reverse("all_teams", args=[race.slug]))
+
+    assert resp.status_code == 200
+    html = resp.content.decode()
+    assert "card-admin" in html
+    # «Редактировать гонку» lives on the race page now, not on teams.
+    assert reverse("edit_race", args=[race.slug]) not in html
+    # The teams admin panel keeps «+ Команда».
+    assert reverse("add_team", args=[race.slug]) in html
+
+
+@pytest.mark.django_db
 def test_teams2_returns_200_with_category_data_initial(client):
     owner = User.objects.create_user(
         username="ru3", password="p", email="ru3@example.com"
@@ -381,9 +445,11 @@ def test_teams_page_renders_key_markup(client):
     # page wrapper + initial filter
     assert 'class="teams-page"' in html
     assert 'data-initial="all"' in html
-    # cover meta card + breadcrumb
+    # cover meta card + breadcrumb trail (race › Команды), leaf is the <h1>
     assert 'class="cover-meta-card"' in html
-    assert 'class="crumb"' in html
+    assert "cover-crumbs" in html
+    assert reverse("race", args=[race.slug]) in html
+    assert '<h1 aria-current="page">Команды</h1>' in html
     # search box + chips container the JS hydrates
     assert 'id="searchInput"' in html
     assert 'id="catChips"' in html
@@ -496,6 +562,7 @@ def test_race_page_admin_sees_edit_button(client):
     assert resp.status_code == 200
     assert resp.context["can_edit_race"] is True
     html = resp.content.decode()
+    assert "card-admin" in html  # «Управление» panel in the sidebar
     assert reverse("edit_race", args=[race.slug]) in html
     assert "Редактировать" in html
     # A non-superuser ADMIN does not get the «new race» link.
@@ -515,6 +582,7 @@ def test_race_page_regular_user_no_edit_button(client):
     assert resp.status_code == 200
     assert resp.context["can_edit_race"] is False
     html = resp.content.decode()
+    assert "card-admin" not in html  # no «Управление» panel for regular users
     assert "Редактировать" not in html
     assert "+ Новая гонка" not in html
 
@@ -532,6 +600,7 @@ def test_race_page_superuser_sees_edit_and_new_buttons(client):
     assert resp.status_code == 200
     assert resp.context["can_edit_race"] is True
     html = resp.content.decode()
+    assert "card-admin" in html  # «Управление» panel in the sidebar
     assert reverse("edit_race", args=[race.slug]) in html
     assert reverse("add_race") in html
     assert "+ Новая гонка" in html
@@ -662,6 +731,21 @@ def test_race_form_invalid_header_image_url():
 
     assert not form.is_valid()
     assert "header_image" in form.errors
+
+
+@pytest.mark.django_db
+def test_race_form_relative_header_paths_valid():
+    form = RaceForm(
+        data=_race_form_data(
+            header_image="/static/images/backgrounds/header2023.jpg",
+            header_logo="/static/images/logo_big.png",
+        )
+    )
+
+    assert form.is_valid(), form.errors
+    race = form.save()
+    assert race.header_image == "/static/images/backgrounds/header2023.jpg"
+    assert race.header_logo == "/static/images/logo_big.png"
 
 
 # --- RaceEditView GET + auth ---
