@@ -127,9 +127,9 @@ class EmailVerification(models.Model):
         if not self.is_alive:
             return False
         if not check_password(raw_code, self.code_hash):
-            EmailVerification.objects.filter(pk=self.pk).update(
-                attempts=models.F("attempts") + 1
-            )
+            EmailVerification.objects.filter(
+                pk=self.pk, attempts__lt=self.MAX_ATTEMPTS
+            ).update(attempts=models.F("attempts") + 1)
             return False
         now = timezone.now()
         updated = EmailVerification.objects.filter(

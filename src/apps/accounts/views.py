@@ -433,7 +433,7 @@ class MagicLinkView(View):
 
     def get(self, request, signed, *args, **kwargs):
         try:
-            pk = TimestampSigner().unsign(signed)
+            pk = TimestampSigner().unsign(signed, max_age=EmailVerification.CODE_TTL)
         except BadSignature:
             raise Http404("Invalid link")
         verification = EmailVerification.objects.filter(pk=pk).first()

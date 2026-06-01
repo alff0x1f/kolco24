@@ -63,7 +63,7 @@
                         <a href="{% url 'stop_impersonate' %}">Вернуться к администратору</a>
                         <div class="menu-divider"></div>
                         {% endif %}
-                        <form action="/logout/" method="POST" id="logoutForm">
+                        <form action="{% url 'logout' %}" method="POST" id="logoutForm">
                             <input type="hidden" name="logout" value="logout">
                             {% csrf_token %}
                         </form>
