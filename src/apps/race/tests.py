@@ -1461,3 +1461,104 @@ def test_teams_context_includes_race_remaining():
     context = RaceTeamsView.build_context(race, AnonymousUser())
 
     assert context["race_remaining"] == 5
+
+
+# --- Add-on models (RaceExtra / TeamExtra / PaymentExtra) ---
+
+import pytest as _pytest  # noqa: E402
+from django.db import IntegrityError  # noqa: E402
+from django.db.models import ProtectedError  # noqa: E402
+
+from apps.race.models import PaymentExtra, RaceExtra, TeamExtra  # noqa: E402
+from website.models.models import Payment  # noqa: E402
+
+
+@pytest.mark.django_db
+def test_race_extra_create_and_str():
+    race = _make_race(slug="ex-race", code="exrace")
+    extra = RaceExtra.objects.create(
+        race=race, code="transfer", name="Трансфер", price=500, free_per_team=0
+    )
+    assert extra.is_active is True
+    assert extra.order == 0
+    assert "Трансфер" in str(extra)
+    assert "transfer" in str(extra)
+
+
+@pytest.mark.django_db
+def test_race_extra_unique_together():
+    race = _make_race(slug="ex-uniq", code="exuniq")
+    RaceExtra.objects.create(race=race, code="map", name="Карты", price=200)
+    with _pytest.raises(IntegrityError):
+        RaceExtra.objects.create(race=race, code="map", name="Карты 2", price=300)
+
+
+@pytest.mark.django_db
+def test_race_extra_default_ordering():
+    race = _make_race(slug="ex-ord", code="exord")
+    RaceExtra.objects.create(race=race, code="b", name="B", order=2)
+    RaceExtra.objects.create(race=race, code="a", name="A", order=1)
+    RaceExtra.objects.create(race=race, code="c", name="C", order=0)
+    codes = list(race.extras.values_list("code", flat=True))
+    assert codes == ["c", "a", "b"]
+
+
+@pytest.mark.django_db
+def test_team_extra_create_and_unique_together():
+    owner = User.objects.create_user(
+        username="te1", password="p", email="te1@example.com"
+    )
+    race = _make_race(slug="te-race", code="terace")
+    cat = _make_category(race)
+    team = _make_team(owner, cat)
+    extra = RaceExtra.objects.create(race=race, code="map", name="Карты", price=200)
+    te = TeamExtra.objects.create(team=team, race_extra=extra, count=3, count_paid=1)
+    assert str(te)
+    with _pytest.raises(IntegrityError):
+        TeamExtra.objects.create(team=team, race_extra=extra, count=1)
+
+
+@pytest.mark.django_db
+def test_team_extra_protect_blocks_race_extra_delete():
+    owner = User.objects.create_user(
+        username="te2", password="p", email="te2@example.com"
+    )
+    race = _make_race(slug="te-prot", code="teprot")
+    cat = _make_category(race)
+    team = _make_team(owner, cat)
+    extra = RaceExtra.objects.create(race=race, code="map", name="Карты", price=200)
+    TeamExtra.objects.create(team=team, race_extra=extra, count=2)
+    with _pytest.raises(ProtectedError):
+        extra.delete()
+
+
+@pytest.mark.django_db
+def test_payment_extra_create_and_str():
+    owner = User.objects.create_user(
+        username="pe1", password="p", email="pe1@example.com"
+    )
+    race = _make_race(slug="pe-race", code="perace")
+    cat = _make_category(race)
+    team = _make_team(owner, cat)
+    extra = RaceExtra.objects.create(race=race, code="map", name="Карты", price=200)
+    payment = Payment.objects.create(owner=owner, team=team, payment_method="sbp2")
+    pe = PaymentExtra.objects.create(
+        payment=payment, race_extra=extra, count=2, unit_price=200
+    )
+    assert str(pe)
+    assert pe.unit_price == 200
+
+
+@pytest.mark.django_db
+def test_payment_extra_protect_blocks_race_extra_delete():
+    owner = User.objects.create_user(
+        username="pe2", password="p", email="pe2@example.com"
+    )
+    race = _make_race(slug="pe-prot", code="peprot")
+    cat = _make_category(race)
+    team = _make_team(owner, cat)
+    extra = RaceExtra.objects.create(race=race, code="map", name="Карты", price=200)
+    payment = Payment.objects.create(owner=owner, team=team, payment_method="sbp2")
+    PaymentExtra.objects.create(payment=payment, race_extra=extra, count=2)
+    with _pytest.raises(ProtectedError):
+        extra.delete()

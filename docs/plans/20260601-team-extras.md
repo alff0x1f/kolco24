@@ -162,13 +162,13 @@ class PaymentExtra(models.Model):
 - Create: `src/apps/race/migrations/0001_initial.py` (via `makemigrations`)
 - Modify: `src/apps/race/tests.py`
 
-- [ ] create `RaceExtra`, `TeamExtra`, `PaymentExtra` in `src/apps/race/models.py` with the FKs, `unique_together`, `ordering`, and `on_delete` (`CASCADE` to owner, `PROTECT` to `RaceExtra`) per Technical Details
-- [ ] add `__str__` to each model (readable in admin / shell)
-- [ ] generate the migration: `uv run python src/manage.py makemigrations race_app` (creates `migrations/__init__.py` if absent — verify the dir exists and is a package)
-- [ ] ensure `0001_initial` declares an **explicit** `dependencies = [("website", "0072_payment_vtb_payment")]` (the cross-app FKs reference `website.Race/Team/Payment`); cross-app FK migrations frequently need this to apply on a fresh DB
-- [ ] sanity-check `makemigrations --check` produces no further changes and `migrate` applies cleanly on a **truly empty** DB (not `--reuse-db`), since the whole pytest suite fails at DB setup if this is wrong
-- [ ] write tests: create each model; `unique_together` violations raise `IntegrityError`; `RaceExtra` default `ordering`; `PROTECT` blocks deleting a `RaceExtra` referenced by a `TeamExtra`/`PaymentExtra`
-- [ ] run tests — must pass before Task 2
+- [x] create `RaceExtra`, `TeamExtra`, `PaymentExtra` in `src/apps/race/models.py` with the FKs, `unique_together`, `ordering`, and `on_delete` (`CASCADE` to owner, `PROTECT` to `RaceExtra`) per Technical Details
+- [x] add `__str__` to each model (readable in admin / shell)
+- [x] generate the migration: `uv run python src/manage.py makemigrations race_app` (creates `migrations/__init__.py` if absent — verify the dir exists and is a package)
+- [x] ensure `0001_initial` declares an **explicit** `dependencies = [("website", "0072_payment_vtb_payment")]` (the cross-app FKs reference `website.Race/Team/Payment`); cross-app FK migrations frequently need this to apply on a fresh DB
+- [x] sanity-check `makemigrations --check` produces no further changes and `migrate` applies cleanly on a **truly empty** DB (not `--reuse-db`), since the whole pytest suite fails at DB setup if this is wrong
+- [x] write tests: create each model; `unique_together` violations raise `IntegrityError`; `RaceExtra` default `ordering`; `PROTECT` blocks deleting a `RaceExtra` referenced by a `TeamExtra`/`PaymentExtra`
+- [x] run tests — must pass before Task 2
 
 ### Task 2: Data migration — maps → extras (backfill, legacy columns retained)
 
