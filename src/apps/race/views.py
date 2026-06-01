@@ -63,20 +63,21 @@ class RacePageView(View):
     @staticmethod
     def build_context(race, user=None):
         categories = list(_categories_with_team_count(race))
-        # Свободные слоты на категорию (``None`` при отсутствии лимита) — для
-        # бейджей «осталось N / мест нет» в списке категорий.
+        # Занятость (paid_people) и свободные слоты на категорию — для строки
+        # «N команд · M участников» и бейджа «осталось K из L / мест нет».
+        # ``remaining`` выводится из уже посчитанного ``people``, чтобы не
+        # дёргать ``people_count()`` повторно внутри ``remaining_people()``.
         for cat in categories:
-            cat.remaining = cat.remaining_people()
-        # Bars in the «Команды» panel are scaled to the largest category (like
-        # the teams-page breakdown), so the biggest one fills the track.
-        category_max_count = max((c.team_count or 0 for c in categories), default=0)
+            cat.people = cat.people_count()
+            cat.remaining = (
+                None if not cat.people_limit else max(0, cat.people_limit - cat.people)
+            )
         news_qs = NewsPost.objects.filter(race=race).order_by("-publication_date")
         news_count = news_qs.count()
         news_list = list(news_qs[:10])
         context = {
             "race": race,
             "categories": categories,
-            "category_max_count": category_max_count,
             "links": race.links.order_by("-id"),
             "news_list": news_list,
             "news_count": news_count,
@@ -126,7 +127,6 @@ class RaceTeamsView(View):
                     "name": cat.name,
                     "count": cat.team_count or 0,
                     "colorIdx": color_idx,
-                    "remaining": cat.remaining_people(),
                 }
             )
 

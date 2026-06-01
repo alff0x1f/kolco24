@@ -211,18 +211,19 @@
                   {% if category.short_name and category.short_name != category.name %}
                   <span class="cat-full" title="{{ category.name }}">{{ category.name }}</span>
                   {% endif %}
-                  <span class="cat-count">{{ category.team_count|default:"0" }}</span>
-                  {% if category.remaining is not None %}
-                  {% if category.remaining > 0 %}
-                  <span class="cat-remaining ok">осталось {{ category.remaining|floatformat:0 }}</span>
-                  {% else %}
-                  <span class="cat-remaining none">мест нет</span>
-                  {% endif %}
-                  {% endif %}
                 </div>
-                <div class="cat-bar">
-                  <i style="width: {% widthratio category.team_count|default:0 category_max_count|default:1 100 %}%"></i>
+                <div class="cat-stats">
+                  <span class="cat-stat"><b>{{ category.team_count|default:"0" }}</b> команд</span>
+                  <span class="cat-sep" aria-hidden="true">·</span>
+                  <span class="cat-stat"><b>{{ category.people|floatformat:0 }}</b> участников</span>
                 </div>
+                {% if category.remaining is not None %}
+                {% if category.remaining > 0 %}
+                <div class="cat-remaining ok">осталось {{ category.remaining|floatformat:0 }} из {{ category.people_limit }}</div>
+                {% else %}
+                <div class="cat-remaining none">мест нет</div>
+                {% endif %}
+                {% endif %}
               </a>
             </li>
             {% endfor %}

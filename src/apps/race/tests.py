@@ -1308,6 +1308,59 @@ def test_race_page_renders_sold_out_badge(client):
 
 
 @pytest.mark.django_db
+def test_race_page_category_card_shows_labelled_stats(client):
+    """Category card states teams and participants in their own units.
+
+    The race itself is unlimited (no cover-line badge), so «осталось K из L»
+    can only come from the category row — it must read participants, not teams.
+    """
+    owner = User.objects.create_user(
+        username="rp5", password="p", email="rp5@example.com"
+    )
+    race = _make_race(slug="stats-race", code="stats")  # race unlimited
+    cat = _make_category(race)
+    cat.people_limit = 10
+    cat.save(update_fields=["people_limit"])
+    _make_team(owner, cat, paid_people=2, start_number="1")
+    _make_team(owner, cat, paid_people=3, start_number="2")
+
+    context = RacePageView.build_context(race)
+    assert context["categories"][0].team_count == 2
+    assert context["categories"][0].people == 5
+    assert context["categories"][0].remaining == 5  # 10 − 5
+
+    resp = client.get(reverse("race", kwargs={"race_slug": race.slug}))
+    html = resp.content.decode()
+
+    assert resp.status_code == 200
+    assert "<b>2</b> команд" in html
+    assert "<b>5</b> участников" in html
+    assert "осталось 5 из 10" in html
+
+
+@pytest.mark.django_db
+def test_race_page_category_card_unlimited_hides_remaining(client):
+    owner = User.objects.create_user(
+        username="rp6", password="p", email="rp6@example.com"
+    )
+    race = _make_race(slug="stats-unl", code="statsunl")
+    cat = _make_category(race)  # people_limit defaults to 0 → unlimited
+    _make_team(owner, cat, paid_people=2, start_number="1")
+
+    context = RacePageView.build_context(race)
+    assert context["categories"][0].remaining is None
+
+    resp = client.get(reverse("race", kwargs={"race_slug": race.slug}))
+    html = resp.content.decode()
+
+    assert resp.status_code == 200
+    assert "<b>1</b> команд" in html
+    assert "<b>2</b> участников" in html
+    # No limit → no «осталось …» line in this category row.
+    assert "осталось" not in html
+
+
+@pytest.mark.django_db
 def test_teams_context_includes_race_remaining():
     owner = User.objects.create_user(
         username="rp4", password="p", email="rp4@example.com"
