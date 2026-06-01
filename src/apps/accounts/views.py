@@ -1,4 +1,5 @@
 import logging
+from urllib.parse import urlsplit
 
 from django.conf import settings
 from django.contrib import messages
@@ -16,7 +17,7 @@ from django.core.signing import BadSignature, TimestampSigner
 from django.db import IntegrityError, transaction
 from django.http import Http404, HttpResponseRedirect
 from django.shortcuts import render
-from django.urls import reverse, reverse_lazy
+from django.urls import Resolver404, resolve, reverse, reverse_lazy
 from django.utils.crypto import get_random_string
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.views import View
@@ -54,6 +55,26 @@ def _safe_redirect(request, url):
     ):
         return HttpResponseRedirect(url)
     return HttpResponseRedirect("/")
+
+
+def _race_from_next(next_url):
+    """Resolve a ``next`` path back to its Race, for display-only race-aware copy.
+
+    Returns the ``Race`` when ``next_url`` is an ``add_team`` path whose slug matches
+    a known race; ``None`` for any other path, an unresolvable string, or an empty
+    value. Never raises into the request — purely cosmetic.
+    """
+    path = urlsplit(next_url or "").path
+    if not path:
+        return None
+    try:
+        match = resolve(path)
+    except Resolver404:
+        return None
+    if match.url_name != "add_team":
+        return None
+    slug = match.kwargs.get("race_slug")
+    return Race.objects.filter(slug=slug).first()
 
 
 def _find_user_for_impersonation(query):
@@ -332,10 +353,11 @@ class StartView(View):
         if request.user.is_authenticated:
             return _safe_redirect(request, request.GET.get("next", "/"))
         form = EmailStartForm()
+        next_url = request.GET.get("next", "")
         return render(
             request,
             self.template,
-            {"form": form, "next": request.GET.get("next", "")},
+            {"form": form, "next": next_url, "race": _race_from_next(next_url)},
         )
 
     def post(self, request):
@@ -344,7 +366,11 @@ class StartView(View):
             return _safe_redirect(request, next_url or "/")
         form = EmailStartForm(request.POST)
         if not form.is_valid():
-            return render(request, self.template, {"form": form, "next": next_url})
+            return render(
+                request,
+                self.template,
+                {"form": form, "next": next_url, "race": _race_from_next(next_url)},
+            )
 
         email = form.cleaned_data["email"]
         verification, raw_code = EmailVerification.create_for(email)
@@ -368,13 +394,15 @@ class VerifyView(View):
         email = request.session.get(PENDING_EMAIL_KEY)
         if not email:
             return HttpResponseRedirect(reverse("account_start"))
+        next_url = request.session.get(PENDING_NEXT_KEY, "")
         return render(
             request,
             self.template,
             {
                 "form": CodeForm(),
                 "email": email,
-                "next": request.session.get(PENDING_NEXT_KEY, ""),
+                "next": next_url,
+                "race": _race_from_next(next_url),
             },
         )
 
@@ -400,7 +428,12 @@ class VerifyView(View):
             return render(
                 request,
                 self.template,
-                {"form": form, "email": email, "next": next_url},
+                {
+                    "form": form,
+                    "email": email,
+                    "next": next_url,
+                    "race": _race_from_next(next_url),
+                },
             )
 
         verification = (
@@ -417,7 +450,12 @@ class VerifyView(View):
             return render(
                 request,
                 self.template,
-                {"form": form, "email": email, "next": next_url},
+                {
+                    "form": form,
+                    "email": email,
+                    "next": next_url,
+                    "race": _race_from_next(next_url),
+                },
             )
 
         request.session.pop(PENDING_EMAIL_KEY, None)

@@ -162,23 +162,23 @@ PENDING_NEXT_KEY, ""))` and add `"race": race`. `MagicLinkView` unchanged.
 - Modify: `src/apps/accounts/views.py`
 - Modify: `src/apps/accounts/tests.py`
 
-- [ ] add `_race_from_next(next_url)` per Technical Details (urlsplit → `resolve` →
+- [x] add `_race_from_next(next_url)` per Technical Details (urlsplit → `resolve` →
       guard `url_name == "add_team"` → `Race.objects.filter(slug=…).first()`;
       `try/except Resolver404`; returns `None` on any miss)
-- [ ] add the needed imports (`from urllib.parse import urlsplit`;
+- [x] add the needed imports (`from urllib.parse import urlsplit`;
       extend the `django.urls` import with `resolve, Resolver404`)
-- [ ] in `StartView.get` and `.post` compute `race = _race_from_next(next_url)` and add
+- [x] in `StartView.get` and `.post` compute `race = _race_from_next(next_url)` and add
       `"race": race` to the template context
-- [ ] in `VerifyView.get` and `.post` compute
+- [x] in `VerifyView.get` and `.post` compute
       `race = _race_from_next(request.session.get(PENDING_NEXT_KEY, ""))` and add
       `"race": race` to the template context
-- [ ] write test: `_race_from_next` returns the Race for a valid `add_team` path,
+- [x] write test: `_race_from_next` returns the Race for a valid `add_team` path,
       `None` for a non-`add_team` path, `None` for a garbage/unresolvable string, and
       `None` for an empty value
-- [ ] write test: `GET account_start?next=<add_team url>` puts the Race in context
-      (assert `race.name` present in the rendered HTML); a garbage `next` renders 200
-      with no race (generic copy, no error)
-- [ ] run `uv run pytest src/apps/accounts/tests.py` (from `src/`) — must pass before
+- [x] write test: `GET account_start?next=<add_team url>` puts the Race in context
+      (race-in-context asserted; the rendered-HTML `race.name` assertion lands in Task 3
+      once the templates render it); a garbage `next` renders 200 with no race
+- [x] run `uv run pytest src/apps/accounts/tests.py` (from `src/`) — must pass before
       next task
 
 ### Task 3: Race-aware copy in start.html and verify.html

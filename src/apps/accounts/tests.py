@@ -629,3 +629,64 @@ def test_add_team_anon_post_redirects_to_account_start(client):
     assert resp.url.startswith(reverse("account_start"))
     assert f"next={add_url}" in resp.url
     assert not resp.url.startswith(reverse("login"))
+
+
+# ── _race_from_next helper + race context in start/verify ────────────────
+
+
+@pytest.mark.django_db
+def test_race_from_next_returns_race_for_add_team_path():
+    from apps.accounts.views import _race_from_next
+    from website.models import Race
+
+    race = Race.objects.create(name="Helper Race", code=910, slug="helper-race")
+    add_url = reverse("add_team", args=[race.slug])
+
+    assert _race_from_next(add_url) == race
+
+
+@pytest.mark.django_db
+def test_race_from_next_returns_none_for_non_add_team_path():
+    from apps.accounts.views import _race_from_next
+
+    assert _race_from_next(reverse("account_start")) is None
+
+
+@pytest.mark.django_db
+def test_race_from_next_returns_none_for_garbage_and_empty():
+    from apps.accounts.views import _race_from_next
+
+    assert _race_from_next("/no/such/path/at/all/") is None
+    assert _race_from_next("not a url") is None
+    assert _race_from_next("") is None
+    assert _race_from_next(None) is None
+
+
+@pytest.mark.django_db
+def test_race_from_next_returns_none_when_slug_unknown():
+    from apps.accounts.views import _race_from_next
+
+    # Resolvable add_team path, but no race with this slug exists.
+    add_url = reverse("add_team", args=["ghost-race"])
+    assert _race_from_next(add_url) is None
+
+
+@pytest.mark.django_db
+def test_start_get_with_add_team_next_puts_race_in_context(client):
+    from website.models import Race
+
+    race = Race.objects.create(name="Context Race", code=911, slug="context-race")
+    add_url = reverse("add_team", args=[race.slug])
+
+    resp = client.get(reverse("account_start") + f"?next={add_url}")
+
+    assert resp.status_code == 200
+    assert resp.context["race"] == race
+
+
+@pytest.mark.django_db
+def test_start_get_with_garbage_next_renders_without_race(client):
+    resp = client.get(reverse("account_start") + "?next=/no/such/path/")
+
+    assert resp.status_code == 200
+    assert resp.context["race"] is None
