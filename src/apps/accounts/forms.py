@@ -165,6 +165,24 @@ class RegForm(forms.Form):
         return super(RegForm, self).clean()
 
 
+class EmailStartForm(forms.Form):
+    """Email-first entry point for the passwordless flow."""
+
+    email = forms.EmailField(label="Адрес email")
+
+    def clean_email(self):
+        return self.cleaned_data["email"].strip()
+
+
+class CodeForm(forms.Form):
+    """The 6-digit code entered on the verify page."""
+
+    code = forms.CharField(label="Код из письма", max_length=6, min_length=6)
+
+    def clean_code(self):
+        return self.cleaned_data["code"].strip()
+
+
 class ImpersonateForm(forms.Form):
     query = forms.CharField(
         label="Email или ID пользователя",

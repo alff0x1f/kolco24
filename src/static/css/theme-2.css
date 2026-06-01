@@ -548,6 +548,9 @@ button { font-family: inherit; }
 .form-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .below { text-align: center; margin-top: 18px; font-size: 14px; color: var(--muted); }
 .below a { font-weight: 500; }
+.alt-login { text-align: center; margin: 0; font-size: 14px; }
+.link-btn { background: none; border: 0; padding: 0; font: inherit; cursor: pointer; color: var(--primary-2); font-weight: 500; }
+.link-btn:hover { text-decoration: underline; }
 
 /* ── Responsive ──────────────────────────────────────── */
 @media (max-width: 920px) {

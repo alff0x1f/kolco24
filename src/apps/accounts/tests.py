@@ -4,12 +4,17 @@ import pytest
 from django.core import mail
 from django.core.signing import TimestampSigner
 from django.test import RequestFactory, override_settings
+from django.urls import reverse
 from django.utils import timezone
 
-from apps.accounts.emails import send_login_email
+from apps.accounts.emails import build_magic_link_signature, send_login_email
 from apps.accounts.models import EmailVerification
 
 LOCMEM_EMAIL = "django.core.mail.backends.locmem.EmailBackend"
+
+
+def _is_logged_in(client):
+    return "_auth_user_id" in client.session
 
 
 @pytest.mark.django_db
@@ -200,3 +205,232 @@ def test_send_login_email_swallows_send_failure(monkeypatch):
 
     # must not raise
     send_login_email(request, obj, raw_code, next_url="/race/foo/")
+
+
+# ── Passwordless views: start ──────────────────────────────────────────
+
+
+@override_settings(EMAIL_BACKEND=LOCMEM_EMAIL)
+@pytest.mark.django_db
+def test_start_post_creates_one_row_and_queues_one_email(client):
+    response = client.post(reverse("account_start"), {"email": "new@example.com"})
+
+    assert response.status_code == 302
+    assert response.url == reverse("account_verify")
+    assert EmailVerification.objects.count() == 1
+    assert len(mail.outbox) == 1
+    body = mail.outbox[0].body
+    assert "/accounts/link/" in body  # magic link
+    assert any(c.isdigit() for c in body)  # the code
+    # the pending email is stashed in session for the verify step
+    assert client.session["accounts_pending_email"] == "new@example.com"
+
+
+@override_settings(EMAIL_BACKEND=LOCMEM_EMAIL)
+@pytest.mark.django_db
+def test_start_is_neutral_for_known_and_unknown_email(client, django_user_model):
+    django_user_model.objects.create_user("known", "known@example.com", "pw")
+
+    known = client.post(reverse("account_start"), {"email": "known@example.com"})
+    client.logout()
+    unknown = client.post(reverse("account_start"), {"email": "nobody@example.com"})
+
+    # identical response regardless of whether the account exists
+    assert known.status_code == unknown.status_code == 302
+    assert known.url == unknown.url == reverse("account_verify")
+
+
+@override_settings(EMAIL_BACKEND=LOCMEM_EMAIL)
+@pytest.mark.django_db
+def test_start_normalizes_email_before_storing(client):
+    client.post(reverse("account_start"), {"email": "Mixed@Example.COM"})
+
+    assert client.session["accounts_pending_email"] == "mixed@example.com"
+    assert EmailVerification.objects.get().email == "mixed@example.com"
+
+
+@override_settings(EMAIL_BACKEND=LOCMEM_EMAIL)
+@pytest.mark.django_db
+def test_resend_within_cooldown_queues_no_second_email(client):
+    client.post(reverse("account_start"), {"email": "user@example.com"})
+    assert len(mail.outbox) == 1
+
+    response = client.post(reverse("account_verify"), {"action": "resend"})
+
+    assert response.status_code == 302
+    # cooldown: no new row, no second email
+    assert EmailVerification.objects.count() == 1
+    assert len(mail.outbox) == 1
+
+
+@pytest.mark.django_db
+def test_authed_user_at_start_is_bounced_to_next(client, django_user_model):
+    django_user_model.objects.create_user("u", "u@example.com", "pw")
+    client.login(username="u@example.com", password="pw")
+
+    response = client.get(reverse("account_start") + "?next=/race/foo/")
+
+    assert response.status_code == 302
+    assert response.url == "/race/foo/"
+
+
+# ── Passwordless views: verify (code path) ─────────────────────────────
+
+
+@pytest.mark.django_db
+def test_verify_correct_code_logs_in_existing_user_and_honors_next(
+    client, django_user_model
+):
+    user = django_user_model.objects.create_user("u", "u@example.com", "pw")
+    obj, raw_code = EmailVerification.create_for("u@example.com")
+    session = client.session
+    session["accounts_pending_email"] = "u@example.com"
+    session["accounts_next"] = "/race/foo/"
+    session.save()
+
+    response = client.post(reverse("account_verify"), {"code": raw_code})
+
+    assert response.status_code == 302
+    assert response.url == "/race/foo/"
+    assert client.session["_auth_user_id"] == str(user.pk)
+    obj.refresh_from_db()
+    assert obj.consumed_at is not None
+
+
+@pytest.mark.django_db
+def test_verify_unknown_email_creates_user_and_profile_and_logs_in(
+    client, django_user_model
+):
+    obj, raw_code = EmailVerification.create_for("fresh@example.com")
+    session = client.session
+    session["accounts_pending_email"] = "fresh@example.com"
+    session["accounts_next"] = ""
+    session.save()
+
+    response = client.post(reverse("account_verify"), {"code": raw_code})
+
+    assert response.status_code == 302
+    user = django_user_model.objects.get(email="fresh@example.com")
+    assert _is_logged_in(client)
+    # the profile is auto-created by the existing signal
+    assert user.profile is not None
+
+
+@pytest.mark.django_db
+def test_verify_wrong_code_increments_attempts_and_does_not_log_in(
+    client, django_user_model
+):
+    django_user_model.objects.create_user("u", "u@example.com", "pw")
+    obj, raw_code = EmailVerification.create_for("u@example.com")
+    wrong = "000000" if raw_code != "000000" else "111111"
+    session = client.session
+    session["accounts_pending_email"] = "u@example.com"
+    session.save()
+
+    response = client.post(reverse("account_verify"), {"code": wrong})
+
+    assert response.status_code == 200
+    assert not _is_logged_in(client)
+    obj.refresh_from_db()
+    assert obj.attempts == 1
+
+
+@pytest.mark.django_db
+def test_verify_expired_row_is_rejected(client, django_user_model):
+    django_user_model.objects.create_user("u", "u@example.com", "pw")
+    obj, raw_code = EmailVerification.create_for("u@example.com")
+    obj.expires_at = timezone.now() - timedelta(seconds=1)
+    obj.save(update_fields=["expires_at"])
+    session = client.session
+    session["accounts_pending_email"] = "u@example.com"
+    session.save()
+
+    response = client.post(reverse("account_verify"), {"code": raw_code})
+
+    assert response.status_code == 200
+    assert not _is_logged_in(client)
+
+
+# ── Passwordless views: magic link ─────────────────────────────────────
+
+
+@pytest.mark.django_db
+def test_magic_link_valid_logs_in_and_honors_next(client, django_user_model):
+    user = django_user_model.objects.create_user("u", "u@example.com", "pw")
+    obj, _ = EmailVerification.create_for("u@example.com")
+    signed = build_magic_link_signature(obj)
+
+    response = client.get(reverse("magic_link", args=[signed]) + "?next=/race/bar/")
+
+    assert response.status_code == 302
+    assert response.url == "/race/bar/"
+    assert client.session["_auth_user_id"] == str(user.pk)
+    obj.refresh_from_db()
+    assert obj.consumed_at is not None
+
+
+@pytest.mark.django_db
+def test_magic_link_unknown_email_creates_user(client, django_user_model):
+    obj, _ = EmailVerification.create_for("link-new@example.com")
+    signed = build_magic_link_signature(obj)
+
+    response = client.get(reverse("magic_link", args=[signed]))
+
+    assert response.status_code == 302
+    assert django_user_model.objects.filter(email="link-new@example.com").exists()
+    assert _is_logged_in(client)
+
+
+@pytest.mark.django_db
+def test_magic_link_tampered_signature_is_rejected(client):
+    obj, _ = EmailVerification.create_for("u@example.com")
+    signed = build_magic_link_signature(obj)
+
+    response = client.get(reverse("magic_link", args=[signed + "x"]))
+
+    assert response.status_code == 404
+    assert not _is_logged_in(client)
+
+
+@pytest.mark.django_db
+def test_magic_link_expired_row_is_rejected(client):
+    obj, _ = EmailVerification.create_for("u@example.com")
+    obj.expires_at = timezone.now() - timedelta(seconds=1)
+    obj.save(update_fields=["expires_at"])
+    signed = build_magic_link_signature(obj)
+
+    response = client.get(reverse("magic_link", args=[signed]))
+
+    assert response.status_code == 404
+    assert not _is_logged_in(client)
+
+
+@pytest.mark.django_db
+def test_magic_link_consumed_or_reused_row_is_rejected(client, django_user_model):
+    django_user_model.objects.create_user("u", "u@example.com", "pw")
+    obj, _ = EmailVerification.create_for("u@example.com")
+    signed = build_magic_link_signature(obj)
+
+    first = client.get(reverse("magic_link", args=[signed]))
+    assert first.status_code == 302
+    client.logout()
+    # reusing the same link now hits a consumed row
+    second = client.get(reverse("magic_link", args=[signed]))
+
+    assert second.status_code == 404
+    assert not _is_logged_in(client)
+
+
+@pytest.mark.django_db
+def test_magic_link_off_host_next_falls_back_to_root(client, django_user_model):
+    django_user_model.objects.create_user("u", "u@example.com", "pw")
+    obj, _ = EmailVerification.create_for("u@example.com")
+    signed = build_magic_link_signature(obj)
+
+    response = client.get(
+        reverse("magic_link", args=[signed]) + "?next=http://evil.com/x"
+    )
+
+    assert response.status_code == 302
+    assert response.url == "/"
+    assert _is_logged_in(client)

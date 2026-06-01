@@ -12,21 +12,27 @@ from django.contrib.auth.views import (
     PasswordResetDoneView,
     PasswordResetView,
 )
+from django.core.signing import BadSignature, TimestampSigner
 from django.db import IntegrityError, transaction
 from django.http import Http404, HttpResponseRedirect
 from django.shortcuts import render
 from django.urls import reverse, reverse_lazy
+from django.utils.crypto import get_random_string
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.views import View
 
+from apps.accounts.emails import send_login_email
 from apps.accounts.forms import (
     DUPLICATE_EMAIL_MSG,
+    CodeForm,
     CustomPasswordResetForm,
     CustomSetPasswordForm,
+    EmailStartForm,
     ImpersonateForm,
     LoginForm,
     RegForm,
 )
+from apps.accounts.models import EmailVerification
 from website.models import Race
 from website.models.race import RegStatus
 
@@ -70,6 +76,40 @@ def _mark_field_invalid(field):
     if "is-invalid" not in classes:
         classes.append("is-invalid")
         field.widget.attrs["class"] = " ".join(filter(None, classes))
+
+
+def _username_from_email(email):
+    """Derive a unique username from the email local-part, deduping with a suffix."""
+    base = email.split("@", 1)[0][:150] or "user"
+    username = base
+    i = 1
+    while User.objects.filter(username=username).exists():
+        i += 1
+        suffix = f"-{i}"
+        username = base[: 150 - len(suffix)] + suffix
+    return username
+
+
+def _complete_login(request, email, next_url):
+    """Shared join point for the code path and the magic-link path.
+
+    Logs in the existing user for ``email`` or creates the account inline (with an
+    unguessable password), then safe-redirects to ``next_url``. The caller is
+    responsible for marking the verification row consumed first.
+    """
+    user = User.objects.filter(email__iexact=email).first()
+    if user is None:
+        try:
+            with transaction.atomic():
+                user = User.objects.create_user(
+                    _username_from_email(email), email, get_random_string(32)
+                )
+        except IntegrityError:
+            user = User.objects.filter(email__iexact=email).first()
+            if user is None:
+                raise
+    auth_login(request, user, backend="apps.accounts.backends.EmailBackend")
+    return _safe_redirect(request, next_url or "/")
 
 
 class RegisterView(View):
@@ -267,15 +307,132 @@ def stop_impersonate(request):
     return _safe_redirect(request, next_url)
 
 
+PENDING_EMAIL_KEY = "accounts_pending_email"
+PENDING_NEXT_KEY = "accounts_next"
+
+
+class StartView(View):
+    """Email-first entry: collect the email and send a code + magic link."""
+
+    template = "accounts/start.html"
+
+    def get(self, request):
+        if request.user.is_authenticated:
+            return _safe_redirect(request, request.GET.get("next", "/"))
+        form = EmailStartForm()
+        return render(
+            request,
+            self.template,
+            {"form": form, "next": request.GET.get("next", "")},
+        )
+
+    def post(self, request):
+        next_url = request.POST.get("next") or request.GET.get("next", "")
+        if request.user.is_authenticated:
+            return _safe_redirect(request, next_url or "/")
+        form = EmailStartForm(request.POST)
+        if not form.is_valid():
+            return render(request, self.template, {"form": form, "next": next_url})
+
+        email = form.cleaned_data["email"]
+        verification, raw_code = EmailVerification.create_for(email)
+        # raw_code is None within the resend cooldown — stay neutral, send nothing.
+        if raw_code is not None:
+            send_login_email(request, verification, raw_code, next_url)
+
+        request.session[PENDING_EMAIL_KEY] = verification.email
+        request.session[PENDING_NEXT_KEY] = next_url
+        return HttpResponseRedirect(reverse("account_verify"))
+
+
+class VerifyView(View):
+    """Show the code field; verify a code (or resend) and complete the login."""
+
+    template = "accounts/verify.html"
+
+    def get(self, request):
+        if request.user.is_authenticated:
+            return _safe_redirect(request, request.GET.get("next", "/"))
+        email = request.session.get(PENDING_EMAIL_KEY)
+        if not email:
+            return HttpResponseRedirect(reverse("account_start"))
+        return render(
+            request,
+            self.template,
+            {
+                "form": CodeForm(),
+                "email": email,
+                "next": request.session.get(PENDING_NEXT_KEY, ""),
+            },
+        )
+
+    def post(self, request):
+        if request.user.is_authenticated:
+            return _safe_redirect(request, request.session.get(PENDING_NEXT_KEY) or "/")
+        email = request.session.get(PENDING_EMAIL_KEY)
+        if not email:
+            return HttpResponseRedirect(reverse("account_start"))
+        next_url = request.session.get(PENDING_NEXT_KEY, "")
+
+        if request.POST.get("action") == "resend":
+            verification, raw_code = EmailVerification.create_for(email)
+            if raw_code is not None:
+                send_login_email(request, verification, raw_code, next_url)
+                messages.success(request, "Письмо отправлено повторно.")
+            else:
+                messages.info(request, "Письмо уже отправлено, проверьте почту.")
+            return HttpResponseRedirect(reverse("account_verify"))
+
+        form = CodeForm(request.POST)
+        if not form.is_valid():
+            return render(
+                request,
+                self.template,
+                {"form": form, "email": email, "next": next_url},
+            )
+
+        verification = (
+            EmailVerification.objects.filter(
+                email=email, purpose="login", consumed_at__isnull=True
+            )
+            .order_by("-created_at")
+            .first()
+        )
+        if verification is None or not verification.verify_code(
+            form.cleaned_data["code"]
+        ):
+            messages.error(request, "Неверный или устаревший код. Попробуйте ещё раз.")
+            return render(
+                request,
+                self.template,
+                {"form": form, "email": email, "next": next_url},
+            )
+
+        verification.mark_consumed()
+        request.session.pop(PENDING_EMAIL_KEY, None)
+        request.session.pop(PENDING_NEXT_KEY, None)
+        return _complete_login(request, verification.email, next_url)
+
+
 class MagicLinkView(View):
     """Magic-link login entry point.
 
-    Placeholder: the route exists so ``send_login_email`` can ``reverse`` it; the
-    full unsign/login logic is implemented in a later task.
+    Unsigns the verification pk from the URL (a tampered signature 404s), checks the
+    row is alive (``expires_at``/``consumed_at``/attempts), then completes the login.
+    Does NOT rely on the session — the link may open in a different browser.
     """
 
     def get(self, request, signed, *args, **kwargs):
-        raise Http404("Not implemented yet")
+        try:
+            pk = TimestampSigner().unsign(signed)
+        except BadSignature:
+            raise Http404("Invalid link")
+        verification = EmailVerification.objects.filter(pk=pk).first()
+        if verification is None or not verification.is_alive:
+            raise Http404("Invalid link")
+        next_url = request.GET.get("next", "")
+        verification.mark_consumed()
+        return _complete_login(request, verification.email, next_url)
 
 
 class CustomPasswordResetView(PasswordResetView):

@@ -319,26 +319,26 @@ appended as a query param. Send failure is logged; the user still reaches verify
 - Modify: `src/templates/accounts/login.html`
 - Modify: `src/apps/accounts/tests.py`
 
-- [ ] add `EmailStartForm` (email) and `CodeForm` (code) to `apps/accounts/forms.py`
-- [ ] implement `StartView` (`account_start`), `VerifyView` (`account_verify`),
+- [x] add `EmailStartForm` (email) and `CodeForm` (code) to `apps/accounts/forms.py`
+- [x] implement `StartView` (`account_start`), `VerifyView` (`account_verify`),
       `MagicLinkView` (`magic_link`), and the resend action; add the shared
       `_complete_login(request, email, next_url)` join point (inline user creation with
       `IntegrityError` handling + username dedup)
-- [ ] wire the three URLs in `apps/accounts/urls.py`; anon-only guard on start/verify
-- [ ] `start.html` (email form, low-emphasis "Войти по паролю" → `login?next=…`) and
+- [x] wire the three URLs in `apps/accounts/urls.py`; anon-only guard on start/verify
+- [x] `start.html` (email form, low-emphasis "Войти по паролю" → `login?next=…`) and
       `verify.html` (code field + resend); add "Войти по коду из письма" →
       `account_start?next=…` link in `login.html` (manual fields, `base-2.html`)
-- [ ] write tests (email assertions under the locmem `@override_settings`): `start`
+- [x] write tests (email assertions under the locmem `@override_settings`): `start`
       POST creates one row, queues one email (code + link), neutral response for known
       vs unknown email (no enumeration); resend within 60 s queues NO second email and
       stays neutral
-- [ ] write tests: `verify` correct code logs in an existing user and redirects to
+- [x] write tests: `verify` correct code logs in an existing user and redirects to
       `next`; unknown email creates user + profile and logs in; wrong code increments
       attempts; expired row rejected
-- [ ] write tests: `magic_link` valid → login; tampered signature rejected;
+- [x] write tests: `magic_link` valid → login; tampered signature rejected;
       expired/consumed/reused rejected; `next` honored via both code and link;
       off-host `next` rejected by `_safe_redirect`; authed user at `start` bounced
-- [ ] run `uv run pytest src/apps/accounts/tests.py` — must pass before next task
+- [x] run `uv run pytest src/apps/accounts/tests.py` — must pass before next task
 
 ### Task 7: Verify acceptance criteria
 

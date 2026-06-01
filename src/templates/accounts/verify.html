@@ -1,0 +1,57 @@
+{% extends "website/base-2.html" %}
+
+{% block title %}Введите код · Кольцо 24{% endblock %}
+{% block head_descr %}Подтверждение входа по коду из письма.{% endblock %}
+
+{% block content %}
+<main class="page login-page">
+  <div class="login-wrap">
+
+    <header class="page-head">
+      <h1>Введите код</h1>
+      <p class="sub">Код отправлен на <strong>{{ email }}</strong>. Также в письме есть ссылка для входа в один клик. Код и ссылка действуют 15 минут.</p>
+    </header>
+
+    <form class="card" action="{% url 'account_verify' %}" method="POST" novalidate>
+      {% csrf_token %}
+      <input type="hidden" name="next" value="{{ next }}">
+      <div class="card-pad">
+
+        {% if messages or form.non_field_errors %}
+        <div class="err-banner show">
+          {% for message in messages %}{{ message }}{% if not forloop.last %}<br>{% endif %}{% endfor %}
+          {% for error in form.non_field_errors %}{{ error }}{% if not forloop.last %}<br>{% endif %}{% endfor %}
+        </div>
+        {% endif %}
+
+        <div class="form">
+          <div class="field">
+            <label for="code">Код из письма</label>
+            <input
+              class="input{% if form.code.errors %} has-error{% endif %}"
+              id="code" name="code" type="text"
+              inputmode="numeric" autocomplete="one-time-code"
+              maxlength="6" placeholder="000000"
+              value="{{ form.code.value|default:'' }}"
+              autofocus
+            >
+            {% if form.code.errors %}
+            <span class="hint err">{{ form.code.errors|join:", " }}</span>
+            {% endif %}
+          </div>
+
+          <button class="btn btn-primary btn-lg btn-block" type="submit">Войти</button>
+        </div>
+      </div>
+    </form>
+
+    <form class="below" action="{% url 'account_verify' %}" method="POST">
+      {% csrf_token %}
+      <input type="hidden" name="next" value="{{ next }}">
+      <input type="hidden" name="action" value="resend">
+      Не пришло письмо? <button class="link-btn" type="submit">Отправить ещё раз</button>
+    </form>
+
+  </div>
+</main>
+{% endblock %}

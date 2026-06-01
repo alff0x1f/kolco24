@@ -59,6 +59,10 @@
           </div>
 
           <button class="btn btn-primary btn-lg btn-block" type="submit">Войти</button>
+
+          <p class="alt-login">
+            <a href="{% url 'account_start' %}{% if next %}?next={{ next|urlencode }}{% endif %}">Войти по коду из письма</a>
+          </p>
         </div>
       </div>
     </form>
