@@ -107,7 +107,11 @@ class Command(BaseCommand):
             return None
         try:
             payment_id = int(vtb_payment.order_id.split("_")[-1])
-        except (ValueError, AttributeError):
+        except ValueError:
+            self.stderr.write(
+                f"Cannot resolve race payment for order_id={vtb_payment.order_id!r} "
+                f"(no FK and non-integer suffix)"
+            )
             return None
         return Payment.objects.filter(pk=payment_id).first()
 
