@@ -19,9 +19,13 @@ urlpatterns = [
         views.TransferPaidListView.as_view(),
         name="transfer_paid_list",
     ),
-    path("team/<team_id>/", EditTeamView.as_view(), name="edit_team"),
-    path("team/<team_id>/move/", TeamMemberMoveView.as_view(), name="move_team_member"),
-    path("team/<team_id>/pay/", views.TeamPayment.as_view(), name="pay_team"),
+    path("team/<int:team_id>/", EditTeamView.as_view(), name="edit_team"),
+    path(
+        "team/<int:team_id>/move/",
+        TeamMemberMoveView.as_view(),
+        name="move_team_member",
+    ),
+    path("team/<int:team_id>/pay/", views.TeamPayment.as_view(), name="pay_team"),
     path("teams/", views.teams, name="teams"),
     # Int-id redirects must come before slug patterns (slug matches ints too)
     path("race/<int:race_id>/", RaceIdRedirectView.as_view()),
@@ -94,7 +98,9 @@ urlpatterns = [
     #     views.AllTeamsResultView.as_view(),
     #     name="all_teams",
     # ),
-    path("team/<team_id>/points/", views.TeamPointsView.as_view(), name="team_points"),
+    path(
+        "team/<int:team_id>/points/", views.TeamPointsView.as_view(), name="team_points"
+    ),
     re_path("^success/(?P<teamid>[0-9a-f]{16})/", views.success),
     path("api/v1/newpayment/", views.NewPaymentView.as_view(), name="new_payment"),
     path("api/v1/paymentinfo/", views.paymentinfo, name="paymentinfo"),
