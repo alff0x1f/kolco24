@@ -156,8 +156,8 @@ with the right dependency; hand-write only if generation names it differently.
 **Files:**
 - Modify: `src/website/views/__init__.py`
 
-- [ ] remove from the `from .views_ import (...)` list: `BreakfastAdminView`, `BreakfastPaidListView`, `BreakfastView`, `TransferPaidListView`, `TransferView`
-- [ ] keep all surviving exports (`AddTeam`, `RaceIdRedirectView`, `TeamMemberRaceLogView`, …)
+- [x] remove from the `from .views_ import (...)` list: `BreakfastAdminView`, `BreakfastPaidListView`, `BreakfastView`, `TransferPaidListView`, `TransferView`
+- [x] keep all surviving exports (`AddTeam`, `RaceIdRedirectView`, `TeamMemberRaceLogView`, …)
 
 ### Task 3: Remove the URL routes
 
