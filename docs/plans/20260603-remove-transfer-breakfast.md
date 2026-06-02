@@ -178,8 +178,8 @@ with the right dependency; hand-write only if generation names it differently.
 - Delete: `src/templates/website/breakfast_admin.html`
 - Delete: `src/templates/website/breakfast_paid_list.html`
 
-- [ ] delete the five template files listed above
-- [ ] grep to confirm none are `{% include %}`d / `render()`ed / linked elsewhere: `grep -rn "transfer.html\|transfer_paid_list.html\|breakfast.html\|breakfast_admin.html\|breakfast_paid_list.html" src/` — zero matches (only the deleted files cross-referenced each other)
+- [x] delete the five template files listed above
+- [x] grep to confirm none are `{% include %}`d / `render()`ed / linked elsewhere: `grep -rn "transfer.html\|transfer_paid_list.html\|breakfast.html\|breakfast_admin.html\|breakfast_paid_list.html" src/` — zero matches (only the deleted files cross-referenced each other)
 
 ### Task 5: Remove the forms and constants
 
