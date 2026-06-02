@@ -187,12 +187,12 @@ set `SOLD_OUT`, save). Remove `PaymentsYa` from the import on line 15.
 
 ### Task 8: Verify acceptance criteria
 
-- [ ] grep for every removed symbol/URL-name/template path across `src/` — zero dangling refs in Python, templates (`{% url %}`), or JS: `grep -rn "payment-list\|confirm-payment\|cancel-payment\|payment-up\|payment-down\|pay_team\|'new_payment'\|paymentinfo\|getcost\|yandexinform\|payment_list\|ConfirmPaymentView\|CancelPaymentView\|PaymentUp\|PaymentDown\|TeamPayment\|NewPaymentView" src/`
-- [ ] grep that no live code calls the removed `PaymentsYa` methods: `grep -rn "\.update_team(\|PaymentsYa.get_cost\|\.new_payment(\|\.get_sum(" src/`
-- [ ] `uv run python src/manage.py check` passes
-- [ ] `uv run python src/manage.py makemigrations --check --dry-run` shows **no** new migration
-- [ ] full suite: `uv run pytest`
-- [ ] `make format && make lint`
+- [x] grep for every removed symbol/URL-name/template path across `src/` — zero dangling refs in Python, templates (`{% url %}`), or JS: zero matches
+- [x] grep that no live code calls the removed `PaymentsYa` methods: zero matches
+- [x] `uv run python src/manage.py check` passes — "System check identified no issues"
+- [x] `uv run python src/manage.py makemigrations --check --dry-run` shows **no** new migration — "No changes detected"
+- [x] full suite: `uv run pytest` — 324 passed
+- [x] `make format && make lint` — all checks passed
 
 ### Task 9: [Final] Update docs and close out
 
