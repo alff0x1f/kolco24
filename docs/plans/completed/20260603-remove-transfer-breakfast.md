@@ -231,8 +231,8 @@ with the right dependency; hand-write only if generation names it differently.
 **Files:**
 - Modify: `CLAUDE.md` (only if a documented pattern changed)
 
-- [ ] add a one-line note in `CLAUDE.md` that the legacy standalone transfer/breakfast registration pages + tables were removed (routes now 404); the `RaceExtra` `code="transfer"`/`"breakfast"` add-ons are the supported mechanism
-- [ ] move this plan to `docs/plans/completed/`
+- [x] add a one-line note in `CLAUDE.md` that the legacy standalone transfer/breakfast registration pages + tables were removed (routes now 404); the `RaceExtra` `code="transfer"`/`"breakfast"` add-ons are the supported mechanism
+- [x] move this plan to `docs/plans/completed/`
 
 ## Post-Completion
 *Items requiring manual intervention or external systems — informational only*
