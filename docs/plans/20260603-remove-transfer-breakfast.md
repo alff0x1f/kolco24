@@ -214,9 +214,9 @@ with the right dependency; hand-write only if generation names it differently.
 **Files:**
 - Create: `src/website/migrations/0073_delete_transfer_breakfast.py`
 
-- [ ] generate via `uv run python src/manage.py makemigrations website` and confirm it emits exactly `DeleteModel("Transfer")` + `DeleteModel("BreakfastRegistration")` with `dependencies = [("website", "0072_payment_vtb_payment")]` (hand-edit/rename only if needed; do not edit `0051`/`0054`). Note: Django folds the `BreakfastRegistration→Race` FK teardown into `DeleteModel`, so the operation list is still just the two `DeleteModel`s
-- [ ] `uv run python src/manage.py makemigrations --check --dry-run` — reports **no changes** (model state and graph agree)
-- [ ] `uv run python src/manage.py migrate` against the local DB — applies cleanly, both tables dropped
+- [x] generate via `uv run python src/manage.py makemigrations website` and confirm it emits exactly `DeleteModel("Transfer")` + `DeleteModel("BreakfastRegistration")` with `dependencies = [("website", "0072_payment_vtb_payment")]` (hand-edit/rename only if needed; do not edit `0051`/`0054`). Note: Django auto-named it `0073_remove_breakfastregistration_race_delete_transfer_and_more` and split out a separate `RemoveField(breakfastregistration, race)` op; hand-rewrote to `0073_delete_transfer_breakfast.py` with exactly the two `DeleteModel`s — `makemigrations --check` confirms the graph still agrees (DeleteModel subsumes the FK column drop)
+- [x] `uv run python src/manage.py makemigrations --check --dry-run` — reports **no changes** (model state and graph agree)
+- [x] `uv run python src/manage.py migrate` against the local DB — applies cleanly, both tables dropped
 
 ### Task 9: Verify acceptance criteria
 
