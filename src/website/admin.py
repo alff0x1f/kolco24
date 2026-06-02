@@ -3,7 +3,6 @@ from django.utils.html import format_html
 from markdown import markdown
 
 from .models import (
-    BreakfastRegistration,
     Checkpoint,
     CheckpointTag,
     MenuItem,
@@ -20,7 +19,6 @@ from .models import (
     TeamFinishLog,
     TeamMemberRaceLog,
     TeamStartLog,
-    Transfer,
 )
 from .models.race import Category, RaceLink, RacePriceTier
 
@@ -39,73 +37,6 @@ class PageAdmin(admin.ModelAdmin):
     readonly_fields = ("content_html",)
 
     fieldsets = ((None, {"fields": ("title", "slug", "content", "content_html")}),)
-
-
-@admin.register(Transfer)
-class TransferAdmin(admin.ModelAdmin):
-    list_display = (
-        "id",
-        "people_count",
-        "participants_display",
-        "created_at",
-        "status",
-    )
-    list_filter = ("created_at", "status")
-    ordering = ("-created_at",)
-
-    @admin.display(description="Участники")
-    def participants_display(self, obj):
-        if not obj.passenger_contacts:
-            return "—"
-        parts = []
-        for contact in obj.passenger_contacts:
-            name = (contact or {}).get("name", "").strip()
-            phone = (contact or {}).get("phone", "").strip()
-            if not name and not phone:
-                continue
-            if phone:
-                parts.append(f"{name} ({phone})" if name else phone)
-            else:
-                parts.append(name)
-        return ", ".join(parts) if parts else "—"
-
-
-@admin.register(BreakfastRegistration)
-class BreakfastRegistrationAdmin(admin.ModelAdmin):
-    list_display = (
-        "id",
-        "race",
-        "people_count",
-        "attendees_display",
-        "vegan_count",
-        "created_at",
-        "status",
-    )
-    list_filter = ("race", "created_at", "status")
-    search_fields = ("attendees",)
-    ordering = ("-created_at",)
-
-    @admin.display(description="Участники")
-    def attendees_display(self, obj):
-        if not obj.attendees:
-            return "—"
-        parts = []
-        for attendee in obj.attendees:
-            attendee = attendee or {}
-            name = attendee.get("name", "").strip()
-            vegan = attendee.get("is_vegan")
-            vegan_label = " (веган)" if vegan else ""
-            if name:
-                parts.append(f"{name}{vegan_label}")
-        return ", ".join(parts) if parts else "—"
-
-    @admin.display(description="Веганы")
-    def vegan_count(self, obj):
-        if not obj.attendees:
-            return 0
-        return sum(
-            1 for attendee in obj.attendees if attendee and attendee.get("is_vegan")
-        )
 
 
 @admin.register(TeamStartLog)

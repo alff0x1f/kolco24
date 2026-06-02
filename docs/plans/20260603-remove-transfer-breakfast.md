@@ -196,8 +196,8 @@ with the right dependency; hand-write only if generation names it differently.
 **Files:**
 - Modify: `src/website/admin.py`
 
-- [ ] delete `@admin.register(Transfer) class TransferAdmin` and `@admin.register(BreakfastRegistration) class BreakfastRegistrationAdmin`
-- [ ] remove `BreakfastRegistration` and `Transfer` from the `from .models import (...)` import (keep all other names)
+- [x] delete `@admin.register(Transfer) class TransferAdmin` and `@admin.register(BreakfastRegistration) class BreakfastRegistrationAdmin`
+- [x] remove `BreakfastRegistration` and `Transfer` from the `from .models import (...)` import (keep all other names)
 
 ### Task 7: Remove the models and export
 
