@@ -220,11 +220,11 @@ with the right dependency; hand-write only if generation names it differently.
 
 ### Task 9: Verify acceptance criteria
 
-- [ ] grep for legacy references across `src/` — `grep -rni "transfer\|breakfast\|завтрак\|трансфер\|автобус" src/ --include=*.py --include=*.html` shows **only** the new `RaceExtra` `code="transfer"`/`"breakfast"` usages in `apps/race` (+ its tests) and the historical migrations `0051`/`0054`; **zero** legacy `Transfer`/`BreakfastRegistration`/view/form/url refs
-- [ ] `uv run python src/manage.py check` — no issues
-- [ ] `uv run python src/manage.py makemigrations --check --dry-run` — no new migration
-- [ ] full suite: `uv run pytest` — all pass (proves the `apps/race` `RaceExtra` tests are unaffected)
-- [ ] `make format && make lint` — all checks pass
+- [x] grep for legacy references across `src/` — `grep -rni "transfer\|breakfast\|завтрак\|трансфер\|автобус" src/ --include=*.py --include=*.html` shows **only** the new `RaceExtra` `code="transfer"`/`"breakfast"` usages in `apps/race` (+ its tests) and the historical migrations `0051`/`0054`; **zero** legacy `Transfer`/`BreakfastRegistration`/view/form/url refs
+- [x] `uv run python src/manage.py check` — no issues
+- [x] `uv run python src/manage.py makemigrations --check --dry-run` — no new migration
+- [x] full suite: `uv run pytest` — all 325 pass (proves the `apps/race` `RaceExtra` tests are unaffected)
+- [x] `make format && make lint` — all checks pass
 
 ### Task 10: [Final] Update docs and close out
 
