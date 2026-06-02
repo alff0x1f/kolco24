@@ -171,10 +171,10 @@ set `SOLD_OUT`, save). Remove `PaymentsYa` from the import on line 15.
 **Files:**
 - Modify: `src/website/models/models.py`
 
-- [ ] delete `PaymentsYa.get_cost` (static), `PaymentsYa.new_payment`, `PaymentsYa.get_sum`, `PaymentsYa.update_team`
-- [ ] keep the `PaymentsYa` class declaration and **all fields** unchanged (table preserved for history)
-- [ ] do **not** touch `PaymentLog`, `SbpPaymentRecipient`, or `Payment` (models, fields, `STATUS_CHOICES` all kept for history)
-- [ ] confirm no migration is generated: `uv run python src/manage.py makemigrations --check --dry-run` reports **no changes** for `website`
+- [x] delete `PaymentsYa.get_cost` (static), `PaymentsYa.new_payment`, `PaymentsYa.get_sum`, `PaymentsYa.update_team`
+- [x] keep the `PaymentsYa` class declaration and **all fields** unchanged (table preserved for history)
+- [x] do **not** touch `PaymentLog`, `SbpPaymentRecipient`, or `Payment` (models, fields, `STATUS_CHOICES` all kept for history)
+- [x] confirm no migration is generated: `uv run python src/manage.py makemigrations --check --dry-run` reports **no changes** for `website` (also removed the now-unused `import hashlib`)
 
 ### Task 7: Rewrite the `_confirm_payment` test helper
 
