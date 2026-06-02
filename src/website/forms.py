@@ -10,7 +10,7 @@ from apps.accounts.forms import (  # noqa: F401
 )
 from website.models import BreakfastRegistration, Team, TeamMemberMove, Transfer
 from website.models.news import NewsPost, Page
-from website.models.race import Category, Race
+from website.models.race import Category
 
 BUS_REGISTRATION_MAX_PASSENGERS = 20
 BREAKFAST_MAX_ATTENDEES = 20
@@ -289,16 +289,6 @@ class BreakfastForm(forms.ModelForm):
         if commit:
             instance.save()
         return instance
-
-
-def category2_from_dist(dist, ucount):
-    race = Race.objects.filter(code="kolco24_2023").first()
-    category = Category.objects.filter(race=race)
-    if dist == "12h":
-        if ucount == 2:
-            return category.filter(code="12h").first()
-        return category.filter(code="12h_team").first()
-    return category.filter(code=dist).first()
 
 
 class TeamForm(forms.Form):
