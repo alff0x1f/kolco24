@@ -164,10 +164,10 @@ with the right dependency; hand-write only if generation names it differently.
 **Files:**
 - Modify: `src/website/urls.py`
 
-- [ ] delete the `transfer` route (`race/8/transfer/`) and `transfer_paid_list` route (`race/8/transfer/list/`)
-- [ ] delete the three slug routes: `breakfast` (`race/<slug>/breakfast/`), `breakfast_admin` (`…/breakfast/admin/`), `breakfast_paid_list` (`…/breakfast/list/`)
-- [ ] delete the three int-id redirect routes: `race/<int:race_id>/breakfast/`, `…/breakfast/admin/`, `…/breakfast/list/` (the `RaceIdRedirectView` lines) — keep `RaceIdRedirectView` itself and its other routes
-- [ ] `uv run python src/manage.py check` — must pass now (URLConf resolves, no missing view imports)
+- [x] delete the `transfer` route (`race/8/transfer/`) and `transfer_paid_list` route (`race/8/transfer/list/`)
+- [x] delete the three slug routes: `breakfast` (`race/<slug>/breakfast/`), `breakfast_admin` (`…/breakfast/admin/`), `breakfast_paid_list` (`…/breakfast/list/`)
+- [x] delete the three int-id redirect routes: `race/<int:race_id>/breakfast/`, `…/breakfast/admin/`, `…/breakfast/list/` (the `RaceIdRedirectView` lines) — keep `RaceIdRedirectView` itself and its other routes
+- [x] `uv run python src/manage.py check` — must pass now (URLConf resolves, no missing view imports)
 
 ### Task 4: Delete the templates
 
