@@ -131,8 +131,8 @@ set `SOLD_OUT`, save). Remove `PaymentsYa` from the import on line 15.
 **Files:**
 - Modify: `src/website/views/__init__.py`
 
-- [ ] remove from the `from .views_ import (...)` list: `CancelPaymentView`, `ConfirmPaymentView`, `NewPaymentView`, `PaymentDown`, `PaymentUp`, `TeamPayment`, `get_cost`, `payment_list`, `paymentinfo`, `success`, `yandex_payment`
-- [ ] keep all surviving exports (e.g. `AddTeam`, `TransferView`, `RaceIdRedirectView`, …)
+- [x] remove from the `from .views_ import (...)` list: `CancelPaymentView`, `ConfirmPaymentView`, `NewPaymentView`, `PaymentDown`, `PaymentUp`, `TeamPayment`, `get_cost`, `payment_list`, `paymentinfo`, `success`, `yandex_payment`
+- [x] keep all surviving exports (e.g. `AddTeam`, `TransferView`, `RaceIdRedirectView`, …)
 
 ### Task 3: Remove the URL routes
 
