@@ -5,7 +5,7 @@ from unittest.mock import patch
 import pytest
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
-from django.db import IntegrityError
+from django.db import IntegrityError, transaction
 from django.urls import reverse
 from django.utils import timezone
 
@@ -1881,33 +1881,36 @@ def test_gate_own_reservation_does_not_block_edit(django_user_model):
 
 def _confirm_payment(user, team, paid_for, cost_per_person=1500):
     """Подтвердить оплату, повторяя check_vtb_payments._settle_race_payment."""
-    team.refresh_from_db()
-    amount = paid_for * cost_per_person
-    Payment.objects.create(
-        owner=user,
-        team=team,
-        payment_method="sbp2",
-        status=Payment.STATUS_DONE,
-        payment_amount=amount,
-        payment_with_discount=amount,
-        cost_per_person=cost_per_person,
-        paid_for=paid_for,
-        sender_card_number="",
-    )
-    team.paid_people += paid_for
-    team.paid_sum += amount
-    team.save(update_fields=["paid_people", "paid_sum"])
+    with transaction.atomic():
+        team.refresh_from_db()
+        amount = paid_for * cost_per_person
+        payment = Payment.objects.create(
+            owner=user,
+            team=team,
+            payment_method="sbp2",
+            status=Payment.STATUS_DONE,
+            payment_amount=amount,
+            payment_with_discount=amount,
+            cost_per_person=cost_per_person,
+            paid_for=paid_for,
+            sender_card_number="",
+        )
+        payment.order = payment.pk
+        payment.save(update_fields=["order"])
+        team.paid_people += paid_for
+        team.paid_sum += amount
+        team.save(update_fields=["paid_people", "paid_sum"])
 
-    category = team.category2
-    race = category.race if category else None
-    if (
-        race
-        and race.people_limit
-        and race.reg_status == RegStatus.OPEN
-        and race.people_count() >= race.people_limit
-    ):
-        race.reg_status = RegStatus.SOLD_OUT
-        race.save(update_fields=["reg_status"])
+        category = team.category2
+        race = category.race if category else None
+        if (
+            race
+            and race.people_limit
+            and race.reg_status == RegStatus.OPEN
+            and race.people_count() >= race.people_limit
+        ):
+            race.reg_status = RegStatus.SOLD_OUT
+            race.save(update_fields=["reg_status"])
 
 
 @pytest.mark.django_db
