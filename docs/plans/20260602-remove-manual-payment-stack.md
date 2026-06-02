@@ -162,9 +162,9 @@ set `SOLD_OUT`, save). Remove `PaymentsYa` from the import on line 15.
 - Delete: `src/static/js/team.js`
 - Delete: `src/static/js/index_reg.js`
 
-- [ ] verify unreferenced: `grep -rn "team\.js\|index_reg\.js" src/templates/ src/static/` returns no template/asset load of these files
-- [ ] confirm these are hand-written app JS, **not** vendored `*.min.js` (memory: vendored assets are off-limits; these two are not vendored)
-- [ ] delete `src/static/js/team.js` and `src/static/js/index_reg.js`
+- [x] verify unreferenced: `grep -rn "team\.js\|index_reg\.js" src/templates/ src/static/` returns no template/asset load of these files
+- [x] confirm these are hand-written app JS, **not** vendored `*.min.js` (memory: vendored assets are off-limits; these two are not vendored)
+- [x] delete `src/static/js/team.js` and `src/static/js/index_reg.js`
 
 ### Task 6: Remove unused `PaymentsYa` methods (keep table)
 
