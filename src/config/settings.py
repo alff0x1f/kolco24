@@ -207,3 +207,32 @@ VTB = {
     "MERCHANT_AUTH": os.getenv("VTB_MERCHANT_AUTH"),
     "RETURN_URL_BASE": os.getenv("VTB_RETURN_URL_BASE"),
 }
+
+# Logging. Django's default config gates the `console` handler behind
+# `require_debug_true`, so 500 tracebacks never reach stdout when DEBUG=False.
+# This config logs `django.request` errors to stdout regardless of DEBUG, so
+# `docker compose logs` shows tracebacks in production without enabling DEBUG.
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {
+        "verbose": {
+            "format": "{asctime} {levelname} {name} {message}",
+            "style": "{",
+        },
+    },
+    "handlers": {
+        "console": {
+            "class": "logging.StreamHandler",
+            "formatter": "verbose",
+        },
+    },
+    "root": {"handlers": ["console"], "level": "INFO"},
+    "loggers": {
+        "django.request": {
+            "handlers": ["console"],
+            "level": "ERROR",
+            "propagate": False,
+        },
+    },
+}
