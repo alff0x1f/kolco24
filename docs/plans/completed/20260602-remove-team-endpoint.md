@@ -183,10 +183,11 @@ will only ever be `""` after `teams_predstart` is removed.
       (ruff --fix/black/isort, then ruff/black --check/isort --check/flake8): all clean, no changes
 
 ### Task 7: [Final] Documentation
-- [ ] update `CLAUDE.md` if any removed item is referenced there (e.g. the note about the stale
-      year-2023/2024 superuser `my_team` editor and the defensive `TeamForm.__init__` rationale —
-      adjust to reflect that `my_team` is gone and the defensive code is now generic)
-- [ ] move this plan to `docs/plans/completed/`
+- [x] update `CLAUDE.md` if any removed item is referenced there (removed the stale year-2023/2024
+      superuser `my_team` editor note; rewrote the defensive `TeamForm.__init__` rationale to drop the
+      `my_team` mention and frame it as generic robustness; dropped `TeamFormAdmin` from the
+      people-limits note. The `my_teams` survivor reference left intact.)
+- [x] move this plan to `docs/plans/completed/`
 
 ## Post-Completion
 *Items requiring manual intervention or external systems — informational only*
