@@ -181,9 +181,9 @@ set `SOLD_OUT`, save). Remove `PaymentsYa` from the import on line 15.
 **Files:**
 - Modify: `src/website/tests.py`
 
-- [ ] rewrite `_confirm_payment` to mirror `check_vtb_payments._settle_race_payment`: after creating the `Payment`, do `team.paid_people += paid_for`, `team.paid_sum += amount`, `team.save()`, then the `OPEN → SOLD_OUT` check (`race = team.category2.race`; if `race.people_limit` and `race.reg_status == RegStatus.OPEN` and `race.people_count() >= race.people_limit` → set `SOLD_OUT`, `race.save(update_fields=["reg_status"])`)
-- [ ] remove `PaymentsYa` from the import on line ~15 (`from website.models.models import PaymentsYa, Team` → `from website.models.models import Team`). `RegStatus` is already imported in tests.py — no new import needed
-- [ ] run the four dependent tests (their names contain none of "sold_out"/"cap"/"people_limit" consistently, so target them explicitly): `uv run pytest src/website/tests.py -k "reaching_cap or reopen or below_cap or without_limit"` — all four must pass unchanged (or just run the whole `src/website/tests.py`)
+- [x] rewrite `_confirm_payment` to mirror `check_vtb_payments._settle_race_payment`: after creating the `Payment`, do `team.paid_people += paid_for`, `team.paid_sum += amount`, `team.save()`, then the `OPEN → SOLD_OUT` check (`race = team.category2.race`; if `race.people_limit` and `race.reg_status == RegStatus.OPEN` and `race.people_count() >= race.people_limit` → set `SOLD_OUT`, `race.save(update_fields=["reg_status"])`)
+- [x] remove `PaymentsYa` from the import on line ~15 (`from website.models.models import PaymentsYa, Team` → `from website.models.models import Team`). `RegStatus` is already imported in tests.py — no new import needed
+- [x] run the four dependent tests (their names contain none of "sold_out"/"cap"/"people_limit" consistently, so target them explicitly): `uv run pytest src/website/tests.py -k "reaching_cap or reopen or below_cap or without_limit"` — all four pass unchanged
 
 ### Task 8: Verify acceptance criteria
 

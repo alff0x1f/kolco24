@@ -12,7 +12,7 @@ from django.utils import timezone
 from apps.race.models import PaymentExtra, RaceExtra, TeamExtra
 from website.forms import TeamForm
 from website.models import Payment, Race, VTBPayment
-from website.models.models import PaymentsYa, Team
+from website.models.models import Team
 from website.models.race import (
     RESERVATION_TTL,
     Category,
@@ -1880,30 +1880,30 @@ def test_gate_own_reservation_does_not_block_edit(django_user_model):
 
 
 def _confirm_payment(user, team, paid_for, cost_per_person=1500):
-    """Подтвердить оплату через PaymentsYa.update_team (инкрементит paid_people)."""
+    """Подтвердить оплату, повторяя check_vtb_payments._settle_race_payment."""
     amount = paid_for * cost_per_person
-    payment = Payment.objects.create(
+    Payment.objects.create(
         owner=user,
         team=team,
-        payment_method="ya",
+        payment_method="sbp2",
         payment_amount=amount,
         payment_with_discount=amount,
         cost_per_person=cost_per_person,
         paid_for=paid_for,
         sender_card_number="",
     )
-    ya = PaymentsYa.objects.create(
-        notification_type="p2p-incoming",
-        operation_id="op",
-        amount=str(amount),
-        withdraw_amount=str(amount),
-        currency="643",
-        datetime="2026-06-01",
-        sender="",
-        label=str(payment.id),
-        sha1_hash="",
-    )
-    ya.update_team(payment.id)
+    team.paid_people += paid_for
+    team.paid_sum += amount
+    team.save(update_fields=["paid_people", "paid_sum"])
+
+    race = team.category2.race
+    if (
+        race.people_limit
+        and race.reg_status == RegStatus.OPEN
+        and race.people_count() >= race.people_limit
+    ):
+        race.reg_status = RegStatus.SOLD_OUT
+        race.save(update_fields=["reg_status"])
 
 
 @pytest.mark.django_db
