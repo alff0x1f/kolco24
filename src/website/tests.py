@@ -1881,6 +1881,7 @@ def test_gate_own_reservation_does_not_block_edit(django_user_model):
 
 def _confirm_payment(user, team, paid_for, cost_per_person=1500):
     """Подтвердить оплату, повторяя check_vtb_payments._settle_race_payment."""
+    team.refresh_from_db()
     amount = paid_for * cost_per_person
     Payment.objects.create(
         owner=user,
@@ -1949,6 +1950,18 @@ def test_payment_below_cap_does_not_flip(django_user_model):
     _confirm_payment(user, team, paid_for=2)  # occupancy 4 < 10
     race.refresh_from_db()
     assert race.reg_status == RegStatus.OPEN
+
+
+@pytest.mark.django_db
+def test_manual_sold_out_below_cap_untouched(django_user_model):
+    # Ручной sold_out ниже cap не сбрасывается (флип только OPEN → SOLD_OUT).
+    user = _pl_user(django_user_model)
+    race = _pl_race(people_limit=10, reg_status=RegStatus.SOLD_OUT)
+    cat = _pl_category(race)
+    team = _pl_team(cat, user, paid_people=2, name="self")
+    _confirm_payment(user, team, paid_for=2)  # occupancy 4 < 10
+    race.refresh_from_db()
+    assert race.reg_status == RegStatus.SOLD_OUT
 
 
 @pytest.mark.django_db
