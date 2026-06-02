@@ -160,15 +160,15 @@ will only ever be `""` after `teams_predstart` is removed.
 **Files:**
 - Modify: `src/website/tests.py`
 
-- [ ] `test_login_required_redirects_to_login_url` (~L371): repoint `client.get("/team/")` to
+- [x] `test_login_required_redirects_to_login_url` (~L371): repoint `client.get("/team/")` to
       `client.get("/page/<slug>/edit/")` (e.g. `/page/x/edit/`) — `edit_page` is a surviving
       `@login_required` view, preserving the decorator→`LOGIN_URL` semantic; keep asserts
       `status_code == 302` and `"/accounts/login/" in response.url`
-- [ ] `test_my_team_post_does_not_500` (~L2247): delete (its endpoint no longer exists)
-- [ ] `test_team_form_defensive_init_with_querydict` (~L2258): keep; genericize the docstring **and**
+- [x] `test_my_team_post_does_not_500` (~L2247): delete (its endpoint no longer exists)
+- [x] `test_team_form_defensive_init_with_querydict` (~L2258): keep; genericize the docstring **and**
       the inline comment at ~L2263 (`# race_id is a QueryDict, as my_team passes it`) to drop the
       `my_team` reference (the form must still tolerate a non-int/`None` `race_id`)
-- [ ] run `uv run pytest src/website/tests.py` — all three behave as expected
+- [x] run `uv run pytest src/website/tests.py` — all three behave as expected
 
 ### Task 6: Verify acceptance criteria
 - [ ] grep sweep returns empty for: word-boundary `my_team` (NOT `my_teams`), `team_admin`,

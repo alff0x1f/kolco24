@@ -368,7 +368,7 @@ def test_login_view_post_blocks_open_redirect(client):
 
 @pytest.mark.django_db
 def test_login_required_redirects_to_login_url(client):
-    response = client.get("/team/")
+    response = client.get("/page/x/edit/")
     assert response.status_code == 302
     assert "/accounts/login/" in response.url
 
@@ -2244,23 +2244,12 @@ def test_superuser_bypass_capacity_but_extra_cap_still_applies(django_user_model
 
 
 @pytest.mark.django_db
-def test_my_team_post_does_not_500(client):
-    # The legacy my_team view calls TeamForm(request.POST or None) — the
-    # defensive __init__ must not 500 when race_id is a QueryDict/None.
-    user = User.objects.create_user(
-        username="mtp", password="pass", email="mtp@example.com"
-    )
-    client.force_login(user)
-    response = client.post(reverse("my_team"), {"ucount": "2"})
-    assert response.status_code != 500
-
-
-@pytest.mark.django_db
 def test_team_form_defensive_init_with_querydict():
+    # TeamForm must tolerate a non-int/None race_id without raising.
     from django.http import QueryDict
 
     qd = QueryDict("ucount=2&teamname=x")
-    form = TeamForm(qd)  # race_id is a QueryDict, as my_team passes it
+    form = TeamForm(qd)  # race_id is a QueryDict (a non-int value)
     assert form.extras == []
     assert not any(name.startswith("extra_") for name in form.fields)
 
