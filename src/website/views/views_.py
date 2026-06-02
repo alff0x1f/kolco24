@@ -1,16 +1,11 @@
 import json
-import logging
 import random
-from collections import defaultdict
 from datetime import datetime, timedelta, timezone
-from decimal import Decimal
-from time import gmtime, strftime
 from urllib.parse import quote
 
 from django.conf import settings
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.core.files.storage import FileSystemStorage
-from django.db import transaction
 from django.http import (
     Http404,
     HttpResponse,
@@ -34,12 +29,8 @@ from website.models import (
     BreakfastRegistration,
     Checkpoint,
     CheckpointTag,
-    Payment,
-    PaymentLog,
-    PaymentsYa,
     Race,
     RaceAdmin,
-    SbpPaymentRecipient,
     TakenKP,
     Team,
     TeamMemberRaceLog,
@@ -50,8 +41,6 @@ from website.models.race import Category, RegStatus
 from website.sync_xlsx import import_file_xlsx
 
 from ..models.news import MenuItem, Page
-
-logger = logging.getLogger(__name__)
 
 
 def is_admin(user):
@@ -608,184 +597,6 @@ def teams_protocol(request):
     return render(request, "website/teams_protocol.html", context)
 
 
-def success(request, teamid=""):
-    team = Team.objects.filter(paymentid=teamid, year=2024)[:1]
-    if team:
-        context = {
-            "team": team[0],
-        }
-        return render(request, "website/success.html", context)
-    raise Http404("File not found.")
-
-
-class NewPaymentView(View):
-    def post(self, request):
-        if not request.user.is_authenticated:
-            return HttpResponseRedirect(reverse("login") + f"?next={request.path}")
-
-        paymentid = request.POST.get("paymentid", "")
-        try:
-            team = Team.objects.get(paymentid=paymentid, year=2024)
-        except Team.DoesNotExist:
-            raise Http404("Team not found")
-
-        payment_method = request.POST.get("payment_method", "visamc")
-
-        cost_now = PaymentsYa.get_cost()
-        cost = (team.ucount - team.paid_people) * cost_now
-
-        payment = Payment.objects.create(
-            owner=request.user,
-            team=team,
-            payment_method=payment_method,
-            payment_amount=cost,
-            payment_with_discount=cost,
-            cost_per_person=cost_now,
-            paid_for=team.ucount - team.paid_people,
-            additional_charge=team.additional_charge,
-            status="draft",
-        )
-        response_data = {
-            "success": "true",
-            "payment_id": str(payment.id),
-            "sum": cost + team.additional_charge,
-            "paymentmethod": payment_method,
-        }
-        if payment_method == "visamc":
-            response_data["yandexwallet"] = settings.YANDEX_WALLET
-
-        if payment_method == "yandexmoney":
-            response_data["yandexwallet"] = settings.YANDEX_WALLET
-
-        if payment_method == "sberbank":
-            response_data["cardholder_phone"] = settings.SBERBANK_INFO["phone"]
-            response_data["cardholder_name"] = settings.SBERBANK_INFO["name"]
-            response_data["today_date"] = strftime("%d.%m.%Y", gmtime())
-
-        if payment_method == "sbp":
-            response_data["paymentmethod"] = "sbp"
-            response_data["cardholder_phone"] = settings.SBP_INFO["phone"]
-            response_data["cardholder_name"] = settings.SBP_INFO["name"]
-            response_data["today_date"] = strftime("%d.%m.%Y", gmtime())
-
-        PaymentLog.objects.create(
-            team=team, payment_method=payment_method, paid_sum=response_data["sum"]
-        )
-
-        return JsonResponse(response_data)
-
-
-class ConfirmPaymentView(View):
-    def post(self, request, pk):
-        if not request.user.is_superuser:
-            raise Http404("Not found")
-
-        balance = Decimal(request.POST.get("balance", 0))
-
-        payment = Payment.objects.get(pk=pk)
-        if payment.status == "done":
-            return self.update_only_balance(payment, balance)
-
-        payment.status = "done"
-        payment.balance = balance
-        payment.order = pk
-
-        team = payment.team
-        if team is None:
-            payment.save(update_fields=["status", "balance", "order", "recipient"])
-            return HttpResponseRedirect("/payments?status=draft_with_info")
-        team.paid_people += payment.paid_for
-        team.paid_sum += payment.payment_amount
-
-        recipient = request.POST.get("recipient", "")
-        if recipient:
-            payment.recipient = SbpPaymentRecipient.objects.get(pk=recipient)
-
-        with transaction.atomic():
-            team.save(update_fields=["paid_people", "paid_sum"])
-            category = team.category2
-            race = category.race if category else None
-            if (
-                race
-                and race.people_limit
-                and race.reg_status == RegStatus.OPEN
-                and race.people_count() >= race.people_limit
-            ):
-                race.reg_status = RegStatus.SOLD_OUT
-                race.save(update_fields=["reg_status"])
-            payment.save(update_fields=["status", "balance", "order", "recipient"])
-        return HttpResponseRedirect("/payments?status=draft_with_info")
-
-    def update_only_balance(self, payment, balance):
-        payment.balance = balance
-        payment.save(update_fields=["balance"])
-        return HttpResponseRedirect(
-            f"/payments?status=done&method=sbp#order{payment.pk}"
-        )
-
-
-class CancelPaymentView(View):
-    def post(self, request, pk):
-        if not request.user.is_superuser:
-            raise Http404("Not found")
-
-        payment = Payment.objects.get(pk=pk)
-        payment.status = "cancel"
-        payment.save(update_fields=["status"])
-
-        return HttpResponseRedirect("/payments?status=draft_with_info")
-
-
-class PaymentUp(View):
-    def post(self, request, pk):
-        if not request.user.is_superuser:
-            raise Http404("Not found")
-
-        payment = Payment.objects.get(pk=pk)
-        next_payment = (
-            Payment.objects.filter(
-                order__gt=payment.order,
-                status=Payment.STATUS_DONE,
-                payment_method__in=["sberbank", "sbp"],
-            )
-            .order_by("order")
-            .first()
-        )
-
-        payment.order, next_payment.order = next_payment.order, payment.order
-        payment.save(update_fields=["order"])
-        next_payment.save(update_fields=["order"])
-
-        return HttpResponseRedirect(
-            f"/payments?status=done&method=sbp#order{payment.pk}"
-        )
-
-
-class PaymentDown(View):
-    def post(self, request, pk):
-        if not request.user.is_superuser:
-            raise Http404("Not found")
-
-        payment = Payment.objects.get(pk=pk)
-        prev_payment = (
-            Payment.objects.filter(
-                order__lt=payment.order,
-                status=Payment.STATUS_DONE,
-                payment_method__in=["sberbank", "sbp"],
-            )
-            .order_by("-order")
-            .first()
-        )
-
-        payment.order, prev_payment.order = prev_payment.order, payment.order
-        payment.save(update_fields=["order"])
-        prev_payment.save(update_fields=["order"])
-
-        return HttpResponseRedirect(
-            f"/payments?status=done&method=sbp#order{payment.pk}"
-        )
-
-
 def new_point(request, pk):
     if request.method == "POST":
         points = request.POST.get("points")
@@ -799,54 +610,6 @@ def new_point(request, pk):
                 year=2024,
             )
     return HttpResponseRedirect("/race/1/teams_result")
-
-
-def paymentinfo(request):
-    if request.method == "POST":
-        new_payment_id = request.POST["paymentid"]
-        payment = Payment.objects.filter(id=new_payment_id)[:1]
-        if payment:
-            payment = payment.get()
-            payment.status = "draft_with_info"
-            payment.sender_card_number = (
-                request.POST["sender_card_number"] + " " + request.POST["payment_sum"]
-            )
-            pdate = datetime.strptime(request.POST["payment_date"], "%d.%m.%Y")
-            payment.payment_date = pdate
-            payment.save()
-
-            return JsonResponse(
-                {
-                    "paymentmethod": payment.payment_method,
-                    "success": "true",
-                }
-            )
-    raise Http404("Wrong values")
-
-
-def get_cost(request):
-    return JsonResponse(
-        {
-            "success": "true",
-            "cost": PaymentsYa.get_cost(),
-        }
-    )
-
-
-@csrf_exempt
-def yandex_payment(request):
-    if request.method == "POST":
-        print(dict(request.POST))
-        payment = PaymentsYa()
-        if payment.new_payment(request.POST):
-            # send_success_email(
-            #     payment.label, payment.withdraw_amount, notification_type
-            # )
-            return HttpResponse("Ok")
-        else:
-            logger.warning(f"Yandex payment failed, {request.POST}")
-            raise Http404("Wrong values")
-    raise Http404("File not found.")
 
 
 def update_protocol(request):
@@ -1441,92 +1204,6 @@ class AddTeam(View):
         )
 
 
-class TeamPayment(View):
-    def get(self, request, team_id):
-        if not request.user.is_authenticated:
-            return HttpResponseRedirect(
-                reverse("login") + "?next=" + quote(request.get_full_path())
-            )
-        # if not settings.REG_OPEN:
-        #     return HttpResponse("Регистрация закрыта")
-
-        team = Team.objects.filter(id=team_id).first()
-        payment_method = request.GET.get("method")
-        if not team or payment_method not in ("sbp", "sberbank"):
-            raise Http404("Not found")
-
-        cost_now = PaymentsYa.get_cost()
-        payment_amount = (team.ucount - team.paid_people) * cost_now
-        if payment_amount < 0:
-            payment_amount = 0
-
-        payment = Payment.objects.create(
-            owner=request.user,
-            team=team,
-            payment_method=payment_method,
-            payment_amount=payment_amount,
-            payment_with_discount=payment_amount,
-            cost_per_person=cost_now,
-            paid_for=int(team.ucount) - team.paid_people,
-            additional_charge=team.additional_charge,
-            status="draft",
-        )
-
-        team = Team.objects.filter(id=team_id).first()
-        if not team:
-            raise Http404("Team not found")
-
-        payment_method = request.GET.get("method", "visamc")
-
-        if payment_method == "sberbank":
-            return render(
-                request,
-                "website/sberbank.html",
-                context={
-                    "team": team,
-                    "id": payment.id,
-                    "payment_amount": payment_amount,
-                    "phone": settings.SBERBANK_INFO["phone"],
-                    "name": settings.SBERBANK_INFO["name"],
-                    "today_date": strftime("%d.%m.%Y", gmtime()),
-                },
-            )
-        elif payment_method == "sbp":
-            return render(
-                request,
-                "website/sbp.html",
-                context={
-                    "team": team,
-                    "id": payment.id,
-                    "payment_amount": payment_amount,
-                    "phone": settings.SBERBANK_INFO["phone"],
-                    "name": settings.SBERBANK_INFO["name"],
-                    "today_date": strftime("%d.%m.%Y", gmtime()),
-                },
-            )
-        raise Http404("Not found")
-
-    def post(self, request, team_id):
-        team = Team.objects.filter(id=team_id).first()
-        if not team:
-            raise Http404("Team not found")
-
-        payment_id = request.POST.get("id")
-        payment = Payment.objects.filter(id=payment_id).first()
-
-        if payment and payment.status == "draft" and payment.owner == request.user:
-            payment.status = "draft_with_info"
-            payment.sender_card_number = (
-                request.POST["sender_card_number"] + " " + request.POST["payment_sum"]
-            )
-            pdate = datetime.strptime(request.POST["payment_date"], "%d.%m.%Y")
-            payment.payment_date = pdate
-            payment.save()
-
-            return render(request, "website/payment_process.html", {"team": team})
-        raise Http404("Not found")
-
-
 class AllTeamsResultView(View):
     def get(self, request, race_slug, category_id=None):
         try:
@@ -1685,51 +1362,3 @@ class TeamPointsView(View):
 
         context = {"team": team, "photo_points": photo_points, "time": time}
         return render(request, "team_points.html", context)
-
-
-@user_passes_test(is_admin)
-def payment_list(request):
-    # select related team to avoid additional queries
-    payments = (
-        Payment.objects.select_related("team", "team__owner", "recipient")
-        .filter(team__year=2025)
-        .order_by("-order", "-id")
-    )
-
-    status_filter = request.GET.get("status")
-    if status_filter:
-        payments = payments.filter(status=status_filter)
-
-    method_filter = request.GET.get("method")
-    if method_filter in ("sbp", "sberbank"):
-        payments = payments.filter(payment_method__in=("sbp", "sberbank"))
-    elif method_filter:
-        payments = payments.filter(payment_method=method_filter)
-
-    # recipient
-    recipient_filter = request.GET.get("recipient")
-    if recipient_filter:
-        payments = payments.filter(recipient_id=recipient_filter)
-
-    # балансы, которые должны быть после каждого платежа
-    balances = defaultdict(int)
-    estimate_balances = {}
-    for payment in payments[::-1]:
-        if payment.status == Payment.STATUS_DONE and payment.payment_method in (
-            "sbp",
-            "sberbank",
-        ):
-            balances[payment.recipient] += payment.payment_amount
-            estimate_balances[payment.id] = balances[payment.recipient]
-
-    return render(
-        request,
-        "payment_list.html",
-        {
-            "payments": payments,
-            "estimate_balances": estimate_balances,
-            "status": status_filter,
-            "method": method_filter,
-            "recipients": SbpPaymentRecipient.objects.all(),
-        },
-    )

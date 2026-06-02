@@ -1,6 +1,4 @@
 import datetime
-import hashlib
-import logging
 import random
 
 from django.conf import settings
@@ -8,8 +6,6 @@ from django.contrib.auth.models import User
 from django.db import models, transaction
 from django.db.models.signals import post_save
 from django.dispatch import receiver
-
-logger = logging.getLogger(__name__)
 
 
 class Profile(models.Model):
@@ -206,109 +202,6 @@ class PaymentsYa(models.Model):
     label = models.CharField(max_length=50)
     sha1_hash = models.CharField(max_length=50)
     unaccepted = models.BooleanField(default=True)
-
-    @staticmethod
-    def get_cost():
-        return 2500
-
-    def new_payment(self, d: dict) -> bool:
-        fields = [
-            "notification_type",
-            "operation_id",
-            "amount",
-            "currency",
-            "datetime",
-            "sender",
-            "codepro",
-            "label",
-            "sha1_hash",
-        ]
-        for field in fields:
-            if field not in d:
-                return False
-
-        notification_secret = settings.YANDEX_NOTIFICATION_SECRET
-
-        s = "%s&%s&%s&%s&%s&%s&%s&%s&%s" % (
-            d["notification_type"],
-            d["operation_id"],
-            d["amount"],
-            d["currency"],
-            d["datetime"],
-            d["sender"],
-            d["codepro"],
-            notification_secret,
-            d["label"],
-        )
-
-        hash = hashlib.sha1(s.encode("utf-8")).hexdigest()
-        if d["sha1_hash"] != hash:
-            logger.warning(f"sha1_hash not equal {d['sha1_hash']} != {hash}")
-            return False
-
-        self.notification_type = d["notification_type"]
-        self.operation_id = d["operation_id"]
-        self.amount = d["amount"]
-        self.currency = d["currency"]
-        self.datetime = d["datetime"]
-        self.sender = d["sender"]
-        self.codepro = d["codepro"] == "true"
-        self.label = d["label"]
-        self.sha1_hash = d["sha1_hash"]
-
-        self.withdraw_amount = d.get("withdraw_amount", "0")
-        if "unaccepted" in d:
-            self.unaccepted = d["unaccepted"] == "true"
-
-        self.save()
-        if self.label:
-            self.update_team(self.label)
-        return True
-
-    def get_sum(self, paymentid):
-        payments = PaymentsYa.objects.filter(label=paymentid, unaccepted=False)
-        paid = 0
-        for payment in payments:
-            amount = float(payment.amount) if payment.amount else 0
-            paid += amount
-        return paid
-
-    def update_team(self, paymentid):
-        payment = Payment.objects.filter(id=int(paymentid))[:1]
-        if not payment:
-            return False
-        payment = payment.get()
-        withdraw_amount = float(self.withdraw_amount) - payment.additional_charge
-        paid_for = payment.paid_for
-        if payment.payment_with_discount <= withdraw_amount:
-            payment.status = "done"
-        if payment.payment_with_discount > withdraw_amount:
-            payment.status = "partial (" + str(withdraw_amount) + ")"
-            paid_for = withdraw_amount / payment.cost_per_person
-        with transaction.atomic():
-            if payment.team:
-                payment.team.paid_people += paid_for
-                payment.team.paid_sum += withdraw_amount + payment.additional_charge
-                payment.team.additional_charge -= payment.additional_charge
-                payment.team.save()
-                # Авто sold_out при достижении лимита гонки (Option B: без
-                # авто-реоткрытия). Caveat: занятость считается по paid_people,
-                # который растёт только при подтверждении оплаты — параллельные
-                # неоплаченные черновики могут кратковременно превысить лимит.
-                from .race import RegStatus
-
-                category = payment.team.category2
-                race = category.race if category else None
-                if (
-                    race
-                    and race.people_limit
-                    and race.reg_status == RegStatus.OPEN
-                    and race.people_count() >= race.people_limit
-                ):
-                    race.reg_status = RegStatus.SOLD_OUT
-                    race.save(update_fields=["reg_status"])
-            payment.save()
-        return True
 
 
 class TeamManager(models.Manager):

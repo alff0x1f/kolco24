@@ -5,14 +5,14 @@ from unittest.mock import patch
 import pytest
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
-from django.db import IntegrityError
+from django.db import IntegrityError, transaction
 from django.urls import reverse
 from django.utils import timezone
 
 from apps.race.models import PaymentExtra, RaceExtra, TeamExtra
 from website.forms import TeamForm
 from website.models import Payment, Race, VTBPayment
-from website.models.models import PaymentsYa, Team
+from website.models.models import Team
 from website.models.race import (
     RESERVATION_TTL,
     Category,
@@ -1880,30 +1880,37 @@ def test_gate_own_reservation_does_not_block_edit(django_user_model):
 
 
 def _confirm_payment(user, team, paid_for, cost_per_person=1500):
-    """Подтвердить оплату через PaymentsYa.update_team (инкрементит paid_people)."""
-    amount = paid_for * cost_per_person
-    payment = Payment.objects.create(
-        owner=user,
-        team=team,
-        payment_method="ya",
-        payment_amount=amount,
-        payment_with_discount=amount,
-        cost_per_person=cost_per_person,
-        paid_for=paid_for,
-        sender_card_number="",
-    )
-    ya = PaymentsYa.objects.create(
-        notification_type="p2p-incoming",
-        operation_id="op",
-        amount=str(amount),
-        withdraw_amount=str(amount),
-        currency="643",
-        datetime="2026-06-01",
-        sender="",
-        label=str(payment.id),
-        sha1_hash="",
-    )
-    ya.update_team(payment.id)
+    """Подтвердить оплату, повторяя check_vtb_payments._settle_race_payment."""
+    with transaction.atomic():
+        team.refresh_from_db()
+        amount = paid_for * cost_per_person
+        payment = Payment.objects.create(
+            owner=user,
+            team=team,
+            payment_method="sbp2",
+            status=Payment.STATUS_DONE,
+            payment_amount=amount,
+            payment_with_discount=amount,
+            cost_per_person=cost_per_person,
+            paid_for=paid_for,
+            sender_card_number="",
+        )
+        payment.order = payment.pk
+        payment.save(update_fields=["order"])
+        team.paid_people += paid_for
+        team.paid_sum += amount
+        team.save(update_fields=["paid_people", "paid_sum"])
+
+        category = team.category2
+        race = category.race if category else None
+        if (
+            race
+            and race.people_limit
+            and race.reg_status == RegStatus.OPEN
+            and race.people_count() >= race.people_limit
+        ):
+            race.reg_status = RegStatus.SOLD_OUT
+            race.save(update_fields=["reg_status"])
 
 
 @pytest.mark.django_db
@@ -1937,8 +1944,20 @@ def test_deleting_team_does_not_reopen(django_user_model):
 
 
 @pytest.mark.django_db
+def test_payment_below_cap_does_not_flip(django_user_model):
+    # OPEN гонка не переходит в SOLD_OUT, пока occupancy < limit.
+    user = _pl_user(django_user_model)
+    race = _pl_race(people_limit=10, reg_status=RegStatus.OPEN)
+    cat = _pl_category(race)
+    team = _pl_team(cat, user, paid_people=2, name="self")
+    _confirm_payment(user, team, paid_for=2)  # occupancy 4 < 10
+    race.refresh_from_db()
+    assert race.reg_status == RegStatus.OPEN
+
+
+@pytest.mark.django_db
 def test_manual_sold_out_below_cap_untouched(django_user_model):
-    # Ручной sold_out ниже cap триггер не трогает (флип только OPEN → SOLD_OUT).
+    # Ручной sold_out ниже cap не сбрасывается (флип только OPEN → SOLD_OUT).
     user = _pl_user(django_user_model)
     race = _pl_race(people_limit=10, reg_status=RegStatus.SOLD_OUT)
     cat = _pl_category(race)
