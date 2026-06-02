@@ -153,8 +153,8 @@ set `SOLD_OUT`, save). Remove `PaymentsYa` from the import on line 15.
 - Delete: `src/templates/website/payment_process.html`
 - Delete: `src/templates/website/success.html`
 
-- [ ] delete the five template files listed above
-- [ ] grep to confirm none are `{% include %}`d or `render()`ed elsewhere: `grep -rn "payment_list.html\|sberbank.html\|sbp.html\|payment_process.html\|website/success.html" src/`
+- [x] delete the five template files listed above
+- [x] grep to confirm none are `{% include %}`d or `render()`ed elsewhere: `grep -rn "payment_list.html\|sberbank.html\|sbp.html\|payment_process.html\|website/success.html" src/` — zero matches
 
 ### Task 5: Delete orphaned legacy JS (verify first)
 
