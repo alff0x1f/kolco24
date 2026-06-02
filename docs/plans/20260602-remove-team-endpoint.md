@@ -102,15 +102,17 @@ will only ever be `""` after `teams_predstart` is removed.
 **Files:**
 - Modify: `src/website/urls.py`
 
-- [ ] delete L22 `path("team/", views.my_team, name="my_team")`
-- [ ] delete L26 `path("team_admin/", views.team_admin, name="team_admin")`
-- [ ] delete the already-commented `teams_predstart/start/finish` lines (L100–102)
-- [ ] delete L103 `re_path("^team/(?P<teamid>[0-9a-f]{16})/", views.my_team)` (already dead — shadowed by `edit_team`)
-- [ ] delete L104–106 `re_path` for `team_predstart` / `team_start` / `team_finish`
-- [ ] delete L108 `path("newteam/", views.new_team, name="new_team")`
-- [ ] keep `edit_team`, `move_team_member`, `pay_team`, `team_points`, `teams` intact
-- [ ] run `uv run pytest` — no `NoReverseMatch` from surviving `{% url %}`/`reverse()` callers
-      (only the removed templates referenced `my_team`/`team_admin`; `my_teams` is distinct and kept)
+- [x] delete L22 `path("team/", views.my_team, name="my_team")`
+- [x] delete L26 `path("team_admin/", views.team_admin, name="team_admin")`
+- [x] delete the already-commented `teams_predstart/start/finish` lines (L100–102)
+- [x] delete L103 `re_path("^team/(?P<teamid>[0-9a-f]{16})/", views.my_team)` (already dead — shadowed by `edit_team`)
+- [x] delete L104–106 `re_path` for `team_predstart` / `team_start` / `team_finish`
+- [x] delete L108 `path("newteam/", views.new_team, name="new_team")`
+- [x] keep `edit_team`, `move_team_member`, `pay_team`, `team_points`, `teams` intact
+- [x] run `uv run pytest` — no `NoReverseMatch` from surviving `{% url %}`/`reverse()` callers
+      (production templates confirmed clean via grep; the only 2 NoReverseMatch failures are
+      test-internal `my_team` references in `test_login_required_redirects_to_login_url` and
+      `test_my_team_post_does_not_500`, both slated for repoint/delete in Task 5; 323 other tests pass)
 
 ### Task 3: Delete view functions and form code
 
