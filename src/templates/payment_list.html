@@ -75,7 +75,7 @@
                                         </button>
                                     </form>
                                 </td>
-                                <td><a href="/team/{{ payment.team.paymentid }}">{{ payment.team.teamname }}</a><br/>
+                                <td><a href="/team/{{ payment.team.id }}/">{{ payment.team.teamname }}</a><br/>
                                     {{ payment.team.owner.last_name }} {{ payment.team.owner.first_name }}<br/>
                                     Оплачено {{ payment.team.paid_people|floatformat }}
                                     из {{ payment.team.ucount }}<br/>
