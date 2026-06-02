@@ -2243,7 +2243,6 @@ def test_superuser_bypass_capacity_but_extra_cap_still_applies(django_user_model
     assert "ucount" not in form.errors  # capacity bypassed
 
 
-@pytest.mark.django_db
 def test_team_form_defensive_init_with_querydict():
     # TeamForm must tolerate a non-int/None race_id without raising.
     from django.http import QueryDict
