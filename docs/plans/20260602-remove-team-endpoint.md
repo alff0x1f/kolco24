@@ -171,13 +171,16 @@ will only ever be `""` after `teams_predstart` is removed.
 - [x] run `uv run pytest src/website/tests.py` — all three behave as expected
 
 ### Task 6: Verify acceptance criteria
-- [ ] grep sweep returns empty for: word-boundary `my_team` (NOT `my_teams`), `team_admin`,
+- [x] grep sweep returns empty for: word-boundary `my_team` (NOT `my_teams`), `team_admin`,
       `TeamFormAdmin`, the `new_team` **view** (NOT `Team.new_team` model method),
       `teams_predstart`/`teams_start`/`teams_finish`, and the 7 deleted template filenames
-- [ ] confirm survivors untouched: `edit_team`, `my_teams`, `teams`/`teams.html`,
-      `Team.new_team` model method, `team_start_log`/`team_finish_log`
-- [ ] run full suite: `uv run pytest`
-- [ ] run `make format && make lint` (project rule: before every commit; catches orphaned `F401`)
+      (all `src/` hits gone; remaining matches are only in `docs/plans/*` and `CLAUDE.md`)
+- [x] confirm survivors untouched: `edit_team`, `my_teams`, `teams`/`teams.html`,
+      `Team.new_team` model method (`models.py:418`, callers in `apps/accounts/forms.py`),
+      `team_start_log`/`team_finish_log`
+- [x] run full suite: `uv run pytest` — 324 passed
+- [x] run `make format && make lint` — no Makefile tracked; ran the underlying tools directly
+      (ruff --fix/black/isort, then ruff/black --check/isort --check/flake8): all clean, no changes
 
 ### Task 7: [Final] Documentation
 - [ ] update `CLAUDE.md` if any removed item is referenced there (e.g. the note about the stale
