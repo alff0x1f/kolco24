@@ -102,8 +102,8 @@ Keep the class declaration and every field.
 **Test helper** (`src/website/tests.py::_confirm_payment`, ~1882): currently calls
 `PaymentsYa.update_team`. Replace its body with logic mirroring
 `_settle_race_payment`: create the `Payment`, then
-`team.paid_people += paid_for`, `team.paid_sum += amount`, `team.save()`, then the
-sold-out check (`race = team.category2.race`; if `race.people_limit` and
+`team.paid_people += paid_for`, `team.paid_sum += payment.payment_amount`,
+`team.save()`, then the sold-out check (`race = team.category2.race`; if `race.people_limit` and
 `reg_status == RegStatus.OPEN` and `race.people_count() >= race.people_limit` →
 set `SOLD_OUT`, save). Remove `PaymentsYa` from the import on line 15.
 
@@ -122,7 +122,7 @@ set `SOLD_OUT`, save). Remove `PaymentsYa` from the import on line 15.
 - Modify: `src/website/views/views_.py`
 
 - [ ] delete view functions/classes: `success`, `NewPaymentView`, `ConfirmPaymentView`, `CancelPaymentView`, `PaymentUp`, `PaymentDown`, `paymentinfo`, `get_cost`, `yandex_payment`, `TeamPayment`, `payment_list`
-- [ ] remove imports in `views_.py` that became unused (likely `PaymentsYa`, `PaymentLog`, `SbpPaymentRecipient`, `csrf_exempt`, `strftime`/`gmtime`) — verify each is unused elsewhere in the file before removing; leave imports still used by surviving code
+- [ ] remove imports in `views_.py` that became unused: `PaymentsYa`, `PaymentLog`, `SbpPaymentRecipient`, `gmtime`, and `Decimal` (used only by deleted `ConfirmPaymentView`). **Keep** `csrf_exempt` (still used ~1073/1108/1214), `strftime` (still used ~226/1066), and the rest. Verify each removal against the file before deleting; `make lint` (Task 8) catches any leftover F401
 - [ ] sanity check: `uv run python src/manage.py check` (file still imports cleanly — `__init__.py`/`urls.py` will still be broken until Tasks 2-3; that is expected here)
 - [ ] (no new tests in this task — see Task 7 for the only test change)
 
@@ -182,8 +182,8 @@ set `SOLD_OUT`, save). Remove `PaymentsYa` from the import on line 15.
 - Modify: `src/website/tests.py`
 
 - [ ] rewrite `_confirm_payment` to mirror `check_vtb_payments._settle_race_payment`: after creating the `Payment`, do `team.paid_people += paid_for`, `team.paid_sum += amount`, `team.save()`, then the `OPEN → SOLD_OUT` check (`race = team.category2.race`; if `race.people_limit` and `race.reg_status == RegStatus.OPEN` and `race.people_count() >= race.people_limit` → set `SOLD_OUT`, `race.save(update_fields=["reg_status"])`)
-- [ ] remove `PaymentsYa` from the import on line ~15 (`from website.models.models import PaymentsYa, Team` → `from website.models.models import Team`); ensure `RegStatus` is imported where the helper lives
-- [ ] run the dependent tests: `uv run pytest src/website/tests.py -k "sold_out or cap or people_limit"` — all must pass unchanged
+- [ ] remove `PaymentsYa` from the import on line ~15 (`from website.models.models import PaymentsYa, Team` → `from website.models.models import Team`). `RegStatus` is already imported in tests.py — no new import needed
+- [ ] run the four dependent tests (their names contain none of "sold_out"/"cap"/"people_limit" consistently, so target them explicitly): `uv run pytest src/website/tests.py -k "reaching_cap or reopen or below_cap or without_limit"` — all four must pass unchanged (or just run the whole `src/website/tests.py`)
 
 ### Task 8: Verify acceptance criteria
 
