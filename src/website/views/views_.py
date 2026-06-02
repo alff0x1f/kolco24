@@ -1,5 +1,4 @@
 import json
-import logging
 import random
 from datetime import datetime, timedelta, timezone
 from urllib.parse import quote
@@ -42,8 +41,6 @@ from website.models.race import Category, RegStatus
 from website.sync_xlsx import import_file_xlsx
 
 from ..models.news import MenuItem, Page
-
-logger = logging.getLogger(__name__)
 
 
 def is_admin(user):

@@ -1,5 +1,4 @@
 import datetime
-import logging
 import random
 
 from django.conf import settings
@@ -7,8 +6,6 @@ from django.contrib.auth.models import User
 from django.db import models, transaction
 from django.db.models.signals import post_save
 from django.dispatch import receiver
-
-logger = logging.getLogger(__name__)
 
 
 class Profile(models.Model):
