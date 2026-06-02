@@ -4,14 +4,13 @@ import random
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
-from time import gmtime, strftime, time
+from time import gmtime, strftime
 from urllib.parse import quote
 
 from django.conf import settings
-from django.contrib.auth import login as auth_login
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.core.files.storage import FileSystemStorage
-from django.db import IntegrityError, transaction
+from django.db import transaction
 from django.http import (
     Http404,
     HttpResponse,
@@ -30,18 +29,8 @@ from django.views.decorators.csrf import csrf_exempt
 from openpyxl import load_workbook
 
 from apps.race.pricing import create_team_payment, upsert_team_extras
-from website.forms import (
-    DUPLICATE_EMAIL_MSG,
-    BreakfastForm,
-    NewsPostForm,
-    PageForm,
-    RegForm,
-    TeamForm,
-    TeamFormAdmin,
-    TransferForm,
-)
+from website.forms import BreakfastForm, NewsPostForm, PageForm, TeamForm, TransferForm
 from website.models import (
-    Athlet,
     BreakfastRegistration,
     Checkpoint,
     CheckpointTag,
@@ -120,57 +109,6 @@ class RaceIdRedirectView(View):
         new_path = request.path.replace(f"/race/{race_id}/", f"/race/{race.slug}/", 1)
         qs = f"?{request.GET.urlencode()}" if request.GET else ""
         return HttpResponsePermanentRedirect(new_path + qs)
-
-
-class IndexView(View):
-    def get(self, request):
-        init_val = {}
-        if request.user.is_authenticated:
-            init_val = {
-                "first_name": request.user.first_name,
-                "last_name": request.user.last_name,
-                "email": request.user.email,
-                "phone": request.user.profile.phone,
-            }
-        contex = self.get_context()
-        contex["reg_form"] = RegForm(initial=init_val)
-        return render(request, "website/index.html", contex)
-
-    def post(self, request):
-        reg_form = RegForm(request.POST, user=request.user, require_agreements=False)
-        if reg_form.is_valid():
-            try:
-                user = reg_form.reg_user(request.user)
-            except IntegrityError:
-                reg_form.add_error("email", DUPLICATE_EMAIL_MSG)
-            else:
-                auth_login(request, user)
-                return HttpResponseRedirect("/team")
-
-        contex = self.get_context()
-        contex["reg_form"] = reg_form
-
-        return render(request, "website/index.html", contex)
-
-    def get_context(self):
-        my_teams = []
-        free_athlets = 0
-        if self.request.user.is_authenticated:
-            my_teams = Team.objects.filter(owner=self.request.user, year=2024)
-            free_athlets = Athlet.objects.filter(
-                owner=self.request.user, team=None
-            ).count()
-
-        teams_count, members_count = Team.get_info()
-        return {
-            "cost": PaymentsYa.get_cost(),
-            "team_count": teams_count,
-            "people_count": int(members_count),
-            "myteams": my_teams,
-            "myteams_count": len(my_teams),
-            "free_athlet": free_athlets,
-            "reg_open": settings.REG_OPEN,
-        }
 
 
 class TransferView(View):
@@ -538,7 +476,7 @@ def index_dummy(request):
     return render(request, "website/index_dummy.html")
 
 
-def teams(request, template=""):
+def teams(request):
     teams = [
         {
             "teams": Team.objects.filter(
@@ -639,97 +577,7 @@ def teams(request, template=""):
     context = {
         "teams": teams,
     }
-    return render(request, "website/teams%s.html" % template, context)
-
-
-def teams_predstart(request):
-    return teams(request, template="_predstart")
-
-
-def teams_start(request):
-    teams = [
-        {
-            "teams": Team.objects.filter(
-                paid_sum__gt=1, category="6h", start_time__isnull=True, year=2024
-            ),
-            "dist_name": "Дистанция 6ч",
-        },
-        {
-            "teams": Team.objects.filter(
-                paid_sum__gt=1,
-                category__startswith="12h",
-                start_time__isnull=True,
-                year=2024,
-            ),
-            "dist_name": "Дистанция 12ч",
-        },
-        {
-            "teams": Team.objects.filter(
-                paid_sum__gt=1, category="24h", start_time__isnull=True, year=2024
-            ),
-            "dist_name": "Дистанция 24ч",
-        },
-        {
-            "teams": Team.objects.filter(
-                paid_sum__gt=1, start_time__isnull=False, year=2024
-            ).order_by("start_time"),
-            "dist_name": "Стартовавшие",
-        },
-    ]
-    for teamgroup in teams:
-        for team in teamgroup["teams"]:
-            if team.start_time:
-                team.start_time = team.start_time + timedelta(hours=5)
-            if team.finish_time:
-                team.finish_time = team.finish_time + timedelta(hours=5)
-
-    context = {
-        "teams": teams,
-    }
-    return render(request, "website/teams_start.html", context)
-
-
-def teams_finish(request):
-    teams = [
-        {
-            "teams": Team.objects.filter(
-                paid_sum__gt=1, category="6h", finish_time__isnull=True, year=2024
-            ).order_by("start_number"),
-            "dist_name": "Дистанция 6ч",
-        },
-        {
-            "teams": Team.objects.filter(
-                paid_sum__gt=1,
-                category__startswith="12h",
-                finish_time__isnull=True,
-                year=2024,
-            ).order_by("start_number"),
-            "dist_name": "Дистанция 12ч",
-        },
-        {
-            "teams": Team.objects.filter(
-                paid_sum__gt=1, category="24h", finish_time__isnull=True, year=2024
-            ).order_by("start_number"),
-            "dist_name": "Дистанция 24ч",
-        },
-        {
-            "teams": Team.objects.filter(
-                paid_sum__gt=1, finish_time__isnull=False, year=2024
-            ).order_by("finish_time"),
-            "dist_name": "Финишировавшие",
-        },
-    ]
-    for teamgroup in teams:
-        for team in teamgroup["teams"]:
-            if team.start_time:
-                team.start_time = team.start_time + timedelta(hours=5)
-            if team.finish_time:
-                team.finish_time = team.finish_time + timedelta(hours=5)
-
-    context = {
-        "teams": teams,
-    }
-    return render(request, "website/teams_finish.html", context)
+    return render(request, "website/teams.html", context)
 
 
 def teams_protocol(request):
@@ -768,103 +616,6 @@ def success(request, teamid=""):
         }
         return render(request, "website/success.html", context)
     raise Http404("File not found.")
-
-
-@login_required
-def my_team(request, teamid="", template="my_team"):
-    team_form = TeamForm(request.POST or None)
-    paymentid = team_form.init_vals(request.user, teamid)
-    if not paymentid:
-        return HttpResponseRedirect("/teams")
-
-    # if request.user.is_superuser:
-    #     team_form_admin = TeamFormAdmin(None)
-    #     team_form_admin.init_vals(request.user, teamid)
-
-    cost_now = PaymentsYa.get_cost()
-
-    if request.method == "GET":
-        if teamid != paymentid:
-            return HttpResponseRedirect("/team/%s" % paymentid)
-
-        main_team = Team.objects.get(paymentid=paymentid, year=2024)
-        other_teams = Team.objects.filter(owner=request.user, year=2024).exclude(
-            paymentid=paymentid
-        )
-        teams_count, _ = Team.get_info()
-        # история платежей
-        payments = Payment.objects.filter(team=main_team, status="done")
-        # проверка бухалтерии
-        payments_sum = 0
-        for p in payments:
-            payments_sum += p.additional_charge + p.payment_amount
-        payments_ok = payments_sum == main_team.paid_sum
-
-        context = {
-            "cost": cost_now,
-            "team_form": team_form,
-            "other_teams": other_teams,
-            "main_team": main_team,
-            "curr_time": datetime.now(timezone.utc) + timedelta(hours=5),
-            "timestamp": time(),
-            "reg_open": settings.REG_OPEN,
-            "additional_charge": main_team.additional_charge,
-            "payments": payments,
-            "payments_ok": payments_ok,
-            "a": payments_sum,
-            "b": main_team.paid_sum,
-            "payback_sum": main_team.paid_sum * 0.92,
-        }
-        # if request.user.is_superuser:
-        #     context["team_form_admin"] = team_form_admin
-        return render(request, "website/%s.html" % template, context)
-    elif request.method == "POST" and team_form.is_valid():
-        if team_form.access_possible(request.user):
-            team = team_form.save()
-            if not team:
-                Http404("Wrong values")
-            response_data = {}
-            response_data["sum"] = (team.ucount - team.paid_people) * cost_now
-
-            new_event = PaymentLog(
-                team=team, payment_method="save", paid_sum=response_data["sum"]
-            )
-            new_event.save()
-            response_data["success"] = "true"
-            return JsonResponse(response_data)
-    raise Http404("Wrong values")
-
-
-def team_predstart(request, teamid=""):
-    if request.user.is_superuser:
-        return my_team(request, teamid, "team_predstart")
-    raise Http404("Not found")
-
-
-def team_start(request, teamid=""):
-    if request.user.is_superuser:
-        return my_team(request, teamid, "team_start")
-    raise Http404("Not found")
-
-
-def team_finish(request, teamid=""):
-    if request.user.is_superuser:
-        return my_team(request, teamid, "team_finish")
-    raise Http404("Not found")
-
-
-@login_required
-def team_admin(request, teamid=""):
-    team_form_admin = TeamFormAdmin(request.POST or None)
-    if request.method == "POST" and team_form_admin.is_valid():
-        if request.user.is_superuser:
-            team = team_form_admin.save(request.user)
-            if not team:
-                Http404("Wrong values")
-            response_data = {}
-            response_data["success"] = "true"
-            return JsonResponse(response_data)
-    raise Http404("Wrong values")
 
 
 class NewPaymentView(View):
@@ -1080,15 +831,6 @@ def get_cost(request):
             "cost": PaymentsYa.get_cost(),
         }
     )
-
-
-@login_required
-def new_team(request):
-    if request.method == "POST":
-        team = Team()
-        team.new_team(request.user, "12h", 4)
-        team.save()
-        return HttpResponseRedirect("/team/%s" % team.paymentid)
 
 
 @csrf_exempt

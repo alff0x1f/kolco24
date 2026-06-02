@@ -11,7 +11,6 @@ from .views.team import EditTeamView, TeamMemberMoveView
 
 urlpatterns = [
     path("", lambda request: redirect("race", race_slug="kolco12-2026"), name="index"),
-    # path("index_hidden/", views.IndexView.as_view(), name="index"),
     # auth now lives in apps.accounts (mounted at /accounts/ in config/urls.py)
     path("race/8/transfer/", views.TransferView.as_view(), name="transfer"),
     path(
@@ -19,11 +18,13 @@ urlpatterns = [
         views.TransferPaidListView.as_view(),
         name="transfer_paid_list",
     ),
-    path("team/", views.my_team, name="my_team"),
-    path("team/<team_id>/", EditTeamView.as_view(), name="edit_team"),
-    path("team/<team_id>/move/", TeamMemberMoveView.as_view(), name="move_team_member"),
-    path("team/<team_id>/pay/", views.TeamPayment.as_view(), name="pay_team"),
-    path("team_admin/", views.team_admin, name="team_admin"),
+    path("team/<int:team_id>/", EditTeamView.as_view(), name="edit_team"),
+    path(
+        "team/<int:team_id>/move/",
+        TeamMemberMoveView.as_view(),
+        name="move_team_member",
+    ),
+    path("team/<int:team_id>/pay/", views.TeamPayment.as_view(), name="pay_team"),
     path("teams/", views.teams, name="teams"),
     # Int-id redirects must come before slug patterns (slug matches ints too)
     path("race/<int:race_id>/", RaceIdRedirectView.as_view()),
@@ -96,16 +97,10 @@ urlpatterns = [
     #     views.AllTeamsResultView.as_view(),
     #     name="all_teams",
     # ),
-    path("team/<team_id>/points/", views.TeamPointsView.as_view(), name="team_points"),
-    # path("teams_predstart/", views.teams_predstart, name="teams_predstart"),
-    # path("teams_start/", views.teams_start, name="teams_start"),
-    # path("teams_finish/", views.teams_finish, name="teams_finish"),
-    re_path("^team/(?P<teamid>[0-9a-f]{16})/", views.my_team),
-    re_path("^team_predstart/(?P<teamid>[0-9a-f]{16})/", views.team_predstart),
-    re_path("^team_start/(?P<teamid>[0-9a-f]{16})/", views.team_start),
-    re_path("^team_finish/(?P<teamid>[0-9a-f]{16})/", views.team_finish),
+    path(
+        "team/<int:team_id>/points/", views.TeamPointsView.as_view(), name="team_points"
+    ),
     re_path("^success/(?P<teamid>[0-9a-f]{16})/", views.success),
-    path("newteam/", views.new_team, name="new_team"),
     path("api/v1/newpayment/", views.NewPaymentView.as_view(), name="new_payment"),
     path("api/v1/paymentinfo/", views.paymentinfo, name="paymentinfo"),
     path("api/v1/getcost/", views.get_cost, name="getcost"),
