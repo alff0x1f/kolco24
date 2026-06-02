@@ -199,8 +199,8 @@ set `SOLD_OUT`, save). Remove `PaymentsYa` from the import on line 15.
 **Files:**
 - Modify: `CLAUDE.md` (only if a documented pattern changed)
 
-- [ ] update `CLAUDE.md` if any documented behavior changed (likely minimal — the live VTB flow is unchanged; consider a one-line note that the manual sberbank/sbp verification flow was removed)
-- [ ] move this plan to `docs/plans/completed/`
+- [x] update `CLAUDE.md` if any documented behavior changed (likely minimal — the live VTB flow is unchanged; consider a one-line note that the manual sberbank/sbp verification flow was removed)
+- [x] move this plan to `docs/plans/completed/`
 
 ## Post-Completion
 *Items requiring manual intervention or external systems — informational only*
