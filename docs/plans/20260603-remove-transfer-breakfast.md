@@ -205,9 +205,9 @@ with the right dependency; hand-write only if generation names it differently.
 - Modify: `src/website/models/models.py`
 - Modify: `src/website/models/__init__.py`
 
-- [ ] delete the `Transfer` class (lines ~16–43) and the `BreakfastRegistration` class (lines ~46–79) from `models.py`
-- [ ] remove `BreakfastRegistration` and `Transfer` from the import list in `models/__init__.py`
-- [ ] `uv run python src/manage.py check` — passes (no remaining references to the deleted models)
+- [x] delete the `Transfer` class (lines ~16–43) and the `BreakfastRegistration` class (lines ~46–79) from `models.py`
+- [x] remove `BreakfastRegistration` and `Transfer` from the import list in `models/__init__.py`
+- [x] `uv run python src/manage.py check` — passes (no remaining references to the deleted models)
 
 ### Task 8: Add the DeleteModel migration (drop tables)
 

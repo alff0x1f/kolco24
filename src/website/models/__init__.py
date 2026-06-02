@@ -1,7 +1,6 @@
 from .checkpoint import Checkpoint, CheckpointTag
 from .models import (
     Athlet,
-    BreakfastRegistration,
     Payment,
     PaymentLog,
     PaymentsYa,
@@ -12,7 +11,6 @@ from .models import (
     TeamMemberMove,
     TeamMemberRaceLog,
     TeamStartLog,
-    Transfer,
 )
 from .news import MenuItem, NewsPost, Page
 from .payment import SbpPaymentRecipient
