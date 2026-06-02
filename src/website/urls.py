@@ -1,12 +1,12 @@
 from django.conf import settings
 from django.conf.urls.static import static
 from django.shortcuts import redirect
-from django.urls import include, path, re_path
+from django.urls import include, path
 
 from apps.race.views import RaceEditView, RacePageView, RaceTeamsView
 
 from . import views
-from .views import CancelPaymentView, ConfirmPaymentView, RaceIdRedirectView
+from .views import RaceIdRedirectView
 from .views.team import EditTeamView, TeamMemberMoveView
 
 urlpatterns = [
@@ -24,7 +24,6 @@ urlpatterns = [
         TeamMemberMoveView.as_view(),
         name="move_team_member",
     ),
-    path("team/<int:team_id>/pay/", views.TeamPayment.as_view(), name="pay_team"),
     path("teams/", views.teams, name="teams"),
     # Int-id redirects must come before slug patterns (slug matches ints too)
     path("race/<int:race_id>/", RaceIdRedirectView.as_view()),
@@ -100,11 +99,6 @@ urlpatterns = [
     path(
         "team/<int:team_id>/points/", views.TeamPointsView.as_view(), name="team_points"
     ),
-    re_path("^success/(?P<teamid>[0-9a-f]{16})/", views.success),
-    path("api/v1/newpayment/", views.NewPaymentView.as_view(), name="new_payment"),
-    path("api/v1/paymentinfo/", views.paymentinfo, name="paymentinfo"),
-    path("api/v1/getcost/", views.get_cost, name="getcost"),
-    path("yandexinform/", views.yandex_payment, name="yandexinform"),
     path("update_protocol/", views.update_protocol, name="update_protocol"),
     path("upload_protocol/", views.upload_protocol, name="upload_protocol"),
     path("regulations/", views.regulations, name="regulations"),
@@ -115,20 +109,6 @@ urlpatterns = [
     path("contacts/", views.contacts, name="contacts"),
     path("page/<str:slug>/", views.page, name="page"),
     path("page/<str:slug>/edit/", views.edit_page, name="edit_page"),
-    # admin
-    path("payments/", views.payment_list, name="payment-list"),
-    path(
-        "payments/confirm/<int:pk>/",
-        ConfirmPaymentView.as_view(),
-        name="confirm-payment",
-    ),
-    path(
-        "payments/cancel/<int:pk>/",
-        CancelPaymentView.as_view(),
-        name="cancel-payment",
-    ),
-    path("payments/<int:pk>/up/", views.PaymentUp.as_view(), name="payment-up"),
-    path("payments/<int:pk>/down/", views.PaymentDown.as_view(), name="payment-down"),
     # path("newpoint/<int:pk>/", views.new_point, name="new_point"),
     # app api
     path("api/", include(("api.urls", "api"), namespace="api")),

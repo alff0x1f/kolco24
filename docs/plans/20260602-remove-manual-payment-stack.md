@@ -139,10 +139,10 @@ set `SOLD_OUT`, save). Remove `PaymentsYa` from the import on line 15.
 **Files:**
 - Modify: `src/website/urls.py`
 
-- [ ] delete routes: `payments/` (`payment-list`), `payments/confirm/<int:pk>/` (`confirm-payment`), `payments/cancel/<int:pk>/` (`cancel-payment`), `payments/<int:pk>/up/` (`payment-up`), `payments/<int:pk>/down/` (`payment-down`)
-- [ ] delete routes: `team/<int:team_id>/pay/` (`pay_team`), `api/v1/newpayment/` (`new_payment`), `api/v1/paymentinfo/` (`paymentinfo`), `api/v1/getcost/` (`getcost`), `yandexinform/` (`yandexinform`), and the `^success/(?P<teamid>...)/` re_path
-- [ ] fix the import line `from .views import CancelPaymentView, ConfirmPaymentView, RaceIdRedirectView` → `from .views import RaceIdRedirectView`
-- [ ] `uv run python src/manage.py check` — must pass now (URLConf resolves cleanly)
+- [x] delete routes: `payments/` (`payment-list`), `payments/confirm/<int:pk>/` (`confirm-payment`), `payments/cancel/<int:pk>/` (`cancel-payment`), `payments/<int:pk>/up/` (`payment-up`), `payments/<int:pk>/down/` (`payment-down`)
+- [x] delete routes: `team/<int:team_id>/pay/` (`pay_team`), `api/v1/newpayment/` (`new_payment`), `api/v1/paymentinfo/` (`paymentinfo`), `api/v1/getcost/` (`getcost`), `yandexinform/` (`yandexinform`), and the `^success/(?P<teamid>...)/` re_path
+- [x] fix the import line `from .views import CancelPaymentView, ConfirmPaymentView, RaceIdRedirectView` → `from .views import RaceIdRedirectView`
+- [x] `uv run python src/manage.py check` — must pass now (URLConf resolves cleanly)
 
 ### Task 4: Delete the manual-payment templates
 
