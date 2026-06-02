@@ -8,10 +8,9 @@ from time import gmtime, strftime
 from urllib.parse import quote
 
 from django.conf import settings
-from django.contrib.auth import login as auth_login
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.core.files.storage import FileSystemStorage
-from django.db import IntegrityError, transaction
+from django.db import transaction
 from django.http import (
     Http404,
     HttpResponse,
@@ -30,17 +29,8 @@ from django.views.decorators.csrf import csrf_exempt
 from openpyxl import load_workbook
 
 from apps.race.pricing import create_team_payment, upsert_team_extras
-from website.forms import (
-    DUPLICATE_EMAIL_MSG,
-    BreakfastForm,
-    NewsPostForm,
-    PageForm,
-    RegForm,
-    TeamForm,
-    TransferForm,
-)
+from website.forms import BreakfastForm, NewsPostForm, PageForm, TeamForm, TransferForm
 from website.models import (
-    Athlet,
     BreakfastRegistration,
     Checkpoint,
     CheckpointTag,
@@ -119,57 +109,6 @@ class RaceIdRedirectView(View):
         new_path = request.path.replace(f"/race/{race_id}/", f"/race/{race.slug}/", 1)
         qs = f"?{request.GET.urlencode()}" if request.GET else ""
         return HttpResponsePermanentRedirect(new_path + qs)
-
-
-class IndexView(View):
-    def get(self, request):
-        init_val = {}
-        if request.user.is_authenticated:
-            init_val = {
-                "first_name": request.user.first_name,
-                "last_name": request.user.last_name,
-                "email": request.user.email,
-                "phone": request.user.profile.phone,
-            }
-        contex = self.get_context()
-        contex["reg_form"] = RegForm(initial=init_val)
-        return render(request, "website/index.html", contex)
-
-    def post(self, request):
-        reg_form = RegForm(request.POST, user=request.user, require_agreements=False)
-        if reg_form.is_valid():
-            try:
-                user = reg_form.reg_user(request.user)
-            except IntegrityError:
-                reg_form.add_error("email", DUPLICATE_EMAIL_MSG)
-            else:
-                auth_login(request, user)
-                return HttpResponseRedirect("/team")
-
-        contex = self.get_context()
-        contex["reg_form"] = reg_form
-
-        return render(request, "website/index.html", contex)
-
-    def get_context(self):
-        my_teams = []
-        free_athlets = 0
-        if self.request.user.is_authenticated:
-            my_teams = Team.objects.filter(owner=self.request.user, year=2024)
-            free_athlets = Athlet.objects.filter(
-                owner=self.request.user, team=None
-            ).count()
-
-        teams_count, members_count = Team.get_info()
-        return {
-            "cost": PaymentsYa.get_cost(),
-            "team_count": teams_count,
-            "people_count": int(members_count),
-            "myteams": my_teams,
-            "myteams_count": len(my_teams),
-            "free_athlet": free_athlets,
-            "reg_open": settings.REG_OPEN,
-        }
 
 
 class TransferView(View):

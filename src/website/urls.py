@@ -11,7 +11,6 @@ from .views.team import EditTeamView, TeamMemberMoveView
 
 urlpatterns = [
     path("", lambda request: redirect("race", race_slug="kolco12-2026"), name="index"),
-    # path("index_hidden/", views.IndexView.as_view(), name="index"),
     # auth now lives in apps.accounts (mounted at /accounts/ in config/urls.py)
     path("race/8/transfer/", views.TransferView.as_view(), name="transfer"),
     path(

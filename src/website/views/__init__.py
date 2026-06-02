@@ -7,7 +7,6 @@ from .views_ import (
     BreakfastView,
     CancelPaymentView,
     ConfirmPaymentView,
-    IndexView,
     NewPaymentView,
     PaymentDown,
     PaymentUp,
