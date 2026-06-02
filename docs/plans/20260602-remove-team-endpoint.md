@@ -91,11 +91,11 @@ will only ever be `""` after `teams_predstart` is removed.
 - Delete: `src/templates/website/teams_finish.html`
 - Delete: `src/static/js/team_admin.js`
 
-- [ ] delete the 7 templates listed above
-- [ ] delete `src/static/js/team_admin.js`
-- [ ] confirm no surviving template `{% include %}`/`{% extends %}`/`{% url %}`s any of these
+- [x] delete the 7 templates listed above
+- [x] delete `src/static/js/team_admin.js`
+- [x] confirm no surviving template `{% include %}`/`{% extends %}`/`{% url %}`s any of these
       (grep `team_admin`, the 7 filenames) — must be empty
-- [ ] run `uv run pytest` — suite still green (no template not-found at import/collection time)
+- [x] run `uv run pytest` — suite still green (no template not-found at import/collection time)
 
 ### Task 2: Remove URL patterns
 
