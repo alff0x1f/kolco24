@@ -356,6 +356,25 @@ def test_passlogin_url_returns_404(client):
 
 
 @pytest.mark.django_db
+def test_transfer_urls_return_404(client):
+    assert client.get("/race/8/transfer/").status_code == 404
+    assert client.get("/race/8/transfer/list/").status_code == 404
+
+
+@pytest.mark.django_db
+def test_breakfast_urls_return_404(client):
+    for path in [
+        "/race/some-race/breakfast/",
+        "/race/some-race/breakfast/admin/",
+        "/race/some-race/breakfast/list/",
+        "/race/1/breakfast/",
+        "/race/1/breakfast/admin/",
+        "/race/1/breakfast/list/",
+    ]:
+        assert client.get(path).status_code == 404, path
+
+
+@pytest.mark.django_db
 def test_login_view_post_blocks_open_redirect(client):
     User.objects.create_user(username="u4", password="pass", email="u4@example.com")
     response = client.post(
