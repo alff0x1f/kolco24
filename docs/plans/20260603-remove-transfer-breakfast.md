@@ -145,11 +145,11 @@ with the right dependency; hand-write only if generation names it differently.
 **Files:**
 - Modify: `src/website/views/views_.py`
 
-- [ ] delete the view classes `TransferView`, `TransferPaidListView`, `BreakfastView`, `BreakfastAdminView`, `BreakfastPaidListView`
-- [ ] delete the permission helpers `can_manage_transfer` and `can_manage_breakfast`
-- [ ] remove now-unused imports: `BreakfastForm, TransferForm` from the `from website.forms import (...)` line; `BreakfastRegistration, Transfer` from the `from website.models import (...)` block (keep all other names on those imports)
-- [ ] sanity: `views_.py` compiles/lints clean (a full `manage.py check` will still fail on the stale `__init__.py` export — fixed in Task 2)
-- [ ] (no tests — no legacy tests exist; see Testing Strategy)
+- [x] delete the view classes `TransferView`, `TransferPaidListView`, `BreakfastView`, `BreakfastAdminView`, `BreakfastPaidListView`
+- [x] delete the permission helpers `can_manage_transfer` and `can_manage_breakfast`
+- [x] remove now-unused imports: `BreakfastForm, TransferForm` from the `from website.forms import (...)` line; `BreakfastRegistration, Transfer` from the `from website.models import (...)` block (keep all other names on those imports)
+- [x] sanity: `views_.py` compiles/lints clean (a full `manage.py check` will still fail on the stale `__init__.py` export — fixed in Task 2)
+- [x] (no tests — no legacy tests exist; see Testing Strategy)
 
 ### Task 2: Prune the views package re-exports
 
