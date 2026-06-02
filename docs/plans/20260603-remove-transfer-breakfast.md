@@ -186,10 +186,10 @@ with the right dependency; hand-write only if generation names it differently.
 **Files:**
 - Modify: `src/website/forms.py`
 
-- [ ] delete the `TransferForm` and `BreakfastForm` classes
-- [ ] delete the constants `BUS_REGISTRATION_MAX_PASSENGERS` and `BREAKFAST_MAX_ATTENDEES`
-- [ ] remove `BreakfastRegistration, Transfer` from the `from website.models import BreakfastRegistration, Team, TeamMemberMove, Transfer` import — **keep `Team` and `TeamMemberMove`**
-- [ ] **do NOT touch** `FREE_MAPS` / `MAP_PRICE` (unrelated deprecated maps constants — kept)
+- [x] delete the `TransferForm` and `BreakfastForm` classes
+- [x] delete the constants `BUS_REGISTRATION_MAX_PASSENGERS` and `BREAKFAST_MAX_ATTENDEES`
+- [x] remove `BreakfastRegistration, Transfer` from the `from website.models import BreakfastRegistration, Team, TeamMemberMove, Transfer` import — **keep `Team` and `TeamMemberMove`**
+- [x] **do NOT touch** `FREE_MAPS` / `MAP_PRICE` (unrelated deprecated maps constants — kept)
 
 ### Task 6: Remove the admin registrations
 
