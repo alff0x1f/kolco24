@@ -121,10 +121,10 @@ set `SOLD_OUT`, save). Remove `PaymentsYa` from the import on line 15.
 **Files:**
 - Modify: `src/website/views/views_.py`
 
-- [ ] delete view functions/classes: `success`, `NewPaymentView`, `ConfirmPaymentView`, `CancelPaymentView`, `PaymentUp`, `PaymentDown`, `paymentinfo`, `get_cost`, `yandex_payment`, `TeamPayment`, `payment_list`
-- [ ] remove imports in `views_.py` that became unused: `PaymentsYa`, `PaymentLog`, `SbpPaymentRecipient`, `gmtime`, and `Decimal` (used only by deleted `ConfirmPaymentView`). **Keep** `csrf_exempt` (still used ~1073/1108/1214), `strftime` (still used ~226/1066), and the rest. Verify each removal against the file before deleting; `make lint` (Task 8) catches any leftover F401
-- [ ] sanity check: `uv run python src/manage.py check` (file still imports cleanly — `__init__.py`/`urls.py` will still be broken until Tasks 2-3; that is expected here)
-- [ ] (no new tests in this task — see Task 7 for the only test change)
+- [x] delete view functions/classes: `success`, `NewPaymentView`, `ConfirmPaymentView`, `CancelPaymentView`, `PaymentUp`, `PaymentDown`, `paymentinfo`, `get_cost`, `yandex_payment`, `TeamPayment`, `payment_list`
+- [x] remove imports in `views_.py` that became unused: `PaymentsYa`, `PaymentLog`, `SbpPaymentRecipient`, `gmtime`, and `Decimal`. Also removed `Payment`, `strftime`, `transaction`, and `defaultdict` — verified against the file these became unused too (the lines `strftime` was said to be needed at ~226/1066 are actually `datetime.strftime()` method calls, not the imported function). `make lint`/`ruff` confirm no F401 left. **Kept** `csrf_exempt` (still used in `TeamsTimesView`/`PointTagsView`/`upload_photo`)
+- [x] sanity check: `uv run python src/manage.py check` — `views_.py` itself compiles + lints clean; `check` fails only with `cannot import name 'CancelPaymentView'` from `__init__.py` (expected — fixed in Tasks 2-3)
+- [x] (no new tests in this task — see Task 7 for the only test change)
 
 ### Task 2: Prune the views package re-exports
 
