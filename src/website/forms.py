@@ -1,5 +1,3 @@
-from datetime import timedelta
-
 from django import forms
 
 from apps.accounts.forms import (  # noqa: F401
@@ -10,13 +8,7 @@ from apps.accounts.forms import (  # noqa: F401
     LoginForm,
     RegForm,
 )
-from website.models import (
-    BreakfastRegistration,
-    Team,
-    TeamAdminLog,
-    TeamMemberMove,
-    Transfer,
-)
+from website.models import BreakfastRegistration, Team, TeamMemberMove, Transfer
 from website.models.news import NewsPost, Page
 from website.models.race import Category, Race
 
@@ -357,10 +349,9 @@ class TeamForm(forms.Form):
         self.team = team if team is not None else Team()
         self.bypass_limits = bypass_limits
 
-        # Resolve the race defensively: the legacy `my_team` view calls
-        # TeamForm(request.POST or None) — so race_id may be a QueryDict/None.
-        # On a bad id, expose no add-ons and add no extra fields so my_team
-        # never 500s.
+        # Resolve the race defensively: callers may pass a bad/None race_id
+        # (e.g. TeamForm(request.POST or None)). On a non-int id, expose no
+        # add-ons and add no extra fields rather than raising.
         try:
             resolved_race_id = int(race_id)
         except (TypeError, ValueError):
@@ -436,55 +427,6 @@ class TeamForm(forms.Form):
                     }
                 ),
             )
-
-    def init_vals(self, user, paymentid=""):
-        team = None
-        if paymentid:
-            team = Team.objects.filter(owner=user, paymentid=paymentid, year=2024)[:1]
-            if not team and user.is_superuser:
-                team = Team.objects.filter(paymentid=paymentid, year=2024)[:1]
-            if not team:
-                return False
-        else:
-            team = Team.objects.filter(owner=user, year=2024)[:1]
-        if not team:
-            # free_athlet = Athlet.objects.filter(owner=user, team=None)[:1]
-            # if free_athlet:
-            #     return False
-            return False
-        else:
-            team = team.get()
-
-        self.initial["name"] = team.teamname
-        self.initial["city"] = team.city
-        self.initial["organization"] = team.organization
-        self.initial["athlet1"] = team.athlet1
-        self.initial["athlet2"] = team.athlet2
-        self.initial["athlet3"] = team.athlet3
-        self.initial["athlet4"] = team.athlet4
-        self.initial["athlet5"] = team.athlet5
-        self.initial["athlet6"] = team.athlet6
-        self.initial["birth1"] = team.birth1 if team.birth1 else ""
-        self.initial["birth2"] = team.birth2 if team.birth2 else ""
-        self.initial["birth3"] = team.birth3 if team.birth3 else ""
-        self.initial["birth4"] = team.birth4 if team.birth4 else ""
-        self.initial["birth5"] = team.birth5 if team.birth5 else ""
-        self.initial["birth6"] = team.birth6 if team.birth6 else ""
-        self.initial["dist"] = team.dist
-        self.initial["ucount"] = team.ucount
-        self.initial["paymentid"] = team.paymentid
-
-        return team.paymentid
-
-    def access_possible(self, user):
-        if "paymentid" not in self.cleaned_data:
-            return False
-        paymentid = self.cleaned_data["paymentid"]
-        if user.is_superuser:
-            return True
-        team = Team.objects.filter(paymentid=paymentid, year=2023)[:1]
-        if team and team.get().owner == user:
-            return True
 
     def clean(self):
         cleaned_data = super().clean()
@@ -676,205 +618,6 @@ class TeamMemberMoveForm(forms.ModelForm):
             if from_team.category2.race_id != to_team.category2.race_id:
                 raise forms.ValidationError("Teams must be in the same Race")
         return super().clean()
-
-
-class TeamFormAdmin(forms.Form):
-    paymentid = forms.CharField(widget=forms.HiddenInput())
-    get_package = forms.BooleanField(
-        required=False,
-        label="Получили стартовый пакет",
-        widget=forms.CheckboxInput(
-            attrs={
-                "class": "custom-control-input",
-            }
-        ),
-    )
-    get_number = forms.BooleanField(
-        required=False,
-        label="Получили номер",
-        widget=forms.CheckboxInput(
-            attrs={
-                "class": "custom-control-input",
-            }
-        ),
-    )
-    get_map = forms.BooleanField(
-        required=False,
-        label="Получили карту",
-        widget=forms.CheckboxInput(
-            attrs={
-                "class": "custom-control-input",
-            }
-        ),
-    )
-    give_paper = forms.BooleanField(
-        required=False,
-        label="Сдали заявку",
-        widget=forms.CheckboxInput(
-            attrs={
-                "class": "custom-control-input",
-            }
-        ),
-    )
-    give_photos = forms.BooleanField(
-        required=False,
-        label="Сдали фото",
-        widget=forms.CheckboxInput(
-            attrs={
-                "class": "custom-control-input",
-            }
-        ),
-    )
-    dnf = forms.BooleanField(
-        required=False,
-        label="Не финишировали",
-        widget=forms.CheckboxInput(
-            attrs={
-                "class": "custom-control-input",
-            }
-        ),
-    )
-
-    category = forms.ChoiceField(
-        required=False,
-        choices=(
-            ("6h", "6 часов"),
-            ("12h_mw", "12 часов МЖ"),
-            ("12h_mm", "12 часов ММ"),
-            ("12h_ww", "12 часов ЖЖ"),
-            ("12h_team", "12 часов, команда"),
-            ("24h", "24 часа"),
-        ),
-        label="Категория",
-        widget=forms.Select(
-            attrs={"class": "form-control form-control-lg", "placeholder": "Категория"}
-        ),
-    )
-    start_number = forms.CharField(
-        required=False,
-        label="Стартовый номер",
-        widget=forms.TextInput(
-            attrs={
-                "class": "form-control form-control-lg",
-                "placeholder": "Стартовый номер",
-            }
-        ),
-    )
-    start_time = forms.DateTimeField(
-        required=False,
-        label="Время старта",
-        widget=forms.DateTimeInput(
-            attrs={
-                "class": "form-control form-control-lg",
-                "placeholder": "Время старта",
-            }
-        ),
-    )
-    finish_time = forms.DateTimeField(
-        required=False,
-        label="Время финиша",
-        widget=forms.DateTimeInput(
-            attrs={
-                "class": "form-control form-control-lg",
-                "placeholder": "Время финиша",
-            }
-        ),
-    )
-    penalty = forms.IntegerField(
-        required=False,
-        min_value=0,
-        max_value=1000,
-        label="Штраф",
-        widget=forms.NumberInput(
-            attrs={"class": "form-control form-control-lg", "placeholder": "Штраф"}
-        ),
-    )
-
-    def clean(self):
-        paymentid = self.cleaned_data["paymentid"]
-        team = Team.objects.filter(paymentid=paymentid, year=2023)[:1]
-        if not team:
-            raise forms.ValidationError("Команда не найдена.")
-        return self.cleaned_data
-
-    def init_vals(self, user, paymentid=""):
-        team = None
-        if paymentid and user.is_superuser:
-            team = Team.objects.filter(paymentid=paymentid, year=2023)[:1]
-            if not team:
-                return False
-        else:
-            return False
-
-        team = team.get()
-        self.initial["get_package"] = team.get_package
-        self.initial["get_number"] = team.get_number
-        self.initial["get_map"] = team.get_map
-        self.initial["give_paper"] = team.give_paper
-        self.initial["give_photos"] = team.give_photos
-        self.initial["category"] = team.category
-        self.initial["start_number"] = team.start_number
-        self.initial["start_time"] = (
-            team.start_time + timedelta(hours=5) if team.start_time else None
-        )
-        self.initial["finish_time"] = (
-            team.finish_time + timedelta(hours=5) if team.finish_time else None
-        )
-        self.initial["penalty"] = team.penalty
-        self.initial["dnf"] = team.dnf
-
-    def save(self, user):
-        if "paymentid" not in self.cleaned_data:
-            return False
-        paymentid = self.cleaned_data["paymentid"]
-        team = Team.objects.filter(paymentid=paymentid, year=2023)[:1]
-        if team:
-            d = self.cleaned_data
-            print(d)
-            team = team.get()
-            if "get_package" in d:
-                team.get_package = d["get_package"]
-            if "get_number" in d:
-                team.get_number = d["get_number"]
-            if "get_map" in d:
-                team.get_map = d["get_map"]
-            if "give_paper" in d:
-                team.give_paper = d["give_paper"]
-            if "give_photos" in d:
-                team.give_photos = d["give_photos"]
-            if "category" in d:
-                team.category = d["category"]
-            if "start_number" in d and d["start_number"]:
-                team.start_number = d["start_number"]
-            if "start_time" in d and d["start_time"]:
-                team.start_time = d["start_time"] - timedelta(hours=5)
-            if "finish_time" in d and d["finish_time"]:
-                team.finish_time = d["finish_time"] - timedelta(hours=5)
-            if "penalty" in d:
-                team.penalty = d["penalty"] if d["penalty"] else 0
-            if "dnf" in d:
-                team.dnf = d["dnf"]
-            team.save()
-
-            team_admin_log = TeamAdminLog()
-            if user:
-                team_admin_log.editor = user
-            team_admin_log.paymentid = team.paymentid
-            team_admin_log.get_package = team.get_package
-            team_admin_log.get_number = team.get_number
-            team_admin_log.get_map = team.get_map
-            team_admin_log.give_paper = team.give_paper
-            team_admin_log.give_photos = team.give_photos
-            team_admin_log.category = team.category
-            team_admin_log.start_number = team.start_number
-            team_admin_log.start_time = team.start_time
-            team_admin_log.finish_time = team.finish_time
-            team_admin_log.distance_time = team.distance_time
-            team_admin_log.penalty = team.penalty
-            team_admin_log.dnf = team.dnf
-            team_admin_log.save()
-            return team
-        return False
 
 
 class PageForm(forms.ModelForm):

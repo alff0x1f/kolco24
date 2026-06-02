@@ -120,41 +120,40 @@ will only ever be `""` after `teams_predstart` is removed.
 - Modify: `src/website/views/views_.py`
 - Modify: `src/website/forms.py`
 
-- [ ] in `views_.py`, delete `my_team` (~774–835), `team_predstart` (~838–841),
+- [x] in `views_.py`, delete `my_team` (~774–835), `team_predstart` (~838–841),
       `team_start` (~844–847), `team_finish` (~850–853), `team_admin` (~856–867)
-- [ ] in `views_.py`, delete `teams_predstart` (~645–646), `teams_start` (~649–689),
+- [x] in `views_.py`, delete `teams_predstart` (~645–646), `teams_start` (~649–689),
       `teams_finish` (~692–732), `new_team` (~1085–1091)
-- [ ] in `views_.py`, remove `TeamFormAdmin` from the forms-import block (~L40)
-- [ ] keep the `teams` view (~541–642); drop its now-unused `template=""` param (after
+- [x] in `views_.py`, remove `TeamFormAdmin` from the forms-import block (~L40)
+- [x] keep the `teams` view (~541–642); drop its now-unused `template=""` param (after
       `teams_predstart` is gone it is only ever called arg-less) and hardcode `"website/teams.html"` (~L642)
-- [ ] in `forms.py`, delete `TeamForm.init_vals` (~440–478)
-- [ ] in `forms.py`, delete `TeamForm.access_possible` (~479–487) — dead-but-missed: its only caller is
-      `my_team` (views_.py ~L822); it is a method on the *surviving* `TeamForm`, so it is NOT auto-removed
-      and `flake8`/`F401` will NOT flag it. Confirm via grep it has no other caller before deleting.
-- [ ] in `forms.py`, delete the entire `TeamFormAdmin` class (~681–879, incl. its `clean`/`init_vals`/`save`)
-- [ ] in `forms.py`, **keep** the defensive `TeamForm.__init__` `try/except int(race_id)` (~L364);
+- [x] in `forms.py`, delete `TeamForm.init_vals` (~440–478)
+- [x] in `forms.py`, delete `TeamForm.access_possible` (~479–487) — confirmed via grep its only caller
+      was `my_team`; no other callers, removed.
+- [x] in `forms.py`, delete the entire `TeamFormAdmin` class (~681–879, incl. its `clean`/`init_vals`/`save`)
+- [x] in `forms.py`, **keep** the defensive `TeamForm.__init__` `try/except int(race_id)` (~L364);
       rewrite the comment (~L360–363) to drop the `my_team` mention (frame as generic robustness
       against a bad/`None` `race_id`)
-- [ ] fix orphaned imports precisely (do NOT bulk-delete on the F401 hint):
-      - `views_.py` `from time import gmtime, strftime, time` (~L7): only `time()` (used at `my_team`
-        ~L809) becomes unused; `gmtime`/`strftime` survive → edit the line to
-        `from time import gmtime, strftime` (partial edit, not a line delete)
-      - `forms.py` `TeamAdminLog` import (~L16): its only user is `TeamFormAdmin.save` (~L859), so it is
-        orphaned after the class is removed → drop the import (the `TeamAdminLog` **model** stays)
-      - ⚠️ `PaymentsYa` and `PaymentLog` in `views_.py` **survive** (still used by `NewPaymentView`,
-        `IndexView`, `get_cost`) — do NOT remove them
-      - run `make lint` to confirm no remaining `F401`
-- [ ] run `uv run pytest` — suite still green (no import errors, no `NameError`)
+- [x] fix orphaned imports precisely (do NOT bulk-delete on the F401 hint):
+      - `views_.py` `from time import gmtime, strftime, time` → `from time import gmtime, strftime`
+      - `forms.py` `TeamAdminLog` import dropped (the `TeamAdminLog` **model** stays)
+      - `forms.py` now-unused `from datetime import timedelta` dropped (was only used by `TeamFormAdmin`)
+      - ⚠️ `PaymentsYa` and `PaymentLog` in `views_.py` **survive** (still used) — left untouched
+      - `make lint` confirms no remaining `F401`
+- [x] run `uv run pytest` — 323 pass; only the 2 known test-internal `my_team` failures remain
+      (`test_login_required_redirects_to_login_url`, `test_my_team_post_does_not_500`), both slated
+      for Task 5. No import errors, no `NameError`.
 
 ### Task 4: Fix re-export list
 
 **Files:**
 - Modify: `src/website/views/__init__.py`
 
-- [ ] remove from the `from .views_ import (...)` list: `my_team`, `new_team`, `team_admin`,
+- [x] remove from the `from .views_ import (...)` list: `my_team`, `new_team`, `team_admin`,
       `team_finish`, `team_predstart`, `team_start`, `teams_finish`, `teams_predstart`, `teams_start`
-- [ ] keep `teams`, `team_admin`'s neighbors that survive, and all other exports intact
-- [ ] run `uv run pytest` — package imports cleanly
+      (done in Task 3 — required for the package to import after the view deletions)
+- [x] keep `teams`, `team_admin`'s neighbors that survive, and all other exports intact
+- [x] run `uv run pytest` — package imports cleanly
 
 ### Task 5: Update the three affected tests
 
