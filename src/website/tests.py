@@ -1886,6 +1886,7 @@ def _confirm_payment(user, team, paid_for, cost_per_person=1500):
         owner=user,
         team=team,
         payment_method="sbp2",
+        status=Payment.STATUS_DONE,
         payment_amount=amount,
         payment_with_discount=amount,
         cost_per_person=cost_per_person,
@@ -1896,9 +1897,11 @@ def _confirm_payment(user, team, paid_for, cost_per_person=1500):
     team.paid_sum += amount
     team.save(update_fields=["paid_people", "paid_sum"])
 
-    race = team.category2.race
+    category = team.category2
+    race = category.race if category else None
     if (
-        race.people_limit
+        race
+        and race.people_limit
         and race.reg_status == RegStatus.OPEN
         and race.people_count() >= race.people_limit
     ):
@@ -1937,15 +1940,15 @@ def test_deleting_team_does_not_reopen(django_user_model):
 
 
 @pytest.mark.django_db
-def test_manual_sold_out_below_cap_untouched(django_user_model):
-    # Ручной sold_out ниже cap триггер не трогает (флип только OPEN → SOLD_OUT).
+def test_payment_below_cap_does_not_flip(django_user_model):
+    # OPEN гонка не переходит в SOLD_OUT, пока occupancy < limit.
     user = _pl_user(django_user_model)
-    race = _pl_race(people_limit=10, reg_status=RegStatus.SOLD_OUT)
+    race = _pl_race(people_limit=10, reg_status=RegStatus.OPEN)
     cat = _pl_category(race)
     team = _pl_team(cat, user, paid_people=2, name="self")
     _confirm_payment(user, team, paid_for=2)  # occupancy 4 < 10
     race.refresh_from_db()
-    assert race.reg_status == RegStatus.SOLD_OUT
+    assert race.reg_status == RegStatus.OPEN
 
 
 @pytest.mark.django_db
