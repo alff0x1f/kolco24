@@ -169,8 +169,8 @@ def test_legacy_teams_endpoint_returns_404(client):
 
 ### Task 7: [Final] Close out
 
-- [ ] confirm `CLAUDE.md` needs no change (it does not document the `/teams/` endpoint — nothing to update)
-- [ ] move this plan to `docs/plans/completed/`
+- [x] confirm `CLAUDE.md` needs no change (it does not document the `/teams/` endpoint — nothing to update)
+- [x] move this plan to `docs/plans/completed/`
 
 ## Post-Completion
 *Items requiring manual intervention or external systems — informational only*
