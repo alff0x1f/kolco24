@@ -149,8 +149,8 @@ def test_legacy_teams_endpoint_returns_404(client):
 **Files:**
 - Delete: `src/templates/website/teams.html`
 
-- [ ] delete `src/templates/website/teams.html`
-- [ ] grep to confirm it is not `{% include %}`d / `{% extends %}`ed / `render()`ed elsewhere: `grep -rn "website/teams.html\|teams.html" src/` — only the now-deleted `render()` call and the `race.css` comment about `race/teams.html` should have referenced it
+- [x] delete `src/templates/website/teams.html`
+- [x] grep to confirm it is not `{% include %}`d / `{% extends %}`ed / `render()`ed elsewhere: `grep -rn "website/teams.html\|teams.html" src/` — only the now-deleted `render()` call and the `race.css` comment about `race/teams.html` should have referenced it
 
 ### Task 5: Add the 404 regression test
 
