@@ -18,7 +18,6 @@ urlpatterns = [
         TeamMemberMoveView.as_view(),
         name="move_team_member",
     ),
-    path("teams/", views.teams, name="teams"),
     # Int-id redirects must come before slug patterns (slug matches ints too)
     path("race/<int:race_id>/", RaceIdRedirectView.as_view()),
     path("race/<int:race_id>/teams/", RaceIdRedirectView.as_view()),

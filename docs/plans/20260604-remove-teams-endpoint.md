@@ -140,9 +140,9 @@ def test_legacy_teams_endpoint_returns_404(client):
 **Files:**
 - Modify: `src/website/urls.py`
 
-- [ ] delete `path("teams/", views.teams, name="teams")`
-- [ ] leave the line-22 redirect-ordering comment and the `RaceIdRedirectView` block intact
-- [ ] `uv run python src/manage.py check` — must pass now (URLConf resolves, no missing view import)
+- [x] delete `path("teams/", views.teams, name="teams")`
+- [x] leave the line-22 redirect-ordering comment and the `RaceIdRedirectView` block intact
+- [x] `uv run python src/manage.py check` — must pass now (URLConf resolves, no missing view import)
 
 ### Task 4: Delete the template
 
