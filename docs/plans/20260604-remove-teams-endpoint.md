@@ -132,8 +132,8 @@ def test_legacy_teams_endpoint_returns_404(client):
 **Files:**
 - Modify: `src/website/views/__init__.py`
 
-- [ ] remove `teams,` from the `from .views_ import (...)` list
-- [ ] keep all surviving exports (`teams_api`, `AddTeam`, `RaceIdRedirectView`, …)
+- [x] remove `teams,` from the `from .views_ import (...)` list
+- [x] keep all surviving exports (`teams_api`, `AddTeam`, `RaceIdRedirectView`, …)
 
 ### Task 3: Remove the URL route
 

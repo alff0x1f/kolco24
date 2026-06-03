@@ -16,7 +16,6 @@ from .views_ import (
     regulations,
     rules,
     service_order_rules,
-    teams,
     teams_api,
     update_protocol,
     upload_photo,
