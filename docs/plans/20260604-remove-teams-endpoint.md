@@ -162,10 +162,10 @@ def test_legacy_teams_endpoint_returns_404(client):
 
 ### Task 6: Verify acceptance criteria
 
-- [ ] grep for legacy references: `grep -rn "views.teams\b\|name=\"teams\"\|'teams'\|teams_protocol\|website/teams.html" src/` — only intentional survivors remain (`teams_api`, `teams2`/`my_teams`/`all_teams`, the int redirects, `race/teams.html`)
-- [ ] `uv run python src/manage.py check` — no issues
-- [ ] full suite: `uv run pytest --reuse-db` — all pass (incl. the unchanged int→slug redirect test at `tests.py:91-93`)
-- [ ] `make format && make lint` — all checks pass
+- [x] grep for legacy references: `grep -rn "views.teams\b\|name=\"teams\"\|'teams'\|teams_protocol\|website/teams.html" src/` — only intentional survivors remain (`teams_api`, `teams2`/`my_teams`/`all_teams`, the int redirects, `race/teams.html`)
+- [x] `uv run python src/manage.py check` — no issues
+- [x] full suite: `uv run pytest --reuse-db` — all pass (incl. the unchanged int→slug redirect test at `tests.py:91-93`)
+- [x] `make format && make lint` — all checks pass
 
 ### Task 7: [Final] Close out
 
