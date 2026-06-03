@@ -157,8 +157,8 @@ def test_legacy_teams_endpoint_returns_404(client):
 **Files:**
 - Modify: `src/website/tests.py`
 
-- [ ] add `test_legacy_teams_endpoint_returns_404` (pytest-style, `@pytest.mark.django_db`, `client` fixture) asserting `client.get("/teams/").status_code == 404`
-- [ ] run it: `uv run pytest src/website/tests.py -k legacy_teams_endpoint --reuse-db` — passes
+- [x] add `test_legacy_teams_endpoint_returns_404` (pytest-style, `@pytest.mark.django_db`, `client` fixture) asserting `client.get("/teams/").status_code == 404`
+- [x] run it: `uv run pytest src/website/tests.py -k legacy_teams_endpoint --reuse-db` — passes
 
 ### Task 6: Verify acceptance criteria
 

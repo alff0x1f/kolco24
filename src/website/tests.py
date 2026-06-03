@@ -94,6 +94,11 @@ def test_race_id_redirect_teams(client):
 
 
 @pytest.mark.django_db
+def test_legacy_teams_endpoint_returns_404(client):
+    assert client.get("/teams/").status_code == 404
+
+
+@pytest.mark.django_db
 def test_race_slug_news_view(client):
     race = Race.objects.create(name="Test Race", code="tr2025c", slug="tr2025c")
     response = client.get(f"/race/{race.slug}/")
