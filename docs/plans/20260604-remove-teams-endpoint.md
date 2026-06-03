@@ -122,10 +122,10 @@ def test_legacy_teams_endpoint_returns_404(client):
 **Files:**
 - Modify: `src/website/views/views_.py`
 
-- [ ] delete `def teams(request)` (the hardcoded 2024 listing that renders `website/teams.html`)
-- [ ] delete `def teams_protocol(request)` (dead: no URL, not exported, template missing)
-- [ ] confirm no module-level imports are now orphaned — `timedelta`, `Team`, `render` all still used elsewhere; **do not** edit the import lines
-- [ ] sanity: `views_.py` lints clean (a full `manage.py check` still fails on the stale `__init__.py` export — fixed in Task 2)
+- [x] delete `def teams(request)` (the hardcoded 2024 listing that renders `website/teams.html`)
+- [x] delete `def teams_protocol(request)` (dead: no URL, not exported, template missing)
+- [x] confirm no module-level imports are now orphaned — `timedelta`, `Team`, `render` all still used elsewhere; **do not** edit the import lines
+- [x] sanity: `views_.py` lints clean (a full `manage.py check` still fails on the stale `__init__.py` export — fixed in Task 2)
 
 ### Task 2: Prune the views package re-export
 
