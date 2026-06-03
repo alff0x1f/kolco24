@@ -12,12 +12,6 @@ from .views.team import EditTeamView, TeamMemberMoveView
 urlpatterns = [
     path("", lambda request: redirect("race", race_slug="kolco12-2026"), name="index"),
     # auth now lives in apps.accounts (mounted at /accounts/ in config/urls.py)
-    path("race/8/transfer/", views.TransferView.as_view(), name="transfer"),
-    path(
-        "race/8/transfer/list/",
-        views.TransferPaidListView.as_view(),
-        name="transfer_paid_list",
-    ),
     path("team/<int:team_id>/", EditTeamView.as_view(), name="edit_team"),
     path(
         "team/<int:team_id>/move/",
@@ -37,9 +31,6 @@ urlpatterns = [
         "race/<int:race_id>/category/<int:category_id>/results/",
         RaceIdRedirectView.as_view(),
     ),
-    path("race/<int:race_id>/breakfast/", RaceIdRedirectView.as_view()),
-    path("race/<int:race_id>/breakfast/admin/", RaceIdRedirectView.as_view()),
-    path("race/<int:race_id>/breakfast/list/", RaceIdRedirectView.as_view()),
     path("race/<int:race_id>/member_logs/", RaceIdRedirectView.as_view()),
     path("races/new/", RaceEditView.as_view(), name="add_race"),
     # Slug-based (primary)
@@ -75,21 +66,6 @@ urlpatterns = [
         "race/<slug:race_slug>/member_logs/",
         views.TeamMemberRaceLogView.as_view(),
         name="race_member_logs",
-    ),
-    path(
-        "race/<slug:race_slug>/breakfast/",
-        views.BreakfastView.as_view(),
-        name="breakfast",
-    ),
-    path(
-        "race/<slug:race_slug>/breakfast/admin/",
-        views.BreakfastAdminView.as_view(),
-        name="breakfast_admin",
-    ),
-    path(
-        "race/<slug:race_slug>/breakfast/list/",
-        views.BreakfastPaidListView.as_view(),
-        name="breakfast_paid_list",
     ),
     # path(
     #     "race/<race_id>/teams_result",

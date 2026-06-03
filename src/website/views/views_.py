@@ -24,9 +24,8 @@ from django.views.decorators.csrf import csrf_exempt
 from openpyxl import load_workbook
 
 from apps.race.pricing import create_team_payment, upsert_team_extras
-from website.forms import BreakfastForm, NewsPostForm, PageForm, TeamForm, TransferForm
+from website.forms import NewsPostForm, PageForm, TeamForm
 from website.models import (
-    BreakfastRegistration,
     Checkpoint,
     CheckpointTag,
     Race,
@@ -35,7 +34,6 @@ from website.models import (
     Team,
     TeamMemberRaceLog,
     TeamStartLog,
-    Transfer,
 )
 from website.models.race import Category, RegStatus
 from website.sync_xlsx import import_file_xlsx
@@ -45,18 +43,6 @@ from ..models.news import MenuItem, Page
 
 def is_admin(user):
     return user.is_superuser
-
-
-def can_manage_breakfast(user):
-    if not user.is_authenticated:
-        return False
-    return user.is_superuser or user.has_perm("website.change_breakfastregistration")
-
-
-def can_manage_transfer(user):
-    if not user.is_authenticated:
-        return False
-    return user.is_superuser or user.has_perm("website.change_transfer")
 
 
 def is_race_admin(user, race):
@@ -98,82 +84,6 @@ class RaceIdRedirectView(View):
         new_path = request.path.replace(f"/race/{race_id}/", f"/race/{race.slug}/", 1)
         qs = f"?{request.GET.urlencode()}" if request.GET else ""
         return HttpResponsePermanentRedirect(new_path + qs)
-
-
-class TransferView(View):
-    template_name = "website/transfer.html"
-    registration_open = False  # TODO перенести эту настройку в модель race
-
-    def get(self, request):
-        registration_closed = not self.registration_open
-        return render(
-            request,
-            self.template_name,
-            {
-                "form": TransferForm(),
-                "registration_closed": registration_closed,
-            },
-        )
-
-    def post(self, request):
-        if not self.registration_open:
-            return self.get(request)
-
-        form = TransferForm(request.POST)
-        if form.is_valid():
-            form.save()
-            return render(
-                request,
-                self.template_name,
-                {
-                    "form": TransferForm(),
-                    "submitted": True,
-                    "registration_closed": not self.registration_open,
-                },
-            )
-
-        return render(
-            request,
-            self.template_name,
-            {"form": form, "registration_closed": not self.registration_open},
-        )
-
-
-@method_decorator(
-    user_passes_test(can_manage_transfer, login_url="login"), name="dispatch"
-)
-class TransferPaidListView(View):
-    template_name = "website/transfer_paid_list.html"
-
-    def get(self, request):
-        transfers = Transfer.objects.filter(status="processed").order_by("created_at")
-
-        passengers = []
-        for transfer in transfers:
-            contacts = transfer.passenger_contacts or []
-            for contact in contacts:
-                if not contact:
-                    continue
-                name = (contact.get("name") or "").strip()
-                if not name:
-                    continue
-                passengers.append(
-                    {
-                        "name": name,
-                        "phone": (contact.get("phone") or "").strip(),
-                        "created_at": transfer.created_at,
-                        "transfer_id": transfer.id,
-                    }
-                )
-
-        return render(
-            request,
-            self.template_name,
-            {
-                "passengers": passengers,
-                "passenger_total": len(passengers),
-            },
-        )
 
 
 @method_decorator(user_passes_test(is_admin, login_url="login"), name="dispatch")
@@ -253,212 +163,6 @@ class TeamMemberRaceLogView(View):
         name = team.teamname or "Без названия"
         start_number = team.start_number or "—"
         return f"{name} (#{start_number})"
-
-
-class BreakfastView(View):
-    template_name = "website/breakfast.html"
-    breakfast_time = "08:00"
-    cost_rub = 300
-    registration_open = False
-
-    def get(self, request, race_slug):
-        race = get_object_or_404(Race, slug=race_slug)
-        form = BreakfastForm(race=race)
-        return render(
-            request,
-            self.template_name,
-            {
-                "form": form,
-                "race": race,
-                "cost": self.cost_rub,
-                "breakfast_time": self.breakfast_time,
-                "registration_closed": not self.registration_open,
-            },
-        )
-
-    def post(self, request, race_slug):
-        if not self.registration_open:
-            return self.get(request, race_slug)
-        race = get_object_or_404(Race, slug=race_slug)
-        form = BreakfastForm(request.POST, race=race)
-        if form.is_valid():
-            form.save(race=race)
-            return render(
-                request,
-                self.template_name,
-                {
-                    "form": BreakfastForm(race=race),
-                    "race": race,
-                    "submitted": True,
-                    "cost": self.cost_rub,
-                    "breakfast_time": self.breakfast_time,
-                    "registration_closed": False,
-                },
-            )
-
-        return render(
-            request,
-            self.template_name,
-            {
-                "form": form,
-                "race": race,
-                "cost": self.cost_rub,
-                "breakfast_time": self.breakfast_time,
-                "registration_closed": False,
-            },
-        )
-
-
-@method_decorator(
-    user_passes_test(can_manage_breakfast, login_url="login"), name="dispatch"
-)
-class BreakfastAdminView(View):
-    template_name = "website/breakfast_admin.html"
-
-    def get(self, request, race_slug):
-        race = get_object_or_404(Race, slug=race_slug)
-        status_filter = request.GET.get("status", "new")
-        if status_filter not in {"new", "processed", "cancelled", "all"}:
-            status_filter = "new"
-
-        all_registrations = list(self._registrations_queryset(race, "all"))
-        registrations = list(self._registrations_queryset(race, status_filter))
-
-        overall_totals = self._calculate_totals(all_registrations, annotate=False)
-        current_totals = self._calculate_totals(registrations, annotate=True)
-
-        base_url = reverse("breakfast_admin", args=[race.slug])
-        filter_urls = {
-            "new": base_url,
-            "processed": f"{base_url}?status=processed",
-            "cancelled": f"{base_url}?status=cancelled",
-            "all": f"{base_url}?status=all",
-        }
-
-        return render(
-            request,
-            self.template_name,
-            {
-                "race": race,
-                "registrations": registrations,
-                "total_people": overall_totals["total_people"],
-                "paid_people": overall_totals["paid_people"],
-                "vegan_people": overall_totals["vegan_people"],
-                "filtered_people": current_totals["total_people"],
-                "filtered_count": len(registrations),
-                "status_filter": status_filter,
-                "filter_urls": filter_urls,
-            },
-        )
-
-    def post(self, request, race_slug):
-        race = get_object_or_404(Race, slug=race_slug)
-        registration_id = request.POST.get("registration_id")
-        action = request.POST.get("action")
-        status_filter = request.POST.get("status", "new")
-        if status_filter not in {"new", "processed", "cancelled", "all"}:
-            status_filter = "new"
-
-        if (
-            action not in {"mark_paid", "mark_new", "mark_cancelled"}
-            or not registration_id
-        ):
-            return HttpResponse("Некорректный запрос", status=400)
-
-        registration = get_object_or_404(
-            BreakfastRegistration,
-            pk=registration_id,
-            race=race,
-        )
-
-        status_map = {
-            "mark_paid": "processed",
-            "mark_new": "new",
-            "mark_cancelled": "cancelled",
-        }
-        registration.status = status_map[action]
-        registration.save(update_fields=["status"])
-
-        redirect_url = reverse("breakfast_admin", args=[race.slug])
-        if status_filter and status_filter != "new":
-            redirect_url = f"{redirect_url}?status={status_filter}"
-
-        return HttpResponseRedirect(redirect_url)
-
-    @staticmethod
-    def _registrations_queryset(race, status_filter):
-        qs = BreakfastRegistration.objects.filter(race=race).order_by("-created_at")
-        if status_filter == "new":
-            qs = qs.filter(status="new")
-        elif status_filter == "processed":
-            qs = qs.filter(status="processed")
-        elif status_filter == "cancelled":
-            qs = qs.filter(status="cancelled")
-        return qs
-
-    @staticmethod
-    def _calculate_totals(registrations, annotate=False):
-        total_people = 0
-        paid_people = 0
-        vegan_people = 0
-        for reg in registrations:
-            total_people += reg.people_count
-            if reg.status == "processed":
-                paid_people += reg.people_count
-            attendees = reg.attendees or []
-            vegan_count = sum(
-                1 for attendee in attendees if attendee and attendee.get("is_vegan")
-            )
-            vegan_people += vegan_count
-            if annotate:
-                reg.vegan_count = vegan_count
-        return {
-            "total_people": total_people,
-            "paid_people": paid_people,
-            "vegan_people": vegan_people,
-        }
-
-
-@method_decorator(
-    user_passes_test(can_manage_breakfast, login_url="login"), name="dispatch"
-)
-class BreakfastPaidListView(View):
-    template_name = "website/breakfast_paid_list.html"
-
-    def get(self, request, race_slug):
-        race = get_object_or_404(Race, slug=race_slug)
-        registrations = BreakfastRegistration.objects.filter(
-            race=race, status="processed"
-        ).order_by("created_at")
-
-        participants = []
-        for reg in registrations:
-            attendees = reg.attendees or []
-            for attendee in attendees:
-                if not attendee:
-                    continue
-                name = (attendee.get("name") or "").strip()
-                if not name:
-                    continue
-                participants.append(
-                    {
-                        "name": name,
-                        "is_vegan": bool(attendee.get("is_vegan")),
-                        "created_at": reg.created_at,
-                        "registration_id": reg.id,
-                    }
-                )
-
-        return render(
-            request,
-            self.template_name,
-            {
-                "race": race,
-                "participants": participants,
-                "vegan_total": sum(1 for p in participants if p["is_vegan"]),
-                "people_total": len(participants),
-            },
-        )
 
 
 def index_dummy(request):
