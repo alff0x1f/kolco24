@@ -173,18 +173,18 @@ with the DB down; visual consistency is preserved through shared CSS.
 - Create: `src/templates/500.html`
 - Modify: `src/website/tests.py`
 
-- [ ] Create standalone `src/templates/500.html` (`<!doctype html>`): minimal `<head>`
+- [x] Create standalone `src/templates/500.html` (`<!doctype html>`): minimal `<head>`
       mirroring base-2 (charset, viewport, title, Rubik link). **Hardcode** asset URLs —
       `/static/css/theme-2.css`, `/static/css/error.css`, `/static/favicon.ico` (no
       `{% static %}`, no `{% load %}`).
-- [ ] Add static `.nav` mini-header: `/static/images/logo.png` (hardcoded) + «Кольцо 24»
+- [x] Add static `.nav` mini-header: `/static/images/logo.png` (hardcoded) + «Кольцо 24»
       linking to `/`, NO user menu.
-- [ ] Add `<main class="page error-page">` hero: `.error-code` 500, H1 «Что-то сломалось на
+- [x] Add `<main class="page error-page">` hero: `.error-code` 500, H1 «Что-то сломалось на
       дистанции», sub «Мы уже разбираемся…», CTA «На главную» (`href="/"`). NO `{{ user }}`,
       NO `{% url %}`, NO `{% footer_menu %}`, NO DB access.
-- [ ] Write test (standalone-safety): `get_template("500.html").render({})` does NOT raise and
+- [x] Write test (standalone-safety): `get_template("500.html").render({})` does NOT raise and
       contains the 500 marker — proves zero context-processor / DB dependency.
-- [ ] Run tests — must pass before next task.
+- [x] Run tests — must pass before next task.
 
 ### Task 5: (Optional, dev-only) Local preview scaffold
 **Files:**

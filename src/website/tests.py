@@ -2401,3 +2401,14 @@ def test_custom_403_page_renders():
 
     html = get_template("403.html").render({})
     assert "Доступ закрыт" in html
+
+
+def test_custom_500_page_renders_standalone():
+    # 500 is standalone: rendered by server_error with an empty Context() and no
+    # context processors (the DB may be the cause of the 500). It must NOT extend
+    # base-2.html and must touch no DB — hence NO @pytest.mark.django_db here;
+    # that absence is itself part of what this test guarantees.
+    from django.template.loader import get_template
+
+    html = get_template("500.html").render({})
+    assert "Что-то сломалось на дистанции" in html
