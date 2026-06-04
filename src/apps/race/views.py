@@ -65,15 +65,22 @@ class RacePageView(View):
     @staticmethod
     def build_context(race, user=None):
         categories = list(_categories_with_team_count(race))
-        # Занятость (paid_people) и свободные слоты на категорию — для строки
-        # «N команд · M участников» и бейджа «осталось K из L / мест нет».
-        # ``remaining`` выводится из уже посчитанного ``people``, чтобы не
-        # дёргать ``people_count()`` повторно внутри ``remaining_people()``.
+        race_remaining = race.remaining_people()
+        race_full = race_remaining is not None and race_remaining <= 0
         for cat in categories:
             cat.people = cat.people_count()
-            cat.remaining = (
-                None if not cat.people_limit else max(0, cat.people_limit - cat.people)
-            )
+            if race_full:
+                # Когда исчерпан лимит всей гонки, регистрация невозможна ни в одной
+                # категории — форсируем ``remaining = 0`` во всех категориях, чтобы
+                # бейдж показал «мест нет» даже там, где у категории свой лимит ещё не
+                # выбран (или его нет вовсе). 0 → ветка «мест нет» в шаблоне.
+                cat.remaining = 0
+            else:
+                cat.remaining = (
+                    None
+                    if not cat.people_limit
+                    else max(0, cat.people_limit - cat.people)
+                )
         news_qs = NewsPost.objects.filter(race=race).order_by("-publication_date")
         news_count = news_qs.count()
         news_list = list(news_qs[:10])
@@ -87,7 +94,7 @@ class RacePageView(View):
             "reg_upcoming": race.reg_status == RegStatus.UPCOMING,
             "race_team_count": race.team_count(),
             "race_people_count": race.people_count(),
-            "race_remaining": race.remaining_people(),
+            "race_remaining": race_remaining,
         }
         context["can_edit_race"] = bool(user is not None and can_edit_race(user, race))
         if user is not None and is_race_admin(user, race):

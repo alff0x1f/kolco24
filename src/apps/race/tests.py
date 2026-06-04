@@ -1393,6 +1393,32 @@ def test_race_page_renders_sold_out_badge(client):
 
 
 @pytest.mark.django_db
+def test_race_page_category_badge_sold_out_when_race_full():
+    """Race-level limit reached → every category badge reads «мест нет».
+
+    The category still has free slots within its own limit, but the race is
+    full, so registration is impossible — the per-category badge must mirror
+    that (``remaining`` forced to 0), not show «осталось K из L».
+    """
+    owner = User.objects.create_user(
+        username="rp4", password="p", email="rp4@example.com"
+    )
+    race = _make_race(slug="racefull-cat", code="rfc")
+    race.people_limit = 4
+    race.save(update_fields=["people_limit"])
+    cat = _make_category(race)
+    cat.people_limit = 20  # plenty of room in the category itself
+    cat.save(update_fields=["people_limit"])
+    _make_team(owner, cat, paid_people=4)  # fills the race
+
+    context = RacePageView.build_context(race)
+
+    assert context["race_remaining"] == 0
+    # Category alone would have 16 free, but the race is full → forced to 0.
+    assert context["categories"][0].remaining == 0
+
+
+@pytest.mark.django_db
 def test_race_page_category_card_shows_labelled_stats(client):
     """Category card states teams and participants in their own units.
 
