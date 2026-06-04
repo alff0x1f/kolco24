@@ -2398,6 +2398,20 @@ def test_custom_403_page_renders():
     assert "is-403" in html
 
 
+@pytest.mark.django_db
+def test_custom_403_page_http_response(rf):
+    from django.contrib.auth.models import AnonymousUser
+    from django.core.exceptions import PermissionDenied
+    from django.views.defaults import permission_denied
+
+    request = rf.get("/")
+    request.user = AnonymousUser()
+    resp = permission_denied(request, PermissionDenied())
+    assert resp.status_code == 403
+    assert "Доступ закрыт" in resp.content.decode()
+    assert "is-403" in resp.content.decode()
+
+
 def test_custom_500_page_renders_standalone():
     # 500 is standalone: rendered by server_error with an empty Context() and no
     # context processors (the DB may be the cause of the 500). It must NOT extend

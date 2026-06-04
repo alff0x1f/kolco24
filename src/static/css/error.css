@@ -28,6 +28,8 @@
 .error-page.is-500 {
   --accent: var(--danger);
   --accent-ink: #ad2330;
+  /* standalone page: error-nav only (30px logo + 2×12px padding), no footer */
+  min-height: calc(100vh - 54px);
 }
 
 .error-page .error-inner {
