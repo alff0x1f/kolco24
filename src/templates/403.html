@@ -9,28 +9,34 @@
 
 {% block content %}
 <main class="page error-page is-403">
-    <div class="error-inner">
-        <span class="error-eyebrow">
-            <span class="code">Судья на КП</span>
-            <span class="dot"></span>
-            <span>Ошибка 403</span>
-        </span>
-
-        <svg class="error-art" viewBox="0 0 120 120" fill="none"
-             xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-            <circle cx="60" cy="60" r="40" stroke="currentColor" stroke-width="6"/>
-            <path d="M60 36v24l16 12" stroke="currentColor" stroke-width="6"
-                  stroke-linecap="round" stroke-linejoin="round"/>
-            <circle cx="60" cy="60" r="5" fill="currentColor"/>
+    <div class="terrain" aria-hidden="true">
+        <svg class="grain"><filter id="err-grain"><feTurbulence type="fractalNoise" baseFrequency=".9" numOctaves="2" stitchTiles="stitch"/><feColorMatrix type="saturate" values="0"/></filter><rect width="100%" height="100%" filter="url(#err-grain)"/></svg>
+        <svg class="contours" viewBox="0 0 1440 900" preserveAspectRatio="xMidYMid slice" fill="none" stroke="currentColor" stroke-width="1.4">
+            <g id="err-line"><path d="M-160 70 C 200 0 430 150 760 80 S 1300 0 1640 96"/></g>
+            <use href="#err-line" y="62"/><use href="#err-line" y="124"/><use href="#err-line" y="186"/>
+            <use href="#err-line" y="248"/><use href="#err-line" y="310"/><use href="#err-line" y="372"/>
+            <use href="#err-line" y="434"/><use href="#err-line" y="496"/><use href="#err-line" y="558"/>
+            <use href="#err-line" y="620"/><use href="#err-line" y="682"/><use href="#err-line" y="744"/>
+            <use href="#err-line" y="806"/>
         </svg>
+        <svg class="route" viewBox="0 0 1440 900" preserveAspectRatio="xMidYMid slice" fill="none">
+            <path d="M -40 760 C 240 700 250 470 470 460 C 690 450 700 300 540 250 C 430 215 360 300 470 360" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-dasharray="2 14" opacity=".55"/>
+            <circle cx="-40" cy="760" r="6" fill="currentColor" opacity=".55"/>
+        </svg>
+    </div>
 
-        <div class="error-code">403</div>
-        <h1>Доступ закрыт</h1>
-        <p class="sub">У этого КП стоит судья — сюда вам нельзя.</p>
+    <span class="error-eyebrow">
+        <span class="code">Судья на КП</span>
+        <span class="dot"></span>
+        <span>Ошибка 403</span>
+    </span>
 
-        <div class="error-actions">
-            <a class="btn btn-primary btn-lg" href="/">На главную</a>
-        </div>
+    <div class="error-code">403</div>
+    <h1>Доступ закрыт</h1>
+    <p class="sub">У этого КП стоит судья — сюда вам нельзя.</p>
+
+    <div class="error-actions">
+        <a class="btn btn-primary btn-lg" href="/">На главную</a>
     </div>
 </main>
 {% endblock %}
