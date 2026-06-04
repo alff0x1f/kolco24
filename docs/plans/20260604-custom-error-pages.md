@@ -190,12 +190,9 @@ with the DB down; visual consistency is preserved through shared CSS.
 **Files:**
 - Modify: `src/config/urls.py` (TEMPORARY — remove before commit)
 
-- [ ] If visual iteration is needed under `runserver` (DEBUG hides custom error pages),
-      add TEMPORARY routes gated behind `settings.DEBUG` (e.g. `/__err/404`, `/__err/500`,
-      `/__err/403`) that render the templates directly.
-- [ ] Iterate on visuals; then **remove** the scaffold before committing. (Alternative: run
-      with `DEBUG=False` + `collectstatic` so WhiteNoise serves assets.)
-- [ ] No tests for throwaway scaffold; ensure it is deleted (grep `__err` returns nothing).
+- [x] manual visual-iteration scaffold (skipped — optional, dev-only, not automatable)
+- [x] manual visual-iteration scaffold (skipped — optional, dev-only, not automatable)
+- [x] No throwaway scaffold added; verified `grep __err` returns no code references (only this plan doc).
 
 ### Task 6: Verify acceptance criteria
 - [ ] All three templates render in the site style; 500 verified DB/context-free.
