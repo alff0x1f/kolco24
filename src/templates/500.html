@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="ru">
+<head>
+    <meta charset="utf-8">
+    <title>Что-то сломалось · Кольцо 24</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="/static/css/theme-2.css" rel="stylesheet" type="text/css">
+    <link href="/static/css/error.css" rel="stylesheet" type="text/css">
+    <link href="/static/favicon.ico" rel="shortcut icon" type="image/png">
+</head>
+<body>
+<header class="error-nav">
+    <div class="container error-nav-inner">
+        <a class="brand" href="/">
+            <img src="/static/images/logo.png" alt="Кольцо 24">
+            <span>Кольцо&nbsp;24</span>
+        </a>
+    </div>
+</header>
+
+<main class="page error-page is-500">
+    <div class="terrain" aria-hidden="true">
+        <svg class="grain"><filter id="err-grain"><feTurbulence type="fractalNoise" baseFrequency=".9" numOctaves="2" stitchTiles="stitch"/><feColorMatrix type="saturate" values="0"/></filter><rect width="100%" height="100%" filter="url(#err-grain)"/></svg>
+        <svg class="contours" viewBox="0 0 1440 900" preserveAspectRatio="xMidYMid slice" fill="none" stroke="currentColor" stroke-width="1.4">
+            <g id="err-line"><path d="M-160 70 C 200 0 430 150 760 80 S 1300 0 1640 96"/></g>
+            <use href="#err-line" y="62"/><use href="#err-line" y="124"/><use href="#err-line" y="186"/>
+            <use href="#err-line" y="248"/><use href="#err-line" y="310"/><use href="#err-line" y="372"/>
+            <use href="#err-line" y="434"/><use href="#err-line" y="496"/><use href="#err-line" y="558"/>
+            <use href="#err-line" y="620"/><use href="#err-line" y="682"/><use href="#err-line" y="744"/>
+            <use href="#err-line" y="806"/>
+        </svg>
+        <svg class="route" viewBox="0 0 1440 900" preserveAspectRatio="xMidYMid slice" fill="none">
+            <path d="M -40 760 C 240 700 250 470 470 460 C 690 450 700 300 540 250 C 430 215 360 300 470 360" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-dasharray="2 14" opacity=".55"/>
+            <circle cx="-40" cy="760" r="6" fill="currentColor" opacity=".55"/>
+        </svg>
+    </div>
+
+    <span class="error-eyebrow">
+        <span class="code">Сбой на дистанции</span>
+        <span class="dot"></span>
+        <span>Ошибка 500</span>
+    </span>
+
+    <div class="error-code">500</div>
+    <h1>Что-то сломалось на дистанции</h1>
+    <p class="sub">Мы уже разбираемся. Попробуйте обновить страницу чуть позже.</p>
+
+    <div class="error-actions">
+        <a class="btn btn-primary btn-lg" href="/">На главную</a>
+    </div>
+</main>
+</body>
+</html>

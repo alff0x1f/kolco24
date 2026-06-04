@@ -1,0 +1,43 @@
+{% extends "website/base-2.html" %}
+{% load static %}
+
+{% block title %}Страница не найдена · Кольцо 24{% endblock %}
+
+{% block extra_head %}
+<link href="{% static 'css/error.css' %}" rel="stylesheet" type="text/css">
+{% endblock %}
+
+{% block content %}
+<main class="page error-page">
+    <div class="terrain" aria-hidden="true">
+        <svg class="grain"><filter id="err-grain"><feTurbulence type="fractalNoise" baseFrequency=".9" numOctaves="2" stitchTiles="stitch"/><feColorMatrix type="saturate" values="0"/></filter><rect width="100%" height="100%" filter="url(#err-grain)"/></svg>
+        <svg class="contours" viewBox="0 0 1440 900" preserveAspectRatio="xMidYMid slice" fill="none" stroke="currentColor" stroke-width="1.4">
+            <g id="err-line"><path d="M-160 70 C 200 0 430 150 760 80 S 1300 0 1640 96"/></g>
+            <use href="#err-line" y="62"/><use href="#err-line" y="124"/><use href="#err-line" y="186"/>
+            <use href="#err-line" y="248"/><use href="#err-line" y="310"/><use href="#err-line" y="372"/>
+            <use href="#err-line" y="434"/><use href="#err-line" y="496"/><use href="#err-line" y="558"/>
+            <use href="#err-line" y="620"/><use href="#err-line" y="682"/><use href="#err-line" y="744"/>
+            <use href="#err-line" y="806"/>
+        </svg>
+        <svg class="route" viewBox="0 0 1440 900" preserveAspectRatio="xMidYMid slice" fill="none">
+            <path d="M -40 760 C 240 700 250 470 470 460 C 690 450 700 300 540 250 C 430 215 360 300 470 360" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-dasharray="2 14" opacity=".55"/>
+            <circle cx="-40" cy="760" r="6" fill="currentColor" opacity=".55"/>
+        </svg>
+    </div>
+
+    <span class="error-eyebrow">
+        <span class="code">КП не найден</span>
+        <span class="dot"></span>
+        <span>Ошибка 404</span>
+    </span>
+
+    <div class="error-code">404</div>
+    <h1>Похоже, вы сбились с маршрута</h1>
+    <p class="sub">Этого КП нет на карте — страница не найдена.</p>
+
+    <div class="error-actions">
+        <a class="btn btn-primary btn-lg" href="/">На главную</a>
+        <a class="btn btn-ghost btn-lg" href="#" onclick="history.back(); return false;">Назад</a>
+    </div>
+</main>
+{% endblock %}

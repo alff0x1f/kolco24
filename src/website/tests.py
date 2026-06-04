@@ -2377,3 +2377,48 @@ def test_config_island_mirrors_compute_team_charge(client):
     assert len(lines) == 1
     assert lines[0].count == 2
     assert lines[0].unit_price == 500
+
+
+@pytest.mark.django_db
+def test_custom_404_page_renders(client):
+    resp = client.get("/no-such-page/")
+    assert resp.status_code == 404
+    assert "сбились с маршрута" in resp.content.decode()
+    assert "404.html" in [t.name for t in resp.templates]
+
+
+@pytest.mark.django_db
+def test_custom_403_page_renders():
+    # 403 extends base-2.html, whose footer calls {% footer_menu %} (a DB query),
+    # so the render legitimately touches the DB — hence @pytest.mark.django_db.
+    from django.template.loader import get_template
+
+    html = get_template("403.html").render({})
+    assert "Доступ закрыт" in html
+    assert "is-403" in html
+
+
+@pytest.mark.django_db
+def test_custom_403_page_http_response(rf):
+    from django.contrib.auth.models import AnonymousUser
+    from django.core.exceptions import PermissionDenied
+    from django.views.defaults import permission_denied
+
+    request = rf.get("/")
+    request.user = AnonymousUser()
+    resp = permission_denied(request, PermissionDenied())
+    assert resp.status_code == 403
+    assert "Доступ закрыт" in resp.content.decode()
+    assert "is-403" in resp.content.decode()
+
+
+def test_custom_500_page_renders_standalone():
+    # 500 is standalone: rendered by server_error with an empty Context() and no
+    # context processors (the DB may be the cause of the 500). It must NOT extend
+    # base-2.html and must touch no DB — hence NO @pytest.mark.django_db here;
+    # that absence is itself part of what this test guarantees.
+    from django.template.loader import get_template
+
+    html = get_template("500.html").render({})
+    assert "Что-то сломалось на дистанции" in html
+    assert "<!doctype html>" in html.lower()
