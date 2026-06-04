@@ -201,9 +201,9 @@ with the DB down; visual consistency is preserved through shared CSS.
 - [x] Run `make format && make lint` — clean.
 
 ### Task 7: [Final] Docs & cleanup
-- [ ] Update CLAUDE.md only if a new reusable pattern emerged (likely a one-line note that
+- [x] Update CLAUDE.md only if a new reusable pattern emerged (likely a one-line note that
       `src/templates/{404,403,500}.html` exist; 500 is standalone by design). Keep minimal.
-- [ ] Move this plan to `docs/plans/completed/`.
+- [x] Move this plan to `docs/plans/completed/`.
 
 ## Post-Completion
 *Informational — manual / external, no checkboxes*
