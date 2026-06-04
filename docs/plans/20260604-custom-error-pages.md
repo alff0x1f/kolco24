@@ -195,10 +195,10 @@ with the DB down; visual consistency is preserved through shared CSS.
 - [x] No throwaway scaffold added; verified `grep __err` returns no code references (only this plan doc).
 
 ### Task 6: Verify acceptance criteria
-- [ ] All three templates render in the site style; 500 verified DB/context-free.
-- [ ] Confirm no `handler404/500/403` was added to `config/urls.py` and no dev scaffold remains.
-- [ ] Run full suite: `uv run pytest`.
-- [ ] Run `make format && make lint` — clean.
+- [x] All three templates render in the site style; 500 verified DB/context-free.
+- [x] Confirm no `handler404/500/403` was added to `config/urls.py` and no dev scaffold remains.
+- [x] Run full suite: `uv run pytest`.
+- [x] Run `make format && make lint` — clean.
 
 ### Task 7: [Final] Docs & cleanup
 - [ ] Update CLAUDE.md only if a new reusable pattern emerged (likely a one-line note that
