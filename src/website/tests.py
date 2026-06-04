@@ -2391,3 +2391,13 @@ def test_custom_404_uses_our_template(client):
     resp = client.get("/no-such-page/")
     assert resp.status_code == 404
     assert "404.html" in [t.name for t in resp.templates]
+
+
+@pytest.mark.django_db
+def test_custom_403_page_renders():
+    # 403 extends base-2.html, whose footer calls {% footer_menu %} (a DB query),
+    # so the render legitimately touches the DB — hence @pytest.mark.django_db.
+    from django.template.loader import get_template
+
+    html = get_template("403.html").render({})
+    assert "Доступ закрыт" in html

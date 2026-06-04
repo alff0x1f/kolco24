@@ -161,12 +161,12 @@ with the DB down; visual consistency is preserved through shared CSS.
 - Create: `src/templates/403.html`
 - Modify: `src/website/tests.py`
 
-- [ ] Create `src/templates/403.html` extending `website/base-2.html`; same shape as 404,
+- [x] Create `src/templates/403.html` extending `website/base-2.html`; same shape as 404,
       `.error-code` 403, H1 «Доступ закрыт», sub «У этого КП стоит судья — сюда вам нельзя.»,
       CTA «На главную».
-- [ ] Write test (carry `@pytest.mark.django_db` — 403 inherits base-2's DB-backed footer):
+- [x] Write test (carry `@pytest.mark.django_db` — 403 inherits base-2's DB-backed footer):
       `get_template("403.html").render({})` does not raise and contains the 403 marker text.
-- [ ] Run tests — must pass before next task.
+- [x] Run tests — must pass before next task.
 
 ### Task 4: 500 page (standalone, DB/context-free)
 **Files:**
