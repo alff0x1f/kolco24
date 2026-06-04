@@ -145,16 +145,16 @@ with the DB down; visual consistency is preserved through shared CSS.
 - Create: `src/templates/404.html`
 - Modify: `src/website/tests.py`
 
-- [ ] Create `src/templates/404.html` extending `website/base-2.html`; set `{% block title %}`,
+- [x] Create `src/templates/404.html` extending `website/base-2.html`; set `{% block title %}`,
       link `error.css` in `{% block extra_head %}`.
-- [ ] Build `{% block content %}` → `<main class="page error-page">` hero: SVG art, `.error-code`
+- [x] Build `{% block content %}` → `<main class="page error-page">` hero: SVG art, `.error-code`
       404, H1 «Похоже, вы сбились с маршрута», `.sub`, CTA «На главную» (`href="/"`) +
       secondary `btn-ghost`.
-- [ ] Write test: `client.get("/no-such-page/")` → `status_code == 404` and marker
+- [x] Write test: `client.get("/no-such-page/")` → `status_code == 404` and marker
       «сбились с маршрута» in `resp.content.decode()`.
-- [ ] Write test (edge): assert `"404.html"` is among the response's used template names
+- [x] Write test (edge): assert `"404.html"` is among the response's used template names
       (custom template, not Django default).
-- [ ] Run tests — must pass before next task: `uv run pytest src/website/tests.py -k error`.
+- [x] Run tests — must pass before next task: `uv run pytest src/website/tests.py -k error`.
 
 ### Task 3: 403 page (extends base-2)
 **Files:**

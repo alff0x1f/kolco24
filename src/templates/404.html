@@ -1,0 +1,37 @@
+{% extends "website/base-2.html" %}
+{% load static %}
+
+{% block title %}Страница не найдена · Кольцо 24{% endblock %}
+
+{% block extra_head %}
+<link href="{% static 'css/error.css' %}" rel="stylesheet" type="text/css">
+{% endblock %}
+
+{% block content %}
+<main class="page error-page">
+    <div class="error-inner">
+        <span class="error-eyebrow">
+            <span class="code">КП не найден</span>
+            <span class="dot"></span>
+            <span>Ошибка 404</span>
+        </span>
+
+        <svg class="error-art" viewBox="0 0 120 120" fill="none"
+             xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <circle cx="60" cy="60" r="40" stroke="currentColor" stroke-width="6"/>
+            <path d="M60 36v24l16 12" stroke="currentColor" stroke-width="6"
+                  stroke-linecap="round" stroke-linejoin="round"/>
+            <circle cx="60" cy="60" r="5" fill="currentColor"/>
+        </svg>
+
+        <div class="error-code">404</div>
+        <h1>Похоже, вы сбились с маршрута</h1>
+        <p class="sub">Этого КП нет на карте — страница не найдена.</p>
+
+        <div class="error-actions">
+            <a class="btn btn-primary btn-lg" href="/">На главную</a>
+            <a class="btn btn-ghost btn-lg" href="#" onclick="history.back(); return false;">Назад</a>
+        </div>
+    </div>
+</main>
+{% endblock %}

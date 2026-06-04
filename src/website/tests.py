@@ -2377,3 +2377,17 @@ def test_config_island_mirrors_compute_team_charge(client):
     assert len(lines) == 1
     assert lines[0].count == 2
     assert lines[0].unit_price == 500
+
+
+@pytest.mark.django_db
+def test_custom_404_page_renders(client):
+    resp = client.get("/no-such-page/")
+    assert resp.status_code == 404
+    assert "сбились с маршрута" in resp.content.decode()
+
+
+@pytest.mark.django_db
+def test_custom_404_uses_our_template(client):
+    resp = client.get("/no-such-page/")
+    assert resp.status_code == 404
+    assert "404.html" in [t.name for t in resp.templates]
