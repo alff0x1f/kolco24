@@ -130,14 +130,14 @@ with the DB down; visual consistency is preserved through shared CSS.
 **Files:**
 - Create: `src/static/css/error.css`
 
-- [ ] Create `src/static/css/error.css` with ALL rules scoped under `.error-page`
+- [x] Create `src/static/css/error.css` with ALL rules scoped under `.error-page`
       (centered hero, vertical rhythm, container max-width reuse).
-- [ ] Add `.error-code` (large stylized 404/500/403), `.error-art` (inline SVG sizing/color
+- [x] Add `.error-code` (large stylized 404/500/403), `.error-art` (inline SVG sizing/color
       via `currentColor` + `--primary` tokens), CTA row spacing.
-- [ ] Add `@media (max-width: 600px)` breakpoint matching theme-2 (theme-2.css:591) — smaller
+- [x] Add `@media (max-width: 600px)` breakpoint matching theme-2 (theme-2.css:591) — smaller
       code/heading on mobile.
-- [ ] Do NOT redefine bare `.page` (theme-2 owns it); verify no class collisions with theme-2.
-- [ ] Tests: covered indirectly by template render tests in later tasks — note that CSS itself
+- [x] Do NOT redefine bare `.page` (theme-2 owns it); verify no class collisions with theme-2.
+- [x] Tests: covered indirectly by template render tests in later tasks — note that CSS itself
       has no unit test (asset-only); marker assertions live with the templates.
 
 ### Task 2: 404 page (extends base-2)
