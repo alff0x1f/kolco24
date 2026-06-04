@@ -2384,12 +2384,6 @@ def test_custom_404_page_renders(client):
     resp = client.get("/no-such-page/")
     assert resp.status_code == 404
     assert "сбились с маршрута" in resp.content.decode()
-
-
-@pytest.mark.django_db
-def test_custom_404_uses_our_template(client):
-    resp = client.get("/no-such-page/")
-    assert resp.status_code == 404
     assert "404.html" in [t.name for t in resp.templates]
 
 
@@ -2401,6 +2395,7 @@ def test_custom_403_page_renders():
 
     html = get_template("403.html").render({})
     assert "Доступ закрыт" in html
+    assert "is-403" in html
 
 
 def test_custom_500_page_renders_standalone():
@@ -2412,3 +2407,4 @@ def test_custom_500_page_renders_standalone():
 
     html = get_template("500.html").render({})
     assert "Что-то сломалось на дистанции" in html
+    assert "<!doctype html>" in html.lower()
