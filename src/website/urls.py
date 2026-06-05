@@ -10,6 +10,7 @@ from .views import RaceIdRedirectView
 from .views.team import EditTeamView, TeamMemberMoveView
 
 urlpatterns = [
+    # "/" redirects to the current race.
     path("", lambda request: redirect("race", race_slug="kolco12-2026"), name="index"),
     # auth now lives in apps.accounts (mounted at /accounts/ in config/urls.py)
     path("team/<int:team_id>/", EditTeamView.as_view(), name="edit_team"),
@@ -18,7 +19,9 @@ urlpatterns = [
         TeamMemberMoveView.as_view(),
         name="move_team_member",
     ),
-    # Int-id redirects must come before slug patterns (slug matches ints too)
+    # ============================ Redirects ============================
+    # Legacy int-id URLs → slug equivalents. MUST stay before the slug
+    # patterns below (<slug:race_slug> also matches bare integers).
     path("race/<int:race_id>/", RaceIdRedirectView.as_view()),
     path("race/<int:race_id>/teams/", RaceIdRedirectView.as_view()),
     path("race/<int:race_id>/teams/my/", RaceIdRedirectView.as_view()),
@@ -31,6 +34,13 @@ urlpatterns = [
         RaceIdRedirectView.as_view(),
     ),
     path("race/<int:race_id>/member_logs/", RaceIdRedirectView.as_view()),
+    # Short-URL aliases → generic /page/<slug>/ view.
+    path("privacy/", views.privacy_policy, name="privacy_policy"),
+    path("refund_policy/", views.refund_policy, name="refund_policy"),
+    path("service_order_rules/", views.service_order_rules, name="service_order_rules"),
+    path("rules/", views.rules, name="rules"),
+    path("contacts/", views.contacts, name="contacts"),
+    # ========================== Working URLs ==========================
     path("races/new/", RaceEditView.as_view(), name="add_race"),
     # Slug-based (primary)
     path(
@@ -77,11 +87,6 @@ urlpatterns = [
     path("update_protocol/", views.update_protocol, name="update_protocol"),
     path("upload_protocol/", views.upload_protocol, name="upload_protocol"),
     path("regulations/", views.regulations, name="regulations"),
-    path("privacy/", views.privacy_policy, name="privacy_policy"),
-    path("refund_policy/", views.refund_policy, name="refund_policy"),
-    path("service_order_rules/", views.service_order_rules, name="service_order_rules"),
-    path("rules/", views.rules, name="rules"),
-    path("contacts/", views.contacts, name="contacts"),
     path("page/<str:slug>/", views.page, name="page"),
     path("page/<str:slug>/edit/", views.edit_page, name="edit_page"),
     # path("newpoint/<int:pk>/", views.new_point, name="new_point"),
