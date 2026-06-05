@@ -1,9 +1,8 @@
 import json
 import random
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from urllib.parse import quote
 
-from django.conf import settings
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.core.files.storage import FileSystemStorage
 from django.http import (
@@ -21,7 +20,6 @@ from django.utils.decorators import method_decorator
 from django.utils.safestring import mark_safe
 from django.views import View
 from django.views.decorators.csrf import csrf_exempt
-from openpyxl import load_workbook
 
 from apps.race.permissions import can_edit_race
 from apps.race.pricing import create_team_payment, upsert_team_extras
@@ -37,7 +35,6 @@ from website.models import (
     TeamStartLog,
 )
 from website.models.race import Category, RegStatus
-from website.sync_xlsx import import_file_xlsx
 
 from ..models.news import MenuItem, Page
 
@@ -183,136 +180,6 @@ def new_point(request, pk):
                 year=2024,
             )
     return HttpResponseRedirect("/race/1/teams_result")
-
-
-def update_protocol(request):
-    if not request.user.is_staff:
-        raise Http404("File not found.")
-
-    wb = load_workbook(filename=settings.PROTOCOL_DIR + "protokol.xlsx")
-    # grab the active worksheet
-    sheet_tabs = {
-        "6h": "6ч",
-        "12h_ww": "12ч_ЖЖ",
-        "12h_mw": "12ч_МЖ",
-        "12h_mm": "12ч_ММ",
-        "12h_team": "12ч_группа",
-        "24h": "24ч",
-    }
-    distance_max_time = {
-        "6h": timedelta(hours=6),
-        "12h_ww": timedelta(hours=12),
-        "12h_mw": timedelta(hours=12),
-        "12h_mm": timedelta(hours=12),
-        "12h_team": timedelta(hours=12),
-        "24h": timedelta(hours=24),
-    }
-
-    for tab in sheet_tabs:
-        ws = wb[sheet_tabs[tab]]
-        # export KP
-        cpoints = Checkpoint.objects.filter(year="2024").order_by("iterator")
-        column = 14
-        point_column = {}
-        for p in cpoints:
-            ws.cell(8, column, p.number)
-            ws.cell(9, column, p.cost)
-            point_column[p.number] = column
-            column += 1
-        # export teams
-        Team().update_places()
-        teams = Team.objects.filter(category=tab, year="2024").order_by(
-            "place", "start_number"
-        )
-        teams = [team for team in teams if team.paid_sum > 0]
-        line = 10
-        for team in teams:
-            row = str(line)
-            ws["B" + row] = team.start_number
-            ws["C" + row] = team.teamname
-            athlets = [
-                team.athlet1,
-                team.athlet2,
-                team.athlet3,
-                team.athlet4,
-                team.athlet5,
-                team.athlet6,
-            ]
-            athlets = ", ".join(athlets[: int(team.paid_people)])
-            ws["D" + row] = athlets
-            ws["E" + row] = (
-                team.start_time + timedelta(hours=5) if team.start_time else ""
-            )
-            ws["F" + row] = (
-                team.finish_time + timedelta(hours=5) if team.finish_time else ""
-            )
-            if team.distance_time:
-                ws["G" + row] = team.distance_time
-                if team.distance_time > distance_max_time[tab]:
-                    ws["H" + row] = team.distance_time - distance_max_time[tab]
-                else:
-                    ws["H" + row] = ""
-            points = TakenKP.objects.filter(team=team)
-            points_sum = 0
-            points_count = 0
-            for point in points:
-                points_sum += point.point.cost
-                points_count += 1
-                ws.cell(line, point_column[point.point.number], 1)
-            ws["I" + row] = points_count
-            ws["J" + row] = team.points_sum + team.penalty
-            ws["K" + row] = team.penalty
-            ws["L" + row] = team.points_sum
-            ws["M" + row] = team.place if team.place != 10000 else 0
-            if team.dnf:
-                ws["M" + row] = "СН"
-                ws["K" + row] = "снятие"
-            line += 1
-
-    # Save the file
-    filename = "protokol2024.xlsx"
-    wb.save(settings.PROTOCOL_DIR + filename)
-    return render(
-        request,
-        "website/save_protokol.html",
-        {"success": "save", "file_url": settings.PROTOCOL_URL + filename},
-    )
-
-
-def upload_protocol(request):
-    if not request.user.is_staff:
-        raise Http404("File not found.")
-
-    if request.method == "POST" and request.FILES["myfile"]:
-        myfile = request.FILES["myfile"]
-        fs = FileSystemStorage()
-
-        curr_time = datetime.now(timezone.utc) + timedelta(hours=5)
-        file_prefix = (
-            "uploads/"
-            + str(curr_time.year)
-            + str(curr_time.month).zfill(2)
-            + str(curr_time.day).zfill(2)
-            + "_"
-            + str(curr_time.hour).zfill(2)
-            + str(curr_time.minute).zfill(2)
-            + str(curr_time.second).zfill(2)
-            + "_"
-        )
-
-        filename = fs.save(settings.PROTOCOL_DIR + file_prefix + myfile.name, myfile)
-
-        uploaded_file_url = fs.url(settings.PROTOCOL_URL + file_prefix + myfile.name)
-
-        # read this file:
-        err, msg = import_file_xlsx(filename)
-
-        return render(
-            request,
-            "website/simple_upload.html",
-            {"uploaded_file_url": uploaded_file_url, "err": err, "msg": msg},
-        )
-    return render(request, "website/simple_upload.html")
 
 
 def regulations(request):

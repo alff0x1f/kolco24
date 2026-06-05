@@ -84,8 +84,6 @@ urlpatterns = [
     path(
         "team/<int:team_id>/points/", views.TeamPointsView.as_view(), name="team_points"
     ),
-    path("update_protocol/", views.update_protocol, name="update_protocol"),
-    path("upload_protocol/", views.upload_protocol, name="upload_protocol"),
     path("regulations/", views.regulations, name="regulations"),
     path("page/<str:slug>/", views.page, name="page"),
     path("page/<str:slug>/edit/", views.edit_page, name="edit_page"),
