@@ -31,6 +31,7 @@ dev = [
 [tool.pytest.ini_options]
 DJANGO_SETTINGS_MODULE = "config.settings"
 python_files = "tests.py test_*.py"
+pythonpath = ["src"]
 
 [tool.ruff.lint.extend-per-file-ignores]
 "__init__.py" = ["F401"]
