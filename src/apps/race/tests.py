@@ -1467,6 +1467,98 @@ def test_teams_context_includes_race_remaining():
     assert context["race_remaining"] == 5
 
 
+# --- "мест нет": hide the add-team CTA when the race is full ------------------
+
+
+@pytest.mark.django_db
+def test_build_context_exposes_race_full_flag():
+    owner = User.objects.create_user(
+        username="rf1", password="p", email="rf1@example.com"
+    )
+    race = _make_race(slug="rf-ctx")
+    race.people_limit = 4
+    race.save(update_fields=["people_limit"])
+    cat = _make_category(race)
+
+    # Room left → not full (both views agree).
+    _make_team(owner, cat, paid_people=2)
+    assert RacePageView.build_context(race)["race_full"] is False
+    assert RaceTeamsView.build_context(race, AnonymousUser())["race_full"] is False
+
+    # Race cap reached → full.
+    _make_team(owner, cat, paid_people=2, start_number="2")
+    assert RacePageView.build_context(race)["race_full"] is True
+    assert RaceTeamsView.build_context(race, AnonymousUser())["race_full"] is True
+
+
+@pytest.mark.django_db
+def test_race_full_is_false_when_unlimited():
+    """No ``people_limit`` (0) → ``remaining_people()`` is None → never full."""
+    owner = User.objects.create_user(
+        username="rf2", password="p", email="rf2@example.com"
+    )
+    race = _make_race(slug="rf-unl")  # people_limit defaults to 0
+    cat = _make_category(race)
+    _make_team(owner, cat, paid_people=2)
+
+    assert RacePageView.build_context(race)["race_full"] is False
+    assert RaceTeamsView.build_context(race, AnonymousUser())["race_full"] is False
+
+
+@pytest.mark.django_db
+def test_race_page_hides_add_team_cta_when_full(client):
+    owner = User.objects.create_user(
+        username="rf3", password="p", email="rf3@example.com"
+    )
+    race = _make_race(slug="rf-hide")
+    race.people_limit = 4
+    race.reg_status = RegStatus.OPEN
+    race.save(update_fields=["people_limit", "reg_status"])
+    cat = _make_category(race)
+    _make_team(owner, cat, paid_people=2)
+
+    add_url = reverse("add_team", args=[race.slug])
+    page_url = reverse("race", kwargs={"race_slug": race.slug})
+
+    # Room left + reg open → public CTAs link to add_team.
+    html = client.get(page_url).content.decode()
+    assert add_url in html
+
+    # Fill the race → CTAs gone, «мест нет» badge shown instead.
+    _make_team(owner, cat, paid_people=2, start_number="2")
+    html = client.get(page_url).content.decode()
+    assert add_url not in html
+    assert "мест нет" in html
+
+
+@pytest.mark.django_db
+def test_teams_page_hides_add_team_button_when_full(client):
+    owner = User.objects.create_user(
+        username="rf4", password="p", email="rf4@example.com"
+    )
+    race = _make_race(slug="rf-teams-hide")
+    race.people_limit = 4
+    race.reg_status = RegStatus.OPEN
+    race.save(update_fields=["people_limit", "reg_status"])
+    cat = _make_category(race)
+    _make_team(owner, cat, paid_people=2)
+
+    # A plain authenticated user (not a race admin) sees the toolbar button.
+    viewer = User.objects.create_user(
+        username="rf4v", password="p", email="rf4v@example.com"
+    )
+    client.force_login(viewer)
+    add_url = reverse("add_team", args=[race.slug])
+    teams_url = reverse("all_teams", args=[race.slug])
+
+    html = client.get(teams_url).content.decode()
+    assert add_url in html
+
+    _make_team(owner, cat, paid_people=2, start_number="2")
+    html = client.get(teams_url).content.decode()
+    assert add_url not in html
+
+
 # --- Add-on models (RaceExtra / TeamExtra / PaymentExtra) ---
 
 import pytest as _pytest  # noqa: E402

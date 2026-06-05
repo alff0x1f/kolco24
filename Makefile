@@ -5,7 +5,7 @@ TAG      ?= latest
 
 FULL_IMAGE = $(REGISTRY)/$(IMAGE):$(TAG)
 
-.PHONY: build push build-push login backup restore format lint
+.PHONY: build push build-push login backup restore format lint test
 
 build:
 	$(PODMAN) build -t $(FULL_IMAGE) --platform linux/amd64 .
@@ -17,6 +17,9 @@ build-push: build push
 
 login:
 	$(PODMAN) login $(REGISTRY)
+
+test:
+	uv run pytest
 
 format:
 	uv run ruff check --fix src

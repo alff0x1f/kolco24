@@ -41,7 +41,7 @@
             <span>{{ category_count }} {{ category_count|ru_plural:"категория,категории,категорий" }}</span>
           </div>
         </div>
-        {% if reg_open and user.is_authenticated %}
+        {% if reg_open and not race_full and user.is_authenticated %}
         <div class="cover-actions">
           <a class="btn btn-primary" href="{% url 'add_team' race.slug %}">Добавить команду</a>
         </div>

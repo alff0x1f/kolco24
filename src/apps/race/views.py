@@ -95,6 +95,7 @@ class RacePageView(View):
             "race_team_count": race.team_count(),
             "race_people_count": race.people_count(),
             "race_remaining": race_remaining,
+            "race_full": race_full,
         }
         context["can_edit_race"] = bool(user is not None and can_edit_race(user, race))
         if user is not None and is_race_admin(user, race):
@@ -192,6 +193,8 @@ class RaceTeamsView(View):
                 row["edit"] = f"/team/{team.id}"
             teams_data.append(row)
 
+        race_remaining = race.remaining_people()
+        race_full = race_remaining is not None and race_remaining <= 0
         return {
             "race": race,
             "categories": categories,
@@ -201,7 +204,8 @@ class RaceTeamsView(View):
             "reg_upcoming": race.reg_status == RegStatus.UPCOMING,
             "race_team_count": race.team_count(),
             "race_people_count": race.people_count(),
-            "race_remaining": race.remaining_people(),
+            "race_remaining": race_remaining,
+            "race_full": race_full,
             "category_count": len(categories),
             "race_date": race.date,
             "can_edit_race": bool(user is not None and can_edit_race(user, race)),

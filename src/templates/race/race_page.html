@@ -43,7 +43,7 @@
           </div>
         </div>
         <div class="cover-actions">
-          {% if reg_open %}
+          {% if reg_open and not race_full %}
             <a class="btn btn-primary" href="{% url 'add_team' race.slug %}">{% if user.is_authenticated %}Добавить команду{% else %}Зарегистрировать команду{% endif %}</a>
           {% endif %}
           <a class="btn btn-ghost" href="{% url 'all_teams' race.slug %}">Все команды</a>
@@ -235,7 +235,7 @@
             </li>
             {% endfor %}
           </ul>
-          {% if reg_open %}
+          {% if reg_open and not race_full %}
           <div class="category-cta">
             <a class="btn btn-primary"
               href="{% url 'add_team' race.slug %}">{% if user.is_authenticated %}Добавить команду{% else %}Зарегистрировать команду{% endif %}</a>
