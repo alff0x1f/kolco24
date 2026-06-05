@@ -64,7 +64,6 @@ def test_logout_user_view(client):
 def test_race_slug_populated():
     race = Race.objects.create(
         name="Test Race",
-        code="test-race",
         slug="test-race",
     )
     assert race.slug == "test-race"
@@ -72,14 +71,14 @@ def test_race_slug_populated():
 
 @pytest.mark.django_db
 def test_race_slug_unique():
-    Race.objects.create(name="Race A", code="race-a", slug="same-slug")
+    Race.objects.create(name="Race A", slug="same-slug")
     with pytest.raises(IntegrityError):
-        Race.objects.create(name="Race B", code="race-b", slug="same-slug")
+        Race.objects.create(name="Race B", slug="same-slug")
 
 
 @pytest.mark.django_db
 def test_race_id_redirect_main(client):
-    race = Race.objects.create(name="Test Race", code="tr2025", slug="tr2025")
+    race = Race.objects.create(name="Test Race", slug="tr2025")
     response = client.get(f"/race/{race.id}/")
     assert response.status_code == 301
     assert response["Location"] == f"/race/{race.slug}/"
@@ -87,7 +86,7 @@ def test_race_id_redirect_main(client):
 
 @pytest.mark.django_db
 def test_race_id_redirect_teams(client):
-    race = Race.objects.create(name="Test Race", code="tr2025b", slug="tr2025b")
+    race = Race.objects.create(name="Test Race", slug="tr2025b")
     response = client.get(f"/race/{race.id}/teams/")
     assert response.status_code == 301
     assert response["Location"] == f"/race/{race.slug}/teams/"
@@ -100,7 +99,7 @@ def test_legacy_teams_endpoint_returns_404(client):
 
 @pytest.mark.django_db
 def test_race_slug_news_view(client):
-    race = Race.objects.create(name="Test Race", code="tr2025c", slug="tr2025c")
+    race = Race.objects.create(name="Test Race", slug="tr2025c")
     response = client.get(f"/race/{race.slug}/")
     assert response.status_code == 200
 
@@ -112,7 +111,6 @@ def test_edit_team_redirect_uses_slug(client):
     )
     race = Race.objects.create(
         name="Edit Race",
-        code="edit24",
         slug="edit-race-2024",
         is_teams_editable=True,
         reg_status=RegStatus.UPCOMING,
@@ -146,7 +144,7 @@ def test_race_admin_model_creation():
 
     from website.models.race import RaceAdmin
 
-    race = Race.objects.create(name="Admin Race", code="ar2025", slug="admin-race-2025")
+    race = Race.objects.create(name="Admin Race", slug="admin-race-2025")
     user = User.objects.create_user(username="raceadmin", password="pass")
     ra = RaceAdmin.objects.create(race=race, user=user, role=RaceAdmin.Role.ADMIN)
     assert str(ra) == f"{user} — {race} (admin)"
@@ -159,9 +157,7 @@ def test_race_admin_unique_together():
 
     from website.models.race import RaceAdmin
 
-    race = Race.objects.create(
-        name="Unique Race", code="ur2025", slug="unique-race-2025"
-    )
+    race = Race.objects.create(name="Unique Race", slug="unique-race-2025")
     user = User.objects.create_user(username="uniqueadmin", password="pass")
     RaceAdmin.objects.create(race=race, user=user)
     with pytest.raises(IntegrityError):
@@ -172,7 +168,7 @@ def test_race_admin_unique_together():
 def test_newspost_xss_sanitization():
     from website.models.news import NewsPost
 
-    race = Race.objects.create(name="XSS Race", code="xss1", slug="xss-race")
+    race = Race.objects.create(name="XSS Race", slug="xss-race")
     post = NewsPost.objects.create(
         title="XSS Test",
         content='<script>alert("xss")</script> Normal **bold** text',
@@ -187,7 +183,7 @@ def test_newspost_xss_sanitization():
 def test_newspost_xss_event_handler_stripped():
     from website.models.news import NewsPost
 
-    race = Race.objects.create(name="XSS Race2", code="xss2", slug="xss-race-2")
+    race = Race.objects.create(name="XSS Race2", slug="xss-race-2")
     post = NewsPost.objects.create(
         title="Event Handler Test",
         content='<img src="x" onerror="alert(1)"> text',
@@ -220,7 +216,7 @@ def test_add_post_by_race_admin(client):
     from website.models.news import NewsPost
     from website.models.race import RaceAdmin
 
-    race = Race.objects.create(name="Post Race", code="pr2025", slug="post-race-2025")
+    race = Race.objects.create(name="Post Race", slug="post-race-2025")
     user = User.objects.create_user(username="postadmin", password="pass")
     RaceAdmin.objects.create(race=race, user=user, role=RaceAdmin.Role.ADMIN)
     client.force_login(user)
@@ -234,7 +230,7 @@ def test_add_post_by_race_admin(client):
 
 @pytest.mark.django_db
 def test_add_post_unauthorized(client):
-    race = Race.objects.create(name="Post Race2", code="pr2026", slug="post-race-2026")
+    race = Race.objects.create(name="Post Race2", slug="post-race-2026")
     response = client.post(
         f"/race/{race.slug}/post/add/",
         {"title": "Should fail", "content": "No auth"},
@@ -245,7 +241,7 @@ def test_add_post_unauthorized(client):
 
 @pytest.mark.django_db
 def test_add_post_non_admin_user(client):
-    race = Race.objects.create(name="Post Race3", code="pr2027", slug="post-race-2027")
+    race = Race.objects.create(name="Post Race3", slug="post-race-2027")
     user = User.objects.create_user(username="notadmin", password="pass")
     client.force_login(user)
     response = client.post(
@@ -447,7 +443,7 @@ def test_register_view_post_blocks_open_redirect(client):
 def test_race_page_view_shows_form_for_admin(client):
     from website.models.race import RaceAdmin
 
-    race = Race.objects.create(name="Admin Race", code="ar2025", slug="admin-race-2025")
+    race = Race.objects.create(name="Admin Race", slug="admin-race-2025")
     admin_user = User.objects.create_user(username="newsadmin", password="pass")
     regular_user = User.objects.create_user(username="regularuser", password="pass")
     RaceAdmin.objects.create(race=race, user=admin_user, role=RaceAdmin.Role.ADMIN)
@@ -465,7 +461,7 @@ def test_race_page_view_shows_form_for_admin(client):
 
 @pytest.mark.django_db
 def test_race_page_view_status_200(client):
-    race = Race.objects.create(name="T", code="t25", slug="t-2025")
+    race = Race.objects.create(name="T", slug="t-2025")
     response = client.get(f"/race/{race.slug}/")
     assert response.status_code == 200
     assert "race/race_page.html" in [t.name for t in response.templates]
@@ -479,7 +475,7 @@ def test_race_page_view_404_for_unknown_slug(client):
 
 @pytest.mark.django_db
 def test_race_page_view_context_keys(client):
-    race = Race.objects.create(name="C", code="c25", slug="c-2025")
+    race = Race.objects.create(name="C", slug="c-2025")
     response = client.get(f"/race/{race.slug}/")
     for key in (
         "categories",
@@ -496,16 +492,14 @@ def test_race_page_view_context_keys(client):
 
 @pytest.mark.django_db
 def test_race_page_view_no_post_form_for_anon(client):
-    race = Race.objects.create(name="A", code="a25", slug="a-2025")
+    race = Race.objects.create(name="A", slug="a-2025")
     response = client.get(f"/race/{race.slug}/")
     assert "post_form" not in response.context
 
 
 @pytest.mark.django_db
 def test_race_page_view_reg_open_flag(client):
-    race = Race.objects.create(
-        name="R", code="ro1", slug="ro-2025", reg_status=RegStatus.OPEN
-    )
+    race = Race.objects.create(name="R", slug="ro-2025", reg_status=RegStatus.OPEN)
     response = client.get(f"/race/{race.slug}/")
     assert response.context["reg_open"] is True
     assert response.context["reg_upcoming"] is False
@@ -525,7 +519,7 @@ def test_race_page_view_reg_open_flag(client):
 
 @pytest.mark.django_db
 def test_race_page_view_excludes_inactive_categories(client):
-    race = Race.objects.create(name="R", code="rc2", slug="rc-2026")
+    race = Race.objects.create(name="R", slug="rc-2026")
     Category.objects.create(
         code="active", name="Active", short_name="A", race=race, is_active=True
     )
@@ -542,7 +536,7 @@ def test_race_page_view_excludes_inactive_categories(client):
 def test_race_page_view_news_list_capped_at_10(client):
     from website.models import NewsPost
 
-    race = Race.objects.create(name="N", code="nl1", slug="nl-2025")
+    race = Race.objects.create(name="N", slug="nl-2025")
     for i in range(11):
         NewsPost.objects.create(race=race, title=f"Post {i}", content=f"body {i}")
     response = client.get(f"/race/{race.slug}/")
@@ -555,7 +549,7 @@ def test_race_page_view_news_list_capped_at_10(client):
 def test_add_post_invalid_form_shows_errors(client):
     from website.models.race import RaceAdmin
 
-    race = Race.objects.create(name="R", code="ap1", slug="ap-2025")
+    race = Race.objects.create(name="R", slug="ap-2025")
     admin_user = User.objects.create_user(username="postadmin", password="pass")
     RaceAdmin.objects.create(race=race, user=admin_user, role=RaceAdmin.Role.ADMIN)
     client.force_login(admin_user)
@@ -570,7 +564,6 @@ def test_add_post_invalid_form_shows_errors(client):
 def test_race_clean_accepts_valid_url():
     race = Race.objects.create(
         name="URL Race",
-        code="ur1",
         slug="url-race-1",
         place="Moscow",
         header_image="https://example.com/banner.jpg",
@@ -583,7 +576,6 @@ def test_race_clean_accepts_valid_url():
 def test_race_clean_rejects_invalid_url():
     race = Race.objects.create(
         name="URL Race",
-        code="ur2",
         slug="url-race-2",
         place="Moscow",
         header_image="not-a-url",
@@ -597,7 +589,6 @@ def test_race_clean_rejects_invalid_url():
 def test_race_clean_accepts_blank_url():
     race = Race.objects.create(
         name="URL Race",
-        code="ur3",
         slug="url-race-3",
         place="Moscow",
         header_image="",
@@ -608,14 +599,14 @@ def test_race_clean_accepts_blank_url():
 
 @pytest.mark.django_db
 def test_race_link_clean_accepts_valid_url():
-    race = Race.objects.create(name="LR", code="lr1", slug="lr-2025")
+    race = Race.objects.create(name="LR", slug="lr-2025")
     link = RaceLink.objects.create(race=race, name="Site", url="https://example.com/")
     link.full_clean()
 
 
 @pytest.mark.django_db
 def test_race_link_clean_rejects_invalid_url():
-    race = Race.objects.create(name="LR", code="lr2", slug="lr-2026")
+    race = Race.objects.create(name="LR", slug="lr-2026")
     link = RaceLink.objects.create(race=race, name="Bad", url="not-a-url")
     with pytest.raises(ValidationError) as exc_info:
         link.full_clean()
@@ -624,7 +615,7 @@ def test_race_link_clean_rejects_invalid_url():
 
 @pytest.mark.django_db
 def test_category_team_size_defaults():
-    race = Race.objects.create(name="Cat Race", code="cat1", slug="cat-race-1")
+    race = Race.objects.create(name="Cat Race", slug="cat-race-1")
     category = Category.objects.create(
         code="def",
         name="Defaults",
@@ -659,13 +650,13 @@ def test_category_backfill_mapping():
 
 @pytest.mark.django_db
 def test_current_price_falls_back_to_cost_without_tiers():
-    race = Race.objects.create(name="No Tiers", code="nt1", slug="no-tiers", cost=1500)
+    race = Race.objects.create(name="No Tiers", slug="no-tiers", cost=1500)
     assert race.current_price == 1500
 
 
 @pytest.mark.django_db
 def test_current_price_picks_active_tier():
-    race = Race.objects.create(name="Tiers", code="t1", slug="tiers-1", cost=999)
+    race = Race.objects.create(name="Tiers", slug="tiers-1", cost=999)
     today = timezone.localdate()
     # earliest tier already past, second still active
     RacePriceTier.objects.create(
@@ -683,7 +674,7 @@ def test_current_price_picks_active_tier():
 
 @pytest.mark.django_db
 def test_current_price_uses_last_tier_when_all_past():
-    race = Race.objects.create(name="Past", code="p1", slug="past-1", cost=999)
+    race = Race.objects.create(name="Past", slug="past-1", cost=999)
     today = timezone.localdate()
     RacePriceTier.objects.create(
         race=race, price=1000, active_until=today - timedelta(days=20)
@@ -697,7 +688,7 @@ def test_current_price_uses_last_tier_when_all_past():
 
 @pytest.mark.django_db
 def test_current_price_same_day_boundary_is_inclusive():
-    race = Race.objects.create(name="Today", code="td1", slug="today-1", cost=999)
+    race = Race.objects.create(name="Today", slug="today-1", cost=999)
     today = timezone.localdate()
     RacePriceTier.objects.create(race=race, price=1200, active_until=today)
     RacePriceTier.objects.create(
@@ -709,7 +700,7 @@ def test_current_price_same_day_boundary_is_inclusive():
 
 @pytest.mark.django_db
 def test_price_tier_ladder_flags_statuses():
-    race = Race.objects.create(name="Ladder", code="l1", slug="ladder-1", cost=999)
+    race = Race.objects.create(name="Ladder", slug="ladder-1", cost=999)
     today = timezone.localdate()
     past = RacePriceTier.objects.create(
         race=race, price=1000, active_until=today - timedelta(days=10)
@@ -730,7 +721,7 @@ def test_price_tier_ladder_flags_statuses():
 
 @pytest.mark.django_db
 def test_price_tier_ladder_all_past_marks_last_active():
-    race = Race.objects.create(name="LadderPast", code="lp1", slug="ladder-past-1")
+    race = Race.objects.create(name="LadderPast", slug="ladder-past-1")
     today = timezone.localdate()
     first = RacePriceTier.objects.create(
         race=race, price=1000, active_until=today - timedelta(days=20)
@@ -747,7 +738,7 @@ def test_price_tier_ladder_all_past_marks_last_active():
 
 @pytest.mark.django_db
 def test_price_tier_ladder_empty_without_tiers():
-    race = Race.objects.create(name="Empty", code="e1", slug="empty-1", cost=500)
+    race = Race.objects.create(name="Empty", slug="empty-1", cost=500)
     assert race.price_tier_ladder() == []
 
 
@@ -775,7 +766,6 @@ def _create_team_for_edit(
     )
     race = Race.objects.create(
         name="R",
-        code=f"rc{suffix}",
         slug=f"slug-{suffix}",
         cost=cost,
         reg_status=reg_status,
@@ -827,7 +817,6 @@ def test_get_add_team_context_has_price_and_counts(client):
     )
     race = Race.objects.create(
         name="Add Race",
-        code="addr1",
         slug="add-race-1",
         cost=1000,
         reg_status=RegStatus.OPEN,
@@ -1028,7 +1017,6 @@ def test_add_team_rejects_out_of_range_ucount(client):
     )
     race = Race.objects.create(
         name="Add OOR",
-        code="addoor1",
         slug="add-oor-1",
         cost=1000,
         reg_status=RegStatus.OPEN,
@@ -1077,7 +1065,6 @@ def test_add_team_mints_ulid_order_id_and_links_fk(
     )
     race = Race.objects.create(
         name="ULID Add",
-        code="ulidadd1",
         slug="ulid-add-1",
         cost=1000,
         reg_status=RegStatus.OPEN,
@@ -1177,7 +1164,6 @@ def test_add_team_renders_base2_template(client):
     )
     race = Race.objects.create(
         name="Base2 Race",
-        code="b2r1",
         slug="base2-race-1",
         cost=1000,
         reg_status=RegStatus.OPEN,
@@ -1218,7 +1204,6 @@ def test_add_team_config_island_uses_current_price(client):
     )
     race = Race.objects.create(
         name="Base2 Price",
-        code="b2p1",
         slug="base2-price-1",
         cost=1000,
         reg_status=RegStatus.OPEN,
@@ -1244,7 +1229,6 @@ def test_add_team_hides_submit_when_not_editable(client):
     )
     race = Race.objects.create(
         name="Base2 Closed",
-        code="b2c1",
         slug="base2-closed-1",
         cost=1000,
         reg_status=RegStatus.SOLD_OUT,
@@ -1371,7 +1355,6 @@ def test_add_team_omits_edit_only_sections(client):
     )
     race = Race.objects.create(
         name="Add No Edit",
-        code="ane1",
         slug="add-no-edit-1",
         cost=1000,
         reg_status=RegStatus.OPEN,
@@ -1473,7 +1456,6 @@ def test_build_category_options_single_size(client):
     )
     race = Race.objects.create(
         name="Single",
-        code="sng1",
         slug="single-1",
         cost=1000,
         reg_status=RegStatus.OPEN,
@@ -1501,7 +1483,6 @@ def _pl_user(django_user_model, n=0):
 
 def _pl_race(**kwargs):
     kwargs.setdefault("name", "PL Race")
-    kwargs.setdefault("code", "pl-race")
     kwargs.setdefault("slug", "pl-race")
     return Race.objects.create(**kwargs)
 
@@ -2135,7 +2116,6 @@ def test_add_team_with_transfer_creates_payment_and_extra(client):
     )
     race = Race.objects.create(
         name="Trf Race",
-        code="trf1",
         slug="trf-race-1",
         cost=1000,
         reg_status=RegStatus.OPEN,
@@ -2211,7 +2191,6 @@ def test_add_team_rejects_over_cap_extra(client):
     )
     race = Race.objects.create(
         name="OverCap",
-        code="ovc1",
         slug="overcap-1",
         cost=1000,
         reg_status=RegStatus.OPEN,
@@ -2259,7 +2238,6 @@ def test_superuser_bypass_capacity_but_extra_cap_still_applies(django_user_model
     )
     race = Race.objects.create(
         name="SUcap",
-        code="sucap1",
         slug="sucap-1",
         cost=1000,
         reg_status=RegStatus.OPEN,
@@ -2304,7 +2282,7 @@ def test_reconciliation_credits_extras_once_idempotent():
         username="rec", password="pass", email="rec@example.com"
     )
     race = Race.objects.create(
-        name="Rec", code="rec1", slug="rec-1", cost=1000, reg_status=RegStatus.OPEN
+        name="Rec", slug="rec-1", cost=1000, reg_status=RegStatus.OPEN
     )
     cat = Category.objects.create(
         code="t", name="Team", short_name="T", race=race, min_people=2, max_people=6

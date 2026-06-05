@@ -628,7 +628,7 @@ def test_email_backend_authenticates_active_user(django_user_model):
 def test_add_team_anon_get_redirects_to_account_start(client):
     from website.models import Race
 
-    race = Race.objects.create(name="Anon Race", code=900, slug="anon-race")
+    race = Race.objects.create(name="Anon Race", slug="anon-race")
     add_url = reverse("add_team", args=[race.slug])
 
     resp = client.get(add_url)
@@ -643,7 +643,7 @@ def test_add_team_anon_get_redirects_to_account_start(client):
 def test_add_team_anon_post_redirects_to_account_start(client):
     from website.models import Race
 
-    race = Race.objects.create(name="Anon Race", code=901, slug="anon-race-post")
+    race = Race.objects.create(name="Anon Race", slug="anon-race-post")
     add_url = reverse("add_team", args=[race.slug])
 
     resp = client.post(add_url, {})
@@ -662,7 +662,7 @@ def test_race_from_next_returns_race_for_add_team_path():
     from apps.accounts.views import _race_from_next
     from website.models import Race
 
-    race = Race.objects.create(name="Helper Race", code=910, slug="helper-race")
+    race = Race.objects.create(name="Helper Race", slug="helper-race")
     add_url = reverse("add_team", args=[race.slug])
 
     assert _race_from_next(add_url) == race
@@ -698,7 +698,7 @@ def test_race_from_next_returns_none_when_slug_unknown():
 def test_start_get_with_add_team_next_puts_race_in_context(client):
     from website.models import Race
 
-    race = Race.objects.create(name="Context Race", code=911, slug="context-race")
+    race = Race.objects.create(name="Context Race", slug="context-race")
     add_url = reverse("add_team", args=[race.slug])
 
     resp = client.get(reverse("account_start") + f"?next={add_url}")
@@ -722,7 +722,7 @@ def test_start_get_with_garbage_next_renders_without_race(client):
 def test_start_renders_race_copy_and_back_link(client):
     from website.models import Race
 
-    race = Race.objects.create(name="Copy Race", code=920, slug="copy-race")
+    race = Race.objects.create(name="Copy Race", slug="copy-race")
     add_url = reverse("add_team", args=[race.slug])
 
     resp = client.get(reverse("account_start") + f"?next={add_url}")
@@ -747,7 +747,7 @@ def test_start_garbage_next_renders_no_race_copy_or_back_link(client):
 def test_verify_renders_race_copy_and_back_link(client):
     from website.models import Race
 
-    race = Race.objects.create(name="Verify Race", code=921, slug="verify-race")
+    race = Race.objects.create(name="Verify Race", slug="verify-race")
     add_url = reverse("add_team", args=[race.slug])
 
     session = client.session
@@ -786,7 +786,7 @@ def test_add_team_passwordless_round_trip_lands_back_on_add_team(client):
 
     from website.models import Race
 
-    race = Race.objects.create(name="E2E Race", code=922, slug="e2e-race")
+    race = Race.objects.create(name="E2E Race", slug="e2e-race")
     add_url = reverse("add_team", args=[race.slug])
 
     # Anon hits add_team → redirected to passwordless start carrying ?next=.

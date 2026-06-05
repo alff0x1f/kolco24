@@ -26,8 +26,8 @@ def _script_json(html, script_id):
     return json.loads(match.group(1))
 
 
-def _make_race(slug="teams-race", code="tr-teams"):
-    return Race.objects.create(name="Teams Race", code=code, slug=slug)
+def _make_race(slug="teams-race"):
+    return Race.objects.create(name="Teams Race", slug=slug)
 
 
 def _make_category(race, code="12h", short_name="12ч", name="12 часов", order=0):
@@ -128,7 +128,7 @@ def test_build_context_owner_sees_own_unpaid():
     other = User.objects.create_user(
         username="x2", password="p", email="x2@example.com"
     )
-    race = _make_race(slug="r2", code="r2")
+    race = _make_race(slug="r2")
     cat = _make_category(race)
     _make_team(owner, cat, teamname="MyUnpaid", paid_people=0)
     _make_team(other, cat, teamname="OtherPaid", paid_people=3, ucount=3)
@@ -151,7 +151,7 @@ def test_build_context_superuser_sees_all():
     admin = User.objects.create_superuser(
         username="a3", password="p", email="a3@example.com"
     )
-    race = _make_race(slug="r3", code="r3")
+    race = _make_race(slug="r3")
     cat = _make_category(race)
     _make_team(owner, cat, teamname="Paid", paid_people=2)
     _make_team(owner, cat, teamname="Unpaid", paid_people=0)
@@ -173,7 +173,7 @@ def test_mine_and_edit_flags():
     other = User.objects.create_user(
         username="x4", password="p", email="x4@example.com"
     )
-    race = _make_race(slug="r4", code="r4")
+    race = _make_race(slug="r4")
     cat = _make_category(race)
     mine_team = _make_team(owner, cat, teamname="Mine", paid_people=2)
     _make_team(other, cat, teamname="Theirs", paid_people=2)
@@ -192,7 +192,7 @@ def test_participants_string_clean_join():
     owner = User.objects.create_user(
         username="o5", password="p", email="o5@example.com"
     )
-    race = _make_race(slug="r5", code="r5")
+    race = _make_race(slug="r5")
     cat = _make_category(race)
     _make_team(
         owner,
@@ -220,7 +220,7 @@ def test_name_fallback_when_no_teamname():
         first_name="Иван",
         last_name="Петров",
     )
-    race = _make_race(slug="r6", code="r6")
+    race = _make_race(slug="r6")
     cat = _make_category(race)
     team = _make_team(owner, cat, teamname="", paid_people=2)
 
@@ -235,7 +235,7 @@ def test_cnt_display_when_paid_differs_from_ucount():
     owner = User.objects.create_user(
         username="o7", password="p", email="o7@example.com"
     )
-    race = _make_race(slug="r7", code="r7")
+    race = _make_race(slug="r7")
     cat = _make_category(race)
     _make_team(owner, cat, teamname="Partial", paid_people=1, ucount=3)
 
@@ -250,7 +250,7 @@ def test_color_idx_wraps_at_eight():
     owner = User.objects.create_user(
         username="o8", password="p", email="o8@example.com"
     )
-    race = _make_race(slug="r8", code="r8")
+    race = _make_race(slug="r8")
     for i in range(9):
         _make_category(race, code=f"c{i}", short_name=f"c{i}", order=i)
 
@@ -269,7 +269,7 @@ def test_category_with_zero_paid_teams_count_is_zero():
     owner = User.objects.create_user(
         username="o9", password="p", email="o9@example.com"
     )
-    race = _make_race(slug="r9", code="r9")
+    race = _make_race(slug="r9")
     _make_category(race, code="empty", short_name="empty", order=0)
     full_cat = _make_category(race, code="full", short_name="full", order=1)
     _make_team(owner, full_cat, teamname="T", paid_people=2)
@@ -288,7 +288,7 @@ def test_summary_uses_model_helpers():
     owner = User.objects.create_user(
         username="o10", password="p", email="o10@example.com"
     )
-    race = _make_race(slug="r10", code="r10")
+    race = _make_race(slug="r10")
     cat = _make_category(race)
     _make_team(owner, cat, teamname="A", paid_people=2)
     _make_team(owner, cat, teamname="B", paid_people=3, ucount=3)
@@ -304,7 +304,7 @@ def test_summary_uses_model_helpers():
 
 @pytest.mark.django_db
 def test_urls_resolve_to_race_teams_view():
-    race = _make_race(slug="ru1", code="ru1")
+    race = _make_race(slug="ru1")
     cat = _make_category(race)
 
     for url in (
@@ -320,7 +320,7 @@ def test_all_teams_returns_200_with_data_initial_all(client):
     owner = User.objects.create_user(
         username="ru2", password="p", email="ru2@example.com"
     )
-    race = _make_race(slug="ru2", code="ru2")
+    race = _make_race(slug="ru2")
     cat = _make_category(race)
     _make_team(owner, cat, teamname="Paid", paid_people=2)
 
@@ -338,7 +338,7 @@ def test_all_teams_returns_200_with_data_initial_all(client):
 
 @pytest.mark.django_db
 def test_all_teams_renders_admin_panel_for_superuser(client, django_user_model):
-    race = _make_race(slug="ru2a", code="ru2a")
+    race = _make_race(slug="ru2a")
     superuser = django_user_model.objects.create_superuser(
         username="su2", password="p", email="su2@example.com"
     )
@@ -360,7 +360,7 @@ def test_teams2_returns_200_with_category_data_initial(client):
     owner = User.objects.create_user(
         username="ru3", password="p", email="ru3@example.com"
     )
-    race = _make_race(slug="ru3", code="ru3")
+    race = _make_race(slug="ru3")
     cat = _make_category(race)
     _make_team(owner, cat, teamname="Paid", paid_people=2)
 
@@ -379,7 +379,7 @@ def test_my_teams_authenticated_returns_200_with_mine_initial(client):
     owner = User.objects.create_user(
         username="ru4", password="p", email="ru4@example.com"
     )
-    race = _make_race(slug="ru4", code="ru4")
+    race = _make_race(slug="ru4")
     cat = _make_category(race)
     _make_team(owner, cat, teamname="Mine", paid_people=2)
     client.force_login(owner)
@@ -393,7 +393,7 @@ def test_my_teams_authenticated_returns_200_with_mine_initial(client):
 
 @pytest.mark.django_db
 def test_my_teams_anon_redirects_to_login_with_next(client):
-    race = _make_race(slug="ru5", code="ru5")
+    race = _make_race(slug="ru5")
     _make_category(race)
 
     url = reverse("my_teams", args=[race.slug])
@@ -412,7 +412,7 @@ def test_invalid_race_slug_returns_404(client):
 
 @pytest.mark.django_db
 def test_invalid_category_returns_404(client):
-    race = _make_race(slug="ru6", code="ru6")
+    race = _make_race(slug="ru6")
     _make_category(race)
 
     # numeric id that does not exist for this race
@@ -422,7 +422,7 @@ def test_invalid_category_returns_404(client):
 
 @pytest.mark.django_db
 def test_non_numeric_category_returns_404(client):
-    race = _make_race(slug="ru7", code="ru7")
+    race = _make_race(slug="ru7")
     _make_category(race)
 
     resp = client.get(f"/race/{race.slug}/category/not-a-number/teams/")
@@ -434,7 +434,7 @@ def test_teams_page_renders_key_markup(client):
     owner = User.objects.create_user(
         username="ru8", password="p", email="ru8@example.com"
     )
-    race = _make_race(slug="ru8", code="ru8")
+    race = _make_race(slug="ru8")
     cat = _make_category(race)
     _make_team(owner, cat, teamname="Paid", paid_people=2)
 
@@ -480,7 +480,7 @@ def test_embedded_json_escapes_html_specials(client):
     owner = User.objects.create_user(
         username="ru9", password="p", email="ru9@example.com"
     )
-    race = _make_race(slug="ru9", code="ru9")
+    race = _make_race(slug="ru9")
     cat = _make_category(race)
     # Both a literal </script> and the <!--<script> tokenizer-state vector.
     payload = "</script><!--<script>alert(1)&x"
@@ -504,7 +504,7 @@ def test_embedded_json_escapes_html_specials(client):
 @pytest.mark.django_db
 def test_race_page_anon_sees_login_and_add_button(client):
     """Logged-out visitors get an «add team» CTA that routes through login."""
-    race = _make_race(slug="reg-open", code="reg-open")
+    race = _make_race(slug="reg-open")
     race.reg_status = RegStatus.OPEN
     race.save(update_fields=["reg_status"])
 
@@ -525,7 +525,7 @@ def test_race_page_authenticated_sees_plain_add_button(client):
         username="member", password="p", email="member@example.com"
     )
     client.force_login(member)
-    race = _make_race(slug="reg-open2", code="reg-open2")
+    race = _make_race(slug="reg-open2")
     race.reg_status = RegStatus.OPEN
     race.save(update_fields=["reg_status"])
 
@@ -539,7 +539,7 @@ def test_race_page_authenticated_sees_plain_add_button(client):
 
 @pytest.mark.django_db
 def test_race_page_hides_add_button_when_reg_not_open(client):
-    race = _make_race(slug="reg-upcoming", code="reg-upcoming")
+    race = _make_race(slug="reg-upcoming")
     # default reg_status is UPCOMING, so no add-team CTA at all.
 
     resp = client.get(reverse("race", args=[race.slug]))
@@ -554,7 +554,7 @@ def test_race_page_admin_sees_edit_button(client):
     user = User.objects.create_user(
         username="raedit", password="p", email="raedit@example.com"
     )
-    race = _make_race(slug="edit-btn", code="edit-btn")
+    race = _make_race(slug="edit-btn")
     RaceAdmin.objects.create(race=race, user=user, role=RaceAdmin.Role.ADMIN)
     client.force_login(user)
 
@@ -575,7 +575,7 @@ def test_race_page_regular_user_no_edit_button(client):
     user = User.objects.create_user(
         username="plain", password="p", email="plain@example.com"
     )
-    race = _make_race(slug="no-edit-btn", code="no-edit-btn")
+    race = _make_race(slug="no-edit-btn")
     client.force_login(user)
 
     resp = client.get(reverse("race", args=[race.slug]))
@@ -593,7 +593,7 @@ def test_race_page_superuser_sees_edit_and_new_buttons(client):
     admin = User.objects.create_superuser(
         username="su-buttons", password="p", email="su-buttons@example.com"
     )
-    race = _make_race(slug="su-btn", code="su-btn")
+    race = _make_race(slug="su-btn")
     client.force_login(admin)
 
     resp = client.get(reverse("race", args=[race.slug]))
@@ -615,8 +615,8 @@ def test_can_edit_race_superuser_true_for_any_race():
     admin = User.objects.create_superuser(
         username="su", password="p", email="su@example.com"
     )
-    race = _make_race(slug="ce1", code="ce1")
-    other = _make_race(slug="ce1b", code="ce1b")
+    race = _make_race(slug="ce1")
+    other = _make_race(slug="ce1b")
 
     assert can_edit_race(admin, race) is True
     assert can_edit_race(admin, other) is True
@@ -625,8 +625,8 @@ def test_can_edit_race_superuser_true_for_any_race():
 @pytest.mark.django_db
 def test_can_edit_race_admin_only_for_own_race():
     user = User.objects.create_user(username="ra", password="p", email="ra@example.com")
-    race = _make_race(slug="ce2", code="ce2")
-    other = _make_race(slug="ce2b", code="ce2b")
+    race = _make_race(slug="ce2")
+    other = _make_race(slug="ce2b")
     RaceAdmin.objects.create(race=race, user=user, role=RaceAdmin.Role.ADMIN)
 
     assert can_edit_race(user, race) is True
@@ -641,7 +641,7 @@ def test_can_edit_race_moderator_and_others_false():
     regular = User.objects.create_user(
         username="reg", password="p", email="reg@example.com"
     )
-    race = _make_race(slug="ce3", code="ce3")
+    race = _make_race(slug="ce3")
     RaceAdmin.objects.create(race=race, user=moderator, role=RaceAdmin.Role.MODERATOR)
 
     assert can_edit_race(moderator, race) is False
@@ -655,7 +655,6 @@ def test_can_edit_race_moderator_and_others_false():
 def _race_form_data(**overrides):
     data = {
         "name": "New Race",
-        "code": "nr-1",
         "slug": "new-race",
         "place": "Москва",
         "date": "2026-09-01",
@@ -681,7 +680,6 @@ def test_race_form_valid_data_creates_race():
     race = form.save()
     assert Race.objects.filter(pk=race.pk).exists()
     assert race.name == "New Race"
-    assert race.code == "nr-1"
     assert race.slug == "new-race"
     assert race.cost == 1000
     assert race.reg_status == RegStatus.UPCOMING
@@ -694,35 +692,25 @@ def test_race_form_does_not_include_is_reg_open():
 
 
 @pytest.mark.django_db
-def test_race_form_duplicate_code_invalid():
-    _make_race(slug="existing", code="dup-code")
-    form = RaceForm(data=_race_form_data(code="dup-code", slug="fresh-slug"))
-
-    assert not form.is_valid()
-    assert "code" in form.errors
-
-
-@pytest.mark.django_db
 def test_race_form_duplicate_slug_invalid():
-    _make_race(slug="dup-slug", code="some-code")
-    form = RaceForm(data=_race_form_data(code="fresh-code", slug="dup-slug"))
+    _make_race(slug="dup-slug")
+    form = RaceForm(data=_race_form_data(slug="dup-slug"))
 
     assert not form.is_valid()
     assert "slug" in form.errors
 
 
 @pytest.mark.django_db
-def test_race_form_edit_keeps_own_code_and_slug_valid():
-    race = _make_race(slug="own-slug", code="own-code")
+def test_race_form_edit_keeps_own_slug_valid():
+    race = _make_race(slug="own-slug")
     form = RaceForm(
-        data=_race_form_data(code="own-code", slug="own-slug"),
+        data=_race_form_data(slug="own-slug"),
         instance=race,
     )
 
     assert form.is_valid(), form.errors
     saved = form.save()
     assert saved.pk == race.pk
-    assert saved.code == "own-code"
     assert saved.slug == "own-slug"
 
 
@@ -760,7 +748,7 @@ def _edit_get(path, user, **kwargs):
 
 @pytest.mark.django_db
 def test_race_edit_get_anonymous_redirects_to_login():
-    race = _make_race(slug="re1", code="re1")
+    race = _make_race(slug="re1")
 
     edit = _edit_get(f"/race/{race.slug}/edit/", AnonymousUser(), race_slug=race.slug)
     create = _edit_get("/races/new/", AnonymousUser())
@@ -775,7 +763,7 @@ def test_race_edit_get_anonymous_redirects_to_login():
 @pytest.mark.django_db
 def test_race_edit_get_regular_user_forbidden():
     user = User.objects.create_user(username="re2", password="p", email="re2@e.com")
-    race = _make_race(slug="re2", code="re2")
+    race = _make_race(slug="re2")
 
     edit = _edit_get(f"/race/{race.slug}/edit/", user, race_slug=race.slug)
     create = _edit_get("/races/new/", user)
@@ -787,7 +775,7 @@ def test_race_edit_get_regular_user_forbidden():
 @pytest.mark.django_db
 def test_race_edit_get_moderator_forbidden():
     user = User.objects.create_user(username="re3", password="p", email="re3@e.com")
-    race = _make_race(slug="re3", code="re3")
+    race = _make_race(slug="re3")
     RaceAdmin.objects.create(race=race, user=user, role=RaceAdmin.Role.MODERATOR)
 
     resp = _edit_get(f"/race/{race.slug}/edit/", user, race_slug=race.slug)
@@ -814,7 +802,7 @@ def test_race_edit_get_superuser_create_returns_200():
 @pytest.mark.django_db
 def test_race_edit_get_admin_edit_returns_200_with_context():
     user = User.objects.create_user(username="re5", password="p", email="re5@e.com")
-    race = _make_race(slug="re5", code="re5")
+    race = _make_race(slug="re5")
     RaceAdmin.objects.create(race=race, user=user, role=RaceAdmin.Role.ADMIN)
     cat = _make_category(race, code="6h", short_name="6ч", name="6 часов", order=0)
     RacePriceTier.objects.create(race=race, price=1500, active_until="2026-08-01")
@@ -837,7 +825,6 @@ def test_race_form_template_renders_fields_and_data(client):
     user = User.objects.create_user(username="tpl", password="p", email="tpl@e.com")
     race = Race.objects.create(
         name="Шаблонная гонка",
-        code="tpl-1",
         slug="tpl-1",
         place="Москва",
         cost=0,
@@ -856,7 +843,6 @@ def test_race_form_template_renders_fields_and_data(client):
     html = resp.content.decode()
     # Scalar fields render their current values into manual inputs.
     assert 'name="name"' in html and 'value="Шаблонная гонка"' in html
-    assert 'name="code"' in html and 'value="tpl-1"' in html
     # reg_status select marks the current choice selected.
     assert f'value="{RegStatus.OPEN}" selected' in html
     # cost=0 must survive (not blanked by a `default` filter).
@@ -906,7 +892,6 @@ def test_race_edit_post_superuser_create():
     assert resp.url == reverse("race", kwargs={"race_slug": "new-race"})
     race = Race.objects.get(slug="new-race")
     assert race.name == "New Race"
-    assert race.code == "nr-1"
     assert race.cost == 1000
     assert race.reg_status == RegStatus.UPCOMING
 
@@ -914,12 +899,11 @@ def test_race_edit_post_superuser_create():
 @pytest.mark.django_db
 def test_race_edit_post_edit_updates_scalar_fields():
     user = User.objects.create_user(username="pe1", password="p", email="pe1@e.com")
-    race = _make_race(slug="pe1", code="pe1")
+    race = _make_race(slug="pe1")
     RaceAdmin.objects.create(race=race, user=user, role=RaceAdmin.Role.ADMIN)
 
     data = _post_data(
         name="Updated Name",
-        code="pe1",
         slug="pe1",
         reg_status=RegStatus.OPEN,
         cost=2500,
@@ -936,7 +920,7 @@ def test_race_edit_post_edit_updates_scalar_fields():
 @pytest.mark.django_db
 def test_race_edit_post_category_reconcile_update_create_delete():
     user = User.objects.create_user(username="pc2", password="p", email="pc2@e.com")
-    race = _make_race(slug="pc2", code="pc2")
+    race = _make_race(slug="pc2")
     RaceAdmin.objects.create(race=race, user=user, role=RaceAdmin.Role.ADMIN)
     keep = _make_category(race, code="keep", short_name="k", name="Keep", order=0)
     drop = _make_category(race, code="drop", short_name="d", name="Drop", order=1)
@@ -965,7 +949,7 @@ def test_race_edit_post_category_reconcile_update_create_delete():
             },
         ]
     )
-    data = _post_data(code="pc2", slug="pc2", categories_json=categories)
+    data = _post_data(slug="pc2", categories_json=categories)
     resp = _edit_post(f"/race/{race.slug}/edit/", user, data, race_slug=race.slug)
 
     assert resp.status_code == 302
@@ -982,7 +966,7 @@ def test_race_edit_post_category_reconcile_update_create_delete():
 @pytest.mark.django_db
 def test_race_edit_post_price_tier_reconcile_and_current_price():
     user = User.objects.create_user(username="pt1", password="p", email="pt1@e.com")
-    race = _make_race(slug="pt1", code="pt1")
+    race = _make_race(slug="pt1")
     RaceAdmin.objects.create(race=race, user=user, role=RaceAdmin.Role.ADMIN)
     today = datetime.date.today()
     soon = (today + datetime.timedelta(days=30)).isoformat()
@@ -1004,7 +988,7 @@ def test_race_edit_post_price_tier_reconcile_and_current_price():
             {"id": None, "price": 1800, "active_until": far},
         ]
     )
-    data = _post_data(code="pt1", slug="pt1", price_tiers_json=tiers)
+    data = _post_data(slug="pt1", price_tiers_json=tiers)
     resp = _edit_post(f"/race/{race.slug}/edit/", user, data, race_slug=race.slug)
 
     assert resp.status_code == 302
@@ -1020,9 +1004,9 @@ def test_race_edit_post_price_tier_reconcile_and_current_price():
 @pytest.mark.django_db
 def test_race_edit_post_cross_race_id_treated_as_new():
     user = User.objects.create_user(username="cr1", password="p", email="cr1@e.com")
-    race = _make_race(slug="cr1", code="cr1")
+    race = _make_race(slug="cr1")
     RaceAdmin.objects.create(race=race, user=user, role=RaceAdmin.Role.ADMIN)
-    other = _make_race(slug="cr1b", code="cr1b")
+    other = _make_race(slug="cr1b")
     other_cat = _make_category(other, code="oc", short_name="oc", name="Other Cat")
     future = (datetime.date.today() + datetime.timedelta(days=60)).isoformat()
     other_tier = RacePriceTier.objects.create(
@@ -1044,9 +1028,7 @@ def test_race_edit_post_cross_race_id_treated_as_new():
         ]
     )
     tiers = json.dumps([{"id": other_tier.id, "price": 111, "active_until": future}])
-    data = _post_data(
-        code="cr1", slug="cr1", categories_json=categories, price_tiers_json=tiers
-    )
+    data = _post_data(slug="cr1", categories_json=categories, price_tiers_json=tiers)
     resp = _edit_post(f"/race/{race.slug}/edit/", user, data, race_slug=race.slug)
 
     assert resp.status_code == 302
@@ -1065,10 +1047,10 @@ def test_race_edit_post_cross_race_id_treated_as_new():
 @pytest.mark.django_db
 def test_race_edit_post_malformed_json_rolls_back():
     user = User.objects.create_user(username="mj1", password="p", email="mj1@e.com")
-    race = _make_race(slug="mj1", code="mj1")
+    race = _make_race(slug="mj1")
     RaceAdmin.objects.create(race=race, user=user, role=RaceAdmin.Role.ADMIN)
 
-    data = _post_data(code="mj1", slug="mj1", categories_json="{not json")
+    data = _post_data(slug="mj1", categories_json="{not json")
     resp = _edit_post(f"/race/{race.slug}/edit/", user, data, race_slug=race.slug)
 
     assert resp.status_code == 200
@@ -1080,7 +1062,7 @@ def test_race_edit_post_malformed_json_rolls_back():
 @pytest.mark.django_db
 def test_race_edit_post_invalid_category_row_rolls_back():
     user = User.objects.create_user(username="iv1", password="p", email="iv1@e.com")
-    race = _make_race(slug="iv1", code="iv1")
+    race = _make_race(slug="iv1")
     RaceAdmin.objects.create(race=race, user=user, role=RaceAdmin.Role.ADMIN)
 
     # Missing code + name.
@@ -1090,7 +1072,7 @@ def test_race_edit_post_invalid_category_row_rolls_back():
     resp = _edit_post(
         f"/race/{race.slug}/edit/",
         user,
-        _post_data(code="iv1", slug="iv1", categories_json=bad_missing),
+        _post_data(slug="iv1", categories_json=bad_missing),
         race_slug=race.slug,
     )
     assert resp.status_code == 200
@@ -1102,7 +1084,7 @@ def test_race_edit_post_invalid_category_row_rolls_back():
     resp = _edit_post(
         f"/race/{race.slug}/edit/",
         user,
-        _post_data(code="iv1", slug="iv1", categories_json=bad_range),
+        _post_data(slug="iv1", categories_json=bad_range),
         race_slug=race.slug,
     )
     assert resp.status_code == 200
@@ -1115,7 +1097,7 @@ def test_race_edit_post_invalid_category_row_rolls_back():
 @pytest.mark.django_db
 def test_race_edit_post_invalid_price_tier_row_rolls_back():
     user = User.objects.create_user(username="iv2", password="p", email="iv2@e.com")
-    race = _make_race(slug="iv2", code="iv2")
+    race = _make_race(slug="iv2")
     RaceAdmin.objects.create(race=race, user=user, role=RaceAdmin.Role.ADMIN)
 
     # Non-positive price.
@@ -1123,7 +1105,7 @@ def test_race_edit_post_invalid_price_tier_row_rolls_back():
     resp = _edit_post(
         f"/race/{race.slug}/edit/",
         user,
-        _post_data(code="iv2", slug="iv2", price_tiers_json=bad_price),
+        _post_data(slug="iv2", price_tiers_json=bad_price),
         race_slug=race.slug,
     )
     assert resp.status_code == 200
@@ -1133,7 +1115,7 @@ def test_race_edit_post_invalid_price_tier_row_rolls_back():
     resp = _edit_post(
         f"/race/{race.slug}/edit/",
         user,
-        _post_data(code="iv2", slug="iv2", price_tiers_json=bad_date),
+        _post_data(slug="iv2", price_tiers_json=bad_date),
         race_slug=race.slug,
     )
     assert resp.status_code == 200
@@ -1146,7 +1128,7 @@ def test_race_edit_post_invalid_price_tier_row_rolls_back():
 @pytest.mark.django_db
 def test_race_edit_post_moderator_other_race_forbidden():
     user = User.objects.create_user(username="pf1", password="p", email="pf1@e.com")
-    race = _make_race(slug="pf1", code="pf1")
+    race = _make_race(slug="pf1")
     RaceAdmin.objects.create(race=race, user=user, role=RaceAdmin.Role.MODERATOR)
 
     resp = _edit_post(
@@ -1159,10 +1141,10 @@ def test_race_edit_post_moderator_other_race_forbidden():
 def test_race_edit_post_admin_create_forbidden():
     # A RaceAdmin(ADMIN) is not a superuser, so they cannot create a race.
     user = User.objects.create_user(username="pf2", password="p", email="pf2@e.com")
-    race = _make_race(slug="pf2", code="pf2")
+    race = _make_race(slug="pf2")
     RaceAdmin.objects.create(race=race, user=user, role=RaceAdmin.Role.ADMIN)
 
-    resp = _edit_post("/races/new/", user, _post_data(code="brand-new", slug="bn"))
+    resp = _edit_post("/races/new/", user, _post_data(slug="bn"))
     assert resp.status_code == 403
     assert not Race.objects.filter(slug="bn").exists()
 
@@ -1238,13 +1220,11 @@ def test_race_form_people_limit_zero_accepted():
 @pytest.mark.django_db
 def test_race_edit_post_saves_race_and_category_people_limit():
     user = User.objects.create_user(username="pl1", password="p", email="pl1@e.com")
-    race = _make_race(slug="pl1", code="pl1")
+    race = _make_race(slug="pl1")
     RaceAdmin.objects.create(race=race, user=user, role=RaceAdmin.Role.ADMIN)
 
     categories = json.dumps([_cat_row(code="six", name="Six", people_limit=40)])
-    data = _post_data(
-        code="pl1", slug="pl1", people_limit=200, categories_json=categories
-    )
+    data = _post_data(slug="pl1", people_limit=200, categories_json=categories)
     resp = _edit_post(f"/race/{race.slug}/edit/", user, data, race_slug=race.slug)
 
     assert resp.status_code == 302
@@ -1257,11 +1237,11 @@ def test_race_edit_post_saves_race_and_category_people_limit():
 @pytest.mark.django_db
 def test_race_edit_post_category_people_limit_zero_accepted():
     user = User.objects.create_user(username="pl2", password="p", email="pl2@e.com")
-    race = _make_race(slug="pl2", code="pl2")
+    race = _make_race(slug="pl2")
     RaceAdmin.objects.create(race=race, user=user, role=RaceAdmin.Role.ADMIN)
 
     categories = json.dumps([_cat_row(code="z", name="Zero", people_limit=0)])
-    data = _post_data(code="pl2", slug="pl2", categories_json=categories)
+    data = _post_data(slug="pl2", categories_json=categories)
     resp = _edit_post(f"/race/{race.slug}/edit/", user, data, race_slug=race.slug)
 
     assert resp.status_code == 302
@@ -1272,11 +1252,11 @@ def test_race_edit_post_category_people_limit_zero_accepted():
 @pytest.mark.django_db
 def test_race_edit_post_category_people_limit_negative_rolls_back():
     user = User.objects.create_user(username="pl3", password="p", email="pl3@e.com")
-    race = _make_race(slug="pl3", code="pl3")
+    race = _make_race(slug="pl3")
     RaceAdmin.objects.create(race=race, user=user, role=RaceAdmin.Role.ADMIN)
 
     categories = json.dumps([_cat_row(code="neg", name="Neg", people_limit=-1)])
-    data = _post_data(code="pl3", slug="pl3", categories_json=categories)
+    data = _post_data(slug="pl3", categories_json=categories)
     resp = _edit_post(f"/race/{race.slug}/edit/", user, data, race_slug=race.slug)
 
     assert resp.status_code == 200
@@ -1286,7 +1266,7 @@ def test_race_edit_post_category_people_limit_negative_rolls_back():
 @pytest.mark.django_db
 def test_race_edit_round_trip_preserves_people_limits():
     user = User.objects.create_user(username="pl4", password="p", email="pl4@e.com")
-    race = _make_race(slug="pl4", code="pl4")
+    race = _make_race(slug="pl4")
     race.people_limit = 150
     race.save(update_fields=["people_limit"])
     RaceAdmin.objects.create(race=race, user=user, role=RaceAdmin.Role.ADMIN)
@@ -1309,9 +1289,7 @@ def test_race_edit_round_trip_preserves_people_limits():
             )
         ]
     )
-    data = _post_data(
-        code="pl4", slug="pl4", people_limit=150, categories_json=categories
-    )
+    data = _post_data(slug="pl4", people_limit=150, categories_json=categories)
     resp = _edit_post(f"/race/{race.slug}/edit/", user, data, race_slug=race.slug)
 
     assert resp.status_code == 302
@@ -1329,7 +1307,7 @@ def test_race_page_context_remaining_with_limit():
     owner = User.objects.create_user(
         username="rp1", password="p", email="rp1@example.com"
     )
-    race = _make_race(slug="rem-race", code="rem")
+    race = _make_race(slug="rem-race")
     race.people_limit = 10
     race.save(update_fields=["people_limit"])
     cat = _make_category(race)
@@ -1347,7 +1325,7 @@ def test_race_page_context_remaining_with_limit():
 
 @pytest.mark.django_db
 def test_race_page_context_remaining_unlimited_is_none():
-    race = _make_race(slug="unl-race", code="unl")
+    race = _make_race(slug="unl-race")
     _make_category(race)  # both limits default to 0 → unlimited
 
     context = RacePageView.build_context(race)
@@ -1361,7 +1339,7 @@ def test_race_page_renders_remaining_badge(client):
     owner = User.objects.create_user(
         username="rp2", password="p", email="rp2@example.com"
     )
-    race = _make_race(slug="badge-race", code="badge")
+    race = _make_race(slug="badge-race")
     race.people_limit = 5
     race.save(update_fields=["people_limit"])
     cat = _make_category(race)
@@ -1379,7 +1357,7 @@ def test_race_page_renders_sold_out_badge(client):
     owner = User.objects.create_user(
         username="rp3", password="p", email="rp3@example.com"
     )
-    race = _make_race(slug="full-race", code="full")
+    race = _make_race(slug="full-race")
     race.people_limit = 2
     race.save(update_fields=["people_limit"])
     cat = _make_category(race)
@@ -1403,7 +1381,7 @@ def test_race_page_category_badge_sold_out_when_race_full():
     owner = User.objects.create_user(
         username="rp4", password="p", email="rp4@example.com"
     )
-    race = _make_race(slug="racefull-cat", code="rfc")
+    race = _make_race(slug="racefull-cat")
     race.people_limit = 4
     race.save(update_fields=["people_limit"])
     cat = _make_category(race)
@@ -1428,7 +1406,7 @@ def test_race_page_category_card_shows_labelled_stats(client):
     owner = User.objects.create_user(
         username="rp5", password="p", email="rp5@example.com"
     )
-    race = _make_race(slug="stats-race", code="stats")  # race unlimited
+    race = _make_race(slug="stats-race")  # race unlimited
     cat = _make_category(race)
     cat.people_limit = 10
     cat.save(update_fields=["people_limit"])
@@ -1455,7 +1433,7 @@ def test_race_page_category_card_unlimited_hides_remaining(client):
     owner = User.objects.create_user(
         username="rp6", password="p", email="rp6@example.com"
     )
-    race = _make_race(slug="stats-unl", code="statsunl")
+    race = _make_race(slug="stats-unl")
     cat = _make_category(race)  # people_limit defaults to 0 → unlimited
     _make_team(owner, cat, paid_people=2, start_number="1")
 
@@ -1478,7 +1456,7 @@ def test_teams_context_includes_race_remaining():
     owner = User.objects.create_user(
         username="rp4", password="p", email="rp4@example.com"
     )
-    race = _make_race(slug="tr-rem", code="trrem")
+    race = _make_race(slug="tr-rem")
     race.people_limit = 8
     race.save(update_fields=["people_limit"])
     cat = _make_category(race)
@@ -1501,7 +1479,7 @@ from website.models.models import Payment  # noqa: E402
 
 @pytest.mark.django_db
 def test_race_extra_create_and_str():
-    race = _make_race(slug="ex-race", code="exrace")
+    race = _make_race(slug="ex-race")
     extra = RaceExtra.objects.create(
         race=race, code="transfer", name="Трансфер", price=500, free_per_team=0
     )
@@ -1513,7 +1491,7 @@ def test_race_extra_create_and_str():
 
 @pytest.mark.django_db
 def test_race_extra_unique_together():
-    race = _make_race(slug="ex-uniq", code="exuniq")
+    race = _make_race(slug="ex-uniq")
     RaceExtra.objects.create(race=race, code="map", name="Карты", price=200)
     with _pytest.raises(IntegrityError):
         RaceExtra.objects.create(race=race, code="map", name="Карты 2", price=300)
@@ -1521,7 +1499,7 @@ def test_race_extra_unique_together():
 
 @pytest.mark.django_db
 def test_race_extra_default_ordering():
-    race = _make_race(slug="ex-ord", code="exord")
+    race = _make_race(slug="ex-ord")
     RaceExtra.objects.create(race=race, code="b", name="B", order=2)
     RaceExtra.objects.create(race=race, code="a", name="A", order=1)
     RaceExtra.objects.create(race=race, code="c", name="C", order=0)
@@ -1534,7 +1512,7 @@ def test_team_extra_create_and_unique_together():
     owner = User.objects.create_user(
         username="te1", password="p", email="te1@example.com"
     )
-    race = _make_race(slug="te-race", code="terace")
+    race = _make_race(slug="te-race")
     cat = _make_category(race)
     team = _make_team(owner, cat)
     extra = RaceExtra.objects.create(race=race, code="map", name="Карты", price=200)
@@ -1549,7 +1527,7 @@ def test_team_extra_protect_blocks_race_extra_delete():
     owner = User.objects.create_user(
         username="te2", password="p", email="te2@example.com"
     )
-    race = _make_race(slug="te-prot", code="teprot")
+    race = _make_race(slug="te-prot")
     cat = _make_category(race)
     team = _make_team(owner, cat)
     extra = RaceExtra.objects.create(race=race, code="map", name="Карты", price=200)
@@ -1563,7 +1541,7 @@ def test_payment_extra_create_and_str():
     owner = User.objects.create_user(
         username="pe1", password="p", email="pe1@example.com"
     )
-    race = _make_race(slug="pe-race", code="perace")
+    race = _make_race(slug="pe-race")
     cat = _make_category(race)
     team = _make_team(owner, cat)
     extra = RaceExtra.objects.create(race=race, code="map", name="Карты", price=200)
@@ -1580,7 +1558,7 @@ def test_payment_extra_protect_blocks_race_extra_delete():
     owner = User.objects.create_user(
         username="pe2", password="p", email="pe2@example.com"
     )
-    race = _make_race(slug="pe-prot", code="peprot")
+    race = _make_race(slug="pe-prot")
     cat = _make_category(race)
     team = _make_team(owner, cat)
     extra = RaceExtra.objects.create(race=race, code="map", name="Карты", price=200)
@@ -1612,7 +1590,7 @@ def test_maps_migration_backfills_race_team_payment_extras():
     owner = User.objects.create_user(
         username="mm1", password="p", email="mm1@example.com"
     )
-    race = _make_race(slug="mm-race", code="mmrace")
+    race = _make_race(slug="mm-race")
     cat = _make_category(race)
     team = _make_team(owner, cat, map_count=3, map_count_paid=1)
     payment = Payment.objects.create(
@@ -1678,7 +1656,7 @@ def test_maps_migration_reuses_existing_map_extra_without_error():
     owner = User.objects.create_user(
         username="mm4", password="p", email="mm4@example.com"
     )
-    race = _make_race(slug="mm-pre", code="mmpre")
+    race = _make_race(slug="mm-pre")
     cat = _make_category(race)
     team = _make_team(owner, cat, map_count=2, map_count_paid=0)
     # A pre-existing map extra with a *custom* price must be reused, not
@@ -1702,7 +1680,7 @@ def test_maps_migration_reverse_removes_map_rows():
     owner = User.objects.create_user(
         username="mm5", password="p", email="mm5@example.com"
     )
-    race = _make_race(slug="mm-rev", code="mmrev")
+    race = _make_race(slug="mm-rev")
     cat = _make_category(race)
     team = _make_team(owner, cat, map_count=3, map_count_paid=1)
     payment = Payment.objects.create(
@@ -1742,7 +1720,7 @@ def _priced_team(username, *, cost=1000, ucount=3, paid_people=1, slug=None):
         username=username, password="p", email=f"{username}@example.com"
     )
     slug = slug or f"pr-{username}"
-    race = _make_race(slug=slug, code=slug)
+    race = _make_race(slug=slug)
     race.cost = cost
     race.save(update_fields=["cost"])
     cat = _make_category(race)
@@ -1916,7 +1894,7 @@ def test_create_team_payment_returns_none_when_cost_zero(rf):
 @pytest.mark.django_db
 def test_race_edit_post_extras_reconcile_add_update_delete():
     user = User.objects.create_user(username="xa1", password="p", email="xa1@e.com")
-    race = _make_race(slug="xa1", code="xa1")
+    race = _make_race(slug="xa1")
     RaceAdmin.objects.create(race=race, user=user, role=RaceAdmin.Role.ADMIN)
     keep = RaceExtra.objects.create(
         race=race, code="map", name="Карты", price=200, free_per_team=2, order=0
@@ -1945,7 +1923,7 @@ def test_race_edit_post_extras_reconcile_add_update_delete():
             },
         ]
     )
-    data = _post_data(code="xa1", slug="xa1", extras_json=extras)
+    data = _post_data(slug="xa1", extras_json=extras)
     resp = _edit_post(f"/race/{race.slug}/edit/", user, data, race_slug=race.slug)
 
     assert resp.status_code == 302
@@ -1963,7 +1941,7 @@ def test_race_edit_post_extras_reconcile_add_update_delete():
 @pytest.mark.django_db
 def test_race_edit_post_extra_in_use_deactivated_not_deleted():
     user = User.objects.create_user(username="xu1", password="p", email="xu1@e.com")
-    race = _make_race(slug="xu1", code="xu1")
+    race = _make_race(slug="xu1")
     RaceAdmin.objects.create(race=race, user=user, role=RaceAdmin.Role.ADMIN)
     cat = _make_category(race)
     team = _make_team(user, cat)
@@ -1975,9 +1953,7 @@ def test_race_edit_post_extra_in_use_deactivated_not_deleted():
     # Keep the team's category in the payload (so the category reconcile does
     # not abort), but omit the extra entirely — it must deactivate, not delete.
     keep_cat = json.dumps([_cat_row(id=cat.id, code=cat.code, name=cat.name)])
-    data = _post_data(
-        code="xu1", slug="xu1", categories_json=keep_cat, extras_json="[]"
-    )
+    data = _post_data(slug="xu1", categories_json=keep_cat, extras_json="[]")
     resp = _edit_post(f"/race/{race.slug}/edit/", user, data, race_slug=race.slug)
 
     assert resp.status_code == 302
@@ -1989,9 +1965,9 @@ def test_race_edit_post_extra_in_use_deactivated_not_deleted():
 @pytest.mark.django_db
 def test_race_edit_post_extra_cross_race_id_treated_as_new():
     user = User.objects.create_user(username="xr1", password="p", email="xr1@e.com")
-    race = _make_race(slug="xr1", code="xr1")
+    race = _make_race(slug="xr1")
     RaceAdmin.objects.create(race=race, user=user, role=RaceAdmin.Role.ADMIN)
-    other = _make_race(slug="xr1b", code="xr1b")
+    other = _make_race(slug="xr1b")
     other_extra = RaceExtra.objects.create(
         race=other, code="transfer", name="Трансфер", price=500
     )
@@ -2009,7 +1985,7 @@ def test_race_edit_post_extra_cross_race_id_treated_as_new():
             }
         ]
     )
-    data = _post_data(code="xr1", slug="xr1", extras_json=extras)
+    data = _post_data(slug="xr1", extras_json=extras)
     resp = _edit_post(f"/race/{race.slug}/edit/", user, data, race_slug=race.slug)
 
     assert resp.status_code == 302
@@ -2025,7 +2001,7 @@ def test_race_edit_post_extra_cross_race_id_treated_as_new():
 @pytest.mark.django_db
 def test_race_edit_post_extra_duplicate_code_rejected():
     user = User.objects.create_user(username="xd1", password="p", email="xd1@e.com")
-    race = _make_race(slug="xd1", code="xd1")
+    race = _make_race(slug="xd1")
     RaceAdmin.objects.create(race=race, user=user, role=RaceAdmin.Role.ADMIN)
 
     dup = json.dumps(
@@ -2049,7 +2025,7 @@ def test_race_edit_post_extra_duplicate_code_rejected():
     resp = _edit_post(
         f"/race/{race.slug}/edit/",
         user,
-        _post_data(code="xd1", slug="xd1", extras_json=dup),
+        _post_data(slug="xd1", extras_json=dup),
         race_slug=race.slug,
     )
     assert resp.status_code == 200
@@ -2061,7 +2037,7 @@ def test_race_edit_post_extra_duplicate_code_rejected():
 @pytest.mark.django_db
 def test_race_edit_post_extra_invalid_code_rejected():
     user = User.objects.create_user(username="xc1", password="p", email="xc1@e.com")
-    race = _make_race(slug="xc1", code="xc1")
+    race = _make_race(slug="xc1")
     RaceAdmin.objects.create(race=race, user=user, role=RaceAdmin.Role.ADMIN)
 
     # Blank code.
@@ -2069,7 +2045,7 @@ def test_race_edit_post_extra_invalid_code_rejected():
     resp = _edit_post(
         f"/race/{race.slug}/edit/",
         user,
-        _post_data(code="xc1", slug="xc1", extras_json=blank),
+        _post_data(slug="xc1", extras_json=blank),
         race_slug=race.slug,
     )
     assert resp.status_code == 200
@@ -2079,7 +2055,7 @@ def test_race_edit_post_extra_invalid_code_rejected():
     resp = _edit_post(
         f"/race/{race.slug}/edit/",
         user,
-        _post_data(code="xc1", slug="xc1", extras_json=bad),
+        _post_data(slug="xc1", extras_json=bad),
         race_slug=race.slug,
     )
     assert resp.status_code == 200
@@ -2089,7 +2065,7 @@ def test_race_edit_post_extra_invalid_code_rejected():
     resp = _edit_post(
         f"/race/{race.slug}/edit/",
         user,
-        _post_data(code="xc1", slug="xc1", extras_json=noname),
+        _post_data(slug="xc1", extras_json=noname),
         race_slug=race.slug,
     )
     assert resp.status_code == 200
@@ -2102,7 +2078,7 @@ def test_race_edit_post_extra_invalid_code_rejected():
 @pytest.mark.django_db
 def test_race_edit_post_extra_negative_values_rejected():
     user = User.objects.create_user(username="xn1", password="p", email="xn1@e.com")
-    race = _make_race(slug="xn1", code="xn1")
+    race = _make_race(slug="xn1")
     RaceAdmin.objects.create(race=race, user=user, role=RaceAdmin.Role.ADMIN)
 
     neg_price = json.dumps(
@@ -2111,7 +2087,7 @@ def test_race_edit_post_extra_negative_values_rejected():
     resp = _edit_post(
         f"/race/{race.slug}/edit/",
         user,
-        _post_data(code="xn1", slug="xn1", extras_json=neg_price),
+        _post_data(slug="xn1", extras_json=neg_price),
         race_slug=race.slug,
     )
     assert resp.status_code == 200
@@ -2122,7 +2098,7 @@ def test_race_edit_post_extra_negative_values_rejected():
     resp = _edit_post(
         f"/race/{race.slug}/edit/",
         user,
-        _post_data(code="xn1", slug="xn1", extras_json=neg_free),
+        _post_data(slug="xn1", extras_json=neg_free),
         race_slug=race.slug,
     )
     assert resp.status_code == 200
@@ -2135,7 +2111,7 @@ def test_race_edit_post_extra_negative_values_rejected():
 @pytest.mark.django_db
 def test_race_edit_get_serializes_existing_extras_with_usage_flag():
     user = User.objects.create_user(username="xg1", password="p", email="xg1@e.com")
-    race = _make_race(slug="xg1", code="xg1")
+    race = _make_race(slug="xg1")
     RaceAdmin.objects.create(race=race, user=user, role=RaceAdmin.Role.ADMIN)
     cat = _make_category(race)
     team = _make_team(user, cat)
