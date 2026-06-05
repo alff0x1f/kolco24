@@ -5,6 +5,7 @@ from django.shortcuts import render
 from django.urls import reverse
 from django.views import View
 
+from apps.race.permissions import can_edit_race
 from apps.race.pricing import create_team_payment, upsert_team_extras
 from website.forms import TeamForm, TeamMemberMoveForm
 from website.models import Payment, Team, TeamMemberMove
@@ -22,6 +23,7 @@ class EditTeamView(View):
             raise Http404
 
         race = team.category2.race
+        bypass = can_edit_race(request.user, race)
 
         initial = {
             "teamname": team.teamname,
@@ -66,7 +68,7 @@ class EditTeamView(View):
                 ).order_by("id"),
                 "team_move_form": TeamMemberMoveForm(race_id=team.category2.race_id),
                 **build_team_form_context(
-                    race, team, is_edit=True, bypass_limits=request.user.is_superuser
+                    race, team, is_edit=True, bypass_limits=bypass
                 ),
             },
         )
@@ -79,6 +81,7 @@ class EditTeamView(View):
         if not team:
             raise Http404
         race = team.category2.race
+        bypass = can_edit_race(request.user, race)
 
         if not team.category2.race.is_teams_editable and not request.user.is_superuser:
             return HttpResponse("Редактирование команд запрещено", status=403)
@@ -91,7 +94,7 @@ class EditTeamView(View):
             request.POST,
             current_category_id=team.category2_id,
             team=team,
-            bypass_limits=request.user.is_superuser,
+            bypass_limits=bypass,
         )
         if form.is_valid():
             if "teamname" in form.cleaned_data:
@@ -129,7 +132,7 @@ class EditTeamView(View):
                             race,
                             team,
                             is_edit=True,
-                            bypass_limits=request.user.is_superuser,
+                            bypass_limits=bypass,
                             form=form,
                         ),
                     },
@@ -186,7 +189,7 @@ class EditTeamView(View):
                     race,
                     team,
                     is_edit=True,
-                    bypass_limits=request.user.is_superuser,
+                    bypass_limits=bypass,
                     form=form,
                 ),
             },

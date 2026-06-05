@@ -23,6 +23,7 @@ from django.views import View
 from django.views.decorators.csrf import csrf_exempt
 from openpyxl import load_workbook
 
+from apps.race.permissions import can_edit_race
 from apps.race.pricing import create_team_payment, upsert_team_extras
 from website.forms import NewsPostForm, PageForm, TeamForm
 from website.models import (
@@ -700,6 +701,7 @@ class AddTeam(View):
                 reverse("account_start") + f"?next={request.path}"
             )
         form = TeamForm(race.id)
+        bypass = can_edit_race(request.user, race)
         return render(
             request,
             "website/add_team.html",
@@ -709,9 +711,7 @@ class AddTeam(View):
                 "team_form": form,
                 "team": Team(),
                 "action": reverse("add_team", args=[race.slug]),
-                **build_team_form_context(
-                    race, Team(), bypass_limits=request.user.is_superuser
-                ),
+                **build_team_form_context(race, Team(), bypass_limits=bypass),
             },
         )
 
@@ -737,7 +737,8 @@ class AddTeam(View):
         data = request.POST.copy()
         data["dist"] = category2.code
         data["paymentid"] = "%016x" % random.randrange(16**16)  # legacy
-        form = TeamForm(race.id, data, bypass_limits=request.user.is_superuser)
+        bypass = can_edit_race(request.user, race)
+        form = TeamForm(race.id, data, bypass_limits=bypass)
         if form.is_valid():
             # save team (extra_<code> fields are add-ons, not Team columns)
             team_fields = {
@@ -770,7 +771,7 @@ class AddTeam(View):
                 "team": Team(),
                 "action": reverse("add_team", args=[race.slug]),
                 **build_team_form_context(
-                    race, Team(), bypass_limits=request.user.is_superuser, form=form
+                    race, Team(), bypass_limits=bypass, form=form
                 ),
             },
         )
