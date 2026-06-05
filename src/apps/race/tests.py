@@ -2008,12 +2008,14 @@ def test_race_edit_post_extra_duplicate_code_rejected():
         [
             {
                 "id": None,
+                "code": "transfer",
                 "name": "A",
                 "price": 1,
                 "is_active": True,
             },
             {
                 "id": None,
+                "code": "transfer",
                 "name": "B",
                 "price": 2,
                 "is_active": True,
