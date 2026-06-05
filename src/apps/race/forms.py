@@ -8,11 +8,11 @@ class RaceForm(forms.ModelForm):
     """ModelForm over the scalar ``Race`` fields.
 
     Widgets carry no ``attrs`` — the template renders every input manually
-    (see the ``base-2.html`` convention). ``code``/``slug`` uniqueness is
-    enforced by the model fields with automatic self-exclusion on edit, and
-    ``Race.clean()`` (header image/logo URL validation) runs via the
-    ModelForm's ``_post_clean``. The removed ``is_reg_open`` field is
-    intentionally absent; ``cost`` is now only the fallback price.
+    (see the ``base-2.html`` convention). ``slug`` uniqueness is enforced by
+    the model field with automatic self-exclusion on edit, and ``Race.clean()``
+    (header image/logo URL validation) runs via the ModelForm's ``_post_clean``.
+    The removed ``is_reg_open`` field is intentionally absent; ``cost`` is now
+    only the fallback price.
     """
 
     cost = forms.IntegerField(required=False, min_value=0)
@@ -48,7 +48,6 @@ class RaceForm(forms.ModelForm):
         }
         fields = [
             "name",
-            "code",
             "slug",
             "place",
             "date",

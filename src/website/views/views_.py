@@ -398,7 +398,6 @@ class RaceView(View):
                 {
                     "id": race.id,
                     "name": race.name,
-                    "code": race.code,
                     "date": race.date.strftime("%Y-%m-%d"),
                     "is_active": race.is_active,
                 }

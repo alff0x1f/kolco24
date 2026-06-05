@@ -32,7 +32,7 @@
           <span class="chip edit">{% if is_create %}Новая{% else %}Изменение{% endif %}</span>
         </div>
         {% if not is_create %}
-        <div class="sub">ID&nbsp;{{ race.id }} · код&nbsp;<code>{{ race.code }}</code></div>
+        <div class="sub">ID&nbsp;{{ race.id }}</div>
         {% endif %}
       </div>
       <div class="head-actions">
@@ -68,29 +68,16 @@
               {% if form.name.errors %}<span class="field-error">{{ form.name.errors|join:", " }}</span>{% endif %}
             </div>
 
-            <div class="field-row two">
-              <div class="field">
-                <div class="label-row">
-                  <label for="f-code">Код <span class="req">*</span></label>
-                  <span class="charcount"><span data-count-for="f-code">0</span>/15</span>
-                </div>
-                <input class="control mono{% if form.code.errors %} has-error{% endif %}" id="f-code"
-                       name="code" type="text" maxlength="15"
-                       value="{{ form.code.value|default_if_none:'' }}" placeholder="k24-2025">
-                {% if form.code.errors %}<span class="field-error">{{ form.code.errors|join:", " }}</span>
-                {% else %}<span class="field-hint">Уникальный, для внутренних ссылок и API.</span>{% endif %}
+            <div class="field">
+              <label for="f-slug">URL-slug <span class="req">*</span></label>
+              <div class="input-group">
+                <span class="prefix">/race/</span>
+                <input class="control mono{% if form.slug.errors %} has-error{% endif %}" id="f-slug"
+                       name="slug" type="text" maxlength="50"
+                       value="{{ form.slug.value|default_if_none:'' }}" placeholder="kolco24-2025">
               </div>
-              <div class="field">
-                <label for="f-slug">URL-slug <span class="req">*</span></label>
-                <div class="input-group">
-                  <span class="prefix">/race/</span>
-                  <input class="control mono{% if form.slug.errors %} has-error{% endif %}" id="f-slug"
-                         name="slug" type="text" maxlength="50"
-                         value="{{ form.slug.value|default_if_none:'' }}" placeholder="kolco24-2025">
-                </div>
-                {% if form.slug.errors %}<span class="field-error">{{ form.slug.errors|join:", " }}</span>
-                {% else %}<span class="field-hint">Адрес страницы. <a href="#" id="slugAuto">Сгенерировать из названия</a></span>{% endif %}
-              </div>
+              {% if form.slug.errors %}<span class="field-error">{{ form.slug.errors|join:", " }}</span>
+              {% else %}<span class="field-hint">Адрес страницы. <a href="#" id="slugAuto">Сгенерировать из названия</a></span>{% endif %}
             </div>
 
             <div class="field">
