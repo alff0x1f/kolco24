@@ -197,10 +197,10 @@ method.upper() + "\n" + full_path + "\n" + ts + "\n" + sha256_hex(body)
 - [x] run `make lint` (ruff, black --check, isort --check, flake8) — must pass before next task
 
 ### Task 8: Verify acceptance criteria
-- [ ] verify all Overview requirements: legend gated by signature, install stats recorded, `/api`/`donate`/`website` untouched
-- [ ] verify edge cases: fail-closed empty secret, neutral 403, 404-after-auth, stats-write failure does not 500
-- [ ] run full test suite: `uv run pytest --reuse-db`
-- [ ] (no project e2e suite for this area — n/a)
+- [x] verify all Overview requirements: legend gated by signature, install stats recorded, `/api`/`donate`/`website` untouched (branch diff vs master is additive-only: mobile app + 5 lines in settings.py + 1 line in urls.py + env example)
+- [x] verify edge cases: fail-closed empty secret, neutral 403, 404-after-auth, stats-write failure does not 500 (covered by Task 6 request-level tests)
+- [x] run full test suite: `uv run pytest --reuse-db` (369 passed)
+- [x] (no project e2e suite for this area — n/a)
 
 ### Task 9: [Final] Update documentation
 - [ ] update `CLAUDE.md` with an `apps.mobile` architecture note (signed app endpoints, `AppInstall` stats, fail-closed secret, canonical-string rule)
