@@ -167,3 +167,45 @@ def test_client_ip_prefers_forwarded_for():
 def test_client_ip_falls_back_to_remote_addr():
     request = RequestFactory().get(PATH, REMOTE_ADDR="10.0.0.2")
     assert _client_ip(request) == "10.0.0.2"
+
+
+# --- LegendView request-level ----------------------------------------------
+
+
+def _signed_headers(method, path, secret, body=b""):
+    """Build signed request headers mirroring the client side."""
+    ts = str(int(time.time()))
+    canonical = build_canonical(method, path, ts, body)
+    sig = sign(secret, canonical)
+    return {
+        "HTTP_X_APP_SIG": sig,
+        "HTTP_X_APP_TS": ts,
+        "HTTP_X_INSTALL_ID": "install-abc",
+        "HTTP_X_APP_PLATFORM": "ios",
+        "HTTP_X_APP_VERSION": "1.4.0",
+    }
+
+
+@pytest.mark.django_db
+def test_legend_valid_signature_returns_200_with_fields_and_order(client, settings):
+    from website.models.checkpoint import Checkpoint
+    from website.models.race import Race
+
+    settings.MOBILE_APP_SECRET = SECRET
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    race = Race.objects.create(name="Test race", slug="test-race")
+    Checkpoint.objects.create(race=race, number=3, cost=2, description="third")
+    Checkpoint.objects.create(race=race, number=1, cost=1, description="first")
+    Checkpoint.objects.create(race=race, number=2, cost=1, description="second")
+
+    path = f"/app/race/{race.id}/legend/"
+    response = client.get(path, **_signed_headers("GET", path, SECRET))
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["race"] == race.id
+    assert [c["number"] for c in data["checkpoints"]] == [1, 2, 3]
+    first = data["checkpoints"][0]
+    assert set(first.keys()) == {"number", "cost", "type", "description"}
+    assert first["description"] == "first"

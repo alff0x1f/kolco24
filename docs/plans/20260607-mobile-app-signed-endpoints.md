@@ -165,12 +165,12 @@ method.upper() + "\n" + full_path + "\n" + ts + "\n" + sha256_hex(body)
 - Create: `src/apps/mobile/urls.py`
 - Modify: `src/config/urls.py`
 
-- [ ] create `LegendCheckpointSerializer(ModelSerializer)` on `website.Checkpoint`, `fields = ["number","cost","type","description"]`
-- [ ] create `AppAPIView(APIView)` with `authentication_classes=[]`, `permission_classes=[SignedAppPermission]`, `initial()` override calling `super().initial()` then `_record_install()`; `_record_install` does update_or_create + `F()` increment wrapped in try/except + `logger.exception`
-- [ ] create `LegendView(AppAPIView).get(request, race_id)` returning race legend (`get_object_or_404(Race, pk=race_id)`, ordered by `number, id`)
-- [ ] create `apps/mobile/urls.py` (`app_name="mobile"`, legend route) and mount `path("app/", include("apps.mobile.urls"))` in `src/config/urls.py`
-- [ ] write request-level test: `signed_headers` helper + valid signature → 200 with expected fields and `number` ordering
-- [ ] run tests — must pass before next task
+- [x] create `LegendCheckpointSerializer(ModelSerializer)` on `website.Checkpoint`, `fields = ["number","cost","type","description"]`
+- [x] create `AppAPIView(APIView)` with `authentication_classes=[]`, `permission_classes=[SignedAppPermission]`, `initial()` override calling `super().initial()` then `_record_install()`; `_record_install` does update_or_create + `F()` increment wrapped in try/except + `logger.exception`
+- [x] create `LegendView(AppAPIView).get(request, race_id)` returning race legend (`get_object_or_404(Race, pk=race_id)`, ordered by `number, id`)
+- [x] create `apps/mobile/urls.py` (`app_name="mobile"`, legend route) and mount `path("app/", include("apps.mobile.urls"))` in `src/config/urls.py`
+- [x] write request-level test: `signed_headers` helper + valid signature → 200 with expected fields and `number` ordering
+- [x] run tests — must pass before next task
 
 ### Task 6: End-to-end request-level test cases (gate + stats)
 
