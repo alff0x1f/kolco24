@@ -35,7 +35,6 @@ from apps.accounts.forms import (
 )
 from apps.accounts.models import EmailVerification
 from website.models import Race
-from website.models.race import RegStatus
 
 logger = logging.getLogger(__name__)
 
@@ -189,17 +188,8 @@ class RegisterView(View):
 
             # A guest who started from a login-gated page (e.g. «Войти и
             # добавить команду») carries ?next= through login → register; honor
-            # it so they land back where they came from.
-            if next_url:
-                return _safe_redirect(request, next_url)
-
-            # todo change it in 2026
-            race = Race.objects.filter(id=8).first()  # 2025
-            if race is None:
-                return HttpResponseRedirect("/")
-            if race.reg_status == RegStatus.OPEN:
-                return HttpResponseRedirect(reverse("add_team", args=[race.slug]))
-            return HttpResponseRedirect(reverse("my_teams", args=[race.slug]))
+            # it so they land back where they came from, otherwise go home.
+            return _safe_redirect(request, next_url or "/")
 
         return render(
             request,

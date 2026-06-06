@@ -67,7 +67,7 @@
                     </div>
                 </div>
                 {% else %}
-                <a class="login" href="{% url 'login' %}">Войти</a>
+                <a class="login" href="{% url 'login' %}?next={{ request.get_full_path|urlencode }}">Войти</a>
                 {% endif %}
             </div>
         </div>
