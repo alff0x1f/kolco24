@@ -192,9 +192,9 @@ method.upper() + "\n" + full_path + "\n" + ts + "\n" + sha256_hex(body)
 **Files:**
 - Modify: `deploy/kolco24.env.example`
 
-- [ ] add `MOBILE_APP_SECRET=` to `deploy/kolco24.env.example` (with a short comment)
-- [ ] run `make format` (ruff --fix, black, isort)
-- [ ] run `make lint` (ruff, black --check, isort --check, flake8) — must pass before next task
+- [x] add `MOBILE_APP_SECRET=` to `deploy/kolco24.env.example` (with a short comment)
+- [x] run `make format` (ruff --fix, black, isort)
+- [x] run `make lint` (ruff, black --check, isort --check, flake8) — must pass before next task
 
 ### Task 8: Verify acceptance criteria
 - [ ] verify all Overview requirements: legend gated by signature, install stats recorded, `/api`/`donate`/`website` untouched

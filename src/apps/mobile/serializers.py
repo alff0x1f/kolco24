@@ -6,7 +6,10 @@ from website.models.checkpoint import Checkpoint
 
 
 class LegendCheckpointSerializer(serializers.ModelSerializer):
-    """Public legend view of a checkpoint — never exposes ``id``/``iterator``/``year``."""
+    """Public legend view of a checkpoint.
+
+    Never exposes ``id``/``iterator``/``year``.
+    """
 
     class Meta:
         model = Checkpoint
