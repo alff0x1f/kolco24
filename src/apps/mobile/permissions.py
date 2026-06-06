@@ -26,6 +26,9 @@ def _client_ip(request):
 class SignedAppPermission(BasePermission):
     """Verify the mobile app's HMAC signature; stash metadata on success."""
 
+    # Neutral denial: never hint which check failed (don't help brute-forcing).
+    message = "Forbidden"
+
     def has_permission(self, request, view):
         secret = getattr(settings, "MOBILE_APP_SECRET", "") or ""
         if not secret:

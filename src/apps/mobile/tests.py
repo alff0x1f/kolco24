@@ -209,3 +209,122 @@ def test_legend_valid_signature_returns_200_with_fields_and_order(client, settin
     first = data["checkpoints"][0]
     assert set(first.keys()) == {"number", "cost", "type", "description"}
     assert first["description"] == "first"
+
+
+# --- End-to-end gate + stats (request-level) -------------------------------
+
+
+@pytest.fixture
+def race_with_checkpoints(db):
+    from website.models.checkpoint import Checkpoint
+    from website.models.race import Race
+
+    race = Race.objects.create(name="E2E race", slug="e2e-race")
+    Checkpoint.objects.create(race=race, number=1, cost=1, description="first")
+    return race
+
+
+@pytest.mark.django_db
+def test_legend_no_headers_returns_403(client, settings, race_with_checkpoints):
+    settings.MOBILE_APP_SECRET = SECRET
+    path = f"/app/race/{race_with_checkpoints.id}/legend/"
+    response = client.get(path)
+    assert response.status_code == 403
+    assert response.json() == {"detail": "Forbidden"}
+
+
+@pytest.mark.django_db
+def test_legend_wrong_signature_returns_403(client, settings, race_with_checkpoints):
+    settings.MOBILE_APP_SECRET = SECRET
+    path = f"/app/race/{race_with_checkpoints.id}/legend/"
+    headers = _signed_headers("GET", path, "wrong-secret")
+    response = client.get(path, **headers)
+    assert response.status_code == 403
+    assert response.json() == {"detail": "Forbidden"}
+
+
+@pytest.mark.django_db
+def test_legend_expired_ts_returns_403(client, settings, race_with_checkpoints):
+    settings.MOBILE_APP_SECRET = SECRET
+    settings.MOBILE_APP_TS_WINDOW = 300
+    path = f"/app/race/{race_with_checkpoints.id}/legend/"
+    old_ts = str(int(time.time()) - 1000)
+    canonical = build_canonical("GET", path, old_ts, b"")
+    sig = sign(SECRET, canonical)
+    headers = {
+        "HTTP_X_APP_SIG": sig,
+        "HTTP_X_APP_TS": old_ts,
+        "HTTP_X_INSTALL_ID": "install-abc",
+        "HTTP_X_APP_PLATFORM": "ios",
+        "HTTP_X_APP_VERSION": "1.4.0",
+    }
+    response = client.get(path, **headers)
+    assert response.status_code == 403
+    assert response.json() == {"detail": "Forbidden"}
+
+
+@pytest.mark.django_db
+def test_legend_empty_secret_fails_closed(client, settings, race_with_checkpoints):
+    settings.MOBILE_APP_SECRET = ""
+    path = f"/app/race/{race_with_checkpoints.id}/legend/"
+    # even a "correctly" signed request (against empty secret) must be rejected
+    headers = _signed_headers("GET", path, "")
+    response = client.get(path, **headers)
+    assert response.status_code == 403
+    assert response.json() == {"detail": "Forbidden"}
+
+
+@pytest.mark.django_db
+def test_legend_valid_sig_nonexistent_race_returns_404(client, settings):
+    settings.MOBILE_APP_SECRET = SECRET
+    settings.MOBILE_APP_TS_WINDOW = 300
+    path = "/app/race/999999/legend/"
+    headers = _signed_headers("GET", path, SECRET)
+    response = client.get(path, **headers)
+    assert response.status_code == 404
+
+
+@pytest.mark.django_db
+def test_legend_records_appinstall_and_increments(
+    client, settings, race_with_checkpoints
+):
+    settings.MOBILE_APP_SECRET = SECRET
+    settings.MOBILE_APP_TS_WINDOW = 300
+    path = f"/app/race/{race_with_checkpoints.id}/legend/"
+
+    response = client.get(path, **_signed_headers("GET", path, SECRET))
+    assert response.status_code == 200
+
+    install = AppInstall.objects.get(install_id="install-abc")
+    assert install.request_count == 1
+    assert install.platform == "ios"
+    assert install.app_version == "1.4.0"
+    first_last_seen = install.last_seen
+
+    response = client.get(path, **_signed_headers("GET", path, SECRET))
+    assert response.status_code == 200
+
+    install.refresh_from_db()
+    assert install.request_count == 2
+    assert install.last_seen >= first_last_seen
+    assert AppInstall.objects.filter(install_id="install-abc").count() == 1
+
+
+@pytest.mark.django_db
+def test_legend_stats_write_failure_does_not_break_response(
+    client, settings, race_with_checkpoints, monkeypatch
+):
+    settings.MOBILE_APP_SECRET = SECRET
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    def boom(*args, **kwargs):
+        raise IntegrityError("simulated stats write failure")
+
+    monkeypatch.setattr(AppInstall.objects, "update_or_create", boom)
+
+    path = f"/app/race/{race_with_checkpoints.id}/legend/"
+    response = client.get(path, **_signed_headers("GET", path, SECRET))
+
+    assert response.status_code == 200
+    assert response.json()["race"] == race_with_checkpoints.id
+    assert not AppInstall.objects.filter(install_id="install-abc").exists()

@@ -177,13 +177,15 @@ method.upper() + "\n" + full_path + "\n" + ts + "\n" + sha256_hex(body)
 **Files:**
 - Modify: `src/apps/mobile/tests.py`
 
-- [ ] add `settings` fixture / `settings.MOBILE_APP_SECRET = ...` setup and a `signed_headers(method, path, secret, body=b"")` helper
-- [ ] case: no headers → 403; case: wrong signature → 403; case: expired `X-App-Ts` (outside window) → 403
-- [ ] case: empty `MOBILE_APP_SECRET` → 403 (fail closed); case: valid signature + nonexistent `race_id` → 404
-- [ ] case: valid request creates `AppInstall`; repeat increments `request_count` and updates `last_seen`/`platform`
-- [ ] case: a stats-write failure does NOT break the response — mock `AppInstall.objects.update_or_create` to raise and assert the legend still returns 200
-- [ ] case: `_client_ip` parses first `X-Forwarded-For` entry, falls back to `REMOTE_ADDR`
-- [ ] run full app test suite: `uv run pytest src/apps/mobile/tests.py` — must pass before next task
+- [x] add `settings` fixture / `settings.MOBILE_APP_SECRET = ...` setup and a `signed_headers(method, path, secret, body=b"")` helper
+- [x] case: no headers → 403; case: wrong signature → 403; case: expired `X-App-Ts` (outside window) → 403
+- [x] case: empty `MOBILE_APP_SECRET` → 403 (fail closed); case: valid signature + nonexistent `race_id` → 404
+- [x] case: valid request creates `AppInstall`; repeat increments `request_count` and updates `last_seen`/`platform`
+- [x] case: a stats-write failure does NOT break the response — mock `AppInstall.objects.update_or_create` to raise and assert the legend still returns 200
+- [x] case: `_client_ip` parses first `X-Forwarded-For` entry, falls back to `REMOTE_ADDR`
+- [x] run full app test suite: `uv run pytest src/apps/mobile/tests.py` — must pass before next task
+
+  ➕ Added `message = "Forbidden"` to `SignedAppPermission` so DRF returns the neutral `{"detail": "Forbidden"}` body the plan's contract specifies (was returning the default localized message).
 
 ### Task 7: Env example + format/lint
 
