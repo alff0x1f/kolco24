@@ -25,9 +25,7 @@ def build_canonical(method: str, full_path: str, ts: str, body: bytes) -> str:
 
 def sign(secret: str, canonical: str) -> str:
     """HMAC-SHA256 hexdigest of ``canonical`` keyed by ``secret``."""
-    return hmac.new(
-        secret.encode(), canonical.encode(), hashlib.sha256
-    ).hexdigest()
+    return hmac.new(secret.encode(), canonical.encode(), hashlib.sha256).hexdigest()
 
 
 def verify(secret: str, canonical: str, provided_sig: str) -> bool:

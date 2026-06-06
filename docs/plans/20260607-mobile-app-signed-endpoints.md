@@ -140,11 +140,11 @@ method.upper() + "\n" + full_path + "\n" + ts + "\n" + sha256_hex(body)
 - Create: `src/apps/mobile/migrations/0001_initial.py` (generated)
 - Modify: `src/apps/mobile/tests.py`
 
-- [ ] create `AppInstall` model with all fields per Technical Details
-- [ ] register `AppInstall` in admin as read-only list (`list_display`, all fields read-only, no add/delete needed)
-- [ ] generate migration: `uv run python src/manage.py makemigrations mobile`
-- [ ] write test: `AppInstall` create + uniqueness of `install_id`; `request_count` default 0
-- [ ] run tests + `uv run python src/manage.py makemigrations --check` — must pass before next task
+- [x] create `AppInstall` model with all fields per Technical Details
+- [x] register `AppInstall` in admin as read-only list (`list_display`, all fields read-only, no add/delete needed)
+- [x] generate migration: `uv run python src/manage.py makemigrations mobile`
+- [x] write test: `AppInstall` create + uniqueness of `install_id`; `request_count` default 0
+- [x] run tests + `uv run python src/manage.py makemigrations --check` — must pass before next task
 
 ### Task 4: `SignedAppPermission` (`permissions.py`)
 

@@ -1,6 +1,10 @@
 import hashlib
 import hmac
 
+import pytest
+from django.db import IntegrityError
+
+from apps.mobile.models import AppInstall
 from apps.mobile.signing import build_canonical, sha256_hex, sign, verify
 
 
@@ -32,9 +36,7 @@ def test_build_canonical_hashes_body():
 
 def test_sign_matches_hmac():
     canonical = build_canonical("GET", "/app/race/1/legend/", "1700000000", b"")
-    expected = hmac.new(
-        b"secret", canonical.encode(), hashlib.sha256
-    ).hexdigest()
+    expected = hmac.new(b"secret", canonical.encode(), hashlib.sha256).hexdigest()
     assert sign("secret", canonical) == expected
 
 
@@ -64,3 +66,20 @@ def test_verify_false_for_changed_path():
         "GET", "/app/race/2/legend/", "1700000000", b""
     )
     assert verify("secret", tampered_canonical, sig) is False
+
+
+@pytest.mark.django_db
+def test_appinstall_create_defaults():
+    install = AppInstall.objects.create(install_id="abc-123")
+    assert install.request_count == 0
+    assert install.platform == ""
+    assert install.app_version == ""
+    assert install.first_seen is not None
+    assert install.last_seen is not None
+
+
+@pytest.mark.django_db
+def test_appinstall_install_id_unique():
+    AppInstall.objects.create(install_id="dup-id")
+    with pytest.raises(IntegrityError):
+        AppInstall.objects.create(install_id="dup-id")
