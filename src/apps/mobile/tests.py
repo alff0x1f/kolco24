@@ -138,6 +138,14 @@ def test_permission_expired_ts_false(settings):
     assert SignedAppPermission().has_permission(request, None) is False
 
 
+def test_permission_future_ts_false(settings):
+    settings.MOBILE_APP_SECRET = SECRET
+    settings.MOBILE_APP_TS_WINDOW = 300
+    future_ts = str(int(time.time()) + 1000)
+    request = _signed_get_request(ts=future_ts)
+    assert SignedAppPermission().has_permission(request, None) is False
+
+
 def test_permission_bad_signature_false(settings):
     settings.MOBILE_APP_SECRET = SECRET
     request = _signed_get_request(secret="wrong-secret")
@@ -194,7 +202,9 @@ def test_legend_valid_signature_returns_200_with_fields_and_order(client, settin
     settings.MOBILE_APP_SECRET = SECRET
     settings.MOBILE_APP_TS_WINDOW = 300
 
-    race = Race.objects.create(name="Test race", slug="test-race")
+    race = Race.objects.create(
+        name="Test race", slug="test-race", is_legend_visible=True
+    )
     Checkpoint.objects.create(race=race, number=3, cost=2, description="third")
     Checkpoint.objects.create(race=race, number=1, cost=1, description="first")
     Checkpoint.objects.create(race=race, number=2, cost=1, description="second")
@@ -208,6 +218,7 @@ def test_legend_valid_signature_returns_200_with_fields_and_order(client, settin
     assert [c["number"] for c in data["checkpoints"]] == [1, 2, 3]
     first = data["checkpoints"][0]
     assert set(first.keys()) == {"number", "cost", "type", "description"}
+    assert first["type"] == "kp"
     assert first["description"] == "first"
 
 
@@ -219,7 +230,7 @@ def race_with_checkpoints(db):
     from website.models.checkpoint import Checkpoint
     from website.models.race import Race
 
-    race = Race.objects.create(name="E2E race", slug="e2e-race")
+    race = Race.objects.create(name="E2E race", slug="e2e-race", is_legend_visible=True)
     Checkpoint.objects.create(race=race, number=1, cost=1, description="first")
     return race
 
@@ -308,6 +319,53 @@ def test_legend_records_appinstall_and_increments(
     assert install.request_count == 2
     assert install.last_seen >= first_last_seen
     assert AppInstall.objects.filter(install_id="install-abc").count() == 1
+
+
+@pytest.mark.django_db
+def test_legend_closed_legend_returns_empty_checkpoints(client, settings):
+    from website.models.checkpoint import Checkpoint
+    from website.models.race import Race
+
+    settings.MOBILE_APP_SECRET = SECRET
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    race = Race.objects.create(
+        name="Closed race", slug="closed-race", is_legend_visible=False
+    )
+    Checkpoint.objects.create(race=race, number=1, cost=1, description="secret")
+
+    path = f"/app/race/{race.id}/legend/"
+    response = client.get(path, **_signed_headers("GET", path, SECRET))
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["race"] == race.id
+    assert data["checkpoints"] == []
+
+
+@pytest.mark.django_db
+def test_legend_excludes_draft_checkpoints(client, settings):
+    from website.models.checkpoint import Checkpoint
+    from website.models.race import Race
+
+    settings.MOBILE_APP_SECRET = SECRET
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    race = Race.objects.create(
+        name="Draft race", slug="draft-race", is_legend_visible=True
+    )
+    Checkpoint.objects.create(race=race, number=1, cost=1, description="visible")
+    Checkpoint.objects.create(
+        race=race, number=2, cost=0, description="draft cp", type="draft"
+    )
+
+    path = f"/app/race/{race.id}/legend/"
+    response = client.get(path, **_signed_headers("GET", path, SECRET))
+
+    assert response.status_code == 200
+    data = response.json()
+    numbers = [c["number"] for c in data["checkpoints"]]
+    assert numbers == [1]
 
 
 @pytest.mark.django_db

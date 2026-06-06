@@ -14,6 +14,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from website.models.checkpoint import Checkpoint
+from website.models.enums import CheckpointType
 from website.models.race import Race
 
 from .models import AppInstall
@@ -60,7 +61,13 @@ class LegendView(AppAPIView):
 
     def get(self, request, race_id):
         race = get_object_or_404(Race, pk=race_id)
-        qs = Checkpoint.objects.filter(race=race).order_by("number", "id")
+        if not race.is_legend_visible:
+            return Response({"race": race_id, "checkpoints": []})
+        qs = (
+            Checkpoint.objects.filter(race=race)
+            .exclude(type=CheckpointType.draft.value)
+            .order_by("number", "id")
+        )
         return Response(
             {
                 "race": race_id,
