@@ -203,8 +203,8 @@ method.upper() + "\n" + full_path + "\n" + ts + "\n" + sha256_hex(body)
 - [x] (no project e2e suite for this area — n/a)
 
 ### Task 9: [Final] Update documentation
-- [ ] update `CLAUDE.md` with an `apps.mobile` architecture note (signed app endpoints, `AppInstall` stats, fail-closed secret, canonical-string rule)
-- [ ] move this plan to `docs/plans/completed/`
+- [x] update `CLAUDE.md` with an `apps.mobile` architecture note (signed app endpoints, `AppInstall` stats, fail-closed secret, canonical-string rule)
+- [x] move this plan to `docs/plans/completed/`
 
 ## Post-Completion
 *Items requiring manual intervention or external systems — no checkboxes, informational only*
