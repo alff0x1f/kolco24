@@ -114,11 +114,11 @@ method.upper() + "\n" + full_path + "\n" + ts + "\n" + sha256_hex(body)
 - Create: `src/apps/mobile/migrations/__init__.py`
 - Modify: `src/config/settings.py`
 
-- [ ] create `src/apps/mobile/__init__.py` (empty) and `migrations/__init__.py` (empty)
-- [ ] create `src/apps/mobile/apps.py` with `class MobileConfig(AppConfig)`: `default_auto_field`, `name = "apps.mobile"`, `label = "mobile"`
-- [ ] add `"apps.mobile"` to `INSTALLED_APPS` in `src/config/settings.py`
-- [ ] add `MOBILE_APP_SECRET = os.getenv("MOBILE_APP_SECRET", "")` and `MOBILE_APP_TS_WINDOW = 300` to `src/config/settings.py`
-- [ ] verify app loads: `uv run python src/manage.py check` — must pass before next task
+- [x] create `src/apps/mobile/__init__.py` (empty) and `migrations/__init__.py` (empty)
+- [x] create `src/apps/mobile/apps.py` with `class MobileConfig(AppConfig)`: `default_auto_field`, `name = "apps.mobile"`, `label = "mobile"`
+- [x] add `"apps.mobile"` to `INSTALLED_APPS` in `src/config/settings.py`
+- [x] add `MOBILE_APP_SECRET = os.getenv("MOBILE_APP_SECRET", "")` and `MOBILE_APP_TS_WINDOW = 300` to `src/config/settings.py`
+- [x] verify app loads: `uv run python src/manage.py check` — must pass before next task
 
 ### Task 2: Signing helpers (`signing.py`)
 
