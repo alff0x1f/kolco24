@@ -2390,6 +2390,23 @@ def test_custom_403_page_http_response(rf):
     assert "is-403" in resp.content.decode()
 
 
+@pytest.mark.django_db
+def test_race_api_returns_published_races(client):
+    published = Race.objects.create(
+        name="Open Race", slug="open-race", is_published=True
+    )
+    Race.objects.create(name="Draft Race", slug="draft-race", is_published=False)
+
+    resp = client.get(reverse("api_races"))
+
+    assert resp.status_code == 200
+    data = resp.json()
+    ids = [r["id"] for r in data]
+    assert published.id in ids
+    assert all(r["is_published"] is True for r in data)
+    assert not any(r.get("is_active") is not None for r in data)
+
+
 def test_custom_500_page_renders_standalone():
     # 500 is standalone: rendered by server_error with an empty Context() and no
     # context processors (the DB may be the cause of the 500). It must NOT extend

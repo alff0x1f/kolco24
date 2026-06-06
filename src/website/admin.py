@@ -153,8 +153,8 @@ class RacePriceTierInline(admin.TabularInline):
 
 
 class RaceModelAdmin(admin.ModelAdmin):
-    list_display = ("id", "name", "slug", "date", "is_active", "reg_status")
-    list_filter = ("is_active",)
+    list_display = ("id", "name", "slug", "date", "is_published", "reg_status")
+    list_filter = ("is_published",)
     search_fields = ("name", "slug")
     prepopulated_fields = {"slug": ("name",)}
     inlines = [RaceAdminInline, RacePriceTierInline]

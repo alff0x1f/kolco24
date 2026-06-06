@@ -283,18 +283,18 @@
         <section class="card">
           <div class="card-head"><h2>Публикация</h2></div>
           <div class="pub">
-            <div class="pub-status{% if not form.is_active.value %} off{% endif %}" id="pubStatus">
+            <div class="pub-status{% if not form.is_published.value %} off{% endif %}" id="pubStatus">
               <span class="dot"></span>
-              <span class="txt">{% if form.is_active.value %}Гонка активна и видна на сайте{% else %}Черновик — гонка скрыта с сайта{% endif %}</span>
+              <span class="txt">{% if form.is_published.value %}Гонка опубликована{% else %}Черновик — скрыта{% endif %}</span>
             </div>
 
             <div class="pub-line">
               <div>
-                <div class="pl-label">Активна</div>
-                <div class="pl-desc">Показывать гонку в&nbsp;списках</div>
+                <div class="pl-label">Опубликована</div>
+                <div class="pl-desc">Показывать гонку в&nbsp;приложении и&nbsp;на&nbsp;сайте</div>
               </div>
               <label class="switch">
-                <input type="checkbox" id="f-active" name="is_active"{% if form.is_active.value %} checked{% endif %}>
+                <input type="checkbox" id="f-active" name="is_published"{% if form.is_published.value %} checked{% endif %}>
                 <span class="track"></span>
               </label>
             </div>
