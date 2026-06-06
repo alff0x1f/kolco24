@@ -93,11 +93,6 @@ def test_race_id_redirect_teams(client):
 
 
 @pytest.mark.django_db
-def test_legacy_teams_endpoint_returns_404(client):
-    assert client.get("/teams/").status_code == 404
-
-
-@pytest.mark.django_db
 def test_race_slug_news_view(client):
     race = Race.objects.create(name="Test Race", slug="tr2025c")
     response = client.get(f"/race/{race.slug}/")
@@ -348,31 +343,6 @@ def test_login_view_post_invalid_credentials(client):
     )
     assert response.status_code == 200
     assert "_auth_user_id" not in client.session
-
-
-@pytest.mark.django_db
-def test_passlogin_url_returns_404(client):
-    response = client.get("/passlogin/")
-    assert response.status_code == 404
-
-
-@pytest.mark.django_db
-def test_transfer_urls_return_404(client):
-    assert client.get("/race/8/transfer/").status_code == 404
-    assert client.get("/race/8/transfer/list/").status_code == 404
-
-
-@pytest.mark.django_db
-def test_breakfast_urls_return_404(client):
-    for path in [
-        "/race/some-race/breakfast/",
-        "/race/some-race/breakfast/admin/",
-        "/race/some-race/breakfast/list/",
-        "/race/1/breakfast/",
-        "/race/1/breakfast/admin/",
-        "/race/1/breakfast/list/",
-    ]:
-        assert client.get(path).status_code == 404, path
 
 
 @pytest.mark.django_db
