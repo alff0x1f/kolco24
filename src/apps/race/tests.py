@@ -858,6 +858,9 @@ def test_race_form_template_renders_fields_and_data(client):
     tiers = _script_json(html, "price-tiers-data")
     assert [t["id"] for t in tiers] == [tier.id]
     assert tiers[0]["active_until"] == "2026-08-01"
+    # is_published toggle uses the renamed field name.
+    assert 'name="is_published"' in html
+    assert 'name="is_active"' not in html
     # race_form.js is wired up.
     assert "js/race_form.js" in html
 
@@ -894,6 +897,7 @@ def test_race_edit_post_superuser_create():
     assert race.name == "New Race"
     assert race.cost == 1000
     assert race.reg_status == RegStatus.UPCOMING
+    assert race.is_published is True
 
 
 @pytest.mark.django_db
