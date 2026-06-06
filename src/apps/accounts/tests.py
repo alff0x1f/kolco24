@@ -810,3 +810,43 @@ def test_add_team_passwordless_round_trip_lands_back_on_add_team(client):
     assert resp.status_code == 302
     assert resp.url == add_url
     assert _is_logged_in(client)
+
+
+def _reg_post_data(**overrides):
+    data = {
+        "first_name": "Иван",
+        "last_name": "Петров",
+        "email": "newreg@example.com",
+        "phone": "+70000000000",
+        "password": "s3cret-pass",
+        "agree_privacy": "on",
+    }
+    data.update(overrides)
+    return data
+
+
+@pytest.mark.django_db
+def test_register_without_next_redirects_home(client):
+    resp = client.post(reverse("register"), _reg_post_data())
+    assert resp.status_code == 302
+    assert resp.url == "/"
+    assert _is_logged_in(client)
+
+
+@pytest.mark.django_db
+def test_register_honors_next(client):
+    resp = client.post(
+        reverse("register"), _reg_post_data(next="/race/some-race/teams/")
+    )
+    assert resp.status_code == 302
+    assert resp.url == "/race/some-race/teams/"
+    assert _is_logged_in(client)
+
+
+@pytest.mark.django_db
+def test_register_off_host_next_falls_back_home(client):
+    resp = client.post(
+        reverse("register"), _reg_post_data(next="https://evil.example.com/phish")
+    )
+    assert resp.status_code == 302
+    assert resp.url == "/"

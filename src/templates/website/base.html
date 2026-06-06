@@ -70,7 +70,7 @@
                             </li>
                             {% else %}
                             <li class="nav-item">
-                                <a href="{% url 'login' %}" class="nav-link">Войти</a>
+                                <a href="{% url 'login' %}?next={{ request.get_full_path|urlencode }}" class="nav-link">Войти</a>
                             </li>
                             {% endif %}
                         </ul>
