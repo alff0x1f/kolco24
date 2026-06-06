@@ -126,11 +126,11 @@ method.upper() + "\n" + full_path + "\n" + ts + "\n" + sha256_hex(body)
 - Create: `src/apps/mobile/signing.py`
 - Create: `src/apps/mobile/tests.py` (signing tests)
 
-- [ ] implement `build_canonical(method, full_path, ts, body: bytes) -> str` (method upper-cased, `\n`-joined, `sha256_hex(body)` as last segment)
-- [ ] implement `sign(secret, canonical) -> str` (HMAC-SHA256 hexdigest) and `verify(secret, canonical, provided_sig) -> bool` (`hmac.compare_digest`)
-- [ ] write unit tests: canonical format is stable/exact; empty-body GET hashes `b""`; `verify` true for a correctly-signed string
-- [ ] write unit tests: `verify` false for tampered sig / wrong secret / changed path
-- [ ] run tests — must pass before next task
+- [x] implement `build_canonical(method, full_path, ts, body: bytes) -> str` (method upper-cased, `\n`-joined, `sha256_hex(body)` as last segment)
+- [x] implement `sign(secret, canonical) -> str` (HMAC-SHA256 hexdigest) and `verify(secret, canonical, provided_sig) -> bool` (`hmac.compare_digest`)
+- [x] write unit tests: canonical format is stable/exact; empty-body GET hashes `b""`; `verify` true for a correctly-signed string
+- [x] write unit tests: `verify` false for tampered sig / wrong secret / changed path
+- [x] run tests — must pass before next task
 
 ### Task 3: `AppInstall` model + admin + migration
 
