@@ -7,6 +7,7 @@ an empty/missing ``MOBILE_APP_SECRET`` rejects every request — and returns no
 hint about which check failed (the view turns any ``False`` into a neutral 403).
 """
 
+import ipaddress
 import time
 
 from django.conf import settings
@@ -19,7 +20,12 @@ def _client_ip(request):
     """Best-effort client IP: first ``X-Forwarded-For`` entry, else ``REMOTE_ADDR``."""
     forwarded = request.META.get("HTTP_X_FORWARDED_FOR", "")
     if forwarded:
-        return forwarded.split(",")[0].strip()
+        candidate = forwarded.split(",")[0].strip()
+        try:
+            ipaddress.ip_address(candidate)
+            return candidate
+        except ValueError:
+            pass
     return request.META.get("REMOTE_ADDR") or None
 
 
