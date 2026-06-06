@@ -49,11 +49,6 @@
                         <span class="chevron"></span>
                     </button>
                     <div class="nav-user-menu">
-                        {% if request.user.is_staff %}
-                        <a href="/upload_protocol">Загрузить данные</a>
-                        <a href="/update_protocol">Скачать протокол</a>
-                        <div class="menu-divider"></div>
-                        {% endif %}
                         {% if user.is_superuser %}
                         <a href="/admin">Админка</a>
                         <a href="{% url 'impersonate' %}">Просмотр как пользователь</a>
