@@ -152,10 +152,10 @@ method.upper() + "\n" + full_path + "\n" + ts + "\n" + sha256_hex(body)
 - Create: `src/apps/mobile/permissions.py`
 - Modify: `src/apps/mobile/tests.py`
 
-- [ ] implement `_client_ip(request)` helper (X-Forwarded-For first entry, fall back to REMOTE_ADDR)
-- [ ] implement `SignedAppPermission(BasePermission).has_permission` per Technical Details (fail closed; missing headers; bad ts; expired window; bad sig; success stashes `request.app_meta`)
-- [ ] write unit tests for `has_permission` using a DRF-wrapped request factory: empty secret → False; missing headers → False; non-int ts → False; expired ts → False; bad sig → False; valid → True and `app_meta` populated
-- [ ] run tests — must pass before next task
+- [x] implement `_client_ip(request)` helper (X-Forwarded-For first entry, fall back to REMOTE_ADDR)
+- [x] implement `SignedAppPermission(BasePermission).has_permission` per Technical Details (fail closed; missing headers; bad ts; expired window; bad sig; success stashes `request.app_meta`)
+- [x] write unit tests for `has_permission` using a DRF-wrapped request factory: empty secret → False; missing headers → False; non-int ts → False; expired ts → False; bad sig → False; valid → True and `app_meta` populated
+- [x] run tests — must pass before next task
 
 ### Task 5: Base view, legend serializer + view, URLs
 
