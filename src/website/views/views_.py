@@ -258,7 +258,7 @@ def edit_page(request, slug):
 # API _________________________________________________________________
 class RaceView(View):
     def get(self, request):
-        races = Race.objects.filter(is_active=True)
+        races = Race.objects.filter(is_published=True)
         data = []
         for race in races:
             data.append(
@@ -266,7 +266,7 @@ class RaceView(View):
                     "id": race.id,
                     "name": race.name,
                     "date": race.date.strftime("%Y-%m-%d"),
-                    "is_active": race.is_active,
+                    "is_published": race.is_published,
                 }
             )
         return JsonResponse(data, safe=False)

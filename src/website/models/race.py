@@ -41,7 +41,7 @@ class Race(Model):
     date = DateField("Дата", default=timezone.now)
     date_end = DateField("Дата окончания", default=timezone.now)
     place = CharField("Место", max_length=50, blank=True, default="")
-    is_active = BooleanField("Активна", default=True)
+    is_published = BooleanField("Опубликована", default=True)
     cost = IntegerField("Стоимость участия", default=0)
 
     reg_status = CharField(

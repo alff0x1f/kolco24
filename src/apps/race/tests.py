@@ -663,7 +663,7 @@ def _race_form_data(**overrides):
         "header_image": "",
         "header_logo": "",
         "reg_status": RegStatus.UPCOMING,
-        "is_active": True,
+        "is_published": True,
         "is_legend_visible": False,
         "is_teams_editable": False,
         "is_photo_upload_enabled": False,
