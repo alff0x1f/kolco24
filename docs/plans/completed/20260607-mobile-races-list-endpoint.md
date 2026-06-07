@@ -101,10 +101,10 @@
 - [x] run full mobile suite: `uv run pytest src/apps/mobile/tests.py`
 
 ### Task 3: [Final] Update documentation
-- [ ] update the `apps.mobile` paragraph in `CLAUDE.md` to document the second
+- [x] update the `apps.mobile` paragraph in `CLAUDE.md` to document the second
       endpoint `GET /app/races/` (`mobile:races`): published-only, `-date` order,
       8 core fields, wrapped `{"races": [...]}`, no pagination
-- [ ] move this plan to `docs/plans/completed/`
+- [x] move this plan to `docs/plans/completed/`
 
 ## Post-Completion
 *Items requiring manual intervention or external systems — informational only*
