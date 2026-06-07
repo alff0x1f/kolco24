@@ -52,7 +52,7 @@ class SignedAppPermission(BasePermission):
             return False
 
         window = getattr(settings, "MOBILE_APP_TS_WINDOW", 300)
-        if abs(time.time() - ts_int) > window:
+        if abs(int(time.time()) - ts_int) > window:
             return False
 
         canonical = build_canonical(

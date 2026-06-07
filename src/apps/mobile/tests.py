@@ -168,6 +168,16 @@ def test_permission_future_ts_false(settings):
     assert SignedAppPermission().has_permission(request, None) is False
 
 
+def test_permission_huge_ts_returns_false_not_500(settings):
+    # A very large integer timestamp must return False (out-of-window), not raise
+    # OverflowError from float(huge_int) when doing time.time() - ts_int.
+    settings.MOBILE_APP_SECRET = SECRET
+    settings.MOBILE_APP_TS_WINDOW = 300
+    huge_ts = str(10**400)
+    request = _signed_get_request(ts=huge_ts)
+    assert SignedAppPermission().has_permission(request, None) is False
+
+
 def test_permission_bad_signature_false(settings):
     settings.MOBILE_APP_SECRET = SECRET
     request = _signed_get_request(secret="wrong-secret")
