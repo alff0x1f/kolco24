@@ -156,9 +156,9 @@ reusing the existing signing/permission machinery. Self-contained: no changes to
 - [x] run `make format && make lint` (all checks passed)
 
 ### Task 7: [Final] Update documentation
-- [ ] update `src/apps/mobile/README.md` **Статус** note: `teams` + `sync` implemented; `versions` carries only `teams`; legend still without tags/ETag; lease stubbed (`data_source` from settings, cloud default); update the endpoints table footnote accordingly
-- [ ] update the `apps.mobile` paragraph in `CLAUDE.md`: new `teams` + `sync` endpoints, `Athlet.updated_at`-based fingerprint, `versions={teams}` only, `MOBILE_DATA_SOURCE` stub, sync is manifest-only (no 304)
-- [ ] move this plan to `docs/plans/completed/`
+- [x] update `src/apps/mobile/README.md` **Статус** note: `teams` + `sync` implemented; `versions` carries only `teams`; legend still without tags/ETag; lease stubbed (`data_source` from settings, cloud default); update the endpoints table footnote accordingly
+- [x] update the `apps.mobile` paragraph in `CLAUDE.md`: new `teams` + `sync` endpoints, `Athlet.updated_at`-based fingerprint, `versions={teams}` only, `MOBILE_DATA_SOURCE` stub, sync is manifest-only (no 304)
+- [x] move this plan to `docs/plans/completed/`
 
 ## Post-Completion
 *Items requiring manual intervention or external systems — informational only*

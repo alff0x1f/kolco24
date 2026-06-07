@@ -281,11 +281,16 @@ ETag/`If-None-Match` на ресурсах остаётся (см. выше) —
 | GET | `/app/race/<id>/legend/` | `mobile:legend` | КП + NFC-метки |
 | GET | `/app/race/<id>/sync/` | `mobile:sync` | манифест: версии ресурсов + `data_source`/`lease_expires_at` |
 
-Все — наследники `AppAPIView` (подпись + `AppInstall`-статистика); у ресурсных
-эндпоинтов — поддержка `ETag`/`If-None-Match`, у `sync` — лёгкий манифест версий
-для фонового обновления.
+Все — наследники `AppAPIView` (подпись + `AppInstall`-статистика); у `teams` —
+поддержка `ETag`/`If-None-Match` (304), у `sync` — лёгкий манифест версий для
+фонового обновления (без 304). `legend`/`races` пока без ETag.
 
-> **Статус:** реализованы `mobile:legend` (без `tags` и без ETag) и `mobile:races`.
-> `teams`/`sync`, NFC-метки в легенде, `ETag`/`If-None-Match` и лиз-хэндофф
-> (`data_source`/`lease_expires_at`) — целевая схема, описанная выше; этот README
-> задаёт контракт, к которому их доводим.
+> **Статус:** реализованы `mobile:races`, `mobile:legend` (пока без `tags` и без
+> ETag), `mobile:teams` (с `ETag`/`If-None-Match` → 304) и `mobile:sync`.
+> Отпечаток `teams` считается по `MAX(Team.updated_at)`/`MAX(Athlet.updated_at)`/
+> `COUNT` (поле `Athlet.updated_at` добавлено, чтобы переименование участника
+> сдвигало версию). Манифест `sync` пока несёт **только** `versions.teams` (у
+> легенды ещё нет тегов/ETag). Лиз-хэндофф **застаблен**: `data_source` берётся из
+> настройки `MOBILE_DATA_SOURCE` (по умолчанию `"cloud"`), `lease_expires_at`
+> всегда `null` — реальный per-race лиз/хэндофф и NFC-метки в легенде остаются
+> целевой схемой, описанной выше.
