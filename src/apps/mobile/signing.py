@@ -30,4 +30,7 @@ def sign(secret: str, canonical: str) -> str:
 
 def verify(secret: str, canonical: str, provided_sig: str) -> bool:
     """Constant-time comparison of the expected signature against the provided one."""
-    return hmac.compare_digest(sign(secret, canonical), provided_sig.lower())
+    try:
+        return hmac.compare_digest(sign(secret, canonical), provided_sig.lower())
+    except (TypeError, ValueError):
+        return False
