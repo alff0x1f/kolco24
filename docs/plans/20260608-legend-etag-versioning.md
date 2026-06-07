@@ -216,13 +216,18 @@ explicitly anticipated when they noted the legend was deliberately left unversio
       to confirm nothing regressed.
 
 ### Task 5: Verify acceptance criteria
-- [ ] Verify all Overview requirements: ETag present, 304 works, `versions.legend`
+- [x] Verify all Overview requirements: ETag present, 304 works, `versions.legend`
       present and consistent with the ETag, response body shape unchanged.
-- [ ] Verify edge cases: empty race, all-draft race, hidden legend — all return a
-      stable ETag and don't crash.
-- [ ] Run full suite: `uv run pytest`.
-- [ ] Run `make format && make lint`.
-- [ ] Confirm `uv run python src/manage.py makemigrations --check --dry-run` is clean.
+      (tests: `test_legend_response_carries_etag`,
+      `test_legend_if_none_match_returns_304_empty_body`,
+      `test_sync_versions_legend_matches_legend_etag`)
+- [x] Verify edge cases: empty race, all-draft race, hidden legend — all return a
+      stable ETag and don't crash. (tests: `test_legend_version_stable_for_empty_race`,
+      `test_legend_excludes_draft_checkpoints`, `test_legend_hidden_response_carries_etag`)
+- [x] Run full suite: `uv run pytest`. (424 passed)
+- [x] Run `make format && make lint`. (clean, no changes)
+- [x] Confirm `uv run python src/manage.py makemigrations --check --dry-run` is clean.
+      (No changes detected)
 
 ### Task 6: [Final] Wrap up
 - [ ] Confirm `README.md` + `CLAUDE.md` reflect the new versioned legend.
