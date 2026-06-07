@@ -23,7 +23,7 @@ from website.models.race import Race
 from .models import AppInstall
 from .permissions import SignedAppPermission
 from .serializers import LegendCheckpointSerializer, RaceListSerializer, TeamSerializer
-from .versioning import teams_version
+from .versioning import legend_version, teams_version
 
 logger = logging.getLogger(__name__)
 
@@ -69,23 +69,41 @@ class RaceListView(AppAPIView):
 
 
 class LegendView(AppAPIView):
-    """Return the checkpoint legend (descriptions) for a race."""
+    """Return the checkpoint legend (descriptions) for a race (conditional GET).
+
+    The ETag is the bare :func:`legend_version` fingerprint wrapped in quotes;
+    a matching ``If-None-Match`` short-circuits to an empty ``304`` before any
+    serialization. The ETag is set on every exit path (incl. the
+    ``is_legend_visible=False`` empty response) so a later un-hide is detected.
+    """
 
     def get(self, request, race_id):
         race = get_object_or_404(Race, pk=race_id)
+        quoted = f'"{legend_version(race_id)}"'
+
+        if request.headers.get("If-None-Match") == quoted:
+            resp = HttpResponseNotModified()
+            resp["ETag"] = quoted
+            return resp
+
         if not race.is_legend_visible:
-            return Response({"race": race_id, "checkpoints": []})
+            resp = Response({"race": race_id, "checkpoints": []})
+            resp["ETag"] = quoted
+            return resp
+
         qs = (
             Checkpoint.objects.filter(race=race)
             .exclude(type=CheckpointType.draft.value)
             .order_by("number", "id")
         )
-        return Response(
+        resp = Response(
             {
                 "race": race_id,
                 "checkpoints": LegendCheckpointSerializer(qs, many=True).data,
             }
         )
+        resp["ETag"] = quoted
+        return resp
 
 
 class TeamsView(AppAPIView):
@@ -125,10 +143,11 @@ class TeamsView(AppAPIView):
 class SyncView(AppAPIView):
     """Return a pure version manifest for a race (no data serialization).
 
-    A cheap signed probe: the client compares ``versions.teams`` (the bare
-    :func:`teams_version` fingerprint, same value the ``/teams/`` ETag wraps in
-    quotes) against its stored ETag to decide whether to re-fetch. No
-    ``If-None-Match``/304 — there is nothing to short-circuit.
+    A cheap signed probe: the client compares ``versions.teams`` / ``versions.legend``
+    (the bare :func:`teams_version` / :func:`legend_version` fingerprints, the same
+    values the ``/teams/`` and ``/legend/`` ETags wrap in quotes) against its stored
+    ETags to decide whether to re-fetch. No ``If-None-Match``/304 — there is nothing
+    to short-circuit.
     """
 
     def get(self, request, race_id):
@@ -138,6 +157,9 @@ class SyncView(AppAPIView):
                 "race": race_id,
                 "data_source": settings.MOBILE_DATA_SOURCE,
                 "lease_expires_at": None,
-                "versions": {"teams": teams_version(race_id)},
+                "versions": {
+                    "teams": teams_version(race_id),
+                    "legend": legend_version(race_id),
+                },
             }
         )

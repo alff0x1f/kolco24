@@ -175,25 +175,25 @@ explicitly anticipated when they noted the legend was deliberately left unversio
 - Modify: `src/apps/mobile/views.py`
 - Modify: `src/apps/mobile/tests.py`
 
-- [ ] Import `legend_version` from `.versioning` (next to `teams_version`).
-- [ ] In `LegendView.get`: after `get_object_or_404`, compute
+- [x] Import `legend_version` from `.versioning` (next to `teams_version`).
+- [x] In `LegendView.get`: after `get_object_or_404`, compute
       `quoted = f'"{legend_version(race_id)}"'`; if
       `request.headers.get("If-None-Match") == quoted` return
       `HttpResponseNotModified()` with `resp["ETag"] = quoted`.
-- [ ] Set `resp["ETag"] = quoted` on **both** remaining exit paths: the
+- [x] Set `resp["ETag"] = quoted` on **both** remaining exit paths: the
       `is_legend_visible=False` empty response and the full serialized response.
-- [ ] In `SyncView.get`: change `versions` to
+- [x] In `SyncView.get`: change `versions` to
       `{"teams": teams_version(race_id), "legend": legend_version(race_id)}`.
-- [ ] Write view tests (mirror teams): legend response carries an `ETag` header;
+- [x] Write view tests (mirror teams): legend response carries an `ETag` header;
       `If-None-Match` with the current ETag → `304` with an explicit
       `response.content == b""` assertion + ETag echoed (mirror
       `test_teams_if_none_match_returns_304_empty_body`); stale `If-None-Match` →
       `200` with a new ETag; the hidden (`is_legend_visible=False`) response still
       carries an ETag.
-- [ ] Write test: `/sync/` manifest includes `versions.legend`, and it equals the
+- [x] Write test: `/sync/` manifest includes `versions.legend`, and it equals the
       bare value the legend `ETag` wraps in quotes (mirror
       `test_sync_versions_teams_matches_teams_etag`).
-- [ ] Run `uv run pytest src/apps/mobile/tests.py` — full mobile suite green before
+- [x] Run `uv run pytest src/apps/mobile/tests.py` — full mobile suite green before
       Task 4.
 
 ### Task 4: Update documentation

@@ -399,6 +399,86 @@ def test_legend_excludes_draft_checkpoints(client, settings):
     assert numbers == [1]
 
 
+@pytest.mark.django_db
+def test_legend_response_carries_etag(client, settings, race_with_checkpoints):
+    settings.MOBILE_APP_SECRET = SECRET
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    path = f"/app/race/{race_with_checkpoints.id}/legend/"
+    response = client.get(path, **_signed_headers("GET", path, SECRET))
+
+    assert response.status_code == 200
+    assert response["ETag"]
+
+
+@pytest.mark.django_db
+def test_legend_if_none_match_returns_304_empty_body(
+    client, settings, race_with_checkpoints
+):
+    settings.MOBILE_APP_SECRET = SECRET
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    path = f"/app/race/{race_with_checkpoints.id}/legend/"
+    first = client.get(path, **_signed_headers("GET", path, SECRET))
+    etag = first["ETag"]
+
+    headers = _signed_headers("GET", path, SECRET)
+    headers["HTTP_IF_NONE_MATCH"] = etag
+    second = client.get(path, **headers)
+
+    assert second.status_code == 304
+    assert second["ETag"] == etag
+    assert second.content == b""
+
+
+@pytest.mark.django_db
+def test_legend_stale_if_none_match_returns_200_with_new_etag(client, settings):
+    from website.models.checkpoint import Checkpoint
+    from website.models.race import Race
+
+    settings.MOBILE_APP_SECRET = SECRET
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    race = Race.objects.create(
+        name="Stale legend", slug="stale-legend", is_legend_visible=True
+    )
+    Checkpoint.objects.create(race=race, number=1, cost=1, description="first")
+
+    path = f"/app/race/{race.id}/legend/"
+    first = client.get(path, **_signed_headers("GET", path, SECRET))
+    old_etag = first["ETag"]
+
+    Checkpoint.objects.create(race=race, number=2, cost=1, description="second")
+
+    headers = _signed_headers("GET", path, SECRET)
+    headers["HTTP_IF_NONE_MATCH"] = old_etag
+    second = client.get(path, **headers)
+
+    assert second.status_code == 200
+    assert second["ETag"] != old_etag
+
+
+@pytest.mark.django_db
+def test_legend_hidden_response_carries_etag(client, settings):
+    from website.models.checkpoint import Checkpoint
+    from website.models.race import Race
+
+    settings.MOBILE_APP_SECRET = SECRET
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    race = Race.objects.create(
+        name="Hidden legend", slug="hidden-legend", is_legend_visible=False
+    )
+    Checkpoint.objects.create(race=race, number=1, cost=1, description="secret")
+
+    path = f"/app/race/{race.id}/legend/"
+    response = client.get(path, **_signed_headers("GET", path, SECRET))
+
+    assert response.status_code == 200
+    assert response.json()["checkpoints"] == []
+    assert response["ETag"]
+
+
 # --- RaceListView request-level --------------------------------------------
 
 RACES_PATH = "/app/races/"
@@ -1089,8 +1169,9 @@ def test_sync_manifest_shape_and_defaults(client, settings, django_user_model):
     assert data["race"] == race.id
     assert data["data_source"] == "cloud"
     assert data["lease_expires_at"] is None
-    assert set(data["versions"].keys()) == {"teams"}
+    assert set(data["versions"].keys()) == {"teams", "legend"}
     assert data["versions"]["teams"]  # non-empty fingerprint
+    assert data["versions"]["legend"]  # non-empty fingerprint
 
 
 @pytest.mark.django_db
@@ -1115,6 +1196,30 @@ def test_sync_versions_teams_matches_teams_etag(client, settings, django_user_mo
 
     bare = sync_resp.json()["versions"]["teams"]
     assert etag == f'"{bare}"'  # /teams/ ETag is the bare version wrapped in quotes
+
+
+@pytest.mark.django_db
+def test_sync_versions_legend_matches_legend_etag(client, settings):
+    from website.models.checkpoint import Checkpoint
+    from website.models.race import Race
+
+    settings.MOBILE_APP_SECRET = SECRET
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    race = Race.objects.create(
+        name="Sync legend", slug="sync-legend-etag", is_legend_visible=True
+    )
+    Checkpoint.objects.create(race=race, number=1, cost=1, description="first")
+
+    legend_path = f"/app/race/{race.id}/legend/"
+    legend_resp = client.get(legend_path, **_signed_headers("GET", legend_path, SECRET))
+    etag = legend_resp["ETag"]
+
+    sync_path = f"/app/race/{race.id}/sync/"
+    sync_resp = client.get(sync_path, **_signed_headers("GET", sync_path, SECRET))
+
+    bare = sync_resp.json()["versions"]["legend"]
+    assert etag == f'"{bare}"'  # /legend/ ETag is the bare version wrapped in quotes
 
 
 @pytest.mark.django_db
