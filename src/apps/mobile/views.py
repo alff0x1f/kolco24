@@ -19,7 +19,7 @@ from website.models.race import Race
 
 from .models import AppInstall
 from .permissions import SignedAppPermission
-from .serializers import LegendCheckpointSerializer
+from .serializers import LegendCheckpointSerializer, RaceListSerializer
 
 logger = logging.getLogger(__name__)
 
@@ -54,6 +54,14 @@ class AppAPIView(APIView):
             )
         except Exception:
             logger.exception("Failed to record AppInstall stats")
+
+
+class RaceListView(AppAPIView):
+    """Return the list of published races for the mobile app."""
+
+    def get(self, request):
+        qs = Race.objects.filter(is_published=True)  # Meta.ordering = ["-date"]
+        return Response({"races": RaceListSerializer(qs, many=True).data})
 
 
 class LegendView(AppAPIView):

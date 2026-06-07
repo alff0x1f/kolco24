@@ -80,19 +80,19 @@
 - Modify: `src/apps/mobile/views.py`
 - Modify: `src/apps/mobile/urls.py`
 
-- [ ] add `RaceListSerializer(ModelSerializer)` in `serializers.py` importing
+- [x] add `RaceListSerializer(ModelSerializer)` in `serializers.py` importing
       `website.models.race.Race`, with the 8 core fields (no images)
-- [ ] add `RaceListView(AppAPIView)` in `views.py` with a `get` returning
+- [x] add `RaceListView(AppAPIView)` in `views.py` with a `get` returning
       `Response({"races": RaceListSerializer(Race.objects.filter(is_published=True), many=True).data})`
-- [ ] add `path("races/", RaceListView.as_view(), name="races")` to `urls.py`
+- [x] add `path("races/", RaceListView.as_view(), name="races")` to `urls.py`
       and update the `from .views import ...` import
-- [ ] write request-level tests in `src/apps/mobile/tests.py` (success):
+- [x] write request-level tests in `src/apps/mobile/tests.py` (success):
       valid signed `GET /app/races/` → 200, returns only `is_published=True` races
       in `-date` order, each item has exactly the 8 fields, response is `{"races": [...]}`
-- [ ] write tests for exclusion + auth-failure cases:
+- [x] write tests for exclusion + auth-failure cases:
       unpublished race excluded; no-headers/bad-signature → neutral `403 {"detail": "Forbidden"}`;
       empty response (`{"races": []}`) when no published races exist
-- [ ] run tests — must pass before next task: `uv run pytest src/apps/mobile/tests.py`
+- [x] run tests — must pass before next task: `uv run pytest src/apps/mobile/tests.py`
 
 ### Task 2: Verify acceptance criteria
 - [ ] verify `GET /app/races/` returns only published races, `-date` order, wrapped shape, 8 fields

@@ -368,6 +368,77 @@ def test_legend_excludes_draft_checkpoints(client, settings):
     assert numbers == [1]
 
 
+# --- RaceListView request-level --------------------------------------------
+
+RACES_PATH = "/app/races/"
+RACE_FIELDS = {
+    "id",
+    "name",
+    "slug",
+    "date",
+    "date_end",
+    "place",
+    "reg_status",
+    "is_legend_visible",
+}
+
+
+@pytest.mark.django_db
+def test_races_valid_signature_returns_published_in_date_order(client, settings):
+    from website.models.race import Race
+
+    settings.MOBILE_APP_SECRET = SECRET
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    Race.objects.create(name="Old", slug="old", date="2024-01-01")
+    Race.objects.create(name="New", slug="new", date="2026-01-01")
+    Race.objects.create(name="Mid", slug="mid", date="2025-01-01")
+    Race.objects.create(
+        name="Hidden", slug="hidden", date="2027-01-01", is_published=False
+    )
+
+    response = client.get(RACES_PATH, **_signed_headers("GET", RACES_PATH, SECRET))
+
+    assert response.status_code == 200
+    data = response.json()
+    assert list(data.keys()) == ["races"]
+    slugs = [r["slug"] for r in data["races"]]
+    assert slugs == ["new", "mid", "old"]  # -date order, hidden excluded
+    assert set(data["races"][0].keys()) == RACE_FIELDS
+
+
+@pytest.mark.django_db
+def test_races_empty_when_no_published(client, settings):
+    from website.models.race import Race
+
+    settings.MOBILE_APP_SECRET = SECRET
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    Race.objects.create(name="Hidden", slug="hidden", is_published=False)
+
+    response = client.get(RACES_PATH, **_signed_headers("GET", RACES_PATH, SECRET))
+
+    assert response.status_code == 200
+    assert response.json() == {"races": []}
+
+
+@pytest.mark.django_db
+def test_races_no_headers_returns_403(client, settings):
+    settings.MOBILE_APP_SECRET = SECRET
+    response = client.get(RACES_PATH)
+    assert response.status_code == 403
+    assert response.json() == {"detail": "Forbidden"}
+
+
+@pytest.mark.django_db
+def test_races_wrong_signature_returns_403(client, settings):
+    settings.MOBILE_APP_SECRET = SECRET
+    headers = _signed_headers("GET", RACES_PATH, "wrong-secret")
+    response = client.get(RACES_PATH, **headers)
+    assert response.status_code == 403
+    assert response.json() == {"detail": "Forbidden"}
+
+
 @pytest.mark.django_db
 def test_legend_stats_write_failure_does_not_break_response(
     client, settings, race_with_checkpoints, monkeypatch
