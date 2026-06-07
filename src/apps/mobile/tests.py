@@ -528,3 +528,77 @@ def test_races_tampered_query_string_returns_403(client, settings):
     headers = _signed_headers("GET", RACES_PATH, SECRET)
     response = client.get(RACES_PATH + "?page=2", **headers)
     assert response.status_code == 403
+
+
+# --- teams_version fingerprint ----------------------------------------------
+
+
+def _make_race_with_category(name="Versioned race", slug="versioned-race"):
+    from website.models.race import Category, Race
+
+    race = Race.objects.create(name=name, slug=slug)
+    category = Category.objects.create(code="open", name="Open", race=race)
+    return race, category
+
+
+@pytest.mark.django_db
+def test_teams_version_stable_for_empty_race():
+    from apps.mobile.versioning import teams_version
+
+    race, _ = _make_race_with_category()
+    first = teams_version(race.id)
+    second = teams_version(race.id)
+    assert first == second
+    assert first  # non-empty
+
+
+@pytest.mark.django_db
+def test_teams_version_changes_when_team_added(django_user_model):
+    from apps.mobile.versioning import teams_version
+    from website.models.models import Team
+
+    race, category = _make_race_with_category()
+    user = django_user_model.objects.create_user(
+        username="owner1", email="o1@example.com", password="x"
+    )
+    before = teams_version(race.id)
+    Team.objects.create(owner=user, category2=category, teamname="Alpha")
+    after = teams_version(race.id)
+    assert before != after
+
+
+@pytest.mark.django_db
+def test_teams_version_changes_when_team_edited(django_user_model):
+    from apps.mobile.versioning import teams_version
+    from website.models.models import Team
+
+    race, category = _make_race_with_category()
+    user = django_user_model.objects.create_user(
+        username="owner2", email="o2@example.com", password="x"
+    )
+    team = Team.objects.create(owner=user, category2=category, teamname="Beta")
+    before = teams_version(race.id)
+    team.teamname = "Beta renamed"
+    team.save()
+    after = teams_version(race.id)
+    assert before != after
+
+
+@pytest.mark.django_db
+def test_teams_version_changes_when_athlet_renamed(django_user_model):
+    from apps.mobile.versioning import teams_version
+    from website.models.models import Athlet, Team
+
+    race, category = _make_race_with_category()
+    user = django_user_model.objects.create_user(
+        username="owner3", email="o3@example.com", password="x"
+    )
+    team = Team.objects.create(owner=user, category2=category, teamname="Gamma")
+    athlet = Athlet.objects.create(
+        owner=user, team=team, name="Runner", number_in_team=1
+    )
+    before = teams_version(race.id)
+    athlet.name = "Runner renamed"
+    athlet.save()
+    after = teams_version(race.id)
+    assert before != after

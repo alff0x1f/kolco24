@@ -108,11 +108,11 @@ reusing the existing signing/permission machinery. Self-contained: no changes to
 **Files:**
 - Create: `src/apps/mobile/versioning.py`
 
-- [ ] implement `teams_version(race_id) -> str` with the two aggregates + blake2b fingerprint (digest_size=8, bare hex)
-- [ ] ensure stability for an empty race (None aggregates → `"None"` literals, no crash)
-- [ ] add cross-reference comment that this is the single source of truth for the teams ETag and `sync` manifest `versions.teams`
-- [ ] write unit tests: two consecutive calls on an unchanged empty race return the **same** non-empty string (stability); adding a team changes it; editing a team (`updated_at`) changes it; renaming an `Athlet` changes it
-- [ ] run tests — must pass before next task
+- [x] implement `teams_version(race_id) -> str` with the two aggregates + blake2b fingerprint (digest_size=8, bare hex)
+- [x] ensure stability for an empty race (None aggregates → `"None"` literals, no crash)
+- [x] add cross-reference comment that this is the single source of truth for the teams ETag and `sync` manifest `versions.teams`
+- [x] write unit tests: two consecutive calls on an unchanged empty race return the **same** non-empty string (stability); adding a team changes it; editing a team (`updated_at`) changes it; renaming an `Athlet` changes it
+- [x] run tests — must pass before next task
 
 ### Task 3: Mobile `TeamSerializer`
 
