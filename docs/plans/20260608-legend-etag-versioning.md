@@ -125,17 +125,17 @@ explicitly anticipated when they noted the legend was deliberately left unversio
 - Modify: `src/website/models/checkpoint.py`
 - Create: `src/website/migrations/0077_checkpoint_updated_at.py`
 
-- [ ] Add `updated_at = models.DateTimeField(auto_now=True)` to the `Checkpoint`
+- [x] Add `updated_at = models.DateTimeField(auto_now=True)` to the `Checkpoint`
       model (place near the other fields; no `verbose_name` needed, matches
       `Athlet.updated_at`).
-- [ ] Generate the migration: `uv run python src/manage.py makemigrations website`
+- [x] Generate the migration: `uv run python src/manage.py makemigrations website`
       (verify it produces `0077_checkpoint_updated_at` depending on
       `0076_athlet_updated_at`; mirror the `0076` body — single `AddField`).
-- [ ] Run `uv run python src/manage.py migrate` against the local DB to confirm it
+- [x] Run `uv run python src/manage.py migrate` against the local DB to confirm it
       applies cleanly.
-- [ ] Sanity check: `uv run python src/manage.py makemigrations --check --dry-run`
+- [x] Sanity check: `uv run python src/manage.py makemigrations --check --dry-run`
       reports no missing migrations.
-- [ ] Run `uv run pytest src/apps/mobile/tests.py` — existing suite still green
+- [x] Run `uv run pytest src/apps/mobile/tests.py` — existing suite still green
       (no behavior change yet).
 
 ### Task 2: Add `legend_version(race_id)` to versioning.py
