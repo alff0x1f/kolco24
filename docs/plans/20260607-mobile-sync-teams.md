@@ -149,11 +149,11 @@ reusing the existing signing/permission machinery. Self-contained: no changes to
 - [x] run tests — must pass before next task
 
 ### Task 6: Verify acceptance criteria
-- [ ] verify the legend endpoint/tests are unchanged and still pass
-- [ ] verify `versions` carries only `teams` (no `legend`)
-- [ ] run `uv run pytest src/apps/mobile/tests.py`
-- [ ] run full suite if quick: `uv run pytest`
-- [ ] run `make format && make lint`
+- [x] verify the legend endpoint/tests are unchanged and still pass
+- [x] verify `versions` carries only `teams` (no `legend`)
+- [x] run `uv run pytest src/apps/mobile/tests.py` (59 passed)
+- [x] run full suite if quick: `uv run pytest` (403 passed)
+- [x] run `make format && make lint` (all checks passed)
 
 ### Task 7: [Final] Update documentation
 - [ ] update `src/apps/mobile/README.md` **Статус** note: `teams` + `sync` implemented; `versions` carries only `teams`; legend still without tags/ETag; lease stubbed (`data_source` from settings, cloud default); update the endpoints table footnote accordingly
