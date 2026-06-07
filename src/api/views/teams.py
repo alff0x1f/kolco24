@@ -152,7 +152,7 @@ class TeamStartView(APIView):
             )
 
             team.start_time = data["start_timestamp"]
-            team.save(update_fields=["start_time"])
+            team.save(update_fields=["start_time", "updated_at"])
 
             member_tag_values = [
                 (value or "").strip() for value in data.get("member_tags", [])
@@ -234,7 +234,7 @@ class TeamFinishView(APIView):
             )
 
             team.finish_time = recorded_at
-            team.save(update_fields=["finish_time"])
+            team.save(update_fields=["finish_time", "updated_at"])
 
             member_log = TeamMemberRaceLog.objects.filter(
                 race=race,

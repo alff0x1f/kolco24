@@ -327,8 +327,8 @@ class TeamMemberMove(models.Model):
         self.to_team.paid_people += self.moved_people
 
         with transaction.atomic():
-            self.from_team.save(update_fields=["paid_people"])
-            self.to_team.save(update_fields=["paid_people"])
+            self.from_team.save(update_fields=["paid_people", "updated_at"])
+            self.to_team.save(update_fields=["paid_people", "updated_at"])
             from .race import RegStatus
 
             category = self.to_team.category2

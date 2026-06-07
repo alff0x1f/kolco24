@@ -34,6 +34,10 @@ def teams_version(race_id):
         team__is_deleted=False, team__category2__race_id=race_id
     ).aggregate(
         max_updated=Max("updated_at"),
+        count=Count("id"),
     )
-    raw = f"{teams['max_updated']}|{members['max_updated']}|{teams['count']}"
+    raw = (
+        f"{teams['max_updated']}|{members['max_updated']}"
+        f"|{members['count']}|{teams['count']}"
+    )
     return hashlib.blake2b(raw.encode(), digest_size=8).hexdigest()

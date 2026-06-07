@@ -87,6 +87,7 @@ class Command(BaseCommand):
                     update_fields=[
                         "paid_people",
                         "paid_sum",
+                        "updated_at",
                     ]
                 )
                 # Credit add-ons from the per-payment snapshots.
