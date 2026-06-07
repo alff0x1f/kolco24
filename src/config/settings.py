@@ -45,6 +45,9 @@ CONTRIBUTORS_API_TOKEN = os.getenv("CONTRIBUTORS_API_TOKEN")
 # Mobile app signed endpoints (apps.mobile): shared HMAC secret + replay window.
 MOBILE_APP_SECRET = os.getenv("MOBILE_APP_SECRET", "")
 MOBILE_APP_TS_WINDOW = 300
+# Data source advertised by the /app/race/<id>/sync/ manifest. "cloud" → no
+# lease (lease_expires_at: null); a local-race server would set "local".
+MOBILE_DATA_SOURCE = os.getenv("MOBILE_DATA_SOURCE", "cloud")
 
 EMAIL_BACKEND = "mailer.backend.DbBackend"
 

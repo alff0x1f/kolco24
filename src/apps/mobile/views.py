@@ -8,6 +8,7 @@ failure break the response.
 
 import logging
 
+from django.conf import settings
 from django.db.models import F, Prefetch
 from django.http import HttpResponseNotModified
 from django.shortcuts import get_object_or_404
@@ -119,3 +120,24 @@ class TeamsView(AppAPIView):
         )
         resp["ETag"] = quoted
         return resp
+
+
+class SyncView(AppAPIView):
+    """Return a pure version manifest for a race (no data serialization).
+
+    A cheap signed probe: the client compares ``versions.teams`` (the bare
+    :func:`teams_version` fingerprint, same value the ``/teams/`` ETag wraps in
+    quotes) against its stored ETag to decide whether to re-fetch. No
+    ``If-None-Match``/304 — there is nothing to short-circuit.
+    """
+
+    def get(self, request, race_id):
+        get_object_or_404(Race, pk=race_id)
+        return Response(
+            {
+                "race": race_id,
+                "data_source": settings.MOBILE_DATA_SOURCE,
+                "lease_expires_at": None,
+                "versions": {"teams": teams_version(race_id)},
+            }
+        )

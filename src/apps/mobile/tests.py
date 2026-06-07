@@ -806,3 +806,89 @@ def test_teams_no_headers_returns_403(client, settings, django_user_model):
     response = client.get(path)
     assert response.status_code == 403
     assert response.json() == {"detail": "Forbidden"}
+
+
+# --- SyncView request-level -------------------------------------------------
+
+
+@pytest.mark.django_db
+def test_sync_manifest_shape_and_defaults(client, settings, django_user_model):
+    settings.MOBILE_APP_SECRET = SECRET
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    from website.models.models import Team
+
+    race, category = _make_race_with_category(slug="sync-shape")
+    user = django_user_model.objects.create_user(
+        username="s1", email="s1@example.com", password="x"
+    )
+    Team.objects.create(owner=user, category2=category, teamname="Alpha")
+
+    path = f"/app/race/{race.id}/sync/"
+    response = client.get(path, **_signed_headers("GET", path, SECRET))
+
+    assert response.status_code == 200
+    data = response.json()
+    assert set(data.keys()) == {"race", "data_source", "lease_expires_at", "versions"}
+    assert data["race"] == race.id
+    assert data["data_source"] == "cloud"
+    assert data["lease_expires_at"] is None
+    assert set(data["versions"].keys()) == {"teams"}
+    assert data["versions"]["teams"]  # non-empty fingerprint
+
+
+@pytest.mark.django_db
+def test_sync_versions_teams_matches_teams_etag(client, settings, django_user_model):
+    settings.MOBILE_APP_SECRET = SECRET
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    from website.models.models import Team
+
+    race, category = _make_race_with_category(slug="sync-etag")
+    user = django_user_model.objects.create_user(
+        username="s2", email="s2@example.com", password="x"
+    )
+    Team.objects.create(owner=user, category2=category, teamname="Alpha")
+
+    teams_path = f"/app/race/{race.id}/teams/"
+    teams_resp = client.get(teams_path, **_signed_headers("GET", teams_path, SECRET))
+    etag = teams_resp["ETag"]
+
+    sync_path = f"/app/race/{race.id}/sync/"
+    sync_resp = client.get(sync_path, **_signed_headers("GET", sync_path, SECRET))
+
+    bare = sync_resp.json()["versions"]["teams"]
+    assert etag == f'"{bare}"'  # /teams/ ETag is the bare version wrapped in quotes
+
+
+@pytest.mark.django_db
+def test_sync_respects_data_source_setting(client, settings):
+    settings.MOBILE_APP_SECRET = SECRET
+    settings.MOBILE_APP_TS_WINDOW = 300
+    settings.MOBILE_DATA_SOURCE = "local"
+
+    race, _ = _make_race_with_category(slug="sync-local")
+    path = f"/app/race/{race.id}/sync/"
+    response = client.get(path, **_signed_headers("GET", path, SECRET))
+
+    assert response.status_code == 200
+    assert response.json()["data_source"] == "local"
+
+
+@pytest.mark.django_db
+def test_sync_valid_sig_nonexistent_race_returns_404(client, settings):
+    settings.MOBILE_APP_SECRET = SECRET
+    settings.MOBILE_APP_TS_WINDOW = 300
+    path = "/app/race/999999/sync/"
+    response = client.get(path, **_signed_headers("GET", path, SECRET))
+    assert response.status_code == 404
+
+
+@pytest.mark.django_db
+def test_sync_no_headers_returns_403(client, settings):
+    settings.MOBILE_APP_SECRET = SECRET
+    race, _ = _make_race_with_category(slug="sync-403")
+    path = f"/app/race/{race.id}/sync/"
+    response = client.get(path)
+    assert response.status_code == 403
+    assert response.json() == {"detail": "Forbidden"}

@@ -142,11 +142,11 @@ reusing the existing signing/permission machinery. Self-contained: no changes to
 - Modify: `src/apps/mobile/views.py`
 - Modify: `src/apps/mobile/urls.py`
 
-- [ ] add `MOBILE_DATA_SOURCE = os.getenv("MOBILE_DATA_SOURCE", "cloud")` near `MOBILE_APP_SECRET`
-- [ ] add `SyncView(AppAPIView)`: `get_object_or_404(Race, pk=race_id)`, return `{"race", "data_source": settings.MOBILE_DATA_SOURCE, "lease_expires_at": None, "versions": {"teams": teams_version(race_id)}}` (no If-None-Match/304)
-- [ ] wire `path("race/<int:race_id>/sync/", SyncView.as_view(), name="sync")`
-- [ ] write request-level tests: 200 manifest shape `{race, data_source, lease_expires_at, versions.teams}`; `versions.teams` equals the `/teams/` ETag value (bare, quotes stripped); `data_source == "cloud"` and `lease_expires_at is None`; no headers → 403
-- [ ] run tests — must pass before next task
+- [x] add `MOBILE_DATA_SOURCE = os.getenv("MOBILE_DATA_SOURCE", "cloud")` near `MOBILE_APP_SECRET`
+- [x] add `SyncView(AppAPIView)`: `get_object_or_404(Race, pk=race_id)`, return `{"race", "data_source": settings.MOBILE_DATA_SOURCE, "lease_expires_at": None, "versions": {"teams": teams_version(race_id)}}` (no If-None-Match/304)
+- [x] wire `path("race/<int:race_id>/sync/", SyncView.as_view(), name="sync")`
+- [x] write request-level tests: 200 manifest shape `{race, data_source, lease_expires_at, versions.teams}`; `versions.teams` equals the `/teams/` ETag value (bare, quotes stripped); `data_source == "cloud"` and `lease_expires_at is None`; no headers → 403
+- [x] run tests — must pass before next task
 
 ### Task 6: Verify acceptance criteria
 - [ ] verify the legend endpoint/tests are unchanged and still pass
