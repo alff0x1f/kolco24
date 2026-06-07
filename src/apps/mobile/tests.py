@@ -4,6 +4,7 @@ import time
 
 import pytest
 from django.db import IntegrityError
+from django.db.models import Prefetch
 from django.test import RequestFactory
 
 from apps.mobile.models import AppInstall
@@ -602,3 +603,73 @@ def test_teams_version_changes_when_athlet_renamed(django_user_model):
     athlet.save()
     after = teams_version(race.id)
     assert before != after
+
+
+# --- mobile TeamSerializer --------------------------------------------------
+
+TEAM_FIELDS = {
+    "id",
+    "teamname",
+    "category2",
+    "ucount",
+    "paid_people",
+    "start_time",
+    "finish_time",
+    "members",
+}
+MEMBER_FIELDS = {"name", "birth", "number_in_team"}
+
+
+@pytest.mark.django_db
+def test_team_serializer_output_keys_match_spec(django_user_model):
+    from apps.mobile.serializers import TeamSerializer
+    from website.models.models import Team
+
+    race, category = _make_race_with_category(slug="ser-keys")
+    user = django_user_model.objects.create_user(
+        username="ser1", email="ser1@example.com", password="x"
+    )
+    team = Team.objects.create(
+        owner=user, category2=category, teamname="Delta", ucount=2
+    )
+    data = TeamSerializer(team).data
+    assert set(data.keys()) == TEAM_FIELDS
+    assert data["category2"] == category.id
+    assert data["members"] == []
+
+
+@pytest.mark.django_db
+def test_team_serializer_members_in_number_order(django_user_model):
+    from apps.mobile.serializers import TeamSerializer
+    from website.models.models import Athlet, Team
+
+    race, category = _make_race_with_category(slug="ser-members")
+    user = django_user_model.objects.create_user(
+        username="ser2", email="ser2@example.com", password="x"
+    )
+    team = Team.objects.create(owner=user, category2=category, teamname="Echo")
+    Athlet.objects.create(owner=user, team=team, name="Second", number_in_team=2)
+    Athlet.objects.create(owner=user, team=team, name="First", number_in_team=1)
+
+    team = Team.objects.prefetch_related(
+        Prefetch(
+            "athlet_set",
+            queryset=Athlet.objects.order_by("number_in_team", "id"),
+        )
+    ).get(pk=team.pk)
+    data = TeamSerializer(team).data
+    assert [m["name"] for m in data["members"]] == ["First", "Second"]
+    assert set(data["members"][0].keys()) == MEMBER_FIELDS
+
+
+@pytest.mark.django_db
+def test_team_serializer_category2_null_when_unset(django_user_model):
+    from apps.mobile.serializers import TeamSerializer
+    from website.models.models import Team
+
+    user = django_user_model.objects.create_user(
+        username="ser3", email="ser3@example.com", password="x"
+    )
+    team = Team.objects.create(owner=user, category2=None, teamname="Foxtrot")
+    data = TeamSerializer(team).data
+    assert data["category2"] is None

@@ -119,10 +119,10 @@ reusing the existing signing/permission machinery. Self-contained: no changes to
 **Files:**
 - Modify: `src/apps/mobile/serializers.py`
 
-- [ ] add a nested member serializer (`name`, `birth`, `number_in_team`)
-- [ ] add `TeamSerializer` with fields `id`, `teamname`, `category2` (`IntegerField(source="category2_id")`), `ucount`, `paid_people`, `start_time`, `finish_time`, and `members` from `team.athlet_set` ordered `number_in_team, id`
-- [ ] write tests: serializer output keys exactly match the spec; members serialized in `number_in_team` order; `category2` is the FK id (int or null)
-- [ ] run tests — must pass before next task
+- [x] add a nested member serializer (`name`, `birth`, `number_in_team`)
+- [x] add `TeamSerializer` with fields `id`, `teamname`, `category2` (`IntegerField(source="category2_id")`), `ucount`, `paid_people`, `start_time`, `finish_time`, and `members` from `team.athlet_set` ordered `number_in_team, id`
+- [x] write tests: serializer output keys exactly match the spec; members serialized in `number_in_team` order; `category2` is the FK id (int or null)
+- [x] run tests — must pass before next task
 
 ### Task 4: `TeamsView` (with ETag / 304)
 
