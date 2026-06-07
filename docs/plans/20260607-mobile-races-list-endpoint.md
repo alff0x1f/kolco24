@@ -95,10 +95,10 @@
 - [x] run tests — must pass before next task: `uv run pytest src/apps/mobile/tests.py`
 
 ### Task 2: Verify acceptance criteria
-- [ ] verify `GET /app/races/` returns only published races, `-date` order, wrapped shape, 8 fields
-- [ ] verify auth failures return neutral `403 {"detail": "Forbidden"}` (no leak)
-- [ ] run `make format && make lint`
-- [ ] run full mobile suite: `uv run pytest src/apps/mobile/tests.py`
+- [x] verify `GET /app/races/` returns only published races, `-date` order, wrapped shape, 8 fields
+- [x] verify auth failures return neutral `403 {"detail": "Forbidden"}` (no leak)
+- [x] run `make format && make lint`
+- [x] run full mobile suite: `uv run pytest src/apps/mobile/tests.py`
 
 ### Task 3: [Final] Update documentation
 - [ ] update the `apps.mobile` paragraph in `CLAUDE.md` to document the second
