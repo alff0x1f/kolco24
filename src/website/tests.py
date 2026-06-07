@@ -2417,3 +2417,18 @@ def test_custom_500_page_renders_standalone():
     html = get_template("500.html").render({})
     assert "Что-то сломалось на дистанции" in html
     assert "<!doctype html>" in html.lower()
+
+
+@pytest.mark.django_db
+def test_athlet_updated_at_populated_and_advances():
+    from website.models.models import Athlet
+
+    user = User.objects.create_user(username="ath_owner", password="x")
+    athlet = Athlet.objects.create(owner=user, name="Ivan", birth=1990)
+    assert athlet.updated_at is not None
+
+    first = athlet.updated_at
+    athlet.name = "Ivan Renamed"
+    athlet.save()
+    athlet.refresh_from_db()
+    assert athlet.updated_at > first

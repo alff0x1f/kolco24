@@ -97,11 +97,11 @@ reusing the existing signing/permission machinery. Self-contained: no changes to
 - Modify: `src/website/models/models.py`
 - Create: `src/website/migrations/0076_athlet_updated_at.py` (generated)
 
-- [ ] add `updated_at = models.DateTimeField(auto_now=True)` to `Athlet` (class ~line 429), matching the `created_at`/`updated_at` idiom used by `Team`
-- [ ] generate migration: `uv run python src/manage.py makemigrations website` — `auto_now` triggers an interactive one-off-default prompt for existing rows; answer `1` (provide now) then accept the offered `timezone.now`. Verify the result is `0076` and adds only the field. (Interactive flags aren't supported here — if the prompt blocks, set a `default=timezone.now` on the field temporarily to generate, then it's a non-issue since `auto_now` rows are overwritten on save.)
-- [ ] apply: `uv run python src/manage.py migrate`
-- [ ] write test: creating/saving an `Athlet` populates `updated_at`; re-saving advances it
-- [ ] run tests — must pass before next task
+- [x] add `updated_at = models.DateTimeField(auto_now=True)` to `Athlet` (class ~line 429), matching the `created_at`/`updated_at` idiom used by `Team`
+- [x] generate migration: `uv run python src/manage.py makemigrations website` — `auto_now` triggers an interactive one-off-default prompt for existing rows; answer `1` (provide now) then accept the offered `timezone.now`. Verify the result is `0076` and adds only the field. (Interactive flags aren't supported here — if the prompt blocks, set a `default=timezone.now` on the field temporarily to generate, then it's a non-issue since `auto_now` rows are overwritten on save.)
+- [x] apply: `uv run python src/manage.py migrate`
+- [x] write test: creating/saving an `Athlet` populates `updated_at`; re-saving advances it
+- [x] run tests — must pass before next task
 
 ### Task 2: `versioning.teams_version` helper
 

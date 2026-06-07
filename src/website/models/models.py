@@ -442,6 +442,8 @@ class Athlet(models.Model):
     number_in_team = models.IntegerField(default=0)
     paid = models.FloatField(default=0)
 
+    updated_at = models.DateTimeField(auto_now=True)
+
     def new_athlet(self, user, team, name, birth=-1):
         if user.is_authenticated:
             self.owner = user
