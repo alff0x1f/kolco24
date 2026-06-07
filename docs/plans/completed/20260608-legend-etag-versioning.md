@@ -230,8 +230,10 @@ explicitly anticipated when they noted the legend was deliberately left unversio
       (No changes detected)
 
 ### Task 6: [Final] Wrap up
-- [ ] Confirm `README.md` + `CLAUDE.md` reflect the new versioned legend.
-- [ ] Move this plan to `docs/plans/completed/`.
+- [x] Confirm `README.md` + `CLAUDE.md` reflect the new versioned legend.
+      (README §legend documents `ETag`/`If-None-Match`→304 + `legend_version`;
+      CLAUDE.md legend paragraph references `legend_version(race_id)`.)
+- [x] Move this plan to `docs/plans/completed/`.
 
 ## Post-Completion
 *Informational — no checkboxes.*
