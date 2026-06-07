@@ -790,6 +790,64 @@ def test_teams_etag_changes_when_athlet_renamed(client, settings, django_user_mo
 
 
 @pytest.mark.django_db
+def test_teams_stale_if_none_match_returns_200_with_new_etag(
+    client, settings, django_user_model
+):
+    settings.MOBILE_APP_SECRET = SECRET
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    from website.models.models import Athlet, Team
+
+    race, category = _make_race_with_category(slug="teams-stale-304")
+    user = django_user_model.objects.create_user(
+        username="t5", email="t5@example.com", password="x"
+    )
+    team = Team.objects.create(owner=user, category2=category, teamname="Beta")
+    athlet = Athlet.objects.create(
+        owner=user, team=team, name="Runner2", number_in_team=1
+    )
+
+    path = f"/app/race/{race.id}/teams/"
+    first = client.get(path, **_signed_headers("GET", path, SECRET))
+    old_etag = first["ETag"]
+
+    athlet.name = "Runner2 Renamed"
+    athlet.save()
+
+    headers = _signed_headers("GET", path, SECRET)
+    headers["HTTP_IF_NONE_MATCH"] = old_etag
+    second = client.get(path, **headers)
+
+    assert second.status_code == 200
+    assert second["ETag"] != old_etag
+
+
+@pytest.mark.django_db
+def test_teams_soft_delete_changes_etag(client, settings, django_user_model):
+    settings.MOBILE_APP_SECRET = SECRET
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    from website.models.models import Team
+
+    race, category = _make_race_with_category(slug="teams-del-etag")
+    user = django_user_model.objects.create_user(
+        username="td2", email="td2@example.com", password="x"
+    )
+    team = Team.objects.create(owner=user, category2=category, teamname="Phantom")
+
+    path = f"/app/race/{race.id}/teams/"
+    before = client.get(path, **_signed_headers("GET", path, SECRET))
+
+    team.is_deleted = True
+    team.save()
+
+    after = client.get(path, **_signed_headers("GET", path, SECRET))
+    assert after.status_code == 200
+    assert after["ETag"] != before["ETag"]
+    assert after.json()["teams"] == []
+
+
+@pytest.mark.django_db
 def test_teams_valid_sig_nonexistent_race_returns_404(client, settings):
     settings.MOBILE_APP_SECRET = SECRET
     settings.MOBILE_APP_TS_WINDOW = 300

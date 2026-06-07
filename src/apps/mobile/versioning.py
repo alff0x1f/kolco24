@@ -17,11 +17,11 @@ from website.models.models import Athlet, Team
 def teams_version(race_id):
     """Return a short, stable fingerprint of a race's teams + members.
 
-    Combines ``MAX(updated_at)`` and the team count across the race's teams
-    (``TeamManager`` already excludes ``is_deleted``) with ``MAX(updated_at)``
-    over their members, so a team edit, a member rename, or a team add/remove
-    all move the fingerprint. Teams with ``category2=None`` are out of scope
-    (a race owns teams via ``category2.race``) and excluded by the filter.
+    Combines ``MAX(Team.updated_at)|MAX(Athlet.updated_at)|COUNT(Athlet)|COUNT(Team)``
+    (``TeamManager`` already excludes ``is_deleted``) so a team edit, a member
+    rename, a member add/remove, or a team add/remove all move the fingerprint.
+    Teams with ``category2=None`` are out of scope (a race owns teams via
+    ``category2.race``) and excluded by the filter.
 
     None aggregates (empty race) render as the literal ``"None"`` → stable,
     non-crashing. Returns **bare** hex (no quotes).
