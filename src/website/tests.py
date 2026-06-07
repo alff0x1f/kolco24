@@ -2432,3 +2432,19 @@ def test_athlet_updated_at_populated_and_advances():
     athlet.save()
     athlet.refresh_from_db()
     assert athlet.updated_at > first
+
+
+@pytest.mark.django_db
+def test_checkpoint_updated_at_populated_and_advances():
+    from website.models.checkpoint import Checkpoint
+    from website.models.race import Race
+
+    race = Race.objects.create(name="CP test", slug="cp-updated-at")
+    cp = Checkpoint.objects.create(race=race, number=1, cost=1, description="first")
+    assert cp.updated_at is not None
+
+    first = cp.updated_at
+    cp.description = "updated"
+    cp.save()
+    cp.refresh_from_db()
+    assert cp.updated_at > first

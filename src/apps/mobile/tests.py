@@ -479,6 +479,33 @@ def test_legend_hidden_response_carries_etag(client, settings):
     assert response["ETag"]
 
 
+@pytest.mark.django_db
+def test_legend_hidden_if_none_match_returns_304(client, settings):
+    """304 fires even when is_legend_visible=False."""
+    from website.models.checkpoint import Checkpoint
+    from website.models.race import Race
+
+    settings.MOBILE_APP_SECRET = SECRET
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    race = Race.objects.create(
+        name="Hidden 304", slug="hidden-304", is_legend_visible=False
+    )
+    Checkpoint.objects.create(race=race, number=1, cost=1, description="secret")
+
+    path = f"/app/race/{race.id}/legend/"
+    first = client.get(path, **_signed_headers("GET", path, SECRET))
+    etag = first["ETag"]
+
+    headers = _signed_headers("GET", path, SECRET)
+    headers["HTTP_IF_NONE_MATCH"] = etag
+    second = client.get(path, **headers)
+
+    assert second.status_code == 304
+    assert second["ETag"] == etag
+    assert second.content == b""
+
+
 # --- RaceListView request-level --------------------------------------------
 
 RACES_PATH = "/app/races/"
@@ -1107,6 +1134,60 @@ def test_teams_tampered_query_string_returns_403(client, settings):
     headers = _signed_headers("GET", path, SECRET)
     response = client.get(path + "?foo=bar", **headers)
     assert response.status_code == 403
+
+
+@pytest.mark.django_db
+def test_teams_records_appinstall(client, settings, django_user_model):
+    settings.MOBILE_APP_SECRET = SECRET
+    settings.MOBILE_APP_TS_WINDOW = 300
+    race, _ = _make_race_with_category(slug="teams-install")
+    path = f"/app/race/{race.id}/teams/"
+    response = client.get(path, **_signed_headers("GET", path, SECRET))
+    assert response.status_code == 200
+    install = AppInstall.objects.get(install_id="install-abc")
+    assert install.request_count == 1
+
+
+@pytest.mark.django_db
+def test_teams_stats_write_failure_does_not_break_response(
+    client, settings, monkeypatch
+):
+    settings.MOBILE_APP_SECRET = SECRET
+    settings.MOBILE_APP_TS_WINDOW = 300
+    race, _ = _make_race_with_category(slug="teams-stats-fail")
+
+    def boom(*args, **kwargs):
+        raise IntegrityError("simulated stats write failure")
+
+    monkeypatch.setattr(AppInstall.objects, "update_or_create", boom)
+
+    path = f"/app/race/{race.id}/teams/"
+    response = client.get(path, **_signed_headers("GET", path, SECRET))
+
+    assert response.status_code == 200
+    assert response.json()["race"] == race.id
+    assert not AppInstall.objects.filter(install_id="install-abc").exists()
+
+
+@pytest.mark.django_db
+def test_teams_excludes_category2_none_team(client, settings, django_user_model):
+    """Teams with category2=None are not owned by any race and must be absent."""
+    settings.MOBILE_APP_SECRET = SECRET
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    from website.models.models import Team
+
+    race, _ = _make_race_with_category(slug="teams-no-cat")
+    user = django_user_model.objects.create_user(
+        username="nc1", email="nc1@example.com", password="x"
+    )
+    Team.objects.create(owner=user, category2=None, teamname="Orphan")
+
+    path = f"/app/race/{race.id}/teams/"
+    response = client.get(path, **_signed_headers("GET", path, SECRET))
+
+    assert response.status_code == 200
+    assert response.json()["teams"] == []
 
 
 @pytest.mark.django_db
