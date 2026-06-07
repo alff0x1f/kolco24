@@ -808,6 +808,64 @@ def test_teams_no_headers_returns_403(client, settings, django_user_model):
     assert response.json() == {"detail": "Forbidden"}
 
 
+@pytest.mark.django_db
+def test_teams_wrong_signature_returns_403(client, settings):
+    settings.MOBILE_APP_SECRET = SECRET
+    settings.MOBILE_APP_TS_WINDOW = 300
+    race, _ = _make_race_with_category(slug="teams-bad-sig")
+    path = f"/app/race/{race.id}/teams/"
+    headers = _signed_headers("GET", path, "wrong-secret")
+    response = client.get(path, **headers)
+    assert response.status_code == 403
+    assert response.json() == {"detail": "Forbidden"}
+
+
+@pytest.mark.django_db
+def test_teams_tampered_query_string_returns_403(client, settings):
+    settings.MOBILE_APP_SECRET = SECRET
+    settings.MOBILE_APP_TS_WINDOW = 300
+    race, _ = _make_race_with_category(slug="teams-qs")
+    path = f"/app/race/{race.id}/teams/"
+    headers = _signed_headers("GET", path, SECRET)
+    response = client.get(path + "?foo=bar", **headers)
+    assert response.status_code == 403
+
+
+@pytest.mark.django_db
+def test_teams_empty_race_returns_empty_list(client, settings):
+    settings.MOBILE_APP_SECRET = SECRET
+    settings.MOBILE_APP_TS_WINDOW = 300
+    race, _ = _make_race_with_category(slug="teams-empty")
+    path = f"/app/race/{race.id}/teams/"
+    response = client.get(path, **_signed_headers("GET", path, SECRET))
+    assert response.status_code == 200
+    data = response.json()
+    assert data["race"] == race.id
+    assert data["teams"] == []
+
+
+@pytest.mark.django_db
+def test_teams_excludes_soft_deleted_team(client, settings, django_user_model):
+    settings.MOBILE_APP_SECRET = SECRET
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    from website.models.models import Team
+
+    race, category = _make_race_with_category(slug="teams-deleted")
+    user = django_user_model.objects.create_user(
+        username="td1", email="td1@example.com", password="x"
+    )
+    team = Team.objects.create(owner=user, category2=category, teamname="Ghost")
+    team.is_deleted = True
+    team.save()
+
+    path = f"/app/race/{race.id}/teams/"
+    response = client.get(path, **_signed_headers("GET", path, SECRET))
+
+    assert response.status_code == 200
+    assert response.json()["teams"] == []
+
+
 # --- SyncView request-level -------------------------------------------------
 
 
@@ -892,3 +950,26 @@ def test_sync_no_headers_returns_403(client, settings):
     response = client.get(path)
     assert response.status_code == 403
     assert response.json() == {"detail": "Forbidden"}
+
+
+@pytest.mark.django_db
+def test_sync_wrong_signature_returns_403(client, settings):
+    settings.MOBILE_APP_SECRET = SECRET
+    settings.MOBILE_APP_TS_WINDOW = 300
+    race, _ = _make_race_with_category(slug="sync-bad-sig")
+    path = f"/app/race/{race.id}/sync/"
+    headers = _signed_headers("GET", path, "wrong-secret")
+    response = client.get(path, **headers)
+    assert response.status_code == 403
+    assert response.json() == {"detail": "Forbidden"}
+
+
+@pytest.mark.django_db
+def test_sync_tampered_query_string_returns_403(client, settings):
+    settings.MOBILE_APP_SECRET = SECRET
+    settings.MOBILE_APP_TS_WINDOW = 300
+    race, _ = _make_race_with_category(slug="sync-qs")
+    path = f"/app/race/{race.id}/sync/"
+    headers = _signed_headers("GET", path, SECRET)
+    response = client.get(path + "?foo=bar", **headers)
+    assert response.status_code == 403

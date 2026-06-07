@@ -8,7 +8,7 @@ class AppInstall(models.Model):
     stored locally by the client). Updated best-effort on each verified request.
     """
 
-    install_id = models.CharField(max_length=64, unique=True, db_index=True)
+    install_id = models.CharField(max_length=64, unique=True)
     platform = models.CharField(max_length=16, blank=True)
     app_version = models.CharField(max_length=32, blank=True)
     first_seen = models.DateTimeField(auto_now_add=True)

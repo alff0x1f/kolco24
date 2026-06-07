@@ -30,7 +30,9 @@ def teams_version(race_id):
         max_updated=Max("updated_at"),
         count=Count("id"),
     )
-    members = Athlet.objects.filter(team__category2__race_id=race_id).aggregate(
+    members = Athlet.objects.filter(
+        team__is_deleted=False, team__category2__race_id=race_id
+    ).aggregate(
         max_updated=Max("updated_at"),
     )
     raw = f"{teams['max_updated']}|{members['max_updated']}|{teams['count']}"
