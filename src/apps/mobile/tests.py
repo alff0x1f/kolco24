@@ -605,6 +605,146 @@ def test_teams_version_changes_when_athlet_renamed(django_user_model):
     assert before != after
 
 
+# --- legend_version fingerprint ---------------------------------------------
+
+
+@pytest.mark.django_db
+def test_legend_version_stable_for_empty_race():
+    from apps.mobile.versioning import legend_version
+    from website.models.race import Race
+
+    race = Race.objects.create(
+        name="Empty legend", slug="empty-legend", is_legend_visible=True
+    )
+    first = legend_version(race.id)
+    second = legend_version(race.id)
+    assert first == second
+    assert first  # non-empty
+
+
+@pytest.mark.django_db
+def test_legend_version_changes_when_checkpoint_description_edited():
+    from apps.mobile.versioning import legend_version
+    from website.models.checkpoint import Checkpoint
+    from website.models.race import Race
+
+    race = Race.objects.create(
+        name="Edit legend", slug="edit-legend", is_legend_visible=True
+    )
+    cp = Checkpoint.objects.create(race=race, number=1, cost=1, description="old")
+    before = legend_version(race.id)
+    cp.description = "new"
+    cp.save()
+    after = legend_version(race.id)
+    assert before != after
+
+
+@pytest.mark.django_db
+def test_legend_version_changes_when_checkpoint_added():
+    from apps.mobile.versioning import legend_version
+    from website.models.checkpoint import Checkpoint
+    from website.models.race import Race
+
+    race = Race.objects.create(
+        name="Add legend", slug="add-legend", is_legend_visible=True
+    )
+    Checkpoint.objects.create(race=race, number=1, cost=1, description="first")
+    before = legend_version(race.id)
+    Checkpoint.objects.create(race=race, number=2, cost=1, description="second")
+    after = legend_version(race.id)
+    assert before != after
+
+
+@pytest.mark.django_db
+def test_legend_version_changes_when_checkpoint_removed():
+    from apps.mobile.versioning import legend_version
+    from website.models.checkpoint import Checkpoint
+    from website.models.race import Race
+
+    race = Race.objects.create(
+        name="Remove legend", slug="remove-legend", is_legend_visible=True
+    )
+    cp = Checkpoint.objects.create(race=race, number=1, cost=1, description="first")
+    Checkpoint.objects.create(race=race, number=2, cost=1, description="second")
+    before = legend_version(race.id)
+    cp.delete()
+    after = legend_version(race.id)
+    assert before != after
+
+
+@pytest.mark.django_db
+def test_legend_version_changes_when_kp_flips_to_draft():
+    from apps.mobile.versioning import legend_version
+    from website.models.checkpoint import Checkpoint
+    from website.models.race import Race
+
+    race = Race.objects.create(
+        name="Kp to draft", slug="kp-to-draft", is_legend_visible=True
+    )
+    cp = Checkpoint.objects.create(race=race, number=1, cost=1, description="cp")
+    before = legend_version(race.id)
+    cp.type = "draft"
+    cp.save()
+    after = legend_version(race.id)
+    assert before != after
+
+
+@pytest.mark.django_db
+def test_legend_version_changes_when_draft_flips_to_kp():
+    from apps.mobile.versioning import legend_version
+    from website.models.checkpoint import Checkpoint
+    from website.models.race import Race
+
+    race = Race.objects.create(
+        name="Draft to kp", slug="draft-to-kp", is_legend_visible=True
+    )
+    cp = Checkpoint.objects.create(
+        race=race, number=1, cost=1, description="cp", type="draft"
+    )
+    before = legend_version(race.id)
+    cp.type = "kp"
+    cp.save()
+    after = legend_version(race.id)
+    assert before != after
+
+
+@pytest.mark.django_db
+def test_legend_version_changes_when_is_legend_visible_toggled():
+    from apps.mobile.versioning import legend_version
+    from website.models.checkpoint import Checkpoint
+    from website.models.race import Race
+
+    race = Race.objects.create(
+        name="Toggle legend", slug="toggle-legend", is_legend_visible=True
+    )
+    Checkpoint.objects.create(race=race, number=1, cost=1, description="cp")
+    before = legend_version(race.id)
+    race.is_legend_visible = False
+    race.save()
+    after = legend_version(race.id)
+    assert before != after
+
+
+@pytest.mark.django_db
+def test_legend_version_unchanged_when_draft_checkpoint_edited():
+    from apps.mobile.versioning import legend_version
+    from website.models.checkpoint import Checkpoint
+    from website.models.race import Race
+
+    race = Race.objects.create(
+        name="Draft edit", slug="draft-edit", is_legend_visible=True
+    )
+    Checkpoint.objects.create(race=race, number=1, cost=1, description="visible")
+    draft = Checkpoint.objects.create(
+        race=race, number=2, cost=0, description="draft", type="draft"
+    )
+    before = legend_version(race.id)
+    draft.description = "draft edited"
+    draft.save()
+    after = legend_version(race.id)
+    assert before == after
+
+
 # --- mobile TeamSerializer --------------------------------------------------
 
 TEAM_FIELDS = {

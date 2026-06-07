@@ -144,29 +144,29 @@ explicitly anticipated when they noted the legend was deliberately left unversio
 - Modify: `src/apps/mobile/versioning.py`
 - Modify: `src/apps/mobile/tests.py`
 
-- [ ] Import `Checkpoint` and `CheckpointType` (and `Race`) in `versioning.py`
+- [x] Import `Checkpoint` and `CheckpointType` (and `Race`) in `versioning.py`
       alongside the existing `Athlet`/`Team` imports.
-- [ ] Add `legend_version(race_id)`: aggregate `Max("updated_at")`/`Count("id")`
+- [x] Add `legend_version(race_id)`: aggregate `Max("updated_at")`/`Count("id")`
       over the draft-excluded checkpoint queryset, fetch `is_legend_visible` via
       `values_list(..., flat=True).first()`, build
       `raw = f"{max_updated}|{count}|{visible}"`, return
       `hashlib.blake2b(raw.encode(), digest_size=8).hexdigest()`.
-- [ ] Add a module docstring/comment note that `legend_version` is the single
+- [x] Add a module docstring/comment note that `legend_version` is the single
       source of truth for the legend ETag + `versions.legend` (mirror the existing
       `teams_version` framing), and a one-line comment that the `is_legend_visible`
       re-query is **deliberate** — the helper keeps a bare `race_id` signature
       rather than accepting the view's `Race`, so a future reader shouldn't
       "optimize" it and break the `race_id` single-source-of-truth contract.
-- [ ] Write test: `legend_version` is **stable** across two calls for an unchanged
+- [x] Write test: `legend_version` is **stable** across two calls for an unchanged
       race (incl. an empty race → no crash, deterministic).
-- [ ] Write tests: version **moves** on (a) checkpoint `description` edit,
+- [x] Write tests: version **moves** on (a) checkpoint `description` edit,
       (b) checkpoint add, (c) checkpoint remove, (d) `kp → draft` flip
       (`COUNT` drops), (e) `draft → kp` flip (`COUNT` rises and the un-drafted
       row's `updated_at` enters `MAX` — the "checkpoint becomes visible" event a
       client must detect), (f) `race.is_legend_visible` toggle.
-- [ ] Write test: editing a **draft** checkpoint's description does **not** move
+- [x] Write test: editing a **draft** checkpoint's description does **not** move
       the version (draft excluded).
-- [ ] Run `uv run pytest src/apps/mobile/tests.py -k legend_version` — must pass
+- [x] Run `uv run pytest src/apps/mobile/tests.py -k legend_version` — must pass
       before Task 3.
 
 ### Task 3: Wire ETag/304 into LegendView and `versions.legend` into SyncView
