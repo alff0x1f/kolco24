@@ -8,18 +8,21 @@ failure break the response.
 
 import logging
 
-from django.db.models import F
+from django.db.models import F, Prefetch
+from django.http import HttpResponseNotModified
 from django.shortcuts import get_object_or_404
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from website.models.checkpoint import Checkpoint
 from website.models.enums import CheckpointType
+from website.models.models import Athlet, Team
 from website.models.race import Race
 
 from .models import AppInstall
 from .permissions import SignedAppPermission
-from .serializers import LegendCheckpointSerializer, RaceListSerializer
+from .serializers import LegendCheckpointSerializer, RaceListSerializer, TeamSerializer
+from .versioning import teams_version
 
 logger = logging.getLogger(__name__)
 
@@ -82,3 +85,37 @@ class LegendView(AppAPIView):
                 "checkpoints": LegendCheckpointSerializer(qs, many=True).data,
             }
         )
+
+
+class TeamsView(AppAPIView):
+    """Return a race's full team list with nested members (conditional GET).
+
+    The ETag is the bare :func:`teams_version` fingerprint wrapped in quotes;
+    a matching ``If-None-Match`` short-circuits to an empty ``304`` before any
+    serialization.
+    """
+
+    def get(self, request, race_id):
+        race = get_object_or_404(Race, pk=race_id)
+        quoted = f'"{teams_version(race_id)}"'
+
+        if request.headers.get("If-None-Match") == quoted:
+            resp = HttpResponseNotModified()
+            resp["ETag"] = quoted
+            return resp
+
+        teams = (
+            Team.objects.filter(category2__race=race)
+            .order_by("id")
+            .prefetch_related(
+                Prefetch(
+                    "athlet_set",
+                    queryset=Athlet.objects.order_by("number_in_team", "id"),
+                )
+            )
+        )
+        resp = Response(
+            {"race": race_id, "teams": TeamSerializer(teams, many=True).data}
+        )
+        resp["ETag"] = quoted
+        return resp

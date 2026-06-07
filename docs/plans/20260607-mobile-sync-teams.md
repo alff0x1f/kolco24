@@ -130,10 +130,10 @@ reusing the existing signing/permission machinery. Self-contained: no changes to
 - Modify: `src/apps/mobile/views.py`
 - Modify: `src/apps/mobile/urls.py`
 
-- [ ] add `TeamsView(AppAPIView)` with `get(self, request, race_id)`: `get_object_or_404(Race, pk=race_id)`, compute `quoted` ETag; `If-None-Match` match → `HttpResponseNotModified()` + `ETag` header + no serialization (early return); else serialize teams `order_by("id")` with an ordered `Prefetch("athlet_set", queryset=Athlet.objects.order_by("number_in_team", "id"))`, set ETag, return `{"race": race_id, "teams": [...]}`
-- [ ] wire `path("race/<int:race_id>/teams/", TeamsView.as_view(), name="teams")`
-- [ ] write request-level tests (use `_signed_headers`, set `settings.MOBILE_APP_SECRET`/`MOBILE_APP_TS_WINDOW`): 200 with fields + members + member ordering; `ETag` header present; `If-None-Match` == current ETag → 304 with empty body and ETag set; renaming an `Athlet` yields 200 + different ETag; valid sig + nonexistent race → 404; no headers → 403
-- [ ] run tests — must pass before next task
+- [x] add `TeamsView(AppAPIView)` with `get(self, request, race_id)`: `get_object_or_404(Race, pk=race_id)`, compute `quoted` ETag; `If-None-Match` match → `HttpResponseNotModified()` + `ETag` header + no serialization (early return); else serialize teams `order_by("id")` with an ordered `Prefetch("athlet_set", queryset=Athlet.objects.order_by("number_in_team", "id"))`, set ETag, return `{"race": race_id, "teams": [...]}`
+- [x] wire `path("race/<int:race_id>/teams/", TeamsView.as_view(), name="teams")`
+- [x] write request-level tests (use `_signed_headers`, set `settings.MOBILE_APP_SECRET`/`MOBILE_APP_TS_WINDOW`): 200 with fields + members + member ordering; `ETag` header present; `If-None-Match` == current ETag → 304 with empty body and ETag set; renaming an `Athlet` yields 200 + different ETag; valid sig + nonexistent race → 404; no headers → 403
+- [x] run tests — must pass before next task
 
 ### Task 5: `SyncView` manifest + `MOBILE_DATA_SOURCE` setting
 

@@ -673,3 +673,136 @@ def test_team_serializer_category2_null_when_unset(django_user_model):
     team = Team.objects.create(owner=user, category2=None, teamname="Foxtrot")
     data = TeamSerializer(team).data
     assert data["category2"] is None
+
+
+# --- TeamsView request-level ------------------------------------------------
+
+
+@pytest.mark.django_db
+def test_teams_valid_signature_returns_200_with_fields_and_members(
+    client, settings, django_user_model
+):
+    settings.MOBILE_APP_SECRET = SECRET
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    from website.models.models import Athlet, Team
+
+    race, category = _make_race_with_category(slug="teams-200")
+    user = django_user_model.objects.create_user(
+        username="t1", email="t1@example.com", password="x"
+    )
+    team = Team.objects.create(
+        owner=user, category2=category, teamname="Alpha", ucount=2
+    )
+    Athlet.objects.create(owner=user, team=team, name="Second", number_in_team=2)
+    Athlet.objects.create(owner=user, team=team, name="First", number_in_team=1)
+
+    path = f"/app/race/{race.id}/teams/"
+    response = client.get(path, **_signed_headers("GET", path, SECRET))
+
+    assert response.status_code == 200
+    assert response["ETag"]
+    data = response.json()
+    assert data["race"] == race.id
+    assert len(data["teams"]) == 1
+    team_data = data["teams"][0]
+    assert set(team_data.keys()) == TEAM_FIELDS
+    assert team_data["category2"] == category.id
+    assert [m["name"] for m in team_data["members"]] == ["First", "Second"]
+    assert set(team_data["members"][0].keys()) == MEMBER_FIELDS
+
+
+@pytest.mark.django_db
+def test_teams_orders_by_id(client, settings, django_user_model):
+    settings.MOBILE_APP_SECRET = SECRET
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    from website.models.models import Team
+
+    race, category = _make_race_with_category(slug="teams-order")
+    user = django_user_model.objects.create_user(
+        username="t2", email="t2@example.com", password="x"
+    )
+    first = Team.objects.create(owner=user, category2=category, teamname="Alpha")
+    second = Team.objects.create(owner=user, category2=category, teamname="Bravo")
+
+    path = f"/app/race/{race.id}/teams/"
+    response = client.get(path, **_signed_headers("GET", path, SECRET))
+
+    assert response.status_code == 200
+    ids = [t["id"] for t in response.json()["teams"]]
+    assert ids == [first.id, second.id]
+
+
+@pytest.mark.django_db
+def test_teams_if_none_match_returns_304_empty_body(
+    client, settings, django_user_model
+):
+    settings.MOBILE_APP_SECRET = SECRET
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    from website.models.models import Team
+
+    race, category = _make_race_with_category(slug="teams-304")
+    user = django_user_model.objects.create_user(
+        username="t3", email="t3@example.com", password="x"
+    )
+    Team.objects.create(owner=user, category2=category, teamname="Alpha")
+
+    path = f"/app/race/{race.id}/teams/"
+    first = client.get(path, **_signed_headers("GET", path, SECRET))
+    etag = first["ETag"]
+
+    headers = _signed_headers("GET", path, SECRET)
+    headers["HTTP_IF_NONE_MATCH"] = etag
+    second = client.get(path, **headers)
+
+    assert second.status_code == 304
+    assert second["ETag"] == etag
+    assert second.content == b""
+
+
+@pytest.mark.django_db
+def test_teams_etag_changes_when_athlet_renamed(client, settings, django_user_model):
+    settings.MOBILE_APP_SECRET = SECRET
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    from website.models.models import Athlet, Team
+
+    race, category = _make_race_with_category(slug="teams-etag")
+    user = django_user_model.objects.create_user(
+        username="t4", email="t4@example.com", password="x"
+    )
+    team = Team.objects.create(owner=user, category2=category, teamname="Alpha")
+    athlet = Athlet.objects.create(
+        owner=user, team=team, name="Runner", number_in_team=1
+    )
+
+    path = f"/app/race/{race.id}/teams/"
+    before = client.get(path, **_signed_headers("GET", path, SECRET))
+
+    athlet.name = "Runner renamed"
+    athlet.save()
+
+    after = client.get(path, **_signed_headers("GET", path, SECRET))
+    assert after.status_code == 200
+    assert after["ETag"] != before["ETag"]
+
+
+@pytest.mark.django_db
+def test_teams_valid_sig_nonexistent_race_returns_404(client, settings):
+    settings.MOBILE_APP_SECRET = SECRET
+    settings.MOBILE_APP_TS_WINDOW = 300
+    path = "/app/race/999999/teams/"
+    response = client.get(path, **_signed_headers("GET", path, SECRET))
+    assert response.status_code == 404
+
+
+@pytest.mark.django_db
+def test_teams_no_headers_returns_403(client, settings, django_user_model):
+    settings.MOBILE_APP_SECRET = SECRET
+    race, _ = _make_race_with_category(slug="teams-403")
+    path = f"/app/race/{race.id}/teams/"
+    response = client.get(path)
+    assert response.status_code == 403
+    assert response.json() == {"detail": "Forbidden"}
