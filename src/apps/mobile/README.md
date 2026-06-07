@@ -281,16 +281,21 @@ ETag/`If-None-Match` на ресурсах остаётся (см. выше) —
 | GET | `/app/race/<id>/legend/` | `mobile:legend` | КП + NFC-метки |
 | GET | `/app/race/<id>/sync/` | `mobile:sync` | манифест: версии ресурсов + `data_source`/`lease_expires_at` |
 
-Все — наследники `AppAPIView` (подпись + `AppInstall`-статистика); у `teams` —
-поддержка `ETag`/`If-None-Match` (304), у `sync` — лёгкий манифест версий для
-фонового обновления (без 304). `legend`/`races` пока без ETag.
+Все — наследники `AppAPIView` (подпись + `AppInstall`-статистика); у `teams` и
+`legend` — поддержка `ETag`/`If-None-Match` (304), у `sync` — лёгкий манифест
+версий для фонового обновления (без 304). `races` пока без ETag.
 
-> **Статус:** реализованы `mobile:races`, `mobile:legend` (пока без `tags` и без
-> ETag), `mobile:teams` (с `ETag`/`If-None-Match` → 304) и `mobile:sync`.
-> Отпечаток `teams` считается по `MAX(Team.updated_at)`/`MAX(Athlet.updated_at)`/
-> `COUNT` (поле `Athlet.updated_at` добавлено, чтобы переименование участника
-> сдвигало версию). Манифест `sync` пока несёт **только** `versions.teams` (у
-> легенды ещё нет тегов/ETag). Лиз-хэндофф **застаблен**: `data_source` берётся из
-> настройки `MOBILE_DATA_SOURCE` (по умолчанию `"cloud"`), `lease_expires_at`
-> всегда `null` — реальный per-race лиз/хэндофф и NFC-метки в легенде остаются
-> целевой схемой, описанной выше.
+> **Статус:** реализованы `mobile:races`, `mobile:legend` (с `ETag`/`If-None-Match`
+> → 304; пока без `tags`), `mobile:teams` (с `ETag`/`If-None-Match` → 304) и
+> `mobile:sync`. Отпечаток `teams` считается по
+> `MAX(Team.updated_at)`/`MAX(Athlet.updated_at)`/`COUNT` (поле `Athlet.updated_at`
+> добавлено, чтобы переименование участника сдвигало версию). Отпечаток `legend` —
+> `MAX(Checkpoint.updated_at)|COUNT|is_legend_visible` по **draft-исключённому**
+> набору КП (поле `Checkpoint.updated_at` добавлено миграцией `0077` по той же
+> причине, что и `Athlet.updated_at` — ловить правки на месте). Теги
+> (`CheckpointTag`) **вне области**: легенда их не отдаёт, поэтому правка тега
+> версию легенды не сдвигает. Манифест `sync` несёт **оба** `versions.teams` и
+> `versions.legend`. Лиз-хэндофф **застаблен**: `data_source` берётся из настройки
+> `MOBILE_DATA_SOURCE` (по умолчанию `"cloud"`), `lease_expires_at` всегда `null` —
+> реальный per-race лиз/хэндофф и NFC-метки в легенде остаются целевой схемой,
+> описанной выше.

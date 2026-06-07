@@ -202,17 +202,17 @@ explicitly anticipated when they noted the legend was deliberately left unversio
 - Modify: `src/apps/mobile/README.md`
 - Modify: `CLAUDE.md`
 
-- [ ] `README.md` + `CLAUDE.md` legend-endpoint paragraph: state the legend now
+- [x] `README.md` + `CLAUDE.md` legend-endpoint paragraph: state the legend now
       carries a strong `ETag` + `If-None-Match`/304, fingerprint =
       `legend_version(race_id)` over `MAX(Checkpoint.updated_at)|COUNT|is_legend_visible`
       (draft excluded). Remove the "legend stays unversioned / no ETag until a
       later redo" wording.
-- [ ] `SyncView` paragraph: `versions` now carries **both** `teams` and `legend`.
-- [ ] Note `Checkpoint.updated_at` was added (migration `0077`) for the same reason
+- [x] `SyncView` paragraph: `versions` now carries **both** `teams` and `legend`.
+- [x] Note `Checkpoint.updated_at` was added (migration `0077`) for the same reason
       as `Athlet.updated_at` — to catch in-place edits.
-- [ ] Keep/clarify the caveat: `CheckpointTag` (tags) stays out of scope — a tag
+- [x] Keep/clarify the caveat: `CheckpointTag` (tags) stays out of scope — a tag
       edit does not move the legend version (legend never exposes tags).
-- [ ] No code in this task → no new tests; re-run `uv run pytest src/apps/mobile/tests.py`
+- [x] No code in this task → no new tests; re-run `uv run pytest src/apps/mobile/tests.py`
       to confirm nothing regressed.
 
 ### Task 5: Verify acceptance criteria
