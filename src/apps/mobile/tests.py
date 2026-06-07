@@ -118,9 +118,30 @@ def test_permission_empty_secret_fails_closed(settings):
     assert SignedAppPermission().has_permission(request, None) is False
 
 
+def test_permission_none_secret_fails_closed(settings):
+    settings.MOBILE_APP_SECRET = None
+    request = _signed_get_request()
+    assert SignedAppPermission().has_permission(request, None) is False
+
+
 def test_permission_missing_headers_false(settings):
     settings.MOBILE_APP_SECRET = SECRET
     request = RequestFactory().get(PATH)
+    assert SignedAppPermission().has_permission(request, None) is False
+
+
+@pytest.mark.parametrize("drop_header", ["X-App-Sig", "X-App-Ts", "X-Install-Id"])
+def test_permission_each_required_header_individually_false(settings, drop_header):
+    settings.MOBILE_APP_SECRET = SECRET
+    ts = str(int(time.time()))
+    canonical = build_canonical("GET", PATH, ts, b"")
+    headers = {
+        "X-App-Sig": sign(SECRET, canonical),
+        "X-App-Ts": ts,
+        "X-Install-Id": "install-abc",
+    }
+    del headers[drop_header]
+    request = RequestFactory().get(PATH, headers=headers)
     assert SignedAppPermission().has_permission(request, None) is False
 
 
@@ -174,6 +195,15 @@ def test_client_ip_prefers_forwarded_for():
 
 def test_client_ip_falls_back_to_remote_addr():
     request = RequestFactory().get(PATH, REMOTE_ADDR="10.0.0.2")
+    assert _client_ip(request) == "10.0.0.2"
+
+
+def test_client_ip_invalid_forwarded_for_falls_back_to_remote_addr():
+    request = RequestFactory().get(
+        PATH,
+        headers={"X-Forwarded-For": "not-an-ip"},
+        REMOTE_ADDR="10.0.0.2",
+    )
     assert _client_ip(request) == "10.0.0.2"
 
 
@@ -457,3 +487,44 @@ def test_legend_stats_write_failure_does_not_break_response(
     assert response.status_code == 200
     assert response.json()["race"] == race_with_checkpoints.id
     assert not AppInstall.objects.filter(install_id="install-abc").exists()
+
+
+@pytest.mark.django_db
+def test_races_records_appinstall(client, settings):
+    settings.MOBILE_APP_SECRET = SECRET
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    response = client.get(RACES_PATH, **_signed_headers("GET", RACES_PATH, SECRET))
+
+    assert response.status_code == 200
+    install = AppInstall.objects.get(install_id="install-abc")
+    assert install.request_count == 1
+
+
+@pytest.mark.django_db
+def test_races_stats_write_failure_does_not_break_response(
+    client, settings, monkeypatch
+):
+    settings.MOBILE_APP_SECRET = SECRET
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    def boom(*args, **kwargs):
+        raise IntegrityError("simulated stats write failure")
+
+    monkeypatch.setattr(AppInstall.objects, "update_or_create", boom)
+
+    response = client.get(RACES_PATH, **_signed_headers("GET", RACES_PATH, SECRET))
+
+    assert response.status_code == 200
+    assert response.json() == {"races": []}
+    assert not AppInstall.objects.filter(install_id="install-abc").exists()
+
+
+@pytest.mark.django_db
+def test_races_tampered_query_string_returns_403(client, settings):
+    settings.MOBILE_APP_SECRET = SECRET
+    settings.MOBILE_APP_TS_WINDOW = 300
+    # Signature covers the bare path; appending a query string must be rejected
+    headers = _signed_headers("GET", RACES_PATH, SECRET)
+    response = client.get(RACES_PATH + "?page=2", **headers)
+    assert response.status_code == 403
