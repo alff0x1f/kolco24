@@ -285,7 +285,7 @@ ETag/`If-None-Match` на ресурсах остаётся (см. выше) —
 эндпоинтов — поддержка `ETag`/`If-None-Match`, у `sync` — лёгкий манифест версий
 для фонового обновления.
 
-> **Статус:** реализован пока только `mobile:legend` (без `tags` и без ETag).
-> `races`/`teams`/`sync`, NFC-метки в легенде, `ETag`/`If-None-Match` и лиз-хэндофф
+> **Статус:** реализованы `mobile:legend` (без `tags` и без ETag) и `mobile:races`.
+> `teams`/`sync`, NFC-метки в легенде, `ETag`/`If-None-Match` и лиз-хэндофф
 > (`data_source`/`lease_expires_at`) — целевая схема, описанная выше; этот README
 > задаёт контракт, к которому их доводим.
