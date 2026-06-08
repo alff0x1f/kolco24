@@ -63,6 +63,12 @@ def test_verify_false_for_wrong_secret():
     assert verify("other-secret", canonical, sig) is False
 
 
+def test_verify_true_for_uppercase_signature():
+    canonical = build_canonical("GET", "/app/race/1/legend/", "1700000000", b"")
+    good_sig = sign("secret", canonical).upper()
+    assert verify("secret", canonical, good_sig) is True
+
+
 def test_verify_false_for_changed_path():
     canonical = build_canonical("GET", "/app/race/1/legend/", "1700000000", b"")
     sig = sign("secret", canonical)
@@ -78,6 +84,7 @@ def test_appinstall_create_defaults():
     assert install.request_count == 0
     assert install.platform == ""
     assert install.app_version == ""
+    assert install.key_id == ""
     assert install.first_seen is not None
     assert install.last_seen is not None
 
@@ -146,6 +153,13 @@ def test_permission_missing_key_id_header_false(settings):
 def test_permission_missing_headers_false(settings):
     settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
     request = RequestFactory().get(PATH)
+    assert SignedAppPermission().has_permission(request, None) is False
+
+
+def test_permission_empty_string_secret_fails_closed(settings):
+    # keys.get(key_id) returns "" → falsy → same neutral 403 as unknown key
+    settings.MOBILE_APP_KEYS = {"test-v1": ""}
+    request = _signed_get_request()
     assert SignedAppPermission().has_permission(request, None) is False
 
 
@@ -387,6 +401,18 @@ def test_legend_valid_sig_nonexistent_race_returns_404(client, settings):
 
 
 @pytest.mark.django_db
+def test_legend_unpublished_race_returns_404(client, settings):
+    from website.models.race import Race
+
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+    race = Race.objects.create(name="Unpub", slug="unpub-legend", is_published=False)
+    path = f"/app/race/{race.id}/legend/"
+    response = client.get(path, **_signed_headers("GET", path, SECRET))
+    assert response.status_code == 404
+
+
+@pytest.mark.django_db
 def test_legend_records_appinstall_and_increments(
     client, settings, race_with_checkpoints
 ):
@@ -468,7 +494,8 @@ def test_legend_response_carries_etag(client, settings, race_with_checkpoints):
     response = client.get(path, **_signed_headers("GET", path, SECRET))
 
     assert response.status_code == 200
-    assert response["ETag"]
+    etag = response["ETag"]
+    assert etag.startswith('"') and etag.endswith('"')
 
 
 @pytest.mark.django_db
@@ -537,7 +564,8 @@ def test_legend_hidden_response_carries_etag(client, settings):
 
     assert response.status_code == 200
     assert response.json()["checkpoints"] == []
-    assert response["ETag"]
+    etag = response["ETag"]
+    assert etag.startswith('"') and etag.endswith('"')
 
 
 @pytest.mark.django_db
@@ -1022,7 +1050,8 @@ def test_teams_valid_signature_returns_200_with_fields_and_members(
     response = client.get(path, **_signed_headers("GET", path, SECRET))
 
     assert response.status_code == 200
-    assert response["ETag"]
+    etag = response["ETag"]
+    assert etag.startswith('"') and etag.endswith('"')
     data = response.json()
     assert data["race"] == race.id
     assert len(data["teams"]) == 1
@@ -1174,6 +1203,18 @@ def test_teams_valid_sig_nonexistent_race_returns_404(client, settings):
     settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
     settings.MOBILE_APP_TS_WINDOW = 300
     path = "/app/race/999999/teams/"
+    response = client.get(path, **_signed_headers("GET", path, SECRET))
+    assert response.status_code == 404
+
+
+@pytest.mark.django_db
+def test_teams_unpublished_race_returns_404(client, settings):
+    from website.models.race import Race
+
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+    race = Race.objects.create(name="Unpub", slug="unpub-teams", is_published=False)
+    path = f"/app/race/{race.id}/teams/"
     response = client.get(path, **_signed_headers("GET", path, SECRET))
     assert response.status_code == 404
 
@@ -1421,6 +1462,18 @@ def test_sync_valid_sig_nonexistent_race_returns_404(client, settings):
     settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
     settings.MOBILE_APP_TS_WINDOW = 300
     path = "/app/race/999999/sync/"
+    response = client.get(path, **_signed_headers("GET", path, SECRET))
+    assert response.status_code == 404
+
+
+@pytest.mark.django_db
+def test_sync_unpublished_race_returns_404(client, settings):
+    from website.models.race import Race
+
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+    race = Race.objects.create(name="Unpub", slug="unpub-sync", is_published=False)
+    path = f"/app/race/{race.id}/sync/"
     response = client.get(path, **_signed_headers("GET", path, SECRET))
     assert response.status_code == 404
 
