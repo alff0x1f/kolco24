@@ -50,6 +50,34 @@ def teams_version(race_id):
     return hashlib.blake2b(raw.encode(), digest_size=8).hexdigest()
 
 
+def legend_state(race_id):
+    """Return ``(version, is_legend_visible)`` from a single coherent snapshot.
+
+    Both values are derived in one call so the ETag and the visibility branch
+    in the view always agree — a visibility flip between two separate reads
+    cannot produce a response body that contradicts its own ETag.
+
+    Deliberately re-queries ``is_legend_visible`` by ``race_id`` rather than
+    accepting a ``Race`` object: keeps the bare ``race_id`` signature that is
+    the single source of truth for both the ETag and ``versions.legend``. Do
+    not "optimize" this into a ``Race`` parameter — it would break that
+    contract.
+    """
+    agg = (
+        Checkpoint.objects.filter(race_id=race_id)
+        .exclude(type=CheckpointType.draft.value)
+        .aggregate(max_updated=Max("updated_at"), count=Count("id"))
+    )
+    visible = (
+        Race.objects.filter(pk=race_id)
+        .values_list("is_legend_visible", flat=True)
+        .first()
+    )
+    raw = f"{agg['max_updated']}|{agg['count']}|{visible}"
+    version = hashlib.blake2b(raw.encode(), digest_size=8).hexdigest()
+    return version, visible
+
+
 def legend_version(race_id):
     """Return a short, stable fingerprint of a race's legend.
 
@@ -62,20 +90,10 @@ def legend_version(race_id):
 
     None aggregates (empty/all-draft race) render as the literal ``"None"`` →
     stable, non-crashing. Returns **bare** hex (no quotes).
+
+    Thin wrapper around :func:`legend_state` — use ``legend_state`` when you
+    also need the ``is_legend_visible`` flag (e.g. in :class:`LegendView`) to
+    avoid a second independent DB read that could race with a visibility flip.
     """
-    agg = (
-        Checkpoint.objects.filter(race_id=race_id)
-        .exclude(type=CheckpointType.draft.value)
-        .aggregate(max_updated=Max("updated_at"), count=Count("id"))
-    )
-    # Deliberately re-query is_legend_visible by race_id rather than accepting the
-    # view's Race object: legend_version keeps a bare race_id signature to stay the
-    # single source of truth for both the ETag and versions.legend. Do not
-    # "optimize" this into a Race parameter — it would break that contract.
-    visible = (
-        Race.objects.filter(pk=race_id)
-        .values_list("is_legend_visible", flat=True)
-        .first()
-    )
-    raw = f"{agg['max_updated']}|{agg['count']}|{visible}"
-    return hashlib.blake2b(raw.encode(), digest_size=8).hexdigest()
+    version, _ = legend_state(race_id)
+    return version

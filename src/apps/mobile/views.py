@@ -23,7 +23,7 @@ from website.models.race import Race
 from .models import AppInstall
 from .permissions import SignedAppPermission
 from .serializers import LegendCheckpointSerializer, RaceListSerializer, TeamSerializer
-from .versioning import legend_version, teams_version
+from .versioning import legend_state, legend_version, teams_version
 
 logger = logging.getLogger(__name__)
 
@@ -79,21 +79,22 @@ class LegendView(AppAPIView):
     """
 
     def get(self, request, race_id):
-        race = get_object_or_404(Race, pk=race_id, is_published=True)
-        quoted = f'"{legend_version(race_id)}"'
+        get_object_or_404(Race, pk=race_id, is_published=True)
+        version, is_legend_visible = legend_state(race_id)
+        quoted = f'"{version}"'
 
         if request.headers.get("If-None-Match") == quoted:
             resp = HttpResponseNotModified()
             resp["ETag"] = quoted
             return resp
 
-        if not race.is_legend_visible:
+        if not is_legend_visible:
             resp = Response({"race": race_id, "checkpoints": []})
             resp["ETag"] = quoted
             return resp
 
         qs = (
-            Checkpoint.objects.filter(race=race)
+            Checkpoint.objects.filter(race_id=race_id)
             .exclude(type=CheckpointType.draft.value)
             .order_by("number", "id")
         )
