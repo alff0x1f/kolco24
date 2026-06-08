@@ -1904,7 +1904,7 @@ def _confirm_payment(user, team, paid_for, cost_per_person=1500):
         payment.save(update_fields=["order"])
         team.paid_people += paid_for
         team.paid_sum += amount
-        team.save(update_fields=["paid_people", "paid_sum"])
+        team.save(update_fields=["paid_people", "paid_sum", "updated_at"])
 
         category = team.category2
         race = category.race if category else None
