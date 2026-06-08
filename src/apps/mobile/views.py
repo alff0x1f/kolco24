@@ -78,7 +78,7 @@ class LegendView(AppAPIView):
     """
 
     def get(self, request, race_id):
-        race = get_object_or_404(Race, pk=race_id)
+        race = get_object_or_404(Race, pk=race_id, is_published=True)
         quoted = f'"{legend_version(race_id)}"'
 
         if request.headers.get("If-None-Match") == quoted:
@@ -115,7 +115,7 @@ class TeamsView(AppAPIView):
     """
 
     def get(self, request, race_id):
-        race = get_object_or_404(Race, pk=race_id)
+        race = get_object_or_404(Race, pk=race_id, is_published=True)
         quoted = f'"{teams_version(race_id)}"'
 
         if request.headers.get("If-None-Match") == quoted:
@@ -151,7 +151,7 @@ class SyncView(AppAPIView):
     """
 
     def get(self, request, race_id):
-        get_object_or_404(Race, pk=race_id)
+        get_object_or_404(Race, pk=race_id, is_published=True)
         return Response(
             {
                 "race": race_id,

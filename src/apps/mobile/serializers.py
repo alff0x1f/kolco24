@@ -46,13 +46,31 @@ class MemberSerializer(serializers.ModelSerializer):
 class TeamSerializer(serializers.ModelSerializer):
     """Mobile view of a team with its nested member composition.
 
-    ``members`` iterates the **prefetched** ``athlet_set`` directly (no
-    ``.order_by`` here — that would re-query and defeat the view's
-    ``Prefetch``); ordering is supplied by ``TeamsView``'s prefetch queryset.
+    ``members`` prefers the prefetched ``athlet_set`` (new storage); if that
+    set is empty it falls back to the legacy ``athlet1..6`` / ``birth1..6``
+    columns that the existing web UI still writes to.  The fallback keeps
+    member data visible until every team is stored in the ``Athlet`` table.
     """
 
     category2 = serializers.IntegerField(source="category2_id")
-    members = MemberSerializer(source="athlet_set", many=True, read_only=True)
+    members = serializers.SerializerMethodField()
+
+    def get_members(self, team):
+        # Prefer Athlet rows (ordering comes from the view's Prefetch).
+        athlets = list(team.athlet_set.all())
+        if athlets:
+            return MemberSerializer(athlets, many=True).data
+        # Fall back to legacy athlet1..6 / birth1..6 columns.
+        # Cap at ucount so slots above the active roster (stale after a size
+        # reduction — the web form hides but does not clear those inputs) are
+        # not exposed.
+        result = []
+        for i in range(1, min(team.ucount, 6) + 1):
+            name = getattr(team, f"athlet{i}", "")
+            birth = getattr(team, f"birth{i}", 0)
+            if name:
+                result.append({"name": name, "birth": birth, "number_in_team": i})
+        return result
 
     class Meta:
         model = Team
