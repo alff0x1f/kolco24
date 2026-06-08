@@ -52,7 +52,9 @@ CONTRIBUTORS_API_TOKEN = os.getenv("CONTRIBUTORS_API_TOKEN")
 _raw_mobile_keys = os.getenv("MOBILE_APP_KEYS", "")
 try:
     _parsed_mobile_keys = json.loads(_raw_mobile_keys) if _raw_mobile_keys else {}
-except json.JSONDecodeError:
+except (json.JSONDecodeError, AttributeError):
+    _parsed_mobile_keys = {}
+if not isinstance(_parsed_mobile_keys, dict):
     _parsed_mobile_keys = {}
 MOBILE_APP_KEYS = {
     k: v for k, v in _parsed_mobile_keys.items() if isinstance(v, str) and v
