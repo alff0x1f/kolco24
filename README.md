@@ -36,8 +36,9 @@ make build-push TAG=v1.2.3  # с конкретным тегом
 ```bash
 cp deploy/kolco24.env.example deploy/kolco24.env
 # заполнить deploy/kolco24.env
-# MOBILE_APP_SECRET должен совпадать со значением, зашитым в iOS/Android-бинарник;
-# пустое значение → все /app/* запросы вернут 403
+# MOBILE_APP_KEYS — JSON-карта key-id → секрет; каждый секрет должен совпадать со
+# значением, зашитым в соответствующий iOS/Android-бинарник;
+# пустое/некорректное значение → все /app/* запросы вернут 403
 
 echo "KOLCO24_IMAGE=registry.lab.tk-sputnik.org/kolco24:latest" > .env
 docker compose -f docker-compose_v2.yml up -d

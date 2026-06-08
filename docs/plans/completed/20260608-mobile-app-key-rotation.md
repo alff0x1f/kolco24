@@ -240,11 +240,11 @@ signature with it.
 - [x] confirm `uv run python src/manage.py makemigrations --check --dry-run` is clean — "No changes detected"
 
 ### Task 7: [Final] Update documentation
-- [ ] `deploy/kolco24.env.example`: replace `MOBILE_APP_SECRET=` with the `MOBILE_APP_KEYS={...}` example + rotation comment
-- [ ] **root `README.md:39`**: update the stale `MOBILE_APP_SECRET` setup comment → `MOBILE_APP_KEYS` (JSON map, empty/malformed → all `/app/*` return 403)
-- [ ] `src/apps/mobile/README.md`: update line 4 (`MOBILE_APP_SECRET` → keyed map) and the `X-App-*` header note (line 8, add `X-App-Key-Id`); document the rotation workflow + `AppInstall.key_id` (this README is prose, not a header table)
-- [ ] `CLAUDE.md` apps.mobile paragraph: replace `MOBILE_APP_SECRET` with the keyed map, add `X-App-Key-Id` to the **header enumeration** (the `X-Install-Id`/`X-App-Platform`/… list — the only place headers are enumerated), note `AppInstall.key_id` + migration `0003`, keep the "canonical unchanged / key-id selects the secret" rationale
-- [ ] move this plan to `docs/plans/completed/`
+- [x] `deploy/kolco24.env.example`: replace `MOBILE_APP_SECRET=` with the `MOBILE_APP_KEYS={...}` example + rotation comment
+- [x] **root `README.md:39`**: update the stale `MOBILE_APP_SECRET` setup comment → `MOBILE_APP_KEYS` (JSON map, empty/malformed → all `/app/*` return 403)
+- [x] `src/apps/mobile/README.md`: update line 4 (`MOBILE_APP_SECRET` → keyed map) and the `X-App-*` header note (line 8, add `X-App-Key-Id`); document the rotation workflow + `AppInstall.key_id` (this README is prose, not a header table)
+- [x] `CLAUDE.md` apps.mobile paragraph: replace `MOBILE_APP_SECRET` with the keyed map, add `X-App-Key-Id` to the **header enumeration** (the `X-Install-Id`/`X-App-Platform`/… list — the only place headers are enumerated), note `AppInstall.key_id` + migration `0003`, keep the "canonical unchanged / key-id selects the secret" rationale
+- [x] move this plan to `docs/plans/completed/`
 
 ## Post-Completion
 *Items requiring manual intervention or external systems — no checkboxes, informational only.*
