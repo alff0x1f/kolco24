@@ -9,13 +9,16 @@ class AppInstallAdmin(admin.ModelAdmin):
         "install_id",
         "platform",
         "app_version",
+        "key_id",
         "request_count",
         "last_seen",
     )
+    list_filter = ("key_id", "platform")
     readonly_fields = (
         "install_id",
         "platform",
         "app_version",
+        "key_id",
         "first_seen",
         "last_seen",
         "last_ip",

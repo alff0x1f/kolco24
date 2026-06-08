@@ -11,6 +11,7 @@ class AppInstall(models.Model):
     install_id = models.CharField(max_length=64, unique=True)
     platform = models.CharField(max_length=16, blank=True)
     app_version = models.CharField(max_length=32, blank=True)
+    key_id = models.CharField(max_length=32, blank=True)
     first_seen = models.DateTimeField(auto_now_add=True)
     last_seen = models.DateTimeField(auto_now=True)
     last_ip = models.GenericIPAddressField(null=True, blank=True)

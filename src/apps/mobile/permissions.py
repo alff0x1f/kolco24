@@ -1,10 +1,12 @@
 """DRF permission enforcing the HMAC-signed mobile-app request contract.
 
-The check is pure crypto: it verifies the shared-secret signature over a
-canonical string and, on success, stashes parsed metadata on ``request.app_meta``
-for the view to record stats. It does no DB writes itself. It fails closed —
-an empty/missing ``MOBILE_APP_SECRET`` rejects every request — and returns no
-hint about which check failed (the view turns any ``False`` into a neutral 403).
+The check is pure crypto: it selects the per-build secret from the keyed map
+``MOBILE_APP_KEYS`` (by the request's ``X-App-Key-Id``), verifies the signature
+over a canonical string and, on success, stashes parsed metadata on
+``request.app_meta`` for the view to record stats. It does no DB writes itself.
+It fails closed — an empty/missing ``MOBILE_APP_KEYS`` (or an unknown key-id)
+rejects every request — and returns no hint about which check failed (the view
+turns any ``False`` into a neutral 403).
 """
 
 import ipaddress
@@ -36,15 +38,20 @@ class SignedAppPermission(BasePermission):
     message = "Forbidden"
 
     def has_permission(self, request, view):
-        secret = getattr(settings, "MOBILE_APP_SECRET", "") or ""
-        if not secret:
+        keys = getattr(settings, "MOBILE_APP_KEYS", {}) or {}
+        if not keys:
             return False  # fail closed: misconfigured deploy never leaks the legend
 
+        key_id = request.headers.get("X-App-Key-Id")
         sig = request.headers.get("X-App-Sig")
         ts = request.headers.get("X-App-Ts")
         install = request.headers.get("X-Install-Id")
-        if not sig or not ts or not install:
+        if not key_id or not sig or not ts or not install:
             return False
+
+        secret = keys.get(key_id)
+        if not secret:
+            return False  # unknown key-id → neutral 403, no hint
 
         try:
             ts_int = int(ts)
@@ -65,6 +72,7 @@ class SignedAppPermission(BasePermission):
             "install_id": install[:64],
             "platform": request.headers.get("X-App-Platform", "")[:16],
             "app_version": request.headers.get("X-App-Version", "")[:32],
+            "key_id": key_id[:32],
             "ip": _client_ip(request),
         }
         return True

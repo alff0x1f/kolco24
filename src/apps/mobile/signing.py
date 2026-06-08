@@ -1,9 +1,9 @@
 """HMAC-SHA256 request signing for the mobile app endpoints.
 
 Mirrors the client side baked into the iOS/Android binaries: the app builds the
-same canonical string from the request and signs it with the shared
-``MOBILE_APP_SECRET``. The canonical signs the *hash* of the body (not the body
-itself) to keep the signed string small.
+same canonical string from the request and signs it with the per-build shared
+secret selected by ``X-App-Key-Id``. The canonical signs the *hash* of the body
+(not the body itself) to keep the signed string small.
 """
 
 import hashlib

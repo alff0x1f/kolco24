@@ -50,6 +50,7 @@ class AppAPIView(APIView):
                 defaults={
                     "platform": meta.get("platform", ""),
                     "app_version": meta.get("app_version", ""),
+                    "key_id": meta.get("key_id", ""),
                     "last_ip": meta.get("ip"),
                 },
             )

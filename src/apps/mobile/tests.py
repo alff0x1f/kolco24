@@ -95,48 +95,69 @@ SECRET = "test-secret"
 PATH = "/app/race/1/legend/"
 
 
-def _signed_get_request(secret=SECRET, ts=None, path=PATH, extra_headers=None):
+def _signed_get_request(
+    secret=SECRET, ts=None, path=PATH, extra_headers=None, key_id="test-v1"
+):
     """Build a Django request with valid signed headers for a GET."""
     if ts is None:
         ts = str(int(time.time()))
     canonical = build_canonical("GET", path, ts, b"")
     sig = sign(secret, canonical)
     headers = {
+        "X-App-Key-Id": key_id,
         "X-App-Sig": sig,
         "X-App-Ts": ts,
         "X-Install-Id": "install-abc",
         "X-App-Platform": "ios",
         "X-App-Version": "1.4.0",
     }
+    if key_id is None:
+        del headers["X-App-Key-Id"]
     if extra_headers:
         headers.update(extra_headers)
     return RequestFactory().get(path, headers=headers)
 
 
-def test_permission_empty_secret_fails_closed(settings):
-    settings.MOBILE_APP_SECRET = ""
+def test_permission_empty_keys_fails_closed(settings):
+    settings.MOBILE_APP_KEYS = {}
     request = _signed_get_request()
     assert SignedAppPermission().has_permission(request, None) is False
 
 
-def test_permission_none_secret_fails_closed(settings):
-    settings.MOBILE_APP_SECRET = None
+def test_permission_unset_keys_fails_closed(settings):
+    # The getattr(..., {}) or {} unset/None path also fails closed.
+    settings.MOBILE_APP_KEYS = None
     request = _signed_get_request()
+    assert SignedAppPermission().has_permission(request, None) is False
+
+
+def test_permission_unknown_key_id_false(settings):
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    request = _signed_get_request(key_id="nope-v9")
+    assert SignedAppPermission().has_permission(request, None) is False
+
+
+def test_permission_missing_key_id_header_false(settings):
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    request = _signed_get_request(key_id=None)
     assert SignedAppPermission().has_permission(request, None) is False
 
 
 def test_permission_missing_headers_false(settings):
-    settings.MOBILE_APP_SECRET = SECRET
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
     request = RequestFactory().get(PATH)
     assert SignedAppPermission().has_permission(request, None) is False
 
 
-@pytest.mark.parametrize("drop_header", ["X-App-Sig", "X-App-Ts", "X-Install-Id"])
+@pytest.mark.parametrize(
+    "drop_header", ["X-App-Key-Id", "X-App-Sig", "X-App-Ts", "X-Install-Id"]
+)
 def test_permission_each_required_header_individually_false(settings, drop_header):
-    settings.MOBILE_APP_SECRET = SECRET
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
     ts = str(int(time.time()))
     canonical = build_canonical("GET", PATH, ts, b"")
     headers = {
+        "X-App-Key-Id": "test-v1",
         "X-App-Sig": sign(SECRET, canonical),
         "X-App-Ts": ts,
         "X-Install-Id": "install-abc",
@@ -147,13 +168,13 @@ def test_permission_each_required_header_individually_false(settings, drop_heade
 
 
 def test_permission_non_int_ts_false(settings):
-    settings.MOBILE_APP_SECRET = SECRET
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
     request = _signed_get_request(ts="not-a-number")
     assert SignedAppPermission().has_permission(request, None) is False
 
 
 def test_permission_expired_ts_false(settings):
-    settings.MOBILE_APP_SECRET = SECRET
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
     settings.MOBILE_APP_TS_WINDOW = 300
     old_ts = str(int(time.time()) - 1000)
     request = _signed_get_request(ts=old_ts)
@@ -161,7 +182,7 @@ def test_permission_expired_ts_false(settings):
 
 
 def test_permission_future_ts_false(settings):
-    settings.MOBILE_APP_SECRET = SECRET
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
     settings.MOBILE_APP_TS_WINDOW = 300
     future_ts = str(int(time.time()) + 1000)
     request = _signed_get_request(ts=future_ts)
@@ -172,7 +193,7 @@ def test_permission_huge_ts_returns_false_not_500(settings):
     # A very large integer timestamp is simply outside the replay window and
     # must return False cleanly (Python integers are arbitrary-precision; no
     # overflow risk).
-    settings.MOBILE_APP_SECRET = SECRET
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
     settings.MOBILE_APP_TS_WINDOW = 300
     huge_ts = str(10**400)
     request = _signed_get_request(ts=huge_ts)
@@ -180,20 +201,44 @@ def test_permission_huge_ts_returns_false_not_500(settings):
 
 
 def test_permission_bad_signature_false(settings):
-    settings.MOBILE_APP_SECRET = SECRET
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
     request = _signed_get_request(secret="wrong-secret")
     assert SignedAppPermission().has_permission(request, None) is False
 
 
 def test_permission_valid_true_and_stashes_meta(settings):
-    settings.MOBILE_APP_SECRET = SECRET
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
     settings.MOBILE_APP_TS_WINDOW = 300
     request = _signed_get_request()
     assert SignedAppPermission().has_permission(request, None) is True
     assert request.app_meta["install_id"] == "install-abc"
     assert request.app_meta["platform"] == "ios"
     assert request.app_meta["app_version"] == "1.4.0"
+    assert request.app_meta["key_id"] == "test-v1"
     assert "ip" in request.app_meta
+
+
+def test_permission_two_active_keys_both_verify(settings):
+    # Rotation-overlap proof: two keys active at once, each request signed with
+    # its own paired secret + key-id verifies.
+    settings.MOBILE_APP_KEYS = {"android-v1": "secret-1", "ios-v1": "secret-2"}
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    req1 = _signed_get_request(secret="secret-1", key_id="android-v1")
+    assert SignedAppPermission().has_permission(req1, None) is True
+    assert req1.app_meta["key_id"] == "android-v1"
+
+    req2 = _signed_get_request(secret="secret-2", key_id="ios-v1")
+    assert SignedAppPermission().has_permission(req2, None) is True
+    assert req2.app_meta["key_id"] == "ios-v1"
+
+
+def test_permission_valid_key_id_wrong_secret_false(settings):
+    # A known key-id but a signature made with the wrong secret must fail.
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+    request = _signed_get_request(secret="wrong-secret", key_id="test-v1")
+    assert SignedAppPermission().has_permission(request, None) is False
 
 
 def test_client_ip_prefers_forwarded_for():
@@ -222,18 +267,22 @@ def test_client_ip_invalid_forwarded_for_falls_back_to_remote_addr():
 # --- LegendView request-level ----------------------------------------------
 
 
-def _signed_headers(method, path, secret, body=b""):
+def _signed_headers(method, path, secret, body=b"", key_id="test-v1"):
     """Build signed request headers mirroring the client side."""
     ts = str(int(time.time()))
     canonical = build_canonical(method, path, ts, body)
     sig = sign(secret, canonical)
-    return {
+    headers = {
+        "HTTP_X_APP_KEY_ID": key_id,
         "HTTP_X_APP_SIG": sig,
         "HTTP_X_APP_TS": ts,
         "HTTP_X_INSTALL_ID": "install-abc",
         "HTTP_X_APP_PLATFORM": "ios",
         "HTTP_X_APP_VERSION": "1.4.0",
     }
+    if key_id is None:
+        del headers["HTTP_X_APP_KEY_ID"]
+    return headers
 
 
 @pytest.mark.django_db
@@ -241,7 +290,7 @@ def test_legend_valid_signature_returns_200_with_fields_and_order(client, settin
     from website.models.checkpoint import Checkpoint
     from website.models.race import Race
 
-    settings.MOBILE_APP_SECRET = SECRET
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
     settings.MOBILE_APP_TS_WINDOW = 300
 
     race = Race.objects.create(
@@ -279,7 +328,7 @@ def race_with_checkpoints(db):
 
 @pytest.mark.django_db
 def test_legend_no_headers_returns_403(client, settings, race_with_checkpoints):
-    settings.MOBILE_APP_SECRET = SECRET
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
     path = f"/app/race/{race_with_checkpoints.id}/legend/"
     response = client.get(path)
     assert response.status_code == 403
@@ -288,7 +337,7 @@ def test_legend_no_headers_returns_403(client, settings, race_with_checkpoints):
 
 @pytest.mark.django_db
 def test_legend_wrong_signature_returns_403(client, settings, race_with_checkpoints):
-    settings.MOBILE_APP_SECRET = SECRET
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
     path = f"/app/race/{race_with_checkpoints.id}/legend/"
     headers = _signed_headers("GET", path, "wrong-secret")
     response = client.get(path, **headers)
@@ -298,7 +347,7 @@ def test_legend_wrong_signature_returns_403(client, settings, race_with_checkpoi
 
 @pytest.mark.django_db
 def test_legend_expired_ts_returns_403(client, settings, race_with_checkpoints):
-    settings.MOBILE_APP_SECRET = SECRET
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
     settings.MOBILE_APP_TS_WINDOW = 300
     path = f"/app/race/{race_with_checkpoints.id}/legend/"
     old_ts = str(int(time.time()) - 1000)
@@ -317,11 +366,11 @@ def test_legend_expired_ts_returns_403(client, settings, race_with_checkpoints):
 
 
 @pytest.mark.django_db
-def test_legend_empty_secret_fails_closed(client, settings, race_with_checkpoints):
-    settings.MOBILE_APP_SECRET = ""
+def test_legend_empty_keys_fails_closed(client, settings, race_with_checkpoints):
+    settings.MOBILE_APP_KEYS = {}
     path = f"/app/race/{race_with_checkpoints.id}/legend/"
-    # even a "correctly" signed request (against empty secret) must be rejected
-    headers = _signed_headers("GET", path, "")
+    # even a "correctly" signed request (against an empty map) must be rejected
+    headers = _signed_headers("GET", path, SECRET)
     response = client.get(path, **headers)
     assert response.status_code == 403
     assert response.json() == {"detail": "Forbidden"}
@@ -329,7 +378,7 @@ def test_legend_empty_secret_fails_closed(client, settings, race_with_checkpoint
 
 @pytest.mark.django_db
 def test_legend_valid_sig_nonexistent_race_returns_404(client, settings):
-    settings.MOBILE_APP_SECRET = SECRET
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
     settings.MOBILE_APP_TS_WINDOW = 300
     path = "/app/race/999999/legend/"
     headers = _signed_headers("GET", path, SECRET)
@@ -341,7 +390,7 @@ def test_legend_valid_sig_nonexistent_race_returns_404(client, settings):
 def test_legend_records_appinstall_and_increments(
     client, settings, race_with_checkpoints
 ):
-    settings.MOBILE_APP_SECRET = SECRET
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
     settings.MOBILE_APP_TS_WINDOW = 300
     path = f"/app/race/{race_with_checkpoints.id}/legend/"
 
@@ -368,7 +417,7 @@ def test_legend_closed_legend_returns_empty_checkpoints(client, settings):
     from website.models.checkpoint import Checkpoint
     from website.models.race import Race
 
-    settings.MOBILE_APP_SECRET = SECRET
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
     settings.MOBILE_APP_TS_WINDOW = 300
 
     race = Race.objects.create(
@@ -390,7 +439,7 @@ def test_legend_excludes_draft_checkpoints(client, settings):
     from website.models.checkpoint import Checkpoint
     from website.models.race import Race
 
-    settings.MOBILE_APP_SECRET = SECRET
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
     settings.MOBILE_APP_TS_WINDOW = 300
 
     race = Race.objects.create(
@@ -412,7 +461,7 @@ def test_legend_excludes_draft_checkpoints(client, settings):
 
 @pytest.mark.django_db
 def test_legend_response_carries_etag(client, settings, race_with_checkpoints):
-    settings.MOBILE_APP_SECRET = SECRET
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
     settings.MOBILE_APP_TS_WINDOW = 300
 
     path = f"/app/race/{race_with_checkpoints.id}/legend/"
@@ -426,7 +475,7 @@ def test_legend_response_carries_etag(client, settings, race_with_checkpoints):
 def test_legend_if_none_match_returns_304_empty_body(
     client, settings, race_with_checkpoints
 ):
-    settings.MOBILE_APP_SECRET = SECRET
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
     settings.MOBILE_APP_TS_WINDOW = 300
 
     path = f"/app/race/{race_with_checkpoints.id}/legend/"
@@ -448,7 +497,7 @@ def test_legend_stale_if_none_match_returns_200_with_new_etag(client, settings):
     from website.models.checkpoint import Checkpoint
     from website.models.race import Race
 
-    settings.MOBILE_APP_SECRET = SECRET
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
     settings.MOBILE_APP_TS_WINDOW = 300
 
     race = Race.objects.create(
@@ -475,7 +524,7 @@ def test_legend_hidden_response_carries_etag(client, settings):
     from website.models.checkpoint import Checkpoint
     from website.models.race import Race
 
-    settings.MOBILE_APP_SECRET = SECRET
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
     settings.MOBILE_APP_TS_WINDOW = 300
 
     race = Race.objects.create(
@@ -497,7 +546,7 @@ def test_legend_hidden_if_none_match_returns_304(client, settings):
     from website.models.checkpoint import Checkpoint
     from website.models.race import Race
 
-    settings.MOBILE_APP_SECRET = SECRET
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
     settings.MOBILE_APP_TS_WINDOW = 300
 
     race = Race.objects.create(
@@ -522,7 +571,7 @@ def test_legend_hidden_if_none_match_returns_304(client, settings):
 def test_legend_tampered_query_string_returns_403(
     client, settings, race_with_checkpoints
 ):
-    settings.MOBILE_APP_SECRET = SECRET
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
     settings.MOBILE_APP_TS_WINDOW = 300
     # Signature covers the bare path; appending a query string must be rejected
     path = f"/app/race/{race_with_checkpoints.id}/legend/"
@@ -550,7 +599,7 @@ RACE_FIELDS = {
 def test_races_valid_signature_returns_published_in_date_order(client, settings):
     from website.models.race import Race
 
-    settings.MOBILE_APP_SECRET = SECRET
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
     settings.MOBILE_APP_TS_WINDOW = 300
 
     Race.objects.create(name="Old", slug="old", date="2024-01-01")
@@ -574,7 +623,7 @@ def test_races_valid_signature_returns_published_in_date_order(client, settings)
 def test_races_empty_when_no_published(client, settings):
     from website.models.race import Race
 
-    settings.MOBILE_APP_SECRET = SECRET
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
     settings.MOBILE_APP_TS_WINDOW = 300
 
     Race.objects.create(name="Hidden", slug="hidden", is_published=False)
@@ -587,7 +636,7 @@ def test_races_empty_when_no_published(client, settings):
 
 @pytest.mark.django_db
 def test_races_no_headers_returns_403(client, settings):
-    settings.MOBILE_APP_SECRET = SECRET
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
     response = client.get(RACES_PATH)
     assert response.status_code == 403
     assert response.json() == {"detail": "Forbidden"}
@@ -595,7 +644,7 @@ def test_races_no_headers_returns_403(client, settings):
 
 @pytest.mark.django_db
 def test_races_wrong_signature_returns_403(client, settings):
-    settings.MOBILE_APP_SECRET = SECRET
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
     headers = _signed_headers("GET", RACES_PATH, "wrong-secret")
     response = client.get(RACES_PATH, **headers)
     assert response.status_code == 403
@@ -606,7 +655,7 @@ def test_races_wrong_signature_returns_403(client, settings):
 def test_legend_stats_write_failure_does_not_break_response(
     client, settings, race_with_checkpoints, monkeypatch
 ):
-    settings.MOBILE_APP_SECRET = SECRET
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
     settings.MOBILE_APP_TS_WINDOW = 300
 
     def boom(*args, **kwargs):
@@ -624,7 +673,7 @@ def test_legend_stats_write_failure_does_not_break_response(
 
 @pytest.mark.django_db
 def test_races_records_appinstall(client, settings):
-    settings.MOBILE_APP_SECRET = SECRET
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
     settings.MOBILE_APP_TS_WINDOW = 300
 
     response = client.get(RACES_PATH, **_signed_headers("GET", RACES_PATH, SECRET))
@@ -638,7 +687,7 @@ def test_races_records_appinstall(client, settings):
 def test_races_stats_write_failure_does_not_break_response(
     client, settings, monkeypatch
 ):
-    settings.MOBILE_APP_SECRET = SECRET
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
     settings.MOBILE_APP_TS_WINDOW = 300
 
     def boom(*args, **kwargs):
@@ -655,7 +704,7 @@ def test_races_stats_write_failure_does_not_break_response(
 
 @pytest.mark.django_db
 def test_races_tampered_query_string_returns_403(client, settings):
-    settings.MOBILE_APP_SECRET = SECRET
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
     settings.MOBILE_APP_TS_WINDOW = 300
     # Signature covers the bare path; appending a query string must be rejected
     headers = _signed_headers("GET", RACES_PATH, SECRET)
@@ -954,7 +1003,7 @@ def test_team_serializer_category2_null_when_unset(django_user_model):
 def test_teams_valid_signature_returns_200_with_fields_and_members(
     client, settings, django_user_model
 ):
-    settings.MOBILE_APP_SECRET = SECRET
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
     settings.MOBILE_APP_TS_WINDOW = 300
 
     from website.models.models import Athlet, Team
@@ -986,7 +1035,7 @@ def test_teams_valid_signature_returns_200_with_fields_and_members(
 
 @pytest.mark.django_db
 def test_teams_orders_by_id(client, settings, django_user_model):
-    settings.MOBILE_APP_SECRET = SECRET
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
     settings.MOBILE_APP_TS_WINDOW = 300
 
     from website.models.models import Team
@@ -1010,7 +1059,7 @@ def test_teams_orders_by_id(client, settings, django_user_model):
 def test_teams_if_none_match_returns_304_empty_body(
     client, settings, django_user_model
 ):
-    settings.MOBILE_APP_SECRET = SECRET
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
     settings.MOBILE_APP_TS_WINDOW = 300
 
     from website.models.models import Team
@@ -1037,7 +1086,7 @@ def test_teams_if_none_match_returns_304_empty_body(
 
 @pytest.mark.django_db
 def test_teams_etag_changes_when_athlet_renamed(client, settings, django_user_model):
-    settings.MOBILE_APP_SECRET = SECRET
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
     settings.MOBILE_APP_TS_WINDOW = 300
 
     from website.models.models import Athlet, Team
@@ -1066,7 +1115,7 @@ def test_teams_etag_changes_when_athlet_renamed(client, settings, django_user_mo
 def test_teams_stale_if_none_match_returns_200_with_new_etag(
     client, settings, django_user_model
 ):
-    settings.MOBILE_APP_SECRET = SECRET
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
     settings.MOBILE_APP_TS_WINDOW = 300
 
     from website.models.models import Athlet, Team
@@ -1097,7 +1146,7 @@ def test_teams_stale_if_none_match_returns_200_with_new_etag(
 
 @pytest.mark.django_db
 def test_teams_soft_delete_changes_etag(client, settings, django_user_model):
-    settings.MOBILE_APP_SECRET = SECRET
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
     settings.MOBILE_APP_TS_WINDOW = 300
 
     from website.models.models import Team
@@ -1122,7 +1171,7 @@ def test_teams_soft_delete_changes_etag(client, settings, django_user_model):
 
 @pytest.mark.django_db
 def test_teams_valid_sig_nonexistent_race_returns_404(client, settings):
-    settings.MOBILE_APP_SECRET = SECRET
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
     settings.MOBILE_APP_TS_WINDOW = 300
     path = "/app/race/999999/teams/"
     response = client.get(path, **_signed_headers("GET", path, SECRET))
@@ -1131,7 +1180,7 @@ def test_teams_valid_sig_nonexistent_race_returns_404(client, settings):
 
 @pytest.mark.django_db
 def test_teams_no_headers_returns_403(client, settings, django_user_model):
-    settings.MOBILE_APP_SECRET = SECRET
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
     race, _ = _make_race_with_category(slug="teams-403")
     path = f"/app/race/{race.id}/teams/"
     response = client.get(path)
@@ -1141,7 +1190,7 @@ def test_teams_no_headers_returns_403(client, settings, django_user_model):
 
 @pytest.mark.django_db
 def test_teams_wrong_signature_returns_403(client, settings):
-    settings.MOBILE_APP_SECRET = SECRET
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
     settings.MOBILE_APP_TS_WINDOW = 300
     race, _ = _make_race_with_category(slug="teams-bad-sig")
     path = f"/app/race/{race.id}/teams/"
@@ -1153,7 +1202,7 @@ def test_teams_wrong_signature_returns_403(client, settings):
 
 @pytest.mark.django_db
 def test_teams_tampered_query_string_returns_403(client, settings):
-    settings.MOBILE_APP_SECRET = SECRET
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
     settings.MOBILE_APP_TS_WINDOW = 300
     race, _ = _make_race_with_category(slug="teams-qs")
     path = f"/app/race/{race.id}/teams/"
@@ -1164,7 +1213,7 @@ def test_teams_tampered_query_string_returns_403(client, settings):
 
 @pytest.mark.django_db
 def test_teams_excludes_other_race_teams(client, settings, django_user_model):
-    settings.MOBILE_APP_SECRET = SECRET
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
     settings.MOBILE_APP_TS_WINDOW = 300
 
     from website.models.models import Team
@@ -1187,7 +1236,7 @@ def test_teams_excludes_other_race_teams(client, settings, django_user_model):
 
 @pytest.mark.django_db
 def test_teams_records_appinstall(client, settings, django_user_model):
-    settings.MOBILE_APP_SECRET = SECRET
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
     settings.MOBILE_APP_TS_WINDOW = 300
     race, _ = _make_race_with_category(slug="teams-install")
     path = f"/app/race/{race.id}/teams/"
@@ -1201,7 +1250,7 @@ def test_teams_records_appinstall(client, settings, django_user_model):
 def test_teams_stats_write_failure_does_not_break_response(
     client, settings, monkeypatch
 ):
-    settings.MOBILE_APP_SECRET = SECRET
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
     settings.MOBILE_APP_TS_WINDOW = 300
     race, _ = _make_race_with_category(slug="teams-stats-fail")
 
@@ -1221,7 +1270,7 @@ def test_teams_stats_write_failure_does_not_break_response(
 @pytest.mark.django_db
 def test_teams_excludes_category2_none_team(client, settings, django_user_model):
     """Teams with category2=None are not owned by any race and must be absent."""
-    settings.MOBILE_APP_SECRET = SECRET
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
     settings.MOBILE_APP_TS_WINDOW = 300
 
     from website.models.models import Team
@@ -1241,7 +1290,7 @@ def test_teams_excludes_category2_none_team(client, settings, django_user_model)
 
 @pytest.mark.django_db
 def test_teams_empty_race_returns_empty_list(client, settings):
-    settings.MOBILE_APP_SECRET = SECRET
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
     settings.MOBILE_APP_TS_WINDOW = 300
     race, _ = _make_race_with_category(slug="teams-empty")
     path = f"/app/race/{race.id}/teams/"
@@ -1254,7 +1303,7 @@ def test_teams_empty_race_returns_empty_list(client, settings):
 
 @pytest.mark.django_db
 def test_teams_excludes_soft_deleted_team(client, settings, django_user_model):
-    settings.MOBILE_APP_SECRET = SECRET
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
     settings.MOBILE_APP_TS_WINDOW = 300
 
     from website.models.models import Team
@@ -1279,7 +1328,7 @@ def test_teams_excludes_soft_deleted_team(client, settings, django_user_model):
 
 @pytest.mark.django_db
 def test_sync_manifest_shape_and_defaults(client, settings, django_user_model):
-    settings.MOBILE_APP_SECRET = SECRET
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
     settings.MOBILE_APP_TS_WINDOW = 300
     settings.MOBILE_DATA_SOURCE = "cloud"
 
@@ -1307,7 +1356,7 @@ def test_sync_manifest_shape_and_defaults(client, settings, django_user_model):
 
 @pytest.mark.django_db
 def test_sync_versions_teams_matches_teams_etag(client, settings, django_user_model):
-    settings.MOBILE_APP_SECRET = SECRET
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
     settings.MOBILE_APP_TS_WINDOW = 300
 
     from website.models.models import Team
@@ -1334,7 +1383,7 @@ def test_sync_versions_legend_matches_legend_etag(client, settings):
     from website.models.checkpoint import Checkpoint
     from website.models.race import Race
 
-    settings.MOBILE_APP_SECRET = SECRET
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
     settings.MOBILE_APP_TS_WINDOW = 300
 
     race = Race.objects.create(
@@ -1355,7 +1404,7 @@ def test_sync_versions_legend_matches_legend_etag(client, settings):
 
 @pytest.mark.django_db
 def test_sync_respects_data_source_setting(client, settings):
-    settings.MOBILE_APP_SECRET = SECRET
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
     settings.MOBILE_APP_TS_WINDOW = 300
     settings.MOBILE_DATA_SOURCE = "local"
 
@@ -1369,7 +1418,7 @@ def test_sync_respects_data_source_setting(client, settings):
 
 @pytest.mark.django_db
 def test_sync_valid_sig_nonexistent_race_returns_404(client, settings):
-    settings.MOBILE_APP_SECRET = SECRET
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
     settings.MOBILE_APP_TS_WINDOW = 300
     path = "/app/race/999999/sync/"
     response = client.get(path, **_signed_headers("GET", path, SECRET))
@@ -1378,7 +1427,7 @@ def test_sync_valid_sig_nonexistent_race_returns_404(client, settings):
 
 @pytest.mark.django_db
 def test_sync_no_headers_returns_403(client, settings):
-    settings.MOBILE_APP_SECRET = SECRET
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
     race, _ = _make_race_with_category(slug="sync-403")
     path = f"/app/race/{race.id}/sync/"
     response = client.get(path)
@@ -1388,7 +1437,7 @@ def test_sync_no_headers_returns_403(client, settings):
 
 @pytest.mark.django_db
 def test_sync_wrong_signature_returns_403(client, settings):
-    settings.MOBILE_APP_SECRET = SECRET
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
     settings.MOBILE_APP_TS_WINDOW = 300
     race, _ = _make_race_with_category(slug="sync-bad-sig")
     path = f"/app/race/{race.id}/sync/"
@@ -1400,10 +1449,80 @@ def test_sync_wrong_signature_returns_403(client, settings):
 
 @pytest.mark.django_db
 def test_sync_tampered_query_string_returns_403(client, settings):
-    settings.MOBILE_APP_SECRET = SECRET
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
     settings.MOBILE_APP_TS_WINDOW = 300
     race, _ = _make_race_with_category(slug="sync-qs")
     path = f"/app/race/{race.id}/sync/"
     headers = _signed_headers("GET", path, SECRET)
     response = client.get(path + "?foo=bar", **headers)
     assert response.status_code == 403
+
+
+# --- Key rotation (request-level) -------------------------------------------
+
+
+@pytest.mark.django_db
+def test_legend_two_active_keys_both_verify(client, settings, race_with_checkpoints):
+    # Rotation overlap: two keys active at once, each app build verifies with its
+    # own paired secret + key-id.
+    settings.MOBILE_APP_KEYS = {"android-v1": "secret-1", "ios-v1": "secret-2"}
+    settings.MOBILE_APP_TS_WINDOW = 300
+    path = f"/app/race/{race_with_checkpoints.id}/legend/"
+
+    resp1 = client.get(
+        path, **_signed_headers("GET", path, "secret-1", key_id="android-v1")
+    )
+    assert resp1.status_code == 200
+
+    resp2 = client.get(
+        path, **_signed_headers("GET", path, "secret-2", key_id="ios-v1")
+    )
+    assert resp2.status_code == 200
+
+
+@pytest.mark.django_db
+def test_legend_unknown_key_id_returns_403(client, settings, race_with_checkpoints):
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+    path = f"/app/race/{race_with_checkpoints.id}/legend/"
+    headers = _signed_headers("GET", path, SECRET, key_id="not-in-map")
+    response = client.get(path, **headers)
+    assert response.status_code == 403
+    assert response.json() == {"detail": "Forbidden"}
+
+
+@pytest.mark.django_db
+def test_legend_missing_key_id_returns_403(client, settings, race_with_checkpoints):
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+    path = f"/app/race/{race_with_checkpoints.id}/legend/"
+    headers = _signed_headers("GET", path, SECRET, key_id=None)
+    response = client.get(path, **headers)
+    assert response.status_code == 403
+    assert response.json() == {"detail": "Forbidden"}
+
+
+@pytest.mark.django_db
+def test_legend_valid_key_id_wrong_secret_returns_403(
+    client, settings, race_with_checkpoints
+):
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+    path = f"/app/race/{race_with_checkpoints.id}/legend/"
+    headers = _signed_headers("GET", path, "wrong-secret", key_id="test-v1")
+    response = client.get(path, **headers)
+    assert response.status_code == 403
+    assert response.json() == {"detail": "Forbidden"}
+
+
+@pytest.mark.django_db
+def test_legend_records_appinstall_key_id(client, settings, race_with_checkpoints):
+    settings.MOBILE_APP_KEYS = {"android-v1": "secret-1"}
+    settings.MOBILE_APP_TS_WINDOW = 300
+    path = f"/app/race/{race_with_checkpoints.id}/legend/"
+    response = client.get(
+        path, **_signed_headers("GET", path, "secret-1", key_id="android-v1")
+    )
+    assert response.status_code == 200
+    install = AppInstall.objects.get(install_id="install-abc")
+    assert install.key_id == "android-v1"

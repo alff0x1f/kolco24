@@ -10,6 +10,7 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/2.0/ref/settings/
 """
 
+import json
 import os
 
 from dotenv import load_dotenv
@@ -42,8 +43,20 @@ SBP_INFO = {
 
 CONTRIBUTORS_API_TOKEN = os.getenv("CONTRIBUTORS_API_TOKEN")
 
-# Mobile app signed endpoints (apps.mobile): shared HMAC secret + replay window.
-MOBILE_APP_SECRET = os.getenv("MOBILE_APP_SECRET", "")
+# Mobile app signed endpoints (apps.mobile): keyed HMAC secrets + replay window.
+# MOBILE_APP_KEYS is a JSON map of key-id -> shared secret; the client sends an
+# X-App-Key-Id header selecting which secret signed the request. Holding >=2 keys
+# at once enables zero-downtime secret rotation aligned with app releases. A
+# missing or malformed env yields {} (fail closed: every request 403), and only
+# non-empty string secrets are kept.
+_raw_mobile_keys = os.getenv("MOBILE_APP_KEYS", "")
+try:
+    _parsed_mobile_keys = json.loads(_raw_mobile_keys) if _raw_mobile_keys else {}
+except json.JSONDecodeError:
+    _parsed_mobile_keys = {}
+MOBILE_APP_KEYS = {
+    k: v for k, v in _parsed_mobile_keys.items() if isinstance(v, str) and v
+}
 MOBILE_APP_TS_WINDOW = 300
 # Data source advertised by the /app/race/<id>/sync/ manifest. "cloud" → no
 # lease (lease_expires_at: null); a local-race server would set "local".

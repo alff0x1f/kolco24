@@ -161,15 +161,14 @@ signature with it.
 **Files:**
 - Modify: `src/config/settings.py`
 
-- [ ] add `import json` near the existing stdlib imports
-- [ ] replace `MOBILE_APP_SECRET = os.getenv(...)` (line ~46) with the
+- [x] add `import json` near the existing stdlib imports
+- [x] replace `MOBILE_APP_SECRET = os.getenv(...)` (line ~46) with the
       `MOBILE_APP_KEYS` parse block (try/except `JSONDecodeError` → `{}`; keep only
       non-empty string secrets)
-- [ ] confirm `uv run python src/manage.py check` passes (no test code yet — parsing
+- [x] confirm `uv run python src/manage.py check` passes (no test code yet — parsing
       is exercised by the permission tests in Task 2/5)
-- [ ] run `uv run pytest src/apps/mobile/tests.py` — **expected to fail** here since
-      tests still set `MOBILE_APP_SECRET`; this is fixed in Task 5. Note the failure
-      set so Task 5 can confirm it clears. (Do not proceed to commit mid-way.)
+- [x] run `uv run pytest src/apps/mobile/tests.py` — Tasks 1–5 landed together
+      (atomic), so the suite is green at the end of Task 5 (97 passed).
 
 > ⚠️ Tasks 1–5 form one logically atomic change (removing `MOBILE_APP_SECRET`
 > breaks the suite until the permission + tests are migrated). Land them together;
@@ -182,14 +181,14 @@ signature with it.
 - Modify: `src/apps/mobile/permissions.py`
 - Modify: `src/apps/mobile/signing.py` (docstring-only)
 
-- [ ] update the `permissions.py` module docstring to reference the `MOBILE_APP_KEYS` map instead of `MOBILE_APP_SECRET`
-- [ ] replace the single-secret read with `keys = getattr(settings, "MOBILE_APP_KEYS", {}) or {}`; empty → `return False`
-- [ ] read `X-App-Key-Id` alongside the existing headers; any missing (incl. key_id) → `return False`
-- [ ] `secret = keys.get(key_id)`; `None`/empty → `return False` (unknown key-id, neutral)
-- [ ] keep the existing ts-window check and `verify(secret, canonical, sig)` flow
-- [ ] add `"key_id": key_id[:32]` to `request.app_meta`
-- [ ] fix the **`signing.py:5` docstring** stale `MOBILE_APP_SECRET` reference → "the per-build shared secret selected by `X-App-Key-Id`". This is the **only** change to `signing.py` — no logic/canonical change (so "canonical unchanged" still holds; the `signing.py` unit tests are untouched)
-- [ ] (behavioral tests land in Task 5 — the suite is migrated wholesale there)
+- [x] update the `permissions.py` module docstring to reference the `MOBILE_APP_KEYS` map instead of `MOBILE_APP_SECRET`
+- [x] replace the single-secret read with `keys = getattr(settings, "MOBILE_APP_KEYS", {}) or {}`; empty → `return False`
+- [x] read `X-App-Key-Id` alongside the existing headers; any missing (incl. key_id) → `return False`
+- [x] `secret = keys.get(key_id)`; `None`/empty → `return False` (unknown key-id, neutral)
+- [x] keep the existing ts-window check and `verify(secret, canonical, sig)` flow
+- [x] add `"key_id": key_id[:32]` to `request.app_meta`
+- [x] fix the **`signing.py:5` docstring** stale `MOBILE_APP_SECRET` reference → "the per-build shared secret selected by `X-App-Key-Id`". This is the **only** change to `signing.py` — no logic/canonical change (so "canonical unchanged" still holds; the `signing.py` unit tests are untouched)
+- [x] (behavioral tests land in Task 5 — the suite is migrated wholesale there)
 
 ### Task 3: Model field + migration
 
@@ -197,11 +196,11 @@ signature with it.
 - Modify: `src/apps/mobile/models.py`
 - Create: `src/apps/mobile/migrations/0003_appinstall_key_id.py` (generated)
 
-- [ ] add `key_id = models.CharField(max_length=32, blank=True)` to `AppInstall`
-- [ ] generate: `uv run python src/manage.py makemigrations mobile` (verify `0003`, single `AddField`, depends on `0002_drop_install_id_db_index`)
-- [ ] apply: `uv run python src/manage.py migrate`
-- [ ] `uv run python src/manage.py makemigrations --check --dry-run` is clean
-- [ ] (model is covered by the stats-recording test in Task 5)
+- [x] add `key_id = models.CharField(max_length=32, blank=True)` to `AppInstall`
+- [x] generate: `uv run python src/manage.py makemigrations mobile` (verify `0003`, single `AddField`, depends on `0002_drop_install_id_db_index`)
+- [x] apply: `uv run python src/manage.py migrate`
+- [x] `uv run python src/manage.py makemigrations --check --dry-run` is clean
+- [x] (model is covered by the stats-recording test in Task 5)
 
 ### Task 4: Stats wiring + admin
 
@@ -209,27 +208,27 @@ signature with it.
 - Modify: `src/apps/mobile/views.py`
 - Modify: `src/apps/mobile/admin.py`
 
-- [ ] in `_record_install`, add `key_id=meta.get("key_id", "")` to the `update_or_create` `defaults`
-- [ ] in `AppInstallAdmin`: add `"key_id"` to `list_display`, add `list_filter = ("key_id", "platform")`, add `"key_id"` to `readonly_fields`
-- [ ] (admin has no behavior tests in this suite; the field write is asserted in Task 5)
+- [x] in `_record_install`, add `key_id=meta.get("key_id", "")` to the `update_or_create` `defaults`
+- [x] in `AppInstallAdmin`: add `"key_id"` to `list_display`, add `list_filter = ("key_id", "platform")`, add `"key_id"` to `readonly_fields`
+- [x] (admin has no behavior tests in this suite; the field write is asserted in Task 5)
 
 ### Task 5: Migrate test suite + new rotation cases
 
 **Files:**
 - Modify: `src/apps/mobile/tests.py`
 
-- [ ] extend **`_signed_headers(...)`** (line 225) with a `key_id="test-v1"` param; emit `X-App-Key-Id` in the `HTTP_X_*` dict
-- [ ] extend **`_signed_get_request(...)`** (line 98) with a `key_id="test-v1"` param; set the `X-App-Key-Id` header on the `RequestFactory` request (this helper drives the direct-permission unit tests at lines 116-196)
-- [ ] replace every `settings.MOBILE_APP_SECRET = SECRET` (~60 sites, **both** the direct-permission tests at 116-196 and the client tests) with `settings.MOBILE_APP_KEYS = {"test-v1": SECRET}`
-- [ ] migrate the fail-closed cases: `test_permission_empty_secret_fails_closed` (117) and `test_legend_empty_secret_fails_closed` (321) → `settings.MOBILE_APP_KEYS = {}`
-- [ ] **`test_permission_none_secret_fails_closed` (123)**: there is no "None secret" analogue under the map model — repurpose it as `test_permission_unset_keys_fails_closed` setting `settings.MOBILE_APP_KEYS = {}` (the `getattr(..., {}) or {}` unset path), or delete it if redundant with the empty-`{}` case. Decide during impl; do not leave it setting the removed `MOBILE_APP_SECRET`.
-- [ ] write test: **two active keys** (`{"android-v1": S1, "ios-v1": S2}`) — a request signed with `S1`+`android-v1` AND a request signed with `S2`+`ios-v1` both return 200 (the rotation-overlap proof)
-- [ ] write test: unknown `key_id` (not in map) → 403 `{"detail": "Forbidden"}`
-- [ ] write test: missing `X-App-Key-Id` header → 403 (pass `key_id=None`/strip the header)
-- [ ] write test: valid `key_id` but signature made with the **wrong** secret → 403
-- [ ] write test: empty `MOBILE_APP_KEYS` (`{}`) → 403 (fail-closed)
-- [ ] write test: a verified request records `AppInstall.key_id` == the request's key-id
-- [ ] run `uv run pytest src/apps/mobile/tests.py` — full mobile suite green (clears the Task 1 failures)
+- [x] extend **`_signed_headers(...)`** with a `key_id="test-v1"` param; emit `X-App-Key-Id` in the `HTTP_X_*` dict (and strip it when `key_id=None`)
+- [x] extend **`_signed_get_request(...)`** with a `key_id="test-v1"` param; set the `X-App-Key-Id` header on the `RequestFactory` request (this helper drives the direct-permission unit tests)
+- [x] replace every `settings.MOBILE_APP_SECRET = SECRET` (**both** the direct-permission tests and the client tests) with `settings.MOBILE_APP_KEYS = {"test-v1": SECRET}`
+- [x] migrate the fail-closed cases: `test_permission_empty_secret_fails_closed` → `test_permission_empty_keys_fails_closed` and `test_legend_empty_secret_fails_closed` → `test_legend_empty_keys_fails_closed`, both `settings.MOBILE_APP_KEYS = {}`
+- [x] **`test_permission_none_secret_fails_closed`**: repurposed as `test_permission_unset_keys_fails_closed` setting `settings.MOBILE_APP_KEYS = None` (the `getattr(..., {}) or {}` unset path)
+- [x] write test: **two active keys** (`{"android-v1": S1, "ios-v1": S2}`) — both verify, at permission level (`test_permission_two_active_keys_both_verify`) and request level (`test_legend_two_active_keys_both_verify`)
+- [x] write test: unknown `key_id` (not in map) → 403 `{"detail": "Forbidden"}` (`test_legend_unknown_key_id_returns_403` + permission-level)
+- [x] write test: missing `X-App-Key-Id` header → 403 (`test_legend_missing_key_id_returns_403` + permission-level)
+- [x] write test: valid `key_id` but signature made with the **wrong** secret → 403 (`test_legend_valid_key_id_wrong_secret_returns_403` + permission-level)
+- [x] write test: empty `MOBILE_APP_KEYS` (`{}`) → 403 (fail-closed) (`test_permission_empty_keys_fails_closed`, `test_legend_empty_keys_fails_closed`)
+- [x] write test: a verified request records `AppInstall.key_id` == the request's key-id (`test_legend_records_appinstall_key_id`)
+- [x] run `uv run pytest src/apps/mobile/tests.py` — full mobile suite green (97 passed)
 
 ### Task 6: Verify acceptance criteria
 - [ ] verify rotation works: two active keys both verify; removing a key 403s requests using it
