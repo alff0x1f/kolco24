@@ -169,8 +169,9 @@ def test_permission_future_ts_false(settings):
 
 
 def test_permission_huge_ts_returns_false_not_500(settings):
-    # A very large integer timestamp must return False (out-of-window), not raise
-    # OverflowError from float(huge_int) when doing time.time() - ts_int.
+    # A very large integer timestamp is simply outside the replay window and
+    # must return False cleanly (Python integers are arbitrary-precision; no
+    # overflow risk).
     settings.MOBILE_APP_SECRET = SECRET
     settings.MOBILE_APP_TS_WINDOW = 300
     huge_ts = str(10**400)
@@ -439,6 +440,7 @@ def test_legend_if_none_match_returns_304_empty_body(
     assert second.status_code == 304
     assert second["ETag"] == etag
     assert second.content == b""
+    assert AppInstall.objects.get(install_id="install-abc").request_count == 2
 
 
 @pytest.mark.django_db
@@ -514,6 +516,19 @@ def test_legend_hidden_if_none_match_returns_304(client, settings):
     assert second.status_code == 304
     assert second["ETag"] == etag
     assert second.content == b""
+
+
+@pytest.mark.django_db
+def test_legend_tampered_query_string_returns_403(
+    client, settings, race_with_checkpoints
+):
+    settings.MOBILE_APP_SECRET = SECRET
+    settings.MOBILE_APP_TS_WINDOW = 300
+    # Signature covers the bare path; appending a query string must be rejected
+    path = f"/app/race/{race_with_checkpoints.id}/legend/"
+    headers = _signed_headers("GET", path, SECRET)
+    response = client.get(path + "?foo=bar", **headers)
+    assert response.status_code == 403
 
 
 # --- RaceListView request-level --------------------------------------------
@@ -1017,6 +1032,7 @@ def test_teams_if_none_match_returns_304_empty_body(
     assert second.status_code == 304
     assert second["ETag"] == etag
     assert second.content == b""
+    assert AppInstall.objects.get(install_id="install-abc").request_count == 2
 
 
 @pytest.mark.django_db
@@ -1147,6 +1163,29 @@ def test_teams_tampered_query_string_returns_403(client, settings):
 
 
 @pytest.mark.django_db
+def test_teams_excludes_other_race_teams(client, settings, django_user_model):
+    settings.MOBILE_APP_SECRET = SECRET
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    from website.models.models import Team
+
+    race1, cat1 = _make_race_with_category(slug="teams-iso-r1")
+    race2, cat2 = _make_race_with_category(slug="teams-iso-r2")
+    user = django_user_model.objects.create_user(
+        username="iso1", email="iso1@example.com", password="x"
+    )
+    team1 = Team.objects.create(owner=user, category2=cat1, teamname="Race1 Team")
+    Team.objects.create(owner=user, category2=cat2, teamname="Race2 Team")
+
+    path = f"/app/race/{race1.id}/teams/"
+    response = client.get(path, **_signed_headers("GET", path, SECRET))
+
+    assert response.status_code == 200
+    ids = [t["id"] for t in response.json()["teams"]]
+    assert ids == [team1.id]
+
+
+@pytest.mark.django_db
 def test_teams_records_appinstall(client, settings, django_user_model):
     settings.MOBILE_APP_SECRET = SECRET
     settings.MOBILE_APP_TS_WINDOW = 300
@@ -1242,6 +1281,7 @@ def test_teams_excludes_soft_deleted_team(client, settings, django_user_model):
 def test_sync_manifest_shape_and_defaults(client, settings, django_user_model):
     settings.MOBILE_APP_SECRET = SECRET
     settings.MOBILE_APP_TS_WINDOW = 300
+    settings.MOBILE_DATA_SOURCE = "cloud"
 
     from website.models.models import Team
 
