@@ -231,13 +231,13 @@ signature with it.
 - [x] run `uv run pytest src/apps/mobile/tests.py` — full mobile suite green (97 passed)
 
 ### Task 6: Verify acceptance criteria
-- [ ] verify rotation works: two active keys both verify; removing a key 403s requests using it
-- [ ] verify fail-closed: empty/malformed `MOBILE_APP_KEYS` → every request 403
-- [ ] verify neutral 403 (no hint) for missing/unknown key-id, bad sig, expired ts
-- [ ] verify `signing.py` has no logic/canonical change (docstring-only) and its unit tests are untouched and still pass
-- [ ] run full suite: `uv run pytest`
-- [ ] run `make format && make lint`
-- [ ] confirm `uv run python src/manage.py makemigrations --check --dry-run` is clean
+- [x] verify rotation works: two active keys both verify; removing a key 403s requests using it (`test_permission_two_active_keys_both_verify`, `test_legend_two_active_keys_both_verify`, `test_legend_unknown_key_id_returns_403`)
+- [x] verify fail-closed: empty/malformed `MOBILE_APP_KEYS` → every request 403 (`test_permission_empty_keys_fails_closed`, `test_permission_unset_keys_fails_closed`, `test_legend_empty_keys_fails_closed`)
+- [x] verify neutral 403 (no hint) for missing/unknown key-id, bad sig, expired ts (`test_legend_missing_key_id_returns_403`, `test_legend_unknown_key_id_returns_403`, `test_legend_valid_key_id_wrong_secret_returns_403`, `test_legend_expired_ts_returns_403`)
+- [x] verify `signing.py` has no logic/canonical change (docstring-only) and its unit tests are untouched and still pass (`build_canonical` signs only method/full_path/ts/body-hash, no key_id; signing unit tests green)
+- [x] run full suite: `uv run pytest` — 442 passed
+- [x] run `make format && make lint` — clean (ruff/black/isort/flake8 all pass)
+- [x] confirm `uv run python src/manage.py makemigrations --check --dry-run` is clean — "No changes detected"
 
 ### Task 7: [Final] Update documentation
 - [ ] `deploy/kolco24.env.example`: replace `MOBILE_APP_SECRET=` with the `MOBILE_APP_KEYS={...}` example + rotation comment
