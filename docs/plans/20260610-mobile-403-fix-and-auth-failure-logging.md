@@ -138,14 +138,14 @@ the neutral `"Forbidden"`).
 - Modify: `src/apps/mobile/models.py`
 - Create: `src/apps/mobile/migrations/0004_appauthfailure.py`
 
-- [ ] Add the `AppAuthFailure` model (fields + `Meta.unique_together = ("ip", "key_id", "reason")`
+- [x] Add the `AppAuthFailure` model (fields + `Meta.unique_together = ("ip", "key_id", "reason")`
       + a `__str__` like `f"{self.ip} {self.key_id} {self.reason} x{self.count}"`)
-- [ ] Generate the migration: `uv run python src/manage.py makemigrations mobile` (verify it is named
+- [x] Generate the migration: `uv run python src/manage.py makemigrations mobile` (verify it is named
       `0004_*` and creates the table + unique constraint)
-- [ ] Apply it locally: `uv run python src/manage.py migrate mobile`
-- [ ] Write a test: creating two `AppAuthFailure` rows differing only in `key_id` (or `reason`) both
+- [x] Apply it locally: `uv run python src/manage.py migrate mobile`
+- [x] Write a test: creating two `AppAuthFailure` rows differing only in `key_id` (or `reason`) both
       persist; a second `update_or_create` with the same `(ip, key_id, reason)` reuses the row
-- [ ] run tests - must pass before next task
+- [x] run tests - must pass before next task
 
 ### Task 3: Make `SignedAppPermission` stash the denial reason
 

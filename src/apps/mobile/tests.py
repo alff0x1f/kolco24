@@ -7,7 +7,7 @@ from django.db import IntegrityError
 from django.db.models import Prefetch
 from django.test import RequestFactory
 
-from apps.mobile.models import AppInstall
+from apps.mobile.models import AppAuthFailure, AppInstall
 from apps.mobile.permissions import SignedAppPermission, _client_ip
 from apps.mobile.signing import build_canonical, sha256_hex, sign, verify
 
@@ -1579,3 +1579,31 @@ def test_legend_records_appinstall_key_id(client, settings, race_with_checkpoint
     assert response.status_code == 200
     install = AppInstall.objects.get(install_id="install-abc")
     assert install.key_id == "android-v1"
+
+
+@pytest.mark.django_db
+def test_appauthfailure_key_id_and_reason_granularity():
+    """Rows differing only in key_id or reason persist separately."""
+    base = dict(ip="1.2.3.4", reason="bad_sig")
+    AppAuthFailure.objects.create(key_id="a-v1", count=1, **base)
+    AppAuthFailure.objects.create(key_id="a-v2", count=1, **base)
+    AppAuthFailure.objects.create(
+        ip="1.2.3.4", key_id="a-v1", reason="unknown_key", count=1
+    )
+    assert AppAuthFailure.objects.count() == 3
+
+
+@pytest.mark.django_db
+def test_appauthfailure_update_or_create_reuses_row():
+    """A second update_or_create with the same (ip, key_id, reason) reuses the row."""
+    key = dict(ip="1.2.3.4", key_id="a-v1", reason="bad_sig")
+    obj1, created1 = AppAuthFailure.objects.update_or_create(
+        defaults={"last_path": "/app/x"}, **key
+    )
+    assert created1 is True
+    obj2, created2 = AppAuthFailure.objects.update_or_create(
+        defaults={"last_path": "/app/y"}, **key
+    )
+    assert created2 is False
+    assert obj1.pk == obj2.pk
+    assert AppAuthFailure.objects.count() == 1
