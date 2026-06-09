@@ -122,12 +122,15 @@ the neutral `"Forbidden"`).
 **Files:**
 - Modify: `src/config/settings.py`
 
-- [ ] Add a module-level `import logging` if not present; in the `except` branch of the
+- [x] Add a module-level `import logging` if not present; in the `except` branch of the
       `MOBILE_APP_KEYS` parse, log `logging.getLogger("config.settings").warning("MOBILE_APP_KEYS malformed or empty; all /app/* requests will 403")`
-- [ ] Also emit that same warning when `_raw_mobile_keys` was non-empty but the filtered
+- [x] Also emit that same warning when `_raw_mobile_keys` was non-empty but the filtered
       `MOBILE_APP_KEYS` ends up empty (guard against the unset case — no warning when env is absent)
-- [ ] (No unit test for settings-import logging — it runs once at import; the smoke run in
-      Post-Completion confirms endpoints 200 with a valid env)
+      (consolidated into a single `if _raw_mobile_keys and not MOBILE_APP_KEYS` guard so malformed
+      JSON, which flows through both branches, warns once — covers except + filtered-empty cases)
+- [x] (No unit test for settings-import logging — it runs once at import; the smoke run in
+      Post-Completion confirms endpoints 200 with a valid env) — verified manually: malformed env
+      logs the WARNING, valid env parses silently
 
 ### Task 2: Add the `AppAuthFailure` model + migration
 

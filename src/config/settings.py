@@ -11,6 +11,7 @@ https://docs.djangoproject.com/en/2.0/ref/settings/
 """
 
 import json
+import logging
 import os
 
 from dotenv import load_dotenv
@@ -59,6 +60,14 @@ if not isinstance(_parsed_mobile_keys, dict):
 MOBILE_APP_KEYS = {
     k: v for k, v in _parsed_mobile_keys.items() if isinstance(v, str) and v
 }
+# Be loud when a non-empty env produced no usable keys — malformed JSON (the
+# except branch above), wrong top-level shape, or all-blank/non-string secrets.
+# Only warn when the env var was actually set, so the legit "MOBILE_APP_KEYS
+# unset" config stays silent instead of crying wolf on every server start.
+if _raw_mobile_keys and not MOBILE_APP_KEYS:
+    logging.getLogger("config.settings").warning(
+        "MOBILE_APP_KEYS malformed or empty; all /app/* requests will 403"
+    )
 MOBILE_APP_TS_WINDOW = 300
 # Data source advertised by the /app/race/<id>/sync/ manifest. "cloud" → no
 # lease (lease_expires_at: null); a local-race server would set "local".
