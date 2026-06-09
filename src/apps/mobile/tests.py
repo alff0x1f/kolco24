@@ -428,6 +428,7 @@ def test_legend_expired_ts_returns_403(client, settings, race_with_checkpoints):
     canonical = build_canonical("GET", path, old_ts, b"")
     sig = sign(SECRET, canonical)
     headers = {
+        "HTTP_X_APP_KEY_ID": "test-v1",
         "HTTP_X_APP_SIG": sig,
         "HTTP_X_APP_TS": old_ts,
         "HTTP_X_INSTALL_ID": "install-abc",
@@ -448,6 +449,7 @@ def test_legend_empty_keys_fails_closed(client, settings, race_with_checkpoints)
     response = client.get(path, **headers)
     assert response.status_code == 403
     assert response.json() == {"detail": "Forbidden"}
+    assert AppAuthFailure.objects.filter(reason="no_keys").exists()
 
 
 @pytest.mark.django_db
@@ -775,8 +777,12 @@ def test_races_records_appinstall(client, settings):
 def test_races_stats_write_failure_does_not_break_response(
     client, settings, monkeypatch
 ):
+    from website.models.race import Race
+
     settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
     settings.MOBILE_APP_TS_WINDOW = 300
+
+    Race.objects.create(name="Published", slug="published-race", is_published=True)
 
     def boom(*args, **kwargs):
         raise IntegrityError("simulated stats write failure")
@@ -786,7 +792,7 @@ def test_races_stats_write_failure_does_not_break_response(
     response = client.get(RACES_PATH, **_signed_headers("GET", RACES_PATH, SECRET))
 
     assert response.status_code == 200
-    assert response.json() == {"races": []}
+    assert len(response.json()["races"]) == 1
     assert not AppInstall.objects.filter(install_id="install-abc").exists()
 
 

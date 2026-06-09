@@ -28,6 +28,22 @@ Read-only API для iOS/Android-приложения. Без регистрац
 инстал его больше не репортит. Рунбук ротации — в `## Implementation Steps` /
 `## Post-Completion` плана и в корневом `CLAUDE.md`.
 
+## 403-трекинг (`AppAuthFailure`)
+
+Каждый провалившийся запрос к `/app/*` логируется (`WARNING`) и записывается
+**агрегированной** строкой `AppAuthFailure` с ключом `(ip, key_id, reason)` —
+не по одной строке на попытку, чтобы брутфорс не переполнял таблицу. Коды
+причины: `no_keys`, `missing_headers`, `unknown_key`, `bad_ts`, `expired_ts`,
+`bad_sig`.
+
+`SignedAppPermission` делает только crypto-проверку и заполняет
+`request.app_denial` — **без DB-записей**. Лог и запись в БД живут в
+`AppAPIView.permission_denied()` (DRF-хук, вызывается до `_record_install`).
+Отклонённый запрос **никогда** не создаёт строку `AppInstall`. Клиенту
+возвращается нейтральный `403 {"detail": "Forbidden"}` без подсказки о
+причине. Таблица читается через read-only `AppAuthFailureAdmin` в Django admin
+(фильтры по `reason`, `key_id`; сортировка по `count` убыванием).
+
 ## Что обновляется
 
 Приложение держит локальную копию справочников и в фоне поддерживает её
