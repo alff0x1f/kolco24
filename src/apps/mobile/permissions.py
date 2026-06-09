@@ -19,10 +19,16 @@ from .signing import build_canonical, verify
 
 
 def _client_ip(request):
-    """Best-effort client IP: first ``X-Forwarded-For`` entry, else ``REMOTE_ADDR``."""
+    """Trusted client IP: last ``X-Forwarded-For`` entry, else ``REMOTE_ADDR``.
+
+    Nginx's ``proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for``
+    *appends* ``$remote_addr`` to whatever the client sent, so the last entry
+    is the actual connection IP and cannot be forged by the client.  Taking the
+    first entry would accept an attacker-supplied value.
+    """
     forwarded = request.META.get("HTTP_X_FORWARDED_FOR", "")
     if forwarded:
-        candidate = forwarded.split(",")[0].strip()
+        candidate = forwarded.split(",")[-1].strip()
         try:
             ipaddress.ip_address(candidate)
             return candidate
@@ -65,11 +71,16 @@ class SignedAppPermission(BasePermission):
         ts = request.headers.get("X-App-Ts")
         install = request.headers.get("X-Install-Id")
         if not key_id or not sig or not ts or not install:
-            return self._deny(request, "missing_headers", key_id)
+            # Normalise key_id to "" — the claimed id is untrusted and must not
+            # vary the aggregation key, or an attacker can force a row per request
+            # by rotating X-App-Key-Id while omitting other required headers.
+            return self._deny(request, "missing_headers", "")
 
         secret = keys.get(key_id)
         if not secret:
-            return self._deny(request, "unknown_key", key_id)  # no hint
+            # Normalise key_id to "" — the claimed id is untrusted and must not
+            # vary the aggregation key, or an attacker can force a row per request.
+            return self._deny(request, "unknown_key", "")  # no hint
 
         try:
             ts_int = int(ts)

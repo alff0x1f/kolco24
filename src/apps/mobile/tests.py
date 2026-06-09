@@ -251,12 +251,27 @@ def test_permission_missing_headers_stashes_reason_and_empty_key_id(settings):
     assert request.app_denial["key_id"] == ""
 
 
-def test_permission_unknown_key_stashes_reason_with_claimed_key_id(settings):
+def test_permission_missing_headers_with_key_id_present_stashes_blank_key_id(settings):
+    # key_id is provided but sig is missing — key_id must still be normalised to ""
+    # so an attacker rotating X-App-Key-Id doesn't force a row per request.
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    ts = str(int(time.time()))
+    request = RequestFactory().get(
+        PATH,
+        headers={"X-App-Key-Id": "fake-key", "X-App-Ts": ts, "X-Install-Id": "x"},
+    )
+    assert SignedAppPermission().has_permission(request, None) is False
+    assert request.app_denial["reason"] == "missing_headers"
+    assert request.app_denial["key_id"] == ""
+
+
+def test_permission_unknown_key_stashes_reason_with_blank_key_id(settings):
+    # key_id is normalised to "" so different fake key-ids aggregate to one row.
     settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
     request = _signed_get_request(key_id="nope-v9")
     assert SignedAppPermission().has_permission(request, None) is False
     assert request.app_denial["reason"] == "unknown_key"
-    assert request.app_denial["key_id"] == "nope-v9"
+    assert request.app_denial["key_id"] == ""
 
 
 def test_permission_bad_ts_stashes_reason(settings):
@@ -315,13 +330,24 @@ def test_permission_valid_key_id_wrong_secret_false(settings):
     assert SignedAppPermission().has_permission(request, None) is False
 
 
-def test_client_ip_prefers_forwarded_for():
+def test_client_ip_uses_last_forwarded_for_entry():
+    # Last entry is the one nginx appended ($remote_addr); the first can be spoofed.
     request = RequestFactory().get(
         PATH,
         headers={"X-Forwarded-For": "203.0.113.1, 10.0.0.1"},
         REMOTE_ADDR="10.0.0.2",
     )
-    assert _client_ip(request) == "203.0.113.1"
+    assert _client_ip(request) == "10.0.0.1"
+
+
+def test_client_ip_spoofed_first_entry_ignored():
+    # Attacker sends a fake first entry; nginx appends real IP at the end.
+    request = RequestFactory().get(
+        PATH,
+        headers={"X-Forwarded-For": "1.2.3.4, 203.0.113.99"},
+        REMOTE_ADDR="10.0.0.2",
+    )
+    assert _client_ip(request) == "203.0.113.99"
 
 
 def test_client_ip_falls_back_to_remote_addr():
@@ -1716,7 +1742,29 @@ def test_unknown_key_records_authfailure(client, settings, race_with_checkpoints
     assert response.json() == {"detail": "Forbidden"}
 
     row = AppAuthFailure.objects.get(reason="unknown_key")
-    assert row.key_id == "nope-v9"
+    assert row.key_id == ""  # normalised — claimed key is untrusted
+
+
+@pytest.mark.django_db
+def test_unknown_key_different_fake_key_ids_aggregate_to_one_row(
+    client, settings, race_with_checkpoints
+):
+    """Two requests with different fake key_ids must aggregate to a single row.
+
+    Without normalisation the claimed key_id would vary the unique constraint
+    and each request would create a new row (row-per-attempt under attack).
+    """
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+    path = f"/app/race/{race_with_checkpoints.id}/legend/"
+
+    client.get(path, **_signed_headers("GET", path, SECRET, key_id="fake-key-1"))
+    client.get(path, **_signed_headers("GET", path, SECRET, key_id="fake-key-2"))
+
+    assert AppAuthFailure.objects.filter(reason="unknown_key").count() == 1
+    row = AppAuthFailure.objects.get(reason="unknown_key")
+    assert row.count == 2
+    assert row.key_id == ""
 
 
 @pytest.mark.django_db
@@ -1730,6 +1778,33 @@ def test_missing_headers_records_authfailure_with_blank_key_id(
     assert response.status_code == 403
 
     row = AppAuthFailure.objects.get(reason="missing_headers")
+    assert row.key_id == ""
+
+
+@pytest.mark.django_db
+def test_missing_headers_different_fake_key_ids_aggregate_to_one_row(
+    client, settings, race_with_checkpoints
+):
+    """Different X-App-Key-Id values with a missing header must aggregate to one row.
+
+    Without normalisation the claimed key_id would vary the unique constraint
+    and each request would create a new row (row-per-attempt under attack).
+    """
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    path = f"/app/race/{race_with_checkpoints.id}/legend/"
+    ts = str(int(time.time()))
+
+    # Provide key_id but omit X-App-Sig — triggers missing_headers for each request
+    client.get(
+        path, HTTP_X_APP_KEY_ID="fake-key-1", HTTP_X_APP_TS=ts, HTTP_X_INSTALL_ID="x"
+    )
+    client.get(
+        path, HTTP_X_APP_KEY_ID="fake-key-2", HTTP_X_APP_TS=ts, HTTP_X_INSTALL_ID="x"
+    )
+
+    assert AppAuthFailure.objects.filter(reason="missing_headers").count() == 1
+    row = AppAuthFailure.objects.get(reason="missing_headers")
+    assert row.count == 2
     assert row.key_id == ""
 
 
