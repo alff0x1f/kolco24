@@ -1667,3 +1667,124 @@ def test_appauthfailure_update_or_create_reuses_row():
     assert created2 is False
     assert obj1.pk == obj2.pk
     assert AppAuthFailure.objects.count() == 1
+
+
+# --- AppAPIView.permission_denied: log + record 403 (Task 4) ----------------
+
+
+@pytest.mark.django_db
+def test_bad_signature_records_authfailure_and_increments(
+    client, settings, race_with_checkpoints
+):
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+    path = f"/app/race/{race_with_checkpoints.id}/legend/"
+
+    response = client.get(path, **_signed_headers("GET", path, "wrong-secret"))
+    assert response.status_code == 403
+    assert response.json() == {"detail": "Forbidden"}
+
+    row = AppAuthFailure.objects.get(reason="bad_sig")
+    assert row.count == 1
+    assert row.key_id == "test-v1"
+    assert row.last_path == path
+    assert row.last_install_id == "install-abc"
+
+    response = client.get(path, **_signed_headers("GET", path, "wrong-secret"))
+    assert response.status_code == 403
+    row.refresh_from_db()
+    assert row.count == 2
+    assert AppAuthFailure.objects.filter(reason="bad_sig").count() == 1
+
+
+@pytest.mark.django_db
+def test_unknown_key_records_authfailure(client, settings, race_with_checkpoints):
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+    path = f"/app/race/{race_with_checkpoints.id}/legend/"
+
+    response = client.get(
+        path, **_signed_headers("GET", path, SECRET, key_id="nope-v9")
+    )
+    assert response.status_code == 403
+    assert response.json() == {"detail": "Forbidden"}
+
+    row = AppAuthFailure.objects.get(reason="unknown_key")
+    assert row.key_id == "nope-v9"
+
+
+@pytest.mark.django_db
+def test_missing_headers_records_authfailure_with_blank_key_id(
+    client, settings, race_with_checkpoints
+):
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    path = f"/app/race/{race_with_checkpoints.id}/legend/"
+
+    response = client.get(path)
+    assert response.status_code == 403
+
+    row = AppAuthFailure.objects.get(reason="missing_headers")
+    assert row.key_id == ""
+
+
+@pytest.mark.django_db
+def test_expired_ts_records_authfailure(client, settings, race_with_checkpoints):
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+    path = f"/app/race/{race_with_checkpoints.id}/legend/"
+    old_ts = str(int(time.time()) - 1000)
+    canonical = build_canonical("GET", path, old_ts, b"")
+    headers = {
+        "HTTP_X_APP_KEY_ID": "test-v1",
+        "HTTP_X_APP_SIG": sign(SECRET, canonical),
+        "HTTP_X_APP_TS": old_ts,
+        "HTTP_X_INSTALL_ID": "install-abc",
+    }
+    response = client.get(path, **headers)
+    assert response.status_code == 403
+
+    assert AppAuthFailure.objects.filter(reason="expired_ts").exists()
+
+
+@pytest.mark.django_db
+def test_valid_request_records_no_authfailure(client, settings, race_with_checkpoints):
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+    path = f"/app/race/{race_with_checkpoints.id}/legend/"
+
+    response = client.get(path, **_signed_headers("GET", path, SECRET))
+    assert response.status_code == 200
+    assert not AppAuthFailure.objects.exists()
+
+
+@pytest.mark.django_db
+def test_denied_request_records_no_appinstall(client, settings, race_with_checkpoints):
+    """A denied request creates an AppAuthFailure but never an AppInstall row."""
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+    path = f"/app/race/{race_with_checkpoints.id}/legend/"
+
+    response = client.get(path, **_signed_headers("GET", path, "wrong-secret"))
+    assert response.status_code == 403
+    assert AppAuthFailure.objects.count() == 1
+    assert not AppInstall.objects.exists()
+
+
+@pytest.mark.django_db
+def test_authfailure_write_failure_does_not_break_403(
+    client, settings, race_with_checkpoints, monkeypatch
+):
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    def boom(*args, **kwargs):
+        raise IntegrityError("simulated authfailure write failure")
+
+    monkeypatch.setattr(AppAuthFailure.objects, "update_or_create", boom)
+
+    path = f"/app/race/{race_with_checkpoints.id}/legend/"
+    response = client.get(path, **_signed_headers("GET", path, "wrong-secret"))
+
+    assert response.status_code == 403
+    assert response.json() == {"detail": "Forbidden"}
+    assert not AppAuthFailure.objects.exists()

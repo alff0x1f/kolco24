@@ -170,22 +170,22 @@ the neutral `"Forbidden"`).
 **Files:**
 - Modify: `src/apps/mobile/views.py`
 
-- [ ] Import `AppAuthFailure`; add `permission_denied(self, request, message=None, code=None)` that
+- [x] Import `AppAuthFailure`; add `permission_denied(self, request, message=None, code=None)` that
       calls `self._record_denial(request)` then `super().permission_denied(request, message=message, code=code)`
-- [ ] Add `_record_denial(request)`: read `d = getattr(request, "app_denial", {"reason": "unknown"})`
+- [x] Add `_record_denial(request)`: read `d = getattr(request, "app_denial", {"reason": "unknown"})`
       using `.get(...)` for every key after that, `logger.warning("Mobile app 403: reason=%s ip=%s key_id=%s path=%s install=%s", ...)`
-- [ ] In the same method, best-effort DB write wrapped in `try/except` + `logger.exception("Failed to
+- [x] In the same method, best-effort DB write wrapped in `try/except` + `logger.exception("Failed to
       record AppAuthFailure")`: `update_or_create(ip=d.get("ip"), key_id=d.get("key_id", ""),
       reason=d["reason"], defaults={last_path: d.get("path", ""), last_install_id: d.get("install", "")})`
       then `.filter(ip=, key_id=, reason=).update(count=F("count") + 1)` (mirror `_record_install`)
-- [ ] Write tests: bad signature → 403, body is `{"detail": "Forbidden"}`, one `AppAuthFailure` row
+- [x] Write tests: bad signature → 403, body is `{"detail": "Forbidden"}`, one `AppAuthFailure` row
       with `reason="bad_sig"`, `count == 1`; a second identical bad request → same row, `count == 2`
-- [ ] Write tests: unknown key-id → row with `reason="unknown_key"`; missing headers (no `key_id`) →
+- [x] Write tests: unknown key-id → row with `reason="unknown_key"`; missing headers (no `key_id`) →
       `reason="missing_headers"` and stored `key_id=""` (no crash on `None`); expired `ts` →
       `reason="expired_ts"`; a **valid** signed request → 200 and **no** `AppAuthFailure` row created
-- [ ] Write test: a denied request creates an `AppAuthFailure` row but **no** `AppInstall` row
+- [x] Write test: a denied request creates an `AppAuthFailure` row but **no** `AppInstall` row
       (locks in the `permission_denied`-before-`_record_install` ordering)
-- [ ] run tests - must pass before next task
+- [x] run tests - must pass before next task
 
 ### Task 5: Register `AppAuthFailureAdmin` (read-only)
 

@@ -20,7 +20,7 @@ from website.models.enums import CheckpointType
 from website.models.models import Athlet, Team
 from website.models.race import Race
 
-from .models import AppInstall
+from .models import AppAuthFailure, AppInstall
 from .permissions import SignedAppPermission
 from .serializers import LegendCheckpointSerializer, RaceListSerializer, TeamSerializer
 from .versioning import legend_state, legend_version, teams_version
@@ -37,6 +37,47 @@ class AppAPIView(APIView):
     def initial(self, request, *args, **kwargs):
         super().initial(request, *args, **kwargs)  # runs check_permissions
         self._record_install(request)
+
+    def permission_denied(self, request, message=None, code=None):
+        """Log + record the denial, then raise the neutral 403.
+
+        DRF calls this from ``check_permissions`` (inside ``initial``) when a
+        permission returns ``False`` — *before* ``_record_install`` runs, so a
+        denied request produces an ``AppAuthFailure`` row but never an
+        ``AppInstall`` row. The reason flows only to the log/DB; the
+        ``super()`` call keeps the client-facing 403 the neutral ``"Forbidden"``.
+        """
+        self._record_denial(request)
+        super().permission_denied(request, message=message, code=code)
+
+    def _record_denial(self, request):
+        """Best-effort 403 log + aggregated DB row — must never break the 403."""
+        d = getattr(request, "app_denial", {"reason": "unknown"})
+        reason = d.get("reason", "unknown")
+        ip = d.get("ip")
+        key_id = d.get("key_id", "")
+        path = d.get("path", "")
+        install = d.get("install", "")
+        logger.warning(
+            "Mobile app 403: reason=%s ip=%s key_id=%s path=%s install=%s",
+            reason,
+            ip,
+            key_id,
+            path,
+            install,
+        )
+        try:
+            AppAuthFailure.objects.update_or_create(
+                ip=ip,
+                key_id=key_id,
+                reason=reason,
+                defaults={"last_path": path, "last_install_id": install},
+            )
+            AppAuthFailure.objects.filter(ip=ip, key_id=key_id, reason=reason).update(
+                count=F("count") + 1
+            )
+        except Exception:
+            logger.exception("Failed to record AppAuthFailure")
 
     def _record_install(self, request):
         """Best-effort per-install stat write — must never break the response."""
