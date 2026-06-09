@@ -30,7 +30,7 @@ class AppAuthFailure(models.Model):
     does no DB writes. ``key_id`` is the *claimed* one and may be spoofed.
     """
 
-    ip = models.GenericIPAddressField(null=True, blank=True)
+    ip = models.GenericIPAddressField()
     key_id = models.CharField(max_length=32, blank=True)  # claimed, may be spoofed
     reason = models.CharField(max_length=32)
     count = models.PositiveIntegerField(default=0)

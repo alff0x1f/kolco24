@@ -55,7 +55,7 @@ class AppAPIView(APIView):
         """Best-effort 403 log + aggregated DB row — must never break the 403."""
         d = getattr(request, "app_denial", {"reason": "unknown"})
         reason = d.get("reason", "unknown")
-        ip = d.get("ip")
+        ip = d.get("ip") or "0.0.0.0"
         key_id = d.get("key_id", "")
         path = d.get("path", "")
         install = d.get("install", "")
