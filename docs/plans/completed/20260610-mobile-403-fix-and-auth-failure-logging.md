@@ -210,11 +210,12 @@ the neutral `"Forbidden"`).
 - [x] `make format && make lint` clean
 
 ### Task 7: [Final] Documentation
-- [ ] Update CLAUDE.md `apps.mobile` section: note the new `AppAuthFailure` model (aggregate 403
+- [x] Update CLAUDE.md `apps.mobile` section: note the new `AppAuthFailure` model (aggregate 403
       tracking, `(ip, key_id, reason)` key, read-only admin) and that `permission_denied` is the
       log+record hook (permission stays no-DB-writes); reason codes list
-- [ ] Update `deploy/kolco24.env.example` comment if needed (the example already uses valid JSON)
-- [ ] Move this plan to `docs/plans/completed/`
+- [x] Update `deploy/kolco24.env.example` comment if needed (the example already uses valid JSON)
+      — added a valid-JSON requirement + startup-WARNING note above the var
+- [x] Move this plan to `docs/plans/completed/`
 
 ## Post-Completion
 *Items requiring a running server / external systems — no checkboxes, informational only.*
