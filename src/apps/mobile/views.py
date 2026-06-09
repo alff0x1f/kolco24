@@ -10,7 +10,7 @@ import logging
 
 from django.conf import settings
 from django.db.models import F, Prefetch
-from django.http import HttpResponseNotModified
+from django.http import Http404, HttpResponseNotModified
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from rest_framework.response import Response
@@ -125,6 +125,9 @@ class LegendView(AppAPIView):
     def get(self, request, race_id):
         get_object_or_404(Race, pk=race_id, is_published=True)
         version, is_legend_visible = legend_state(race_id)
+        if is_legend_visible is None:
+            # Race was deleted between the 404 check and legend_state; treat as gone.
+            raise Http404
         quoted = f'"{version}"'
 
         if request.headers.get("If-None-Match") == quoted:
