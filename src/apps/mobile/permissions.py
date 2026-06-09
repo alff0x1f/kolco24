@@ -54,7 +54,11 @@ class SignedAppPermission(BasePermission):
         request.app_denial = {
             "reason": reason,
             "key_id": (key_id or "")[:32],
-            "ip": _client_ip(request),
+            # Sentinel "0.0.0.0" avoids NULL in the unique_together — PostgreSQL
+            # treats NULL != NULL in unique constraints so two concurrent null-IP
+            # denials would both INSERT, then MultipleObjectsReturned breaks
+            # subsequent update_or_create for the same (NULL, key_id, reason).
+            "ip": _client_ip(request) or "0.0.0.0",
             "path": request.get_full_path()[:255],
             "install": install[:64],
         }
