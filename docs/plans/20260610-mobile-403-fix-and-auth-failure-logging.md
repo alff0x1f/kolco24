@@ -201,13 +201,13 @@ the neutral `"Forbidden"`).
 - [x] run tests - must pass before next task
 
 ### Task 6: Verify acceptance criteria
-- [ ] All `/app/*` 403s now produce a `WARNING` log + an aggregated `AppAuthFailure` row keyed by
+- [x] All `/app/*` 403s now produce a `WARNING` log + an aggregated `AppAuthFailure` row keyed by
       `(ip, key_id, reason)`; the client still gets a neutral `403 {"detail": "Forbidden"}`
-- [ ] A malformed/empty `MOBILE_APP_KEYS` emits the settings WARNING (not silent)
-- [ ] A valid signed request 200s and records `AppInstall` (unchanged behavior), no `AppAuthFailure`
-- [ ] Run full mobile test file: `uv run pytest src/apps/mobile/tests.py`
-- [ ] Run full suite: `uv run pytest`
-- [ ] `make format && make lint` clean
+- [x] A malformed/empty `MOBILE_APP_KEYS` emits the settings WARNING (not silent)
+- [x] A valid signed request 200s and records `AppInstall` (unchanged behavior), no `AppAuthFailure`
+- [x] Run full mobile test file: `uv run pytest src/apps/mobile/tests.py` (119 passed)
+- [x] Run full suite: `uv run pytest` (464 passed)
+- [x] `make format && make lint` clean
 
 ### Task 7: [Final] Documentation
 - [ ] Update CLAUDE.md `apps.mobile` section: note the new `AppAuthFailure` model (aggregate 403
