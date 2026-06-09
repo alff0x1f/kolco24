@@ -152,18 +152,18 @@ the neutral `"Forbidden"`).
 **Files:**
 - Modify: `src/apps/mobile/permissions.py`
 
-- [ ] Add `_deny(self, request, reason, key_id="")` that sets `request.app_denial = {...}` (reason,
+- [x] Add `_deny(self, request, reason, key_id="")` that sets `request.app_denial = {...}` (reason,
       `(key_id or "")[:32]`, `ip=_client_ip(request)`, `path=request.get_full_path()[:255]`,
       `install=(X-Install-Id or "")[:64]`) and `return False` — coerce `None` key_id to `""`
-- [ ] Replace each of the 6 `return False` points with `return self._deny(request, "<reason>", key_id)`
+- [x] Replace each of the 6 `return False` points with `return self._deny(request, "<reason>", key_id)`
       using the matching code: `no_keys`, `missing_headers`, `unknown_key`, `bad_ts`, `expired_ts`, `bad_sig`
       (pass the claimed `key_id` where available)
-- [ ] Confirm the success path still sets `request.app_meta` and `return True` unchanged; permission
-      still performs **no DB writes**
-- [ ] Write a test asserting `request.app_denial["reason"]` is set correctly per failure mode (can be
-      asserted indirectly via the DB row in Task 4's tests; if testing the permission in isolation,
-      build a DRF `APIRequestFactory` request) — mark which approach is used
-- [ ] run tests - must pass before next task
+- [x] Confirm the success path still sets `request.app_meta` and `return True` unchanged; permission
+      still performs **no DB writes** (verified by `test_permission_success_does_not_stash_denial`)
+- [x] Write a test asserting `request.app_denial["reason"]` is set correctly per failure mode —
+      approach used: **permission in isolation** (RequestFactory + `SignedAppPermission()`), one test
+      per reason code plus key_id/path/install assertions; DB-row side effects deferred to Task 4
+- [x] run tests - must pass before next task
 
 ### Task 4: Record denials in `AppAPIView.permission_denied` (log + DB)
 

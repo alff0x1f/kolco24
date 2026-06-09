@@ -232,6 +232,66 @@ def test_permission_valid_true_and_stashes_meta(settings):
     assert "ip" in request.app_meta
 
 
+# Task 3: the permission is tested in isolation here (RequestFactory + the
+# permission object). The DB-row side effects are covered by Task 4's view tests.
+def test_permission_no_keys_stashes_reason(settings):
+    settings.MOBILE_APP_KEYS = {}
+    request = _signed_get_request()
+    assert SignedAppPermission().has_permission(request, None) is False
+    assert request.app_denial["reason"] == "no_keys"
+    assert request.app_denial["key_id"] == ""
+
+
+def test_permission_missing_headers_stashes_reason_and_empty_key_id(settings):
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    request = RequestFactory().get(PATH)
+    assert SignedAppPermission().has_permission(request, None) is False
+    # X-App-Key-Id absent → coerced to "" (no TypeError on the length-clamp).
+    assert request.app_denial["reason"] == "missing_headers"
+    assert request.app_denial["key_id"] == ""
+
+
+def test_permission_unknown_key_stashes_reason_with_claimed_key_id(settings):
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    request = _signed_get_request(key_id="nope-v9")
+    assert SignedAppPermission().has_permission(request, None) is False
+    assert request.app_denial["reason"] == "unknown_key"
+    assert request.app_denial["key_id"] == "nope-v9"
+
+
+def test_permission_bad_ts_stashes_reason(settings):
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    request = _signed_get_request(ts="not-a-number")
+    assert SignedAppPermission().has_permission(request, None) is False
+    assert request.app_denial["reason"] == "bad_ts"
+
+
+def test_permission_expired_ts_stashes_reason(settings):
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+    request = _signed_get_request(ts=str(int(time.time()) - 1000))
+    assert SignedAppPermission().has_permission(request, None) is False
+    assert request.app_denial["reason"] == "expired_ts"
+
+
+def test_permission_bad_sig_stashes_reason(settings):
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    request = _signed_get_request(secret="wrong-secret")
+    assert SignedAppPermission().has_permission(request, None) is False
+    assert request.app_denial["reason"] == "bad_sig"
+    assert request.app_denial["key_id"] == "test-v1"
+    assert request.app_denial["path"] == PATH
+    assert request.app_denial["install"] == "install-abc"
+
+
+def test_permission_success_does_not_stash_denial(settings):
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+    request = _signed_get_request()
+    assert SignedAppPermission().has_permission(request, None) is True
+    assert not hasattr(request, "app_denial")
+
+
 def test_permission_two_active_keys_both_verify(settings):
     # Rotation-overlap proof: two keys active at once, each request signed with
     # its own paired secret + key-id verifies.

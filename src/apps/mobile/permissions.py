@@ -37,36 +37,54 @@ class SignedAppPermission(BasePermission):
     # Neutral denial: never hint which check failed (don't help brute-forcing).
     message = "Forbidden"
 
+    def _deny(self, request, reason, key_id=""):
+        """Stash the denial reason for the view to log/record, then ``return False``.
+
+        Stays pure — no DB write. ``key_id`` is the *claimed* id (may be spoofed
+        or ``None``); coerce ``None`` → ``""`` so the missing-headers/unknown-key
+        paths can't ``TypeError`` on a length-clamp downstream.
+        """
+        install = request.headers.get("X-Install-Id") or ""
+        request.app_denial = {
+            "reason": reason,
+            "key_id": (key_id or "")[:32],
+            "ip": _client_ip(request),
+            "path": request.get_full_path()[:255],
+            "install": install[:64],
+        }
+        return False
+
     def has_permission(self, request, view):
         keys = getattr(settings, "MOBILE_APP_KEYS", {}) or {}
         if not keys:
-            return False  # fail closed: misconfigured deploy never leaks the legend
+            # fail closed: misconfigured deploy never leaks the legend
+            return self._deny(request, "no_keys")
 
         key_id = request.headers.get("X-App-Key-Id")
         sig = request.headers.get("X-App-Sig")
         ts = request.headers.get("X-App-Ts")
         install = request.headers.get("X-Install-Id")
         if not key_id or not sig or not ts or not install:
-            return False
+            return self._deny(request, "missing_headers", key_id)
 
         secret = keys.get(key_id)
         if not secret:
-            return False  # unknown key-id → neutral 403, no hint
+            return self._deny(request, "unknown_key", key_id)  # no hint
 
         try:
             ts_int = int(ts)
         except (TypeError, ValueError):
-            return False
+            return self._deny(request, "bad_ts", key_id)
 
         window = getattr(settings, "MOBILE_APP_TS_WINDOW", 300)
         if abs(int(time.time()) - ts_int) > window:
-            return False
+            return self._deny(request, "expired_ts", key_id)
 
         canonical = build_canonical(
             request.method, request.get_full_path(), ts, request.body
         )
         if not verify(secret, canonical, sig):
-            return False
+            return self._deny(request, "bad_sig", key_id)
 
         request.app_meta = {
             "install_id": install[:64],
