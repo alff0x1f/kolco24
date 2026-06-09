@@ -51,11 +51,14 @@ def teams_version(race_id):
 
 
 def legend_state(race_id):
-    """Return ``(version, is_legend_visible)`` from a single coherent snapshot.
+    """Return ``(version, is_legend_visible)`` paired within one call.
 
-    Both values are derived in one call so the ETag and the visibility branch
-    in the view always agree — a visibility flip between two separate reads
-    cannot produce a response body that contradicts its own ETag.
+    Both values are computed together so the view uses a single, consistent
+    pair — a visibility flip between two independent calls cannot produce a
+    response body that contradicts its own ETag.  There is no DB-level
+    snapshot: the two queries (checkpoint aggregate and race row) are
+    independent, so a flip between them yields a version that represents
+    neither state. Self-corrects on the next request.
 
     Deliberately re-queries ``is_legend_visible`` by ``race_id`` rather than
     accepting a ``Race`` object: keeps the bare ``race_id`` signature that is

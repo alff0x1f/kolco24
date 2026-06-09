@@ -12,6 +12,7 @@ from django.conf import settings
 from django.db.models import F, Prefetch
 from django.http import HttpResponseNotModified
 from django.shortcuts import get_object_or_404
+from django.utils import timezone
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -74,7 +75,8 @@ class AppAPIView(APIView):
                 defaults={"last_path": path, "last_install_id": install},
             )
             AppAuthFailure.objects.filter(ip=ip, key_id=key_id, reason=reason).update(
-                count=F("count") + 1
+                count=F("count") + 1,
+                last_seen=timezone.now(),
             )
         except Exception:
             logger.exception("Failed to record AppAuthFailure")
@@ -96,7 +98,8 @@ class AppAPIView(APIView):
                 },
             )
             AppInstall.objects.filter(install_id=install_id).update(
-                request_count=F("request_count") + 1
+                request_count=F("request_count") + 1,
+                last_seen=timezone.now(),
             )
         except Exception:
             logger.exception("Failed to record AppInstall stats")
