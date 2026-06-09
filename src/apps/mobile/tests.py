@@ -1788,3 +1788,18 @@ def test_authfailure_write_failure_does_not_break_403(
     assert response.status_code == 403
     assert response.json() == {"detail": "Forbidden"}
     assert not AppAuthFailure.objects.exists()
+
+
+@pytest.mark.django_db
+def test_appauthfailure_admin_changelist_loads(client, django_user_model):
+    """The read-only AppAuthFailure changelist loads (200) for a superuser."""
+    AppAuthFailure.objects.create(
+        ip="1.2.3.4", key_id="android-v1", reason="bad_sig", count=3
+    )
+    admin = django_user_model.objects.create_superuser(
+        username="admin", email="admin@example.com", password="pw"
+    )
+    client.force_login(admin)
+
+    response = client.get("/admin/mobile/appauthfailure/")
+    assert response.status_code == 200

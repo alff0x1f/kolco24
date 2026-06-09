@@ -192,12 +192,13 @@ the neutral `"Forbidden"`).
 **Files:**
 - Modify: `src/apps/mobile/admin.py`
 
-- [ ] Register `AppAuthFailure` with `list_display = ("ip", "key_id", "reason", "count", "last_seen",
+- [x] Register `AppAuthFailure` with `list_display = ("ip", "key_id", "reason", "count", "last_seen",
       "last_path")`, `list_filter = ("reason", "key_id")`, `ordering = ("-count",)`, `search_fields =
       ("ip", "key_id")`, all fields `readonly_fields`, and `has_add/change/delete_permission → False`
-- [ ] Write a test (or extend an admin test if one exists) that the admin changelist for
-      `AppAuthFailure` loads (200) for a staff user — skip if the suite has no admin tests pattern
-- [ ] run tests - must pass before next task
+- [x] Write a test (or extend an admin test if one exists) that the admin changelist for
+      `AppAuthFailure` loads (200) for a staff user — added
+      `test_appauthfailure_admin_changelist_loads` (superuser)
+- [x] run tests - must pass before next task
 
 ### Task 6: Verify acceptance criteria
 - [ ] All `/app/*` 403s now produce a `WARNING` log + an aggregated `AppAuthFailure` row keyed by
