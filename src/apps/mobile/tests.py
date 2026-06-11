@@ -408,7 +408,7 @@ def test_legend_valid_signature_returns_200_with_fields_and_order(client, settin
     assert data["race"] == race.id
     assert [c["number"] for c in data["checkpoints"]] == [1, 2, 3]
     first = data["checkpoints"][0]
-    assert set(first.keys()) == {"number", "cost", "type", "description"}
+    assert set(first.keys()) == {"id", "number", "cost", "type", "description"}
     assert first["type"] == "kp"
     assert first["description"] == "first"
 
@@ -1058,7 +1058,7 @@ TEAM_FIELDS = {
     "finish_time",
     "members",
 }
-MEMBER_FIELDS = {"name", "birth", "number_in_team"}
+MEMBER_FIELDS = {"name", "number_in_team"}
 
 
 @pytest.mark.django_db

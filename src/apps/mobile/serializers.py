@@ -27,12 +27,12 @@ class RaceListSerializer(serializers.ModelSerializer):
 class LegendCheckpointSerializer(serializers.ModelSerializer):
     """Public legend view of a checkpoint.
 
-    Never exposes ``id``/``iterator``/``year``.
+    Never exposes ``iterator``/``year``.
     """
 
     class Meta:
         model = Checkpoint
-        fields = ["number", "cost", "type", "description"]
+        fields = ["id", "number", "cost", "type", "description"]
 
 
 class MemberSerializer(serializers.ModelSerializer):
@@ -40,15 +40,15 @@ class MemberSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Athlet
-        fields = ["name", "birth", "number_in_team"]
+        fields = ["name", "number_in_team"]
 
 
 class TeamSerializer(serializers.ModelSerializer):
     """Mobile view of a team with its nested member composition.
 
     ``members`` prefers the prefetched ``athlet_set`` (new storage); if that
-    set is empty it falls back to the legacy ``athlet1..6`` / ``birth1..6``
-    columns that the existing web UI still writes to.  The fallback keeps
+    set is empty it falls back to the legacy ``athlet1..6`` columns that the
+    existing web UI still writes to.  The fallback keeps
     member data visible until every team is stored in the ``Athlet`` table.
     """
 
@@ -60,16 +60,15 @@ class TeamSerializer(serializers.ModelSerializer):
         athlets = list(team.athlet_set.all())
         if athlets:
             return MemberSerializer(athlets, many=True).data
-        # Fall back to legacy athlet1..6 / birth1..6 columns.
+        # Fall back to legacy athlet1..6 columns.
         # Cap at ucount so slots above the active roster (stale after a size
         # reduction — the web form hides but does not clear those inputs) are
         # not exposed.
         result = []
         for i in range(1, min(team.ucount, 6) + 1):
             name = getattr(team, f"athlet{i}", "")
-            birth = getattr(team, f"birth{i}", 0)
             if name:
-                result.append({"name": name, "birth": birth, "number_in_team": i})
+                result.append({"name": name, "number_in_team": i})
         return result
 
     class Meta:
