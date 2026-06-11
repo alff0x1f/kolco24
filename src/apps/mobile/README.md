@@ -73,8 +73,12 @@ Read-only API для iOS/Android-приложения. Без регистрац
 
 Считается дёшево, без сериализации данных:
 
-- **teams**: `hash(MAX(Team.updated_at), COUNT(*))` по командам гонки. Добавили
-  команду → вырос `COUNT`; отредактировали → сдвинулся `MAX(updated_at)`.
+- **teams**: `hash(MAX(Team.updated_at), COUNT(*))` по командам гонки **плюс**
+  агрегаты по участникам (`Athlet`) и категориям (`Category`) — в ответ teams
+  встроен и список категорий гонки, поэтому переименование/реордер/добавление/
+  удаление категории тоже двигает версию (`MAX(Category.updated_at)` +
+  `COUNT`). Добавили команду → вырос `COUNT`; отредактировали → сдвинулся
+  `MAX(updated_at)`.
 - **legend / races**: аналогично по `MAX(updated_at), COUNT` соответствующих
   строк.
 
@@ -91,10 +95,18 @@ ETag оборачивается в кавычки (часть синтаксис
 
 ← 200 OK
    ETag: "a1b2c3"
-   {"race": 8, "teams": [ …весь список… ]}
+   {"race": 8, "categories": [ …категории гонки… ], "teams": [ …весь список… ]}
 ```
 
 Клиент сохраняет локально тело **и** строку `"a1b2c3"`.
+
+Блок `categories` едет **внутри** ответа teams (отдельного эндпоинта нет):
+каждая категория — `id`/`code`/`short_name`/`name`/`order`, отсортированы по
+`order, id`. Включаются **все** категории гонки, в том числе `is_active=False`
+(команда может ссылаться на снятую категорию — её `category2`-id должен
+резолвиться); само поле `is_active` не отдаётся. Изменение списка категорий
+двигает тот же `versions.teams` / ETag teams — отдельного `versions.categories`
+нет.
 
 **2. Фоновый опрос — ничего не поменялось:**
 
@@ -121,7 +133,7 @@ ETag оборачивается в кавычки (часть синтаксис
 
 ← 200 OK
    ETag: "d4e5f6"               ← новая версия
-   {"race": 8, "teams": [ …обновлённый список… ]}
+   {"race": 8, "categories": [ … ], "teams": [ …обновлённый список… ]}
 ```
 
 ETag не совпал → полный свежий payload + новый ETag. Клиент перезаписывает копию
@@ -311,7 +323,7 @@ ETag/`If-None-Match` на ресурсах остаётся (см. выше) —
 | Метод | Путь | Имя | Отдаёт |
 |-------|------|-----|--------|
 | GET | `/app/races/` | `mobile:races` | список гонок (лёгкий: id, slug, name, date, reg_status, флаги `is_*`) |
-| GET | `/app/race/<id>/teams/` | `mobile:teams` | команды гонки |
+| GET | `/app/race/<id>/teams/` | `mobile:teams` | команды гонки + категории (`categories`) |
 | GET | `/app/race/<id>/legend/` | `mobile:legend` | КП + NFC-метки |
 | GET | `/app/race/<id>/sync/` | `mobile:sync` | манифест: версии ресурсов + `data_source`/`lease_expires_at` |
 
@@ -322,8 +334,11 @@ ETag/`If-None-Match` на ресурсах остаётся (см. выше) —
 > **Статус:** реализованы `mobile:races`, `mobile:legend` (с `ETag`/`If-None-Match`
 > → 304; пока без `tags`), `mobile:teams` (с `ETag`/`If-None-Match` → 304) и
 > `mobile:sync`. Отпечаток `teams` считается по
-> `MAX(Team.updated_at)`/`MAX(Athlet.updated_at)`/`COUNT` (поле `Athlet.updated_at`
-> добавлено, чтобы переименование участника сдвигало версию). Отпечаток `legend` —
+> `MAX(Team.updated_at)`/`MAX(Athlet.updated_at)`/`COUNT` команд и участников
+> **плюс** `MAX(Category.updated_at)`/`COUNT(Category)` по категориям гонки
+> (поле `Athlet.updated_at` добавлено, чтобы переименование участника сдвигало
+> версию; `Category.updated_at` — миграция `0078` — чтобы правка встроенного в
+> ответ списка категорий тоже двигала версию). Отпечаток `legend` —
 > `MAX(Checkpoint.updated_at)|COUNT|is_legend_visible` по **draft-исключённому**
 > набору КП (поле `Checkpoint.updated_at` добавлено миграцией `0077` по той же
 > причине, что и `Athlet.updated_at` — ловить правки на месте). Теги

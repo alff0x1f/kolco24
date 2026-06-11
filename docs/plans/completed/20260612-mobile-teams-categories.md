@@ -170,13 +170,17 @@ Key decisions:
 - Modify: `src/apps/mobile/README.md` (if it describes the teams response)
 - Modify: `CLAUDE.md`
 
-- [ ] `API.md`: document the `categories` block in the teams endpoint (fields,
-      `order, id` ordering, "includes inactive categories" note)
-- [ ] `README.md`: update the teams response example if present
-- [ ] `CLAUDE.md`: update the `apps.mobile` teams-endpoint shape and the
+- [x] `API.md`: document the `categories` block in the teams endpoint (fields,
+      `order, id` ordering, "includes inactive categories" note) — no `API.md`
+      exists in `apps/mobile`; the app's doc surface is `README.md`, so this was
+      documented there instead (categories block, fields, ordering, inactive note)
+- [x] `README.md`: update the teams response example if present (added the
+      `categories` key to the example payloads, the teams fingerprint formula,
+      the endpoint table, and the status block)
+- [x] `CLAUDE.md`: update the `apps.mobile` teams-endpoint shape and the
       `teams_version` formula; add `Category` to the `update_fields` discipline
       list; mention migration `0078`
-- [ ] move this plan to `docs/plans/completed/`
+- [x] move this plan to `docs/plans/completed/`
 
 ## Post-Completion
 
