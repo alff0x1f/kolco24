@@ -137,24 +137,24 @@ Key decisions:
 - Modify: `src/apps/mobile/views.py`
 - Modify: `src/apps/mobile/tests.py`
 
-- [ ] add `CategorySerializer` (ModelSerializer over `website.models.race.Category`,
+- [x] add `CategorySerializer` (ModelSerializer over `website.models.race.Category`,
       fields `["id", "code", "short_name", "name", "order"]`) to
       `src/apps/mobile/serializers.py`
-- [ ] in `TeamsView.get`, build
+- [x] in `TeamsView.get`, build
       `Category.objects.filter(race=race).order_by("order", "id")` (no
       `is_active` filter) and return
       `{"race": race_id, "categories": [...], "teams": [...]}`; leave the
       `If-None-Match` short-circuit untouched (no queryset evaluation on 304)
-- [ ] update the `TeamsView` docstring
-- [ ] write test: `categories` present with exactly the 5 expected fields,
+- [x] update the `TeamsView` docstring
+- [x] write test: `categories` present with exactly the 5 expected fields,
       sorted by `order, id`
-- [ ] write test: a deactivated (`is_active=False`) category referenced by a
+- [x] write test: a deactivated (`is_active=False`) category referenced by a
       team appears in `categories`
-- [ ] write test: ETag/304 interplay — after a category rename a stale
+- [x] write test: ETag/304 interplay — after a category rename a stale
       `If-None-Match` gets `200` with the new list, the fresh ETag gets `304`
-- [ ] write test: sync manifest `versions.teams` equals the bare teams ETag and
+- [x] write test: sync manifest `versions.teams` equals the bare teams ETag and
       moves after a category edit
-- [ ] run `uv run pytest src/apps/mobile/tests.py --reuse-db` — must pass before task 3
+- [x] run `uv run pytest src/apps/mobile/tests.py --reuse-db` — must pass before task 3
 
 ### Task 3: Verify acceptance criteria
 

@@ -4,7 +4,7 @@ from rest_framework import serializers
 
 from website.models.checkpoint import Checkpoint
 from website.models.models import Athlet, Team
-from website.models.race import Race
+from website.models.race import Category, Race
 
 
 class RaceListSerializer(serializers.ModelSerializer):
@@ -33,6 +33,20 @@ class LegendCheckpointSerializer(serializers.ModelSerializer):
     class Meta:
         model = Checkpoint
         fields = ["id", "number", "cost", "type", "description"]
+
+
+class CategorySerializer(serializers.ModelSerializer):
+    """Mobile view of a race category (display + filter only).
+
+    Exposes just the fields the app needs to resolve a team's ``category2`` id
+    into a label and build a category filter — no ``is_active`` (the list
+    intentionally includes inactive categories so a team's id still resolves),
+    no ``description`` or size fields (YAGNI).
+    """
+
+    class Meta:
+        model = Category
+        fields = ["id", "code", "short_name", "name", "order"]
 
 
 class MemberSerializer(serializers.ModelSerializer):
