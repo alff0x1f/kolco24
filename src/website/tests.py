@@ -1874,7 +1874,7 @@ def _confirm_payment(user, team, paid_for, cost_per_person=1500):
         payment.save(update_fields=["order"])
         team.paid_people += paid_for
         team.paid_sum += amount
-        team.save(update_fields=["paid_people", "paid_sum"])
+        team.save(update_fields=["paid_people", "paid_sum", "updated_at"])
 
         category = team.category2
         race = category.race if category else None
@@ -2387,3 +2387,34 @@ def test_custom_500_page_renders_standalone():
     html = get_template("500.html").render({})
     assert "Что-то сломалось на дистанции" in html
     assert "<!doctype html>" in html.lower()
+
+
+@pytest.mark.django_db
+def test_athlet_updated_at_populated_and_advances():
+    from website.models.models import Athlet
+
+    user = User.objects.create_user(username="ath_owner", password="x")
+    athlet = Athlet.objects.create(owner=user, name="Ivan", birth=1990)
+    assert athlet.updated_at is not None
+
+    first = athlet.updated_at
+    athlet.name = "Ivan Renamed"
+    athlet.save()
+    athlet.refresh_from_db()
+    assert athlet.updated_at > first
+
+
+@pytest.mark.django_db
+def test_checkpoint_updated_at_populated_and_advances():
+    from website.models.checkpoint import Checkpoint
+    from website.models.race import Race
+
+    race = Race.objects.create(name="CP test", slug="cp-updated-at")
+    cp = Checkpoint.objects.create(race=race, number=1, cost=1, description="first")
+    assert cp.updated_at is not None
+
+    first = cp.updated_at
+    cp.description = "updated"
+    cp.save()
+    cp.refresh_from_db()
+    assert cp.updated_at > first

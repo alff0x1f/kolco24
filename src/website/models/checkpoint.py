@@ -18,6 +18,7 @@ class Checkpoint(models.Model):
         choices=CheckpointType.choices,
         default="kp",
     )
+    updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
         return f"КП {self.number}-{self.cost} ({self.race})"

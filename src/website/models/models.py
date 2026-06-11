@@ -327,8 +327,8 @@ class TeamMemberMove(models.Model):
         self.to_team.paid_people += self.moved_people
 
         with transaction.atomic():
-            self.from_team.save(update_fields=["paid_people"])
-            self.to_team.save(update_fields=["paid_people"])
+            self.from_team.save(update_fields=["paid_people", "updated_at"])
+            self.to_team.save(update_fields=["paid_people", "updated_at"])
             from .race import RegStatus
 
             category = self.to_team.category2
@@ -441,6 +441,8 @@ class Athlet(models.Model):
     birth = models.IntegerField(default=0)
     number_in_team = models.IntegerField(default=0)
     paid = models.FloatField(default=0)
+
+    updated_at = models.DateTimeField(auto_now=True)
 
     def new_athlet(self, user, team, name, birth=-1):
         if user.is_authenticated:

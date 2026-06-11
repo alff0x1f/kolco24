@@ -10,6 +10,8 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/2.0/ref/settings/
 """
 
+import json
+import logging
 import os
 
 from dotenv import load_dotenv
@@ -41,6 +43,35 @@ SBP_INFO = {
 }
 
 CONTRIBUTORS_API_TOKEN = os.getenv("CONTRIBUTORS_API_TOKEN")
+
+# Mobile app signed endpoints (apps.mobile): keyed HMAC secrets + replay window.
+# MOBILE_APP_KEYS is a JSON map of key-id -> shared secret; the client sends an
+# X-App-Key-Id header selecting which secret signed the request. Holding >=2 keys
+# at once enables zero-downtime secret rotation aligned with app releases. A
+# missing or malformed env yields {} (fail closed: every request 403), and only
+# non-empty string secrets are kept.
+_raw_mobile_keys = os.getenv("MOBILE_APP_KEYS", "")
+try:
+    _parsed_mobile_keys = json.loads(_raw_mobile_keys) if _raw_mobile_keys else {}
+except (json.JSONDecodeError, AttributeError):
+    _parsed_mobile_keys = {}
+if not isinstance(_parsed_mobile_keys, dict):
+    _parsed_mobile_keys = {}
+MOBILE_APP_KEYS = {
+    k: v for k, v in _parsed_mobile_keys.items() if isinstance(v, str) and v
+}
+# Be loud when a non-empty env produced no usable keys — malformed JSON (the
+# except branch above), wrong top-level shape, or all-blank/non-string secrets.
+# Only warn when the env var was actually set, so the legit "MOBILE_APP_KEYS
+# unset" config stays silent instead of crying wolf on every server start.
+if _raw_mobile_keys and not MOBILE_APP_KEYS:
+    logging.getLogger("config.settings").warning(
+        "MOBILE_APP_KEYS malformed or empty; all /app/* requests will 403"
+    )
+MOBILE_APP_TS_WINDOW = 300
+# Data source advertised by the /app/race/<id>/sync/ manifest. "cloud" → no
+# lease (lease_expires_at: null); a local-race server would set "local".
+MOBILE_DATA_SOURCE = os.getenv("MOBILE_DATA_SOURCE", "cloud")
 
 EMAIL_BACKEND = "mailer.backend.DbBackend"
 
@@ -81,6 +112,7 @@ INSTALLED_APPS = [
     "mailer",
     "apps.race",
     "apps.accounts",
+    "apps.mobile",
 ]
 
 MIDDLEWARE = [

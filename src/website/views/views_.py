@@ -294,6 +294,7 @@ class TeamsTimesView(View):
                     fields.append("finish_time")
 
                 if fields:
+                    fields.append("updated_at")
                     team.save(update_fields=fields)
 
             return JsonResponse(

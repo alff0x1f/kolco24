@@ -203,7 +203,7 @@ class EditTeamView(View):
             return HttpResponse("Команду нельзя удалить", status=400)
 
         team.is_deleted = True
-        team.save(update_fields=["is_deleted"])
+        team.save(update_fields=["is_deleted", "updated_at"])
 
         return HttpResponseRedirect(
             reverse("my_teams", args=[team.category2.race.slug])
