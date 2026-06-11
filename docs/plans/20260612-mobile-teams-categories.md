@@ -158,10 +158,10 @@ Key decisions:
 
 ### Task 3: Verify acceptance criteria
 
-- [ ] verify the response shape is additive (existing `race`/`teams` unchanged)
-- [ ] verify the 304 path serializes nothing (no `categories` query on 304)
-- [ ] run full test suite: `uv run pytest`
-- [ ] run `make format && make lint`
+- [x] verify the response shape is additive (existing `race`/`teams` unchanged)
+- [x] verify the 304 path serializes nothing (no `categories` query on 304)
+- [x] run full test suite: `uv run pytest` (474 passed)
+- [x] run `make format && make lint` (all checks passed)
 
 ### Task 4: [Final] Update documentation
 
