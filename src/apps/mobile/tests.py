@@ -844,7 +844,7 @@ def _make_race_with_category(name="Versioned race", slug="versioned-race"):
 
 
 @pytest.mark.django_db
-def test_teams_version_stable_for_empty_race():
+def test_teams_version_stable_for_race_with_no_teams():
     from apps.mobile.versioning import teams_version
 
     race, _ = _make_race_with_category()
@@ -939,6 +939,20 @@ def test_teams_version_changes_when_category_deleted():
     extra = Category.objects.create(code="sport", name="Sport", race=race)
     before = teams_version(race.id)
     extra.delete()
+    after = teams_version(race.id)
+    assert before != after
+
+
+@pytest.mark.django_db
+def test_teams_version_changes_when_category_deactivated():
+    from apps.mobile.versioning import teams_version
+    from website.models.race import Category
+
+    race, _ = _make_race_with_category()
+    extra = Category.objects.create(code="sport", name="Sport", race=race)
+    before = teams_version(race.id)
+    extra.is_active = False
+    extra.save()
     after = teams_version(race.id)
     assert before != after
 
@@ -1163,6 +1177,21 @@ def test_team_serializer_category2_null_when_unset(django_user_model):
     team = Team.objects.create(owner=user, category2=None, teamname="Foxtrot")
     data = TeamSerializer(team).data
     assert data["category2"] is None
+
+
+@pytest.mark.django_db
+def test_category_serializer_output_keys_match_spec():
+    from apps.mobile.serializers import CategorySerializer
+
+    race, category = _make_race_with_category(slug="ser-cat-keys")
+    category.short_name = "O"
+    category.order = 3
+    category.save()
+    data = CategorySerializer(category).data
+    assert set(data.keys()) == {"id", "code", "short_name", "name", "order"}
+    assert data["short_name"] == "O"
+    assert data["order"] == 3
+    assert "is_active" not in data
 
 
 # --- TeamsView request-level ------------------------------------------------
@@ -1579,9 +1608,12 @@ def test_teams_categories_include_inactive(client, settings, django_user_model):
     response = client.get(path, **_signed_headers("GET", path, SECRET))
 
     assert response.status_code == 200
-    codes = [c["code"] for c in response.json()["categories"]]
+    cats = response.json()["categories"]
+    codes = [c["code"] for c in cats]
+    ids = [c["id"] for c in cats]
     assert set(codes) == {"open", "legacy"}
-    assert active.id and dead.id
+    assert active.id in ids
+    assert dead.id in ids
 
 
 @pytest.mark.django_db

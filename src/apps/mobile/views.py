@@ -177,7 +177,7 @@ class TeamsView(AppAPIView):
     """
 
     def get(self, request, race_id):
-        race = get_object_or_404(Race, pk=race_id, is_published=True)
+        get_object_or_404(Race, pk=race_id, is_published=True)
         quoted = f'"{teams_version(race_id)}"'
 
         if request.headers.get("If-None-Match") == quoted:
@@ -185,9 +185,9 @@ class TeamsView(AppAPIView):
             resp["ETag"] = quoted
             return resp
 
-        categories = Category.objects.filter(race=race).order_by("order", "id")
+        categories = Category.objects.filter(race_id=race_id).order_by("order", "id")
         teams = (
-            Team.objects.filter(category2__race=race)
+            Team.objects.filter(category2__race_id=race_id)
             .order_by("id")
             .prefetch_related(
                 Prefetch(
