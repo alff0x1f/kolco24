@@ -114,21 +114,21 @@ Key decisions:
 - Modify: `src/apps/mobile/versioning.py`
 - Modify: `src/apps/mobile/tests.py`
 
-- [ ] add `updated_at = DateTimeField(auto_now=True)` to `Category`
+- [x] add `updated_at = DateTimeField(auto_now=True)` to `Category`
       (`src/website/models/race.py`), mirroring `Athlet`/`Checkpoint`
-- [ ] generate migration `0078_category_updated_at`
+- [x] generate migration `0078_category_updated_at`
       (`uv run python src/manage.py makemigrations website`)
-- [ ] in `teams_version` add the third aggregate
+- [x] in `teams_version` add the third aggregate
       `Category.objects.filter(race_id=race_id).aggregate(max_updated=Max("updated_at"), count=Count("id"))`
       and append `|{max_updated}|{count}` to `raw`; import `Category`
-- [ ] update the `teams_version` docstring (formula, what moves it: category
+- [x] update the `teams_version` docstring (formula, what moves it: category
       rename/reorder via `updated_at`, add/delete via `COUNT`) and the module
       docstring if needed
-- [ ] write test: fingerprint moves on category rename, on category add, on
+- [x] write test: fingerprint moves on category rename, on category add, on
       category delete
-- [ ] write test: race with zero categories → stable fingerprint, no crash
+- [x] write test: race with zero categories → stable fingerprint, no crash
       (`None` aggregate path)
-- [ ] run `uv run pytest src/apps/mobile/tests.py --reuse-db` — must pass before task 2
+- [x] run `uv run pytest src/apps/mobile/tests.py --reuse-db` — must pass before task 2
 
 ### Task 2: `CategorySerializer` + embed `categories` in `TeamsView`
 

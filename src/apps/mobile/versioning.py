@@ -18,17 +18,25 @@ from django.db.models import Count, Max
 from website.models.checkpoint import Checkpoint
 from website.models.enums import CheckpointType
 from website.models.models import Athlet, Team
-from website.models.race import Race
+from website.models.race import Category, Race
 
 
 def teams_version(race_id):
-    """Return a short, stable fingerprint of a race's teams + members.
+    """Return a short, stable fingerprint of a race's teams + members + categories.
 
-    Combines ``MAX(Team.updated_at)|MAX(Athlet.updated_at)|COUNT(Athlet)|COUNT(Team)``
+    Combines
+    ``MAX(Team.updated_at)|MAX(Athlet.updated_at)|COUNT(Athlet)|COUNT(Team)|MAX(Category.updated_at)|COUNT(Category)``
     (``TeamManager`` already excludes ``is_deleted``) so a team edit, a member
     rename, a member add/remove, or a team add/remove all move the fingerprint.
     Teams with ``category2=None`` are out of scope (a race owns teams via
     ``category2.race``) and excluded by the filter.
+
+    Categories are folded in because they ride inside the teams response (no
+    separate ``versions.categories``): a category **rename/reorder** moves
+    ``MAX(Category.updated_at)`` (its ``updated_at`` is ``auto_now``) and a
+    category **add/delete** moves ``COUNT(Category)``. The category aggregate is
+    over ``Category.objects.filter(race_id=race_id)`` with **no ``is_active``
+    filter** — the exact queryset the view serves (single-source contract).
 
     None aggregates (empty race) render as the literal ``"None"`` → stable,
     non-crashing. Returns **bare** hex (no quotes).
@@ -43,9 +51,14 @@ def teams_version(race_id):
         max_updated=Max("updated_at"),
         count=Count("id"),
     )
+    categories = Category.objects.filter(race_id=race_id).aggregate(
+        max_updated=Max("updated_at"),
+        count=Count("id"),
+    )
     raw = (
         f"{teams['max_updated']}|{members['max_updated']}"
         f"|{members['count']}|{teams['count']}"
+        f"|{categories['max_updated']}|{categories['count']}"
     )
     return hashlib.blake2b(raw.encode(), digest_size=8).hexdigest()
 

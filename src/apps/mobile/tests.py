@@ -906,6 +906,55 @@ def test_teams_version_changes_when_athlet_renamed(django_user_model):
     assert before != after
 
 
+@pytest.mark.django_db
+def test_teams_version_changes_when_category_renamed():
+    from apps.mobile.versioning import teams_version
+
+    race, category = _make_race_with_category()
+    before = teams_version(race.id)
+    category.name = "Open renamed"
+    category.save()
+    after = teams_version(race.id)
+    assert before != after
+
+
+@pytest.mark.django_db
+def test_teams_version_changes_when_category_added():
+    from apps.mobile.versioning import teams_version
+    from website.models.race import Category
+
+    race, _ = _make_race_with_category()
+    before = teams_version(race.id)
+    Category.objects.create(code="sport", name="Sport", race=race)
+    after = teams_version(race.id)
+    assert before != after
+
+
+@pytest.mark.django_db
+def test_teams_version_changes_when_category_deleted():
+    from apps.mobile.versioning import teams_version
+    from website.models.race import Category
+
+    race, _ = _make_race_with_category()
+    extra = Category.objects.create(code="sport", name="Sport", race=race)
+    before = teams_version(race.id)
+    extra.delete()
+    after = teams_version(race.id)
+    assert before != after
+
+
+@pytest.mark.django_db
+def test_teams_version_stable_for_race_with_zero_categories():
+    from apps.mobile.versioning import teams_version
+    from website.models.race import Race
+
+    race = Race.objects.create(name="No categories", slug="no-categories")
+    first = teams_version(race.id)
+    second = teams_version(race.id)
+    assert first == second
+    assert first  # non-empty, no crash on None aggregate
+
+
 # --- legend_version fingerprint ---------------------------------------------
 
 
