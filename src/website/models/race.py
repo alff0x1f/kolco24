@@ -9,6 +9,7 @@ from django.db.models import (
     BooleanField,
     CharField,
     DateField,
+    DateTimeField,
     ForeignKey,
     IntegerField,
     Manager,
@@ -250,6 +251,7 @@ class Category(Model):
     min_people = IntegerField("Минимум участников", default=2)
     max_people = IntegerField("Максимум участников", default=6)
     people_limit = IntegerField("Лимит участников", default=0)  # 0 = без лимита
+    updated_at = DateTimeField(auto_now=True)
 
     class Meta:
         verbose_name = "Категория"

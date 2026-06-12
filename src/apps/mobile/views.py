@@ -19,11 +19,16 @@ from rest_framework.views import APIView
 from website.models.checkpoint import Checkpoint
 from website.models.enums import CheckpointType
 from website.models.models import Athlet, Team
-from website.models.race import Race
+from website.models.race import Category, Race
 
 from .models import AppAuthFailure, AppInstall
 from .permissions import SignedAppPermission
-from .serializers import LegendCheckpointSerializer, RaceListSerializer, TeamSerializer
+from .serializers import (
+    CategorySerializer,
+    LegendCheckpointSerializer,
+    RaceListSerializer,
+    TeamSerializer,
+)
 from .versioning import legend_state, legend_version, teams_version
 
 logger = logging.getLogger(__name__)
@@ -156,15 +161,23 @@ class LegendView(AppAPIView):
 
 
 class TeamsView(AppAPIView):
-    """Return a race's full team list with nested members (conditional GET).
+    """Return a race's teams + members + categories (conditional GET).
+
+    The response is ``{"race": id, "categories": [...], "teams": [...]}``. The
+    ``categories`` block rides inside this resource (no separate endpoint) so the
+    app can resolve a team's ``category2`` id into a label and build a filter; it
+    lists **all** of the race's categories ordered ``order, id`` — including
+    ``is_active=False`` ones, since a team may still reference a deactivated
+    category (``is_active`` itself is not exposed).
 
     The ETag is the bare :func:`teams_version` fingerprint wrapped in quotes;
-    a matching ``If-None-Match`` short-circuits to an empty ``304`` before any
-    serialization.
+    category state is folded into that fingerprint, so a category rename/reorder
+    or add/delete moves it too. A matching ``If-None-Match`` short-circuits to an
+    empty ``304`` before any serialization of either queryset.
     """
 
     def get(self, request, race_id):
-        race = get_object_or_404(Race, pk=race_id, is_published=True)
+        get_object_or_404(Race, pk=race_id, is_published=True)
         quoted = f'"{teams_version(race_id)}"'
 
         if request.headers.get("If-None-Match") == quoted:
@@ -172,8 +185,9 @@ class TeamsView(AppAPIView):
             resp["ETag"] = quoted
             return resp
 
+        categories = Category.objects.filter(race_id=race_id).order_by("order", "id")
         teams = (
-            Team.objects.filter(category2__race=race)
+            Team.objects.filter(category2__race_id=race_id)
             .order_by("id")
             .prefetch_related(
                 Prefetch(
@@ -183,7 +197,11 @@ class TeamsView(AppAPIView):
             )
         )
         resp = Response(
-            {"race": race_id, "teams": TeamSerializer(teams, many=True).data}
+            {
+                "race": race_id,
+                "categories": CategorySerializer(categories, many=True).data,
+                "teams": TeamSerializer(teams, many=True).data,
+            }
         )
         resp["ETag"] = quoted
         return resp

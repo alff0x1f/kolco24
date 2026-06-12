@@ -408,7 +408,7 @@ def test_legend_valid_signature_returns_200_with_fields_and_order(client, settin
     assert data["race"] == race.id
     assert [c["number"] for c in data["checkpoints"]] == [1, 2, 3]
     first = data["checkpoints"][0]
-    assert set(first.keys()) == {"number", "cost", "type", "description"}
+    assert set(first.keys()) == {"id", "number", "cost", "type", "description"}
     assert first["type"] == "kp"
     assert first["description"] == "first"
 
@@ -844,7 +844,7 @@ def _make_race_with_category(name="Versioned race", slug="versioned-race"):
 
 
 @pytest.mark.django_db
-def test_teams_version_stable_for_empty_race():
+def test_teams_version_stable_for_race_with_no_teams():
     from apps.mobile.versioning import teams_version
 
     race, _ = _make_race_with_category()
@@ -904,6 +904,69 @@ def test_teams_version_changes_when_athlet_renamed(django_user_model):
     athlet.save()
     after = teams_version(race.id)
     assert before != after
+
+
+@pytest.mark.django_db
+def test_teams_version_changes_when_category_renamed():
+    from apps.mobile.versioning import teams_version
+
+    race, category = _make_race_with_category()
+    before = teams_version(race.id)
+    category.name = "Open renamed"
+    category.save()
+    after = teams_version(race.id)
+    assert before != after
+
+
+@pytest.mark.django_db
+def test_teams_version_changes_when_category_added():
+    from apps.mobile.versioning import teams_version
+    from website.models.race import Category
+
+    race, _ = _make_race_with_category()
+    before = teams_version(race.id)
+    Category.objects.create(code="sport", name="Sport", race=race)
+    after = teams_version(race.id)
+    assert before != after
+
+
+@pytest.mark.django_db
+def test_teams_version_changes_when_category_deleted():
+    from apps.mobile.versioning import teams_version
+    from website.models.race import Category
+
+    race, _ = _make_race_with_category()
+    extra = Category.objects.create(code="sport", name="Sport", race=race)
+    before = teams_version(race.id)
+    extra.delete()
+    after = teams_version(race.id)
+    assert before != after
+
+
+@pytest.mark.django_db
+def test_teams_version_changes_when_category_deactivated():
+    from apps.mobile.versioning import teams_version
+    from website.models.race import Category
+
+    race, _ = _make_race_with_category()
+    extra = Category.objects.create(code="sport", name="Sport", race=race)
+    before = teams_version(race.id)
+    extra.is_active = False
+    extra.save()
+    after = teams_version(race.id)
+    assert before != after
+
+
+@pytest.mark.django_db
+def test_teams_version_stable_for_race_with_zero_categories():
+    from apps.mobile.versioning import teams_version
+    from website.models.race import Race
+
+    race = Race.objects.create(name="No categories", slug="no-categories")
+    first = teams_version(race.id)
+    second = teams_version(race.id)
+    assert first == second
+    assert first  # non-empty, no crash on None aggregate
 
 
 # --- legend_version fingerprint ---------------------------------------------
@@ -1058,7 +1121,7 @@ TEAM_FIELDS = {
     "finish_time",
     "members",
 }
-MEMBER_FIELDS = {"name", "birth", "number_in_team"}
+MEMBER_FIELDS = {"name", "number_in_team"}
 
 
 @pytest.mark.django_db
@@ -1114,6 +1177,21 @@ def test_team_serializer_category2_null_when_unset(django_user_model):
     team = Team.objects.create(owner=user, category2=None, teamname="Foxtrot")
     data = TeamSerializer(team).data
     assert data["category2"] is None
+
+
+@pytest.mark.django_db
+def test_category_serializer_output_keys_match_spec():
+    from apps.mobile.serializers import CategorySerializer
+
+    race, category = _make_race_with_category(slug="ser-cat-keys")
+    category.short_name = "O"
+    category.order = 3
+    category.save()
+    data = CategorySerializer(category).data
+    assert set(data.keys()) == {"id", "code", "short_name", "name", "order"}
+    assert data["short_name"] == "O"
+    assert data["order"] == 3
+    assert "is_active" not in data
 
 
 # --- TeamsView request-level ------------------------------------------------
@@ -1454,6 +1532,164 @@ def test_teams_excludes_soft_deleted_team(client, settings, django_user_model):
 
     assert response.status_code == 200
     assert response.json()["teams"] == []
+
+
+# --- TeamsView embedded categories ------------------------------------------
+
+CATEGORY_FIELDS = {"id", "code", "short_name", "name", "order"}
+
+
+@pytest.mark.django_db
+def test_teams_categories_present_with_fields_and_order(client, settings):
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    from website.models.race import Category, Race
+
+    race = Race.objects.create(name="Cat race", slug="cat-race")
+    # Insert out of `order` so the response ordering is exercised.
+    Category.objects.create(
+        code="sport", short_name="S", name="Sport", race=race, order=2
+    )
+    Category.objects.create(
+        code="open", short_name="O", name="Open", race=race, order=1
+    )
+
+    path = f"/app/race/{race.id}/teams/"
+    response = client.get(path, **_signed_headers("GET", path, SECRET))
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["race"] == race.id
+    cats = data["categories"]
+    assert [c["code"] for c in cats] == ["open", "sport"]  # by order, id
+    assert set(cats[0].keys()) == CATEGORY_FIELDS
+    assert "is_active" not in cats[0]
+
+
+@pytest.mark.django_db
+def test_teams_categories_order_tiebreak_by_id(client, settings):
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    from website.models.race import Category, Race
+
+    race = Race.objects.create(name="Tie race", slug="tie-race")
+    c1 = Category.objects.create(code="a", name="A", race=race, order=0)
+    c2 = Category.objects.create(code="b", name="B", race=race, order=0)
+
+    path = f"/app/race/{race.id}/teams/"
+    response = client.get(path, **_signed_headers("GET", path, SECRET))
+
+    ids = [c["id"] for c in response.json()["categories"]]
+    assert ids == [c1.id, c2.id]  # equal order → id ascending
+
+
+@pytest.mark.django_db
+def test_teams_categories_include_inactive(client, settings, django_user_model):
+    """A deactivated category referenced by a team is still listed."""
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    from website.models.models import Team
+    from website.models.race import Category, Race
+
+    race = Race.objects.create(name="Inactive cat", slug="inactive-cat")
+    active = Category.objects.create(code="open", name="Open", race=race, order=1)
+    dead = Category.objects.create(
+        code="legacy", name="Legacy", race=race, order=2, is_active=False
+    )
+    user = django_user_model.objects.create_user(
+        username="ic1", email="ic1@example.com", password="x"
+    )
+    Team.objects.create(owner=user, category2=dead, teamname="Old team")
+
+    path = f"/app/race/{race.id}/teams/"
+    response = client.get(path, **_signed_headers("GET", path, SECRET))
+
+    assert response.status_code == 200
+    cats = response.json()["categories"]
+    codes = [c["code"] for c in cats]
+    ids = [c["id"] for c in cats]
+    assert set(codes) == {"open", "legacy"}
+    assert active.id in ids
+    assert dead.id in ids
+
+
+@pytest.mark.django_db
+def test_teams_categories_empty_when_no_categories(client, settings):
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    from website.models.race import Race
+
+    race = Race.objects.create(name="No cats", slug="no-cats-teams")
+    path = f"/app/race/{race.id}/teams/"
+    response = client.get(path, **_signed_headers("GET", path, SECRET))
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["categories"] == []
+    assert data["teams"] == []
+
+
+@pytest.mark.django_db
+def test_teams_category_rename_stale_etag_refetches_then_304(client, settings):
+    """After a category rename a stale If-None-Match gets 200; the fresh one 304s."""
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    race, category = _make_race_with_category(slug="teams-cat-rename")
+
+    path = f"/app/race/{race.id}/teams/"
+    first = client.get(path, **_signed_headers("GET", path, SECRET))
+    old_etag = first["ETag"]
+
+    category.name = "Open renamed"
+    category.save()
+
+    # Stale ETag → fresh 200 with the new name + a new ETag.
+    headers = _signed_headers("GET", path, SECRET)
+    headers["HTTP_IF_NONE_MATCH"] = old_etag
+    second = client.get(path, **headers)
+    assert second.status_code == 200
+    new_etag = second["ETag"]
+    assert new_etag != old_etag
+    assert second.json()["categories"][0]["name"] == "Open renamed"
+
+    # Fresh ETag → 304.
+    headers = _signed_headers("GET", path, SECRET)
+    headers["HTTP_IF_NONE_MATCH"] = new_etag
+    third = client.get(path, **headers)
+    assert third.status_code == 304
+    assert third.content == b""
+
+
+@pytest.mark.django_db
+def test_teams_sync_versions_teams_moves_after_category_edit(client, settings):
+    """versions.teams equals the teams ETag and moves after a category edit."""
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    race, category = _make_race_with_category(slug="teams-cat-sync")
+
+    teams_path = f"/app/race/{race.id}/teams/"
+    sync_path = f"/app/race/{race.id}/sync/"
+
+    teams_resp = client.get(teams_path, **_signed_headers("GET", teams_path, SECRET))
+    sync_resp = client.get(sync_path, **_signed_headers("GET", sync_path, SECRET))
+    before_bare = sync_resp.json()["versions"]["teams"]
+    assert teams_resp["ETag"] == f'"{before_bare}"'
+
+    category.name = "Open renamed"
+    category.save()
+
+    sync_resp2 = client.get(sync_path, **_signed_headers("GET", sync_path, SECRET))
+    after_bare = sync_resp2.json()["versions"]["teams"]
+    assert after_bare != before_bare
+
+    teams_resp2 = client.get(teams_path, **_signed_headers("GET", teams_path, SECRET))
+    assert teams_resp2["ETag"] == f'"{after_bare}"'
 
 
 # --- SyncView request-level -------------------------------------------------
