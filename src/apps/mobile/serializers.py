@@ -90,6 +90,7 @@ class TeamSerializer(serializers.ModelSerializer):
         fields = [
             "id",
             "teamname",
+            "start_number",
             "category2",
             "ucount",
             "paid_people",
