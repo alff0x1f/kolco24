@@ -340,7 +340,7 @@ class TeamMemberMove(models.Model):
                 and race.people_count() >= race.people_limit
             ):
                 race.reg_status = RegStatus.SOLD_OUT
-                race.save(update_fields=["reg_status"])
+                race.save(update_fields=["reg_status", "updated_at"])
 
 
 class TeamAdminLog(models.Model):

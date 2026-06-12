@@ -9,6 +9,11 @@ never disagree.
 ``legend_version`` is the matching single source of truth for the legend
 resource: ``LegendView`` wraps it in quotes for the ``ETag`` and ``SyncView``
 emits the bare value in ``versions.legend``.
+
+``races_version`` is the single source of truth for the global published-races
+list served by ``RaceListView``. It is global (no ``race_id``) and deliberately
+**not** part of the per-race ``SyncView`` manifest — the races list is the
+app's entry point, probed directly via its own conditional GET.
 """
 
 import hashlib
@@ -60,6 +65,28 @@ def teams_version(race_id):
         f"|{members['count']}|{teams['count']}"
         f"|{categories['max_updated']}|{categories['count']}"
     )
+    return hashlib.blake2b(raw.encode(), digest_size=8).hexdigest()
+
+
+def races_version():
+    """Return a short, stable fingerprint of the published-races list.
+
+    Combines ``MAX(Race.updated_at)|COUNT`` over
+    ``Race.objects.filter(is_published=True)`` — the exact queryset
+    ``RaceListView`` serves (single-source contract). An edit to a published
+    race moves ``MAX(updated_at)`` (``auto_now``); a publish/unpublish moves
+    ``COUNT`` (so an unpublish is detected even when the race wasn't the
+    ``MAX``). An edit to an *unpublished* race deliberately does not move the
+    fingerprint — it is not in the response.
+
+    None aggregate (no published races) renders as the literal ``"None"`` →
+    stable, non-crashing. Returns **bare** hex (no quotes).
+    """
+    agg = Race.objects.filter(is_published=True).aggregate(
+        max_updated=Max("updated_at"),
+        count=Count("id"),
+    )
+    raw = f"{agg['max_updated']}|{agg['count']}"
     return hashlib.blake2b(raw.encode(), digest_size=8).hexdigest()
 
 

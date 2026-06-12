@@ -832,6 +832,157 @@ def test_races_tampered_query_string_returns_403(client, settings):
     assert response.status_code == 403
 
 
+@pytest.mark.django_db
+def test_races_response_carries_etag(client, settings):
+    from website.models.race import Race
+
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    Race.objects.create(name="Published", slug="published-race", is_published=True)
+
+    response = client.get(RACES_PATH, **_signed_headers("GET", RACES_PATH, SECRET))
+
+    assert response.status_code == 200
+    etag = response["ETag"]
+    assert etag.startswith('"') and etag.endswith('"')
+
+
+@pytest.mark.django_db
+def test_races_if_none_match_returns_304_empty_body(client, settings):
+    from website.models.race import Race
+
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    Race.objects.create(name="Published", slug="published-race")
+
+    first = client.get(RACES_PATH, **_signed_headers("GET", RACES_PATH, SECRET))
+    etag = first["ETag"]
+
+    headers = _signed_headers("GET", RACES_PATH, SECRET)
+    headers["HTTP_IF_NONE_MATCH"] = etag
+    second = client.get(RACES_PATH, **headers)
+
+    assert second.status_code == 304
+    assert second["ETag"] == etag
+    assert second.content == b""
+    assert AppInstall.objects.get(install_id="install-abc").request_count == 2
+
+
+@pytest.mark.django_db
+def test_races_stale_if_none_match_returns_200_with_new_etag(client, settings):
+    from website.models.race import Race
+
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    race = Race.objects.create(name="Published", slug="published-race")
+
+    first = client.get(RACES_PATH, **_signed_headers("GET", RACES_PATH, SECRET))
+    old_etag = first["ETag"]
+
+    race.name = "Renamed"
+    race.save()
+
+    headers = _signed_headers("GET", RACES_PATH, SECRET)
+    headers["HTTP_IF_NONE_MATCH"] = old_etag
+    second = client.get(RACES_PATH, **headers)
+
+    assert second.status_code == 200
+    assert second["ETag"] != old_etag
+    assert second.json()["races"][0]["name"] == "Renamed"
+
+
+@pytest.mark.django_db
+def test_races_empty_list_carries_etag_and_304(client, settings):
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    first = client.get(RACES_PATH, **_signed_headers("GET", RACES_PATH, SECRET))
+    assert first.status_code == 200
+    assert first.json() == {"races": []}
+    etag = first["ETag"]
+
+    headers = _signed_headers("GET", RACES_PATH, SECRET)
+    headers["HTTP_IF_NONE_MATCH"] = etag
+    second = client.get(RACES_PATH, **headers)
+
+    assert second.status_code == 304
+    assert second["ETag"] == etag
+
+
+# --- races_version fingerprint -----------------------------------------------
+
+
+@pytest.mark.django_db
+def test_races_version_stable_with_no_published_races():
+    from apps.mobile.versioning import races_version
+    from website.models.race import Race
+
+    Race.objects.create(name="Hidden", slug="hidden", is_published=False)
+    assert races_version() == races_version()
+
+
+@pytest.mark.django_db
+def test_races_version_changes_on_publish_and_unpublish():
+    from apps.mobile.versioning import races_version
+    from website.models.race import Race
+
+    race = Race.objects.create(name="Race", slug="race", is_published=False)
+    before = races_version()
+
+    race.is_published = True
+    race.save()
+    published = races_version()
+    assert published != before
+
+    race.is_published = False
+    race.save()
+    assert races_version() != published
+
+
+@pytest.mark.django_db
+def test_races_version_changes_when_published_race_edited():
+    from apps.mobile.versioning import races_version
+    from website.models.race import Race
+
+    race = Race.objects.create(name="Race", slug="race")
+    before = races_version()
+
+    race.place = "New place"
+    race.save()
+    assert races_version() != before
+
+
+@pytest.mark.django_db
+def test_races_version_changes_on_reg_status_update_fields():
+    """The SOLD_OUT flip uses update_fields and must still move the version."""
+    from apps.mobile.versioning import races_version
+    from website.models.race import Race, RegStatus
+
+    race = Race.objects.create(name="Race", slug="race")
+    before = races_version()
+
+    race.reg_status = RegStatus.SOLD_OUT
+    race.save(update_fields=["reg_status", "updated_at"])
+    assert races_version() != before
+
+
+@pytest.mark.django_db
+def test_races_version_ignores_unpublished_race_edit():
+    from apps.mobile.versioning import races_version
+    from website.models.race import Race
+
+    Race.objects.create(name="Published", slug="published")
+    hidden = Race.objects.create(name="Hidden", slug="hidden", is_published=False)
+    before = races_version()
+
+    hidden.place = "Elsewhere"
+    hidden.save()
+    assert races_version() == before
+
+
 # --- teams_version fingerprint ----------------------------------------------
 
 

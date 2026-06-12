@@ -327,11 +327,16 @@ ETag/`If-None-Match` на ресурсах остаётся (см. выше) —
 | GET | `/app/race/<id>/legend/` | `mobile:legend` | КП + NFC-метки |
 | GET | `/app/race/<id>/sync/` | `mobile:sync` | манифест: версии ресурсов + `data_source`/`lease_expires_at` |
 
-Все — наследники `AppAPIView` (подпись + `AppInstall`-статистика); у `teams` и
-`legend` — поддержка `ETag`/`If-None-Match` (304), у `sync` — лёгкий манифест
-версий для фонового обновления (без 304). `races` пока без ETag.
+Все — наследники `AppAPIView` (подпись + `AppInstall`-статистика); у `races`,
+`teams` и `legend` — поддержка `ETag`/`If-None-Match` (304), у `sync` — лёгкий
+манифест версий для фонового обновления (без 304). Версия `races` глобальная
+(`races_version()`, без `race_id`) и сознательно **не входит** в пер-гоночный
+манифест `sync` — список гонок клиент пробует напрямую своим conditional GET
+(это входная точка приложения, до выбора `race_id`).
 
-> **Статус:** реализованы `mobile:races`, `mobile:legend` (с `ETag`/`If-None-Match`
+> **Статус:** реализованы `mobile:races` (с `ETag`/`If-None-Match` → 304;
+> отпечаток — `MAX(Race.updated_at)|COUNT` по published-гонкам, поле
+> `Race.updated_at` — миграция `0079`), `mobile:legend` (с `ETag`/`If-None-Match`
 > → 304; пока без `tags`), `mobile:teams` (с `ETag`/`If-None-Match` → 304) и
 > `mobile:sync`. Отпечаток `teams` считается по
 > `MAX(Team.updated_at)`/`MAX(Athlet.updated_at)`/`COUNT` команд и участников

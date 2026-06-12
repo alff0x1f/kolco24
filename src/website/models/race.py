@@ -61,6 +61,7 @@ class Race(Model):
     is_photo_upload_enabled = BooleanField("Загрузка фото включена", default=False)
 
     people_limit = IntegerField("Лимит участников", default=0)  # 0 = без лимита
+    updated_at = DateTimeField(auto_now=True)
 
     class Meta:
         verbose_name = "Гонка"

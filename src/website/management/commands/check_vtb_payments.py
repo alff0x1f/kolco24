@@ -103,7 +103,7 @@ class Command(BaseCommand):
                     and race.people_count() >= race.people_limit
                 ):
                     race.reg_status = RegStatus.SOLD_OUT
-                    race.save(update_fields=["reg_status"])
+                    race.save(update_fields=["reg_status", "updated_at"])
             payment.status = Payment.STATUS_DONE
             payment.order = payment.pk
             payment.save(update_fields=["status", "order"])
