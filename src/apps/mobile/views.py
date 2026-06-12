@@ -29,7 +29,7 @@ from .serializers import (
     RaceListSerializer,
     TeamSerializer,
 )
-from .versioning import legend_state, legend_version, teams_version
+from .versioning import legend_state, legend_version, races_version, teams_version
 
 logger = logging.getLogger(__name__)
 
@@ -111,11 +111,26 @@ class AppAPIView(APIView):
 
 
 class RaceListView(AppAPIView):
-    """Return the list of published races for the mobile app."""
+    """Return the list of published races for the mobile app (conditional GET).
+
+    The ETag is the bare :func:`races_version` fingerprint wrapped in quotes; a
+    matching ``If-None-Match`` short-circuits to an empty ``304`` before any
+    serialization. The resource is global, so the fingerprint takes no
+    ``race_id`` and is deliberately absent from the per-race ``/sync/`` manifest.
+    """
 
     def get(self, request):
+        quoted = f'"{races_version()}"'
+
+        if request.headers.get("If-None-Match") == quoted:
+            resp = HttpResponseNotModified()
+            resp["ETag"] = quoted
+            return resp
+
         qs = Race.objects.filter(is_published=True)  # Meta.ordering = ["-date"]
-        return Response({"races": RaceListSerializer(qs, many=True).data})
+        resp = Response({"races": RaceListSerializer(qs, many=True).data})
+        resp["ETag"] = quoted
+        return resp
 
 
 class LegendView(AppAPIView):
