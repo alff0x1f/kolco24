@@ -1265,6 +1265,7 @@ def test_legend_version_unchanged_when_draft_checkpoint_edited():
 TEAM_FIELDS = {
     "id",
     "teamname",
+    "start_number",
     "category2",
     "ucount",
     "paid_people",

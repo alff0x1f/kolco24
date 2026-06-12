@@ -5,14 +5,18 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Local environment
 
 **Container runtime**: use `docker`. Start the DB:
+
 ```bash
 docker compose up -d kolco24_db
 ```
 
-**`.env` file**: `src/config/settings.py` loads `src/.env` via `python-dotenv`. Copy from `deploy/kolco24.env.example` and fill in secrets before running the server or tests:
+**`.env` file**: `src/config/settings.py` loads `src/.env` via `python-dotenv`. Copy from `deploy/kolco24.env.example`
+and fill in secrets before running the server or tests:
+
 ```bash
 cp deploy/kolco24.env.example src/.env
 ```
+
 Without `.env`, most env vars will be `None` (DB password, VTB keys, etc.) and tests/server will fail.
 
 ## Commands
@@ -44,53 +48,258 @@ Django 4.2 project. Source lives entirely under `src/`, with `manage.py` at `src
 
 **Apps:**
 
-- `website` — core domain: team registration, race management, payment processing (VTB, Yandex, Sberbank, SBP), checkpoint tracking, athlete profiles. Models are split into files under `src/website/models/`.
+- `website` — core domain: team registration, race management, payment processing (VTB, Yandex, Sberbank, SBP),
+  checkpoint tracking, athlete profiles. Models are split into files under `src/website/models/`.
 - `api` — DRF REST API consumed by the mobile app: member tag scanning, checkpoint events, team CRUD, CSV exports.
 - `donate` — donation flow built on top of `VTBPayment`.
-- `demo` — static HTML mockups served at `/demo/home-multiple/`, `/demo/home-offseason/`, `/demo/home-single/`, `/demo/team-register/` for design review. No models or auth required. Templates live in `src/templates/demo/` (common templates dir), not in the app's own `templates/` folder.
+- `demo` — static HTML mockups served at `/demo/home-multiple/`, `/demo/home-offseason/`, `/demo/home-single/`,
+  `/demo/team-register/` for design review. No models or auth required. Templates live in `src/templates/demo/` (common
+  templates dir), not in the app's own `templates/` folder.
 - `config` — Django project config (settings, urls, wsgi).
-- `apps.accounts` — all authentication (`AppConfig` `label="accounts"`), mounted at `/accounts/*` via `config/urls.py`. Holds the moved password auth (`LoginView`, `RegisterView`, `LogoutUserView`, `impersonate`/`stop_impersonate`, the `CustomPasswordReset*` CBVs, `EmailBackend`, the auth forms, and the private redirect/auth helpers incl. `_safe_redirect`) plus an email-first passwordless flow. URL names stay flat and unchanged (`login`, `register`, `logout`, `password_reset*`, `impersonate`, `stop_impersonate`) — only the paths moved, so `reverse()`/`{% url %}`/`LOGIN_URL` need no changes. `website/auth.py` and `website/forms.py` keep thin re-export shims (`from apps.accounts.backends import EmailBackend`; `from apps.accounts.forms import ...`) so old import sites still work. Templates live in `src/templates/accounts/` (extend `base-2.html`, manual form fields); Django's reset emails stay in `templates/registration/password_reset_email.*`. See the **Auth** note below for the passwordless flow + `EmailVerification` model.
-- `apps.race` — race detail page (`/race/<slug>/`) and the unified teams-list page. **Owns the add-on models + migrations** (`src/apps/race/models.py`, `migrations/` — its first; `0001_initial` declares an explicit `dependencies = [("website", "0072_payment_vtb_payment")]` because the FKs cross into `website`): `RaceExtra`/`TeamExtra`/`PaymentExtra` (see the **Team add-ons** note below). All other models still remain in `website`. Entry points: `src/apps/race/views.py:RacePageView`, `RaceTeamsView`, and `RaceEditView`. Uses `label = "race_app"` in `AppConfig` to avoid Django app-registry collision with the `race` model label. `RacePageView.build_context` is also called by `website.views.views_.AddNewsPostView` via a deferred import to avoid a circular dependency. `RaceTeamsView` (template `src/templates/race/teams.html`, assets `src/static/css/teams.css` + `src/static/js/teams.js`) backs all three teams URL names (`all_teams`, `teams2`, `my_teams`, wired in `website/urls.py`); it embeds teams/categories as JSON `<script>` blocks and does search/filter/sort entirely client-side. `RaceEditView` (template `src/templates/race/race_form.html`, assets `src/static/css/race_form.css` + `src/static/js/race_form.js`, form `src/apps/race/forms.py:RaceForm`) is one CBV for both creating and editing a race, backing the `add_race` (`races/new/`) and `edit_race` (`race/<slug>/edit/`) URL names. Create is superuser-only; edit requires `can_edit_race(user, race)` (in `src/apps/race/permissions.py` — superuser, or `RaceAdmin` with `role=ADMIN`). It edits all scalar `Race` fields and inline-manages the race's `Category` rows (incl. `min_people`, `max_people`, `people_limit`), `RacePriceTier` rows, and `RaceExtra` («Доп-услуги») rows, posted as hidden `categories_json` + `price_tiers_json` + `extras_json` inputs and reconciled (add/update/delete, `order=index`) inside one `transaction.atomic()`. Add-on reconciliation (`_reconcile_extras` + `_validate_extra_rows`) uses a **softer** delete policy than categories: a row still referenced by any `TeamExtra` is force-deactivated (`is_active=False`) rather than deleted (and `PROTECT` on the FK is the backstop); `code` is validated `^[a-z_]+$`, unique-within-race, editable on create but read-only once saved. `RacePageView.build_context` exposes `can_edit_race` so `race_page.html` shows an "Редактировать" button (admins) and "+ Новая гонка" link (superusers).
-- `apps.mobile` — **signed app endpoints** for the iOS/Android mobile app, **no user registration** (`label = "mobile"`, mounted at `/app/*` via `config/urls.py`). The app authenticates itself with a per-build shared secret selected by `X-App-Key-Id` (the server holds a JSON **key-id → secret** map `MOBILE_APP_KEYS` env, parsed once at startup; each secret is baked into the matching binary — extractable by design, deters casual `curl` not a determined reverse-engineer) and an **HMAC-SHA256 signature** per request, so the legend isn't reachable by plain `curl`. **Secret rotation:** keeping ≥2 keys active at once lets a new app build (`*-v2`) and the previous one (`*-v1`) both verify during the overlap, so a secret can rotate (aligned with an app release) without instantly breaking older builds; the old key is dropped only once no `AppInstall` reports it. The canonical is **unchanged** — a tampered `key_id` selects a different secret so `verify` fails (the key-id is implicitly bound by the signature); all key selection lives in `permissions.py`. Parsing is **fail-closed**: a missing/malformed `MOBILE_APP_KEYS` (or one with no non-empty string secrets) yields `{}` → every `/app/*` request 403s. First endpoint: `GET /app/race/<int:race_id>/legend/` (`name="mobile:legend"`) → the race's `Checkpoint` legend (`id`/`number`/`cost`/`type`/`description`, ordered `number, id`; never exposes `year`; draft checkpoints excluded; if `race.is_legend_visible` is `False` returns `200 {"race": id, "checkpoints": []}` — empty list, not 403). Like teams, it supports **conditional GET**: the response carries a strong `ETag` = `"<fingerprint>"` on **all** exit paths (the full list, the hidden-empty list, and the 304), and an `If-None-Match` matching the current ETag short-circuits to `HttpResponseNotModified()` (empty body, ETag set, no serialization). The fingerprint is `versioning.legend_version(race_id)` — the **single source of truth** for both the legend ETag and `versions.legend` — a `blake2b(digest_size=8)` hex over `MAX(Checkpoint.updated_at)|COUNT|is_legend_visible` aggregated over the **draft-excluded** queryset the view serves (`None` aggregates render as `"None"` so an empty/all-draft race is stable; `is_legend_visible` is folded in so a hide/show moves the version, and re-queried by `race_id` — **not** taken from the view's `Race` — to keep the bare-`race_id` single-source contract). `Checkpoint.updated_at` (`auto_now`, migration `0077`) was added for the same reason as `Athlet.updated_at` — to catch in-place checkpoint edits. Tags (`CheckpointTag`) stay **out of scope**: the legend never exposes them, so a tag edit deliberately does not move the legend version. Second endpoint: `GET /app/races/` (`name="mobile:races"`, `RaceListView`/`RaceListSerializer`) → the published-races list (`Race.objects.filter(is_published=True)`, `Meta.ordering = ["-date"]`) wrapped as `{"races": [...]}` (mirrors the legend's wrapped shape), each item exposing exactly the 8 core fields `id`/`name`/`slug`/`date`/`date_end`/`place`/`reg_status`/`is_legend_visible` (no images); no pagination (YAGNI), no query string (the signature covers `full_path`, so the client must call the bare path). It supports **conditional GET** like teams/legend: strong `ETag` = `"<fingerprint>"` on both exit paths, matching `If-None-Match` → `HttpResponseNotModified()` before serialization. The fingerprint is `versioning.races_version()` — **global, no `race_id`** — a `blake2b(digest_size=8)` hex over `MAX(Race.updated_at)|COUNT` aggregated over the same `is_published=True` queryset the view serves (a publish/unpublish moves `COUNT`, an edit to a published race moves `MAX`; an unpublished-race edit deliberately does not move it; empty list renders `"None|0"` — stable). `Race.updated_at` (`auto_now`, migration `0079`) was added for it. Being global, `races_version` is deliberately **absent from the per-race `/sync/` manifest** — the races list is the app's entry point (probed before any `race_id` exists), so the client probes it directly via its own conditional GET. Third endpoint: `GET /app/race/<int:race_id>/teams/` (`name="mobile:teams"`, `TeamsView`/`TeamSerializer`) → the race's full team list plus the race's category catalogue `{"race": id, "categories": [...], "teams": [...]}` (teams owned via `category2.race`, so `category2=None` teams are out of scope; `TeamManager` excludes `is_deleted`; `order_by("id")`), each team exposing `id`/`teamname`/`category2` (FK id)/`ucount`/`paid_people`/`start_time`/`finish_time` plus nested `members` (`name`/`number_in_team`, from `athlet_set` ordered `number_in_team, id` via a `Prefetch`; legacy `athlet1..6` excluded). The `categories` block (`CategorySerializer`, fields `id`/`code`/`short_name`/`name`/`order`, `Category.objects.filter(race=race).order_by("order", "id")`) is **embedded here, not a separate endpoint** — categories are useless without teams and needed on the same screen, so they ride inside the teams resource (one fetch, one ETag, one `versions.teams` key, mirroring the web `RaceTeamsView`). **All** of the race's categories are included, including `is_active=False` (a team may reference a deactivated category and its `category2` id must still resolve); `is_active` itself is not exposed. It supports **conditional GET**: the response carries a strong `ETag` = `"<fingerprint>"`, and an `If-None-Match` matching the current ETag short-circuits to Django's `HttpResponseNotModified()` (empty body, ETag set, **no serialization** of either queryset — the `categories` query is only evaluated on the `200` path). The fingerprint is `versioning.teams_version(race_id)` (`apps/mobile/versioning.py`) — the **single source of truth** for both the teams ETag and the sync manifest — a `blake2b(digest_size=8)` hex over `MAX(Team.updated_at)|MAX(Athlet.updated_at)|COUNT(Athlet)|COUNT(Team)|MAX(Category.updated_at)|COUNT(Category)` (bare hex, `None` aggregates render as `"None"` so an empty race is stable, not a crash). `Athlet.updated_at` (`auto_now`, migration `0076`) was **added specifically** so a member rename moves `MAX(Athlet.updated_at)` and thus the version — `MAX(Team.updated_at)` alone would miss it. The category aggregate (over `Category.objects.filter(race_id=race_id)`, **no `is_active` filter** — the exact queryset the view serves) is folded in for the same reason: since categories ship inside the teams response there is deliberately **no `versions.categories` key**, so a category rename/reorder (`MAX(Category.updated_at)`, via `Category.updated_at` `auto_now`, migration `0078`) or add/delete (`COUNT`) must move `versions.teams`. Fourth endpoint: `GET /app/race/<int:race_id>/sync/` (`name="mobile:sync"`, `SyncView`) → a **pure manifest** (no data, no ETag/304) `{"race": id, "data_source": settings.MOBILE_DATA_SOURCE, "lease_expires_at": None, "versions": {"teams": teams_version(race_id), "legend": legend_version(race_id)}}` — lets the client probe once and re-fetch only changed resources. `versions` carries **both** `teams` and `legend` (each the bare value its resource's ETag wraps in quotes). The lease/handoff is **stubbed**: `data_source` comes from `MOBILE_DATA_SOURCE` env (default `"cloud"`), `lease_expires_at` is always `null`; the real per-race lease is deferred (see `apps/mobile/README.md`). **Canonical string** signed by both sides: `method.upper() + "\n" + full_path + "\n" + ts + "\n" + sha256_hex(body)` — `full_path` is `request.get_full_path()` (query-string included so params can't be tampered), `body` is empty for GET (`sha256_hex(b"")`). Helpers in `signing.py` (`build_canonical`/`sign`/`verify`, `verify` uses `hmac.compare_digest`). Request headers: `X-App-Key-Id` (selects the secret from `MOBILE_APP_KEYS`), `X-Install-Id`, `X-App-Platform`, `X-App-Version`, `X-App-Ts` (unix seconds), `X-App-Sig` (hex). `SignedAppPermission` (`permissions.py`) **fails closed** (empty `MOBILE_APP_KEYS`, or a missing/unknown `X-App-Key-Id` → 403 on every request) and returns a single **neutral** `403 {"detail": "Forbidden"}` for any verification failure (missing headers, non-int/expired `ts` outside the ±`MOBILE_APP_TS_WINDOW`=300s replay window, bad sig) — no hint which check failed; a `race_id` 404 is only reachable *after* a valid signature. On success it stashes `request.app_meta` (install_id/platform/app_version/key_id/ip via `_client_ip` = last `X-Forwarded-For` entry then `REMOTE_ADDR`). **Install stats**: `AppInstall` model (one row per app-generated `install_id`, `request_count`/`last_seen`/`last_ip`/`key_id` — the last key-id the install reported, migration `0003`, filterable in the read-only admin to confirm no install still uses a key before retiring it) recorded **best-effort** in `AppAPIView.initial()` *after* permissions pass (`super().initial()` → `_record_install`, wrapped in `try/except` + `logger.exception` so a stats-write failure never breaks the legend response). **403 tracking**: every `/app/*` auth failure is logged (a `WARNING`) and recorded as an aggregate `AppAuthFailure` row keyed `unique_together = ("ip", "key_id", "reason")` (migration `0004`, `count`/`first_seen`/`last_seen`/`last_path`/`last_install_id`; read-only admin `AppAuthFailureAdmin` like `AppInstallAdmin`) — aggregated, not row-per-attempt, to bound table growth under brute force. `SignedAppPermission` stays **no-DB-writes**: each of its 6 `return False` points is `return self._deny(request, reason, key_id)`, which only stashes `request.app_denial = {reason, key_id, ip, path, install}` (reason codes: `no_keys`, `missing_headers`, `unknown_key`, `bad_ts`, `expired_ts`, `bad_sig`; `None` key_id coerced to `""`; default `"unknown"` if unset). The log+DB write lives in `AppAPIView.permission_denied()` (DRF's hook, called inside `check_permissions` → `initial`, **before** `_record_install`), wrapped best-effort in `try/except` + `logger.exception` and mirroring `AppInstall`'s `update_or_create` + `F("count")+1` pattern. The reason flows **only** to the log/DB — `super().permission_denied()` is called without a message, so the client still gets the neutral `403 {"detail": "Forbidden"}`. A denied request raises `PermissionDenied` and short-circuits, so it writes an `AppAuthFailure` row but **never** an `AppInstall` row. A malformed/empty `MOBILE_APP_KEYS` now also emits a settings-import `WARNING` (`logging.getLogger("config.settings")`) so a misconfigured deploy is loud, not silent (only when the env var is non-empty-but-bad, not when it is simply unset). Self-contained: does **not** touch `/api/`, `donate`, or `website`. There is no nonce (replay mitigation is the ts window only); body signing is GET-only for now (revisit `request.body` reading before any body-bearing POST, since DRF can raise `RawPostDataException` once the stream is parsed). **`update_fields` discipline**: `teams_version`, `legend_version` and `races_version` rely on `auto_now` fields — `Team.updated_at`, `Athlet.updated_at` (migration `0076`), `Checkpoint.updated_at` (migration `0077`), `Category.updated_at` (migration `0078`), `Race.updated_at` (migration `0079`). Any `model.save(update_fields=[...])` call on these models **must** include `"updated_at"` in the list, otherwise Django skips the `auto_now` update and the version fingerprint goes stale (e.g. the auto `OPEN → SOLD_OUT` `reg_status` flips in `check_vtb_payments.py` and `website/models/models.py` include it — `reg_status` is exposed in `/app/races/`). Established pattern: `api/views/teams.py`, `website/views/views_.py`, `website/views/team.py`, `check_vtb_payments.py`, `website/models/models.py`. `MOBILE_APP_TS_WINDOW = 300` is a hardcoded Python constant in `settings.py`, not an env var — edit the file directly to change the replay window.
+- `apps.accounts` — all authentication (`AppConfig` `label="accounts"`), mounted at `/accounts/*` via `config/urls.py`.
+  Holds the moved password auth (`LoginView`, `RegisterView`, `LogoutUserView`, `impersonate`/`stop_impersonate`, the
+  `CustomPasswordReset*` CBVs, `EmailBackend`, the auth forms, and the private redirect/auth helpers incl.
+  `_safe_redirect`) plus an email-first passwordless flow. URL names stay flat and unchanged (`login`, `register`,
+  `logout`, `password_reset*`, `impersonate`, `stop_impersonate`) — only the paths moved, so `reverse()`/`{% url %}`/
+  `LOGIN_URL` need no changes. `website/auth.py` and `website/forms.py` keep thin re-export shims (
+  `from apps.accounts.backends import EmailBackend`; `from apps.accounts.forms import ...`) so old import sites still
+  work. Templates live in `src/templates/accounts/` (extend `base-2.html`, manual form fields); Django's reset emails
+  stay in `templates/registration/password_reset_email.*`. See the **Auth** note below for the passwordless flow +
+  `EmailVerification` model.
+- `apps.race` — race detail page (`/race/<slug>/`) and the unified teams-list page. **Owns the add-on models +
+  migrations** (`src/apps/race/models.py`, `migrations/` — its first; `0001_initial` declares an explicit
+  `dependencies = [("website", "0072_payment_vtb_payment")]` because the FKs cross into `website`): `RaceExtra`/
+  `TeamExtra`/`PaymentExtra` (see the **Team add-ons** note below). All other models still remain in `website`. Entry
+  points: `src/apps/race/views.py:RacePageView`, `RaceTeamsView`, and `RaceEditView`. Uses `label = "race_app"` in
+  `AppConfig` to avoid Django app-registry collision with the `race` model label. `RacePageView.build_context` is also
+  called by `website.views.views_.AddNewsPostView` via a deferred import to avoid a circular dependency.
+  `RaceTeamsView` (template `src/templates/race/teams.html`, assets `src/static/css/teams.css` +
+  `src/static/js/teams.js`) backs all three teams URL names (`all_teams`, `teams2`, `my_teams`, wired in
+  `website/urls.py`); it embeds teams/categories as JSON `<script>` blocks and does search/filter/sort entirely
+  client-side. `RaceEditView` (template `src/templates/race/race_form.html`, assets `src/static/css/race_form.css` +
+  `src/static/js/race_form.js`, form `src/apps/race/forms.py:RaceForm`) is one CBV for both creating and editing a race,
+  backing the `add_race` (`races/new/`) and `edit_race` (`race/<slug>/edit/`) URL names. Create is superuser-only; edit
+  requires `can_edit_race(user, race)` (in `src/apps/race/permissions.py` — superuser, or `RaceAdmin` with
+  `role=ADMIN`). It edits all scalar `Race` fields and inline-manages the race's `Category` rows (incl. `min_people`,
+  `max_people`, `people_limit`), `RacePriceTier` rows, and `RaceExtra` («Доп-услуги») rows, posted as hidden
+  `categories_json` + `price_tiers_json` + `extras_json` inputs and reconciled (add/update/delete, `order=index`) inside
+  one `transaction.atomic()`. Add-on reconciliation (`_reconcile_extras` + `_validate_extra_rows`) uses a **softer**
+  delete policy than categories: a row still referenced by any `TeamExtra` is force-deactivated (`is_active=False`)
+  rather than deleted (and `PROTECT` on the FK is the backstop); `code` is validated `^[a-z_]+$`, unique-within-race,
+  editable on create but read-only once saved. `RacePageView.build_context` exposes `can_edit_race` so `race_page.html`
+  shows an "Редактировать" button (admins) and "+ Новая гонка" link (superusers).
+- `apps.mobile` — **signed read-only endpoints** for the iOS/Android mobile app (`label = "mobile"`, mounted at `/app/*`
+  via `config/urls.py`). Self-contained: touches neither `/api/` nor `donate`/`website`. No user accounts — the app
+  authenticates **itself**. Full design (background-sync model, two-server lease/handoff, secret-rotation runbook, 403
+  reason codes) lives in `src/apps/mobile/README.md`; exact response fields are pinned by the serializers and the
+  field-set tests in `tests.py`. Invariants to preserve:
+    - **Auth**: per-build shared secret selected by `X-App-Key-Id` from `MOBILE_APP_KEYS` (JSON key-id → secret map env,
+      parsed once at startup, **fail-closed** — a missing/malformed map means every `/app/*` request 403s; a
+      non-empty-but-bad value also logs a settings-import `WARNING`). HMAC-SHA256 over the canonical
+      `method + "\n" + full_path + "\n" + ts + "\n" + sha256_hex(body)` (`signing.py`); replay window ±
+      `MOBILE_APP_TS_WINDOW` = 300 s — a hardcoded constant in `settings.py`, not an env var; no nonce. Body signing is
+      GET-only for now — revisit `request.body` reading before adding any body-bearing endpoint (DRF can raise
+      `RawPostDataException`).
+    - **Neutral failures, no writes in the permission**: every verification failure returns the same
+      `403 {"detail": "Forbidden"}` — no hint which check failed. `SignedAppPermission` does no DB writes; the log +
+      aggregated `AppAuthFailure` row happen in `AppAPIView.permission_denied()`, and `AppInstall` stats are recorded
+      best-effort in `initial()` after permissions pass (a stats-write failure never breaks a response; a denied request
+      never writes `AppInstall`).
+    - **Endpoints** (all GET, see `urls.py`): `/app/races/` (published races), `/app/race/<id>/teams/` (teams **plus the
+      embedded category catalogue** — deliberately no separate categories endpoint; inactive categories included so
+      every `category2` id resolves), `/app/race/<id>/legend/` (a hidden legend returns `200` with an empty list, not
+      403), `/app/race/<id>/sync/` (pure version manifest — no data, no ETag; lease/handoff stubbed: `data_source` from
+      `MOBILE_DATA_SOURCE` env, default `"cloud"`, `lease_expires_at` always `null`).
+    - **Conditional GET**: races/teams/legend set a strong `ETag` on **every** exit path; a matching `If-None-Match`
+      short-circuits to `304` with no serialization. `versioning.py` is the **single source of truth** for both the
+      ETags and the `sync` manifest: each fingerprint is a `blake2b(digest_size=8)` hex over `MAX(updated_at)|COUNT`
+      aggregates computed over the exact queryset the view serves (`None` aggregates render as `"None"`, so an empty
+      race is stable). Deliberately **no `versions.categories`** — category edits must move `versions.teams`;
+      `races_version()` is global and deliberately absent from the per-race `sync` manifest (the races list is the app's
+      entry point, probed via its own conditional GET).
+    - **`update_fields` discipline**: the fingerprints rely on `auto_now` `updated_at` fields on `Team`/`Athlet`/
+      `Checkpoint`/`Category`/`Race`. Any `save(update_fields=[...])` on these models **must** include `"updated_at"`,
+      otherwise the version/ETag goes stale (e.g. the auto `OPEN → SOLD_OUT` `reg_status` flips in
+      `check_vtb_payments.py` and `website/models/models.py` include it).
 
-New feature apps that don't fit in `website` live under `src/apps/<name>/`. Each needs a unique `AppConfig` label (e.g. `label = "race_app"`).
+New feature apps that don't fit in `website` live under `src/apps/<name>/`. Each needs a unique `AppConfig` label (e.g.
+`label = "race_app"`).
 
-**Template stacks**: `src/templates/website/` has two base templates. `base.html` + `src/static/css/theme.css` — Bootstrap-based, used by all pages except registration and login. `base-2.html` + `src/static/css/theme-2.css` — custom CSS (Rubik font, vanilla JS), used by `register.html`, `login.html`, `start.html`, and `verify.html`. New pages matching the new design should extend `base-2.html`. Page-specific CSS goes in `src/static/css/<page>.css` and is loaded via `{% block extra_head %}`. Do not define a bare `.page` class in page-specific CSS — `theme-2.css` already defines it. Use a scoped wrapper class (e.g. `.race-page`).
+**Template stacks**: `src/templates/website/` has two base templates. `base.html` + `src/static/css/theme.css` —
+Bootstrap-based, used by all pages except registration and login. `base-2.html` + `src/static/css/theme-2.css` — custom
+CSS (Rubik font, vanilla JS), used by `register.html`, `login.html`, `start.html`, and `verify.html`. New pages matching
+the new design should extend `base-2.html`. Page-specific CSS goes in `src/static/css/<page>.css` and is loaded via
+`{% block extra_head %}`. Do not define a bare `.page` class in page-specific CSS — `theme-2.css` already defines it.
+Use a scoped wrapper class (e.g. `.race-page`).
 
-**Custom error pages**: `src/templates/{404,403,500}.html` (themed «Сбились с маршрута»), sharing `src/static/css/error.css` (scoped under `.error-page`). Django's default handlers auto-load them by name — no `handler404/500/403` wiring in `config/urls.py`. `404.html`/`403.html` extend `base-2.html` (rendered with a `RequestContext`). `500.html` is **standalone by design** — a full `<!doctype html>` doc with hardcoded asset URLs, no `{% static %}`/`{% url %}`/`{% footer_menu %}`/`{{ user }}`, so it renders with an empty context and a down DB.
+**Custom error pages**: `src/templates/{404,403,500}.html` (themed «Сбились с маршрута»), sharing
+`src/static/css/error.css` (scoped under `.error-page`). Django's default handlers auto-load them by name — no
+`handler404/500/403` wiring in `config/urls.py`. `404.html`/`403.html` extend `base-2.html` (rendered with a
+`RequestContext`). `500.html` is **standalone by design** — a full `<!doctype html>` doc with hardcoded asset URLs, no
+`{% static %}`/`{% url %}`/`{% footer_menu %}`/`{{ user }}`, so it renders with an empty context and a down DB.
 
-**Auth**: lives in `apps.accounts` (mounted at `/accounts/*`). `LOGIN_URL = "login"` in `settings.py` points Django's `@login_required` and `user_passes_test` decorators to `LoginView` (URL name `login`, now at `/accounts/login/`); `AUTHENTICATION_BACKENDS` uses `apps.accounts.backends.EmailBackend`, which authenticates by `email__iexact`. URL names are flat and unchanged from before the move (`login`, `register`, `logout`, `password_reset*`, `impersonate`), so name-based `reverse()`/`{% url %}` callers are unaffected; only the paths changed, and old `/login/`, `/register/` now 404 (no redirects, by decision). `website/auth.py` re-exports `EmailBackend` and `website/forms.py` re-exports the auth forms as shims.
+**Auth**: lives in `apps.accounts` (mounted at `/accounts/*`). `LOGIN_URL = "login"` in `settings.py` points Django's
+`@login_required` and `user_passes_test` decorators to `LoginView` (URL name `login`, now at `/accounts/login/`);
+`AUTHENTICATION_BACKENDS` uses `apps.accounts.backends.EmailBackend`, which authenticates by `email__iexact`. URL names
+are flat and unchanged from before the move (`login`, `register`, `logout`, `password_reset*`, `impersonate`), so
+name-based `reverse()`/`{% url %}` callers are unaffected; only the paths changed, and old `/login/`, `/register/` now
+404 (no redirects, by decision). `website/auth.py` re-exports `EmailBackend` and `website/forms.py` re-exports the auth
+forms as shims.
 
-**Passwordless login** (email-first, the promoted entry point — password login is kept as a secondary option). One DB model `EmailVerification` (`apps/accounts/models.py`) backs both a 6-digit code and a magic link from a single row: `code_hash` (`make_password` of the code — the raw code is never stored), `expires_at` (`CODE_TTL = 15 min`), `attempts` (`MAX_ATTEMPTS = 5`), `consumed_at`; the magic link has no token column — the URL embeds `TimestampSigner().sign(str(pk))` and the row's `expires_at`/`consumed_at` enforce lifetime + single use. `create_for(email, purpose)` returns `(obj, raw_code)` and refuses a new code within `RESEND_COOLDOWN = 60 s` (returns `(existing, None)` — anti-bombing); `verify_code` increments `attempts` and rejects dead rows; `is_alive` gates everything. Flow (`/accounts/start|verify|link/<signed>/`, names `account_start`/`account_verify`/`magic_link`, all carry `?next=`): `StartView` issues a code and emails it via `apps/accounts/emails.py:send_login_email` (code + signed absolute magic-link URL, both `.txt`/`.html` alts, templates in `templates/accounts/email/`), responding neutrally for known/unknown emails (no account-enumeration leak); `VerifyView` (code) and `MagicLinkView` (link) both funnel into the shared `_complete_login(request, email, next_url)` — `mark_consumed` → log in existing user or inline-create (atomic, catching `IntegrityError` from the case-insensitive email unique index, random password, username deduped from the local-part) → app-local `_safe_redirect` against `request.get_host()` (so a tampered unsigned `next` falls back to `/`). The link must not rely on the session (may open in another browser). Email send failures are logged, not raised. Email tests must override `EMAIL_BACKEND` to locmem (django-mailer's `DbBackend` does not populate `mail.outbox`). The race-page «Зарегистрировать команду» button (shown to anon users) — `AddTeam`'s anon redirect (`views_.py`, both `get` and `post`) — enters the passwordless `account_start` (not password `login`), carrying `?next=request.path`; `StartView`/`VerifyView` derive race context from that `next` path via `_race_from_next(next_url)` (`urlsplit` → `resolve` → guard `url_name == "add_team"` → `Race.objects.filter(slug=…).first()`, display-only, never raises) so `start.html`/`verify.html` greet «…добавить команду на «<гонка>»» with a back link to the race. Other login-gated team actions (`EditTeamView`, member transfer/delete) still redirect to password `login`.
+**Passwordless login** (email-first, the promoted entry point — password login is kept as a secondary option). One DB
+model `EmailVerification` (`apps/accounts/models.py`) backs both a 6-digit code and a magic link from a single row:
+`code_hash` (`make_password` of the code — the raw code is never stored), `expires_at` (`CODE_TTL = 15 min`),
+`attempts` (`MAX_ATTEMPTS = 5`), `consumed_at`; the magic link has no token column — the URL embeds
+`TimestampSigner().sign(str(pk))` and the row's `expires_at`/`consumed_at` enforce lifetime + single use.
+`create_for(email, purpose)` returns `(obj, raw_code)` and refuses a new code within `RESEND_COOLDOWN = 60 s` (returns
+`(existing, None)` — anti-bombing); `verify_code` increments `attempts` and rejects dead rows; `is_alive` gates
+everything. Flow (`/accounts/start|verify|link/<signed>/`, names `account_start`/`account_verify`/`magic_link`, all
+carry `?next=`): `StartView` issues a code and emails it via `apps/accounts/emails.py:send_login_email` (code + signed
+absolute magic-link URL, both `.txt`/`.html` alts, templates in `templates/accounts/email/`), responding neutrally for
+known/unknown emails (no account-enumeration leak); `VerifyView` (code) and `MagicLinkView` (link) both funnel into the
+shared `_complete_login(request, email, next_url)` — `mark_consumed` → log in existing user or inline-create (atomic,
+catching `IntegrityError` from the case-insensitive email unique index, random password, username deduped from the
+local-part) → app-local `_safe_redirect` against `request.get_host()` (so a tampered unsigned `next` falls back to `/`).
+The link must not rely on the session (may open in another browser). Email send failures are logged, not raised. Email
+tests must override `EMAIL_BACKEND` to locmem (django-mailer's `DbBackend` does not populate `mail.outbox`). The
+race-page «Зарегистрировать команду» button (shown to anon users) — `AddTeam`'s anon redirect (`views_.py`, both `get`
+and `post`) — enters the passwordless `account_start` (not password `login`), carrying `?next=request.path`;
+`StartView`/`VerifyView` derive race context from that `next` path via `_race_from_next(next_url)` (`urlsplit` →
+`resolve` → guard `url_name == "add_team"` → `Race.objects.filter(slug=…).first()`, display-only, never raises) so
+`start.html`/`verify.html` greet «…добавить команду на «<гонка>»» with a back link to the race. Other login-gated team
+actions (`EditTeamView`, member transfer/delete) still redirect to password `login`.
 
-**Form fields in `base-2.html` pages**: Do not use `{{ form.field }}` — Django widgets emit `class="form-control"` (Bootstrap) which conflicts with `theme-2.css`. Write fields manually: `<input class="input{% if form.field.errors %} has-error{% endif %}" name="field_name" value="{{ form.field.value|default:'' }}">`, with errors shown via `{{ form.field.errors|join:", " }}` beneath each input.
+**Form fields in `base-2.html` pages**: Do not use `{{ form.field }}` — Django widgets emit `class="form-control"` (
+Bootstrap) which conflicts with `theme-2.css`. Write fields manually:
+`<input class="input{% if form.field.errors %} has-error{% endif %}" name="field_name" value="{{ form.field.value|default:'' }}">`,
+with errors shown via `{{ form.field.errors|join:", " }}` beneath each input.
 
-**Team add/edit pages** (`add_team.html`, `edit_team.html`) are two standalone base-2 templates — the shared form body is intentionally duplicated (no partial); only behavior/styling is shared via `src/static/css/team-form.css` (scoped under `.team-register`) and `src/static/js/team-form.js`. The JS reads no inline template vars: both views emit a JSON config island `<script type="application/json" id="teamFormConfig">` (`currentPrice`, `paidPeople`, `isEdit`, `raceRemaining`, `currentCategoryId`, `bypassLimits`, and `extras: [{code, name, price, freePerTeam, count, countPaid}, …]`) and the JS renders one stepper per add-on (hidden `extra_<code>` inputs, each bounded `countPaid … (ucount − freePerTeam)`) and computes the live доплата-aware total mirroring the backend `compute_team_charge` (`max(0, (ucount − paidPeople) × currentPrice + Σ active extras max(0, count − countPaid) × price)`). `team-form.js` and `apps/race/pricing.py` carry cross-reference comments pointing at each other (the client/server-mirror rule). `raceRemaining` is `null` for unlimited races; `currentCategoryId` is `null` on add. Category `<option>` elements carry `data-remaining` (free slots, empty string = unlimited) and `data-current="1"` (team's own category) — `team-form.js` uses these to disable full categories in the dropdown and cap the segmented size control; the team's own category is never disabled. The segmented team-size control reads allowed counts from each category `<option>`'s `data-counts` attribute (no hardcoded `switch`). `AddTeam` (`views_.py`) and `EditTeamView` (`team.py`) share context-building helpers (`build_category_options` / `build_team_form_context` in `views_.py`); `EditTeamView` renders `edit_team.html` and adds edit-only sections (payment history, member transfer, delete). Server-side guards (in `TeamForm.clean`) enforce `ucount ∈ [category.min_people, category.max_people]` and, per active extra, `count ≤ max(0, ucount − free_per_team)` plus the edit-only `count ≥ count_paid` ("can't reduce a partly-paid add-on") — the client controls only cap values in the browser. `TeamForm.__init__` resolves the race **defensively** (a non-id/`None` `race_id` must yield `self.extras = []` and add no fields rather than 500).
+**Team add/edit pages** (`add_team.html`, `edit_team.html`) are two standalone base-2 templates — the shared form body
+is intentionally duplicated (no partial); only behavior/styling is shared via `src/static/css/team-form.css` (scoped
+under `.team-register`) and `src/static/js/team-form.js`. The JS reads no inline template vars: both views emit a JSON
+config island `<script type="application/json" id="teamFormConfig">` (`currentPrice`, `paidPeople`, `isEdit`,
+`raceRemaining`, `currentCategoryId`, `bypassLimits`, and
+`extras: [{code, name, price, freePerTeam, count, countPaid}, …]`) and the JS renders one stepper per add-on (hidden
+`extra_<code>` inputs, each bounded `countPaid … (ucount − freePerTeam)`) and computes the live доплата-aware total
+mirroring the backend `compute_team_charge` (
+`max(0, (ucount − paidPeople) × currentPrice + Σ active extras max(0, count − countPaid) × price)`). `team-form.js` and
+`apps/race/pricing.py` carry cross-reference comments pointing at each other (the client/server-mirror rule).
+`raceRemaining` is `null` for unlimited races; `currentCategoryId` is `null` on add. Category `<option>` elements carry
+`data-remaining` (free slots, empty string = unlimited) and `data-current="1"` (team's own category) — `team-form.js`
+uses these to disable full categories in the dropdown and cap the segmented size control; the team's own category is
+never disabled. The segmented team-size control reads allowed counts from each category `<option>`'s `data-counts`
+attribute (no hardcoded `switch`). `AddTeam` (`views_.py`) and `EditTeamView` (`team.py`) share context-building
+helpers (`build_category_options` / `build_team_form_context` in `views_.py`); `EditTeamView` renders `edit_team.html`
+and adds edit-only sections (payment history, member transfer, delete). Server-side guards (in `TeamForm.clean`) enforce
+`ucount ∈ [category.min_people, category.max_people]` and, per active extra, `count ≤ max(0, ucount − free_per_team)`
+plus the edit-only `count ≥ count_paid` ("can't reduce a partly-paid add-on") — the client controls only cap values in
+the browser. `TeamForm.__init__` resolves the race **defensively** (a non-id/`None` `race_id` must yield
+`self.extras = []` and add no fields rather than 500).
 
-**Email uniqueness**: `auth_user.email` has a case-insensitive unique index (migration `0065_unique_user_email`). Registration views wrap `User.objects.create_user` in `transaction.atomic()` and catch `IntegrityError` to surface a field error on `email`. `EmailBackend` catches `MultipleObjectsReturned` defensively. Any code that creates users must handle `IntegrityError` from this constraint.
+**Email uniqueness**: `auth_user.email` has a case-insensitive unique index (migration `0065_unique_user_email`).
+Registration views wrap `User.objects.create_user` in `transaction.atomic()` and catch `IntegrityError` to surface a
+field error on `email`. `EmailBackend` catches `MultipleObjectsReturned` defensively. Any code that creates users must
+handle `IntegrityError` from this constraint.
 
-**Payments**: models exist for four providers — VTB (OAuth), Yandex Wallet, Sberbank (phone transfer), SBP — each in `website/models/` (`VTBPayment`, `PaymentsYa`, etc.). Credentials come from env vars — see `deploy/kolco24.env.example`. The live flow is VTB `sbp2`, confirmed automatically by the `check_vtb_payments` polling command (`_settle_race_payment`). The legacy manual-verification stack (the admin `/payments/` confirm/cancel page, the user-facing sberbank/sbp "I paid, here is my card" templates, and the older Yandex API stubs `new_payment`/`paymentinfo`/`getcost`/`yandexinform`/`success`) was **removed** — those routes now 404. The `Payment`/`PaymentLog`/`PaymentsYa`/`SbpPaymentRecipient` tables and admin registrations are kept for history.
+**Payments**: models exist for four providers — VTB (OAuth), Yandex Wallet, Sberbank (phone transfer), SBP — each in
+`website/models/` (`VTBPayment`, `PaymentsYa`, etc.). Credentials come from env vars — see `deploy/kolco24.env.example`.
+The live flow is VTB `sbp2`, confirmed automatically by the `check_vtb_payments` polling command (
+`_settle_race_payment`). The legacy manual-verification stack (the admin `/payments/` confirm/cancel page, the
+user-facing sberbank/sbp "I paid, here is my card" templates, and the older Yandex API stubs `new_payment`/
+`paymentinfo`/`getcost`/`yandexinform`/`success`) was **removed** — those routes now 404. The `Payment`/`PaymentLog`/
+`PaymentsYa`/`SbpPaymentRecipient` tables and admin registrations are kept for history.
 
-**VTB `order_id`s** (race-fee and donations) are random ULIDs — `ORDER_<ulid>` for race fees, `SPUTNIK_<ulid>` for donations — minted by the single generator `VTBPayment.new_order_id(prefix)` (`website/models/vtb.py`). They are globally unique across environments, which matters because dev and prod share VTB credentials (and thus the VTB `order_id` namespace). Reconciliation (the polling command `check_vtb_payments`) follows an explicit FK to find the domain object — `Payment.vtb_payment` (OneToOne, `on_delete=SET_NULL`, `related_name="race_payment"`) for race fees, `DonateRequest.payment` for donations — never by parsing the id. The legacy `ORDER_<int>` int-parse survives only as a fallback in `_resolve_race_payment` for pre-deploy in-flight payments and can be dropped once those settle.
+**VTB `order_id`s** (race-fee and donations) are random ULIDs — `ORDER_<ulid>` for race fees, `SPUTNIK_<ulid>` for
+donations — minted by the single generator `VTBPayment.new_order_id(prefix)` (`website/models/vtb.py`). They are
+globally unique across environments, which matters because dev and prod share VTB credentials (and thus the VTB
+`order_id` namespace). Reconciliation (the polling command `check_vtb_payments`) follows an explicit FK to find the
+domain object — `Payment.vtb_payment` (OneToOne, `on_delete=SET_NULL`, `related_name="race_payment"`) for race fees,
+`DonateRequest.payment` for donations — never by parsing the id. The legacy `ORDER_<int>` int-parse survives only as a
+fallback in `_resolve_race_payment` for pre-deploy in-flight payments and can be dropped once those settle.
 
-**Team pricing & sizes** (`website/models/race.py`): `RacePriceTier` (FK `race`, `related_name="price_tiers"`; `price`, `active_until` inclusive `DateField`, `order`) holds the price ladder. `Race.current_price` is the single source of truth for the charged per-person amount — it returns the earliest tier with `active_until >= today`, the last tier when all are past, or falls back to `Race.cost` when the race has no tiers. `Race.price_tier_ladder()` returns `[{"tier", "status"}]` (`past`/`active`/`future`) for display. When charging, set `cost_now = race.current_price` for BOTH the people-count multiplier AND the stored `Payment.cost_per_person` — `Team.update_team` back-calculates `paid_for = withdraw_amount / cost_per_person`, so the two must stay identical. `Team.additional_charge` is deprecated — do not add it to the formula. Allowed team sizes come from `Category.min_people`/`max_people` (defaults 2/6), not a hardcoded JS `switch`.
+**Team pricing & sizes** (`website/models/race.py`): `RacePriceTier` (FK `race`, `related_name="price_tiers"`; `price`,
+`active_until` inclusive `DateField`, `order`) holds the price ladder. `Race.current_price` is the single source of
+truth for the charged per-person amount — it returns the earliest tier with `active_until >= today`, the last tier when
+all are past, or falls back to `Race.cost` when the race has no tiers. `Race.price_tier_ladder()` returns
+`[{"tier", "status"}]` (`past`/`active`/`future`) for display. When charging, set `cost_now = race.current_price` for
+BOTH the people-count multiplier AND the stored `Payment.cost_per_person` — `Team.update_team` back-calculates
+`paid_for = withdraw_amount / cost_per_person`, so the two must stay identical. `Team.additional_charge` is deprecated —
+do not add it to the formula. Allowed team sizes come from `Category.min_people`/`max_people` (defaults 2/6), not a
+hardcoded JS `switch`.
 
-**Team add-ons / доп-услуги** (`src/apps/race/models.py`, `src/apps/race/pricing.py`): a generic per-race "extra" mechanism — teams buy optional units (maps, transfer, breakfast, …) during add/edit, charged together with the race fee in one VTB/SBP payment. Three relational models: `RaceExtra` (per-race catalogue: `code`/`name`/`price`/`free_per_team`/`order`/`is_active`, `unique_together("race","code")`), `TeamExtra` (per-team desired-vs-paid: `count`/`count_paid`, FK to `RaceExtra` `on_delete=PROTECT`), `PaymentExtra` (per-payment snapshot of the delta a payment covers: `count` + `unit_price` price-snapshot, generalizes the old `Payment.map`). **Single quantity rule for every add-on:** `max = ucount − free_per_team` (maps `free=2`; transfer/breakfast `free=0`). Three shared helpers replace the two duplicated maps formulas: `compute_team_charge(team, race) -> (total, lines)` (race-fee term plus `Σ active extras max(0, count − count_paid) × price`), `upsert_team_extras(team, cleaned_data, race)` (writes `TeamExtra.count` from the form's `extra_<code>` fields), and `create_team_payment(request, team, race)` (builds the `Payment` + `PaymentExtra` rows, mints the VTB order, returns the redirect — or `None` when cost is 0 so the caller redirects to its own success URL; sets/asserts `payment_method="sbp2"` because once extras are present `payment_amount` deliberately diverges from `paid_for × cost_per_person`, so these must never flow through the partial Yandex `update_team` back-calc). Both `AddTeam` and `EditTeamView` call `upsert_team_extras` then `create_team_payment`. **Reconciliation** (`check_vtb_payments`, VTB PAID path) credits add-ons from the per-payment snapshot — loops `payment.extras`, `get_or_create(TeamExtra)`, `count_paid += pe.count` (clamping `count` up) — inside the existing `transaction.atomic()`; idempotency lives in the command (the `status == done` guard + the outer already-`PAID` exclusion), **not** in `PaymentExtra` (it has no consumed flag — `Payment.status` is the idempotency token). An admin enables a new add-on by adding a row on the race edit page (no code change, no migration). The **legacy standalone** transfer (`race/8/transfer/`) and breakfast (`race/<slug>/breakfast/…`) registration pages + their `Transfer`/`BreakfastRegistration` models/tables were **removed** (migration `0073_delete_transfer_breakfast`; routes now 404, no redirects) — the `RaceExtra` `code="transfer"`/`"breakfast"` add-ons above are the supported mechanism.
+**Team add-ons / доп-услуги** (`src/apps/race/models.py`, `src/apps/race/pricing.py`): a generic per-race "extra"
+mechanism — teams buy optional units (maps, transfer, breakfast, …) during add/edit, charged together with the race fee
+in one VTB/SBP payment. Three relational models: `RaceExtra` (per-race catalogue: `code`/`name`/`price`/`free_per_team`/
+`order`/`is_active`, `unique_together("race","code")`), `TeamExtra` (per-team desired-vs-paid: `count`/`count_paid`, FK
+to `RaceExtra` `on_delete=PROTECT`), `PaymentExtra` (per-payment snapshot of the delta a payment covers: `count` +
+`unit_price` price-snapshot, generalizes the old `Payment.map`). **Single quantity rule for every add-on:**
+`max = ucount − free_per_team` (maps `free=2`; transfer/breakfast `free=0`). Three shared helpers replace the two
+duplicated maps formulas: `compute_team_charge(team, race) -> (total, lines)` (race-fee term plus
+`Σ active extras max(0, count − count_paid) × price`), `upsert_team_extras(team, cleaned_data, race)` (writes
+`TeamExtra.count` from the form's `extra_<code>` fields), and `create_team_payment(request, team, race)` (builds the
+`Payment` + `PaymentExtra` rows, mints the VTB order, returns the redirect — or `None` when cost is 0 so the caller
+redirects to its own success URL; sets/asserts `payment_method="sbp2"` because once extras are present `payment_amount`
+deliberately diverges from `paid_for × cost_per_person`, so these must never flow through the partial Yandex
+`update_team` back-calc). Both `AddTeam` and `EditTeamView` call `upsert_team_extras` then `create_team_payment`. *
+*Reconciliation** (`check_vtb_payments`, VTB PAID path) credits add-ons from the per-payment snapshot — loops
+`payment.extras`, `get_or_create(TeamExtra)`, `count_paid += pe.count` (clamping `count` up) — inside the existing
+`transaction.atomic()`; idempotency lives in the command (the `status == done` guard + the outer already-`PAID`
+exclusion), **not** in `PaymentExtra` (it has no consumed flag — `Payment.status` is the idempotency token). An admin
+enables a new add-on by adding a row on the race edit page (no code change, no migration). The **legacy standalone**
+transfer (`race/8/transfer/`) and breakfast (`race/<slug>/breakfast/…`) registration pages + their `Transfer`/
+`BreakfastRegistration` models/tables were **removed** (migration `0073_delete_transfer_breakfast`; routes now 404, no
+redirects) — the `RaceExtra` `code="transfer"`/`"breakfast"` add-ons above are the supported mechanism.
 
-**Maps are now the `code="map"` extra** (`price=200`, `free_per_team=2`), backfilled by data migration `apps/race/migrations/0002_migrate_maps_to_extras`. The legacy `Team.map_count`/`Team.map_count_paid`, `Payment.map`, and the `FREE_MAPS`/`MAP_PRICE` constants in `website/forms.py` are **deprecated but still present** — their usages are gone but the column/constant definitions are pending removal in a deferred follow-up migration (kept through at least one deploy cycle so a payment created pre-deploy and confirmed post-deploy still reconciles).
+**Maps are now the `code="map"` extra** (`price=200`, `free_per_team=2`), backfilled by data migration
+`apps/race/migrations/0002_migrate_maps_to_extras`. The legacy `Team.map_count`/`Team.map_count_paid`, `Payment.map`,
+and the `FREE_MAPS`/`MAP_PRICE` constants in `website/forms.py` are **deprecated but still present** — their usages are
+gone but the column/constant definitions are pending removal in a deferred follow-up migration (kept through at least
+one deploy cycle so a payment created pre-deploy and confirmed post-deploy still reconciles).
 
-**People limits** (`website/models/race.py`): two `IntegerField`s — `Race.people_limit` (cap across the whole race) and `Category.people_limit` (cap within a category), both `default=0` where `0 = unlimited` (distinct from per-team `Category.max_people`). Occupancy = **paid + reserved**: `Category.people_count()` / `Race.people_count()` sum `paid_people` over non-deleted teams (`TeamManager` already excludes `is_deleted`); `Category.reserved_people()` / `Race.reserved_people()` add *live reservations* (see **Seat reservation** below); `remaining_people()` returns `None` when unlimited. `Category.remaining_people(exclude_team=...)` self-excludes the team being edited. The capacity **gate lives in `TeamForm.clean()`** (reused by both `AddTeam` and `EditTeamView`, which pass `team=` + `bypass_limits=request.user.is_superuser`; superusers skip the gate): the race-check blocks only *growth* (`needed = new_ucount − team.paid_people`), the category-check blocks entering a full category or growing inside a full one (a pure 2→2 move into a category with room is allowed). Auto `sold_out`: `update_team()` flips `Race.reg_status` `OPEN → SOLD_OUT` once the race cap is reached at payment confirmation — **no auto-reopening** when slots free up (Option B). Limits are configured on the race edit page (`RaceForm.people_limit` + per-row `Category.people_limit`). Note: `api`-app team creation does **not** enforce these limits.
+**People limits** (`website/models/race.py`): two `IntegerField`s — `Race.people_limit` (cap across the whole race) and
+`Category.people_limit` (cap within a category), both `default=0` where `0 = unlimited` (distinct from per-team
+`Category.max_people`). Occupancy = **paid + reserved**: `Category.people_count()` / `Race.people_count()` sum
+`paid_people` over non-deleted teams (`TeamManager` already excludes `is_deleted`); `Category.reserved_people()` /
+`Race.reserved_people()` add *live reservations* (see **Seat reservation** below); `remaining_people()` returns `None`
+when unlimited. `Category.remaining_people(exclude_team=...)` self-excludes the team being edited. The capacity **gate
+lives in `TeamForm.clean()`** (reused by both `AddTeam` and `EditTeamView`, which pass `team=` +
+`bypass_limits=request.user.is_superuser`; superusers skip the gate): the race-check blocks only *growth* (
+`needed = new_ucount − team.paid_people`), the category-check blocks entering a full category or growing inside a full
+one (a pure 2→2 move into a category with room is allowed). Auto `sold_out`: `update_team()` flips `Race.reg_status`
+`OPEN → SOLD_OUT` once the race cap is reached at payment confirmation — **no auto-reopening** when slots free up (
+Option B). Limits are configured on the race edit page (`RaceForm.people_limit` + per-row `Category.people_limit`).
+Note: `api`-app team creation does **not** enforce these limits.
 
-**Seat reservation** (`website/models/race.py`): a team that *started* paying must hold its seats until the payment confirms, otherwise a payment confirmed 5–10 min later could push the race past its cap (the old paid-basis caveat). A *live reservation* is any `Payment` with `status="draft"` whose `created_at` is within `RESERVATION_TTL` (a module-level `timedelta`, currently **20 min**) — `create_team_payment` already mints exactly such a draft when the user is redirected to VTB, so no new "start reservation" code path exists. `Race.reserved_people(exclude_team=…)` / `Category.reserved_people(exclude_team=…)` sum, **per distinct team** (a re-submit's extra drafts don't multiply the reservation), `max(0, ucount − paid_people)` — the seats that payment will fill (full `ucount` on add, the delta on a top-up). `remaining_people()` = `people_limit − people_count() − reserved_people()`, self-excluding the edited team's own paid **and** reserved seats. Nothing else changed: the `TeamForm.clean()` gate, the displayed `raceRemaining`/`data-remaining` caps, and `bypass_limits` all tighten automatically because they already route through `remaining_people()`. `reg_status` SOLD_OUT still flips on **paid** fill only (no reservation-driven open/close churn). Two accepted caveats: (1) **fail-safe TTL** — the 20-min window is our estimate of the VTB order's life, not the real expiry; if a draft outlives or dies before it, the seat is held at most ~20 min (never longer, never overbooks past the window); (2) **double add-submit** — `AddTeam.post` creates a fresh `Team` per POST, so submitting the *add* form twice can briefly reserve seats against the same user (self-resolves in ≤20 min), not fixed.
+**Seat reservation** (`website/models/race.py`): a team that *started* paying must hold its seats until the payment
+confirms, otherwise a payment confirmed 5–10 min later could push the race past its cap (the old paid-basis caveat). A
+*live reservation* is any `Payment` with `status="draft"` whose `created_at` is within `RESERVATION_TTL` (a module-level
+`timedelta`, currently **20 min**) — `create_team_payment` already mints exactly such a draft when the user is
+redirected to VTB, so no new "start reservation" code path exists. `Race.reserved_people(exclude_team=…)` /
+`Category.reserved_people(exclude_team=…)` sum, **per distinct team** (a re-submit's extra drafts don't multiply the
+reservation), `max(0, ucount − paid_people)` — the seats that payment will fill (full `ucount` on add, the delta on a
+top-up). `remaining_people()` = `people_limit − people_count() − reserved_people()`, self-excluding the edited team's
+own paid **and** reserved seats. Nothing else changed: the `TeamForm.clean()` gate, the displayed `raceRemaining`/
+`data-remaining` caps, and `bypass_limits` all tighten automatically because they already route through
+`remaining_people()`. `reg_status` SOLD_OUT still flips on **paid** fill only (no reservation-driven open/close churn).
+Two accepted caveats: (1) **fail-safe TTL** — the 20-min window is our estimate of the VTB order's life, not the real
+expiry; if a draft outlives or dies before it, the seat is held at most ~20 min (never longer, never overbooks past the
+window); (2) **double add-submit** — `AddTeam.post` creates a fresh `Team` per POST, so submitting the *add* form twice
+can briefly reserve seats against the same user (self-resolves in ≤20 min), not fixed.
 
-**Email** goes through `django-mailer` (`EMAIL_BACKEND = "mailer.backend.DbBackend"`): messages are queued in the DB and sent by the `kolco24_runmailer` container running `manage.py runmailer`.
+**Email** goes through `django-mailer` (`EMAIL_BACKEND = "mailer.backend.DbBackend"`): messages are queued in the DB and
+sent by the `kolco24_runmailer` container running `manage.py runmailer`.
 
-**Static files** are served by WhiteNoise from `STATIC_ROOT = src/staticfiles/` (populated by `collectstatic` at Docker build time). `STATICFILES_DIRS` points to `src/static/` (source assets).
+**Static files** are served by WhiteNoise from `STATIC_ROOT = src/staticfiles/` (populated by `collectstatic` at Docker
+build time). `STATICFILES_DIRS` points to `src/static/` (source assets).
 
-**Settings**: `src/config/settings.py` reads all secrets from env vars via `python-dotenv`. For production, values go in `deploy/kolco24.env` (copy from `deploy/kolco24.env.example`).
+**Settings**: `src/config/settings.py` reads all secrets from env vars via `python-dotenv`. For production, values go in
+`deploy/kolco24.env` (copy from `deploy/kolco24.env.example`).
 
 ## Code Style
 
-Black 88-char limit, `isort` with Black profile. `ruff` and `flake8` share ignore rules from `setup.cfg` (`W503`, `E722`; `F401` ignored in `__init__.py`).
+Black 88-char limit, `isort` with Black profile. `ruff` and `flake8` share ignore rules from `setup.cfg` (`W503`,
+`E722`; `F401` ignored in `__init__.py`).
 
-Tests live in `src/<app>/tests.py` and use **pytest-style** functions with `@pytest.mark.django_db` and `client`/`django_user_model` fixtures — not Django `TestCase` subclasses. `DJANGO_SETTINGS_MODULE = config.settings` is set automatically by `pyproject.toml`.
+Tests live in `src/<app>/tests.py` and use **pytest-style** functions with `@pytest.mark.django_db` and `client`/
+`django_user_model` fixtures — not Django `TestCase` subclasses. `DJANGO_SETTINGS_MODULE = config.settings` is set
+automatically by `pyproject.toml`.

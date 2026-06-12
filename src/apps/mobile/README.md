@@ -10,9 +10,9 @@ Read-only API для iOS/Android-приложения. Без регистрац
 
 Детали схемы подписи (канонная строка, заголовки `X-App-*` включая
 `X-App-Key-Id`, `SignedAppPermission`, replay-окно `±MOBILE_APP_TS_WINDOW`,
-`AppInstall`-статистика) — в `signing.py`, `permissions.py` и в разделе
-**apps.mobile** корневого `CLAUDE.md`. Этот документ про **то, как приложение
-обновляет данные в фоне**.
+`AppInstall`-статистика) — в `signing.py` и `permissions.py`; краткая сводка
+инвариантов — в разделе **apps.mobile** корневого `CLAUDE.md`. Этот документ
+про **то, как приложение обновляет данные в фоне**.
 
 ## Ротация секрета (`MOBILE_APP_KEYS` + `X-App-Key-Id`)
 
@@ -25,8 +25,10 @@ Read-only API для iOS/Android-приложения. Без регистрац
 
 `AppInstall.key_id` (миграция `0003`) хранит последний key-id каждого инстала —
 перед снятием старого ключа админ через фильтр в админке убеждается, что ни один
-инстал его больше не репортит. Рунбук ротации — в `## Implementation Steps` /
-`## Post-Completion` плана и в корневом `CLAUDE.md`.
+инстал его больше не репортит. Рунбук ротации: добавить новый ключ в
+`MOBILE_APP_KEYS` → выпустить сборку приложения с новым секретом и key-id →
+дождаться, когда ни один `AppInstall` не репортит старый key-id → убрать старый
+ключ из карты.
 
 ## 403-трекинг (`AppAuthFailure`)
 
@@ -324,7 +326,7 @@ ETag/`If-None-Match` на ресурсах остаётся (см. выше) —
 |-------|------|-----|--------|
 | GET | `/app/races/` | `mobile:races` | список гонок (лёгкий: id, slug, name, date, reg_status, флаги `is_*`) |
 | GET | `/app/race/<id>/teams/` | `mobile:teams` | команды гонки + категории (`categories`) |
-| GET | `/app/race/<id>/legend/` | `mobile:legend` | КП + NFC-метки |
+| GET | `/app/race/<id>/legend/` | `mobile:legend` | КП + NFC-метки (скрытая легенда → `200` с пустым списком, не 403) |
 | GET | `/app/race/<id>/sync/` | `mobile:sync` | манифест: версии ресурсов + `data_source`/`lease_expires_at` |
 
 Все — наследники `AppAPIView` (подпись + `AppInstall`-статистика); у `races`,
