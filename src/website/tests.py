@@ -129,8 +129,7 @@ def test_edit_team_redirect_uses_slug(client):
         {"ucount": "2", "category2_id": str(category.id)},
     )
     assert response.status_code == 302
-    assert race.slug in response["Location"]
-    assert str(race.id) not in response["Location"]
+    assert response["Location"] == f"/race/{race.slug}/teams/my/"
 
 
 @pytest.mark.django_db
