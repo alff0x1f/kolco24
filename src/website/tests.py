@@ -1884,7 +1884,7 @@ def _confirm_payment(user, team, paid_for, cost_per_person=1500):
             and race.people_count() >= race.people_limit
         ):
             race.reg_status = RegStatus.SOLD_OUT
-            race.save(update_fields=["reg_status"])
+            race.save(update_fields=["reg_status", "updated_at"])
 
 
 @pytest.mark.django_db

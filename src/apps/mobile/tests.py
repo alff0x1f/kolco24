@@ -839,7 +839,7 @@ def test_races_response_carries_etag(client, settings):
     settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
     settings.MOBILE_APP_TS_WINDOW = 300
 
-    Race.objects.create(name="Published", slug="published-race")
+    Race.objects.create(name="Published", slug="published-race", is_published=True)
 
     response = client.get(RACES_PATH, **_signed_headers("GET", RACES_PATH, SECRET))
 
