@@ -176,23 +176,23 @@ to the hashes from the legend.
 - Modify: `src/apps/mobile/versioning.py`
 - Modify: `src/apps/mobile/tests.py`
 
-- [ ] change `legend_state(race_id, key_id)` to also aggregate
+- [x] change `legend_state(race_id, key_id)` to also aggregate
       `MAX(CheckpointTag.updated_at)|COUNT(CheckpointTag)` over tags whose
       `point` is a non-draft checkpoint of `race_id`, and append `key_id` to the
       blake2b input string
-- [ ] change `legend_version(race_id, key_id)` to accept and forward `key_id`
-- [ ] update the module docstrings/comments to reflect tags now in scope and the
+- [x] change `legend_version(race_id, key_id)` to accept and forward `key_id`
+- [x] update the module docstrings/comments to reflect tags now in scope and the
       `key_id` dependency (and that `teams_version`/`races_version` are unchanged)
-- [ ] write test: an in-place `tag.save()` (changing `check_method`) bumps
+- [x] write test: an in-place `tag.save()` (changing `check_method`) bumps
       `updated_at` and changes `legend_version` (unit-level proof the `auto_now`
       field is folded in — the production path edits via create/delete, but this
       guards against a future in-place save going undetected); adding/removing a
       tag changes it
-- [ ] write test: a tag on a **draft** checkpoint does NOT change
+- [x] write test: a tag on a **draft** checkpoint does NOT change
       `legend_version`
-- [ ] write test: two different `key_id`s yield different `legend_version` for
+- [x] write test: two different `key_id`s yield different `legend_version` for
       the same data; an empty/tag-less race is stable (no crash, `"None"`)
-- [ ] run `uv run pytest src/apps/mobile/tests.py` — must pass before next task
+- [x] run `uv run pytest src/apps/mobile/tests.py` — must pass before next task
 
 ### Task 4: Nested tag serializer with hashed `tag_id`
 

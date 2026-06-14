@@ -1271,6 +1271,86 @@ def test_legend_version_unchanged_when_draft_checkpoint_edited():
     assert before == after
 
 
+@pytest.mark.django_db
+def test_legend_version_changes_when_tag_check_method_edited():
+    from apps.mobile.versioning import legend_version
+    from website.models.checkpoint import Checkpoint, CheckpointTag
+    from website.models.race import Race
+
+    race = Race.objects.create(name="Tag edit", slug="tag-edit", is_legend_visible=True)
+    cp = Checkpoint.objects.create(race=race, number=1, cost=1, description="cp")
+    tag = CheckpointTag.objects.create(point=cp, tag_id="AA:BB", check_method="offline")
+    before = legend_version(race.id)
+    tag.check_method = "online"
+    tag.save()
+    after = legend_version(race.id)
+    assert before != after
+
+
+@pytest.mark.django_db
+def test_legend_version_changes_when_tag_added_and_removed():
+    from apps.mobile.versioning import legend_version
+    from website.models.checkpoint import Checkpoint, CheckpointTag
+    from website.models.race import Race
+
+    race = Race.objects.create(name="Tag add", slug="tag-add", is_legend_visible=True)
+    cp = Checkpoint.objects.create(race=race, number=1, cost=1, description="cp")
+    before = legend_version(race.id)
+    tag = CheckpointTag.objects.create(point=cp, tag_id="AA:BB", check_method="offline")
+    after_add = legend_version(race.id)
+    assert before != after_add
+    tag.delete()
+    after_remove = legend_version(race.id)
+    assert after_add != after_remove
+
+
+@pytest.mark.django_db
+def test_legend_version_unchanged_when_tag_on_draft_checkpoint_added():
+    from apps.mobile.versioning import legend_version
+    from website.models.checkpoint import Checkpoint, CheckpointTag
+    from website.models.race import Race
+
+    race = Race.objects.create(
+        name="Tag draft", slug="tag-draft", is_legend_visible=True
+    )
+    Checkpoint.objects.create(race=race, number=1, cost=1, description="visible")
+    draft = Checkpoint.objects.create(
+        race=race, number=2, cost=0, description="draft", type="draft"
+    )
+    before = legend_version(race.id)
+    CheckpointTag.objects.create(point=draft, tag_id="AA:BB", check_method="offline")
+    after = legend_version(race.id)
+    assert before == after
+
+
+@pytest.mark.django_db
+def test_legend_version_differs_per_key_id():
+    from apps.mobile.versioning import legend_version
+    from website.models.checkpoint import Checkpoint, CheckpointTag
+    from website.models.race import Race
+
+    race = Race.objects.create(
+        name="Key id legend", slug="key-id-legend", is_legend_visible=True
+    )
+    cp = Checkpoint.objects.create(race=race, number=1, cost=1, description="cp")
+    CheckpointTag.objects.create(point=cp, tag_id="AA:BB", check_method="offline")
+    assert legend_version(race.id, "build-a") != legend_version(race.id, "build-b")
+
+
+@pytest.mark.django_db
+def test_legend_version_tagless_race_stable_across_key_ids():
+    from apps.mobile.versioning import legend_version
+    from website.models.race import Race
+
+    race = Race.objects.create(
+        name="Tagless", slug="tagless-legend", is_legend_visible=True
+    )
+    # No checkpoints/tags: empty aggregates render "None"; must not crash and
+    # must still be deterministic per key_id.
+    assert legend_version(race.id, "build-a") == legend_version(race.id, "build-a")
+    assert legend_version(race.id, "build-a") != legend_version(race.id, "build-b")
+
+
 # --- mobile TeamSerializer --------------------------------------------------
 
 TEAM_FIELDS = {
