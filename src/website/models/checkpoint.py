@@ -47,6 +47,7 @@ class CheckpointTag(models.Model):
         ],
         default="offline",
     )
+    updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
         return f"{self.id} - {self.tag_id}"

@@ -54,7 +54,8 @@ Read-only API для iOS/Android-приложения. Без регистрац
 - **список гонок** — какие гонки есть, их статус/флаги;
 - **команды гонки** — состав участников;
 - **легенда гонки** — контрольные точки + NFC-метки (`CheckpointTag`) для
-  офлайн-сканирования.
+  офлайн-сканирования; `tag_id` отдаётся **только в виде HMAC-хеша**
+  (`tag_hash`), сырой UID на провод не уходит.
 
 ## Принцип синхронизации: полный payload + условный GET (ETag / If-None-Match)
 
@@ -326,7 +327,7 @@ ETag/`If-None-Match` на ресурсах остаётся (см. выше) —
 |-------|------|-----|--------|
 | GET | `/app/races/` | `mobile:races` | список гонок (лёгкий: id, slug, name, date, reg_status, флаги `is_*`) |
 | GET | `/app/race/<id>/teams/` | `mobile:teams` | команды гонки + категории (`categories`) |
-| GET | `/app/race/<id>/legend/` | `mobile:legend` | КП + NFC-метки (скрытая легенда → `200` с пустым списком, не 403) |
+| GET | `/app/race/<id>/legend/` | `mobile:legend` | КП + NFC-метки как `tag_hash` (скрытая легенда → `200` с пустым списком, не 403) |
 | GET | `/app/race/<id>/sync/` | `mobile:sync` | манифест: версии ресурсов + `data_source`/`lease_expires_at` |
 
 Все — наследники `AppAPIView` (подпись + `AppInstall`-статистика); у `races`,
@@ -339,7 +340,7 @@ ETag/`If-None-Match` на ресурсах остаётся (см. выше) —
 > **Статус:** реализованы `mobile:races` (с `ETag`/`If-None-Match` → 304;
 > отпечаток — `MAX(Race.updated_at)|COUNT` по published-гонкам, поле
 > `Race.updated_at` — миграция `0079`), `mobile:legend` (с `ETag`/`If-None-Match`
-> → 304; пока без `tags`), `mobile:teams` (с `ETag`/`If-None-Match` → 304) и
+> → 304; теги отдаются как `tag_hash`), `mobile:teams` (с `ETag`/`If-None-Match` → 304) и
 > `mobile:sync`. Отпечаток `teams` считается по
 > `MAX(Team.updated_at)`/`MAX(Athlet.updated_at)`/`COUNT` команд и участников
 > **плюс** `MAX(Category.updated_at)`/`COUNT(Category)` по категориям гонки
@@ -348,10 +349,14 @@ ETag/`If-None-Match` на ресурсах остаётся (см. выше) —
 > ответ списка категорий тоже двигала версию). Отпечаток `legend` —
 > `MAX(Checkpoint.updated_at)|COUNT|is_legend_visible` по **draft-исключённому**
 > набору КП (поле `Checkpoint.updated_at` добавлено миграцией `0077` по той же
-> причине, что и `Athlet.updated_at` — ловить правки на месте). Теги
-> (`CheckpointTag`) **вне области**: легенда их не отдаёт, поэтому правка тега
-> версию легенды не сдвигает. Манифест `sync` несёт **оба** `versions.teams` и
+> причине, что и `Athlet.updated_at` — ловить правки на месте) **плюс**
+> `MAX(CheckpointTag.updated_at)|COUNT(CheckpointTag)` по тегам тех же
+> draft-исключённых КП (поле `CheckpointTag.updated_at` — миграция `0080`),
+> **плюс** `key_id` запроса. Теги (`CheckpointTag`) теперь **в области**: легенда
+> отдаёт их как `tag_hash` (HMAC-SHA256 от `tag_id` секретом сборки, выбранным по
+> `X-App-Key-Id`), поэтому правка тега сдвигает версию легенды, а ETag/
+> `versions.legend` различаются **по `key_id`** — обновление сборки со сменой
+> секрета не получит `304` со старыми хешами. Манифест `sync` несёт **оба** `versions.teams` и
 > `versions.legend`. Лиз-хэндофф **застаблен**: `data_source` берётся из настройки
 > `MOBILE_DATA_SOURCE` (по умолчанию `"cloud"`), `lease_expires_at` всегда `null` —
-> реальный per-race лиз/хэндофф и NFC-метки в легенде остаются целевой схемой,
-> описанной выше.
+> реальный per-race лиз/хэндофф остаётся целевой схемой, описанной выше.

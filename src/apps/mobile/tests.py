@@ -9,7 +9,7 @@ from django.test import RequestFactory
 
 from apps.mobile.models import AppAuthFailure, AppInstall
 from apps.mobile.permissions import SignedAppPermission, _client_ip
-from apps.mobile.signing import build_canonical, sha256_hex, sign, verify
+from apps.mobile.signing import build_canonical, sha256_hex, sign, tag_hash, verify
 
 
 def test_build_canonical_exact_format():
@@ -76,6 +76,54 @@ def test_verify_false_for_changed_path():
         "GET", "/app/race/2/legend/", "1700000000", b""
     )
     assert verify("secret", tampered_canonical, sig) is False
+
+
+def test_tag_hash_matches_hmac():
+    expected = hmac.new(b"secret", b"04A1B2C3", hashlib.sha256).hexdigest()
+    assert tag_hash("secret", "04A1B2C3") == expected
+    # deterministic across calls
+    assert tag_hash("secret", "04A1B2C3") == tag_hash("secret", "04A1B2C3")
+
+
+def test_tag_hash_differs_per_secret():
+    assert tag_hash("secret", "04A1B2C3") != tag_hash("other-secret", "04A1B2C3")
+
+
+@pytest.mark.django_db
+def test_legend_tag_serializer_hashes_tag_id():
+    from apps.mobile.serializers import LegendTagSerializer
+    from website.models.checkpoint import Checkpoint, CheckpointTag
+    from website.models.race import Race
+
+    race = Race.objects.create(name="Tag race", slug="tag-race")
+    point = Checkpoint.objects.create(race=race, number=1, cost=1)
+    tag = CheckpointTag.objects.create(
+        point=point, tag_id="04A1B2C3", check_method="offline"
+    )
+
+    data = LegendTagSerializer(tag, context={"secret": SECRET}).data
+
+    assert set(data.keys()) == {"id", "tag_hash", "check_method"}
+    assert "tag_id" not in data
+    assert data["id"] == tag.id
+    assert data["check_method"] == "offline"
+    assert data["tag_hash"] == tag_hash(SECRET, "04A1B2C3")
+
+
+@pytest.mark.django_db
+def test_legend_checkpoint_serializer_nests_hashed_tags():
+    from apps.mobile.serializers import LegendCheckpointSerializer
+    from website.models.checkpoint import Checkpoint, CheckpointTag
+    from website.models.race import Race
+
+    race = Race.objects.create(name="Tag race 2", slug="tag-race-2")
+    point = Checkpoint.objects.create(race=race, number=1, cost=1)
+    CheckpointTag.objects.create(point=point, tag_id="DEADBEEF", check_method="online")
+
+    data = LegendCheckpointSerializer(point, context={"secret": SECRET}).data
+
+    assert [t["tag_hash"] for t in data["tags"]] == [tag_hash(SECRET, "DEADBEEF")]
+    assert "tag_id" not in data["tags"][0]
 
 
 @pytest.mark.django_db
@@ -408,7 +456,7 @@ def test_legend_valid_signature_returns_200_with_fields_and_order(client, settin
     assert data["race"] == race.id
     assert [c["number"] for c in data["checkpoints"]] == [1, 2, 3]
     first = data["checkpoints"][0]
-    assert set(first.keys()) == {"id", "number", "cost", "type", "description"}
+    assert set(first.keys()) == {"id", "number", "cost", "type", "description", "tags"}
     assert first["type"] == "kp"
     assert first["description"] == "first"
 
@@ -496,6 +544,28 @@ def test_legend_unpublished_race_returns_404(client, settings):
     settings.MOBILE_APP_TS_WINDOW = 300
     race = Race.objects.create(name="Unpub", slug="unpub-legend", is_published=False)
     path = f"/app/race/{race.id}/legend/"
+    response = client.get(path, **_signed_headers("GET", path, SECRET))
+    assert response.status_code == 404
+
+
+@pytest.mark.django_db
+def test_legend_race_deleted_mid_request_returns_404(client, settings, monkeypatch):
+    """legend_state returning visible=None (race deleted after 404 check) → 404."""
+    import apps.mobile.views as mobile_views
+    from website.models.race import Race
+
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    race = Race.objects.create(
+        name="Ghost", slug="ghost-legend", is_legend_visible=True
+    )
+    path = f"/app/race/{race.id}/legend/"
+
+    monkeypatch.setattr(
+        mobile_views, "legend_state", lambda *a, **kw: ("deadbeef00000000", None)
+    )
+
     response = client.get(path, **_signed_headers("GET", path, SECRET))
     assert response.status_code == 404
 
@@ -681,6 +751,160 @@ def test_legend_hidden_if_none_match_returns_304(client, settings):
     assert second.status_code == 304
     assert second["ETag"] == etag
     assert second.content == b""
+
+
+@pytest.mark.django_db
+def test_legend_serves_hashed_tags_and_never_raw_tag_id(client, settings):
+    from website.models.checkpoint import Checkpoint, CheckpointTag
+    from website.models.race import Race
+
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    race = Race.objects.create(
+        name="Hashed legend", slug="hashed-legend", is_legend_visible=True
+    )
+    cp = Checkpoint.objects.create(race=race, number=1, cost=1, description="first")
+    CheckpointTag.objects.create(point=cp, tag_id="04A1B2C3", check_method="offline")
+    CheckpointTag.objects.create(point=cp, tag_id="DEADBEEF", check_method="online")
+
+    path = f"/app/race/{race.id}/legend/"
+    response = client.get(path, **_signed_headers("GET", path, SECRET))
+
+    assert response.status_code == 200
+    data = response.json()
+    tags = data["checkpoints"][0]["tags"]
+    assert [t["tag_hash"] for t in tags] == [
+        tag_hash(SECRET, "04A1B2C3"),
+        tag_hash(SECRET, "DEADBEEF"),
+    ]
+    for t in tags:
+        assert set(t.keys()) == {"id", "tag_hash", "check_method"}
+        assert "tag_id" not in t
+    # the raw UID never appears anywhere in the serialized body
+    body = response.content.decode()
+    assert "04A1B2C3" not in body
+    assert "DEADBEEF" not in body
+
+
+@pytest.mark.django_db
+def test_legend_etag_changes_when_tag_edited_and_304_with_new_etag(client, settings):
+    from website.models.checkpoint import Checkpoint, CheckpointTag
+    from website.models.race import Race
+
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    race = Race.objects.create(name="Tag etag", slug="tag-etag", is_legend_visible=True)
+    cp = Checkpoint.objects.create(race=race, number=1, cost=1, description="first")
+    tag = CheckpointTag.objects.create(
+        point=cp, tag_id="04A1B2C3", check_method="offline"
+    )
+
+    path = f"/app/race/{race.id}/legend/"
+    first = client.get(path, **_signed_headers("GET", path, SECRET))
+    old_etag = first["ETag"]
+
+    tag.check_method = "online"
+    tag.save()
+
+    second = client.get(path, **_signed_headers("GET", path, SECRET))
+    new_etag = second["ETag"]
+    assert new_etag != old_etag
+
+    headers = _signed_headers("GET", path, SECRET)
+    headers["HTTP_IF_NONE_MATCH"] = new_etag
+    third = client.get(path, **headers)
+    assert third.status_code == 304
+    assert third["ETag"] == new_etag
+
+
+@pytest.mark.django_db
+def test_legend_etag_changes_when_tag_edited_with_update_fields(client, settings):
+    """save(update_fields=[..., "updated_at"]) on CheckpointTag must move the ETag.
+
+    CLAUDE.md mandates that save(update_fields=...) on auto_now models must
+    include "updated_at"; this verifies that discipline keeps the legend
+    fingerprint fresh (i.e. omitting "updated_at" from update_fields would
+    silently stale the ETag, and this test would catch it).
+    """
+    from website.models.checkpoint import Checkpoint, CheckpointTag
+    from website.models.race import Race
+
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    race = Race.objects.create(
+        name="Tag etag uf", slug="tag-etag-uf", is_legend_visible=True
+    )
+    cp = Checkpoint.objects.create(race=race, number=1, cost=1, description="first")
+    tag = CheckpointTag.objects.create(
+        point=cp, tag_id="04A1B2C3", check_method="offline"
+    )
+
+    path = f"/app/race/{race.id}/legend/"
+    first = client.get(path, **_signed_headers("GET", path, SECRET))
+    old_etag = first["ETag"]
+
+    tag.check_method = "online"
+    tag.save(update_fields=["check_method", "updated_at"])
+
+    second = client.get(path, **_signed_headers("GET", path, SECRET))
+    assert second["ETag"] != old_etag
+
+
+@pytest.mark.django_db
+def test_legend_different_key_ids_get_different_hashes_and_etags(client, settings):
+    from website.models.checkpoint import Checkpoint, CheckpointTag
+    from website.models.race import Race
+
+    settings.MOBILE_APP_KEYS = {"build-a": "secret-a", "build-b": "secret-b"}
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    race = Race.objects.create(
+        name="Per build", slug="per-build-legend", is_legend_visible=True
+    )
+    cp = Checkpoint.objects.create(race=race, number=1, cost=1, description="first")
+    CheckpointTag.objects.create(point=cp, tag_id="04A1B2C3", check_method="offline")
+
+    path = f"/app/race/{race.id}/legend/"
+    resp_a = client.get(
+        path, **_signed_headers("GET", path, "secret-a", key_id="build-a")
+    )
+    resp_b = client.get(
+        path, **_signed_headers("GET", path, "secret-b", key_id="build-b")
+    )
+
+    hash_a = resp_a.json()["checkpoints"][0]["tags"][0]["tag_hash"]
+    hash_b = resp_b.json()["checkpoints"][0]["tags"][0]["tag_hash"]
+    assert hash_a == tag_hash("secret-a", "04A1B2C3")
+    assert hash_b == tag_hash("secret-b", "04A1B2C3")
+    assert hash_a != hash_b
+    assert resp_a["ETag"] != resp_b["ETag"]
+
+
+@pytest.mark.django_db
+def test_legend_hidden_still_200_empty_with_etag_when_tags_present(client, settings):
+    from website.models.checkpoint import Checkpoint, CheckpointTag
+    from website.models.race import Race
+
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    race = Race.objects.create(
+        name="Hidden with tags", slug="hidden-tags", is_legend_visible=False
+    )
+    cp = Checkpoint.objects.create(race=race, number=1, cost=1, description="secret")
+    CheckpointTag.objects.create(point=cp, tag_id="04A1B2C3", check_method="offline")
+
+    path = f"/app/race/{race.id}/legend/"
+    response = client.get(path, **_signed_headers("GET", path, SECRET))
+
+    assert response.status_code == 200
+    assert response.json()["checkpoints"] == []
+    etag = response["ETag"]
+    assert etag.startswith('"') and etag.endswith('"')
+    assert "04A1B2C3" not in response.content.decode()
 
 
 @pytest.mark.django_db
@@ -1258,6 +1482,86 @@ def test_legend_version_unchanged_when_draft_checkpoint_edited():
     draft.save()
     after = legend_version(race.id)
     assert before == after
+
+
+@pytest.mark.django_db
+def test_legend_version_changes_when_tag_check_method_edited():
+    from apps.mobile.versioning import legend_version
+    from website.models.checkpoint import Checkpoint, CheckpointTag
+    from website.models.race import Race
+
+    race = Race.objects.create(name="Tag edit", slug="tag-edit", is_legend_visible=True)
+    cp = Checkpoint.objects.create(race=race, number=1, cost=1, description="cp")
+    tag = CheckpointTag.objects.create(point=cp, tag_id="AA:BB", check_method="offline")
+    before = legend_version(race.id)
+    tag.check_method = "online"
+    tag.save()
+    after = legend_version(race.id)
+    assert before != after
+
+
+@pytest.mark.django_db
+def test_legend_version_changes_when_tag_added_and_removed():
+    from apps.mobile.versioning import legend_version
+    from website.models.checkpoint import Checkpoint, CheckpointTag
+    from website.models.race import Race
+
+    race = Race.objects.create(name="Tag add", slug="tag-add", is_legend_visible=True)
+    cp = Checkpoint.objects.create(race=race, number=1, cost=1, description="cp")
+    before = legend_version(race.id)
+    tag = CheckpointTag.objects.create(point=cp, tag_id="AA:BB", check_method="offline")
+    after_add = legend_version(race.id)
+    assert before != after_add
+    tag.delete()
+    after_remove = legend_version(race.id)
+    assert after_add != after_remove
+
+
+@pytest.mark.django_db
+def test_legend_version_unchanged_when_tag_on_draft_checkpoint_added():
+    from apps.mobile.versioning import legend_version
+    from website.models.checkpoint import Checkpoint, CheckpointTag
+    from website.models.race import Race
+
+    race = Race.objects.create(
+        name="Tag draft", slug="tag-draft", is_legend_visible=True
+    )
+    Checkpoint.objects.create(race=race, number=1, cost=1, description="visible")
+    draft = Checkpoint.objects.create(
+        race=race, number=2, cost=0, description="draft", type="draft"
+    )
+    before = legend_version(race.id)
+    CheckpointTag.objects.create(point=draft, tag_id="AA:BB", check_method="offline")
+    after = legend_version(race.id)
+    assert before == after
+
+
+@pytest.mark.django_db
+def test_legend_version_differs_per_key_id():
+    from apps.mobile.versioning import legend_version
+    from website.models.checkpoint import Checkpoint, CheckpointTag
+    from website.models.race import Race
+
+    race = Race.objects.create(
+        name="Key id legend", slug="key-id-legend", is_legend_visible=True
+    )
+    cp = Checkpoint.objects.create(race=race, number=1, cost=1, description="cp")
+    CheckpointTag.objects.create(point=cp, tag_id="AA:BB", check_method="offline")
+    assert legend_version(race.id, "build-a") != legend_version(race.id, "build-b")
+
+
+@pytest.mark.django_db
+def test_legend_version_tagless_race_stable_across_key_ids():
+    from apps.mobile.versioning import legend_version
+    from website.models.race import Race
+
+    race = Race.objects.create(
+        name="Tagless", slug="tagless-legend", is_legend_visible=True
+    )
+    # No checkpoints/tags: empty aggregates render "None"; must not crash and
+    # must still be deterministic per key_id.
+    assert legend_version(race.id, "build-a") == legend_version(race.id, "build-a")
+    assert legend_version(race.id, "build-a") != legend_version(race.id, "build-b")
 
 
 # --- mobile TeamSerializer --------------------------------------------------
@@ -1921,6 +2225,61 @@ def test_sync_versions_legend_matches_legend_etag(client, settings):
 
     bare = sync_resp.json()["versions"]["legend"]
     assert etag == f'"{bare}"'  # /legend/ ETag is the bare version wrapped in quotes
+
+
+@pytest.mark.django_db
+def test_sync_versions_legend_matches_legend_etag_per_key_id(client, settings):
+    # versions.legend from /sync/ (bare) must equal the legend endpoint ETag
+    # (unquoted) for the *same* key_id — both fold key_id into the fingerprint.
+    from website.models.checkpoint import Checkpoint, CheckpointTag
+    from website.models.race import Race
+
+    settings.MOBILE_APP_KEYS = {"build-a": "secret-a", "build-b": "secret-b"}
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    race = Race.objects.create(
+        name="Sync per build", slug="sync-legend-per-key", is_legend_visible=True
+    )
+    cp = Checkpoint.objects.create(race=race, number=1, cost=1, description="first")
+    CheckpointTag.objects.create(point=cp, tag_id="04A1B2C3", check_method="offline")
+
+    legend_path = f"/app/race/{race.id}/legend/"
+    sync_path = f"/app/race/{race.id}/sync/"
+
+    for key_id, secret in (("build-a", "secret-a"), ("build-b", "secret-b")):
+        legend_resp = client.get(
+            legend_path, **_signed_headers("GET", legend_path, secret, key_id=key_id)
+        )
+        sync_resp = client.get(
+            sync_path, **_signed_headers("GET", sync_path, secret, key_id=key_id)
+        )
+        bare = sync_resp.json()["versions"]["legend"]
+        assert legend_resp["ETag"] == f'"{bare}"'
+
+
+@pytest.mark.django_db
+def test_sync_versions_legend_differs_across_key_ids(client, settings):
+    from website.models.checkpoint import Checkpoint, CheckpointTag
+    from website.models.race import Race
+
+    settings.MOBILE_APP_KEYS = {"build-a": "secret-a", "build-b": "secret-b"}
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    race = Race.objects.create(
+        name="Sync diff build", slug="sync-legend-diff-key", is_legend_visible=True
+    )
+    cp = Checkpoint.objects.create(race=race, number=1, cost=1, description="first")
+    CheckpointTag.objects.create(point=cp, tag_id="04A1B2C3", check_method="offline")
+
+    sync_path = f"/app/race/{race.id}/sync/"
+    resp_a = client.get(
+        sync_path, **_signed_headers("GET", sync_path, "secret-a", key_id="build-a")
+    )
+    resp_b = client.get(
+        sync_path, **_signed_headers("GET", sync_path, "secret-b", key_id="build-b")
+    )
+
+    assert resp_a.json()["versions"]["legend"] != resp_b.json()["versions"]["legend"]
 
 
 @pytest.mark.django_db

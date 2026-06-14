@@ -107,7 +107,9 @@ Django 4.2 project. Source lives entirely under `src/`, with `manage.py` at `src
       never writes `AppInstall`).
     - **Endpoints** (all GET, see `urls.py`): `/app/races/` (published races), `/app/race/<id>/teams/` (teams **plus the
       embedded category catalogue** — deliberately no separate categories endpoint; inactive categories included so
-      every `category2` id resolves), `/app/race/<id>/legend/` (a hidden legend returns `200` with an empty list, not
+      every `category2` id resolves), `/app/race/<id>/legend/` (checkpoints **plus their NFC tags as `tag_hash`** — an
+      HMAC-SHA256 of `tag_id` keyed by the request's per-build secret, never the raw UID; a hidden legend returns `200`
+      with an empty list, not
       403), `/app/race/<id>/sync/` (pure version manifest — no data, no ETag; lease/handoff stubbed: `data_source` from
       `MOBILE_DATA_SOURCE` env, default `"cloud"`, `lease_expires_at` always `null`).
     - **Conditional GET**: races/teams/legend set a strong `ETag` on **every** exit path; a matching `If-None-Match`
@@ -116,9 +118,14 @@ Django 4.2 project. Source lives entirely under `src/`, with `manage.py` at `src
       aggregates computed over the exact queryset the view serves (`None` aggregates render as `"None"`, so an empty
       race is stable). Deliberately **no `versions.categories`** — category edits must move `versions.teams`;
       `races_version()` is global and deliberately absent from the per-race `sync` manifest (the races list is the app's
-      entry point, probed via its own conditional GET).
+      entry point, probed via its own conditional GET). The **legend** fingerprint additionally folds in
+      `MAX(CheckpointTag.updated_at)|COUNT` over the same draft-excluded checkpoints **and** the request's `key_id`, so
+      the legend ETag / `versions.legend` change on any tag edit **and differ per build/secret** — an app update that
+      rotates `X-App-Key-Id` re-fetches the legend (new ETag) instead of getting a `304` with hashes computed under the
+      old secret. `legend_state`/`legend_version` therefore take a `key_id` arg; both `LegendView` and `SyncView` thread
+      it through.
     - **`update_fields` discipline**: the fingerprints rely on `auto_now` `updated_at` fields on `Team`/`Athlet`/
-      `Checkpoint`/`Category`/`Race`. Any `save(update_fields=[...])` on these models **must** include `"updated_at"`,
+      `Checkpoint`/`CheckpointTag`/`Category`/`Race`. Any `save(update_fields=[...])` on these models **must** include `"updated_at"`,
       otherwise the version/ETag goes stale (e.g. the auto `OPEN → SOLD_OUT` `reg_status` flips in
       `check_vtb_payments.py` and `website/models/models.py` include it).
 

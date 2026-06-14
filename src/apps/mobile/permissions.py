@@ -105,7 +105,10 @@ class SignedAppPermission(BasePermission):
             "install_id": install[:64],
             "platform": request.headers.get("X-App-Platform", "")[:16],
             "app_version": request.headers.get("X-App-Version", "")[:32],
-            "key_id": key_id[:32],
+            # Store the full key_id — views use it for MOBILE_APP_KEYS lookup and
+            # legend fingerprinting.  DB column truncation (max_length=32) happens
+            # in _record_install, not here.
+            "key_id": key_id,
             "ip": _client_ip(request),
         }
         return True
