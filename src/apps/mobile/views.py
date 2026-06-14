@@ -144,7 +144,14 @@ class LegendView(AppAPIView):
 
     def get(self, request, race_id):
         get_object_or_404(Race, pk=race_id, is_published=True)
-        version, is_legend_visible = legend_state(race_id)
+        # key_id was already signature-verified by SignedAppPermission against the
+        # same MOBILE_APP_KEYS map, so the subscript cannot KeyError — use it (not
+        # .get()) so a real bug wouldn't be masked. The version folds key_id in so
+        # two builds (different secrets → different tag_hash bodies) never share an
+        # ETag (otherwise a secret rotation would 304 onto stale hashes).
+        key_id = request.app_meta["key_id"]
+        secret = settings.MOBILE_APP_KEYS[key_id]
+        version, is_legend_visible = legend_state(race_id, key_id)
         if is_legend_visible is None:
             # Race was deleted between the 404 check and legend_state; treat as gone.
             raise Http404
@@ -164,11 +171,14 @@ class LegendView(AppAPIView):
             Checkpoint.objects.filter(race_id=race_id)
             .exclude(type=CheckpointType.draft.value)
             .order_by("number", "id")
+            .prefetch_related("tags")
         )
         resp = Response(
             {
                 "race": race_id,
-                "checkpoints": LegendCheckpointSerializer(qs, many=True).data,
+                "checkpoints": LegendCheckpointSerializer(
+                    qs, many=True, context={"secret": secret}
+                ).data,
             }
         )
         resp["ETag"] = quoted
@@ -241,7 +251,9 @@ class SyncView(AppAPIView):
                 "lease_expires_at": None,
                 "versions": {
                     "teams": teams_version(race_id),
-                    "legend": legend_version(race_id),
+                    # key_id folded in so versions.legend equals the legend ETag
+                    # for this build (the legend tag_hash bodies are per-secret).
+                    "legend": legend_version(race_id, request.app_meta["key_id"]),
                 },
             }
         )

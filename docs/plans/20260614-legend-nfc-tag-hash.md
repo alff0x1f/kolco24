@@ -216,27 +216,33 @@ to the hashes from the legend.
 - Modify: `src/apps/mobile/views.py`
 - Modify: `src/apps/mobile/tests.py`
 
-- [ ] in `LegendView.get`, resolve `key_id = request.app_meta["key_id"]` and
+- [x] in `LegendView.get`, resolve `key_id = request.app_meta["key_id"]` and
       `secret = settings.MOBILE_APP_KEYS[key_id]` (subscript, not `.get()` — see
       Technical Details; safe because `key_id` is already permission-verified)
-- [ ] call `legend_state(race_id, key_id)` (the signature gained `key_id` in
+- [x] call `legend_state(race_id, key_id)` (the signature gained `key_id` in
       Task 3) and wrap version in quotes for the ETag (keep the
       `is_legend_visible is None` → `Http404` guard and the `If-None-Match` 304
       short-circuit on every exit path)
-- [ ] add `.prefetch_related("tags")` to the checkpoint queryset and pass
+- [x] add `.prefetch_related("tags")` to the checkpoint queryset and pass
       `context={"secret": secret}` to `LegendCheckpointSerializer`
-- [ ] keep the hidden-legend branch returning `200` with `checkpoints: []` and
+- [x] keep the hidden-legend branch returning `200` with `checkpoints: []` and
       the ETag set
-- [ ] write test: a real signed GET returns checkpoints each with a `tags` array
+- [x] write test: a real signed GET returns checkpoints each with a `tags` array
       of `{id, tag_hash, check_method}`, hash matches `tag_hash(secret, raw)`,
       and no raw `tag_id` appears anywhere in the body
-- [ ] write test: editing a tag changes the response ETag; `If-None-Match` with
+- [x] write test: editing a tag changes the response ETag; `If-None-Match` with
       the new ETag returns `304` (same key_id)
-- [ ] write test: two different `key_id`s get different hashes AND different
+- [x] write test: two different `key_id`s get different hashes AND different
       ETags for the same race
-- [ ] write test: hidden legend (`is_legend_visible=False`) still returns `200`
+- [x] write test: hidden legend (`is_legend_visible=False`) still returns `200`
       with empty `checkpoints` and an ETag
-- [ ] run `uv run pytest src/apps/mobile/tests.py` — must pass before next task
+- [x] run `uv run pytest src/apps/mobile/tests.py` — must pass before next task
+
+Note: the Task 6 SyncView one-liner (`legend_version(race_id, key_id)`) was
+applied here too — it is tightly coupled (the LegendView ETag now folds in
+`key_id`, so leaving `SyncView` on the bare `legend_version` broke the existing
+`test_sync_versions_legend_matches_legend_etag`). Task 6 remains for its own
+tests.
 
 ### Task 6: Thread `key_id` through `SyncView`'s `versions.legend`
 
