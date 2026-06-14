@@ -200,15 +200,15 @@ to the hashes from the legend.
 - Modify: `src/apps/mobile/serializers.py`
 - Modify: `src/apps/mobile/tests.py`
 
-- [ ] add `LegendTagSerializer` with fields `id`, `check_method`, and a
+- [x] add `LegendTagSerializer` with fields `id`, `check_method`, and a
       `tag_hash` `SerializerMethodField` that reads `self.context["secret"]` and
       calls `signing.tag_hash`
-- [ ] add `tags = LegendTagSerializer(many=True)` (source `tags`) to
+- [x] add `tags = LegendTagSerializer(many=True)` (source `tags`) to
       `LegendCheckpointSerializer`; never expose raw `tag_id`
-- [ ] write test (serializer-level): given a secret in context, output is
+- [x] write test (serializer-level): given a secret in context, output is
       `{id, tag_hash, check_method}` with `tag_hash == tag_hash(secret, raw)` and
       no `tag_id` key present
-- [ ] run `uv run pytest src/apps/mobile/tests.py` — must pass before next task
+- [x] run `uv run pytest src/apps/mobile/tests.py` — must pass before next task
 
 ### Task 5: Wire the secret + tags into `LegendView`
 

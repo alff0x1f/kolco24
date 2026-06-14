@@ -2,9 +2,11 @@
 
 from rest_framework import serializers
 
-from website.models.checkpoint import Checkpoint
+from website.models.checkpoint import Checkpoint, CheckpointTag
 from website.models.models import Athlet, Team
 from website.models.race import Category, Race
+
+from . import signing
 
 
 class RaceListSerializer(serializers.ModelSerializer):
@@ -24,15 +26,38 @@ class RaceListSerializer(serializers.ModelSerializer):
         ]
 
 
+class LegendTagSerializer(serializers.ModelSerializer):
+    """Public legend view of an NFC tag.
+
+    Never exposes the raw ``tag_id``: it is served only as ``tag_hash``, an
+    HMAC of the raw UID keyed by the per-build secret (``context["secret"]``),
+    so the physical tag IDs never travel on the wire. The app re-computes the
+    same hash from a scanned UID to match scan → checkpoint offline.
+    """
+
+    tag_hash = serializers.SerializerMethodField()
+
+    def get_tag_hash(self, tag):
+        return signing.tag_hash(self.context["secret"], tag.tag_id)
+
+    class Meta:
+        model = CheckpointTag
+        fields = ["id", "tag_hash", "check_method"]
+
+
 class LegendCheckpointSerializer(serializers.ModelSerializer):
     """Public legend view of a checkpoint.
 
-    Never exposes ``iterator``/``year``.
+    Never exposes ``iterator``/``year``. ``tags`` carries hashed NFC tag UIDs
+    (see ``LegendTagSerializer``); the resolved secret must be threaded through
+    serializer ``context``.
     """
+
+    tags = LegendTagSerializer(many=True)
 
     class Meta:
         model = Checkpoint
-        fields = ["id", "number", "cost", "type", "description"]
+        fields = ["id", "number", "cost", "type", "description", "tags"]
 
 
 class CategorySerializer(serializers.ModelSerializer):

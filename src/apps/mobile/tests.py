@@ -90,6 +90,43 @@ def test_tag_hash_differs_per_secret():
 
 
 @pytest.mark.django_db
+def test_legend_tag_serializer_hashes_tag_id():
+    from apps.mobile.serializers import LegendTagSerializer
+    from website.models.checkpoint import Checkpoint, CheckpointTag
+    from website.models.race import Race
+
+    race = Race.objects.create(name="Tag race", slug="tag-race")
+    point = Checkpoint.objects.create(race=race, number=1, cost=1)
+    tag = CheckpointTag.objects.create(
+        point=point, tag_id="04A1B2C3", check_method="offline"
+    )
+
+    data = LegendTagSerializer(tag, context={"secret": SECRET}).data
+
+    assert set(data.keys()) == {"id", "tag_hash", "check_method"}
+    assert "tag_id" not in data
+    assert data["id"] == tag.id
+    assert data["check_method"] == "offline"
+    assert data["tag_hash"] == tag_hash(SECRET, "04A1B2C3")
+
+
+@pytest.mark.django_db
+def test_legend_checkpoint_serializer_nests_hashed_tags():
+    from apps.mobile.serializers import LegendCheckpointSerializer
+    from website.models.checkpoint import Checkpoint, CheckpointTag
+    from website.models.race import Race
+
+    race = Race.objects.create(name="Tag race 2", slug="tag-race-2")
+    point = Checkpoint.objects.create(race=race, number=1, cost=1)
+    CheckpointTag.objects.create(point=point, tag_id="DEADBEEF", check_method="online")
+
+    data = LegendCheckpointSerializer(point, context={"secret": SECRET}).data
+
+    assert [t["tag_hash"] for t in data["tags"]] == [tag_hash(SECRET, "DEADBEEF")]
+    assert "tag_id" not in data["tags"][0]
+
+
+@pytest.mark.django_db
 def test_appinstall_create_defaults():
     install = AppInstall.objects.create(install_id="abc-123")
     assert install.request_count == 0
@@ -419,7 +456,7 @@ def test_legend_valid_signature_returns_200_with_fields_and_order(client, settin
     assert data["race"] == race.id
     assert [c["number"] for c in data["checkpoints"]] == [1, 2, 3]
     first = data["checkpoints"][0]
-    assert set(first.keys()) == {"id", "number", "cost", "type", "description"}
+    assert set(first.keys()) == {"id", "number", "cost", "type", "description", "tags"}
     assert first["type"] == "kp"
     assert first["description"] == "first"
 
