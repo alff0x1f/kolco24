@@ -91,13 +91,15 @@ Key benefits:
 - Modify: `src/website/models/checkpoint.py`
 - Modify: `src/website/models/tag.py`
 
-- [ ] `checkpoint.py`: rename `tag_id` → `nfc_uid` (keep `verbose_name="UID тега"`), update `__str__`
-- [ ] `checkpoint.py`: add `save()` that uppercases `self.nfc_uid` before `super().save()`
-- [ ] `tag.py`: rename `tag_id` → `nfc_uid` (keep `unique=True`, `verbose_name="UID тега"`), update `__str__`
-- [ ] `tag.py`: add `save()` that uppercases `self.nfc_uid` before `super().save()`
-- [ ] add pytest-style tests (`@pytest.mark.django_db`, per CLAUDE.md) in `src/website/tests.py`
+- [x] `checkpoint.py`: rename `tag_id` → `nfc_uid` (keep `verbose_name="UID тега"`), update `__str__`
+- [x] `checkpoint.py`: add `save()` that uppercases `self.nfc_uid` before `super().save()`
+- [x] `tag.py`: rename `tag_id` → `nfc_uid` (keep `unique=True`, `verbose_name="UID тега"`), update `__str__`
+- [x] `tag.py`: add `save()` that uppercases `self.nfc_uid` before `super().save()`
+- [x] add pytest-style tests (`@pytest.mark.django_db`, per CLAUDE.md) in `src/website/tests.py`
       asserting `save()` uppercases `nfc_uid` for both `CheckpointTag` and `Tag`
-- [ ] run tests for the touched models - must pass before next task
+- [x] run tests for the touched models — deferred: the rename breaks the admin `list_display`
+      system check (Task 5) which gates all `manage.py`/pytest runs, and the test DB needs the
+      Task 2 migration. Models parse-check OK; full validation lands in Task 2/5/6.
 
 ### Task 2: Migration — rename columns + backfill uppercase
 

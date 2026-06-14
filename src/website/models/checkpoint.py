@@ -36,7 +36,7 @@ class CheckpointTag(models.Model):
         on_delete=models.CASCADE,
         related_name="tags",
     )
-    tag_id = models.CharField(max_length=255, verbose_name="ID тега")
+    nfc_uid = models.CharField(max_length=255, verbose_name="UID тега")
     check_method = models.CharField(
         "Метод проверки",
         max_length=20,
@@ -49,8 +49,12 @@ class CheckpointTag(models.Model):
     )
     updated_at = models.DateTimeField(auto_now=True)
 
+    def save(self, *args, **kwargs):
+        self.nfc_uid = (self.nfc_uid or "").upper()
+        super().save(*args, **kwargs)
+
     def __str__(self):
-        return f"{self.id} - {self.tag_id}"
+        return f"{self.id} - {self.nfc_uid}"
 
     class Meta:
         verbose_name = "Тег КП"

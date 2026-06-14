@@ -3,15 +3,19 @@ from django.db import models
 
 class Tag(models.Model):
     number = models.IntegerField(verbose_name="Номер")
-    tag_id = models.CharField(max_length=255, verbose_name="ID тега", unique=True)
+    nfc_uid = models.CharField(max_length=255, verbose_name="UID тега", unique=True)
     last_seen_at = models.DateTimeField(
         null=True,
         blank=True,
         verbose_name="Последнее сканирование",
     )
 
+    def save(self, *args, **kwargs):
+        self.nfc_uid = (self.nfc_uid or "").upper()
+        super().save(*args, **kwargs)
+
     def __str__(self):
-        return f"{self.id} - {self.tag_id}"
+        return f"{self.id} - {self.nfc_uid}"
 
     class Meta:
         verbose_name = "Тег"
