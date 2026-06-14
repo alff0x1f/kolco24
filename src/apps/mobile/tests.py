@@ -2172,6 +2172,61 @@ def test_sync_versions_legend_matches_legend_etag(client, settings):
 
 
 @pytest.mark.django_db
+def test_sync_versions_legend_matches_legend_etag_per_key_id(client, settings):
+    # versions.legend from /sync/ (bare) must equal the legend endpoint ETag
+    # (unquoted) for the *same* key_id — both fold key_id into the fingerprint.
+    from website.models.checkpoint import Checkpoint, CheckpointTag
+    from website.models.race import Race
+
+    settings.MOBILE_APP_KEYS = {"build-a": "secret-a", "build-b": "secret-b"}
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    race = Race.objects.create(
+        name="Sync per build", slug="sync-legend-per-key", is_legend_visible=True
+    )
+    cp = Checkpoint.objects.create(race=race, number=1, cost=1, description="first")
+    CheckpointTag.objects.create(point=cp, tag_id="04A1B2C3", check_method="offline")
+
+    legend_path = f"/app/race/{race.id}/legend/"
+    sync_path = f"/app/race/{race.id}/sync/"
+
+    for key_id, secret in (("build-a", "secret-a"), ("build-b", "secret-b")):
+        legend_resp = client.get(
+            legend_path, **_signed_headers("GET", legend_path, secret, key_id=key_id)
+        )
+        sync_resp = client.get(
+            sync_path, **_signed_headers("GET", sync_path, secret, key_id=key_id)
+        )
+        bare = sync_resp.json()["versions"]["legend"]
+        assert legend_resp["ETag"] == f'"{bare}"'
+
+
+@pytest.mark.django_db
+def test_sync_versions_legend_differs_across_key_ids(client, settings):
+    from website.models.checkpoint import Checkpoint, CheckpointTag
+    from website.models.race import Race
+
+    settings.MOBILE_APP_KEYS = {"build-a": "secret-a", "build-b": "secret-b"}
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    race = Race.objects.create(
+        name="Sync diff build", slug="sync-legend-diff-key", is_legend_visible=True
+    )
+    cp = Checkpoint.objects.create(race=race, number=1, cost=1, description="first")
+    CheckpointTag.objects.create(point=cp, tag_id="04A1B2C3", check_method="offline")
+
+    sync_path = f"/app/race/{race.id}/sync/"
+    resp_a = client.get(
+        sync_path, **_signed_headers("GET", sync_path, "secret-a", key_id="build-a")
+    )
+    resp_b = client.get(
+        sync_path, **_signed_headers("GET", sync_path, "secret-b", key_id="build-b")
+    )
+
+    assert resp_a.json()["versions"]["legend"] != resp_b.json()["versions"]["legend"]
+
+
+@pytest.mark.django_db
 def test_sync_respects_data_source_setting(client, settings):
     settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
     settings.MOBILE_APP_TS_WINDOW = 300

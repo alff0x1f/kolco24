@@ -250,13 +250,13 @@ tests.
 - Modify: `src/apps/mobile/views.py`
 - Modify: `src/apps/mobile/tests.py`
 
-- [ ] in `SyncView.get`, pass `request.app_meta["key_id"]` to
+- [x] in `SyncView.get`, pass `request.app_meta["key_id"]` to
       `legend_version(race_id, key_id)` so `versions.legend` equals the legend
       ETag for that build
-- [ ] write test: `versions.legend` from `/sync/` (bare) equals the legend
+- [x] write test: `versions.legend` from `/sync/` (bare) equals the legend
       endpoint's ETag (unquoted) for the same `key_id`
-- [ ] write test: `versions.legend` differs across two `key_id`s
-- [ ] run `uv run pytest src/apps/mobile/tests.py` — must pass before next task
+- [x] write test: `versions.legend` differs across two `key_id`s
+- [x] run `uv run pytest src/apps/mobile/tests.py` — must pass before next task
 
 ### Task 7: Verify acceptance criteria
 
