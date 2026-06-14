@@ -167,12 +167,13 @@ Key benefits:
 - [x] run full suite - must pass before next task
 
 ### Task 6: Verify acceptance criteria
-- [ ] `grep -rn "\btag_id\b" src/ | grep -v migrations` shows only unrelated hits (`member_tag_id` PK
-      field, `member_tag__` lookups). **Do NOT edit historical migration files** (`0029`/`0030`/`0040`
-      legitimately reference the old `tag_id` and must stay frozen)
-- [ ] `make format && make lint` clean
-- [ ] `uv run pytest` green (full suite)
-- [ ] manually confirm migration applied + backfill uppercased rows on a scratch/dev DB
+- [x] `grep -rn "\btag_id\b" src/ | grep -v migrations` shows only unrelated hits (README — Task 7;
+      mobile `"tag_id" not in data` asserts — intentionally kept). **Do NOT edit historical migration
+      files** (`0029`/`0030`/`0040` legitimately reference the old `tag_id` and must stay frozen)
+- [x] `make format && make lint` clean
+- [x] `uv run pytest` green (full suite — 504 passed)
+- [x] manually confirm migration applied + backfill uppercased rows on dev DB
+      (`0081_rename_tag_id_to_nfc_uid` applied; 328 CheckpointTag + 1017 Tag rows all uppercase)
 
 ### Task 7: [Final] Update documentation
 - [ ] `CLAUDE.md`: update mobile legend / `tag_hash` / `update_fields` mentions of `tag_id` → `nfc_uid`
