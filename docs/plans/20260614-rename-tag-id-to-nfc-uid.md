@@ -106,17 +106,18 @@ Key benefits:
 **Files:**
 - Create: `src/website/migrations/00XX_rename_tag_id_to_nfc_uid.py` (next number after latest)
 
-- [ ] confirm latest `website` migration number (`ls src/website/migrations/`) and set `dependencies`
-- [ ] `migrations.RenameField` for `CheckpointTag` `tag_id`→`nfc_uid`
-- [ ] `migrations.RenameField` for `Tag` `tag_id`→`nfc_uid`
-- [ ] `RunPython` forward: get historical models via `apps.get_model`; uppercase explicitly (do NOT
+- [x] confirm latest `website` migration number (`ls src/website/migrations/`) and set `dependencies`
+- [x] `migrations.RenameField` for `CheckpointTag` `tag_id`→`nfc_uid`
+- [x] `migrations.RenameField` for `Tag` `tag_id`→`nfc_uid`
+- [x] `RunPython` forward: get historical models via `apps.get_model`; uppercase explicitly (do NOT
       rely on the `save()` override — it doesn't exist in historical state)
-- [ ] `RunPython` forward: save `CheckpointTag` rows with `update_fields=["nfc_uid", "updated_at"]`;
+- [x] `RunPython` forward: save `CheckpointTag` rows with `update_fields=["nfc_uid", "updated_at"]`;
       save `Tag` rows with `update_fields=["nfc_uid"]`
-- [ ] `RunPython` forward: pre-check `Tag` for case-insensitive duplicates; raise a clear error if any (don't merge)
-- [ ] `RunPython` reverse: no-op (`migrations.RunPython.noop`)
-- [ ] run `uv run python src/manage.py makemigrations --check` / apply on a scratch DB to verify it runs
-- [ ] verify no other app references the old field name in migrations state
+- [x] `RunPython` forward: pre-check `Tag` for case-insensitive duplicates; raise a clear error if any (don't merge)
+- [x] `RunPython` reverse: no-op (`migrations.RunPython.noop`)
+- [x] run `uv run python src/manage.py makemigrations --check` / apply on a scratch DB to verify it runs
+      (also folded in two `AlterField`s for the `verbose_name` "ID тега"→"UID тега" change from Task 1)
+- [x] verify no other app references the old field name in migrations state
 
 ### Task 3: API serializers + views (wire key → `nfc_uid`)
 
