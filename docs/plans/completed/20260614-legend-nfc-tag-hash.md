@@ -274,15 +274,15 @@ tests.
 - Modify: `src/apps/mobile/README.md`
 - Modify: `CLAUDE.md`
 
-- [ ] README: flip the «теги (`CheckpointTag`) вне области» / «правка тега
+- [x] README: flip the «теги (`CheckpointTag`) вне области» / «правка тега
       версию легенды не сдвигает» notes; update the «Что обновляется» legend
       bullet, the endpoints-table legend row, and the **Статус** block to say
       tags are now served as `tag_hash` and that `legend_version` depends on
       `key_id` + tag aggregates
-- [ ] CLAUDE.md (apps.mobile section): legend endpoint no longer "без tags";
+- [x] CLAUDE.md (apps.mobile section): legend endpoint no longer "без tags";
       add `CheckpointTag.updated_at` to the `update_fields` discipline note; note
       legend ETag/`versions.legend` now vary by `key_id`
-- [ ] move this plan to `docs/plans/completed/`
+- [x] move this plan to `docs/plans/completed/`
 
 ## Post-Completion
 
