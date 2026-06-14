@@ -328,15 +328,21 @@ class PointTagsView(View):
                 )
             nfc_uid = nfc_uid.upper()
 
-            _, created = CheckpointTag.objects.get_or_create(
-                point=point, nfc_uid=nfc_uid
-            )
+            try:
+                _, created = CheckpointTag.objects.get_or_create(
+                    point=point, nfc_uid=nfc_uid
+                )
+            except CheckpointTag.MultipleObjectsReturned:
+                return JsonResponse(
+                    {"error": f"Duplicate tags found for nfc_uid {nfc_uid}."},
+                    status=409,
+                )
             if created:
                 return JsonResponse(
                     {"message": "PointTag created successfully."}, status=201
                 )
             return JsonResponse(
-                {"message": f"PointTag with nfc_uid {nfc_uid} updated."},
+                {"message": f"PointTag with nfc_uid {nfc_uid} already exists."},
                 status=200,
             )
 
