@@ -260,13 +260,13 @@ tests.
 
 ### Task 7: Verify acceptance criteria
 
-- [ ] verify all Overview requirements: tags exposed as hash, no raw `tag_id` on
+- [x] verify all Overview requirements: tags exposed as hash, no raw `tag_id` on
       the wire, ETag/304 correct per `key_id`, sync manifest consistent, hidden
       legend unchanged
-- [ ] verify edge cases: tag-less race, draft-checkpoint tags excluded from
+- [x] verify edge cases: tag-less race, draft-checkpoint tags excluded from
       version, empty aggregates render `"None"`
-- [ ] run full suite: `uv run pytest`
-- [ ] run `make format && make lint`
+- [x] run full suite: `uv run pytest` (500 passed)
+- [x] run `make format && make lint` (all checks passed)
 
 ### Task 8: [Final] Update documentation
 
