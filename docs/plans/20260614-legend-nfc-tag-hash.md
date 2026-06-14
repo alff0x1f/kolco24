@@ -162,13 +162,13 @@ to the hashes from the legend.
 - Modify: `src/apps/mobile/signing.py`
 - Modify: `src/apps/mobile/tests.py`
 
-- [ ] add `tag_hash(secret: str, tag_id: str) -> str` returning
+- [x] add `tag_hash(secret: str, tag_id: str) -> str` returning
       `hmac.new(secret.encode(), tag_id.encode(), hashlib.sha256).hexdigest()`
       with a docstring noting it mirrors the client side
-- [ ] write test: `tag_hash` is deterministic and equals a hand-computed
+- [x] write test: `tag_hash` is deterministic and equals a hand-computed
       `hmac.new(...).hexdigest()` for a known secret/tag_id
-- [ ] write test: different secrets produce different hashes for the same tag_id
-- [ ] run `uv run pytest src/apps/mobile/tests.py` — must pass before next task
+- [x] write test: different secrets produce different hashes for the same tag_id
+- [x] run `uv run pytest src/apps/mobile/tests.py` — must pass before next task
 
 ### Task 3: Fold tag aggregates + `key_id` into the legend fingerprint
 

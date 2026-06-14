@@ -9,7 +9,7 @@ from django.test import RequestFactory
 
 from apps.mobile.models import AppAuthFailure, AppInstall
 from apps.mobile.permissions import SignedAppPermission, _client_ip
-from apps.mobile.signing import build_canonical, sha256_hex, sign, verify
+from apps.mobile.signing import build_canonical, sha256_hex, sign, tag_hash, verify
 
 
 def test_build_canonical_exact_format():
@@ -76,6 +76,17 @@ def test_verify_false_for_changed_path():
         "GET", "/app/race/2/legend/", "1700000000", b""
     )
     assert verify("secret", tampered_canonical, sig) is False
+
+
+def test_tag_hash_matches_hmac():
+    expected = hmac.new(b"secret", b"04A1B2C3", hashlib.sha256).hexdigest()
+    assert tag_hash("secret", "04A1B2C3") == expected
+    # deterministic across calls
+    assert tag_hash("secret", "04A1B2C3") == tag_hash("secret", "04A1B2C3")
+
+
+def test_tag_hash_differs_per_secret():
+    assert tag_hash("secret", "04A1B2C3") != tag_hash("other-secret", "04A1B2C3")
 
 
 @pytest.mark.django_db
