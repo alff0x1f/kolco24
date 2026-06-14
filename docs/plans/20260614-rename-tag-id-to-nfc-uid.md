@@ -143,12 +143,13 @@ Key benefits:
 - Modify: `src/apps/mobile/signing.py`
 - Modify: `src/apps/mobile/versioning.py`
 
-- [ ] `serializers.py`: `signing.tag_hash(secret, tag.nfc_uid)`; update docstring mentions of `tag_id`
-- [ ] `signing.py`: rename param `tag_id` → `nfc_uid` (cosmetic; update docstring)
-- [ ] `versioning.py`: rename internal references/docstrings mentioning `tag_id` (no behavior change)
-- [ ] update `src/apps/mobile/tests.py`: `CheckpointTag.objects.create(nfc_uid=...)` everywhere;
+- [x] `serializers.py`: `signing.tag_hash(secret, tag.nfc_uid)`; update docstring mentions of `tag_id`
+- [x] `signing.py`: rename param `tag_id` → `nfc_uid` (cosmetic; update docstring)
+- [x] `versioning.py`: rename internal references/docstrings mentioning `tag_id` (no behavior change)
+      — none present (uses `updated_at`/`id` aggregates only), no edit needed
+- [x] update `src/apps/mobile/tests.py`: `CheckpointTag.objects.create(nfc_uid=...)` everywhere;
       keep `"tag_id" not in data` asserts and add `"nfc_uid" not in data` where relevant
-- [ ] run `mobile` tests (legend hashing, ETag/version) - must pass before next task
+- [x] run `mobile` tests (legend hashing, ETag/version) - must pass before next task
 
 ### Task 5: Remaining internal callers (website views + admin)
 

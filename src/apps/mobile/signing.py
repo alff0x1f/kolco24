@@ -36,11 +36,11 @@ def verify(secret: str, canonical: str, provided_sig: str) -> bool:
         return False
 
 
-def tag_hash(secret: str, tag_id: str) -> str:
-    """HMAC-SHA256 hexdigest of ``tag_id`` keyed by the per-build ``secret``.
+def tag_hash(secret: str, nfc_uid: str) -> str:
+    """HMAC-SHA256 hexdigest of ``nfc_uid`` keyed by the per-build ``secret``.
 
     Mirrors the client side: the app hashes a scanned NFC UID string with the
     same per-build secret and compares against the ``tag_hash`` values served in
-    the legend, so the raw ``tag_id`` never travels on the wire.
+    the legend, so the raw ``nfc_uid`` never travels on the wire.
     """
-    return hmac.new(secret.encode(), tag_id.encode(), hashlib.sha256).hexdigest()
+    return hmac.new(secret.encode(), nfc_uid.encode(), hashlib.sha256).hexdigest()

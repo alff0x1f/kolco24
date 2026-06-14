@@ -98,13 +98,14 @@ def test_legend_tag_serializer_hashes_tag_id():
     race = Race.objects.create(name="Tag race", slug="tag-race")
     point = Checkpoint.objects.create(race=race, number=1, cost=1)
     tag = CheckpointTag.objects.create(
-        point=point, tag_id="04A1B2C3", check_method="offline"
+        point=point, nfc_uid="04A1B2C3", check_method="offline"
     )
 
     data = LegendTagSerializer(tag, context={"secret": SECRET}).data
 
     assert set(data.keys()) == {"id", "tag_hash", "check_method"}
     assert "tag_id" not in data
+    assert "nfc_uid" not in data
     assert data["id"] == tag.id
     assert data["check_method"] == "offline"
     assert data["tag_hash"] == tag_hash(SECRET, "04A1B2C3")
@@ -118,12 +119,13 @@ def test_legend_checkpoint_serializer_nests_hashed_tags():
 
     race = Race.objects.create(name="Tag race 2", slug="tag-race-2")
     point = Checkpoint.objects.create(race=race, number=1, cost=1)
-    CheckpointTag.objects.create(point=point, tag_id="DEADBEEF", check_method="online")
+    CheckpointTag.objects.create(point=point, nfc_uid="DEADBEEF", check_method="online")
 
     data = LegendCheckpointSerializer(point, context={"secret": SECRET}).data
 
     assert [t["tag_hash"] for t in data["tags"]] == [tag_hash(SECRET, "DEADBEEF")]
     assert "tag_id" not in data["tags"][0]
+    assert "nfc_uid" not in data["tags"][0]
 
 
 @pytest.mark.django_db
@@ -765,8 +767,8 @@ def test_legend_serves_hashed_tags_and_never_raw_tag_id(client, settings):
         name="Hashed legend", slug="hashed-legend", is_legend_visible=True
     )
     cp = Checkpoint.objects.create(race=race, number=1, cost=1, description="first")
-    CheckpointTag.objects.create(point=cp, tag_id="04A1B2C3", check_method="offline")
-    CheckpointTag.objects.create(point=cp, tag_id="DEADBEEF", check_method="online")
+    CheckpointTag.objects.create(point=cp, nfc_uid="04A1B2C3", check_method="offline")
+    CheckpointTag.objects.create(point=cp, nfc_uid="DEADBEEF", check_method="online")
 
     path = f"/app/race/{race.id}/legend/"
     response = client.get(path, **_signed_headers("GET", path, SECRET))
@@ -781,6 +783,7 @@ def test_legend_serves_hashed_tags_and_never_raw_tag_id(client, settings):
     for t in tags:
         assert set(t.keys()) == {"id", "tag_hash", "check_method"}
         assert "tag_id" not in t
+        assert "nfc_uid" not in t
     # the raw UID never appears anywhere in the serialized body
     body = response.content.decode()
     assert "04A1B2C3" not in body
@@ -798,7 +801,7 @@ def test_legend_etag_changes_when_tag_edited_and_304_with_new_etag(client, setti
     race = Race.objects.create(name="Tag etag", slug="tag-etag", is_legend_visible=True)
     cp = Checkpoint.objects.create(race=race, number=1, cost=1, description="first")
     tag = CheckpointTag.objects.create(
-        point=cp, tag_id="04A1B2C3", check_method="offline"
+        point=cp, nfc_uid="04A1B2C3", check_method="offline"
     )
 
     path = f"/app/race/{race.id}/legend/"
@@ -839,7 +842,7 @@ def test_legend_etag_changes_when_tag_edited_with_update_fields(client, settings
     )
     cp = Checkpoint.objects.create(race=race, number=1, cost=1, description="first")
     tag = CheckpointTag.objects.create(
-        point=cp, tag_id="04A1B2C3", check_method="offline"
+        point=cp, nfc_uid="04A1B2C3", check_method="offline"
     )
 
     path = f"/app/race/{race.id}/legend/"
@@ -865,7 +868,7 @@ def test_legend_different_key_ids_get_different_hashes_and_etags(client, setting
         name="Per build", slug="per-build-legend", is_legend_visible=True
     )
     cp = Checkpoint.objects.create(race=race, number=1, cost=1, description="first")
-    CheckpointTag.objects.create(point=cp, tag_id="04A1B2C3", check_method="offline")
+    CheckpointTag.objects.create(point=cp, nfc_uid="04A1B2C3", check_method="offline")
 
     path = f"/app/race/{race.id}/legend/"
     resp_a = client.get(
@@ -895,7 +898,7 @@ def test_legend_hidden_still_200_empty_with_etag_when_tags_present(client, setti
         name="Hidden with tags", slug="hidden-tags", is_legend_visible=False
     )
     cp = Checkpoint.objects.create(race=race, number=1, cost=1, description="secret")
-    CheckpointTag.objects.create(point=cp, tag_id="04A1B2C3", check_method="offline")
+    CheckpointTag.objects.create(point=cp, nfc_uid="04A1B2C3", check_method="offline")
 
     path = f"/app/race/{race.id}/legend/"
     response = client.get(path, **_signed_headers("GET", path, SECRET))
@@ -1492,7 +1495,9 @@ def test_legend_version_changes_when_tag_check_method_edited():
 
     race = Race.objects.create(name="Tag edit", slug="tag-edit", is_legend_visible=True)
     cp = Checkpoint.objects.create(race=race, number=1, cost=1, description="cp")
-    tag = CheckpointTag.objects.create(point=cp, tag_id="AA:BB", check_method="offline")
+    tag = CheckpointTag.objects.create(
+        point=cp, nfc_uid="AA:BB", check_method="offline"
+    )
     before = legend_version(race.id)
     tag.check_method = "online"
     tag.save()
@@ -1509,7 +1514,9 @@ def test_legend_version_changes_when_tag_added_and_removed():
     race = Race.objects.create(name="Tag add", slug="tag-add", is_legend_visible=True)
     cp = Checkpoint.objects.create(race=race, number=1, cost=1, description="cp")
     before = legend_version(race.id)
-    tag = CheckpointTag.objects.create(point=cp, tag_id="AA:BB", check_method="offline")
+    tag = CheckpointTag.objects.create(
+        point=cp, nfc_uid="AA:BB", check_method="offline"
+    )
     after_add = legend_version(race.id)
     assert before != after_add
     tag.delete()
@@ -1531,7 +1538,7 @@ def test_legend_version_unchanged_when_tag_on_draft_checkpoint_added():
         race=race, number=2, cost=0, description="draft", type="draft"
     )
     before = legend_version(race.id)
-    CheckpointTag.objects.create(point=draft, tag_id="AA:BB", check_method="offline")
+    CheckpointTag.objects.create(point=draft, nfc_uid="AA:BB", check_method="offline")
     after = legend_version(race.id)
     assert before == after
 
@@ -1546,7 +1553,7 @@ def test_legend_version_differs_per_key_id():
         name="Key id legend", slug="key-id-legend", is_legend_visible=True
     )
     cp = Checkpoint.objects.create(race=race, number=1, cost=1, description="cp")
-    CheckpointTag.objects.create(point=cp, tag_id="AA:BB", check_method="offline")
+    CheckpointTag.objects.create(point=cp, nfc_uid="AA:BB", check_method="offline")
     assert legend_version(race.id, "build-a") != legend_version(race.id, "build-b")
 
 
@@ -2241,7 +2248,7 @@ def test_sync_versions_legend_matches_legend_etag_per_key_id(client, settings):
         name="Sync per build", slug="sync-legend-per-key", is_legend_visible=True
     )
     cp = Checkpoint.objects.create(race=race, number=1, cost=1, description="first")
-    CheckpointTag.objects.create(point=cp, tag_id="04A1B2C3", check_method="offline")
+    CheckpointTag.objects.create(point=cp, nfc_uid="04A1B2C3", check_method="offline")
 
     legend_path = f"/app/race/{race.id}/legend/"
     sync_path = f"/app/race/{race.id}/sync/"
@@ -2269,7 +2276,7 @@ def test_sync_versions_legend_differs_across_key_ids(client, settings):
         name="Sync diff build", slug="sync-legend-diff-key", is_legend_visible=True
     )
     cp = Checkpoint.objects.create(race=race, number=1, cost=1, description="first")
-    CheckpointTag.objects.create(point=cp, tag_id="04A1B2C3", check_method="offline")
+    CheckpointTag.objects.create(point=cp, nfc_uid="04A1B2C3", check_method="offline")
 
     sync_path = f"/app/race/{race.id}/sync/"
     resp_a = client.get(
