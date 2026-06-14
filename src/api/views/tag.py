@@ -15,7 +15,7 @@ class MemberTagListCreateView(ListCreateAPIView):
 
     {
       "number": 1050,
-      "tag_id": "045D7B32F31C90"
+      "nfc_uid": "045D7B32F31C90"
     }
     """
 
@@ -38,18 +38,18 @@ class CheckpointTagCreateView(APIView):
         serializer = CheckpointTagSerializer(data=request.data)
         if serializer.is_valid():
             number = serializer.validated_data.get("number")
-            tag_id = serializer.validated_data.get("tag_id")
+            nfc_uid = serializer.validated_data.get("nfc_uid")
 
             control_point = self.get_control_point(race_id, number)
             checkpoint_tag = CheckpointTag.objects.create(
-                point=control_point, tag_id=tag_id
+                point=control_point, nfc_uid=nfc_uid
             )
 
             return Response(
                 {
                     "id": checkpoint_tag.id,
                     "point": checkpoint_tag.point.id,
-                    "tag_id": checkpoint_tag.tag_id,
+                    "nfc_uid": checkpoint_tag.nfc_uid,
                 },
                 status=status.HTTP_201_CREATED,
             )
@@ -71,12 +71,12 @@ class MemberTagTouchView(APIView):
         serializer = TagTouchSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        tag_id = serializer.validated_data["tag_id"]
+        nfc_uid = serializer.validated_data["nfc_uid"]
 
         try:
-            tag = Tag.objects.get(tag_id=tag_id)
+            tag = Tag.objects.get(nfc_uid=nfc_uid)
         except Tag.DoesNotExist:
-            raise NotFound({"tag_id": [f"Тег с ID {tag_id} не найден"]})
+            raise NotFound({"nfc_uid": [f"Тег с ID {nfc_uid} не найден"]})
 
         tag.last_seen_at = timezone.now()
         tag.save(update_fields=["last_seen_at"])

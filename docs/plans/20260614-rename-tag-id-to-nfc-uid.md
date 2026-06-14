@@ -126,15 +126,15 @@ Key benefits:
 - Modify: `src/api/views/tag.py`
 - Modify: `src/api/views/teams.py`
 
-- [ ] `serializers/tag.py`: `TagSerializer.fields`, `CheckpointTagSerializer.tag_id`,
+- [x] `serializers/tag.py`: `TagSerializer.fields`, `CheckpointTagSerializer.tag_id`,
       `CheckpointTagSerializer2.fields`, `TagTouchSerializer.tag_id` → `nfc_uid`
-- [ ] `views/tag.py`: `CheckpointTagCreateView` (validated_data key, `create(nfc_uid=...)`, response key, docstring)
-- [ ] `views/tag.py`: `MemberTagTouchView` (validated_data key, `Tag.objects.get(nfc_uid=...)`, error msg),
+- [x] `views/tag.py`: `CheckpointTagCreateView` (validated_data key, `create(nfc_uid=...)`, response key, docstring)
+- [x] `views/tag.py`: `MemberTagTouchView` (validated_data key, `Tag.objects.get(nfc_uid=...)`, error msg),
       `MemberTagListCreateView` docstring example
-- [ ] `views/teams.py`: `Tag.objects.filter(nfc_uid__iexact=...)`, `tag.nfc_uid.upper()`
-- [ ] update `src/api/tests.py` member-tag create/touch tests (request + response key `nfc_uid`).
+- [x] `views/teams.py`: `Tag.objects.filter(nfc_uid__iexact=...)`, `tag.nfc_uid.upper()`
+- [x] update `src/api/tests.py` member-tag create/touch tests (request + response key `nfc_uid`).
       NOTE: this file is `APITestCase`/`TestCase` style — edit in-place, do NOT rewrite to pytest style (out of scope)
-- [ ] run `api` tests - must pass before next task
+- [x] run `api` tests - must pass before next task
 
 ### Task 4: Mobile internals (no wire change — `tag_hash` only)
 

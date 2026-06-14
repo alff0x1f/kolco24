@@ -160,7 +160,7 @@ class TeamStartView(APIView):
             member_tag_values = [value for value in member_tag_values if value]
 
             for tag_value in member_tag_values:
-                tag = Tag.objects.filter(tag_id__iexact=tag_value).first()
+                tag = Tag.objects.filter(nfc_uid__iexact=tag_value).first()
                 if not tag:
                     continue
 
@@ -203,7 +203,7 @@ class TeamFinishView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        if tag.tag_id.upper() != normalized_tag_uid:
+        if tag.nfc_uid.upper() != normalized_tag_uid:
             return Response(
                 {"tag_uid": ["UID не соответствует указанному тегу"]},
                 status=status.HTTP_400_BAD_REQUEST,
