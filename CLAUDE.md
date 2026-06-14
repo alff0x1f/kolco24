@@ -108,7 +108,7 @@ Django 4.2 project. Source lives entirely under `src/`, with `manage.py` at `src
     - **Endpoints** (all GET, see `urls.py`): `/app/races/` (published races), `/app/race/<id>/teams/` (teams **plus the
       embedded category catalogue** — deliberately no separate categories endpoint; inactive categories included so
       every `category2` id resolves), `/app/race/<id>/legend/` (checkpoints **plus their NFC tags as `tag_hash`** — an
-      HMAC-SHA256 of `tag_id` keyed by the request's per-build secret, never the raw UID; a hidden legend returns `200`
+      HMAC-SHA256 of `nfc_uid` keyed by the request's per-build secret, never the raw UID; a hidden legend returns `200`
       with an empty list, not
       403), `/app/race/<id>/sync/` (pure version manifest — no data, no ETag; lease/handoff stubbed: `data_source` from
       `MOBILE_DATA_SOURCE` env, default `"cloud"`, `lease_expires_at` always `null`).

@@ -176,9 +176,9 @@ Key benefits:
       (`0081_rename_tag_id_to_nfc_uid` applied; 328 CheckpointTag + 1017 Tag rows all uppercase)
 
 ### Task 7: [Final] Update documentation
-- [ ] `CLAUDE.md`: update mobile legend / `tag_hash` / `update_fields` mentions of `tag_id` → `nfc_uid`
-- [ ] `src/apps/mobile/README.md`: lines ~56-57, ~353-356 `tag_id` → `nfc_uid`
-- [ ] move this plan to `docs/plans/completed/`
+- [x] `CLAUDE.md`: update mobile legend / `tag_hash` / `update_fields` mentions of `tag_id` → `nfc_uid`
+- [x] `src/apps/mobile/README.md`: lines ~56-57, ~353-356 `tag_id` → `nfc_uid`
+- [x] move this plan to `docs/plans/completed/`
 
 ## Post-Completion
 *Items requiring manual intervention or external systems — informational only*
