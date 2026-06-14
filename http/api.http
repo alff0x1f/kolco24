@@ -7,7 +7,7 @@ Content-Type: application/json
 
 {
   "point_number": 0,
-  "tag_id": "01"
+  "nfc_uid": "01"
 }
 
 ###

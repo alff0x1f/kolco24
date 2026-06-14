@@ -90,7 +90,7 @@ def test_tag_hash_differs_per_secret():
 
 
 @pytest.mark.django_db
-def test_legend_tag_serializer_hashes_tag_id():
+def test_legend_tag_serializer_hashes_nfc_uid():
     from apps.mobile.serializers import LegendTagSerializer
     from website.models.checkpoint import Checkpoint, CheckpointTag
     from website.models.race import Race

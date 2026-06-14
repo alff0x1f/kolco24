@@ -80,7 +80,7 @@ class TeamMemberRaceLogAdmin(admin.ModelAdmin):
         "finish_time",
     )
     list_filter = ("race",)
-    search_fields = ("member_tag__tag_id", "member_tag__number")
+    search_fields = ("member_tag__nfc_uid", "member_tag__number")
 
 
 class TeamAdmin(admin.ModelAdmin):

@@ -125,8 +125,7 @@ class TeamMemberRaceLogView(View):
         entries = []
         for log in logs:
             tag = log.member_tag
-            tag_uid = (tag.nfc_uid or "").strip()
-            normalized = tag_uid.upper()
+            normalized = tag.nfc_uid
             team = tag_to_team.get(normalized)
             fallback_start = tag_to_start_timestamp.get(normalized, 0)
             effective_start = log.start_time or fallback_start
@@ -134,7 +133,7 @@ class TeamMemberRaceLogView(View):
                 {
                     "log": log,
                     "tag_number": tag.number,
-                    "tag_uid": tag_uid,
+                    "tag_uid": normalized,
                     "team": team,
                     "team_label": self._make_team_label(team),
                     "start_timestamp": effective_start,
@@ -327,8 +326,9 @@ class PointTagsView(View):
                 return JsonResponse(
                     {"error": "nfc_uid is a required field."}, status=400
                 )
+            nfc_uid = nfc_uid.upper()
 
-            _, created = CheckpointTag.objects.update_or_create(
+            _, created = CheckpointTag.objects.get_or_create(
                 point=point, nfc_uid=nfc_uid
             )
             if created:

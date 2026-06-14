@@ -128,6 +128,10 @@ Django 4.2 project. Source lives entirely under `src/`, with `manage.py` at `src
       `Checkpoint`/`CheckpointTag`/`Category`/`Race`. Any `save(update_fields=[...])` on these models **must** include `"updated_at"`,
       otherwise the version/ETag goes stale (e.g. the auto `OPEN → SOLD_OUT` `reg_status` flips in
       `check_vtb_payments.py` and `website/models/models.py` include it).
+    - **`nfc_uid` uppercase invariant**: `Tag.nfc_uid` and `CheckpointTag.nfc_uid` are auto-uppercased by their
+      `save()` overrides. Code that calls `save(update_fields=[..., "nfc_uid", ...])` bypasses this override and
+      **must uppercase the value itself** before saving. Lookups against `nfc_uid` should use the plain exact-match
+      (`nfc_uid=value.upper()`) rather than `__iexact`, since stored values are always uppercase.
 
 New feature apps that don't fit in `website` live under `src/apps/<name>/`. Each needs a unique `AppConfig` label (e.g.
 `label = "race_app"`).
