@@ -549,6 +549,28 @@ def test_legend_unpublished_race_returns_404(client, settings):
 
 
 @pytest.mark.django_db
+def test_legend_race_deleted_mid_request_returns_404(client, settings, monkeypatch):
+    """legend_state returning visible=None (race deleted after 404 check) → 404."""
+    import apps.mobile.views as mobile_views
+    from website.models.race import Race
+
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    race = Race.objects.create(
+        name="Ghost", slug="ghost-legend", is_legend_visible=True
+    )
+    path = f"/app/race/{race.id}/legend/"
+
+    monkeypatch.setattr(
+        mobile_views, "legend_state", lambda *a, **kw: ("deadbeef00000000", None)
+    )
+
+    response = client.get(path, **_signed_headers("GET", path, SECRET))
+    assert response.status_code == 404
+
+
+@pytest.mark.django_db
 def test_legend_records_appinstall_and_increments(
     client, settings, race_with_checkpoints
 ):
@@ -795,6 +817,40 @@ def test_legend_etag_changes_when_tag_edited_and_304_with_new_etag(client, setti
     third = client.get(path, **headers)
     assert third.status_code == 304
     assert third["ETag"] == new_etag
+
+
+@pytest.mark.django_db
+def test_legend_etag_changes_when_tag_edited_with_update_fields(client, settings):
+    """save(update_fields=[..., "updated_at"]) on CheckpointTag must move the ETag.
+
+    CLAUDE.md mandates that save(update_fields=...) on auto_now models must
+    include "updated_at"; this verifies that discipline keeps the legend
+    fingerprint fresh (i.e. omitting "updated_at" from update_fields would
+    silently stale the ETag, and this test would catch it).
+    """
+    from website.models.checkpoint import Checkpoint, CheckpointTag
+    from website.models.race import Race
+
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    race = Race.objects.create(
+        name="Tag etag uf", slug="tag-etag-uf", is_legend_visible=True
+    )
+    cp = Checkpoint.objects.create(race=race, number=1, cost=1, description="first")
+    tag = CheckpointTag.objects.create(
+        point=cp, tag_id="04A1B2C3", check_method="offline"
+    )
+
+    path = f"/app/race/{race.id}/legend/"
+    first = client.get(path, **_signed_headers("GET", path, SECRET))
+    old_etag = first["ETag"]
+
+    tag.check_method = "online"
+    tag.save(update_fields=["check_method", "updated_at"])
+
+    second = client.get(path, **_signed_headers("GET", path, SECRET))
+    assert second["ETag"] != old_etag
 
 
 @pytest.mark.django_db

@@ -98,7 +98,10 @@ class AppAPIView(APIView):
                 defaults={
                     "platform": meta.get("platform", ""),
                     "app_version": meta.get("app_version", ""),
-                    "key_id": meta.get("key_id", ""),
+                    # AppInstall.key_id is max_length=32; truncate here, not in
+                    # app_meta (where the full key_id is needed for MOBILE_APP_KEYS
+                    # lookup and legend fingerprinting).
+                    "key_id": meta.get("key_id", "")[:32],
                     "last_ip": meta.get("ip"),
                 },
             )
