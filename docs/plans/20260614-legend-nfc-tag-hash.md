@@ -142,18 +142,18 @@ to the hashes from the legend.
 - Modify: `src/website/models/checkpoint.py`
 - Create: `src/website/migrations/0080_checkpointtag_updated_at.py`
 
-- [ ] add `updated_at = models.DateTimeField(auto_now=True)` to `CheckpointTag`
-- [ ] generate the migration: `uv run python src/manage.py makemigrations website`
-- [ ] confirm the file is named `0080_checkpointtag_updated_at` and depends on
+- [x] add `updated_at = models.DateTimeField(auto_now=True)` to `CheckpointTag`
+- [x] generate the migration: `uv run python src/manage.py makemigrations website`
+- [x] confirm the file is named `0080_checkpointtag_updated_at` and depends on
       `0079_race_updated_at`
-- [ ] run `uv run python src/manage.py migrate` against the local DB to confirm
+- [x] run `uv run python src/manage.py migrate` against the local DB to confirm
       it applies cleanly
-- [ ] verify there are **no** `CheckpointTag.save(update_fields=[...])` sites in
+- [x] verify there are **no** `CheckpointTag.save(update_fields=[...])` sites in
       the codebase (the `update_fields` discipline rule); the only production
       write path is `website/views/views_.py:331`
       `CheckpointTag.objects.update_or_create(point=point, tag_id=tag_id)`, which
       moves the fingerprint via create/delete (COUNT), not in-place edit
-- [ ] run `uv run pytest src/apps/mobile/tests.py` (existing tests still green)
+- [x] run `uv run pytest src/apps/mobile/tests.py` (existing tests still green)
       — must pass before next task
 
 ### Task 2: Add `tag_hash` HMAC helper
