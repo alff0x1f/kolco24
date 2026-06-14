@@ -125,7 +125,7 @@ class TeamMemberRaceLogView(View):
         entries = []
         for log in logs:
             tag = log.member_tag
-            tag_uid = (tag.tag_id or "").strip()
+            tag_uid = (tag.nfc_uid or "").strip()
             normalized = tag_uid.upper()
             team = tag_to_team.get(normalized)
             fallback_start = tag_to_start_timestamp.get(normalized, 0)
@@ -322,21 +322,21 @@ class PointTagsView(View):
                     status=404,
                 )
 
-            tag_id = data.get("tag_id")
-            if tag_id is None:
+            nfc_uid = data.get("nfc_uid")
+            if nfc_uid is None:
                 return JsonResponse(
-                    {"error": "tag_id is a required field."}, status=400
+                    {"error": "nfc_uid is a required field."}, status=400
                 )
 
             _, created = CheckpointTag.objects.update_or_create(
-                point=point, tag_id=tag_id
+                point=point, nfc_uid=nfc_uid
             )
             if created:
                 return JsonResponse(
                     {"message": "PointTag created successfully."}, status=201
                 )
             return JsonResponse(
-                {"message": f"PointTag with tag_id {tag_id} updated."},
+                {"message": f"PointTag with nfc_uid {nfc_uid} updated."},
                 status=200,
             )
 

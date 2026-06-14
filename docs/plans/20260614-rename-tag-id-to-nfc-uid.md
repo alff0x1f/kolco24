@@ -157,13 +157,14 @@ Key benefits:
 - Modify: `src/website/views/views_.py`
 - Modify: `src/website/admin.py`
 
-- [ ] `views_.py:128`: `tag.nfc_uid` (member_tag is a `Tag`)
-- [ ] `views_.py` `PointTagsView`: `update_or_create(point=..., nfc_uid=...)` and request body key
+- [x] `views_.py:128`: `tag.nfc_uid` (member_tag is a `Tag`)
+- [x] `views_.py` `PointTagsView`: `update_or_create(point=..., nfc_uid=...)` and request body key
       `data.get("nfc_uid")` + messages
-- [ ] `admin.py`: `CheckpointTagAdmin.list_display` `tag_id`→`nfc_uid`; `TagAdmin.list_display` +
+- [x] `admin.py`: `CheckpointTagAdmin.list_display` `tag_id`→`nfc_uid`; `TagAdmin.list_display` +
       `search_fields` `tag_id`→`nfc_uid`
-- [ ] grep for any remaining `\btag_id\b` referencing these two models; fix stragglers
-- [ ] run full suite - must pass before next task
+- [x] grep for any remaining `\btag_id\b` referencing these two models; fix stragglers
+      (remaining hits: README — Task 7; mobile `"tag_id" not in data` asserts — intentionally kept)
+- [x] run full suite - must pass before next task
 
 ### Task 6: Verify acceptance criteria
 - [ ] `grep -rn "\btag_id\b" src/ | grep -v migrations` shows only unrelated hits (`member_tag_id` PK
