@@ -71,7 +71,7 @@ class MemberTagTouchView(APIView):
         serializer = TagTouchSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        nfc_uid = serializer.validated_data["nfc_uid"]
+        nfc_uid = serializer.validated_data["nfc_uid"].upper()
 
         try:
             tag = Tag.objects.get(nfc_uid=nfc_uid)
