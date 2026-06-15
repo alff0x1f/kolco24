@@ -101,7 +101,9 @@ def checkpoint_saved(sender, instance, **kwargs):
     )
 
     if lock_toggled or bundle_filter_changed:
-        dependents = set(instance.tags.all()) | set(instance.unlocked_by.all())
+        dependents = set(instance.tags.select_related("point").all()) | set(
+            instance.unlocked_by.select_related("point").all()
+        )
         for tag in dependents:
             _build_bundle_guarded(tag)
 
@@ -110,7 +112,7 @@ def checkpoint_saved(sender, instance, **kwargs):
 def checkpoint_pre_delete(sender, instance, **kwargs):
     # Capture tags that listed this checkpoint in their unlocks M2M *before*
     # the DB CASCADE deletes the junction rows (after which unlocked_by is empty).
-    _pre_delete_tags.value = list(instance.unlocked_by.all())
+    _pre_delete_tags.value = list(instance.unlocked_by.select_related("point").all())
 
 
 @receiver(post_delete, sender=Checkpoint, dispatch_uid="mobile_checkpoint_post_delete")
@@ -154,9 +156,13 @@ def checkpointtag_unlocks_changed(sender, instance, action, pk_set, **kwargs):
         if action == "post_clear":
             pks = getattr(_pre_clear_pks, "value", None) or []
             _pre_clear_pks.value = None
-            tags = list(CheckpointTag.objects.filter(pk__in=pks))
+            tags = list(
+                CheckpointTag.objects.select_related("point").filter(pk__in=pks)
+            )
         elif pk_set:
-            tags = list(CheckpointTag.objects.filter(pk__in=pk_set))
+            tags = list(
+                CheckpointTag.objects.select_related("point").filter(pk__in=pk_set)
+            )
         else:
             tags = []
     for tag in tags:

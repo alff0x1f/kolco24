@@ -78,7 +78,7 @@ def ensure_code(tag):
     Regenerating an existing code would break tags already written in the field,
     so this is a no-op once a code is present.
     """
-    if not tag.code:
+    if tag.code is None:
         tag.code = os.urandom(16)
     return tag
 
