@@ -241,13 +241,13 @@ Response shape:
 - Modify: `src/apps/mobile/apps.py` (`MobileConfig.ready()` imports signals)
 - Modify: `src/apps/mobile/tests.py`
 
-- [ ] `post_save(Checkpoint)` → `seal_checkpoint`; on lock toggle also rebuild bundles of `cp.tags.all()` **∪** `cp.unlocked_by.all()` (the `∪ cp.tags` covers implicit-`[point]` tags with empty `unlocks`)
-- [ ] `post_save(CheckpointTag)` + `m2m_changed(unlocks)` on `post_add`/`post_remove`/`post_clear` → `build_bundle`
-- [ ] add recursion guard: `post_save(CheckpointTag)` early-returns when `update_fields == {"code","bid","bundle_blob","updated_at"}`; thread-local flag fences the `m2m_changed` path
-- [ ] write tests: locking a КП via `save()` creates its secret; toggling lock rebuilds dependent bundles **including an implicit-`[point]` tag**
-- [ ] write tests: editing a tag's `unlocks` rebuilds its bundle; no infinite recursion (tag save + m2m change)
-- [ ] write tests: a bundle rebuild **moves the legend ETag** (guards the `update_fields` must-include-`updated_at` rule)
-- [ ] run tests — must pass before next task
+- [x] `post_save(Checkpoint)` → `seal_checkpoint`; on lock toggle also rebuild bundles of `cp.tags.all()` **∪** `cp.unlocked_by.all()` (the `∪ cp.tags` covers implicit-`[point]` tags with empty `unlocks`)
+- [x] `post_save(CheckpointTag)` + `m2m_changed(unlocks)` on `post_add`/`post_remove`/`post_clear` → `build_bundle`
+- [x] add recursion guard: `post_save(CheckpointTag)` early-returns when `update_fields == {"code","bid","bundle_blob","updated_at"}`; thread-local flag fences the `m2m_changed` path
+- [x] write tests: locking a КП via `save()` creates its secret; toggling lock rebuilds dependent bundles **including an implicit-`[point]` tag**
+- [x] write tests: editing a tag's `unlocks` rebuilds its bundle; no infinite recursion (tag save + m2m change)
+- [x] write tests: a bundle rebuild **moves the legend ETag** (guards the `update_fields` must-include-`updated_at` rule)
+- [x] run tests — must pass before next task
 
 ### Task 5: Management commands (backfill + export)
 

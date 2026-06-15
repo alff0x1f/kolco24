@@ -2698,9 +2698,9 @@ def test_checkpoint_secret_o2o_reverse():
     from website.models.race import Race
 
     race = Race.objects.create(name="Secret race", slug="secret-race")
-    point = Checkpoint.objects.create(
-        race=race, number=1, cost=4, description="tree", is_legend_locked=True
-    )
+    # Unlocked, so the Task 4 post_save signal does not auto-create a secret —
+    # this test owns the single secret it creates to exercise the reverse O2O.
+    point = Checkpoint.objects.create(race=race, number=1, cost=4, description="tree")
     secret = CheckpointSecret.objects.create(
         checkpoint=point,
         content_key=os.urandom(32),
@@ -2745,27 +2745,22 @@ def test_checkpoint_tag_unlocks_m2m_add_and_clear():
 
 @pytest.mark.django_db
 def test_checkpoint_tag_new_fields_nullable_defaults():
-    """``code``/``bundle_blob`` default null; ``bid`` defaults to empty string."""
+    """``code``/``bundle_blob`` default null; ``bid`` defaults to empty string.
+
+    Checked on an **unsaved** instance: once saved, the Task 4 post_save signal
+    populates ``code``/``bid``/``bundle_blob`` (the round-trip persistence of
+    those columns is covered by the Task 3/4 ``build_bundle`` tests).
+    """
     from website.models.checkpoint import Checkpoint, CheckpointTag
     from website.models.race import Race
 
     race = Race.objects.create(name="Tag defaults", slug="tag-defaults")
     point = Checkpoint.objects.create(race=race, number=1, cost=1)
-    tag = CheckpointTag.objects.create(point=point, nfc_uid="CAFEBABE")
+    tag = CheckpointTag(point=point, nfc_uid="CAFEBABE")  # unsaved
 
     assert tag.code is None
     assert tag.bundle_blob is None
     assert tag.bid == ""
-
-    raw = os.urandom(16)
-    tag.code = raw
-    tag.bid = "a1b2c3d4e5f60718"
-    tag.bundle_blob = {"iv": "x", "ct": "y"}
-    tag.save()
-    tag.refresh_from_db()
-    assert bytes(tag.code) == raw
-    assert tag.bid == "a1b2c3d4e5f60718"
-    assert tag.bundle_blob == {"iv": "x", "ct": "y"}
 
 
 # --- Task 3: legend_crypto service layer ------------------------------------
@@ -2860,7 +2855,9 @@ def test_ensure_code_generates_only_when_missing():
 
     race = Race.objects.create(name="Ensure code", slug="ensure-code")
     point = Checkpoint.objects.create(race=race, number=1, cost=1)
-    tag = CheckpointTag.objects.create(point=point, nfc_uid="04A1B2C3")
+    # Unsaved instance: the Task 4 post_save signal auto-populates code on a
+    # saved tag, so test ensure_code's in-memory logic on a fresh instance.
+    tag = CheckpointTag(point=point, nfc_uid="04A1B2C3")
 
     assert tag.code is None
     ensure_code(tag)
@@ -3002,3 +2999,190 @@ def test_build_bundle_preserves_existing_code():
     build_bundle(tag)
     tag.refresh_from_db()
     assert bytes(tag.code) == code_before
+
+
+# --- Task 4: signals --------------------------------------------------------
+
+
+@pytest.mark.django_db
+def test_signal_locking_checkpoint_via_save_creates_secret():
+    from website.models.checkpoint import Checkpoint, CheckpointSecret
+    from website.models.race import Race
+
+    race = Race.objects.create(name="Sig lock", slug="sig-lock")
+    cp = Checkpoint.objects.create(race=race, number=1, cost=1, description="x")
+    assert not CheckpointSecret.objects.filter(checkpoint=cp).exists()
+
+    cp.is_legend_locked = True
+    cp.save()
+
+    assert CheckpointSecret.objects.filter(checkpoint=cp).exists()
+
+
+@pytest.mark.django_db
+def test_signal_unlocking_checkpoint_via_save_deletes_secret():
+    from website.models.checkpoint import Checkpoint, CheckpointSecret
+    from website.models.race import Race
+
+    race = Race.objects.create(name="Sig unlock", slug="sig-unlock")
+    cp = Checkpoint.objects.create(
+        race=race, number=1, cost=1, description="x", is_legend_locked=True
+    )
+    assert CheckpointSecret.objects.filter(checkpoint=cp).exists()
+
+    cp.is_legend_locked = False
+    cp.save()
+
+    assert not CheckpointSecret.objects.filter(checkpoint=cp).exists()
+
+
+@pytest.mark.django_db
+def test_signal_lock_toggle_rebuilds_implicit_point_tag_bundle():
+    """A tag with empty unlocks (implicit [point]) is rebuilt on a lock toggle.
+
+    Such a tag is reachable via ``cp.tags`` but **not** ``cp.unlocked_by`` (its
+    M2M is empty), so the ``∪ cp.tags`` half of the rebuild set is what catches
+    it. Before locking, the tag's bundle is empty (open КП → no content_key);
+    after locking it must carry the КП's content_key.
+    """
+    import base64
+    import json
+
+    from apps.mobile.crypto import derive_wrap_key, unseal
+    from website.models.checkpoint import Checkpoint, CheckpointTag
+    from website.models.race import Race
+
+    race = Race.objects.create(name="Sig implicit", slug="sig-implicit")
+    cp = Checkpoint.objects.create(race=race, number=1, cost=1, description="x")
+    tag = CheckpointTag.objects.create(point=cp, nfc_uid="04A1B2C3")  # empty unlocks
+
+    tag.refresh_from_db()
+    before = json.loads(
+        unseal(derive_wrap_key(bytes(tag.code)), tag.bundle_blob, aad=tag.bid.encode())
+    )
+    assert before == {}  # open КП → no content_key yet
+
+    cp.is_legend_locked = True
+    cp.save()
+
+    tag.refresh_from_db()
+    secret = cp.secret
+    after = json.loads(
+        unseal(derive_wrap_key(bytes(tag.code)), tag.bundle_blob, aad=tag.bid.encode())
+    )
+    assert after == {str(cp.id): base64.b64encode(bytes(secret.content_key)).decode()}
+
+
+@pytest.mark.django_db
+def test_signal_lock_toggle_rebuilds_unlocked_by_tag_bundle():
+    """A tag on a different point unlocking the КП is rebuilt via cp.unlocked_by."""
+    import base64
+    import json
+
+    from apps.mobile.crypto import derive_wrap_key, unseal
+    from website.models.checkpoint import Checkpoint, CheckpointTag
+    from website.models.race import Race
+
+    race = Race.objects.create(name="Sig unlocked-by", slug="sig-unlocked-by")
+    target = Checkpoint.objects.create(race=race, number=1, cost=1, description="t")
+    holder = Checkpoint.objects.create(race=race, number=2, cost=1, description="h")
+    tag = CheckpointTag.objects.create(point=holder, nfc_uid="0B0B0B0B")
+    tag.unlocks.set([target])  # holder tag unlocks the target КП
+
+    target.is_legend_locked = True
+    target.save()
+
+    tag.refresh_from_db()
+    secret = target.secret
+    decrypted = json.loads(
+        unseal(derive_wrap_key(bytes(tag.code)), tag.bundle_blob, aad=tag.bid.encode())
+    )
+    assert decrypted == {
+        str(target.id): base64.b64encode(bytes(secret.content_key)).decode()
+    }
+
+
+@pytest.mark.django_db
+def test_signal_editing_unlocks_rebuilds_bundle():
+    import base64
+    import json
+
+    from apps.mobile.crypto import derive_wrap_key, unseal
+    from website.models.checkpoint import Checkpoint, CheckpointTag
+    from website.models.race import Race
+
+    race = Race.objects.create(name="Sig m2m", slug="sig-m2m")
+    locked = Checkpoint.objects.create(
+        race=race, number=1, cost=1, description="locked", is_legend_locked=True
+    )
+    holder = Checkpoint.objects.create(race=race, number=2, cost=1, description="h")
+    tag = CheckpointTag.objects.create(point=holder, nfc_uid="0C0C0C0C")
+
+    tag.unlocks.add(locked)  # m2m_changed → build_bundle
+
+    tag.refresh_from_db()
+    decrypted = json.loads(
+        unseal(derive_wrap_key(bytes(tag.code)), tag.bundle_blob, aad=tag.bid.encode())
+    )
+    assert decrypted == {
+        str(locked.id): base64.b64encode(bytes(locked.secret.content_key)).decode()
+    }
+
+    tag.unlocks.clear()  # m2m_changed post_clear → rebuild → bundle empties
+    tag.refresh_from_db()
+    after_clear = json.loads(
+        unseal(derive_wrap_key(bytes(tag.code)), tag.bundle_blob, aad=tag.bid.encode())
+    )
+    assert after_clear == {}
+
+
+@pytest.mark.django_db
+def test_signal_no_infinite_recursion():
+    """A tag save + m2m change complete without recursing (sentinel + guard)."""
+    from website.models.checkpoint import Checkpoint, CheckpointTag
+    from website.models.race import Race
+
+    race = Race.objects.create(name="Sig recursion", slug="sig-recursion")
+    cp = Checkpoint.objects.create(
+        race=race, number=1, cost=1, description="x", is_legend_locked=True
+    )
+    tag = CheckpointTag.objects.create(point=cp, nfc_uid="04A1B2C3")
+
+    # Each of these would blow the stack if the receivers re-triggered each other.
+    tag.check_method = "online"
+    tag.save()
+    tag.unlocks.set([cp])
+    tag.unlocks.clear()
+
+    tag.refresh_from_db()
+    assert tag.bid  # a bundle was built, no RecursionError raised
+
+
+@pytest.mark.django_db
+def test_signal_bundle_rebuild_moves_legend_etag():
+    """A bundle rebuild bumps CheckpointTag.updated_at → legend version moves.
+
+    Guards the ``update_fields`` must-include-``updated_at`` rule: if
+    ``build_bundle`` dropped ``"updated_at"`` from its update_fields the
+    fingerprint would silently stale and this assertion would fail.
+    """
+    from apps.mobile.versioning import legend_version
+    from website.models.checkpoint import Checkpoint, CheckpointTag
+    from website.models.race import Race
+
+    race = Race.objects.create(name="Sig etag", slug="sig-etag", is_legend_visible=True)
+    first = Checkpoint.objects.create(
+        race=race, number=1, cost=1, description="a", is_legend_locked=True
+    )
+    second = Checkpoint.objects.create(
+        race=race, number=2, cost=1, description="b", is_legend_locked=True
+    )
+    holder = Checkpoint.objects.create(race=race, number=3, cost=1, description="h")
+    tag = CheckpointTag.objects.create(point=holder, nfc_uid="04A1B2C3")
+    tag.unlocks.set([first])
+
+    before = legend_version(race.id)
+
+    tag.unlocks.add(second)  # rebuild folds in `second`'s key + bumps updated_at
+
+    assert legend_version(race.id) != before
