@@ -129,9 +129,11 @@ Django 4.2 project. Source lives entirely under `src/`, with `manage.py` at `src
       otherwise the version/ETag goes stale (e.g. the auto `OPEN → SOLD_OUT` `reg_status` flips in
       `check_vtb_payments.py` and `website/models/models.py` include it).
     - **`nfc_uid` normalized invariant**: `Tag.nfc_uid` and `CheckpointTag.nfc_uid` are auto-normalized (stripped and uppercased) by their
-      `save()` overrides. Code that calls `save(update_fields=[..., "nfc_uid", ...])` bypasses this override and
-      **must normalize the value itself** (`.strip().upper()`) before saving. Lookups against `nfc_uid` should use the plain exact-match
-      (`nfc_uid=value.strip().upper()`) rather than `__iexact`, since stored values are always stripped and uppercase.
+      `save()` overrides. `save()` with or without `update_fields` still runs the override (Django calls the Python method regardless).
+      The one case that bypasses the override entirely is `QuerySet.update(nfc_uid=...)` — that generates raw SQL without calling `save()`,
+      so callers **must normalize the value themselves** (`.strip().upper()`) before passing it to `update()`. Lookups against `nfc_uid`
+      should use the plain exact-match (`nfc_uid=value.strip().upper()`) rather than `__iexact`, since stored values are always stripped
+      and uppercase.
 
 New feature apps that don't fit in `website` live under `src/apps/<name>/`. Each needs a unique `AppConfig` label (e.g.
 `label = "race_app"`).

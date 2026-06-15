@@ -326,6 +326,8 @@ class PointTagsView(View):
                 return JsonResponse(
                     {"error": "nfc_uid is a required field."}, status=400
                 )
+            if not isinstance(nfc_uid, str):
+                return JsonResponse({"error": "nfc_uid must be a string."}, status=400)
             nfc_uid = nfc_uid.strip().upper()
 
             try:
