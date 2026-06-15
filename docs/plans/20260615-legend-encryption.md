@@ -293,11 +293,11 @@ Response shape:
 - Modify: `src/website/admin.py`
 - Modify: `src/apps/mobile/tests.py`
 
-- [ ] `Checkpoint` admin: `is_legend_locked` in list/edit + bulk actions «Запереть/Открыть легенду»
+- [x] `Checkpoint` admin: `is_legend_locked` in list/edit + bulk actions «Запереть/Открыть легенду»
   — the bulk action MUST **iterate and `save()`** each object (or call `seal_checkpoint` directly), **never** `queryset.update()` (that skips the Task 4 signals → no `CheckpointSecret` created → serializer falls back to the open branch and leaks `cost`/`description` in cleartext)
-- [ ] `CheckpointTag` admin: `unlocks` via `filter_horizontal`, `bid` read-only, actions «Перегенерировать код» / «Пересобрать бандл» (`code` displayed hex-encoded if shown)
-- [ ] write tests: lock/unlock admin action creates/deletes secrets (asserting the bulk path actually seals, not just flips the flag); rebuild-bundle action repopulates `bundle_blob`
-- [ ] run tests — must pass before next task
+- [x] `CheckpointTag` admin: `unlocks` via `filter_horizontal`, `bid` read-only, actions «Перегенерировать код» / «Пересобрать бандл» (`code` displayed hex-encoded if shown)
+- [x] write tests: lock/unlock admin action creates/deletes secrets (asserting the bulk path actually seals, not just flips the flag); rebuild-bundle action repopulates `bundle_blob`
+- [x] run tests — must pass before next task
 
 ### Task 8: Verify acceptance criteria
 

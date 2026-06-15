@@ -3396,3 +3396,129 @@ def test_export_legend_codes_lists_every_tag_code():
     assert bytes(tag1.code).hex() in output
     assert tag2.nfc_uid in output
     assert bytes(tag2.code).hex() in output
+
+
+# --- Task 7: admin actions ---------------------------------------------------
+
+
+@pytest.mark.django_db
+def test_admin_lock_legend_action_creates_secret(client, django_user_model):
+    """The «Запереть легенду» bulk action seals (not just flips the flag)."""
+    from website.models.checkpoint import Checkpoint, CheckpointSecret
+    from website.models.race import Race
+
+    race = Race.objects.create(name="Adm lock", slug="adm-lock")
+    cp = Checkpoint.objects.create(race=race, number=1, cost=4, description="tree")
+    assert not CheckpointSecret.objects.filter(checkpoint=cp).exists()
+
+    admin = django_user_model.objects.create_superuser(
+        username="a1", email="a1@example.com", password="pw"
+    )
+    client.force_login(admin)
+
+    response = client.post(
+        "/admin/website/checkpoint/",
+        {"action": "lock_legend", "_selected_action": [cp.id]},
+    )
+    assert response.status_code == 302
+
+    cp.refresh_from_db()
+    assert cp.is_legend_locked
+    secret = CheckpointSecret.objects.get(checkpoint=cp)
+    assert secret.enc_blob.get("ct")  # actually sealed, not an empty blob
+
+
+@pytest.mark.django_db
+def test_admin_unlock_legend_action_deletes_secret(client, django_user_model):
+    from website.models.checkpoint import Checkpoint, CheckpointSecret
+    from website.models.race import Race
+
+    race = Race.objects.create(name="Adm unlock", slug="adm-unlock")
+    cp = Checkpoint.objects.create(
+        race=race, number=1, cost=4, description="tree", is_legend_locked=True
+    )
+    assert CheckpointSecret.objects.filter(checkpoint=cp).exists()
+
+    admin = django_user_model.objects.create_superuser(
+        username="a2", email="a2@example.com", password="pw"
+    )
+    client.force_login(admin)
+
+    response = client.post(
+        "/admin/website/checkpoint/",
+        {"action": "unlock_legend", "_selected_action": [cp.id]},
+    )
+    assert response.status_code == 302
+
+    cp.refresh_from_db()
+    assert not cp.is_legend_locked
+    assert not CheckpointSecret.objects.filter(checkpoint=cp).exists()
+
+
+@pytest.mark.django_db
+def test_admin_rebuild_bundle_action_repopulates_blob(client, django_user_model):
+    """The «Пересобрать бандл» action rebuilds a blank bundle."""
+    import base64
+    import json
+
+    from apps.mobile.crypto import derive_wrap_key, unseal
+    from website.models.checkpoint import Checkpoint, CheckpointTag
+    from website.models.race import Race
+
+    race = Race.objects.create(name="Adm rebuild", slug="adm-rebuild")
+    cp = Checkpoint.objects.create(
+        race=race, number=1, cost=4, description="tree", is_legend_locked=True
+    )
+    tag = CheckpointTag.objects.create(point=cp, nfc_uid="04A1B2C3")
+    # Wipe the bundle without firing signals (simulate a stale row).
+    CheckpointTag.objects.filter(pk=tag.pk).update(bundle_blob=None)
+    tag.refresh_from_db()
+    assert tag.bundle_blob is None
+
+    admin = django_user_model.objects.create_superuser(
+        username="a3", email="a3@example.com", password="pw"
+    )
+    client.force_login(admin)
+
+    response = client.post(
+        "/admin/website/checkpointtag/",
+        {"action": "rebuild_bundle", "_selected_action": [tag.id]},
+    )
+    assert response.status_code == 302
+
+    tag.refresh_from_db()
+    assert tag.bundle_blob is not None
+    decrypted = json.loads(
+        unseal(derive_wrap_key(bytes(tag.code)), tag.bundle_blob, aad=tag.bid.encode())
+    )
+    assert decrypted == {
+        str(cp.id): base64.b64encode(bytes(cp.secret.content_key)).decode()
+    }
+
+
+@pytest.mark.django_db
+def test_admin_regenerate_code_action_changes_code(client, django_user_model):
+    from website.models.checkpoint import Checkpoint, CheckpointTag
+    from website.models.race import Race
+
+    race = Race.objects.create(name="Adm regen", slug="adm-regen")
+    cp = Checkpoint.objects.create(
+        race=race, number=1, cost=4, description="tree", is_legend_locked=True
+    )
+    tag = CheckpointTag.objects.create(point=cp, nfc_uid="04A1B2C3")
+    tag.refresh_from_db()
+    code_before = bytes(tag.code)
+
+    admin = django_user_model.objects.create_superuser(
+        username="a4", email="a4@example.com", password="pw"
+    )
+    client.force_login(admin)
+
+    response = client.post(
+        "/admin/website/checkpointtag/",
+        {"action": "regenerate_code", "_selected_action": [tag.id]},
+    )
+    assert response.status_code == 302
+
+    tag.refresh_from_db()
+    assert bytes(tag.code) != code_before

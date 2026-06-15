@@ -103,15 +103,50 @@ class PointTagInline(admin.TabularInline):
 
 @admin.register(Checkpoint)
 class CheckpointAdmin(admin.ModelAdmin):
-    list_display = ("id", "year", "iterator", "number", "cost", "description", "race")
-    list_filter = ("race", "year", "cost")
+    list_display = (
+        "id",
+        "year",
+        "iterator",
+        "number",
+        "cost",
+        "description",
+        "is_legend_locked",
+        "race",
+    )
+    list_filter = ("race", "year", "cost", "is_legend_locked")
     inlines = [PointTagInline]
+    actions = ["lock_legend", "unlock_legend"]
+
+    @admin.action(description="Запереть легенду")
+    def lock_legend(self, request, queryset):
+        # MUST iterate + save() each object so the post_save signal seals the
+        # CheckpointSecret (and rebuilds dependent bundles). A queryset.update()
+        # would skip the signal, leaving locked КП without a secret — the
+        # serializer would then fall back to the open branch and leak cleartext.
+        count = 0
+        for cp in queryset:
+            cp.is_legend_locked = True
+            cp.save()
+            count += 1
+        self.message_user(request, f"Заперто КП: {count}")
+
+    @admin.action(description="Открыть легенду")
+    def unlock_legend(self, request, queryset):
+        count = 0
+        for cp in queryset:
+            cp.is_legend_locked = False
+            cp.save()
+            count += 1
+        self.message_user(request, f"Открыто КП: {count}")
 
 
 @admin.register(CheckpointTag)
 class CheckpointTagAdmin(admin.ModelAdmin):
-    list_display = ("id", "point", "point_number", "nfc_uid")
+    list_display = ("id", "point", "point_number", "nfc_uid", "bid")
     list_filter = ("point__race",)
+    filter_horizontal = ("unlocks",)
+    readonly_fields = ("bid", "code_hex")
+    actions = ["regenerate_code", "rebuild_bundle"]
 
     def get_queryset(self, request):
         queryset = super().get_queryset(request)
@@ -119,6 +154,31 @@ class CheckpointTagAdmin(admin.ModelAdmin):
 
     def point_number(self, obj) -> int:
         return obj.point.number
+
+    @admin.display(description="Код (hex)")
+    def code_hex(self, obj) -> str:
+        return bytes(obj.code).hex() if obj.code else ""
+
+    @admin.action(description="Перегенерировать код")
+    def regenerate_code(self, request, queryset):
+        from apps.mobile.legend_crypto import build_bundle
+
+        count = 0
+        for tag in queryset:
+            tag.code = None  # forces ensure_code to mint a fresh code
+            build_bundle(tag)
+            count += 1
+        self.message_user(request, f"Перегенерирован код у тегов: {count}")
+
+    @admin.action(description="Пересобрать бандл")
+    def rebuild_bundle(self, request, queryset):
+        from apps.mobile.legend_crypto import build_bundle
+
+        count = 0
+        for tag in queryset:
+            build_bundle(tag)
+            count += 1
+        self.message_user(request, f"Пересобрано бандлов: {count}")
 
 
 class TakenKPAdmin(admin.ModelAdmin):
