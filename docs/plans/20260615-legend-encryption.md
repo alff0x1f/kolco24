@@ -198,12 +198,12 @@ Response shape:
 - Create: `src/apps/mobile/crypto.py`
 - Modify: `src/apps/mobile/tests.py`
 
-- [ ] add `cryptography` to `[project].dependencies` in `pyproject.toml`; run `uv lock`
-- [ ] create `crypto.py` with `seal`, `unseal`, `derive_wrap_key` (ported from `scratch/playground.py`, no master key; **not** named `open` — shadows the builtin)
-- [ ] write tests: `seal`/`unseal` roundtrip (with correct `aad`)
-- [ ] write tests: wrong key / wrong `aad` / tampered `ct` → raises (GCM auth failure)
-- [ ] write tests: `derive_wrap_key` deterministic for same code, differs across codes
-- [ ] run tests — must pass before next task
+- [x] add `cryptography` to `[project].dependencies` in `pyproject.toml`; run `uv lock`
+- [x] create `crypto.py` with `seal`, `unseal`, `derive_wrap_key` (ported from `scratch/playground.py`, no master key; **not** named `open` — shadows the builtin)
+- [x] write tests: `seal`/`unseal` roundtrip (with correct `aad`)
+- [x] write tests: wrong key / wrong `aad` / tampered `ct` → raises (GCM auth failure)
+- [x] write tests: `derive_wrap_key` deterministic for same code, differs across codes
+- [x] run tests — must pass before next task
 
 ### Task 2: Data model + migration
 

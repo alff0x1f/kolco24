@@ -2638,3 +2638,51 @@ def test_appauthfailure_admin_changelist_loads(client, django_user_model):
 
     response = client.get("/admin/mobile/appauthfailure/")
     assert response.status_code == 200
+
+
+# --- Legend crypto primitives (apps.mobile.crypto) ---------------------------
+
+import os  # noqa: E402
+
+from cryptography.exceptions import InvalidTag  # noqa: E402
+
+from apps.mobile.crypto import derive_wrap_key, seal, unseal  # noqa: E402
+
+
+def test_seal_unseal_roundtrip():
+    key = os.urandom(32)
+    enc = seal(key, b"hello world", aad=b"153")
+    assert set(enc) == {"iv", "ct"}
+    assert unseal(key, enc, aad=b"153") == b"hello world"
+
+
+def test_unseal_wrong_key_raises():
+    enc = seal(os.urandom(32), b"secret", aad=b"153")
+    with pytest.raises(InvalidTag):
+        unseal(os.urandom(32), enc, aad=b"153")
+
+
+def test_unseal_wrong_aad_raises():
+    key = os.urandom(32)
+    enc = seal(key, b"secret", aad=b"153")
+    with pytest.raises(InvalidTag):
+        unseal(key, enc, aad=b"154")
+
+
+def test_unseal_tampered_ct_raises():
+    import base64
+
+    key = os.urandom(32)
+    enc = seal(key, b"secret", aad=b"153")
+    raw = bytearray(base64.b64decode(enc["ct"]))
+    raw[0] ^= 0x01
+    enc["ct"] = base64.b64encode(bytes(raw)).decode()
+    with pytest.raises(InvalidTag):
+        unseal(key, enc, aad=b"153")
+
+
+def test_derive_wrap_key_deterministic_and_distinct():
+    code = os.urandom(16)
+    assert derive_wrap_key(code) == derive_wrap_key(code)
+    assert len(derive_wrap_key(code)) == 32
+    assert derive_wrap_key(code) != derive_wrap_key(os.urandom(16))
