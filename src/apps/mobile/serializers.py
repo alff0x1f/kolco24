@@ -2,11 +2,9 @@
 
 from rest_framework import serializers
 
-from website.models.checkpoint import Checkpoint, CheckpointTag
+from website.models.checkpoint import CheckpointSecret
 from website.models.models import Athlet, Team
 from website.models.race import Category, Race
-
-from . import signing
 
 
 class RaceListSerializer(serializers.ModelSerializer):
@@ -26,38 +24,51 @@ class RaceListSerializer(serializers.ModelSerializer):
         ]
 
 
-class LegendTagSerializer(serializers.ModelSerializer):
-    """Public legend view of an NFC tag.
+class BundleSerializer(serializers.Serializer):
+    """Per-tag envelope bundle for the offline legend unlock.
 
-    Never exposes the raw ``nfc_uid``: it is served only as ``tag_hash``, an
-    HMAC of the raw UID keyed by the per-build secret (``context["secret"]``),
-    so the physical tag IDs never travel on the wire. The app re-computes the
-    same hash from a scanned UID to match scan → checkpoint offline.
+    Flattens ``CheckpointTag.bundle_blob``'s ``{"iv", "ct"}`` next to the tag's
+    ``bid`` and ``check_method``. The app finds a bundle by
+    ``bid = sha256(scanned_code).hexdigest()[:16]``, HKDF-decrypts it to
+    ``{cp_id: content_key}``, then decrypts each locked КП's ``enc`` blob — all
+    offline. The raw ``code``/``nfc_uid`` never travel on the wire.
     """
 
-    tag_hash = serializers.SerializerMethodField()
+    bid = serializers.CharField()
+    iv = serializers.SerializerMethodField()
+    ct = serializers.SerializerMethodField()
+    check_method = serializers.CharField()
 
-    def get_tag_hash(self, tag):
-        return signing.tag_hash(self.context["secret"], tag.nfc_uid)
+    def get_iv(self, tag):
+        return (tag.bundle_blob or {}).get("iv")
 
-    class Meta:
-        model = CheckpointTag
-        fields = ["id", "tag_hash", "check_method"]
+    def get_ct(self, tag):
+        return (tag.bundle_blob or {}).get("ct")
 
 
-class LegendCheckpointSerializer(serializers.ModelSerializer):
+class LegendCheckpointSerializer(serializers.Serializer):
     """Public legend view of a checkpoint.
 
-    Never exposes ``iterator``/``year``. ``tags`` carries hashed NFC tag UIDs
-    (see ``LegendTagSerializer``); the resolved secret must be threaded through
-    serializer ``context``.
+    Branches on ``is_legend_locked``: a **locked** КП exposes only
+    ``{id, number, type, enc}`` (the precomputed ``secret.enc_blob`` ciphertext),
+    so its ``cost``/``description`` never leave the server in cleartext; an
+    **open** КП exposes ``{id, number, type, cost, description}``. Never exposes
+    ``iterator``/``year``. The view must ``select_related("secret")`` so the
+    locked branch reads the prefetched secret without an extra query.
     """
 
-    tags = LegendTagSerializer(many=True)
-
-    class Meta:
-        model = Checkpoint
-        fields = ["id", "number", "cost", "type", "description", "tags"]
+    def to_representation(self, cp):
+        data = {"id": cp.id, "number": cp.number, "type": cp.type}
+        if cp.is_legend_locked:
+            try:
+                secret = cp.secret
+            except CheckpointSecret.DoesNotExist:
+                secret = None
+            data["enc"] = secret.enc_blob if secret else None
+            return data
+        data["cost"] = cp.cost
+        data["description"] = cp.description
+        return data
 
 
 class CategorySerializer(serializers.ModelSerializer):

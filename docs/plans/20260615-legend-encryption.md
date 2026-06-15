@@ -276,16 +276,16 @@ Response shape:
 - Modify: `src/apps/mobile/versioning.py`
 - Modify: `src/apps/mobile/tests.py`
 
-- [ ] `LegendCheckpointSerializer.to_representation`: locked → `{id, number, type, enc}`; open → `{id, number, type, cost, description}`
-- [ ] add `BundleSerializer` (`bid, iv, ct, check_method`); remove `LegendTagSerializer`/`tag_hash` usage
-- [ ] `versioning.py`: remove `key_id` from `legend_state`/`legend_version`; fold in `CheckpointSecret` `MAX(updated_at)|COUNT`
-- [ ] `LegendView.get`: prefetch `secret`; build `bundles` from draft-excluded `CheckpointTag`; drop `secret`/`key_id` resolution; call `legend_state` without `key_id`; keep hidden-legend `{checkpoints: [], bundles: []}` + ETag
-- [ ] `SyncView`: call `legend_version` without `key_id` (teams/races paths unchanged)
-- [ ] write tests: locked КП → `enc`, no `cost`/`description`; open КП → `cost`/`description`, no `enc`; mixed response
-- [ ] write tests: end-to-end — read `code`, compute `bid`, `HKDF(code)` decrypt bundle → decrypt КП `enc` → original `cost`/`description`
-- [ ] write tests: ETag moves on cost/description edit, lock toggle, `unlocks`/`code` change; hidden legend → empty + ETag; update field-set tests
-- [ ] write tests: two different `X-App-Key-Id` builds get the **same** legend ETag; `If-None-Match` → `304`; `versions.legend` matches the legend ETag for any build
-- [ ] run tests — must pass before next task
+- [x] `LegendCheckpointSerializer.to_representation`: locked → `{id, number, type, enc}`; open → `{id, number, type, cost, description}`
+- [x] add `BundleSerializer` (`bid, iv, ct, check_method`); remove `LegendTagSerializer`/`tag_hash` usage
+- [x] `versioning.py`: remove `key_id` from `legend_state`/`legend_version`; fold in `CheckpointSecret` `MAX(updated_at)|COUNT`
+- [x] `LegendView.get`: prefetch `secret`; build `bundles` from draft-excluded `CheckpointTag`; drop `secret`/`key_id` resolution; call `legend_state` without `key_id`; keep hidden-legend `{checkpoints: [], bundles: []}` + ETag
+- [x] `SyncView`: call `legend_version` without `key_id` (teams/races paths unchanged)
+- [x] write tests: locked КП → `enc`, no `cost`/`description`; open КП → `cost`/`description`, no `enc`; mixed response
+- [x] write tests: end-to-end — read `code`, compute `bid`, `HKDF(code)` decrypt bundle → decrypt КП `enc` → original `cost`/`description`
+- [x] write tests: ETag moves on cost/description edit, lock toggle, `unlocks`/`code` change; hidden legend → empty + ETag; update field-set tests
+- [x] write tests: two different `X-App-Key-Id` builds get the **same** legend ETag; `If-None-Match` → `304`; `versions.legend` matches the legend ETag for any build
+- [x] run tests — must pass before next task
 
 ### Task 7: Admin
 

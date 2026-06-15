@@ -90,42 +90,48 @@ def test_tag_hash_differs_per_secret():
 
 
 @pytest.mark.django_db
-def test_legend_tag_serializer_hashes_nfc_uid():
-    from apps.mobile.serializers import LegendTagSerializer
-    from website.models.checkpoint import Checkpoint, CheckpointTag
+def test_legend_checkpoint_serializer_open_exposes_cleartext():
+    from apps.mobile.serializers import LegendCheckpointSerializer
+    from website.models.checkpoint import Checkpoint
     from website.models.race import Race
 
-    race = Race.objects.create(name="Tag race", slug="tag-race")
-    point = Checkpoint.objects.create(race=race, number=1, cost=1)
-    tag = CheckpointTag.objects.create(
-        point=point, nfc_uid="04A1B2C3", check_method="offline"
-    )
+    race = Race.objects.create(name="Open ser", slug="open-ser")
+    point = Checkpoint.objects.create(race=race, number=1, cost=4, description="tree")
 
-    data = LegendTagSerializer(tag, context={"secret": SECRET}).data
+    data = LegendCheckpointSerializer(point).data
 
-    assert set(data.keys()) == {"id", "tag_hash", "check_method"}
-    assert "tag_id" not in data
-    assert "nfc_uid" not in data
-    assert data["id"] == tag.id
-    assert data["check_method"] == "offline"
-    assert data["tag_hash"] == tag_hash(SECRET, "04A1B2C3")
+    assert set(data.keys()) == {"id", "number", "type", "cost", "description"}
+    assert data["cost"] == 4
+    assert data["description"] == "tree"
+    assert "enc" not in data
 
 
 @pytest.mark.django_db
-def test_legend_checkpoint_serializer_nests_hashed_tags():
+def test_legend_checkpoint_serializer_locked_exposes_only_enc():
+    from apps.mobile.crypto import unseal
+    from apps.mobile.legend_crypto import seal_checkpoint
     from apps.mobile.serializers import LegendCheckpointSerializer
-    from website.models.checkpoint import Checkpoint, CheckpointTag
+    from website.models.checkpoint import Checkpoint
     from website.models.race import Race
 
-    race = Race.objects.create(name="Tag race 2", slug="tag-race-2")
-    point = Checkpoint.objects.create(race=race, number=1, cost=1)
-    CheckpointTag.objects.create(point=point, nfc_uid="DEADBEEF", check_method="online")
+    race = Race.objects.create(name="Locked ser", slug="locked-ser")
+    point = Checkpoint.objects.create(
+        race=race, number=1, cost=4, description="tree", is_legend_locked=True
+    )
+    secret = seal_checkpoint(point)
 
-    data = LegendCheckpointSerializer(point, context={"secret": SECRET}).data
+    data = LegendCheckpointSerializer(point).data
 
-    assert [t["tag_hash"] for t in data["tags"]] == [tag_hash(SECRET, "DEADBEEF")]
-    assert "tag_id" not in data["tags"][0]
-    assert "nfc_uid" not in data["tags"][0]
+    assert set(data.keys()) == {"id", "number", "type", "enc"}
+    assert "cost" not in data
+    assert "description" not in data
+    # the served enc blob decrypts (with the stored content_key) to the cleartext
+    import json
+
+    plaintext = unseal(
+        bytes(secret.content_key), data["enc"], aad=str(point.id).encode()
+    )
+    assert json.loads(plaintext) == {"cost": 4, "description": "tree"}
 
 
 @pytest.mark.django_db
@@ -456,9 +462,10 @@ def test_legend_valid_signature_returns_200_with_fields_and_order(client, settin
     assert response.status_code == 200
     data = response.json()
     assert data["race"] == race.id
+    assert data["bundles"] == []
     assert [c["number"] for c in data["checkpoints"]] == [1, 2, 3]
     first = data["checkpoints"][0]
-    assert set(first.keys()) == {"id", "number", "cost", "type", "description", "tags"}
+    assert set(first.keys()) == {"id", "number", "cost", "type", "description"}
     assert first["type"] == "kp"
     assert first["description"] == "first"
 
@@ -756,7 +763,54 @@ def test_legend_hidden_if_none_match_returns_304(client, settings):
 
 
 @pytest.mark.django_db
-def test_legend_serves_hashed_tags_and_never_raw_tag_id(client, settings):
+def test_legend_locked_cp_serves_enc_not_cleartext_open_serves_cleartext(
+    client, settings
+):
+    """Mixed legend: a locked КП exposes only ``enc``; an open КП stays cleartext."""
+    from website.models.checkpoint import Checkpoint
+    from website.models.race import Race
+
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    race = Race.objects.create(
+        name="Mixed legend", slug="mixed-legend", is_legend_visible=True
+    )
+    Checkpoint.objects.create(
+        race=race, number=1, cost=4, description="secret tree", is_legend_locked=True
+    )
+    Checkpoint.objects.create(race=race, number=2, cost=2, description="open spot")
+
+    path = f"/app/race/{race.id}/legend/"
+    response = client.get(path, **_signed_headers("GET", path, SECRET))
+
+    assert response.status_code == 200
+    data = response.json()
+    locked, open_cp = data["checkpoints"]
+
+    assert set(locked.keys()) == {"id", "number", "type", "enc"}
+    assert set(locked["enc"].keys()) == {"iv", "ct"}
+    assert "cost" not in locked
+    assert "description" not in locked
+
+    assert set(open_cp.keys()) == {"id", "number", "type", "cost", "description"}
+    assert open_cp["description"] == "open spot"
+
+    # the locked КП's cleartext never appears anywhere in the serialized body
+    body = response.content.decode()
+    assert "secret tree" not in body
+    # ...but the open КП's cleartext does
+    assert "open spot" in body
+
+
+@pytest.mark.django_db
+def test_legend_end_to_end_scan_code_decrypts_locked_checkpoint(client, settings):
+    """Full offline flow: read code → bid → HKDF → bundle → content_key → enc."""
+    import base64
+    import hashlib
+    import json
+
+    from apps.mobile.crypto import derive_wrap_key, unseal
     from website.models.checkpoint import Checkpoint, CheckpointTag
     from website.models.race import Race
 
@@ -764,30 +818,40 @@ def test_legend_serves_hashed_tags_and_never_raw_tag_id(client, settings):
     settings.MOBILE_APP_TS_WINDOW = 300
 
     race = Race.objects.create(
-        name="Hashed legend", slug="hashed-legend", is_legend_visible=True
+        name="E2E decrypt", slug="e2e-decrypt", is_legend_visible=True
     )
-    cp = Checkpoint.objects.create(race=race, number=1, cost=1, description="first")
-    CheckpointTag.objects.create(point=cp, nfc_uid="04A1B2C3", check_method="offline")
-    CheckpointTag.objects.create(point=cp, nfc_uid="DEADBEEF", check_method="online")
+    cp = Checkpoint.objects.create(
+        race=race, number=1, cost=4, description="столб у воды", is_legend_locked=True
+    )
+    # The tag's empty unlocks falls back to [point]; signals seal + build bundle.
+    tag = CheckpointTag.objects.create(point=cp, nfc_uid="04A1B2C3")
+    tag.refresh_from_db()
+    code = bytes(tag.code)  # what is written into the physical NFC tag's memory
 
     path = f"/app/race/{race.id}/legend/"
     response = client.get(path, **_signed_headers("GET", path, SECRET))
-
     assert response.status_code == 200
     data = response.json()
-    tags = data["checkpoints"][0]["tags"]
-    assert [t["tag_hash"] for t in tags] == [
-        tag_hash(SECRET, "04A1B2C3"),
-        tag_hash(SECRET, "DEADBEEF"),
-    ]
-    for t in tags:
-        assert set(t.keys()) == {"id", "tag_hash", "check_method"}
-        assert "tag_id" not in t
-        assert "nfc_uid" not in t
-    # the raw UID never appears anywhere in the serialized body
-    body = response.content.decode()
-    assert "04A1B2C3" not in body
-    assert "DEADBEEF" not in body
+
+    # 1. locate the bundle by the bid computed from the scanned code
+    bid = hashlib.sha256(code).hexdigest()[:16]
+    bundle = next(b for b in data["bundles"] if b["bid"] == bid)
+    assert bundle["check_method"] == "offline"
+
+    # 2. HKDF(code) decrypts the bundle → {cp_id: content_key}
+    keys = json.loads(
+        unseal(
+            derive_wrap_key(code),
+            {"iv": bundle["iv"], "ct": bundle["ct"]},
+            aad=bid.encode(),
+        )
+    )
+    content_key = base64.b64decode(keys[str(cp.id)])
+
+    # 3. the content_key decrypts the locked КП's enc blob → original cleartext
+    locked = data["checkpoints"][0]
+    plaintext = json.loads(unseal(content_key, locked["enc"], aad=str(cp.id).encode()))
+    assert plaintext == {"cost": 4, "description": "столб у воды"}
 
 
 @pytest.mark.django_db
@@ -857,7 +921,13 @@ def test_legend_etag_changes_when_tag_edited_with_update_fields(client, settings
 
 
 @pytest.mark.django_db
-def test_legend_different_key_ids_get_different_hashes_and_etags(client, settings):
+def test_legend_build_independent_same_etag_and_body_across_key_ids(client, settings):
+    """Two builds (different secrets) get the **same** legend ETag + body.
+
+    The legend is build-independent now: the stored ciphertext/bundles do not
+    depend on the per-build secret, so an app update that rotates X-App-Key-Id
+    sees an unchanged ETag (no spurious re-fetch).
+    """
     from website.models.checkpoint import Checkpoint, CheckpointTag
     from website.models.race import Race
 
@@ -867,7 +937,9 @@ def test_legend_different_key_ids_get_different_hashes_and_etags(client, setting
     race = Race.objects.create(
         name="Per build", slug="per-build-legend", is_legend_visible=True
     )
-    cp = Checkpoint.objects.create(race=race, number=1, cost=1, description="first")
+    cp = Checkpoint.objects.create(
+        race=race, number=1, cost=1, description="first", is_legend_locked=True
+    )
     CheckpointTag.objects.create(point=cp, nfc_uid="04A1B2C3", check_method="offline")
 
     path = f"/app/race/{race.id}/legend/"
@@ -878,12 +950,14 @@ def test_legend_different_key_ids_get_different_hashes_and_etags(client, setting
         path, **_signed_headers("GET", path, "secret-b", key_id="build-b")
     )
 
-    hash_a = resp_a.json()["checkpoints"][0]["tags"][0]["tag_hash"]
-    hash_b = resp_b.json()["checkpoints"][0]["tags"][0]["tag_hash"]
-    assert hash_a == tag_hash("secret-a", "04A1B2C3")
-    assert hash_b == tag_hash("secret-b", "04A1B2C3")
-    assert hash_a != hash_b
-    assert resp_a["ETag"] != resp_b["ETag"]
+    assert resp_a["ETag"] == resp_b["ETag"]
+    assert resp_a.json() == resp_b.json()
+
+    # An If-None-Match from build-a's ETag 304s for build-b too.
+    headers = _signed_headers("GET", path, "secret-b", key_id="build-b")
+    headers["HTTP_IF_NONE_MATCH"] = resp_a["ETag"]
+    cross = client.get(path, **headers)
+    assert cross.status_code == 304
 
 
 @pytest.mark.django_db
@@ -1544,31 +1618,61 @@ def test_legend_version_unchanged_when_tag_on_draft_checkpoint_added():
 
 
 @pytest.mark.django_db
-def test_legend_version_differs_per_key_id():
+def test_legend_version_changes_on_lock_toggle_and_reseal():
+    """A lock toggle creates/deletes a CheckpointSecret → the version moves.
+
+    Folds the ``CheckpointSecret`` aggregate into the fingerprint (the
+    build-independent replacement for the old ``key_id`` term).
+    """
+    from apps.mobile.versioning import legend_version
+    from website.models.checkpoint import Checkpoint
+    from website.models.race import Race
+
+    race = Race.objects.create(
+        name="Lock version", slug="lock-version", is_legend_visible=True
+    )
+    cp = Checkpoint.objects.create(race=race, number=1, cost=1, description="cp")
+    before = legend_version(race.id)
+
+    cp.is_legend_locked = True
+    cp.save()  # signal seals → secret appears
+    after_lock = legend_version(race.id)
+    assert after_lock != before
+
+    cp.is_legend_locked = False
+    cp.save()  # signal deletes the secret
+    assert legend_version(race.id) != after_lock
+
+
+@pytest.mark.django_db
+def test_legend_version_build_independent():
     from apps.mobile.versioning import legend_version
     from website.models.checkpoint import Checkpoint, CheckpointTag
     from website.models.race import Race
 
     race = Race.objects.create(
-        name="Key id legend", slug="key-id-legend", is_legend_visible=True
+        name="Build indep", slug="build-indep-legend", is_legend_visible=True
     )
-    cp = Checkpoint.objects.create(race=race, number=1, cost=1, description="cp")
+    cp = Checkpoint.objects.create(
+        race=race, number=1, cost=1, description="cp", is_legend_locked=True
+    )
     CheckpointTag.objects.create(point=cp, nfc_uid="AA:BB", check_method="offline")
-    assert legend_version(race.id, "build-a") != legend_version(race.id, "build-b")
+    # No key_id argument any more; deterministic regardless of build.
+    assert legend_version(race.id) == legend_version(race.id)
 
 
 @pytest.mark.django_db
-def test_legend_version_tagless_race_stable_across_key_ids():
+def test_legend_version_tagless_race_stable_and_no_crash():
     from apps.mobile.versioning import legend_version
     from website.models.race import Race
 
     race = Race.objects.create(
         name="Tagless", slug="tagless-legend", is_legend_visible=True
     )
-    # No checkpoints/tags: empty aggregates render "None"; must not crash and
-    # must still be deterministic per key_id.
-    assert legend_version(race.id, "build-a") == legend_version(race.id, "build-a")
-    assert legend_version(race.id, "build-a") != legend_version(race.id, "build-b")
+    # No checkpoints/tags/secrets: empty aggregates render "None"; must not
+    # crash and must be deterministic.
+    assert legend_version(race.id) == legend_version(race.id)
+    assert legend_version(race.id)  # non-empty
 
 
 # --- mobile TeamSerializer --------------------------------------------------
@@ -2237,7 +2341,8 @@ def test_sync_versions_legend_matches_legend_etag(client, settings):
 @pytest.mark.django_db
 def test_sync_versions_legend_matches_legend_etag_per_key_id(client, settings):
     # versions.legend from /sync/ (bare) must equal the legend endpoint ETag
-    # (unquoted) for the *same* key_id — both fold key_id into the fingerprint.
+    # (unquoted) for every build — the legend is build-independent, so the
+    # cross-endpoint single-source contract holds regardless of key_id.
     from website.models.checkpoint import Checkpoint, CheckpointTag
     from website.models.race import Race
 
@@ -2265,7 +2370,8 @@ def test_sync_versions_legend_matches_legend_etag_per_key_id(client, settings):
 
 
 @pytest.mark.django_db
-def test_sync_versions_legend_differs_across_key_ids(client, settings):
+def test_sync_versions_legend_same_across_key_ids(client, settings):
+    """versions.legend is build-independent: identical across builds."""
     from website.models.checkpoint import Checkpoint, CheckpointTag
     from website.models.race import Race
 
@@ -2273,9 +2379,11 @@ def test_sync_versions_legend_differs_across_key_ids(client, settings):
     settings.MOBILE_APP_TS_WINDOW = 300
 
     race = Race.objects.create(
-        name="Sync diff build", slug="sync-legend-diff-key", is_legend_visible=True
+        name="Sync same build", slug="sync-legend-same-key", is_legend_visible=True
     )
-    cp = Checkpoint.objects.create(race=race, number=1, cost=1, description="first")
+    cp = Checkpoint.objects.create(
+        race=race, number=1, cost=1, description="first", is_legend_locked=True
+    )
     CheckpointTag.objects.create(point=cp, nfc_uid="04A1B2C3", check_method="offline")
 
     sync_path = f"/app/race/{race.id}/sync/"
@@ -2286,7 +2394,7 @@ def test_sync_versions_legend_differs_across_key_ids(client, settings):
         sync_path, **_signed_headers("GET", sync_path, "secret-b", key_id="build-b")
     )
 
-    assert resp_a.json()["versions"]["legend"] != resp_b.json()["versions"]["legend"]
+    assert resp_a.json()["versions"]["legend"] == resp_b.json()["versions"]["legend"]
 
 
 @pytest.mark.django_db

@@ -16,7 +16,7 @@ from django.utils import timezone
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from website.models.checkpoint import Checkpoint
+from website.models.checkpoint import Checkpoint, CheckpointTag
 from website.models.enums import CheckpointType
 from website.models.models import Athlet, Team
 from website.models.race import Category, Race
@@ -24,6 +24,7 @@ from website.models.race import Category, Race
 from .models import AppAuthFailure, AppInstall
 from .permissions import SignedAppPermission
 from .serializers import (
+    BundleSerializer,
     CategorySerializer,
     LegendCheckpointSerializer,
     RaceListSerializer,
@@ -147,14 +148,11 @@ class LegendView(AppAPIView):
 
     def get(self, request, race_id):
         get_object_or_404(Race, pk=race_id, is_published=True)
-        # key_id was already signature-verified by SignedAppPermission against the
-        # same MOBILE_APP_KEYS map, so the subscript cannot KeyError — use it (not
-        # .get()) so a real bug wouldn't be masked. The version folds key_id in so
-        # two builds (different secrets → different tag_hash bodies) never share an
-        # ETag (otherwise a secret rotation would 304 onto stale hashes).
-        key_id = request.app_meta["key_id"]
-        secret = settings.MOBILE_APP_KEYS[key_id]
-        version, is_legend_visible = legend_state(race_id, key_id)
+        # The legend is build-independent: the stored ciphertext/bundles do not
+        # depend on the per-build secret, so the version folds in no key_id and
+        # two builds share the ETag. Locked КП expose only their precomputed
+        # `enc` blob; the app decrypts offline after scanning a tag's `code`.
+        version, is_legend_visible = legend_state(race_id)
         if is_legend_visible is None:
             # Race was deleted between the 404 check and legend_state; treat as gone.
             raise Http404
@@ -166,7 +164,7 @@ class LegendView(AppAPIView):
             return resp
 
         if not is_legend_visible:
-            resp = Response({"race": race_id, "checkpoints": []})
+            resp = Response({"race": race_id, "checkpoints": [], "bundles": []})
             resp["ETag"] = quoted
             return resp
 
@@ -174,14 +172,18 @@ class LegendView(AppAPIView):
             Checkpoint.objects.filter(race_id=race_id)
             .exclude(type=CheckpointType.draft.value)
             .order_by("number", "id")
-            .prefetch_related("tags")
+            .select_related("secret")
+        )
+        bundle_qs = (
+            CheckpointTag.objects.filter(point__race_id=race_id)
+            .exclude(point__type=CheckpointType.draft.value)
+            .order_by("id")
         )
         resp = Response(
             {
                 "race": race_id,
-                "checkpoints": LegendCheckpointSerializer(
-                    qs, many=True, context={"secret": secret}
-                ).data,
+                "checkpoints": LegendCheckpointSerializer(qs, many=True).data,
+                "bundles": BundleSerializer(bundle_qs, many=True).data,
             }
         )
         resp["ETag"] = quoted
@@ -254,9 +256,9 @@ class SyncView(AppAPIView):
                 "lease_expires_at": None,
                 "versions": {
                     "teams": teams_version(race_id),
-                    # key_id folded in so versions.legend equals the legend ETag
-                    # for this build (the legend tag_hash bodies are per-secret).
-                    "legend": legend_version(race_id, request.app_meta["key_id"]),
+                    # Build-independent: versions.legend equals the legend ETag
+                    # for every build (stored ciphertext/bundles, no key_id).
+                    "legend": legend_version(race_id),
                 },
             }
         )
