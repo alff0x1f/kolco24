@@ -25,7 +25,7 @@ from __future__ import annotations
 
 import threading
 
-from django.db.models.signals import m2m_changed, post_save
+from django.db.models.signals import m2m_changed, post_delete, post_save, pre_delete
 from django.dispatch import receiver
 
 from website.models.checkpoint import Checkpoint, CheckpointSecret, CheckpointTag
@@ -38,6 +38,7 @@ SENTINEL_UPDATE_FIELDS = frozenset(TAG_UPDATE_FIELDS)
 
 _guard = threading.local()
 _pre_clear_pks = threading.local()
+_pre_delete_tags = threading.local()
 
 
 def _build_bundle_guarded(tag):
@@ -63,6 +64,22 @@ def checkpoint_saved(sender, instance, **kwargs):
         dependents = set(instance.tags.all()) | set(instance.unlocked_by.all())
         for tag in dependents:
             _build_bundle_guarded(tag)
+
+
+@receiver(pre_delete, sender=Checkpoint, dispatch_uid="mobile_checkpoint_pre_delete")
+def checkpoint_pre_delete(sender, instance, **kwargs):
+    # Capture tags that listed this checkpoint in their unlocks M2M *before*
+    # the DB CASCADE deletes the junction rows (after which unlocked_by is empty).
+    _pre_delete_tags.value = list(instance.unlocked_by.all())
+
+
+@receiver(post_delete, sender=Checkpoint, dispatch_uid="mobile_checkpoint_post_delete")
+def checkpoint_post_delete(sender, instance, **kwargs):
+    # Rebuild bundles for captured tags; the deleted checkpoint's junction rows
+    # are now gone, so build_bundle will exclude it from the new bundle.
+    for tag in getattr(_pre_delete_tags, "value", None) or []:
+        _build_bundle_guarded(tag)
+    _pre_delete_tags.value = None
 
 
 @receiver(post_save, sender=CheckpointTag, dispatch_uid="mobile_build_bundle")
