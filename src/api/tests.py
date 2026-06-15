@@ -53,6 +53,15 @@ class MemberTagAPITestCase(APITestCase):
         self.assertEqual(response.status_code, 404)
         self.assertIn("nfc_uid", response.data)
 
+    def test_create_member_tag_duplicate_uid_returns_400(self):
+        Tag.objects.create(number=1, nfc_uid="ABC123")
+        url = "/api/member_tag/"
+        response = self.client.post(
+            url, {"number": 2, "nfc_uid": "abc123"}, format="json"
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("nfc_uid", response.data)
+
 
 URL = "/api/contributors/"
 TOKEN = "test-secret-token"

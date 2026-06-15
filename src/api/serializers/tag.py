@@ -1,9 +1,20 @@
 from rest_framework import serializers
+from rest_framework.validators import UniqueValidator
 
 from website.models import CheckpointTag, Tag
 
 
+class _NfcUidField(serializers.CharField):
+    def to_internal_value(self, data):
+        return super().to_internal_value(data).strip().upper()
+
+
 class TagSerializer(serializers.ModelSerializer):
+    nfc_uid = _NfcUidField(
+        max_length=255,
+        validators=[UniqueValidator(queryset=Tag.objects.all())],
+    )
+
     class Meta:
         model = Tag
         fields = ["id", "number", "nfc_uid", "last_seen_at"]

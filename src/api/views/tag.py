@@ -41,7 +41,8 @@ class CheckpointTagCreateView(APIView):
             nfc_uid = serializer.validated_data.get("nfc_uid")
 
             control_point = self.get_control_point(race_id, number)
-            checkpoint_tag = CheckpointTag.objects.create(
+            nfc_uid = nfc_uid.strip().upper()
+            checkpoint_tag, created = CheckpointTag.objects.get_or_create(
                 point=control_point, nfc_uid=nfc_uid
             )
 
@@ -51,7 +52,7 @@ class CheckpointTagCreateView(APIView):
                     "point": checkpoint_tag.point.id,
                     "nfc_uid": checkpoint_tag.nfc_uid,
                 },
-                status=status.HTTP_201_CREATED,
+                status=status.HTTP_201_CREATED if created else status.HTTP_200_OK,
             )
         else:
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
