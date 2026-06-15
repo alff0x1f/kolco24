@@ -2766,3 +2766,239 @@ def test_checkpoint_tag_new_fields_nullable_defaults():
     assert bytes(tag.code) == raw
     assert tag.bid == "a1b2c3d4e5f60718"
     assert tag.bundle_blob == {"iv": "x", "ct": "y"}
+
+
+# --- Task 3: legend_crypto service layer ------------------------------------
+
+
+@pytest.mark.django_db
+def test_seal_checkpoint_locked_creates_secret_that_decrypts():
+    import json
+
+    from apps.mobile.crypto import unseal
+    from apps.mobile.legend_crypto import seal_checkpoint
+    from website.models.checkpoint import Checkpoint, CheckpointSecret
+    from website.models.race import Race
+
+    race = Race.objects.create(name="Seal locked", slug="seal-locked")
+    cp = Checkpoint.objects.create(
+        race=race, number=1, cost=7, description="столб у воды", is_legend_locked=True
+    )
+
+    secret = seal_checkpoint(cp)
+
+    assert CheckpointSecret.objects.filter(checkpoint=cp).exists()
+    assert len(bytes(secret.content_key)) == 32
+    plaintext = unseal(
+        bytes(secret.content_key), secret.enc_blob, aad=str(cp.id).encode()
+    )
+    assert json.loads(plaintext) == {"cost": 7, "description": "столб у воды"}
+
+
+@pytest.mark.django_db
+def test_seal_checkpoint_unlocked_deletes_existing_secret():
+    from apps.mobile.legend_crypto import seal_checkpoint
+    from website.models.checkpoint import Checkpoint, CheckpointSecret
+    from website.models.race import Race
+
+    race = Race.objects.create(name="Seal unlock", slug="seal-unlock")
+    cp = Checkpoint.objects.create(
+        race=race, number=1, cost=1, description="x", is_legend_locked=True
+    )
+    seal_checkpoint(cp)
+    assert CheckpointSecret.objects.filter(checkpoint=cp).exists()
+
+    cp.is_legend_locked = False
+    assert seal_checkpoint(cp) is None
+    assert not CheckpointSecret.objects.filter(checkpoint=cp).exists()
+
+
+@pytest.mark.django_db
+def test_seal_checkpoint_unlocked_no_secret_is_noop():
+    from apps.mobile.legend_crypto import seal_checkpoint
+    from website.models.checkpoint import Checkpoint, CheckpointSecret
+    from website.models.race import Race
+
+    race = Race.objects.create(name="Seal open", slug="seal-open")
+    cp = Checkpoint.objects.create(race=race, number=1, cost=1, description="x")
+
+    assert seal_checkpoint(cp) is None
+    assert not CheckpointSecret.objects.filter(checkpoint=cp).exists()
+
+
+@pytest.mark.django_db
+def test_seal_checkpoint_reseal_keeps_content_key_and_updates_enc():
+    import json
+
+    from apps.mobile.crypto import unseal
+    from apps.mobile.legend_crypto import seal_checkpoint
+    from website.models.checkpoint import Checkpoint
+    from website.models.race import Race
+
+    race = Race.objects.create(name="Reseal", slug="reseal")
+    cp = Checkpoint.objects.create(
+        race=race, number=1, cost=3, description="старое", is_legend_locked=True
+    )
+    first = seal_checkpoint(cp)
+    key_before = bytes(first.content_key)
+    enc_before = first.enc_blob
+
+    cp.description = "новое"
+    second = seal_checkpoint(cp)
+
+    assert bytes(second.content_key) == key_before  # content_key preserved
+    assert second.enc_blob != enc_before  # re-sealed (fresh IV + new plaintext)
+    plaintext = unseal(key_before, second.enc_blob, aad=str(cp.id).encode())
+    assert json.loads(plaintext) == {"cost": 3, "description": "новое"}
+
+
+@pytest.mark.django_db
+def test_ensure_code_generates_only_when_missing():
+    from apps.mobile.legend_crypto import ensure_code
+    from website.models.checkpoint import Checkpoint, CheckpointTag
+    from website.models.race import Race
+
+    race = Race.objects.create(name="Ensure code", slug="ensure-code")
+    point = Checkpoint.objects.create(race=race, number=1, cost=1)
+    tag = CheckpointTag.objects.create(point=point, nfc_uid="04A1B2C3")
+
+    assert tag.code is None
+    ensure_code(tag)
+    code1 = bytes(tag.code)
+    assert len(code1) == 16
+
+    ensure_code(tag)  # already present → unchanged
+    assert bytes(tag.code) == code1
+
+
+@pytest.mark.django_db
+def test_build_bundle_empty_unlocks_falls_back_to_own_locked_point():
+    import base64
+    import hashlib
+    import json
+
+    from apps.mobile.crypto import derive_wrap_key, unseal
+    from apps.mobile.legend_crypto import build_bundle, seal_checkpoint
+    from website.models.checkpoint import Checkpoint, CheckpointTag
+    from website.models.race import Race
+
+    race = Race.objects.create(name="Bundle self", slug="bundle-self")
+    cp = Checkpoint.objects.create(
+        race=race, number=1, cost=1, description="x", is_legend_locked=True
+    )
+    secret = seal_checkpoint(cp)
+    tag = CheckpointTag.objects.create(point=cp, nfc_uid="04A1B2C3")
+
+    build_bundle(tag)
+    tag.refresh_from_db()
+
+    code = bytes(tag.code)
+    assert tag.bid == hashlib.sha256(code).hexdigest()[:16]
+    decrypted = json.loads(
+        unseal(derive_wrap_key(code), tag.bundle_blob, aad=tag.bid.encode())
+    )
+    assert decrypted == {
+        str(cp.id): base64.b64encode(bytes(secret.content_key)).decode()
+    }
+
+
+@pytest.mark.django_db
+def test_build_bundle_skips_open_checkpoints():
+    import json
+
+    from apps.mobile.crypto import derive_wrap_key, unseal
+    from apps.mobile.legend_crypto import build_bundle, seal_checkpoint
+    from website.models.checkpoint import Checkpoint, CheckpointTag
+    from website.models.race import Race
+
+    race = Race.objects.create(name="Bundle skip", slug="bundle-skip")
+    locked = Checkpoint.objects.create(
+        race=race, number=1, cost=1, description="locked", is_legend_locked=True
+    )
+    seal_checkpoint(locked)
+    open_cp = Checkpoint.objects.create(race=race, number=2, cost=1, description="open")
+    tag = CheckpointTag.objects.create(point=locked, nfc_uid="04A1B2C3")
+    tag.unlocks.set([locked, open_cp])
+
+    build_bundle(tag)
+    tag.refresh_from_db()
+
+    code = bytes(tag.code)
+    decrypted = json.loads(
+        unseal(derive_wrap_key(code), tag.bundle_blob, aad=tag.bid.encode())
+    )
+    # only the locked КП is present; the open one is skipped
+    assert set(decrypted.keys()) == {str(locked.id)}
+
+
+@pytest.mark.django_db
+def test_build_bundle_overlap_one_checkpoint_in_two_bundles():
+    import base64
+    import json
+
+    from apps.mobile.crypto import derive_wrap_key, unseal
+    from apps.mobile.legend_crypto import build_bundle, seal_checkpoint
+    from website.models.checkpoint import Checkpoint, CheckpointTag
+    from website.models.race import Race
+
+    race = Race.objects.create(name="Bundle overlap", slug="bundle-overlap")
+    shared = Checkpoint.objects.create(
+        race=race, number=1, cost=1, description="shared", is_legend_locked=True
+    )
+    extra = Checkpoint.objects.create(
+        race=race, number=2, cost=1, description="extra", is_legend_locked=True
+    )
+    shared_secret = seal_checkpoint(shared)
+    seal_checkpoint(extra)
+
+    p_a = Checkpoint.objects.create(race=race, number=3, cost=1)
+    p_b = Checkpoint.objects.create(race=race, number=4, cost=1)
+    tag_a = CheckpointTag.objects.create(point=p_a, nfc_uid="0A0A0A0A")
+    tag_b = CheckpointTag.objects.create(point=p_b, nfc_uid="0B0B0B0B")
+    tag_a.unlocks.set([shared])
+    tag_b.unlocks.set([shared, extra])
+
+    build_bundle(tag_a)
+    build_bundle(tag_b)
+    tag_a.refresh_from_db()
+    tag_b.refresh_from_db()
+
+    shared_b64 = base64.b64encode(bytes(shared_secret.content_key)).decode()
+    decoded_a = json.loads(
+        unseal(
+            derive_wrap_key(bytes(tag_a.code)),
+            tag_a.bundle_blob,
+            aad=tag_a.bid.encode(),
+        )
+    )
+    decoded_b = json.loads(
+        unseal(
+            derive_wrap_key(bytes(tag_b.code)),
+            tag_b.bundle_blob,
+            aad=tag_b.bid.encode(),
+        )
+    )
+    # the shared КП's content_key appears in both bundles (overlap)
+    assert decoded_a[str(shared.id)] == shared_b64
+    assert decoded_b[str(shared.id)] == shared_b64
+    assert set(decoded_b.keys()) == {str(shared.id), str(extra.id)}
+
+
+@pytest.mark.django_db
+def test_build_bundle_preserves_existing_code():
+    from apps.mobile.legend_crypto import build_bundle, ensure_code
+    from website.models.checkpoint import Checkpoint, CheckpointTag
+    from website.models.race import Race
+
+    race = Race.objects.create(name="Bundle keep code", slug="bundle-keep-code")
+    cp = Checkpoint.objects.create(
+        race=race, number=1, cost=1, description="x", is_legend_locked=True
+    )
+    tag = CheckpointTag.objects.create(point=cp, nfc_uid="04A1B2C3")
+    ensure_code(tag)
+    tag.save()
+    code_before = bytes(tag.code)
+
+    build_bundle(tag)
+    tag.refresh_from_db()
+    assert bytes(tag.code) == code_before

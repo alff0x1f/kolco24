@@ -226,13 +226,13 @@ Response shape:
 - Create: `src/apps/mobile/legend_crypto.py`
 - Modify: `src/apps/mobile/tests.py`
 
-- [ ] implement `seal_checkpoint(cp)` (delete secret when unlocked; create/re-seal `enc_blob`, keep `content_key`)
-- [ ] implement `ensure_code(tag)` (generate `code` only when missing)
-- [ ] implement `build_bundle(tag)` (resolve unlock set with `[point]` fallback; skip open КП; set `bid`/`bundle_blob`)
-- [ ] write tests: locked → secret created, `enc_blob` decrypts to `{cost, description}`; unlocked → secret deleted
-- [ ] write tests: re-`seal_checkpoint` after description edit keeps the same `content_key`
-- [ ] write tests: `build_bundle` → bundle decrypts to `{cp_id: content_key}`; open КП skipped; one КП in two tags' bundles (overlap); `ensure_code` does not change an existing code
-- [ ] run tests — must pass before next task
+- [x] implement `seal_checkpoint(cp)` (delete secret when unlocked; create/re-seal `enc_blob`, keep `content_key`)
+- [x] implement `ensure_code(tag)` (generate `code` only when missing)
+- [x] implement `build_bundle(tag)` (resolve unlock set with `[point]` fallback; skip open КП; set `bid`/`bundle_blob`)
+- [x] write tests: locked → secret created, `enc_blob` decrypts to `{cost, description}`; unlocked → secret deleted
+- [x] write tests: re-`seal_checkpoint` after description edit keeps the same `content_key`
+- [x] write tests: `build_bundle` → bundle decrypts to `{cp_id: content_key}`; open КП skipped; one КП in two tags' bundles (overlap); `ensure_code` does not change an existing code
+- [x] run tests — must pass before next task
 
 ### Task 4: Signals + registration
 
