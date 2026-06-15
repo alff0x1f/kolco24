@@ -329,6 +329,8 @@ class PointTagsView(View):
             if not isinstance(nfc_uid, str):
                 return JsonResponse({"error": "nfc_uid must be a string."}, status=400)
             nfc_uid = nfc_uid.strip().upper()
+            if not nfc_uid:
+                return JsonResponse({"error": "nfc_uid must not be blank."}, status=400)
 
             _, created = CheckpointTag.objects.get_or_create(
                 point=point, nfc_uid=nfc_uid

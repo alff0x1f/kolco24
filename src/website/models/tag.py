@@ -12,6 +12,8 @@ class Tag(models.Model):
 
     def save(self, *args, **kwargs):
         self.nfc_uid = (self.nfc_uid or "").strip().upper()
+        if not self.nfc_uid:
+            raise ValueError("nfc_uid must not be blank")
         super().save(*args, **kwargs)
 
     def __str__(self):

@@ -41,7 +41,6 @@ class CheckpointTagCreateView(APIView):
             nfc_uid = serializer.validated_data.get("nfc_uid")
 
             control_point = self.get_control_point(race_id, number)
-            nfc_uid = nfc_uid.strip().upper()
             checkpoint_tag, created = CheckpointTag.objects.get_or_create(
                 point=control_point, nfc_uid=nfc_uid
             )
@@ -72,7 +71,7 @@ class MemberTagTouchView(APIView):
         serializer = TagTouchSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        nfc_uid = serializer.validated_data["nfc_uid"].strip().upper()
+        nfc_uid = serializer.validated_data["nfc_uid"]
 
         try:
             tag = Tag.objects.get(nfc_uid=nfc_uid)

@@ -21,12 +21,12 @@ class TagSerializer(serializers.ModelSerializer):
 
 
 class TagTouchSerializer(serializers.Serializer):
-    nfc_uid = serializers.CharField(max_length=255)
+    nfc_uid = _NfcUidField(max_length=255)
 
 
 class CheckpointTagSerializer(serializers.Serializer):
     number = serializers.IntegerField()
-    nfc_uid = serializers.CharField(max_length=255)
+    nfc_uid = _NfcUidField(max_length=255)
 
 
 class CheckpointTagSerializer2(serializers.ModelSerializer):
