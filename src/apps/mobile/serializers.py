@@ -74,10 +74,10 @@ class LegendCheckpointSerializer(serializers.Serializer):
                     "run rebuild_legend_crypto to repair.",
                     cp.id,
                 )
-                # Fall back to cleartext so the mobile app does not receive
-                # enc=null and crash; cleartext is already the open-КП contract.
-                data["cost"] = cp.cost
-                data["description"] = cp.description
+                # Fail closed: return only the identifier fields, no enc and no
+                # cleartext. Leaking cleartext would defeat the encryption scheme;
+                # the app treats a locked КП with no enc as undecryptable until
+                # the admin runs rebuild_legend_crypto.
                 return data
             data["enc"] = secret.enc_blob
             return data

@@ -135,6 +135,32 @@ def test_legend_checkpoint_serializer_locked_exposes_only_enc():
 
 
 @pytest.mark.django_db
+def test_legend_checkpoint_serializer_locked_no_secret_fails_closed():
+    """A locked КП with no CheckpointSecret must not leak cleartext (fail closed)."""
+    from apps.mobile.serializers import LegendCheckpointSerializer
+    from website.models.checkpoint import Checkpoint, CheckpointSecret
+    from website.models.race import Race
+
+    race = Race.objects.create(name="No secret race", slug="no-secret-race")
+    # Create locked checkpoint via QuerySet.update to bypass the signal that
+    # would normally call seal_checkpoint and create the secret.
+    point = Checkpoint.objects.create(race=race, number=1, cost=9, description="hidden")
+    Checkpoint.objects.filter(pk=point.pk).update(is_legend_locked=True)
+    point.refresh_from_db()
+
+    # Confirm no secret was created.
+    assert not CheckpointSecret.objects.filter(checkpoint=point).exists()
+
+    data = LegendCheckpointSerializer(point).data
+
+    # Must not contain cleartext; only the identifier fields.
+    assert "cost" not in data
+    assert "description" not in data
+    assert "enc" not in data
+    assert set(data.keys()) == {"id", "number", "type"}
+
+
+@pytest.mark.django_db
 def test_appinstall_create_defaults():
     install = AppInstall.objects.create(install_id="abc-123")
     assert install.request_count == 0
@@ -3475,6 +3501,54 @@ def test_signal_bundle_rebuild_moves_legend_etag():
     tag.unlocks.add(second)  # rebuild folds in `second`'s key + bumps updated_at
 
     assert legend_version(race.id) != before
+
+
+@pytest.mark.django_db
+def test_signal_draft_to_kp_on_locked_cp_rebuilds_dependent_bundle():
+    """Promoting a locked draft КП to kp rebuilds bundles of tags that unlock it.
+
+    A tag's explicit unlocks M2M filtered by build_bundle excludes draft КП, so
+    when the CP was a draft the bundle had no content_key for it. After the type
+    change the legend serves that CP's enc_blob; without a signal-driven rebuild
+    the bundle would remain stale and the app could not decrypt.
+    """
+    import base64
+    import json
+
+    from apps.mobile.crypto import derive_wrap_key, unseal
+    from website.models.checkpoint import Checkpoint, CheckpointTag
+    from website.models.race import Race
+
+    race = Race.objects.create(name="Draft promote", slug="draft-promote")
+    locked_draft = Checkpoint.objects.create(
+        race=race,
+        number=1,
+        cost=5,
+        description="secret",
+        type="draft",
+        is_legend_locked=True,
+    )
+    holder = Checkpoint.objects.create(race=race, number=2, cost=1, description="h")
+    tag = CheckpointTag.objects.create(point=holder, nfc_uid="DDDDDDDD")
+    tag.unlocks.add(locked_draft)  # draft at add time → bundle excludes its key
+
+    tag.refresh_from_db()
+    assert tag.bundle_blob is None  # draft КП excluded from bundle
+
+    # Promote to kp — should trigger a bundle rebuild via pre_save/post_save
+    locked_draft.type = "kp"
+    locked_draft.save()
+
+    tag.refresh_from_db()
+    assert tag.bundle_blob is not None  # rebuild happened
+
+    secret = locked_draft.secret
+    decrypted = json.loads(
+        unseal(derive_wrap_key(bytes(tag.code)), tag.bundle_blob, aad=tag.bid.encode())
+    )
+    assert decrypted == {
+        str(locked_draft.id): base64.b64encode(bytes(secret.content_key)).decode()
+    }
 
 
 # --- Task 5: management commands --------------------------------------------

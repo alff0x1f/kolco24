@@ -25,7 +25,13 @@ from __future__ import annotations
 
 import threading
 
-from django.db.models.signals import m2m_changed, post_delete, post_save, pre_delete
+from django.db.models.signals import (
+    m2m_changed,
+    post_delete,
+    post_save,
+    pre_delete,
+    pre_save,
+)
 from django.dispatch import receiver
 
 from website.models.checkpoint import Checkpoint, CheckpointSecret, CheckpointTag
@@ -39,6 +45,9 @@ SENTINEL_UPDATE_FIELDS = frozenset(TAG_UPDATE_FIELDS)
 _guard = threading.local()
 _pre_clear_pks = threading.local()
 _pre_delete_tags = threading.local()
+# Captures (type, race_id) of a Checkpoint before save so checkpoint_saved can
+# detect type/race changes that affect bundle inclusion without an old-value API.
+_pre_save_cp_state = threading.local()
 
 
 def _build_bundle_guarded(tag):
@@ -52,6 +61,20 @@ def _build_bundle_guarded(tag):
         _guard.active = False
 
 
+@receiver(pre_save, sender=Checkpoint, dispatch_uid="mobile_checkpoint_pre_save")
+def checkpoint_pre_save(sender, instance, **kwargs):
+    # Capture type and race_id before the save so checkpoint_saved can detect
+    # changes that affect whether this checkpoint contributes to bundles.
+    if instance.pk:
+        try:
+            row = Checkpoint.objects.values("type", "race_id").get(pk=instance.pk)
+            _pre_save_cp_state.value = row
+        except Checkpoint.DoesNotExist:
+            _pre_save_cp_state.value = None
+    else:
+        _pre_save_cp_state.value = None
+
+
 @receiver(post_save, sender=Checkpoint, dispatch_uid="mobile_seal_checkpoint")
 def checkpoint_saved(sender, instance, **kwargs):
     had_secret = CheckpointSecret.objects.filter(checkpoint=instance).exists()
@@ -60,7 +83,24 @@ def checkpoint_saved(sender, instance, **kwargs):
     # disagreed before sealing: open→locked (key appeared) or locked→open (key
     # disappeared). A cleartext-only edit (locked→locked) leaves them equal and
     # touches only enc_blob, so dependent bundles keep the same content_key.
-    if had_secret != bool(instance.is_legend_locked):
+    lock_toggled = had_secret != bool(instance.is_legend_locked)
+
+    # Also rebuild when a locked checkpoint's draft↔non-draft status (or race)
+    # changes: build_bundle filters explicit unlocks to same-race non-draft КП,
+    # so flipping either dimension while the KP is already locked causes stale
+    # bundles for tags that carry this checkpoint in their unlocks M2M.
+    old_state = getattr(_pre_save_cp_state, "value", None)
+    _pre_save_cp_state.value = None
+    bundle_filter_changed = (
+        instance.is_legend_locked
+        and old_state is not None
+        and (
+            (old_state["type"] == "draft") != (instance.type == "draft")
+            or old_state["race_id"] != instance.race_id
+        )
+    )
+
+    if lock_toggled or bundle_filter_changed:
         dependents = set(instance.tags.all()) | set(instance.unlocked_by.all())
         for tag in dependents:
             _build_bundle_guarded(tag)
