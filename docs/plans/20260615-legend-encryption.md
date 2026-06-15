@@ -199,8 +199,8 @@ Response shape:
 - Modify: `src/apps/mobile/tests.py`
 
 - [ ] add `cryptography` to `[project].dependencies` in `pyproject.toml`; run `uv lock`
-- [ ] create `crypto.py` with `seal`, `open`, `derive_wrap_key` (ported from `scratch/playground.py`, no master key)
-- [ ] write tests: `seal`/`open` roundtrip (with correct `aad`)
+- [ ] create `crypto.py` with `seal`, `unseal`, `derive_wrap_key` (ported from `scratch/playground.py`, no master key; **not** named `open` — shadows the builtin)
+- [ ] write tests: `seal`/`unseal` roundtrip (with correct `aad`)
 - [ ] write tests: wrong key / wrong `aad` / tampered `ct` → raises (GCM auth failure)
 - [ ] write tests: `derive_wrap_key` deterministic for same code, differs across codes
 - [ ] run tests — must pass before next task
@@ -294,8 +294,9 @@ Response shape:
 - Modify: `src/apps/mobile/tests.py`
 
 - [ ] `Checkpoint` admin: `is_legend_locked` in list/edit + bulk actions «Запереть/Открыть легенду»
-- [ ] `CheckpointTag` admin: `unlocks` via `filter_horizontal`, `bid` read-only, actions «Перегенерировать код» / «Пересобрать бандл»
-- [ ] write tests: lock/unlock admin action creates/deletes secrets; rebuild-bundle action repopulates `bundle_blob`
+  — the bulk action MUST **iterate and `save()`** each object (or call `seal_checkpoint` directly), **never** `queryset.update()` (that skips the Task 4 signals → no `CheckpointSecret` created → serializer falls back to the open branch and leaks `cost`/`description` in cleartext)
+- [ ] `CheckpointTag` admin: `unlocks` via `filter_horizontal`, `bid` read-only, actions «Перегенерировать код» / «Пересобрать бандл» (`code` displayed hex-encoded if shown)
+- [ ] write tests: lock/unlock admin action creates/deletes secrets (asserting the bulk path actually seals, not just flips the flag); rebuild-bundle action repopulates `bundle_blob`
 - [ ] run tests — must pass before next task
 
 ### Task 8: Verify acceptance criteria
