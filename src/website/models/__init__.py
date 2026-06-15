@@ -1,4 +1,4 @@
-from .checkpoint import Checkpoint, CheckpointTag
+from .checkpoint import Checkpoint, CheckpointSecret, CheckpointTag
 from .models import (
     Athlet,
     Payment,

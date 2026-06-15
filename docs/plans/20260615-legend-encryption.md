@@ -213,12 +213,12 @@ Response shape:
 - Create: `src/website/migrations/00XX_legend_encryption.py` (via `makemigrations`)
 - Modify: `src/apps/mobile/tests.py`
 
-- [ ] add `Checkpoint.is_legend_locked` (Boolean, default `False`)
-- [ ] add `CheckpointTag.code` (BinaryField, nullable), `bid` (CharField `max_length=16` = `sha256(code).hexdigest()[:16]`), `bundle_blob` (JSONField, nullable), `unlocks` (M2M → `website.Checkpoint`, `related_name="unlocked_by"`, blank)
-- [ ] add `CheckpointSecret` model (O2O → `Checkpoint`, `related_name="secret"`, `content_key` BinaryField, `enc_blob` JSONField, `updated_at` auto_now)
-- [ ] run `makemigrations` (no data migration — default `False`, backfill via command in Task 5)
-- [ ] write tests: model creation, `CheckpointSecret` O2O reverse `checkpoint.secret`, `tag.unlocks` M2M add/clear
-- [ ] run tests + `migrate` on the test DB — must pass before next task
+- [x] add `Checkpoint.is_legend_locked` (Boolean, default `False`)
+- [x] add `CheckpointTag.code` (BinaryField, nullable), `bid` (CharField `max_length=16` = `sha256(code).hexdigest()[:16]`), `bundle_blob` (JSONField, nullable), `unlocks` (M2M → `website.Checkpoint`, `related_name="unlocked_by"`, blank)
+- [x] add `CheckpointSecret` model (O2O → `Checkpoint`, `related_name="secret"`, `content_key` BinaryField, `enc_blob` JSONField, `updated_at` auto_now)
+- [x] run `makemigrations` (no data migration — default `False`, backfill via command in Task 5)
+- [x] write tests: model creation, `CheckpointSecret` O2O reverse `checkpoint.secret`, `tag.unlocks` M2M add/clear
+- [x] run tests + `migrate` on the test DB — must pass before next task
 
 ### Task 3: Service layer (`legend_crypto.py`)
 

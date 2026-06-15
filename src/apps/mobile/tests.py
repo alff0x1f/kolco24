@@ -2686,3 +2686,83 @@ def test_derive_wrap_key_deterministic_and_distinct():
     assert derive_wrap_key(code) == derive_wrap_key(code)
     assert len(derive_wrap_key(code)) == 32
     assert derive_wrap_key(code) != derive_wrap_key(os.urandom(16))
+
+
+# --- Task 2: legend-encryption data model ------------------------------------
+
+
+@pytest.mark.django_db
+def test_checkpoint_secret_o2o_reverse():
+    """A CheckpointSecret is reachable via the ``checkpoint.secret`` reverse O2O."""
+    from website.models.checkpoint import Checkpoint, CheckpointSecret
+    from website.models.race import Race
+
+    race = Race.objects.create(name="Secret race", slug="secret-race")
+    point = Checkpoint.objects.create(
+        race=race, number=1, cost=4, description="tree", is_legend_locked=True
+    )
+    secret = CheckpointSecret.objects.create(
+        checkpoint=point,
+        content_key=os.urandom(32),
+        enc_blob={"iv": "aa", "ct": "bb"},
+    )
+
+    assert point.secret == secret
+    assert len(secret.content_key) == 32
+    assert secret.enc_blob == {"iv": "aa", "ct": "bb"}
+
+
+@pytest.mark.django_db
+def test_checkpoint_is_legend_locked_default():
+    """``is_legend_locked`` defaults to False."""
+    from website.models.checkpoint import Checkpoint
+    from website.models.race import Race
+
+    race = Race.objects.create(name="Lock race", slug="lock-race")
+    point = Checkpoint.objects.create(race=race, number=1, cost=1)
+
+    assert point.is_legend_locked is False
+
+
+@pytest.mark.django_db
+def test_checkpoint_tag_unlocks_m2m_add_and_clear():
+    """``CheckpointTag.unlocks`` M2M can add and clear, with the reverse accessor."""
+    from website.models.checkpoint import Checkpoint, CheckpointTag
+    from website.models.race import Race
+
+    race = Race.objects.create(name="Unlock race", slug="unlock-race")
+    p1 = Checkpoint.objects.create(race=race, number=1, cost=1)
+    p2 = Checkpoint.objects.create(race=race, number=2, cost=1)
+    tag = CheckpointTag.objects.create(point=p1, nfc_uid="DEADBEEF")
+
+    tag.unlocks.add(p1, p2)
+    assert set(tag.unlocks.values_list("id", flat=True)) == {p1.id, p2.id}
+    assert tag in p2.unlocked_by.all()
+
+    tag.unlocks.clear()
+    assert tag.unlocks.count() == 0
+
+
+@pytest.mark.django_db
+def test_checkpoint_tag_new_fields_nullable_defaults():
+    """``code``/``bundle_blob`` default null; ``bid`` defaults to empty string."""
+    from website.models.checkpoint import Checkpoint, CheckpointTag
+    from website.models.race import Race
+
+    race = Race.objects.create(name="Tag defaults", slug="tag-defaults")
+    point = Checkpoint.objects.create(race=race, number=1, cost=1)
+    tag = CheckpointTag.objects.create(point=point, nfc_uid="CAFEBABE")
+
+    assert tag.code is None
+    assert tag.bundle_blob is None
+    assert tag.bid == ""
+
+    raw = os.urandom(16)
+    tag.code = raw
+    tag.bid = "a1b2c3d4e5f60718"
+    tag.bundle_blob = {"iv": "x", "ct": "y"}
+    tag.save()
+    tag.refresh_from_db()
+    assert bytes(tag.code) == raw
+    assert tag.bid == "a1b2c3d4e5f60718"
+    assert tag.bundle_blob == {"iv": "x", "ct": "y"}
