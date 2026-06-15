@@ -330,15 +330,9 @@ class PointTagsView(View):
                 return JsonResponse({"error": "nfc_uid must be a string."}, status=400)
             nfc_uid = nfc_uid.strip().upper()
 
-            try:
-                _, created = CheckpointTag.objects.get_or_create(
-                    point=point, nfc_uid=nfc_uid
-                )
-            except CheckpointTag.MultipleObjectsReturned:
-                return JsonResponse(
-                    {"error": f"Duplicate tags found for nfc_uid {nfc_uid}."},
-                    status=409,
-                )
+            _, created = CheckpointTag.objects.get_or_create(
+                point=point, nfc_uid=nfc_uid
+            )
             if created:
                 return JsonResponse(
                     {"message": "PointTag created successfully."}, status=201
