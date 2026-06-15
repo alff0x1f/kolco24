@@ -37,6 +37,7 @@ from .legend_crypto import TAG_UPDATE_FIELDS, build_bundle, seal_checkpoint
 SENTINEL_UPDATE_FIELDS = frozenset(TAG_UPDATE_FIELDS)
 
 _guard = threading.local()
+_pre_clear_pks = threading.local()
 
 
 def _build_bundle_guarded(tag):
@@ -79,20 +80,27 @@ def checkpointtag_saved(sender, instance, **kwargs):
     dispatch_uid="mobile_unlocks_changed",
 )
 def checkpointtag_unlocks_changed(sender, instance, action, pk_set, **kwargs):
+    # On a reverse pre_clear (checkpoint.unlocked_by.clear()), capture the
+    # affected tag PKs *before* Django deletes the junction rows so that the
+    # matching post_clear can still find and rebuild those tags.
+    if action == "pre_clear" and not isinstance(instance, CheckpointTag):
+        _pre_clear_pks.value = list(instance.unlocked_by.values_list("pk", flat=True))
+        return
+
     if action not in ("post_add", "post_remove", "post_clear"):
         return
     if isinstance(instance, CheckpointTag):
         tags = [instance]
     else:
-        # Reverse relation (``checkpoint.unlocked_by.add(tag)``): instance is a
-        # Checkpoint; the affected tags are in pk_set (None on post_clear).
-        # WARNING: ``checkpoint.unlocked_by.clear()`` fires post_clear with
-        # pk_set=None *after* rows are deleted, so unlocked_by.all() is empty
-        # here and no bundles are rebuilt. Callers must use the forward relation
-        # (``tag.unlocks.remove/clear``) or run ``rebuild_legend_crypto`` after.
-        if pk_set:
+        # Reverse relation: instance is a Checkpoint; affected tags in pk_set
+        # (None on post_clear — rows are already deleted by the time it fires).
+        if action == "post_clear":
+            pks = getattr(_pre_clear_pks, "value", None) or []
+            _pre_clear_pks.value = None
+            tags = list(CheckpointTag.objects.filter(pk__in=pks))
+        elif pk_set:
             tags = list(CheckpointTag.objects.filter(pk__in=pk_set))
         else:
-            tags = list(instance.unlocked_by.all())
+            tags = []
     for tag in tags:
         _build_bundle_guarded(tag)

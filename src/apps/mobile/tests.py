@@ -3168,10 +3168,7 @@ def test_signal_lock_toggle_rebuilds_implicit_point_tag_bundle():
     tag = CheckpointTag.objects.create(point=cp, nfc_uid="04A1B2C3")  # empty unlocks
 
     tag.refresh_from_db()
-    before = json.loads(
-        unseal(derive_wrap_key(bytes(tag.code)), tag.bundle_blob, aad=tag.bid.encode())
-    )
-    assert before == {}  # open КП → no content_key yet
+    assert tag.bundle_blob is None  # open КП → no content_key, no bundle
 
     cp.is_legend_locked = True
     cp.save()
@@ -3239,12 +3236,9 @@ def test_signal_editing_unlocks_rebuilds_bundle():
         str(locked.id): base64.b64encode(bytes(locked.secret.content_key)).decode()
     }
 
-    tag.unlocks.clear()  # m2m_changed post_clear → rebuild → bundle empties
+    tag.unlocks.clear()  # m2m_changed post_clear → rebuild → no locked КП → None
     tag.refresh_from_db()
-    after_clear = json.loads(
-        unseal(derive_wrap_key(bytes(tag.code)), tag.bundle_blob, aad=tag.bid.encode())
-    )
-    assert after_clear == {}
+    assert tag.bundle_blob is None
 
 
 @pytest.mark.django_db
@@ -3274,6 +3268,36 @@ def test_signal_reverse_m2m_add_rebuilds_bundle():
     assert decrypted == {
         str(locked.id): base64.b64encode(bytes(locked.secret.content_key)).decode()
     }
+
+
+@pytest.mark.django_db
+def test_signal_reverse_m2m_clear_rebuilds_bundle():
+    """checkpoint.unlocked_by.clear() (reverse relation) rebuilds affected tag bundles.
+
+    pre_clear captures the tag PKs before Django deletes the junction rows so
+    that post_clear can still find and rebuild those bundles.
+    """
+
+    from website.models.checkpoint import Checkpoint, CheckpointTag
+    from website.models.race import Race
+
+    race = Race.objects.create(name="Sig rev-clear", slug="sig-rev-clear")
+    locked = Checkpoint.objects.create(
+        race=race, number=1, cost=1, description="locked", is_legend_locked=True
+    )
+    holder = Checkpoint.objects.create(race=race, number=2, cost=1, description="h")
+    tag = CheckpointTag.objects.create(point=holder, nfc_uid="0E0E0E0E")
+
+    locked.unlocked_by.add(tag)
+    tag.refresh_from_db()
+    assert tag.bundle_blob is not None  # bundle carries the content_key
+
+    # Reverse clear: Django fires pre_clear then post_clear with pk_set=None.
+    # The signal must rebuild bundles using PKs captured in pre_clear.
+    locked.unlocked_by.clear()
+    tag.refresh_from_db()
+    # holder is an open checkpoint; no locked КП remain in the unlock set.
+    assert tag.bundle_blob is None
 
 
 @pytest.mark.django_db

@@ -103,8 +103,13 @@ def build_bundle(tag):
 
     bid = hashlib.sha256(code).hexdigest()[:16]
     tag.bid = bid
-    tag.bundle_blob = seal(
-        derive_wrap_key(code), json.dumps(bundle).encode(), aad=bid.encode()
-    )
+    if bundle:
+        tag.bundle_blob = seal(
+            derive_wrap_key(code), json.dumps(bundle).encode(), aad=bid.encode()
+        )
+    else:
+        # No locked КП in the unlock set — nothing to protect. A None blob keeps
+        # the tag out of the /legend/ bundles response (.exclude(bundle_blob=None)).
+        tag.bundle_blob = None
     tag.save(update_fields=TAG_UPDATE_FIELDS)
     return tag
