@@ -45,17 +45,26 @@ def seal_checkpoint(cp):
         CheckpointSecret.objects.filter(checkpoint=cp).delete()
         return None
 
-    secret, _ = CheckpointSecret.objects.get_or_create(
-        checkpoint=cp,
-        defaults={"content_key": os.urandom(32), "enc_blob": {}},
-    )
-    if not secret.content_key:
-        secret.content_key = os.urandom(32)
-
     plaintext = json.dumps(
         {"cost": cp.cost, "description": cp.description},
         ensure_ascii=False,
     ).encode()
+    # Pre-compute a fresh key+blob so the defaults row is never written with an
+    # empty enc_blob — avoids a brief window where a concurrent legend fetch
+    # would read {"enc": {}} (missing iv/ct) and crash the mobile app.
+    fresh_key = os.urandom(32)
+    fresh_blob = seal(fresh_key, plaintext, aad=str(cp.id).encode())
+
+    secret, created = CheckpointSecret.objects.get_or_create(
+        checkpoint=cp,
+        defaults={"content_key": fresh_key, "enc_blob": fresh_blob},
+    )
+    if created:
+        return secret
+
+    # Existing secret: preserve content_key, re-seal with current plaintext.
+    if not secret.content_key:
+        secret.content_key = os.urandom(32)
     secret.enc_blob = seal(
         bytes(secret.content_key), plaintext, aad=str(cp.id).encode()
     )

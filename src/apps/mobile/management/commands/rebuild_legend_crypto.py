@@ -47,7 +47,7 @@ class Command(BaseCommand):
         regenerate = options["regenerate_codes"]
 
         checkpoints = Checkpoint.objects.all()
-        tags = CheckpointTag.objects.all()
+        tags = CheckpointTag.objects.select_related("point").all()
         if race_id is not None:
             checkpoints = checkpoints.filter(race_id=race_id)
             tags = tags.filter(point__race_id=race_id)
