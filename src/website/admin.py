@@ -100,7 +100,7 @@ class PointTagInline(admin.TabularInline):
     model = CheckpointTag
     extra = 1
     readonly_fields = ("bid",)
-    exclude = ("code", "bundle_blob")
+    exclude = ("code", "bundle_blob", "unlocks")
 
 
 @admin.register(Checkpoint)
