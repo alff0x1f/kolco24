@@ -309,9 +309,9 @@ Response shape:
 
 ### Task 9: Documentation
 
-- [ ] update `src/apps/mobile/README.md` (legend now encrypted/build-independent; `bid`+bundles replace `tag_hash`; codes/provisioning)
-- [ ] update the `CLAUDE.md` mobile invariant ("legend ETag per-build / folds key_id / tags as tag_hash" → new model; keep `nfc_uid` normalized invariant + api path)
-- [ ] move this plan to `docs/plans/completed/`
+- [x] update `src/apps/mobile/README.md` (legend now encrypted/build-independent; `bid`+bundles replace `tag_hash`; codes/provisioning)
+- [x] update the `CLAUDE.md` mobile invariant ("legend ETag per-build / folds key_id / tags as tag_hash" → new model; keep `nfc_uid` normalized invariant + api path)
+- [x] move this plan to `docs/plans/completed/`
 
 ## Post-Completion
 

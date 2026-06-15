@@ -107,9 +107,9 @@ Django 4.2 project. Source lives entirely under `src/`, with `manage.py` at `src
       never writes `AppInstall`).
     - **Endpoints** (all GET, see `urls.py`): `/app/races/` (published races), `/app/race/<id>/teams/` (teams **plus the
       embedded category catalogue** — deliberately no separate categories endpoint; inactive categories included so
-      every `category2` id resolves), `/app/race/<id>/legend/` (checkpoints **plus their NFC tags as `tag_hash`** — an
-      HMAC-SHA256 of `nfc_uid` keyed by the request's per-build secret, never the raw UID; a hidden legend returns `200`
-      with an empty list, not
+      every `category2` id resolves), `/app/race/<id>/legend/` (checkpoints **plus per-tag envelope `bundles`** for the
+      offline legend unlock — see the **Legend encryption** invariant below; a hidden legend returns `200` with empty
+      `checkpoints`/`bundles`, not
       403), `/app/race/<id>/sync/` (pure version manifest — no data, no ETag; lease/handoff stubbed: `data_source` from
       `MOBILE_DATA_SOURCE` env, default `"cloud"`, `lease_expires_at` always `null`).
     - **Conditional GET**: races/teams/legend set a strong `ETag` on **every** exit path; a matching `If-None-Match`
@@ -118,14 +118,43 @@ Django 4.2 project. Source lives entirely under `src/`, with `manage.py` at `src
       aggregates computed over the exact queryset the view serves (`None` aggregates render as `"None"`, so an empty
       race is stable). Deliberately **no `versions.categories`** — category edits must move `versions.teams`;
       `races_version()` is global and deliberately absent from the per-race `sync` manifest (the races list is the app's
-      entry point, probed via its own conditional GET). The **legend** fingerprint additionally folds in
-      `MAX(CheckpointTag.updated_at)|COUNT` over the same draft-excluded checkpoints **and** the request's `key_id`, so
-      the legend ETag / `versions.legend` change on any tag edit **and differ per build/secret** — an app update that
-      rotates `X-App-Key-Id` re-fetches the legend (new ETag) instead of getting a `304` with hashes computed under the
-      old secret. `legend_state`/`legend_version` therefore take a `key_id` arg; both `LegendView` and `SyncView` thread
-      it through.
+      entry point, probed via its own conditional GET). The **legend** fingerprint additionally folds in two more
+      `MAX(updated_at)|COUNT` aggregates over the same draft-excluded checkpoints — `CheckpointSecret` (re-seal / enc
+      appear/disappear on a lock toggle) and `CheckpointTag` (code/unlocks/bundle/check_method) — so the legend ETag /
+      `versions.legend` move on any lock toggle, re-seal, or tag edit. The legend is now **build-independent**: the
+      ciphertext/bundles are precomputed and stored in the DB (not keyed by the per-build secret), so `legend_state`/
+      `legend_version` take **no** `key_id` and two builds share the legend ETag (an `X-App-Key-Id` rotation no longer
+      re-fetches the legend).
+    - **Legend encryption** (`src/apps/mobile/crypto.py`, `legend_crypto.py`, `signals.py`; models in
+      `src/website/models/checkpoint.py`): a **locked** checkpoint (`Checkpoint.is_legend_locked=True`) hides its
+      `cost`/`description` behind envelope encryption so the app can only decrypt them **after physically scanning that
+      КП's NFC code** — fully offline. Threat model: the adversary is the app in a participant's hands; a DB leak is out
+      of scope, so there is **no at-rest encryption and no master key** — only what leaves the server is encrypted.
+      Scheme (AES-256-GCM + HKDF, `crypto.py:seal`/`unseal`/`derive_wrap_key`; `unseal` is **not** named `open` to avoid
+      shadowing the builtin/tripping flake8): each locked КП is sealed with its own random 32-B `content_key` into
+      `CheckpointSecret` (`O2O → Checkpoint`, `related_name="secret"`; `enc_blob={"iv","ct"}` over `{cost, description}`,
+      `aad=str(cp.id)`); each `CheckpointTag` carries a random 16-B `code` (written into the tag's NFC user memory
+      out-of-band) and a per-tag `bundle_blob` = AES-GCM of `{cp_id: content_key}` over the tag's `unlocks` set, wrap
+      key `HKDF(code)`, `aad=bid` where **`bid = sha256(code).hexdigest()[:16]`** (16 hex chars — the mobile client must
+      compute it identically). `unlocks` is an M2M (`related_name="unlocked_by"`); an **empty** `unlocks` means the tag
+      unlocks its own `point` (runtime `[point]` default in `build_bundle`). The envelope (content-key indirection) is
+      what lets one code open a configurable subset of КП with overlaps without re-encrypting a КП per code. Ciphertext
+      + bundles are **precomputed and stored** so ETags stay stable. The service layer (`legend_crypto.py`:
+      `seal_checkpoint`/`ensure_code`/`build_bundle`) is driven by **signals** (`post_save(Checkpoint)` re-seals + on a
+      lock toggle rebuilds bundles of `cp.tags.all() ∪ cp.unlocked_by.all()`; `post_save(CheckpointTag)` +
+      `m2m_changed(unlocks)` rebuild the tag's bundle) with a **recursion guard** (`post_save(CheckpointTag)`
+      early-returns when `update_fields == {"code","bid","bundle_blob","updated_at"}`, the service's sentinel set; a
+      thread-local flag fences the `m2m_changed` path). Bulk ops bypass signals — backfill/repair via
+      `manage.py rebuild_legend_crypto [--race <id>] [--regenerate-codes]`; dump codes for tag provisioning via
+      `manage.py export_legend_codes --race <id>`. Admin lock/unlock + rebuild-bundle bulk actions **must iterate and
+      `save()`/call the service** (never `queryset.update()`, which skips the signals → no secret → cleartext leak). The
+      serializer (`LegendCheckpointSerializer`) branches: locked → `{id, number, type, enc}`, open →
+      `{id, number, type, cost, description}`; `BundleSerializer` flattens `bundle_blob` to `{bid, iv, ct, check_method}`.
+      **`tag_hash` is gone** — open-КП recognition is no longer the legend's job; the scoring/scan path lives in the
+      `api` app and matches by `nfc_uid` (unchanged). Per the **`update_fields` discipline** above, every service
+      `save(update_fields=[...])` on `CheckpointTag`/`CheckpointSecret` includes `"updated_at"`.
     - **`update_fields` discipline**: the fingerprints rely on `auto_now` `updated_at` fields on `Team`/`Athlet`/
-      `Checkpoint`/`CheckpointTag`/`Category`/`Race`. Any `save(update_fields=[...])` on these models **must** include `"updated_at"`,
+      `Checkpoint`/`CheckpointTag`/`CheckpointSecret`/`Category`/`Race`. Any `save(update_fields=[...])` on these models **must** include `"updated_at"`,
       otherwise the version/ETag goes stale (e.g. the auto `OPEN → SOLD_OUT` `reg_status` flips in
       `check_vtb_payments.py` and `website/models/models.py` include it).
     - **`nfc_uid` normalized invariant**: `Tag.nfc_uid` and `CheckpointTag.nfc_uid` are auto-normalized (stripped and uppercased) by their
