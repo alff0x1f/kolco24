@@ -5,6 +5,31 @@ def uppercase_nfc_uids(apps, schema_editor):
     CheckpointTag = apps.get_model("website", "CheckpointTag")
     Tag = apps.get_model("website", "Tag")
 
+    # CheckpointTag.unique_together(point, nfc_uid) is added in migration 0082.
+    # Pre-check for (point_id, normalized_nfc_uid) collisions here so that
+    # 0082's AlterUniqueTogether fails with a clear error rather than a cryptic
+    # IntegrityError at constraint-creation time.
+    seen_ct: dict = {}
+    collisions_ct = []
+    for pk, point_id, nfc_uid in CheckpointTag.objects.values_list(
+        "pk", "point_id", "nfc_uid"
+    ):
+        key = (point_id, (nfc_uid or "").strip().upper())
+        if key in seen_ct:
+            collisions_ct.append((seen_ct[key], pk, key[1], point_id))
+        else:
+            seen_ct[key] = pk
+    if collisions_ct:
+        details = ", ".join(
+            f"rows {a} and {b} both become (point={p}, nfc_uid='{u}')"
+            for a, b, u, p in collisions_ct
+        )
+        raise RuntimeError(
+            "Cannot normalize CheckpointTag.nfc_uid: duplicates exist after "
+            f"strip+uppercase ({details}). "
+            "Resolve these duplicates manually before migrating."
+        )
+
     # CheckpointTag has updated_at (auto_now) — touch it so the mobile legend
     # fingerprint / ETag moves after the casing change.
     for tag in CheckpointTag.objects.all():
