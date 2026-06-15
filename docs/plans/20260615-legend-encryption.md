@@ -257,12 +257,12 @@ Response shape:
 - Create: `src/apps/mobile/management/commands/export_legend_codes.py`
 - Modify: `src/apps/mobile/tests.py`
 
-- [ ] `rebuild_legend_crypto [--race] [--regenerate-codes]` — re-seal all locked КП + rebuild all bundles
-- [ ] `export_legend_codes --race <id>` — print `nfc_uid / КП number / code(hex)`
-- [ ] write tests: `rebuild_legend_crypto` backfills secrets+bundles for a race with locked КП
-- [ ] write tests: `--regenerate-codes` changes codes; without it codes are preserved
-- [ ] write tests: `export_legend_codes` output lists every tag's code
-- [ ] run tests — must pass before next task
+- [x] `rebuild_legend_crypto [--race] [--regenerate-codes]` — re-seal all locked КП + rebuild all bundles
+- [x] `export_legend_codes --race <id>` — print `nfc_uid / КП number / code(hex)`
+- [x] write tests: `rebuild_legend_crypto` backfills secrets+bundles for a race with locked КП
+- [x] write tests: `--regenerate-codes` changes codes; without it codes are preserved
+- [x] write tests: `export_legend_codes` output lists every tag's code
+- [x] run tests — must pass before next task
 
 ### Task 6: Serving + build-independent versioning (one task — done together so each test stays green)
 

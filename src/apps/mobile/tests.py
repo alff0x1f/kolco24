@@ -3186,3 +3186,105 @@ def test_signal_bundle_rebuild_moves_legend_etag():
     tag.unlocks.add(second)  # rebuild folds in `second`'s key + bumps updated_at
 
     assert legend_version(race.id) != before
+
+
+# --- Task 5: management commands --------------------------------------------
+
+
+@pytest.mark.django_db
+def test_rebuild_legend_crypto_backfills_secrets_and_bundles():
+    """The backfill re-seals locked КП and repopulates tag bundles.
+
+    Simulates a pre-backfill state (no secret, blank bundle) with bypass-signal
+    ``QuerySet.update`` / ``delete``, then asserts the command rebuilds both.
+    """
+    import json
+
+    from django.core.management import call_command
+
+    from apps.mobile.crypto import derive_wrap_key, unseal
+    from website.models.checkpoint import Checkpoint, CheckpointSecret, CheckpointTag
+    from website.models.race import Race
+
+    race = Race.objects.create(name="Backfill", slug="backfill")
+    cp = Checkpoint.objects.create(
+        race=race, number=1, cost=4, description="tree", is_legend_locked=True
+    )
+    tag = CheckpointTag.objects.create(point=cp, nfc_uid="04A1B2C3")
+
+    # Wipe to a pre-backfill state, bypassing signals.
+    CheckpointSecret.objects.filter(checkpoint=cp).delete()
+    CheckpointTag.objects.filter(pk=tag.pk).update(bundle_blob=None, bid="")
+
+    call_command("rebuild_legend_crypto", race=race.id)
+
+    secret = CheckpointSecret.objects.get(checkpoint=cp)
+    enc = json.loads(
+        unseal(bytes(secret.content_key), secret.enc_blob, aad=str(cp.id).encode())
+    )
+    assert enc == {"cost": 4, "description": "tree"}
+
+    tag.refresh_from_db()
+    assert tag.bid
+    assert tag.bundle_blob is not None
+    bundle = json.loads(
+        unseal(derive_wrap_key(bytes(tag.code)), tag.bundle_blob, aad=tag.bid.encode())
+    )
+    assert str(cp.id) in bundle
+
+
+@pytest.mark.django_db
+def test_rebuild_regenerate_codes_changes_codes_else_preserved():
+    from django.core.management import call_command
+
+    from website.models.checkpoint import Checkpoint, CheckpointTag
+    from website.models.race import Race
+
+    race = Race.objects.create(name="Regen", slug="regen")
+    cp = Checkpoint.objects.create(
+        race=race, number=1, cost=1, description="x", is_legend_locked=True
+    )
+    tag = CheckpointTag.objects.create(point=cp, nfc_uid="04A1B2C3")
+    tag.refresh_from_db()
+    code_before = bytes(tag.code)
+
+    # Without the flag the existing code is preserved.
+    call_command("rebuild_legend_crypto", race=race.id)
+    tag.refresh_from_db()
+    assert bytes(tag.code) == code_before
+
+    # With the flag a fresh code is minted.
+    call_command("rebuild_legend_crypto", race=race.id, regenerate_codes=True)
+    tag.refresh_from_db()
+    assert bytes(tag.code) != code_before
+
+
+@pytest.mark.django_db
+def test_export_legend_codes_lists_every_tag_code():
+    from io import StringIO
+
+    from django.core.management import call_command
+
+    from website.models.checkpoint import Checkpoint, CheckpointTag
+    from website.models.race import Race
+
+    race = Race.objects.create(name="Export", slug="export")
+    cp1 = Checkpoint.objects.create(
+        race=race, number=1, cost=1, description="a", is_legend_locked=True
+    )
+    cp2 = Checkpoint.objects.create(
+        race=race, number=2, cost=1, description="b", is_legend_locked=True
+    )
+    tag1 = CheckpointTag.objects.create(point=cp1, nfc_uid="0A0A0A0A")
+    tag2 = CheckpointTag.objects.create(point=cp2, nfc_uid="0B0B0B0B")
+    tag1.refresh_from_db()
+    tag2.refresh_from_db()
+
+    out = StringIO()
+    call_command("export_legend_codes", race=race.id, stdout=out)
+    output = out.getvalue()
+
+    assert tag1.nfc_uid in output
+    assert bytes(tag1.code).hex() in output
+    assert tag2.nfc_uid in output
+    assert bytes(tag2.code).hex() in output
