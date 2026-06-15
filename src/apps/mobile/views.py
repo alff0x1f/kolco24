@@ -177,6 +177,7 @@ class LegendView(AppAPIView):
         bundle_qs = (
             CheckpointTag.objects.filter(point__race_id=race_id)
             .exclude(point__type=CheckpointType.draft.value)
+            .exclude(bundle_blob=None)
             .order_by("id")
         )
         resp = Response(

@@ -130,7 +130,8 @@ Django 4.2 project. Source lives entirely under `src/`, with `manage.py` at `src
       `cost`/`description` behind envelope encryption so the app can only decrypt them **after physically scanning that
       КП's NFC code** — fully offline. Threat model: the adversary is the app in a participant's hands; a DB leak is out
       of scope, so there is **no at-rest encryption and no master key** — only what leaves the server is encrypted.
-      Scheme (AES-256-GCM + HKDF, `crypto.py:seal`/`unseal`/`derive_wrap_key`; `unseal` is **not** named `open` to avoid
+      Scheme (AES-256-GCM + HKDF via the `cryptography` package — a direct `pyproject.toml` dependency since this
+      feature; `crypto.py:seal`/`unseal`/`derive_wrap_key`; `unseal` is **not** named `open` to avoid
       shadowing the builtin/tripping flake8): each locked КП is sealed with its own random 32-B `content_key` into
       `CheckpointSecret` (`O2O → Checkpoint`, `related_name="secret"`; `enc_blob={"iv","ct"}` over `{cost, description}`,
       `aad=str(cp.id)`); each `CheckpointTag` carries a random 16-B `code` (written into the tag's NFC user memory

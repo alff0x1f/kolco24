@@ -1,10 +1,14 @@
 """Serializers for the mobile-app endpoints."""
 
+import logging
+
 from rest_framework import serializers
 
 from website.models.checkpoint import CheckpointSecret
 from website.models.models import Athlet, Team
 from website.models.race import Category, Race
+
+logger = logging.getLogger(__name__)
 
 
 class RaceListSerializer(serializers.ModelSerializer):
@@ -64,6 +68,12 @@ class LegendCheckpointSerializer(serializers.Serializer):
                 secret = cp.secret
             except CheckpointSecret.DoesNotExist:
                 secret = None
+            if secret is None:
+                logger.error(
+                    "Locked checkpoint %d has no CheckpointSecret; "
+                    "run rebuild_legend_crypto to repair.",
+                    cp.id,
+                )
             data["enc"] = secret.enc_blob if secret else None
             return data
         data["cost"] = cp.cost

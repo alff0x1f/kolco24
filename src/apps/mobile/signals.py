@@ -86,6 +86,10 @@ def checkpointtag_unlocks_changed(sender, instance, action, pk_set, **kwargs):
     else:
         # Reverse relation (``checkpoint.unlocked_by.add(tag)``): instance is a
         # Checkpoint; the affected tags are in pk_set (None on post_clear).
+        # WARNING: ``checkpoint.unlocked_by.clear()`` fires post_clear with
+        # pk_set=None *after* rows are deleted, so unlocked_by.all() is empty
+        # here and no bundles are rebuilt. Callers must use the forward relation
+        # (``tag.unlocks.remove/clear``) or run ``rebuild_legend_crypto`` after.
         if pk_set:
             tags = list(CheckpointTag.objects.filter(pk__in=pk_set))
         else:
