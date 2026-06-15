@@ -1,0 +1,125 @@
+{% extends "website/base-2.html" %}
+{% load static %}
+
+{% block title %}Легенда — {{ race.name }} — Кольцо 24{% endblock %}
+
+{% block extra_head %}
+<link href="{% static 'css/legend_form.css' %}" rel="stylesheet">
+{% endblock %}
+
+{% block content %}
+<form class="legend-editor" id="legendForm" method="post">
+  {% csrf_token %}
+  <input type="hidden" name="checkpoints_json" id="checkpointsJson">
+  <div class="container">
+
+    <!-- Breadcrumb -->
+    <nav class="breadcrumb">
+      <a href="/">Кольцо&nbsp;24</a>
+      <span class="sep">/</span>
+      <a href="{% url 'race' race.slug %}">{{ race.name }}</a>
+      <span class="sep">/</span>
+      <span class="cur">Легенда</span>
+    </nav>
+
+    <!-- Header / actions -->
+    <div class="head">
+      <div class="head-l">
+        <div class="head-title">
+          <h1>Легенда гонки</h1>
+          <span class="chip edit">{{ race.name }}</span>
+        </div>
+        <div class="sub">
+          Контрольные точки гонки. Можно редактировать прямо в таблице или
+          вставить из&nbsp;Excel / Google&nbsp;Sheets
+          (<kbd>Ctrl</kbd>+<kbd>V</kbd> в&nbsp;ячейку или кнопка
+          «Вставить из&nbsp;таблицы»).
+        </div>
+      </div>
+      <div class="head-actions">
+        <a class="btn btn-ghost" href="{% url 'race' race.slug %}">Отмена</a>
+        <button class="btn btn-primary" type="submit">Сохранить</button>
+      </div>
+    </div>
+
+    {% if form_errors %}
+    <div class="form-errors">
+      {% for err in form_errors %}<div>{{ err }}</div>{% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- Legend grid -->
+    <div class="card">
+      <div class="card-head">
+        <h2>Контрольные точки</h2>
+        <span class="aux"><span id="cpCount">0</span> КП</span>
+      </div>
+      <div class="card-body tight">
+        <div class="grid-wrap">
+          <div class="lg-grid" id="cpGrid" role="grid" aria-label="Контрольные точки">
+            <div class="lg-headrow" role="row">
+              <span class="lg-h lg-h-num">№</span>
+              <span class="lg-h lg-h-type">Тип</span>
+              <span class="lg-h lg-h-cost">Стоимость</span>
+              <span class="lg-h lg-h-desc">Описание</span>
+              <span class="lg-h lg-h-lock" title="Легенда заперта — открывается только после сканирования КП">🔒</span>
+              <span class="lg-h lg-h-act"></span>
+            </div>
+            <!-- rows injected by legend_form.js from #checkpoints-data -->
+          </div>
+        </div>
+      </div>
+      <div class="card-foot">
+        <button class="btn btn-outline btn-sm" type="button" id="addRow">+ Строка</button>
+        <button class="btn btn-outline btn-sm" type="button" id="pasteOpen">📋 Вставить из таблицы</button>
+        <span class="foot-hint">
+          Порядок колонок при вставке: <code>№</code> · <code>тип</code> ·
+          <code>стоимость</code> · <code>описание</code> · <code>🔒&nbsp;(0/1)</code>
+        </span>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Paste-from-spreadsheet modal -->
+  <div class="lg-modal" id="pasteModal" hidden>
+    <div class="lg-modal-backdrop" data-paste-close></div>
+    <div class="lg-modal-card" role="dialog" aria-modal="true" aria-labelledby="pasteTitle">
+      <div class="lg-modal-head">
+        <h3 id="pasteTitle">Вставить из Excel / Google Sheets</h3>
+        <button class="lg-modal-x" type="button" data-paste-close aria-label="Закрыть">✕</button>
+      </div>
+      <div class="lg-modal-body">
+        <p class="lg-modal-note">
+          Скопируйте ячейки из таблицы и вставьте сюда. Колонки разделяются
+          табуляцией. Ожидаемый порядок:
+          <strong>№ · тип · стоимость · описание · 🔒</strong>.
+          Строка-заголовок (если первая ячейка не&nbsp;число) пропускается.
+          Тип можно указывать кодом (<code>kp</code>, <code>start</code>,
+          <code>finish</code>, <code>test</code>) или оставить пустым — будет
+          <code>КП</code>. Запертость: <code>1</code>/<code>да</code>/<code>+</code>.
+        </p>
+        <textarea class="lg-paste-area" id="pasteArea" rows="10"
+          placeholder="1&#9;kp&#9;30&#9;Опора ЛЭП у реки&#9;1&#10;2&#9;kp&#9;45&#9;Старая мельница&#9;0"></textarea>
+        <div class="lg-paste-count" id="pastePreview"></div>
+      </div>
+      <div class="lg-modal-foot">
+        <label class="lg-replace">
+          <input type="checkbox" id="pasteReplace"> Заменить все строки
+        </label>
+        <span class="lg-modal-spring"></span>
+        <button class="btn btn-ghost btn-sm" type="button" data-paste-close>Отмена</button>
+        <button class="btn btn-primary btn-sm" type="button" id="pasteApply">Добавить</button>
+      </div>
+    </div>
+  </div>
+</form>
+
+<script id="checkpoints-data" type="application/json">{{ checkpoints_data }}</script>
+<script id="checkpoint-errors" type="application/json">{{ checkpoint_errors }}</script>
+<script id="legend-config" type="application/json">{{ legend_config }}</script>
+{% endblock %}
+
+{% block footer_js_include %}
+<script src="{% static 'js/legend_form.js' %}"></script>
+{% endblock %}

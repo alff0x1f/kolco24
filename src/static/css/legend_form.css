@@ -1,0 +1,214 @@
+/* Legend (checkpoints) bulk editor — /race/<slug>/legend/edit/.
+   Scoped under .legend-editor. Reuses theme-2.css tokens/classes (:root,
+   .container, .card, .btn, .btn-primary, .btn-ghost). A dense, spreadsheet-like
+   data console: monospace numerics, sticky header, keyboard-paste-friendly. */
+
+.legend-editor {
+  --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --lock-bg: #fff7ed;
+  --lock-line: #f3d9b5;
+  padding: 0 0 72px;
+}
+
+/* ── Breadcrumb / header (mirrors race_form) ─────────────── */
+.legend-editor .breadcrumb {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 13px; color: var(--muted); padding: 16px 0 0;
+}
+.legend-editor .breadcrumb a { color: var(--muted); }
+.legend-editor .breadcrumb a:hover { color: var(--ink); }
+.legend-editor .breadcrumb .sep { color: var(--muted-2); }
+.legend-editor .breadcrumb .cur { color: var(--ink-soft); }
+
+.legend-editor .head {
+  display: flex; align-items: flex-end; justify-content: space-between;
+  gap: 18px; padding: 10px 0 20px; flex-wrap: wrap;
+}
+.legend-editor .head-l { display: flex; flex-direction: column; gap: 7px; min-width: 0; }
+.legend-editor .head-title { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.legend-editor .head h1 { font-size: 26px; font-weight: 600; letter-spacing: -0.015em; }
+.legend-editor .head .sub { font-size: 13.5px; color: var(--muted); max-width: 64ch; line-height: 1.5; }
+.legend-editor .head-actions { display: flex; gap: 9px; align-items: center; flex-shrink: 0; }
+
+.legend-editor kbd {
+  font-family: var(--mono); font-size: 11px; background: #fff;
+  border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 5px;
+  padding: 1px 5px; color: var(--ink-soft);
+}
+
+.legend-editor .chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 12px; font-weight: 500; padding: 4px 11px; border-radius: 999px;
+}
+.legend-editor .chip.edit { background: #eaf1fd; color: var(--primary); }
+.legend-editor .chip.edit::before {
+  content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--primary-2);
+}
+
+/* ── Buttons not in theme-2 ──────────────────────────────── */
+.legend-editor .btn-outline { background: var(--paper-2); color: var(--ink); border-color: var(--line); }
+.legend-editor .btn-outline:hover { border-color: var(--ink); color: var(--ink); }
+.legend-editor .btn-sm { padding: 7px 13px; font-size: 13px; }
+
+/* ── Error banner ────────────────────────────────────────── */
+.legend-editor .form-errors {
+  background: var(--danger-bg); color: var(--danger);
+  border: 1px solid var(--danger); border-radius: var(--radius-sm);
+  padding: 11px 14px; font-size: 13.5px; margin-bottom: 16px;
+  display: flex; flex-direction: column; gap: 4px;
+}
+
+/* ── Card (header/body/foot split) ───────────────────────── */
+.legend-editor .card { margin-bottom: 0; }
+.legend-editor .card-head {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 16px 22px; border-bottom: 1px solid var(--line-soft);
+}
+.legend-editor .card-head h2 {
+  font-size: 13px; font-weight: 600; letter-spacing: 0.1em;
+  text-transform: uppercase; color: var(--muted); margin: 0;
+}
+.legend-editor .card-head .aux { font-size: 12.5px; color: var(--muted); }
+.legend-editor .card-body { padding: 16px 18px; }
+.legend-editor .card-body.tight { padding: 0; }
+
+.legend-editor .card-foot {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  padding: 14px 18px; border-top: 1px solid var(--line-soft);
+}
+.legend-editor .card-foot .foot-hint {
+  font-size: 12px; color: var(--muted); margin-left: auto;
+}
+.legend-editor .card-foot code,
+.legend-editor .foot-hint code,
+.legend-editor .lg-modal-note code {
+  font-family: var(--mono); font-size: 11.5px; background: var(--line-soft);
+  padding: 1px 5px; border-radius: 4px; color: var(--ink-soft);
+}
+
+/* ── The grid ────────────────────────────────────────────── */
+.legend-editor .grid-wrap { overflow-x: auto; }
+.legend-editor .lg-grid { min-width: 720px; }
+
+.legend-editor .lg-headrow,
+.legend-editor .lg-row {
+  display: grid;
+  grid-template-columns: 64px 132px 116px minmax(180px, 1fr) 52px 44px;
+  align-items: center;
+}
+
+.legend-editor .lg-headrow {
+  position: sticky; top: 0; z-index: 2;
+  background: #f7f9fb; border-bottom: 1px solid var(--line);
+}
+.legend-editor .lg-h {
+  font-size: 11px; font-weight: 600; letter-spacing: 0.08em;
+  text-transform: uppercase; color: var(--muted);
+  padding: 11px 12px;
+}
+.legend-editor .lg-h-num, .legend-editor .lg-h-cost { text-align: right; }
+.legend-editor .lg-h-lock { text-align: center; letter-spacing: 0; }
+
+.legend-editor .lg-row {
+  border-bottom: 1px solid var(--line-soft);
+  transition: background .1s;
+}
+.legend-editor .lg-row:nth-child(even of .lg-row) { background: #fcfcfd; }
+.legend-editor .lg-row:hover { background: #f6f9ff; }
+.legend-editor .lg-row.is-locked { background: var(--lock-bg); }
+.legend-editor .lg-row.is-locked:hover { background: #fef1e0; }
+.legend-editor .lg-row.has-error { background: var(--danger-bg); }
+
+/* Cells render as borderless inputs that gain a frame on focus — the
+   spreadsheet feel. */
+.legend-editor .lg-cell {
+  width: 100%; font-family: inherit; font-size: 13.5px; color: var(--ink);
+  background: transparent; border: 1px solid transparent; border-radius: 6px;
+  padding: 9px 11px; line-height: 1.3; transition: border-color .1s, box-shadow .1s;
+}
+.legend-editor .lg-cell.mono { font-family: var(--mono); font-size: 13px; }
+.legend-editor .lg-num, .legend-editor .lg-cost { text-align: right; }
+.legend-editor .lg-cell:hover { border-color: var(--line); }
+.legend-editor .lg-cell:focus {
+  outline: none; background: #fff; border-color: var(--primary-2);
+  box-shadow: 0 0 0 3px rgba(69,130,236,.14);
+}
+.legend-editor .lg-cell.has-error { border-color: var(--danger); }
+.legend-editor select.lg-type {
+  appearance: none; cursor: pointer; padding-right: 26px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 14 14' fill='none' stroke='%236b7785' stroke-width='1.5'%3E%3Cpath d='M3 5l4 4 4-4'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 8px center;
+}
+
+.legend-editor .lg-lockcell { display: flex; justify-content: center; }
+.legend-editor .lg-lock { width: 17px; height: 17px; accent-color: #d98324; cursor: pointer; }
+
+.legend-editor .lg-del {
+  display: flex; align-items: center; justify-content: center;
+  width: 30px; height: 30px; margin: 0 auto;
+  border: 1px solid transparent; border-radius: 7px;
+  background: none; color: var(--muted-2); cursor: pointer; transition: all .1s;
+}
+.legend-editor .lg-del:hover:not(:disabled) {
+  color: var(--danger); border-color: var(--line); background: #fff;
+}
+.legend-editor .lg-del:disabled { opacity: .3; cursor: not-allowed; }
+.legend-editor .lg-del svg { width: 15px; height: 15px; }
+
+.legend-editor .lg-empty {
+  padding: 28px 18px; text-align: center; font-size: 13.5px; color: var(--muted);
+}
+
+/* ── Paste modal ─────────────────────────────────────────── */
+.legend-editor .lg-modal {
+  position: fixed; inset: 0; z-index: 60;
+  display: flex; align-items: center; justify-content: center; padding: 20px;
+}
+.legend-editor .lg-modal[hidden] { display: none; }
+.legend-editor .lg-modal-backdrop {
+  position: absolute; inset: 0; background: rgba(22,26,31,.42);
+  backdrop-filter: blur(2px);
+}
+.legend-editor .lg-modal-card {
+  position: relative; width: min(620px, 100%);
+  background: var(--paper-2); border-radius: var(--radius);
+  box-shadow: 0 1px 2px rgba(22,26,31,.05), 0 24px 60px rgba(22,26,31,.22);
+  display: flex; flex-direction: column; max-height: 86vh;
+}
+.legend-editor .lg-modal-head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 18px 22px; border-bottom: 1px solid var(--line-soft);
+}
+.legend-editor .lg-modal-head h3 { font-size: 17px; font-weight: 600; }
+.legend-editor .lg-modal-x {
+  background: none; border: 0; font-size: 18px; line-height: 1; cursor: pointer;
+  color: var(--muted); padding: 4px;
+}
+.legend-editor .lg-modal-x:hover { color: var(--ink); }
+.legend-editor .lg-modal-body { padding: 18px 22px; overflow-y: auto; }
+.legend-editor .lg-modal-note {
+  font-size: 13px; color: var(--muted); line-height: 1.55; margin: 0 0 12px;
+}
+.legend-editor .lg-paste-area {
+  width: 100%; font-family: var(--mono); font-size: 12.5px; color: var(--ink);
+  background: var(--paper-2); border: 1px solid var(--line);
+  border-radius: var(--radius-sm); padding: 11px 13px; line-height: 1.5;
+  resize: vertical; white-space: pre; tab-size: 12;
+}
+.legend-editor .lg-paste-area:focus {
+  outline: none; border-color: var(--primary-2);
+  box-shadow: 0 0 0 3px rgba(69,130,236,.14);
+}
+.legend-editor .lg-paste-count { font-size: 12.5px; color: var(--primary); margin-top: 8px; min-height: 16px; }
+.legend-editor .lg-modal-foot {
+  display: flex; align-items: center; gap: 10px;
+  padding: 14px 22px; border-top: 1px solid var(--line-soft);
+}
+.legend-editor .lg-replace { font-size: 13px; color: var(--ink-soft); display: flex; align-items: center; gap: 7px; cursor: pointer; }
+.legend-editor .lg-replace input { width: 16px; height: 16px; accent-color: var(--primary-2); }
+.legend-editor .lg-modal-spring { flex: 1; }
+
+@media (max-width: 640px) {
+  .legend-editor .head { align-items: stretch; }
+  .legend-editor .head-actions { width: 100%; }
+}

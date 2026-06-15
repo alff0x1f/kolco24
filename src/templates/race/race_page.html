@@ -125,6 +125,7 @@
           </div>
           <div class="card-pad admin-actions">
             <a class="btn btn-primary" href="{% url 'edit_race' race.slug %}">Редактировать гонку</a>
+            <a class="btn btn-outline" href="{% url 'edit_legend' race.slug %}">Легенда (КП)</a>
             {% if user.is_superuser %}
             <a class="btn btn-outline" href="{% url 'add_race' %}">+ Новая гонка</a>
             {% endif %}
