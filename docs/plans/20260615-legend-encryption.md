@@ -301,11 +301,11 @@ Response shape:
 
 ### Task 8: Verify acceptance criteria
 
-- [ ] verify selective encryption: locked КП hidden until scan, open КП always visible
-- [ ] verify "code → subset" with overlap works end-to-end
-- [ ] run full suite: `uv run pytest`
-- [ ] run `make format && make lint`
-- [ ] verify the `api`/scoring `nfc_uid` path and `teams`/`races` versions are unaffected
+- [x] verify selective encryption: locked КП hidden until scan, open КП always visible (test_legend_locked_cp_serves_enc_not_cleartext_open_serves_cleartext)
+- [x] verify "code → subset" with overlap works end-to-end (test_build_bundle_overlap_one_checkpoint_in_two_bundles + test_legend_end_to_end_scan_code_decrypts_locked_checkpoint)
+- [x] run full suite: `uv run pytest` (541 passed)
+- [x] run `make format && make lint` (clean)
+- [x] verify the `api`/scoring `nfc_uid` path and `teams`/`races` versions are unaffected (teams_version/races_version tests pass; legend key_id drop confined to legend path)
 
 ### Task 9: Documentation
 
