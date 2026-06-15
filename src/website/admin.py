@@ -99,6 +99,8 @@ class TeamAdmin(admin.ModelAdmin):
 class PointTagInline(admin.TabularInline):
     model = CheckpointTag
     extra = 1
+    readonly_fields = ("bid",)
+    exclude = ("code", "bundle_blob")
 
 
 @admin.register(Checkpoint)
