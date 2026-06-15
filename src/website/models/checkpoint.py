@@ -60,3 +60,4 @@ class CheckpointTag(models.Model):
         verbose_name = "Тег КП"
         verbose_name_plural = "Теги КП"
         ordering = ["id"]
+        unique_together = [("point", "nfc_uid")]
