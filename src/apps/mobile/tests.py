@@ -3040,6 +3040,106 @@ def test_build_bundle_skips_open_checkpoints():
 
 
 @pytest.mark.django_db
+def test_build_bundle_excludes_cross_race_and_draft_unlocks():
+    """Cross-race and draft КП in tag.unlocks must not contribute content keys.
+
+    A tag in Race A whose unlocks M2M includes a locked КП from Race B or a
+    draft КП must not expose those keys in the bundle.
+    """
+    import json
+
+    from apps.mobile.crypto import derive_wrap_key, unseal
+    from apps.mobile.legend_crypto import build_bundle, seal_checkpoint
+    from website.models.checkpoint import Checkpoint, CheckpointTag
+    from website.models.race import Race
+
+    race_a = Race.objects.create(name="Race A", slug="race-a-xrace")
+    race_b = Race.objects.create(name="Race B", slug="race-b-xrace")
+
+    local_locked = Checkpoint.objects.create(
+        race=race_a, number=1, cost=5, description="local", is_legend_locked=True
+    )
+    seal_checkpoint(local_locked)
+
+    cross_race_locked = Checkpoint.objects.create(
+        race=race_b, number=1, cost=9, description="cross", is_legend_locked=True
+    )
+    seal_checkpoint(cross_race_locked)
+
+    draft_locked = Checkpoint.objects.create(
+        race=race_a,
+        number=2,
+        cost=3,
+        description="draft",
+        type="draft",
+        is_legend_locked=True,
+    )
+    seal_checkpoint(draft_locked)
+
+    tag = CheckpointTag.objects.create(point=local_locked, nfc_uid="04AABBCC")
+    tag.unlocks.set([local_locked, cross_race_locked, draft_locked])
+
+    build_bundle(tag)
+    tag.refresh_from_db()
+
+    code = bytes(tag.code)
+    decrypted = json.loads(
+        unseal(derive_wrap_key(code), tag.bundle_blob, aad=tag.bid.encode())
+    )
+    # Only the same-race non-draft КП should appear
+    assert set(decrypted.keys()) == {str(local_locked.id)}
+    assert str(cross_race_locked.id) not in decrypted
+    assert str(draft_locked.id) not in decrypted
+
+
+@pytest.mark.django_db
+def test_build_bundle_invalid_only_unlocks_produces_none_not_fallback():
+    """A tag whose explicit unlocks contain *only* cross-race/draft КП must get
+    bundle_blob=None, not silently fall back to [tag.point].
+
+    Regression for: build_bundle checked ``if not unlocked`` (post-filter) instead
+    of ``if not tag.unlocks.exists()`` (raw M2M), so all-invalid explicit unlocks
+    triggered the [point] default and granted a key outside the configured subset.
+    """
+    from apps.mobile.legend_crypto import build_bundle, seal_checkpoint
+    from website.models.checkpoint import Checkpoint, CheckpointTag
+    from website.models.race import Race
+
+    race_a = Race.objects.create(name="Race A", slug="race-a-invalid-only")
+    race_b = Race.objects.create(name="Race B", slug="race-b-invalid-only")
+
+    local_cp = Checkpoint.objects.create(
+        race=race_a, number=1, cost=5, description="local", is_legend_locked=True
+    )
+    seal_checkpoint(local_cp)
+
+    cross_race_cp = Checkpoint.objects.create(
+        race=race_b, number=1, cost=9, description="cross", is_legend_locked=True
+    )
+    seal_checkpoint(cross_race_cp)
+
+    draft_cp = Checkpoint.objects.create(
+        race=race_a,
+        number=2,
+        cost=3,
+        description="draft",
+        type="draft",
+        is_legend_locked=True,
+    )
+    seal_checkpoint(draft_cp)
+
+    tag = CheckpointTag.objects.create(point=local_cp, nfc_uid="04DEADBEEF")
+    # Both explicit unlocks are invalid — cross-race and draft only
+    tag.unlocks.set([cross_race_cp, draft_cp])
+
+    build_bundle(tag)
+    tag.refresh_from_db()
+
+    # Must not fall back to [local_cp]; no valid keys → bundle_blob=None
+    assert tag.bundle_blob is None
+
+
+@pytest.mark.django_db
 def test_build_bundle_overlap_one_checkpoint_in_two_bundles():
     import base64
     import json

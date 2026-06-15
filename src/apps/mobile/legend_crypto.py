@@ -86,9 +86,16 @@ def build_bundle(tag):
     ensure_code(tag)
     code = bytes(tag.code)
 
-    unlocked = list(tag.unlocks.all())
-    if not unlocked:
+    # Resolve the unlock set: empty M2M → implicit [point] default; non-empty M2M
+    # → filter to same-race non-draft КП only (cross-race or draft entries are
+    # dropped; if all are invalid the filtered list stays empty → bundle_blob=None,
+    # not a silent fallback to [point] which would grant an unconfigured key).
+    if not tag.unlocks.exists():
         unlocked = [tag.point]
+    else:
+        unlocked = list(
+            tag.unlocks.filter(race_id=tag.point.race_id).exclude(type="draft")
+        )
 
     secrets = {
         s.checkpoint_id: s
