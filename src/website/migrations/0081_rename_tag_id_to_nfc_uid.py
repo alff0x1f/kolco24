@@ -8,35 +8,36 @@ def uppercase_nfc_uids(apps, schema_editor):
     # CheckpointTag has updated_at (auto_now) — touch it so the mobile legend
     # fingerprint / ETag moves after the casing change.
     for tag in CheckpointTag.objects.all():
-        upper = (tag.nfc_uid or "").upper()
-        if upper != tag.nfc_uid:
-            tag.nfc_uid = upper
+        normalized = (tag.nfc_uid or "").strip().upper()
+        if normalized != tag.nfc_uid:
+            tag.nfc_uid = normalized
             tag.save(update_fields=["nfc_uid", "updated_at"])
 
-    # Tag.nfc_uid is unique=True — uppercasing could collide two rows that
-    # differ only by case. Abort with a clear error so a human resolves the
-    # duplicate first (do NOT silently merge/drop).
+    # Tag.nfc_uid is unique=True — normalizing (strip+uppercase) could collide
+    # two rows that differ only by case or surrounding whitespace. Abort with a
+    # clear error so a human resolves the duplicate first (do NOT silently
+    # merge/drop).
     seen = {}
     collisions = []
     for pk, nfc_uid in Tag.objects.values_list("pk", "nfc_uid"):
-        upper = (nfc_uid or "").upper()
-        if upper in seen:
-            collisions.append((seen[upper], pk, upper))
+        normalized = (nfc_uid or "").strip().upper()
+        if normalized in seen:
+            collisions.append((seen[normalized], pk, normalized))
         else:
-            seen[upper] = pk
+            seen[normalized] = pk
     if collisions:
         details = ", ".join(
             f"rows {a} and {b} both become '{u}'" for a, b, u in collisions
         )
         raise RuntimeError(
-            "Cannot uppercase Tag.nfc_uid: case-insensitive duplicates exist "
+            "Cannot normalize Tag.nfc_uid: duplicates exist after strip+uppercase "
             f"({details}). Resolve these duplicates manually before migrating."
         )
 
     for tag in Tag.objects.all():
-        upper = (tag.nfc_uid or "").upper()
-        if upper != tag.nfc_uid:
-            tag.nfc_uid = upper
+        normalized = (tag.nfc_uid or "").strip().upper()
+        if normalized != tag.nfc_uid:
+            tag.nfc_uid = normalized
             tag.save(update_fields=["nfc_uid"])
 
 

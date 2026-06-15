@@ -37,6 +37,22 @@ class MemberTagAPITestCase(APITestCase):
         self.assertEqual(response.data["nfc_uid"], tag.nfc_uid)
         self.assertIsNotNone(response.data["last_seen_at"])
 
+    def test_touch_member_tag_lowercase_uid_finds_tag(self):
+        Tag.objects.create(number=1, nfc_uid="123AB")
+
+        url = "/api/member_tag/touch/"
+        response = self.client.post(url, {"nfc_uid": "123ab"}, format="json")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["nfc_uid"], "123AB")
+
+    def test_touch_member_tag_not_found_returns_404(self):
+        url = "/api/member_tag/touch/"
+        response = self.client.post(url, {"nfc_uid": "NONEXISTENT"}, format="json")
+
+        self.assertEqual(response.status_code, 404)
+        self.assertIn("nfc_uid", response.data)
+
 
 URL = "/api/contributors/"
 TOKEN = "test-secret-token"

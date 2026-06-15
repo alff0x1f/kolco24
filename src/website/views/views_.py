@@ -326,7 +326,7 @@ class PointTagsView(View):
                 return JsonResponse(
                     {"error": "nfc_uid is a required field."}, status=400
                 )
-            nfc_uid = nfc_uid.upper()
+            nfc_uid = nfc_uid.strip().upper()
 
             try:
                 _, created = CheckpointTag.objects.get_or_create(

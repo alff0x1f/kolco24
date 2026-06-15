@@ -2434,6 +2434,11 @@ def test_checkpoint_tag_save_uppercases_nfc_uid():
     tag.refresh_from_db()
     assert tag.nfc_uid == "DEADBEEF"
 
+    tag.nfc_uid = " 04a1b2c3 "
+    tag.save()
+    tag.refresh_from_db()
+    assert tag.nfc_uid == "04A1B2C3"
+
 
 @pytest.mark.django_db
 def test_member_tag_save_uppercases_nfc_uid():
@@ -2446,3 +2451,8 @@ def test_member_tag_save_uppercases_nfc_uid():
     tag.save()
     tag.refresh_from_db()
     assert tag.nfc_uid == "DEADBEEF"
+
+    tag.nfc_uid = " 04a1b2c3 "
+    tag.save()
+    tag.refresh_from_db()
+    assert tag.nfc_uid == "04A1B2C3"

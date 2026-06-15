@@ -71,12 +71,12 @@ class MemberTagTouchView(APIView):
         serializer = TagTouchSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        nfc_uid = serializer.validated_data["nfc_uid"].upper()
+        nfc_uid = serializer.validated_data["nfc_uid"].strip().upper()
 
         try:
             tag = Tag.objects.get(nfc_uid=nfc_uid)
         except Tag.DoesNotExist:
-            raise NotFound({"nfc_uid": [f"Тег с ID {nfc_uid} не найден"]})
+            raise NotFound({"nfc_uid": [f"Тег с UID {nfc_uid} не найден"]})
 
         tag.last_seen_at = timezone.now()
         tag.save(update_fields=["last_seen_at"])

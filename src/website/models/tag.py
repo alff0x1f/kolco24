@@ -11,7 +11,7 @@ class Tag(models.Model):
     )
 
     def save(self, *args, **kwargs):
-        self.nfc_uid = (self.nfc_uid or "").upper()
+        self.nfc_uid = (self.nfc_uid or "").strip().upper()
         super().save(*args, **kwargs)
 
     def __str__(self):

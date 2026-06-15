@@ -50,7 +50,7 @@ class CheckpointTag(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     def save(self, *args, **kwargs):
-        self.nfc_uid = (self.nfc_uid or "").upper()
+        self.nfc_uid = (self.nfc_uid or "").strip().upper()
         super().save(*args, **kwargs)
 
     def __str__(self):
