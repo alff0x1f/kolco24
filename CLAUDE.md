@@ -108,7 +108,7 @@ Django 4.2 project. Source lives entirely under `src/`, with `manage.py` at `src
     - **Endpoints** (all GET, see `urls.py`): `/app/races/` (published races), `/app/race/<id>/teams/` (teams **plus the
       embedded category catalogue** — deliberately no separate categories endpoint; inactive categories included so
       every `category2` id resolves), `/app/race/<id>/legend/` (checkpoints **plus their NFC tags as `tag_hash`** — an
-      HMAC-SHA256 of `tag_id` keyed by the request's per-build secret, never the raw UID; a hidden legend returns `200`
+      HMAC-SHA256 of `nfc_uid` keyed by the request's per-build secret, never the raw UID; a hidden legend returns `200`
       with an empty list, not
       403), `/app/race/<id>/sync/` (pure version manifest — no data, no ETag; lease/handoff stubbed: `data_source` from
       `MOBILE_DATA_SOURCE` env, default `"cloud"`, `lease_expires_at` always `null`).
@@ -128,6 +128,12 @@ Django 4.2 project. Source lives entirely under `src/`, with `manage.py` at `src
       `Checkpoint`/`CheckpointTag`/`Category`/`Race`. Any `save(update_fields=[...])` on these models **must** include `"updated_at"`,
       otherwise the version/ETag goes stale (e.g. the auto `OPEN → SOLD_OUT` `reg_status` flips in
       `check_vtb_payments.py` and `website/models/models.py` include it).
+    - **`nfc_uid` normalized invariant**: `Tag.nfc_uid` and `CheckpointTag.nfc_uid` are auto-normalized (stripped and uppercased) by their
+      `save()` overrides. `save()` with or without `update_fields` still runs the override (Django calls the Python method regardless).
+      The one case that bypasses the override entirely is `QuerySet.update(nfc_uid=...)` — that generates raw SQL without calling `save()`,
+      so callers **must normalize the value themselves** (`.strip().upper()`) before passing it to `update()`. Lookups against `nfc_uid`
+      should use the plain exact-match (`nfc_uid=value.strip().upper()`) rather than `__iexact`, since stored values are always stripped
+      and uppercase.
 
 New feature apps that don't fit in `website` live under `src/apps/<name>/`. Each needs a unique `AppConfig` label (e.g.
 `label = "race_app"`).

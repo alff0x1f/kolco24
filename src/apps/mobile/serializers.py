@@ -29,7 +29,7 @@ class RaceListSerializer(serializers.ModelSerializer):
 class LegendTagSerializer(serializers.ModelSerializer):
     """Public legend view of an NFC tag.
 
-    Never exposes the raw ``tag_id``: it is served only as ``tag_hash``, an
+    Never exposes the raw ``nfc_uid``: it is served only as ``tag_hash``, an
     HMAC of the raw UID keyed by the per-build secret (``context["secret"]``),
     so the physical tag IDs never travel on the wire. The app re-computes the
     same hash from a scanned UID to match scan → checkpoint offline.
@@ -38,7 +38,7 @@ class LegendTagSerializer(serializers.ModelSerializer):
     tag_hash = serializers.SerializerMethodField()
 
     def get_tag_hash(self, tag):
-        return signing.tag_hash(self.context["secret"], tag.tag_id)
+        return signing.tag_hash(self.context["secret"], tag.nfc_uid)
 
     class Meta:
         model = CheckpointTag

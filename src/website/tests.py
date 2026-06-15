@@ -2417,3 +2417,42 @@ def test_checkpoint_updated_at_populated_and_advances():
     cp.save()
     cp.refresh_from_db()
     assert cp.updated_at > first
+
+
+@pytest.mark.django_db
+def test_checkpoint_tag_save_uppercases_nfc_uid():
+    from website.models.checkpoint import Checkpoint, CheckpointTag
+    from website.models.race import Race
+
+    race = Race.objects.create(name="Tag test", slug="cp-tag-upper")
+    cp = Checkpoint.objects.create(race=race, number=1, cost=1)
+    tag = CheckpointTag.objects.create(point=cp, nfc_uid="04a1b2c3")
+    assert tag.nfc_uid == "04A1B2C3"
+
+    tag.nfc_uid = "deadbeef"
+    tag.save()
+    tag.refresh_from_db()
+    assert tag.nfc_uid == "DEADBEEF"
+
+    tag.nfc_uid = " 04a1b2c3 "
+    tag.save()
+    tag.refresh_from_db()
+    assert tag.nfc_uid == "04A1B2C3"
+
+
+@pytest.mark.django_db
+def test_member_tag_save_uppercases_nfc_uid():
+    from website.models.tag import Tag
+
+    tag = Tag.objects.create(number=1, nfc_uid="04a1b2c3")
+    assert tag.nfc_uid == "04A1B2C3"
+
+    tag.nfc_uid = "deadbeef"
+    tag.save()
+    tag.refresh_from_db()
+    assert tag.nfc_uid == "DEADBEEF"
+
+    tag.nfc_uid = " 04a1b2c3 "
+    tag.save()
+    tag.refresh_from_db()
+    assert tag.nfc_uid == "04A1B2C3"

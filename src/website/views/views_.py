@@ -125,8 +125,7 @@ class TeamMemberRaceLogView(View):
         entries = []
         for log in logs:
             tag = log.member_tag
-            tag_uid = (tag.tag_id or "").strip()
-            normalized = tag_uid.upper()
+            normalized = tag.nfc_uid
             team = tag_to_team.get(normalized)
             fallback_start = tag_to_start_timestamp.get(normalized, 0)
             effective_start = log.start_time or fallback_start
@@ -134,7 +133,7 @@ class TeamMemberRaceLogView(View):
                 {
                     "log": log,
                     "tag_number": tag.number,
-                    "tag_uid": tag_uid,
+                    "tag_uid": normalized,
                     "team": team,
                     "team_label": self._make_team_label(team),
                     "start_timestamp": effective_start,
@@ -322,21 +321,26 @@ class PointTagsView(View):
                     status=404,
                 )
 
-            tag_id = data.get("tag_id")
-            if tag_id is None:
+            nfc_uid = data.get("nfc_uid")
+            if nfc_uid is None:
                 return JsonResponse(
-                    {"error": "tag_id is a required field."}, status=400
+                    {"error": "nfc_uid is a required field."}, status=400
                 )
+            if not isinstance(nfc_uid, str):
+                return JsonResponse({"error": "nfc_uid must be a string."}, status=400)
+            nfc_uid = nfc_uid.strip().upper()
+            if not nfc_uid:
+                return JsonResponse({"error": "nfc_uid must not be blank."}, status=400)
 
-            _, created = CheckpointTag.objects.update_or_create(
-                point=point, tag_id=tag_id
+            _, created = CheckpointTag.objects.get_or_create(
+                point=point, nfc_uid=nfc_uid
             )
             if created:
                 return JsonResponse(
                     {"message": "PointTag created successfully."}, status=201
                 )
             return JsonResponse(
-                {"message": f"PointTag with tag_id {tag_id} updated."},
+                {"message": f"PointTag with nfc_uid {nfc_uid} already exists."},
                 status=200,
             )
 
