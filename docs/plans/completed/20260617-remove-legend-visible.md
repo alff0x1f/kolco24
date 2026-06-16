@@ -207,8 +207,8 @@ intended; existing `is_legend_visible=False` races must lock their КП or mark 
 - [x] `uv run pytest` — full suite passes (565 passed).
 
 ### Task 10: [Final] Finalize
-- [ ] Confirm both migrations are present, ordered, and reversible.
-- [ ] Move this plan to `docs/plans/completed/`.
+- [x] Confirm both migrations are present, ordered, and reversible. → `0084_remove_race_is_legend_visible.py` (RemoveField, auto-reversible) and `0085_rename_checkpoint_draft_to_hidden.py` (AlterField + RunPython with explicit `hidden_to_draft` reverse); 0085 depends on 0084; `makemigrations --check` reports no pending changes.
+- [x] Move this plan to `docs/plans/completed/`.
 
 ## Post-Completion
 *Items requiring manual intervention or external systems — informational only.*
