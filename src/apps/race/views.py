@@ -909,9 +909,11 @@ class RaceLegendEditView(View):
                 "cost": cp.cost,
                 "description": cp.description,
                 "is_legend_locked": cp.is_legend_locked,
-                "has_tags": cp.tags.exists(),
+                "has_tags": bool(cp.tags.all()),
             }
-            for cp in Checkpoint.objects.filter(race=race).order_by("number", "id")
+            for cp in Checkpoint.objects.filter(race=race)
+            .prefetch_related("tags")
+            .order_by("number", "id")
         ]
 
     def _build_context(

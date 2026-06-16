@@ -59,11 +59,6 @@ class TagSerializer(serializers.Serializer):
         return (tag.bundle_blob or {}).get("ct")
 
 
-# Backwards-compat shim: the view still imports ``BundleSerializer`` until the
-# legend response migrates ``bundles`` → ``tags`` (Task 2). Remove then.
-BundleSerializer = TagSerializer
-
-
 class LegendCheckpointSerializer(serializers.Serializer):
     """Public legend view of a checkpoint.
 

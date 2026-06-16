@@ -16,14 +16,6 @@ from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from cryptography.hazmat.primitives.kdf.hkdf import HKDF
 
 
-def _b64e(b: bytes) -> str:
-    return base64.b64encode(b).decode()
-
-
-def _b64d(s: str) -> bytes:
-    return base64.b64decode(s)
-
-
 def seal(key: bytes, plaintext: bytes, aad: bytes) -> dict:
     """AES-256-GCM encrypt ``plaintext`` under ``key`` → ``{"iv": b64, "ct": b64}``.
 
@@ -31,7 +23,7 @@ def seal(key: bytes, plaintext: bytes, aad: bytes) -> dict:
     """
     iv = os.urandom(12)
     ct = AESGCM(key).encrypt(iv, plaintext, aad)
-    return {"iv": _b64e(iv), "ct": _b64e(ct)}
+    return {"iv": base64.b64encode(iv).decode(), "ct": base64.b64encode(ct).decode()}
 
 
 def unseal(key: bytes, enc: dict, aad: bytes) -> bytes:
@@ -40,7 +32,9 @@ def unseal(key: bytes, enc: dict, aad: bytes) -> bytes:
     Raises ``cryptography.exceptions.InvalidTag`` on a wrong key, wrong ``aad``,
     or tampered ciphertext. Not named ``open`` (would shadow the builtin).
     """
-    return AESGCM(key).decrypt(_b64d(enc["iv"]), _b64d(enc["ct"]), aad)
+    return AESGCM(key).decrypt(
+        base64.b64decode(enc["iv"]), base64.b64decode(enc["ct"]), aad
+    )
 
 
 def derive_wrap_key(code: bytes, info: bytes = b"kp-wrap-v1") -> bytes:

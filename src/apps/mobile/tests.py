@@ -3526,6 +3526,111 @@ def test_signal_content_edit_on_locked_cp_reseals_enc_blob():
 
 
 @pytest.mark.django_db
+def test_signal_reverse_m2m_remove_rebuilds_bundle():
+    """checkpoint.unlocked_by.remove(tag) rebuilds the tag's bundle (key removed)."""
+
+    from website.models.checkpoint import Checkpoint, CheckpointTag
+    from website.models.race import Race
+
+    race = Race.objects.create(name="Sig rev-remove", slug="sig-rev-remove")
+    locked = Checkpoint.objects.create(
+        race=race, number=1, cost=1, description="locked", is_legend_locked=True
+    )
+    holder = Checkpoint.objects.create(race=race, number=2, cost=1, description="h")
+    tag = CheckpointTag.objects.create(point=holder, nfc_uid="0F0F0F0F")
+
+    locked.unlocked_by.add(tag)
+    tag.refresh_from_db()
+    assert tag.bundle_blob is not None  # bundle carries the content_key
+
+    # Reverse remove: fires m2m_changed with action=post_remove, pk_set={tag.pk},
+    # instance=locked. The signal must rebuild the tag's bundle.
+    locked.unlocked_by.remove(tag)
+    tag.refresh_from_db()
+    # No locked КП remain in the unlock set → bundle is None.
+    assert tag.bundle_blob is None
+
+
+@pytest.mark.django_db
+def test_signal_lock_toggle_rebuilds_all_dependent_tag_bundles():
+    """Locking a КП rebuilds bundles for ALL tags that have it in their unlocks.
+
+    Guards the multi-tag loop in checkpoint_saved: if the re-entrancy guard
+    accidentally blocked subsequent iterations, only the first tag would be
+    rebuilt and the rest would be left with a stale (keyless) bundle.
+    """
+    import base64
+    import json
+
+    from apps.mobile.crypto import derive_wrap_key, unseal
+    from website.models.checkpoint import Checkpoint, CheckpointTag
+    from website.models.race import Race
+
+    race = Race.objects.create(name="Sig multi-tag", slug="sig-multi-tag")
+    target = Checkpoint.objects.create(
+        race=race, number=1, cost=5, description="sec", is_legend_locked=False
+    )
+    holder = Checkpoint.objects.create(race=race, number=2, cost=1, description="h")
+    tag_a = CheckpointTag.objects.create(point=holder, nfc_uid="A1A1A1A1")
+    tag_b = CheckpointTag.objects.create(point=holder, nfc_uid="B2B2B2B2")
+
+    # Both tags explicitly unlock target (currently open → no content_key yet).
+    target.unlocked_by.add(tag_a)
+    target.unlocked_by.add(tag_b)
+    tag_a.refresh_from_db()
+    tag_b.refresh_from_db()
+    assert tag_a.bundle_blob is None  # open КП → no key
+    assert tag_b.bundle_blob is None
+
+    # Lock the КП: signal must rebuild bundles for BOTH tags.
+    target.is_legend_locked = True
+    target.save()
+
+    tag_a.refresh_from_db()
+    tag_b.refresh_from_db()
+    assert tag_a.bundle_blob is not None, "tag_a bundle not rebuilt after lock"
+    assert tag_b.bundle_blob is not None, "tag_b bundle not rebuilt after lock"
+
+    # Both bundles must decrypt to the same content_key for target.
+    secret = target.secret
+    for tag in (tag_a, tag_b):
+        decrypted = json.loads(
+            unseal(
+                derive_wrap_key(bytes(tag.code)), tag.bundle_blob, aad=tag.bid.encode()
+            )
+        )
+        assert decrypted == {
+            str(target.id): base64.b64encode(bytes(secret.content_key)).decode()
+        }
+
+
+@pytest.mark.django_db
+def test_legend_version_moves_on_locked_cp_description_edit():
+    """Editing a locked КП's description re-seals, bumping CheckpointSecret.updated_at.
+
+    Guards the ``update_fields`` discipline: if ``seal_checkpoint`` dropped
+    ``"updated_at"`` from its ``save(update_fields=…)`` the fingerprint would
+    silently stale after a description edit on a locked КП.
+    """
+    from apps.mobile.versioning import legend_version
+    from website.models.checkpoint import Checkpoint
+    from website.models.race import Race
+
+    race = Race.objects.create(
+        name="Reseal version", slug="reseal-version", is_legend_visible=True
+    )
+    cp = Checkpoint.objects.create(
+        race=race, number=1, cost=5, description="original", is_legend_locked=True
+    )
+    before = legend_version(race.id)
+
+    cp.description = "updated"
+    cp.save()  # signal re-seals → CheckpointSecret.updated_at bumped
+
+    assert legend_version(race.id) != before
+
+
+@pytest.mark.django_db
 def test_signal_no_infinite_recursion():
     """A tag save + m2m change complete without recursing (sentinel + guard)."""
     from website.models.checkpoint import Checkpoint, CheckpointTag

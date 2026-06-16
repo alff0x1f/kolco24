@@ -51,6 +51,8 @@ Django 4.2 project. Source lives entirely under `src/`, with `manage.py` at `src
 - `website` — core domain: team registration, race management, payment processing (VTB, Yandex, Sberbank, SBP),
   checkpoint tracking, athlete profiles. Models are split into files under `src/website/models/`.
 - `api` — DRF REST API consumed by the mobile app: member tag scanning, checkpoint events, team CRUD, CSV exports.
+  `CheckpointSerializer` short-circuits `cost`/`description` to `0`/`""` for any КП with `is_legend_locked=True`,
+  regardless of `is_legend_visible` — locked КП must not leak cleartext through the scoring/scanning API.
 - `donate` — donation flow built on top of `VTBPayment`.
 - `demo` — static HTML mockups served at `/demo/home-multiple/`, `/demo/home-offseason/`, `/demo/home-single/`,
   `/demo/team-register/` for design review. No models or auth required. Templates live in `src/templates/demo/` (common
@@ -88,6 +90,13 @@ Django 4.2 project. Source lives entirely under `src/`, with `manage.py` at `src
   rather than deleted (and `PROTECT` on the FK is the backstop); `code` is validated `^[a-z_]+$`, unique-within-race,
   editable on create but read-only once saved. `RacePageView.build_context` exposes `can_edit_race` so `race_page.html`
   shows an "Редактировать" button (admins) and "+ Новая гонка" link (superusers).
+  `RaceLegendEditView` (template `src/templates/race/legend_form.html`, assets `src/static/css/legend_form.css` +
+  `src/static/js/legend_form.js`) is a bulk-edit spreadsheet page for a race's checkpoints, backing the `edit_legend`
+  (`race/<slug>/legend/edit/`) URL name. Gated on `can_edit_race`. **Must save via `instance.save()`** — never
+  `QuerySet.update()` — so the legend-crypto `post_save` signals fire (lock toggle creates/destroys `CheckpointSecret`
+  and rebuilds bundles; a bulk update would bypass signals and leak cleartext). Deletion guard: a КП absent from the
+  submitted payload is only deleted if it has no `CheckpointTag` rows — those represent physically provisioned NFC
+  chips that would be silently destroyed; a tag-bearing КП raises `ValueError` and rolls back the whole save.
 - `apps.mobile` — **signed read-only endpoints** for the iOS/Android mobile app (`label = "mobile"`, mounted at `/app/*`
   via `config/urls.py`). Self-contained: touches neither `/api/` nor `donate`/`website`. No user accounts — the app
   authenticates **itself**. Full design (background-sync model, two-server lease/handoff, secret-rotation runbook, 403
