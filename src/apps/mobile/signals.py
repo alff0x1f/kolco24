@@ -110,18 +110,34 @@ def checkpoint_saved(sender, instance, **kwargs):
 
 @receiver(pre_delete, sender=Checkpoint, dispatch_uid="mobile_checkpoint_pre_delete")
 def checkpoint_pre_delete(sender, instance, **kwargs):
-    # Capture tags that listed this checkpoint in their unlocks M2M *before*
+    # Capture PKs of tags that listed this checkpoint in their unlocks M2M before
     # the DB CASCADE deletes the junction rows (after which unlocked_by is empty).
-    _pre_delete_tags.value = list(instance.unlocked_by.select_related("point").all())
+    # Keyed by checkpoint pk so that a QuerySet.delete() of N checkpoints (which
+    # fires all pre_delete signals before any row is deleted) does not overwrite
+    # earlier captures — each checkpoint's dependent tags are stored separately.
+    # PKs rather than instances: post_delete re-queries so cascade-deleted tags
+    # (e.g. a tag whose point checkpoint is in the same bulk delete) are skipped.
+    by_cp = getattr(_pre_delete_tags, "by_cp", None)
+    if by_cp is None:
+        _pre_delete_tags.by_cp = {}
+        by_cp = _pre_delete_tags.by_cp
+    by_cp[instance.pk] = list(instance.unlocked_by.values_list("pk", flat=True))
 
 
 @receiver(post_delete, sender=Checkpoint, dispatch_uid="mobile_checkpoint_post_delete")
 def checkpoint_post_delete(sender, instance, **kwargs):
-    # Rebuild bundles for captured tags; the deleted checkpoint's junction rows
-    # are now gone, so build_bundle will exclude it from the new bundle.
-    for tag in getattr(_pre_delete_tags, "value", None) or []:
-        _build_bundle_guarded(tag)
-    _pre_delete_tags.value = None
+    # Rebuild bundles for this checkpoint's captured tags; its junction rows are
+    # gone so build_bundle will exclude it from the new bundle. Re-querying by PK
+    # naturally skips any CheckpointTag rows that were cascade-deleted (e.g. when
+    # the tag's own point checkpoint was part of the same bulk delete).
+    by_cp = getattr(_pre_delete_tags, "by_cp", None) or {}
+    pks = by_cp.pop(instance.pk, [])
+    if not by_cp:
+        _pre_delete_tags.by_cp = None
+    if pks:
+        tags = list(CheckpointTag.objects.select_related("point").filter(pk__in=pks))
+        for tag in tags:
+            _build_bundle_guarded(tag)
 
 
 @receiver(post_save, sender=CheckpointTag, dispatch_uid="mobile_build_bundle")

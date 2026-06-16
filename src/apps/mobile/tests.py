@@ -4094,3 +4094,72 @@ def test_export_legend_codes_dumps_open_and_locked_tags():
     assert bytes(locked_tag.code).hex() in output
     # The placeholder dash is only for code-less tags; both tags have codes here.
     assert "\t—" not in output
+
+
+@pytest.mark.django_db
+def test_signal_bulk_delete_checkpoints_rebuilds_all_dependent_tags():
+    """Deleting two locked КП at once rebuilds bundles for *each* КП's dependent tags.
+
+    Regression for the _pre_delete_tags overwrite bug: QuerySet.delete() fires all
+    pre_delete signals before any row is deleted, so a naïve .value = [...] approach
+    overwrites the first КП's captured tags with the second's, leaving the first КП's
+    tags with stale bundle_blobs that still reference the deleted content_key.
+    """
+    from website.models.checkpoint import Checkpoint, CheckpointTag
+    from website.models.race import Race
+
+    race = Race.objects.create(name="Bulk del", slug="bulk-del")
+    # Two locked КП, each with its own distinct cross-КП tag.
+    cp_a = Checkpoint.objects.create(
+        race=race, number=1, cost=10, description="A", is_legend_locked=True
+    )
+    cp_b = Checkpoint.objects.create(
+        race=race, number=2, cost=20, description="B", is_legend_locked=True
+    )
+    holder = Checkpoint.objects.create(race=race, number=3, cost=1, description="H")
+    tag_a = CheckpointTag.objects.create(point=holder, nfc_uid="AA000001")
+    tag_b = CheckpointTag.objects.create(point=holder, nfc_uid="BB000002")
+    tag_a.unlocks.set([cp_a])  # tag_a unlocks only cp_a
+    tag_b.unlocks.set([cp_b])  # tag_b unlocks only cp_b
+
+    tag_a.refresh_from_db()
+    tag_b.refresh_from_db()
+    assert tag_a.bundle_blob is not None, "tag_a bundle must exist before delete"
+    assert tag_b.bundle_blob is not None, "tag_b bundle must exist before delete"
+
+    # Bulk delete: all pre_delete signals fire before any deletion.
+    Checkpoint.objects.filter(pk__in=[cp_a.pk, cp_b.pk]).delete()
+
+    tag_a.refresh_from_db()
+    tag_b.refresh_from_db()
+    # Both tags should have their bundles cleared (no locked КП remaining to unlock).
+    assert tag_a.bundle_blob is None, "tag_a bundle should be None after cp_a deleted"
+    assert tag_b.bundle_blob is None, "tag_b bundle should be None after cp_b deleted"
+
+
+@pytest.mark.django_db
+def test_signal_bulk_delete_holder_and_target_skips_cascade_deleted_tag():
+    """Bulk-deleting both the tag's holder KP and the locked target KP must not crash.
+
+    Repro: tag.point=holder, tag.unlocks=[target], delete [holder, target] together.
+    Django cascade-deletes the CheckpointTag row when holder is deleted. The
+    post_delete for target must not try to call build_bundle on the now-deleted tag
+    (which would attempt tag.save() on a non-existent row).
+    """
+    from website.models.checkpoint import Checkpoint, CheckpointTag
+    from website.models.race import Race
+
+    race = Race.objects.create(name="Bulk del holder", slug="bulk-del-holder")
+    target = Checkpoint.objects.create(
+        race=race, number=1, cost=10, description="T", is_legend_locked=True
+    )
+    holder = Checkpoint.objects.create(race=race, number=2, cost=1, description="H")
+    tag = CheckpointTag.objects.create(point=holder, nfc_uid="CC000003")
+    tag.unlocks.set([target])
+    tag_pk = tag.pk
+
+    # Must not raise DatabaseError or IntegrityError.
+    Checkpoint.objects.filter(pk__in=[holder.pk, target.pk]).delete()
+
+    # The tag was cascade-deleted along with holder.
+    assert not CheckpointTag.objects.filter(pk=tag_pk).exists()
