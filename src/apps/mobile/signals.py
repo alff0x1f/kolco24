@@ -77,6 +77,15 @@ def checkpoint_pre_save(sender, instance, **kwargs):
 
 @receiver(post_save, sender=Checkpoint, dispatch_uid="mobile_seal_checkpoint")
 def checkpoint_saved(sender, instance, **kwargs):
+    # Skip completely when the save touches only fields unrelated to the legend
+    # (e.g. the reg_status OPEN→SOLD_OUT flip in check_vtb_payments) — avoids
+    # one EXISTS query per unrelated Checkpoint.save().
+    update_fields = kwargs.get("update_fields")
+    LEGEND_RELEVANT = {"is_legend_locked", "cost", "description", "type", "race_id"}
+    if update_fields is not None and not (set(update_fields) & LEGEND_RELEVANT):
+        _pre_save_cp_state.value = None  # discard stale pre-save capture
+        return
+
     had_secret = CheckpointSecret.objects.filter(checkpoint=instance).exists()
     seal_checkpoint(instance)
     # A lock toggle is exactly the case where secret-existence and the flag
@@ -146,7 +155,10 @@ def checkpointtag_saved(sender, instance, **kwargs):
     if update_fields is not None and set(update_fields) == SENTINEL_UPDATE_FIELDS:
         # build_bundle's own write — do not recurse.
         return
-    _build_bundle_guarded(instance)
+    # Re-fetch with select_related so build_bundle can access tag.point without
+    # an extra query — post_save instances may not have the FK relation cached.
+    tag = CheckpointTag.objects.select_related("point").get(pk=instance.pk)
+    _build_bundle_guarded(tag)
 
 
 @receiver(
