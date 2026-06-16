@@ -619,19 +619,19 @@ def test_legend_always_served_for_published_race(client, settings):
 
 
 @pytest.mark.django_db
-def test_legend_excludes_draft_checkpoints(client, settings):
+def test_legend_excludes_hidden_checkpoints(client, settings):
     from website.models.checkpoint import Checkpoint, CheckpointTag
     from website.models.race import Race
 
     settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
     settings.MOBILE_APP_TS_WINDOW = 300
 
-    race = Race.objects.create(name="Draft race", slug="draft-race")
+    race = Race.objects.create(name="Hidden race", slug="hidden-race")
     Checkpoint.objects.create(race=race, number=1, cost=1, description="visible")
-    draft = Checkpoint.objects.create(
-        race=race, number=2, cost=0, description="draft cp", type="draft"
+    hidden = Checkpoint.objects.create(
+        race=race, number=2, cost=0, description="hidden cp", type="hidden"
     )
-    CheckpointTag.objects.create(point=draft, nfc_uid="DRAFT:TAG")
+    CheckpointTag.objects.create(point=hidden, nfc_uid="HIDDEN:TAG")
 
     path = f"/app/race/{race.id}/legend/"
     response = client.get(path, **_signed_headers("GET", path, SECRET))
@@ -1444,29 +1444,29 @@ def test_legend_version_changes_when_checkpoint_removed():
 
 
 @pytest.mark.django_db
-def test_legend_version_changes_when_kp_flips_to_draft():
+def test_legend_version_changes_when_kp_flips_to_hidden():
     from apps.mobile.versioning import legend_version
     from website.models.checkpoint import Checkpoint
     from website.models.race import Race
 
-    race = Race.objects.create(name="Kp to draft", slug="kp-to-draft")
+    race = Race.objects.create(name="Kp to hidden", slug="kp-to-hidden")
     cp = Checkpoint.objects.create(race=race, number=1, cost=1, description="cp")
     before = legend_version(race.id)
-    cp.type = "draft"
+    cp.type = "hidden"
     cp.save()
     after = legend_version(race.id)
     assert before != after
 
 
 @pytest.mark.django_db
-def test_legend_version_changes_when_draft_flips_to_kp():
+def test_legend_version_changes_when_hidden_flips_to_kp():
     from apps.mobile.versioning import legend_version
     from website.models.checkpoint import Checkpoint
     from website.models.race import Race
 
-    race = Race.objects.create(name="Draft to kp", slug="draft-to-kp")
+    race = Race.objects.create(name="Hidden to kp", slug="hidden-to-kp")
     cp = Checkpoint.objects.create(
-        race=race, number=1, cost=1, description="cp", type="draft"
+        race=race, number=1, cost=1, description="cp", type="hidden"
     )
     before = legend_version(race.id)
     cp.type = "kp"
@@ -1476,19 +1476,19 @@ def test_legend_version_changes_when_draft_flips_to_kp():
 
 
 @pytest.mark.django_db
-def test_legend_version_unchanged_when_draft_checkpoint_edited():
+def test_legend_version_unchanged_when_hidden_checkpoint_edited():
     from apps.mobile.versioning import legend_version
     from website.models.checkpoint import Checkpoint
     from website.models.race import Race
 
-    race = Race.objects.create(name="Draft edit", slug="draft-edit")
+    race = Race.objects.create(name="Hidden edit", slug="hidden-edit")
     Checkpoint.objects.create(race=race, number=1, cost=1, description="visible")
-    draft = Checkpoint.objects.create(
-        race=race, number=2, cost=0, description="draft", type="draft"
+    hidden = Checkpoint.objects.create(
+        race=race, number=2, cost=0, description="hidden", type="hidden"
     )
     before = legend_version(race.id)
-    draft.description = "draft edited"
-    draft.save()
+    hidden.description = "hidden edited"
+    hidden.save()
     after = legend_version(race.id)
     assert before == after
 
@@ -1557,18 +1557,18 @@ def test_legend_version_changes_when_open_checkpoint_tag_added():
 
 
 @pytest.mark.django_db
-def test_legend_version_unchanged_when_tag_on_draft_checkpoint_added():
+def test_legend_version_unchanged_when_tag_on_hidden_checkpoint_added():
     from apps.mobile.versioning import legend_version
     from website.models.checkpoint import Checkpoint, CheckpointTag
     from website.models.race import Race
 
-    race = Race.objects.create(name="Tag draft", slug="tag-draft")
+    race = Race.objects.create(name="Tag hidden", slug="tag-hidden")
     Checkpoint.objects.create(race=race, number=1, cost=1, description="visible")
-    draft = Checkpoint.objects.create(
-        race=race, number=2, cost=0, description="draft", type="draft"
+    hidden = Checkpoint.objects.create(
+        race=race, number=2, cost=0, description="hidden", type="hidden"
     )
     before = legend_version(race.id)
-    CheckpointTag.objects.create(point=draft, nfc_uid="AA:BB", check_method="offline")
+    CheckpointTag.objects.create(point=hidden, nfc_uid="AA:BB", check_method="offline")
     after = legend_version(race.id)
     assert before == after
 
@@ -2981,11 +2981,11 @@ def test_build_bundle_skips_open_checkpoints():
 
 
 @pytest.mark.django_db
-def test_build_bundle_excludes_cross_race_and_draft_unlocks():
-    """Cross-race and draft КП in tag.unlocks must not contribute content keys.
+def test_build_bundle_excludes_cross_race_and_hidden_unlocks():
+    """Cross-race and hidden КП in tag.unlocks must not contribute content keys.
 
     A tag in Race A whose unlocks M2M includes a locked КП from Race B or a
-    draft КП must not expose those keys in the bundle.
+    hidden КП must not expose those keys in the bundle.
     """
     import json
 
@@ -3007,18 +3007,18 @@ def test_build_bundle_excludes_cross_race_and_draft_unlocks():
     )
     seal_checkpoint(cross_race_locked)
 
-    draft_locked = Checkpoint.objects.create(
+    hidden_locked = Checkpoint.objects.create(
         race=race_a,
         number=2,
         cost=3,
-        description="draft",
-        type="draft",
+        description="hidden",
+        type="hidden",
         is_legend_locked=True,
     )
-    seal_checkpoint(draft_locked)
+    seal_checkpoint(hidden_locked)
 
     tag = CheckpointTag.objects.create(point=local_locked, nfc_uid="04AABBCC")
-    tag.unlocks.set([local_locked, cross_race_locked, draft_locked])
+    tag.unlocks.set([local_locked, cross_race_locked, hidden_locked])
 
     build_bundle(tag)
     tag.refresh_from_db()
@@ -3027,15 +3027,15 @@ def test_build_bundle_excludes_cross_race_and_draft_unlocks():
     decrypted = json.loads(
         unseal(derive_wrap_key(code), tag.bundle_blob, aad=tag.bid.encode())
     )
-    # Only the same-race non-draft КП should appear
+    # Only the same-race non-hidden КП should appear
     assert set(decrypted.keys()) == {str(local_locked.id)}
     assert str(cross_race_locked.id) not in decrypted
-    assert str(draft_locked.id) not in decrypted
+    assert str(hidden_locked.id) not in decrypted
 
 
 @pytest.mark.django_db
 def test_build_bundle_invalid_only_unlocks_produces_none_not_fallback():
-    """A tag whose explicit unlocks contain *only* cross-race/draft КП must get
+    """A tag whose explicit unlocks contain *only* cross-race/hidden КП must get
     bundle_blob=None, not silently fall back to [tag.point].
 
     Regression for: build_bundle checked ``if not unlocked`` (post-filter) instead
@@ -3059,19 +3059,19 @@ def test_build_bundle_invalid_only_unlocks_produces_none_not_fallback():
     )
     seal_checkpoint(cross_race_cp)
 
-    draft_cp = Checkpoint.objects.create(
+    hidden_cp = Checkpoint.objects.create(
         race=race_a,
         number=2,
         cost=3,
-        description="draft",
-        type="draft",
+        description="hidden",
+        type="hidden",
         is_legend_locked=True,
     )
-    seal_checkpoint(draft_cp)
+    seal_checkpoint(hidden_cp)
 
     tag = CheckpointTag.objects.create(point=local_cp, nfc_uid="04DEADBEEF")
-    # Both explicit unlocks are invalid — cross-race and draft only
-    tag.unlocks.set([cross_race_cp, draft_cp])
+    # Both explicit unlocks are invalid — cross-race and hidden only
+    tag.unlocks.set([cross_race_cp, hidden_cp])
 
     build_bundle(tag)
     tag.refresh_from_db()
@@ -3522,11 +3522,11 @@ def test_signal_bundle_rebuild_moves_legend_etag():
 
 
 @pytest.mark.django_db
-def test_signal_draft_to_kp_on_locked_cp_rebuilds_dependent_bundle():
-    """Promoting a locked draft КП to kp rebuilds bundles of tags that unlock it.
+def test_signal_hidden_to_kp_on_locked_cp_rebuilds_dependent_bundle():
+    """Promoting a locked hidden КП to kp rebuilds bundles of tags that unlock it.
 
-    A tag's explicit unlocks M2M filtered by build_bundle excludes draft КП, so
-    when the CP was a draft the bundle had no content_key for it. After the type
+    A tag's explicit unlocks M2M filtered by build_bundle excludes hidden КП, so
+    when the CP was hidden the bundle had no content_key for it. After the type
     change the legend serves that CP's enc_blob; without a signal-driven rebuild
     the bundle would remain stale and the app could not decrypt.
     """
@@ -3537,35 +3537,35 @@ def test_signal_draft_to_kp_on_locked_cp_rebuilds_dependent_bundle():
     from website.models.checkpoint import Checkpoint, CheckpointTag
     from website.models.race import Race
 
-    race = Race.objects.create(name="Draft promote", slug="draft-promote")
-    locked_draft = Checkpoint.objects.create(
+    race = Race.objects.create(name="Hidden promote", slug="hidden-promote")
+    locked_hidden = Checkpoint.objects.create(
         race=race,
         number=1,
         cost=5,
         description="secret",
-        type="draft",
+        type="hidden",
         is_legend_locked=True,
     )
     holder = Checkpoint.objects.create(race=race, number=2, cost=1, description="h")
     tag = CheckpointTag.objects.create(point=holder, nfc_uid="DDDDDDDD")
-    tag.unlocks.add(locked_draft)  # draft at add time → bundle excludes its key
+    tag.unlocks.add(locked_hidden)  # hidden at add time → bundle excludes its key
 
     tag.refresh_from_db()
-    assert tag.bundle_blob is None  # draft КП excluded from bundle
+    assert tag.bundle_blob is None  # hidden КП excluded from bundle
 
     # Promote to kp — should trigger a bundle rebuild via pre_save/post_save
-    locked_draft.type = "kp"
-    locked_draft.save()
+    locked_hidden.type = "kp"
+    locked_hidden.save()
 
     tag.refresh_from_db()
     assert tag.bundle_blob is not None  # rebuild happened
 
-    secret = locked_draft.secret
+    secret = locked_hidden.secret
     decrypted = json.loads(
         unseal(derive_wrap_key(bytes(tag.code)), tag.bundle_blob, aad=tag.bid.encode())
     )
     assert decrypted == {
-        str(locked_draft.id): base64.b64encode(bytes(secret.content_key)).decode()
+        str(locked_hidden.id): base64.b64encode(bytes(secret.content_key)).decode()
     }
 
 

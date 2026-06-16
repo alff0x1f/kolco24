@@ -24,6 +24,8 @@ import hashlib
 import json
 import os
 
+from website.models.enums import CheckpointType
+
 from .crypto import derive_wrap_key, seal
 
 # The exact update_fields set the CheckpointTag writes use — also the recursion
@@ -96,7 +98,7 @@ def build_bundle(tag):
     code = bytes(tag.code)
 
     # Resolve the unlock set: empty M2M → implicit [point] default; non-empty M2M
-    # → filter to same-race non-draft КП only (cross-race or draft entries are
+    # → filter to same-race non-hidden КП only (cross-race or hidden entries are
     # dropped; if all are invalid the filtered list stays empty → bundle_blob=None,
     # not a silent fallback to [point] which would grant an unconfigured key).
     if not tag.unlocks.exists():
@@ -107,7 +109,9 @@ def build_bundle(tag):
         unlocked = []
     else:
         unlocked = list(
-            tag.unlocks.filter(race_id=tag.point.race_id).exclude(type="draft")
+            tag.unlocks.filter(race_id=tag.point.race_id).exclude(
+                type=CheckpointType.hidden.value
+            )
         )
 
     secrets = {

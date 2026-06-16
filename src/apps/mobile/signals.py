@@ -35,6 +35,7 @@ from django.db.models.signals import (
 from django.dispatch import receiver
 
 from website.models.checkpoint import Checkpoint, CheckpointSecret, CheckpointTag
+from website.models.enums import CheckpointType
 
 from .legend_crypto import TAG_UPDATE_FIELDS, build_bundle, seal_checkpoint
 
@@ -94,17 +95,18 @@ def checkpoint_saved(sender, instance, **kwargs):
     # touches only enc_blob, so dependent bundles keep the same content_key.
     lock_toggled = had_secret != bool(instance.is_legend_locked)
 
-    # Also rebuild when a locked checkpoint's draft↔non-draft status (or race)
-    # changes: build_bundle filters explicit unlocks to same-race non-draft КП,
+    # Also rebuild when a locked checkpoint's hidden↔non-hidden status (or race)
+    # changes: build_bundle filters explicit unlocks to same-race non-hidden КП,
     # so flipping either dimension while the KP is already locked causes stale
     # bundles for tags that carry this checkpoint in their unlocks M2M.
     old_state = getattr(_pre_save_cp_state, "value", None)
     _pre_save_cp_state.value = None
+    hidden = CheckpointType.hidden.value
     bundle_filter_changed = (
         instance.is_legend_locked
         and old_state is not None
         and (
-            (old_state["type"] == "draft") != (instance.type == "draft")
+            (old_state["type"] == hidden) != (instance.type == hidden)
             or old_state["race_id"] != instance.race_id
         )
     )

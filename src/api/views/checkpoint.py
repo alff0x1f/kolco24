@@ -15,6 +15,6 @@ class CheckpointView(ListAPIView):
         race_id = self.kwargs.get("race_id")
         return (
             Checkpoint.objects.filter(race_id=race_id)
-            .exclude(type=CheckpointType.draft.value)
+            .exclude(type=CheckpointType.hidden.value)
             .prefetch_related("tags")
         )

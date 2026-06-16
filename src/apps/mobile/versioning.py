@@ -99,38 +99,38 @@ def races_version():
 def legend_version(race_id):
     """Return a short, stable fingerprint of a race's legend.
 
-    Folds in three ``MAX(updated_at)|COUNT`` aggregates over the **non-draft**
-    checkpoints of ``race_id`` (the same draft-exclusion predicate the legend
+    Folds in three ``MAX(updated_at)|COUNT`` aggregates over the **non-hidden**
+    checkpoints of ``race_id`` (the same hidden-exclusion predicate the legend
     view serves):
 
-    1. ``Checkpoint`` — a checkpoint edit, add/remove, a ``kp <-> draft`` flip
+    1. ``Checkpoint`` — a checkpoint edit, add/remove, a ``kp <-> hidden`` flip
        (``COUNT`` moves), or a lock toggle.
     2. ``CheckpointSecret`` — a re-seal, or an ``enc`` blob appearing/disappearing
        as a КП is locked/unlocked.
     3. ``CheckpointTag`` — a code/unlocks/bundle/check_method change.
 
-    A draft-checkpoint edit (and a tag on a draft checkpoint) deliberately does
-    **not** move it (drafts are not in the response). The legend is
+    A hidden-checkpoint edit (and a tag on a hidden checkpoint) deliberately does
+    **not** move it (hidden КП are not in the response). The legend is
     **build-independent** (the stored ciphertext/bundles do not depend on the
     per-build secret), so the fingerprint takes **no** ``key_id`` and two builds
     share the ETag.
 
-    None aggregates (empty/all-draft/tag-less race) render as the literal
+    None aggregates (empty/all-hidden/tag-less race) render as the literal
     ``"None"`` → stable, non-crashing. Returns **bare** hex (no quotes).
     """
     agg = (
         Checkpoint.objects.filter(race_id=race_id)
-        .exclude(type=CheckpointType.draft.value)
+        .exclude(type=CheckpointType.hidden.value)
         .aggregate(max_updated=Max("updated_at"), count=Count("id"))
     )
     secrets = (
         CheckpointSecret.objects.filter(checkpoint__race_id=race_id)
-        .exclude(checkpoint__type=CheckpointType.draft.value)
+        .exclude(checkpoint__type=CheckpointType.hidden.value)
         .aggregate(max_updated=Max("updated_at"), count=Count("id"))
     )
     tags = (
         CheckpointTag.objects.filter(point__race_id=race_id)
-        .exclude(point__type=CheckpointType.draft.value)
+        .exclude(point__type=CheckpointType.hidden.value)
         .aggregate(max_updated=Max("updated_at"), count=Count("id"))
     )
     raw = (

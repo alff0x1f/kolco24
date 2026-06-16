@@ -160,7 +160,7 @@ class LegendView(AppAPIView):
 
         qs = (
             Checkpoint.objects.filter(race_id=race_id)
-            .exclude(type=CheckpointType.draft.value)
+            .exclude(type=CheckpointType.hidden.value)
             .order_by("number", "id")
             .select_related("secret")
         )
@@ -170,7 +170,7 @@ class LegendView(AppAPIView):
         # (created bypassing the build_bundle signal) that have no usable bid.
         tag_qs = (
             CheckpointTag.objects.filter(point__race_id=race_id)
-            .exclude(point__type=CheckpointType.draft.value)
+            .exclude(point__type=CheckpointType.hidden.value)
             .exclude(bid="")
             .order_by("id")
         )

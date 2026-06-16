@@ -180,14 +180,14 @@ intended; existing `is_legend_visible=False` races must lock their КП or mark 
 > (`website/tests.py` `_draft_payment`, `test_gate_draft_teams...`) **untouched** — those are
 > a different concept. Only rename literals compared against `Checkpoint.type`.
 
-- [ ] api view exclusion (`checkpoint.py:18`) → `CheckpointType.hidden.value`.
-- [ ] mobile `views.py` exclusions (~173, 183) → hidden value.
-- [ ] mobile `versioning.py` exclusions (~130, 135, 140) → hidden value; update the "non-draft"/"draft" wording in docstrings.
-- [ ] `legend_crypto.py:110` `.exclude(type="draft")` → hidden value; update comment at ~99.
-- [ ] `signals.py:107` type-flip guard `(old == "draft") != (new == "draft")` → compare against the hidden value; update comments at ~97–98.
-- [ ] Update the draft-handling mobile tests: rename `type="draft"` → `type="hidden"` and the related test function names/strings (`test_legend_excludes_draft_checkpoints`, `*_kp_flips_to_draft`, `*_draft_flips_to_kp`, `*_draft_checkpoint_edited`, `*_tag_on_draft_checkpoint`, `*_cross_race_and_draft_unlocks`, `*_draft_to_kp_on_locked_cp`, etc.).
-- [ ] Grep for residual **checkpoint-type** literals only — scope to type-comparison contexts so the unrelated `Payment`/reservation `"draft"` are excluded: `grep -rnE 'type=.?["'\'']draft["'\'']|== ["'\'']draft["'\'']' src`. Must return nothing. (A bare `grep -rn draft src` will still legitimately hit `Payment.STATUS_DRAFT` and reservation status — those stay.)
-- [ ] Run `uv run pytest --reuse-db -q` — full suite green.
+- [x] api view exclusion (`checkpoint.py:18`) → `CheckpointType.hidden.value`.
+- [x] mobile `views.py` exclusions (~173, 183) → hidden value.
+- [x] mobile `versioning.py` exclusions (~130, 135, 140) → hidden value; update the "non-draft"/"draft" wording in docstrings.
+- [x] `legend_crypto.py:110` `.exclude(type="draft")` → hidden value (added `CheckpointType` import); updated comment at ~99.
+- [x] `signals.py:107` type-flip guard `(old == "draft") != (new == "draft")` → compare against `CheckpointType.hidden.value` (added import); updated comments at ~97–98.
+- [x] Update the draft-handling mobile tests: renamed `type="draft"` → `type="hidden"` and the related test function names/strings (`test_legend_excludes_hidden_checkpoints`, `*_kp_flips_to_hidden`, `*_hidden_flips_to_kp`, `*_hidden_checkpoint_edited`, `*_tag_on_hidden_checkpoint`, `*_cross_race_and_hidden_unlocks`, `*_hidden_to_kp_on_locked_cp`, etc.).
+- [x] Grep for residual **checkpoint-type** literals: `grep -rnE 'type=.?["'\'']draft["'\'']|== ["'\'']draft["'\'']' src` returns only `0085_rename_checkpoint_draft_to_hidden.py` data-migration steps (forward filter + reverse), which must reference the historical literal by design — same exemption as the other historical migrations. No live code hits.
+- [x] Run `uv run pytest --reuse-db -q` — full suite green (565 passed). `make format && make lint` clean.
 
 ### Task 8: Update documentation
 
