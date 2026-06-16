@@ -148,9 +148,9 @@ intended; existing `is_legend_visible=False` races must lock their КП or mark 
 - Modify: `src/apps/mobile/tests.py`
 - Modify: `src/api/tests.py`
 
-- [ ] Remove the `is_legend_visible=...` kwarg from every remaining `Race.objects.create(...)` (~40 call sites across the two files).
-- [ ] Grep to confirm zero residual `is_legend_visible` references anywhere: `grep -rn is_legend_visible src` returns nothing (code, tests, templates — docs handled in Task 8).
-- [ ] Run `uv run pytest --reuse-db -q` — full suite green for workstream 1.
+- [x] Remove the `is_legend_visible=...` kwarg from every remaining `Race.objects.create(...)` (~40 call sites across the two files). All kwargs removed from `apps/mobile/tests.py`; `api/tests.py` had none left (only a docstring note at :194).
+- [x] Grep to confirm zero residual `is_legend_visible` references anywhere: `grep -rn is_legend_visible src` — remaining hits are intentional: migrations (`0044/0045/0084`, historical), `apps/race/tests.py` assertions (verify field absent), `api/tests.py:194` docstring (documents the behavior change), and README (Task 8).
+- [x] Run `uv run pytest --reuse-db -q` — full suite green for workstream 1. → 565 passed.
 
 ### Task 6: Rename CheckpointType draft→hidden (enum + migration)
 

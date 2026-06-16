@@ -464,9 +464,7 @@ def test_legend_valid_signature_returns_200_with_fields_and_order(client, settin
     settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
     settings.MOBILE_APP_TS_WINDOW = 300
 
-    race = Race.objects.create(
-        name="Test race", slug="test-race", is_legend_visible=True
-    )
+    race = Race.objects.create(name="Test race", slug="test-race")
     Checkpoint.objects.create(race=race, number=3, cost=2, description="third")
     Checkpoint.objects.create(race=race, number=1, cost=1, description="first")
     Checkpoint.objects.create(race=race, number=2, cost=1, description="second")
@@ -493,7 +491,7 @@ def race_with_checkpoints(db):
     from website.models.checkpoint import Checkpoint
     from website.models.race import Race
 
-    race = Race.objects.create(name="E2E race", slug="e2e-race", is_legend_visible=True)
+    race = Race.objects.create(name="E2E race", slug="e2e-race")
     Checkpoint.objects.create(race=race, number=1, cost=1, description="first")
     return race
 
@@ -628,9 +626,7 @@ def test_legend_excludes_draft_checkpoints(client, settings):
     settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
     settings.MOBILE_APP_TS_WINDOW = 300
 
-    race = Race.objects.create(
-        name="Draft race", slug="draft-race", is_legend_visible=True
-    )
+    race = Race.objects.create(name="Draft race", slug="draft-race")
     Checkpoint.objects.create(race=race, number=1, cost=1, description="visible")
     draft = Checkpoint.objects.create(
         race=race, number=2, cost=0, description="draft cp", type="draft"
@@ -689,9 +685,7 @@ def test_legend_stale_if_none_match_returns_200_with_new_etag(client, settings):
     settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
     settings.MOBILE_APP_TS_WINDOW = 300
 
-    race = Race.objects.create(
-        name="Stale legend", slug="stale-legend", is_legend_visible=True
-    )
+    race = Race.objects.create(name="Stale legend", slug="stale-legend")
     Checkpoint.objects.create(race=race, number=1, cost=1, description="first")
 
     path = f"/app/race/{race.id}/legend/"
@@ -719,9 +713,7 @@ def test_legend_locked_cp_serves_enc_not_cleartext_open_serves_cleartext(
     settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
     settings.MOBILE_APP_TS_WINDOW = 300
 
-    race = Race.objects.create(
-        name="Mixed legend", slug="mixed-legend", is_legend_visible=True
-    )
+    race = Race.objects.create(name="Mixed legend", slug="mixed-legend")
     Checkpoint.objects.create(
         race=race, number=1, cost=4, description="secret tree", is_legend_locked=True
     )
@@ -763,9 +755,7 @@ def test_legend_end_to_end_scan_code_decrypts_locked_checkpoint(client, settings
     settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
     settings.MOBILE_APP_TS_WINDOW = 300
 
-    race = Race.objects.create(
-        name="E2E decrypt", slug="e2e-decrypt", is_legend_visible=True
-    )
+    race = Race.objects.create(name="E2E decrypt", slug="e2e-decrypt")
     cp = Checkpoint.objects.create(
         race=race, number=1, cost=4, description="столб у воды", is_legend_locked=True
     )
@@ -811,7 +801,7 @@ def test_legend_tags_include_open_checkpoint_tag_with_point_no_iv_ct(client, set
     settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
     settings.MOBILE_APP_TS_WINDOW = 300
 
-    race = Race.objects.create(name="Open tag", slug="open-tag", is_legend_visible=True)
+    race = Race.objects.create(name="Open tag", slug="open-tag")
     cp = Checkpoint.objects.create(race=race, number=1, cost=2, description="open spot")
     tag = CheckpointTag.objects.create(
         point=cp, nfc_uid="04A1B2C3", check_method="offline"
@@ -841,9 +831,7 @@ def test_legend_tags_exclude_unbuilt_tag_with_empty_bid(client, settings):
     settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
     settings.MOBILE_APP_TS_WINDOW = 300
 
-    race = Race.objects.create(
-        name="Unbuilt tag", slug="unbuilt-tag", is_legend_visible=True
-    )
+    race = Race.objects.create(name="Unbuilt tag", slug="unbuilt-tag")
     cp = Checkpoint.objects.create(race=race, number=1, cost=2, description="open spot")
     # Bypass the build_bundle signal so the row keeps its bid="" default.
     CheckpointTag.objects.bulk_create(
@@ -866,7 +854,7 @@ def test_legend_etag_changes_when_tag_edited_and_304_with_new_etag(client, setti
     settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
     settings.MOBILE_APP_TS_WINDOW = 300
 
-    race = Race.objects.create(name="Tag etag", slug="tag-etag", is_legend_visible=True)
+    race = Race.objects.create(name="Tag etag", slug="tag-etag")
     cp = Checkpoint.objects.create(race=race, number=1, cost=1, description="first")
     tag = CheckpointTag.objects.create(
         point=cp, nfc_uid="04A1B2C3", check_method="offline"
@@ -905,9 +893,7 @@ def test_legend_etag_changes_when_tag_edited_with_update_fields(client, settings
     settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
     settings.MOBILE_APP_TS_WINDOW = 300
 
-    race = Race.objects.create(
-        name="Tag etag uf", slug="tag-etag-uf", is_legend_visible=True
-    )
+    race = Race.objects.create(name="Tag etag uf", slug="tag-etag-uf")
     cp = Checkpoint.objects.create(race=race, number=1, cost=1, description="first")
     tag = CheckpointTag.objects.create(
         point=cp, nfc_uid="04A1B2C3", check_method="offline"
@@ -938,9 +924,7 @@ def test_legend_build_independent_same_etag_and_body_across_key_ids(client, sett
     settings.MOBILE_APP_KEYS = {"build-a": "secret-a", "build-b": "secret-b"}
     settings.MOBILE_APP_TS_WINDOW = 300
 
-    race = Race.objects.create(
-        name="Per build", slug="per-build-legend", is_legend_visible=True
-    )
+    race = Race.objects.create(name="Per build", slug="per-build-legend")
     cp = Checkpoint.objects.create(
         race=race, number=1, cost=1, description="first", is_legend_locked=True
     )
@@ -1408,9 +1392,7 @@ def test_legend_version_stable_for_empty_race():
     from apps.mobile.versioning import legend_version
     from website.models.race import Race
 
-    race = Race.objects.create(
-        name="Empty legend", slug="empty-legend", is_legend_visible=True
-    )
+    race = Race.objects.create(name="Empty legend", slug="empty-legend")
     first = legend_version(race.id)
     second = legend_version(race.id)
     assert first == second
@@ -1423,9 +1405,7 @@ def test_legend_version_changes_when_checkpoint_description_edited():
     from website.models.checkpoint import Checkpoint
     from website.models.race import Race
 
-    race = Race.objects.create(
-        name="Edit legend", slug="edit-legend", is_legend_visible=True
-    )
+    race = Race.objects.create(name="Edit legend", slug="edit-legend")
     cp = Checkpoint.objects.create(race=race, number=1, cost=1, description="old")
     before = legend_version(race.id)
     cp.description = "new"
@@ -1440,9 +1420,7 @@ def test_legend_version_changes_when_checkpoint_added():
     from website.models.checkpoint import Checkpoint
     from website.models.race import Race
 
-    race = Race.objects.create(
-        name="Add legend", slug="add-legend", is_legend_visible=True
-    )
+    race = Race.objects.create(name="Add legend", slug="add-legend")
     Checkpoint.objects.create(race=race, number=1, cost=1, description="first")
     before = legend_version(race.id)
     Checkpoint.objects.create(race=race, number=2, cost=1, description="second")
@@ -1456,9 +1434,7 @@ def test_legend_version_changes_when_checkpoint_removed():
     from website.models.checkpoint import Checkpoint
     from website.models.race import Race
 
-    race = Race.objects.create(
-        name="Remove legend", slug="remove-legend", is_legend_visible=True
-    )
+    race = Race.objects.create(name="Remove legend", slug="remove-legend")
     cp = Checkpoint.objects.create(race=race, number=1, cost=1, description="first")
     Checkpoint.objects.create(race=race, number=2, cost=1, description="second")
     before = legend_version(race.id)
@@ -1473,9 +1449,7 @@ def test_legend_version_changes_when_kp_flips_to_draft():
     from website.models.checkpoint import Checkpoint
     from website.models.race import Race
 
-    race = Race.objects.create(
-        name="Kp to draft", slug="kp-to-draft", is_legend_visible=True
-    )
+    race = Race.objects.create(name="Kp to draft", slug="kp-to-draft")
     cp = Checkpoint.objects.create(race=race, number=1, cost=1, description="cp")
     before = legend_version(race.id)
     cp.type = "draft"
@@ -1490,9 +1464,7 @@ def test_legend_version_changes_when_draft_flips_to_kp():
     from website.models.checkpoint import Checkpoint
     from website.models.race import Race
 
-    race = Race.objects.create(
-        name="Draft to kp", slug="draft-to-kp", is_legend_visible=True
-    )
+    race = Race.objects.create(name="Draft to kp", slug="draft-to-kp")
     cp = Checkpoint.objects.create(
         race=race, number=1, cost=1, description="cp", type="draft"
     )
@@ -1509,9 +1481,7 @@ def test_legend_version_unchanged_when_draft_checkpoint_edited():
     from website.models.checkpoint import Checkpoint
     from website.models.race import Race
 
-    race = Race.objects.create(
-        name="Draft edit", slug="draft-edit", is_legend_visible=True
-    )
+    race = Race.objects.create(name="Draft edit", slug="draft-edit")
     Checkpoint.objects.create(race=race, number=1, cost=1, description="visible")
     draft = Checkpoint.objects.create(
         race=race, number=2, cost=0, description="draft", type="draft"
@@ -1529,7 +1499,7 @@ def test_legend_version_changes_when_tag_check_method_edited():
     from website.models.checkpoint import Checkpoint, CheckpointTag
     from website.models.race import Race
 
-    race = Race.objects.create(name="Tag edit", slug="tag-edit", is_legend_visible=True)
+    race = Race.objects.create(name="Tag edit", slug="tag-edit")
     cp = Checkpoint.objects.create(race=race, number=1, cost=1, description="cp")
     tag = CheckpointTag.objects.create(
         point=cp, nfc_uid="AA:BB", check_method="offline"
@@ -1547,7 +1517,7 @@ def test_legend_version_changes_when_tag_added_and_removed():
     from website.models.checkpoint import Checkpoint, CheckpointTag
     from website.models.race import Race
 
-    race = Race.objects.create(name="Tag add", slug="tag-add", is_legend_visible=True)
+    race = Race.objects.create(name="Tag add", slug="tag-add")
     cp = Checkpoint.objects.create(race=race, number=1, cost=1, description="cp")
     before = legend_version(race.id)
     tag = CheckpointTag.objects.create(
@@ -1572,7 +1542,7 @@ def test_legend_version_changes_when_open_checkpoint_tag_added():
     from website.models.checkpoint import Checkpoint, CheckpointTag
     from website.models.race import Race
 
-    race = Race.objects.create(name="Open tag", slug="open-tag", is_legend_visible=True)
+    race = Race.objects.create(name="Open tag", slug="open-tag")
     cp = Checkpoint.objects.create(race=race, number=1, cost=1, description="open cp")
     assert cp.is_legend_locked is False  # this is an OPEN КП
 
@@ -1592,9 +1562,7 @@ def test_legend_version_unchanged_when_tag_on_draft_checkpoint_added():
     from website.models.checkpoint import Checkpoint, CheckpointTag
     from website.models.race import Race
 
-    race = Race.objects.create(
-        name="Tag draft", slug="tag-draft", is_legend_visible=True
-    )
+    race = Race.objects.create(name="Tag draft", slug="tag-draft")
     Checkpoint.objects.create(race=race, number=1, cost=1, description="visible")
     draft = Checkpoint.objects.create(
         race=race, number=2, cost=0, description="draft", type="draft"
@@ -1616,9 +1584,7 @@ def test_legend_version_changes_on_lock_toggle_and_reseal():
     from website.models.checkpoint import Checkpoint
     from website.models.race import Race
 
-    race = Race.objects.create(
-        name="Lock version", slug="lock-version", is_legend_visible=True
-    )
+    race = Race.objects.create(name="Lock version", slug="lock-version")
     cp = Checkpoint.objects.create(race=race, number=1, cost=1, description="cp")
     before = legend_version(race.id)
 
@@ -1638,9 +1604,7 @@ def test_legend_version_build_independent():
     from website.models.checkpoint import Checkpoint, CheckpointTag
     from website.models.race import Race
 
-    race = Race.objects.create(
-        name="Build indep", slug="build-indep-legend", is_legend_visible=True
-    )
+    race = Race.objects.create(name="Build indep", slug="build-indep-legend")
     cp = Checkpoint.objects.create(
         race=race, number=1, cost=1, description="cp", is_legend_locked=True
     )
@@ -1654,9 +1618,7 @@ def test_legend_version_tagless_race_stable_and_no_crash():
     from apps.mobile.versioning import legend_version
     from website.models.race import Race
 
-    race = Race.objects.create(
-        name="Tagless", slug="tagless-legend", is_legend_visible=True
-    )
+    race = Race.objects.create(name="Tagless", slug="tagless-legend")
     # No checkpoints/tags/secrets: empty aggregates render "None"; must not
     # crash and must be deterministic.
     assert legend_version(race.id) == legend_version(race.id)
@@ -2310,9 +2272,7 @@ def test_sync_versions_legend_matches_legend_etag(client, settings):
     settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
     settings.MOBILE_APP_TS_WINDOW = 300
 
-    race = Race.objects.create(
-        name="Sync legend", slug="sync-legend-etag", is_legend_visible=True
-    )
+    race = Race.objects.create(name="Sync legend", slug="sync-legend-etag")
     Checkpoint.objects.create(race=race, number=1, cost=1, description="first")
 
     legend_path = f"/app/race/{race.id}/legend/"
@@ -2337,9 +2297,7 @@ def test_sync_versions_legend_matches_legend_etag_per_key_id(client, settings):
     settings.MOBILE_APP_KEYS = {"build-a": "secret-a", "build-b": "secret-b"}
     settings.MOBILE_APP_TS_WINDOW = 300
 
-    race = Race.objects.create(
-        name="Sync per build", slug="sync-legend-per-key", is_legend_visible=True
-    )
+    race = Race.objects.create(name="Sync per build", slug="sync-legend-per-key")
     cp = Checkpoint.objects.create(race=race, number=1, cost=1, description="first")
     CheckpointTag.objects.create(point=cp, nfc_uid="04A1B2C3", check_method="offline")
 
@@ -2366,9 +2324,7 @@ def test_sync_versions_legend_same_across_key_ids(client, settings):
     settings.MOBILE_APP_KEYS = {"build-a": "secret-a", "build-b": "secret-b"}
     settings.MOBILE_APP_TS_WINDOW = 300
 
-    race = Race.objects.create(
-        name="Sync same build", slug="sync-legend-same-key", is_legend_visible=True
-    )
+    race = Race.objects.create(name="Sync same build", slug="sync-legend-same-key")
     cp = Checkpoint.objects.create(
         race=race, number=1, cost=1, description="first", is_legend_locked=True
     )
@@ -3501,9 +3457,7 @@ def test_legend_version_moves_on_locked_cp_description_edit():
     from website.models.checkpoint import Checkpoint
     from website.models.race import Race
 
-    race = Race.objects.create(
-        name="Reseal version", slug="reseal-version", is_legend_visible=True
-    )
+    race = Race.objects.create(name="Reseal version", slug="reseal-version")
     cp = Checkpoint.objects.create(
         race=race, number=1, cost=5, description="original", is_legend_locked=True
     )
@@ -3549,7 +3503,7 @@ def test_signal_bundle_rebuild_moves_legend_etag():
     from website.models.checkpoint import Checkpoint, CheckpointTag
     from website.models.race import Race
 
-    race = Race.objects.create(name="Sig etag", slug="sig-etag", is_legend_visible=True)
+    race = Race.objects.create(name="Sig etag", slug="sig-etag")
     first = Checkpoint.objects.create(
         race=race, number=1, cost=1, description="a", is_legend_locked=True
     )
