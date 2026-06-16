@@ -107,12 +107,12 @@ intended; existing `is_legend_visible=False` races must lock their КП or mark 
 - Modify: `src/api/serializers/checkpoint.py`
 - Modify: `src/api/views/checkpoint.py`
 
-- [ ] Rewrite `get_cost`/`get_description` to branch solely on `cp.is_legend_locked` (locked → `0`/`""`, else cleartext).
-- [ ] Remove the `is_legend_visible` context lookups and the now-unused `CheckpointType` import in the serializer.
-- [ ] Remove `get_serializer_context` from `CheckpointView` (its only job was injecting the flag). Keep the draft/hidden `.exclude(...)` (value updated in Task 6).
-- [ ] Update/rewrite api lock tests (`api/tests.py` ~177–219) to assert lock-only semantics: open КП cleartext, locked КП zeroed — with no race flag involved.
-- [ ] **Add the headline-behavior regression test:** an **unlocked** default `type=kp` КП now serves cleartext `cost`/`description` (this case previously returned `0`/`""` when `is_legend_visible=False`). This is the single biggest behavior change and must have its own assertion.
-- [ ] Run `uv run pytest --reuse-db src/api/tests.py -q` — must pass.
+- [x] Rewrite `get_cost`/`get_description` to branch solely on `cp.is_legend_locked` (locked → `0`/`""`, else cleartext).
+- [x] Remove the `is_legend_visible` context lookups and the now-unused `CheckpointType` import in the serializer.
+- [x] Remove `get_serializer_context` from `CheckpointView` (its only job was injecting the flag). Keep the draft/hidden `.exclude(...)` (value updated in Task 6).
+- [x] Update/rewrite api lock tests (`api/tests.py` ~177–219) to assert lock-only semantics: open КП cleartext, locked КП zeroed — with no race flag involved.
+- [x] **Add the headline-behavior regression test:** an **unlocked** default `type=kp` КП now serves cleartext `cost`/`description` (this case previously returned `0`/`""` when `is_legend_visible=False`). This is the single biggest behavior change and must have its own assertion.
+- [x] Run `uv run pytest --reuse-db src/api/tests.py -q` — must pass.
 
 ### Task 3: Drop mobile race-level gate + fingerprint fold
 

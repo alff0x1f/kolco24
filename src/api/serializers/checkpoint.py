@@ -2,7 +2,6 @@ from rest_framework.fields import SerializerMethodField
 from rest_framework.serializers import ModelSerializer
 
 from website.models import Checkpoint
-from website.models.enums import CheckpointType
 
 from .tag import CheckpointTagSerializer2
 
@@ -19,21 +18,7 @@ class CheckpointSerializer(ModelSerializer):
         fields = ("id", "number", "cost", "description", "type", "tags")
 
     def get_description(self, checkpoint: Checkpoint) -> str:
-        if checkpoint.is_legend_locked:
-            return ""
-        if (
-            self.context.get("is_legend_visible")
-            or checkpoint.type != CheckpointType.kp.value
-        ):
-            return checkpoint.description
-        return ""
+        return "" if checkpoint.is_legend_locked else checkpoint.description
 
     def get_cost(self, checkpoint: Checkpoint) -> int:
-        if checkpoint.is_legend_locked:
-            return 0
-        if (
-            self.context.get("is_legend_visible")
-            or checkpoint.type != CheckpointType.kp.value
-        ):
-            return checkpoint.cost
-        return 0
+        return 0 if checkpoint.is_legend_locked else checkpoint.cost

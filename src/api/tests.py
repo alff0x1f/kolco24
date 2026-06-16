@@ -168,14 +168,12 @@ class ContributorsAPITestCase(APITestCase):
 
 
 @pytest.mark.django_db
-def test_checkpoint_api_hides_locked_legend_even_when_visible(client):
-    """Locked КП must not leak cost/description via /api/ even if legend visible."""
+def test_checkpoint_api_hides_locked_cp(client):
+    """Locked КП must not leak cost/description via /api/ (lock-only, no race flag)."""
     from website.models.checkpoint import Checkpoint
     from website.models.race import Race
 
-    race = Race.objects.create(
-        name="Lock test", slug="lock-test-api", is_legend_visible=True
-    )
+    race = Race.objects.create(name="Lock test", slug="lock-test-api")
     Checkpoint.objects.create(
         race=race, number=1, cost=5, description="secret tree", is_legend_locked=True
     )
@@ -189,35 +187,16 @@ def test_checkpoint_api_hides_locked_legend_even_when_visible(client):
 
 
 @pytest.mark.django_db
-def test_checkpoint_api_locked_cp_hides_cost_even_when_legend_not_visible(client):
-    """is_legend_locked supersedes is_legend_visible — locked КП never leaks cost."""
+def test_checkpoint_api_exposes_open_cp(client):
+    """Open (unlocked) default type=kp КП serves cleartext cost/description.
+
+    Headline behavior change: this previously returned 0/"" when the race had
+    is_legend_visible=False — now hiding depends solely on is_legend_locked.
+    """
     from website.models.checkpoint import Checkpoint
     from website.models.race import Race
 
-    race = Race.objects.create(
-        name="Lock hidden", slug="lock-hidden-api", is_legend_visible=False
-    )
-    Checkpoint.objects.create(
-        race=race, number=1, cost=9, description="secret", is_legend_locked=True
-    )
-
-    response = client.get(f"/api/race/{race.id}/checkpoint/")
-
-    assert response.status_code == 200
-    cp = response.json()[0]
-    assert cp["cost"] == 0
-    assert cp["description"] == ""
-
-
-@pytest.mark.django_db
-def test_checkpoint_api_exposes_open_cp_when_legend_visible(client):
-    """Open (unlocked) КП still serves cost/description when legend is visible."""
-    from website.models.checkpoint import Checkpoint
-    from website.models.race import Race
-
-    race = Race.objects.create(
-        name="Open test", slug="open-test-api", is_legend_visible=True
-    )
+    race = Race.objects.create(name="Open test", slug="open-test-api")
     Checkpoint.objects.create(
         race=race, number=1, cost=3, description="open spot", is_legend_locked=False
     )
