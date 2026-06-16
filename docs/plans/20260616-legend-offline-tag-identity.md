@@ -187,12 +187,12 @@ Design decisions / rationale:
 - Modify: `src/apps/mobile/tests.py`
 - (Modify only if needed: `src/apps/mobile/management/commands/export_legend_codes.py`)
 
-- [ ] verify the command's queryset filters by `point__race_id` only (no locked/
+- [x] verify the command's queryset filters by `point__race_id` only (no locked/
       `bundle_blob` filter) — expected already true; change only if a filter is present.
-- [ ] write a test invoking the command (e.g. via `call_command` capturing stdout) on a
+- [x] write a test invoking the command (e.g. via `call_command` capturing stdout) on a
       race with one **open** and one **locked** КP tag: assert **both** `nfc_uid`s and
       their `code` hex appear in the output.
-- [ ] run `uv run pytest src/apps/mobile/tests.py` — must pass before Task 4.
+- [x] run `uv run pytest src/apps/mobile/tests.py` — must pass before Task 4.
 
 ### Task 4: Versioning regression — open-КП tag moves `legend_version`
 

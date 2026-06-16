@@ -3925,3 +3925,41 @@ def test_tag_serializer_locked_tag_includes_iv_ct():
     assert data["ct"] == tag.bundle_blob["ct"]
     assert data["iv"] is not None
     assert data["ct"] is not None
+
+
+@pytest.mark.django_db
+def test_export_legend_codes_dumps_open_and_locked_tags():
+    """The command exports every tag of a race — open КП included, not just locked."""
+    from io import StringIO
+
+    from django.core.management import call_command
+
+    from website.models.checkpoint import Checkpoint, CheckpointTag
+    from website.models.race import Race
+
+    race = Race.objects.create(name="Export codes", slug="export-codes")
+    open_cp = Checkpoint.objects.create(
+        race=race, number=1, cost=2, description="open", is_legend_locked=False
+    )
+    locked_cp = Checkpoint.objects.create(
+        race=race, number=2, cost=4, description="locked", is_legend_locked=True
+    )
+    # Signals mint a code for every tag (open КП too — open just gets bundle_blob=None).
+    open_tag = CheckpointTag.objects.create(point=open_cp, nfc_uid="0A0A0A0A")
+    locked_tag = CheckpointTag.objects.create(point=locked_cp, nfc_uid="0B0B0B0B")
+    open_tag.refresh_from_db()
+    locked_tag.refresh_from_db()
+    assert open_tag.bundle_blob is None  # open КП → no unlock envelope
+    assert locked_tag.bundle_blob is not None
+
+    out = StringIO()
+    call_command("export_legend_codes", "--race", str(race.id), stdout=out)
+    output = out.getvalue()
+
+    # Both nfc_uids and both code hexes appear (open tag is not filtered out).
+    assert "0A0A0A0A" in output
+    assert "0B0B0B0B" in output
+    assert bytes(open_tag.code).hex() in output
+    assert bytes(locked_tag.code).hex() in output
+    # The placeholder dash is only for code-less tags; both tags have codes here.
+    assert "\t—" not in output
