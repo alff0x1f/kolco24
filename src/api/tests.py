@@ -168,6 +168,40 @@ class ContributorsAPITestCase(APITestCase):
 
 
 @pytest.mark.django_db
+def test_checkpoint_api_excludes_hidden_type(client):
+    """type=hidden КП must not appear in /api/race/<id>/checkpoint/."""
+    from website.models.checkpoint import Checkpoint
+    from website.models.enums import CheckpointType
+    from website.models.race import Race
+
+    race = Race.objects.create(name="Hidden type test", slug="hidden-type-test-api")
+    Checkpoint.objects.create(
+        race=race, number=1, cost=5, description="visible", type=CheckpointType.kp.value
+    )
+    Checkpoint.objects.create(
+        race=race,
+        number=2,
+        cost=9,
+        description="secret",
+        type=CheckpointType.hidden.value,
+    )
+
+    response = client.get(f"/api/race/{race.id}/checkpoint/")
+
+    assert response.status_code == 200
+    numbers = [cp["number"] for cp in response.json()]
+    assert 1 in numbers
+    assert 2 not in numbers
+
+
+@pytest.mark.django_db
+def test_checkpoint_api_nonexistent_race_returns_404(client):
+    """Non-existent race_id must return 404, not an empty 200."""
+    response = client.get("/api/race/999999/checkpoint/")
+    assert response.status_code == 404
+
+
+@pytest.mark.django_db
 def test_checkpoint_api_hides_locked_cp(client):
     """Locked КП must not leak cost/description via /api/ (lock-only, no race flag)."""
     from website.models.checkpoint import Checkpoint

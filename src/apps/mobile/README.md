@@ -422,7 +422,7 @@ ETag/`If-None-Match` на ресурсах остаётся (см. выше) —
 
 | Метод | Путь | Имя | Отдаёт |
 |-------|------|-----|--------|
-| GET | `/app/races/` | `mobile:races` | список гонок (лёгкий: id, slug, name, date, reg_status, флаги `is_*`) |
+| GET | `/app/races/` | `mobile:races` | список гонок (лёгкий: id, slug, name, date, date_end, place, reg_status) |
 | GET | `/app/race/<id>/teams/` | `mobile:teams` | команды гонки + категории (`categories`) |
 | GET | `/app/race/<id>/legend/` | `mobile:legend` | КП (запертые — только `enc`) + пер-тег `tags` (`bid → point` идентичность всегда; `iv`/`ct` только у запертых); легенда published-гонки отдаётся всегда, КП типа `hidden` («Скрытый») исключены |
 | GET | `/app/race/<id>/sync/` | `mobile:sync` | манифест: версии ресурсов + `data_source`/`lease_expires_at` |
