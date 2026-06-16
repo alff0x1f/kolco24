@@ -95,11 +95,11 @@ intended; existing `is_legend_visible=False` races must lock their КП or mark 
 - Modify: `src/website/models/race.py`
 - Create: `src/website/migrations/00XX_remove_race_is_legend_visible.py`
 
-- [ ] Delete the `is_legend_visible = BooleanField(...)` field (`race.py:59`).
-- [ ] Generate the migration: `uv run python src/manage.py makemigrations website` (verify it's a single `RemoveField`, no data step).
-- [ ] Run `uv run python src/manage.py migrate` against the local DB to confirm it applies.
-- [ ] (Tests for behavior land in Tasks 2–3, which consume this field's removal; no standalone test for the bare field drop.)
-- [ ] Run `uv run pytest --reuse-db -q` — expect failures only in tests still passing the kwarg (fixed in Task 5); model import must succeed.
+- [x] Delete the `is_legend_visible = BooleanField(...)` field (`race.py:59`).
+- [x] Generate the migration: `uv run python src/manage.py makemigrations website` (verify it's a single `RemoveField`, no data step). → `0084_remove_race_is_legend_visible.py`
+- [x] Run `uv run python src/manage.py migrate` against the local DB to confirm it applies.
+- [x] (Tests for behavior land in Tasks 2–3, which consume this field's removal; no standalone test for the bare field drop.)
+- [x] Run `uv run pytest --reuse-db -q` — model import succeeds (test collection passes; field removed from `RaceForm.Meta.fields` to unblock app import — remaining Task 4 template/test work deferred).
 
 ### Task 2: Collapse api serializer to `is_legend_locked` only
 
