@@ -136,11 +136,11 @@ intended; existing `is_legend_visible=False` races must lock their КП or mark 
 - Modify: `src/templates/race/race_form.html`
 - Modify: `src/apps/race/tests.py`
 
-- [ ] Remove `"is_legend_visible"` from `RaceForm.Meta.fields` (`forms.py:61`).
-- [ ] Remove the toggle `<label class="switch">…name="is_legend_visible"…</label>` block from `race_form.html` (~334).
-- [ ] Drop the `"is_legend_visible": False` entry from the race-edit test payload (`apps/race/tests.py:667`).
-- [ ] Add/adjust an `apps/race` test asserting the form saves without the field and the edit page renders (no leftover field reference).
-- [ ] Run `uv run pytest --reuse-db src/apps/race/tests.py -q` — must pass.
+- [x] Remove `"is_legend_visible"` from `RaceForm.Meta.fields` (`forms.py:61`). (already removed in Task 1)
+- [x] Remove the toggle `<label class="switch">…name="is_legend_visible"…</label>` block from `race_form.html` (~334).
+- [x] Drop the `"is_legend_visible": False` entry from the race-edit test payload (`apps/race/tests.py:667`).
+- [x] Add/adjust an `apps/race` test asserting the form saves without the field and the edit page renders (no leftover field reference).
+- [x] Run `uv run pytest --reuse-db src/apps/race/tests.py -q` — must pass.
 
 ### Task 5: Sweep remaining `is_legend_visible=` test kwargs
 
