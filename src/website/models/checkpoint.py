@@ -18,6 +18,7 @@ class Checkpoint(models.Model):
         choices=CheckpointType.choices,
         default="kp",
     )
+    is_legend_locked = models.BooleanField("Легенда заперта", default=False)
     updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
@@ -27,6 +28,32 @@ class Checkpoint(models.Model):
         ordering = ["id"]
         verbose_name = "Контрольная точка"
         verbose_name_plural = "Контрольные точки"
+
+
+class CheckpointSecret(models.Model):
+    """Precomputed envelope-encryption secret for a locked checkpoint's legend.
+
+    Exists **only** for locked КП. ``content_key`` is the random 32-byte AES key
+    sealing the КП's ``{cost, description}`` (stored in ``enc_blob``). The DB is
+    trusted in this threat model, so ``content_key`` is stored raw.
+    """
+
+    checkpoint = models.OneToOneField(
+        "website.Checkpoint",
+        verbose_name="КП",
+        on_delete=models.CASCADE,
+        related_name="secret",
+    )
+    content_key = models.BinaryField("Ключ контента")  # 32 raw bytes
+    enc_blob = models.JSONField("Зашифрованная легенда")  # {"iv": b64, "ct": b64}
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"Secret for {self.checkpoint_id}"
+
+    class Meta:
+        verbose_name = "Секрет КП"
+        verbose_name_plural = "Секреты КП"
 
 
 class CheckpointTag(models.Model):
@@ -46,6 +73,19 @@ class CheckpointTag(models.Model):
             ("local_server", "Local Server"),
         ],
         default="offline",
+    )
+    code = models.BinaryField("Код тега", null=True, blank=True)  # 16 raw random bytes
+    bid = models.CharField(
+        "Идентификатор бандла", max_length=16, blank=True, default=""
+    )  # sha256(code).hexdigest()[:16]
+    bundle_blob = models.JSONField(
+        "Бандл", null=True, blank=True
+    )  # {"iv": b64, "ct": b64}
+    unlocks = models.ManyToManyField(
+        "website.Checkpoint",
+        verbose_name="Отпирает КП",
+        related_name="unlocked_by",
+        blank=True,
     )
     updated_at = models.DateTimeField(auto_now=True)
 

@@ -15,7 +15,8 @@ from apps.race.forms import RaceForm
 from apps.race.models import RaceExtra
 from apps.race.permissions import can_edit_race
 from website.forms import NewsPostForm
-from website.models import NewsPost, Race, Team
+from website.models import Checkpoint, NewsPost, Race, Team
+from website.models.enums import CheckpointType
 from website.models.race import Category, RacePriceTier, RegStatus
 from website.views.views_ import is_race_admin
 
@@ -567,6 +568,96 @@ def _reconcile_price_tiers(race, cleaned):
     race.price_tiers.exclude(id__in=seen).delete()
 
 
+_CHECKPOINT_TYPE_VALUES = {value for value, _ in CheckpointType.choices}
+
+
+def _validate_legend_rows(rows):
+    """Validate parsed legend (checkpoint) rows.
+
+    Returns ``(cleaned, errors)`` like :func:`_validate_category_rows`.
+    ``number``/``cost`` are non-negative integers (empty → ``0``); ``type`` must
+    be a valid :class:`CheckpointType` (empty → ``kp``); ``description`` is
+    trimmed and capped at the model's 200-char limit; ``is_legend_locked`` is a
+    bool.
+    """
+    errors = {}
+    cleaned = []
+    for index, row in enumerate(rows):
+        if not isinstance(row, dict):
+            errors[index] = {"__all__": "Некорректная строка."}
+            cleaned.append(None)
+            continue
+        row_errors = {}
+        number, number_err = _people_limit_int(row.get("number"))
+        cost, cost_err = _people_limit_int(row.get("cost"))
+        if number_err:
+            row_errors["number"] = number_err
+        if cost_err:
+            row_errors["cost"] = cost_err
+        type_ = str(row.get("type") or "").strip() or CheckpointType.kp.value
+        if type_ not in _CHECKPOINT_TYPE_VALUES:
+            row_errors["type"] = "Неизвестный тип точки."
+        description = str(row.get("description") or "").strip()
+        if len(description) > 200:
+            row_errors["description"] = "Не длиннее 200 символов."
+        if row_errors:
+            errors[index] = row_errors
+            cleaned.append(None)
+        else:
+            cleaned.append(
+                {
+                    "id": _row_id(row.get("id")),
+                    "number": number,
+                    "cost": cost,
+                    "description": description,
+                    "type": type_,
+                    "is_legend_locked": bool(row.get("is_legend_locked")),
+                }
+            )
+    return cleaned, errors
+
+
+def _reconcile_legend(race, cleaned):
+    """Update/create/delete this race's checkpoints from ``cleaned`` rows.
+
+    A row ``id`` not belonging to ``race`` is treated as a new row (never an
+    update or delete of another race's КП). Each КП is saved **one at a time via
+    ``instance.save()``** — never ``QuerySet.update()`` — so the legend-crypto
+    ``post_save`` signals fire: toggling ``is_legend_locked`` is exactly what
+    creates/destroys the ``CheckpointSecret`` and rebuilds dependent tag bundles,
+    and a bulk update would skip that and leak the cleartext legend.
+
+    Deletion guard: a КП missing from the payload is deleted only when it has no
+    NFC ``CheckpointTag`` rows — those are physically provisioned chips and a
+    ``CASCADE`` delete would silently destroy them, so such a row raises a
+    ``ValueError`` that rolls the whole save back. (``TakenKP`` scan history is
+    keyed by ``point_number``, not an FK, so it neither blocks nor cascades.)
+    """
+    existing = {cp.id: cp for cp in Checkpoint.objects.filter(race=race)}
+    seen = set()
+    for row in cleaned:
+        row_id = row["id"]
+        instance = existing.get(row_id) if row_id is not None else None
+        if instance is None:
+            instance = Checkpoint(race=race)
+        instance.number = row["number"]
+        instance.cost = row["cost"]
+        instance.description = row["description"]
+        instance.type = row["type"]
+        instance.is_legend_locked = row["is_legend_locked"]
+        instance.save()
+        seen.add(instance.id)
+    for cp in (
+        Checkpoint.objects.filter(race=race).exclude(id__in=seen).select_for_update()
+    ):
+        if cp.tags.exists():
+            raise ValueError(
+                f"КП «{cp.number}» нельзя удалить: к нему привязаны NFC-теги. "
+                "Сначала удалите теги."
+            )
+        cp.delete()
+
+
 class RaceEditView(View):
     """Create (``races/new/``) and edit (``race/<slug>/edit/``) a race.
 
@@ -786,3 +877,119 @@ class RaceEditView(View):
             extra_errors=extra_errors,
         )
         return render(request, "race/race_form.html", context)
+
+
+class RaceLegendEditView(View):
+    """Bulk-edit a race's legend (checkpoints) on a dedicated page.
+
+    Mirrors :class:`RaceEditView`'s JSON-island + reconcile pattern, but for a
+    single entity (``Checkpoint``): the page renders one spreadsheet-like grid
+    seeded from ``#checkpoints-data`` and posts the rows back in the hidden
+    ``checkpoints_json`` input. The grid accepts paste straight from
+    Excel/Google Sheets (TSV). Gated on :func:`can_edit_race`.
+    """
+
+    def _load_and_authorize(self, request, race_slug):
+        if not request.user.is_authenticated:
+            return None, HttpResponseRedirect(
+                reverse("login") + "?next=" + quote(request.path, safe="/:@")
+            )
+        race = get_object_or_404(Race, slug=race_slug)
+        if not can_edit_race(request.user, race):
+            return race, HttpResponseForbidden()
+        return race, None
+
+    @staticmethod
+    def _existing_checkpoints(race):
+        # ``has_tags`` lets the JS block the «delete» of a КП with provisioned
+        # NFC tags (mirrors the server-side guard in :func:`_reconcile_legend`).
+        return [
+            {
+                "id": cp.id,
+                "number": cp.number,
+                "type": cp.type,
+                "cost": cp.cost,
+                "description": cp.description,
+                "is_legend_locked": cp.is_legend_locked,
+                "has_tags": bool(cp.tags.all()),
+            }
+            for cp in Checkpoint.objects.filter(race=race)
+            .prefetch_related("tags")
+            .order_by("number", "id")
+        ]
+
+    def _build_context(
+        self, race, checkpoints_data=None, checkpoint_errors=None, form_errors=None
+    ):
+        if checkpoints_data is None:
+            checkpoints_data = self._existing_checkpoints(race)
+        return {
+            "race": race,
+            "checkpoints_data": _safe_json(checkpoints_data),
+            "checkpoint_errors": _safe_json(checkpoint_errors or {}),
+            "legend_config": _safe_json(
+                {
+                    "types": [
+                        {"value": value, "label": label}
+                        for value, label in CheckpointType.choices
+                    ],
+                    "descMaxLen": 200,
+                }
+            ),
+            "form_errors": form_errors or [],
+        }
+
+    def get(self, request, race_slug):
+        race, response = self._load_and_authorize(request, race_slug)
+        if response is not None:
+            return response
+        return render(request, "race/legend_form.html", self._build_context(race))
+
+    def post(self, request, race_slug):
+        race, response = self._load_and_authorize(request, race_slug)
+        if response is not None:
+            return response
+
+        form_errors = []
+        rows = None
+        try:
+            rows = _parse_json_list(request.POST.get("checkpoints_json") or "[]")
+        except ValueError as exc:
+            form_errors.append(f"Контрольные точки: {exc}")
+
+        checkpoint_errors = {}
+        cleaned = None
+        if rows is not None:
+            cleaned, checkpoint_errors = _validate_legend_rows(rows)
+        if checkpoint_errors:
+            bad = ", ".join(str(i + 1) for i in sorted(checkpoint_errors))
+            form_errors.append(f"Ошибки в строках: {bad}.")
+
+        if rows is not None and not checkpoint_errors:
+            try:
+                with transaction.atomic():
+                    _reconcile_legend(race, cleaned)
+            except ValueError as exc:
+                form_errors.append(str(exc))
+            else:
+                return HttpResponseRedirect(
+                    reverse("edit_legend", kwargs={"race_slug": race.slug})
+                )
+
+        # Re-render echoing the submitted rows + per-row errors. Re-attach
+        # ``has_tags`` from the DB so the JS still blocks deleting a tagged КП.
+        if rows:
+            tagged = {
+                cp["id"]: cp["has_tags"] for cp in self._existing_checkpoints(race)
+            }
+            for row in rows:
+                if isinstance(row, dict) and row.get("id") in tagged:
+                    row["has_tags"] = tagged[row["id"]]
+
+        context = self._build_context(
+            race,
+            checkpoints_data=rows or [],
+            checkpoint_errors=checkpoint_errors,
+            form_errors=form_errors,
+        )
+        return render(request, "race/legend_form.html", context)

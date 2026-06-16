@@ -1,12 +1,14 @@
 """Serializers for the mobile-app endpoints."""
 
+import logging
+
 from rest_framework import serializers
 
-from website.models.checkpoint import Checkpoint, CheckpointTag
+from website.models.checkpoint import CheckpointSecret
 from website.models.models import Athlet, Team
 from website.models.race import Category, Race
 
-from . import signing
+logger = logging.getLogger(__name__)
 
 
 class RaceListSerializer(serializers.ModelSerializer):
@@ -26,38 +28,71 @@ class RaceListSerializer(serializers.ModelSerializer):
         ]
 
 
-class LegendTagSerializer(serializers.ModelSerializer):
-    """Public legend view of an NFC tag.
+class TagSerializer(serializers.Serializer):
+    """Per-tag identity (always) plus optional offline-unlock envelope.
 
-    Never exposes the raw ``nfc_uid``: it is served only as ``tag_hash``, an
-    HMAC of the raw UID keyed by the per-build secret (``context["secret"]``),
-    so the physical tag IDs never travel on the wire. The app re-computes the
-    same hash from a scanned UID to match scan → checkpoint offline.
+    Two concerns, cleanly split:
+
+    - **identity** — ``bid → point`` (1:1, **always** present, incl. open КП):
+      the app computes ``bid = sha256(scanned_code).hexdigest()[:16]`` from the
+      code in the tag's NFC user memory and looks it up here to resolve which
+      checkpoint (``point`` = ``point_id``) was physically scanned, fully
+      offline.
+    - **unlock** — ``iv``/``ct`` (locked КП **only**): flattened from
+      ``CheckpointTag.bundle_blob``. When present, HKDF-decrypts to
+      ``{cp_id: content_key}`` and then decrypts each locked КП's ``enc`` blob.
+      ``None`` for an open tag (identity-only, nothing to decrypt).
+
+    The raw ``code``/``nfc_uid`` never travel on the wire.
     """
 
-    tag_hash = serializers.SerializerMethodField()
+    bid = serializers.CharField()
+    point = serializers.IntegerField(source="point_id")
+    iv = serializers.SerializerMethodField()
+    ct = serializers.SerializerMethodField()
+    check_method = serializers.CharField()
 
-    def get_tag_hash(self, tag):
-        return signing.tag_hash(self.context["secret"], tag.nfc_uid)
+    def get_iv(self, tag):
+        return (tag.bundle_blob or {}).get("iv")
 
-    class Meta:
-        model = CheckpointTag
-        fields = ["id", "tag_hash", "check_method"]
+    def get_ct(self, tag):
+        return (tag.bundle_blob or {}).get("ct")
 
 
-class LegendCheckpointSerializer(serializers.ModelSerializer):
+class LegendCheckpointSerializer(serializers.Serializer):
     """Public legend view of a checkpoint.
 
-    Never exposes ``iterator``/``year``. ``tags`` carries hashed NFC tag UIDs
-    (see ``LegendTagSerializer``); the resolved secret must be threaded through
-    serializer ``context``.
+    Branches on ``is_legend_locked``: a **locked** КП exposes only
+    ``{id, number, type, enc}`` (the precomputed ``secret.enc_blob`` ciphertext),
+    so its ``cost``/``description`` never leave the server in cleartext; an
+    **open** КП exposes ``{id, number, type, cost, description}``. Never exposes
+    ``iterator``/``year``. The view must ``select_related("secret")`` so the
+    locked branch reads the prefetched secret without an extra query.
     """
 
-    tags = LegendTagSerializer(many=True)
-
-    class Meta:
-        model = Checkpoint
-        fields = ["id", "number", "cost", "type", "description", "tags"]
+    def to_representation(self, cp):
+        data = {"id": cp.id, "number": cp.number, "type": cp.type}
+        if cp.is_legend_locked:
+            try:
+                secret = cp.secret
+            except CheckpointSecret.DoesNotExist:
+                secret = None
+            if secret is None:
+                logger.error(
+                    "Locked checkpoint %d has no CheckpointSecret; "
+                    "run rebuild_legend_crypto to repair.",
+                    cp.id,
+                )
+                # Fail closed: return only the identifier fields, no enc and no
+                # cleartext. Leaking cleartext would defeat the encryption scheme;
+                # the app treats a locked КП with no enc as undecryptable until
+                # the admin runs rebuild_legend_crypto.
+                return data
+            data["enc"] = secret.enc_blob
+            return data
+        data["cost"] = cp.cost
+        data["description"] = cp.description
+        return data
 
 
 class CategorySerializer(serializers.ModelSerializer):

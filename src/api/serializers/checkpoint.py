@@ -19,6 +19,8 @@ class CheckpointSerializer(ModelSerializer):
         fields = ("id", "number", "cost", "description", "type", "tags")
 
     def get_description(self, checkpoint: Checkpoint) -> str:
+        if checkpoint.is_legend_locked:
+            return ""
         if (
             self.context.get("is_legend_visible")
             or checkpoint.type != CheckpointType.kp.value
@@ -27,6 +29,8 @@ class CheckpointSerializer(ModelSerializer):
         return ""
 
     def get_cost(self, checkpoint: Checkpoint) -> int:
+        if checkpoint.is_legend_locked:
+            return 0
         if (
             self.context.get("is_legend_visible")
             or checkpoint.type != CheckpointType.kp.value

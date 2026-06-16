@@ -8,14 +8,13 @@ never disagree.
 
 ``legend_version`` is the matching single source of truth for the legend
 resource: ``LegendView`` wraps it in quotes for the ``ETag`` and ``SyncView``
-emits the bare value in ``versions.legend``. The legend exposes each
-checkpoint's tags as an HMAC ``tag_hash`` keyed by the per-build secret, so the
-legend fingerprint folds in **both** the ``CheckpointTag`` aggregates (a tag
-add/remove/edit must move the version) **and** the request's ``key_id`` (two
-builds with different secrets produce different hashes for the same data, so
-they must not share an ETag — otherwise an install that rotates to a new secret
-would send a matching ``If-None-Match`` → ``304`` → keep hashes computed with
-the **old** secret). ``teams_version``/``races_version`` are unaffected.
+emits the bare value in ``versions.legend``. The legend is now
+**build-independent** (the ciphertext/bundles are precomputed and stored, no
+longer keyed by the per-build secret), so the fingerprint folds in three
+aggregates — ``Checkpoint``, ``CheckpointSecret`` (re-seal / enc appear or
+disappear), and ``CheckpointTag`` (code/unlocks/bundle/check_method) — and
+takes **no** ``key_id``. Two builds therefore share the legend ETag.
+``teams_version``/``races_version`` are unaffected.
 
 ``races_version`` is the single source of truth for the global published-races
 list served by ``RaceListView``. It is global (no ``race_id``) and deliberately
@@ -27,7 +26,7 @@ import hashlib
 
 from django.db.models import Count, Max
 
-from website.models.checkpoint import Checkpoint, CheckpointTag
+from website.models.checkpoint import Checkpoint, CheckpointSecret, CheckpointTag
 from website.models.enums import CheckpointType
 from website.models.models import Athlet, Team
 from website.models.race import Category, Race
@@ -97,23 +96,28 @@ def races_version():
     return hashlib.blake2b(raw.encode(), digest_size=8).hexdigest()
 
 
-def legend_state(race_id, key_id=""):
+def legend_state(race_id):
     """Return ``(version, is_legend_visible)`` paired within one call.
 
     Both values are computed together so the view uses a single, consistent
     pair — a visibility flip between two independent calls cannot produce a
     response body that contradicts its own ETag.  There is no DB-level
-    snapshot: the queries (checkpoint aggregate, tag aggregate, race row) are
-    independent, so a flip between them yields a version that represents
-    neither state. Self-corrects on the next request.
+    snapshot: the queries (checkpoint aggregate, secret aggregate, tag
+    aggregate, race row) are independent, so a flip between them yields a
+    version that represents neither state. Self-corrects on the next request.
 
-    Folds in the ``CheckpointTag`` aggregates
-    (``MAX(updated_at)|COUNT``) over tags whose ``point`` is a **non-draft**
-    checkpoint of ``race_id`` — the same draft-exclusion predicate as the
-    checkpoint aggregate — so a tag add/remove/edit moves the fingerprint while
-    a tag on a draft checkpoint does not. The request's ``key_id`` is appended
-    to the blake2b input so two builds (different secrets → different
-    ``tag_hash`` bodies) get different ETags.
+    Folds in three ``MAX(updated_at)|COUNT`` aggregates over the **non-draft**
+    checkpoints of ``race_id`` (the same draft-exclusion predicate the legend
+    view serves):
+
+    1. ``Checkpoint`` — a checkpoint edit / add/remove / lock toggle.
+    2. ``CheckpointSecret`` — a re-seal, or an ``enc`` blob appearing/disappearing
+       as a КП is locked/unlocked.
+    3. ``CheckpointTag`` — a code/unlocks/bundle/check_method change.
+
+    The legend is **build-independent** (the stored ciphertext/bundles do not
+    depend on the per-build secret), so the fingerprint takes **no** ``key_id``
+    and two builds share the ETag.
 
     Deliberately re-queries ``is_legend_visible`` by ``race_id`` rather than
     accepting a ``Race`` object: keeps the bare ``race_id`` signature that is
@@ -124,6 +128,11 @@ def legend_state(race_id, key_id=""):
     agg = (
         Checkpoint.objects.filter(race_id=race_id)
         .exclude(type=CheckpointType.draft.value)
+        .aggregate(max_updated=Max("updated_at"), count=Count("id"))
+    )
+    secrets = (
+        CheckpointSecret.objects.filter(checkpoint__race_id=race_id)
+        .exclude(checkpoint__type=CheckpointType.draft.value)
         .aggregate(max_updated=Max("updated_at"), count=Count("id"))
     )
     tags = (
@@ -138,24 +147,25 @@ def legend_state(race_id, key_id=""):
     )
     raw = (
         f"{agg['max_updated']}|{agg['count']}|{visible}"
-        f"|{tags['max_updated']}|{tags['count']}|{key_id}"
+        f"|{secrets['max_updated']}|{secrets['count']}"
+        f"|{tags['max_updated']}|{tags['count']}"
     )
     version = hashlib.blake2b(raw.encode(), digest_size=8).hexdigest()
     return version, visible
 
 
-def legend_version(race_id, key_id=""):
+def legend_version(race_id):
     """Return a short, stable fingerprint of a race's legend.
 
-    Combines
-    ``MAX(Checkpoint.updated_at)|COUNT(Checkpoint)|is_legend_visible|MAX(CheckpointTag.updated_at)|COUNT(CheckpointTag)|key_id``
-    over the **draft-excluded** queryset the legend view actually serves, so a
+    Combines the ``MAX(updated_at)|COUNT`` aggregates of ``Checkpoint``,
+    ``CheckpointSecret`` and ``CheckpointTag`` (plus ``is_legend_visible``) over
+    the **draft-excluded** queryset the legend view actually serves, so a
     checkpoint edit, add/remove, a ``kp <-> draft`` flip (``COUNT`` moves), a
-    hide/show of the legend, **or a tag add/remove/edit** all move the
-    fingerprint. A draft-checkpoint edit (and a tag on a draft checkpoint)
-    deliberately does **not** move it (drafts are not in the response). The
-    ``key_id`` is folded in because the served ``tag_hash`` values depend on the
-    per-build secret.
+    hide/show of the legend, a lock toggle / re-seal, **or a tag
+    add/remove/edit** all move the fingerprint. A draft-checkpoint edit (and a
+    tag on a draft checkpoint) deliberately does **not** move it (drafts are
+    not in the response). The fingerprint is **build-independent** (no
+    ``key_id``).
 
     None aggregates (empty/all-draft/tag-less race) render as the literal
     ``"None"`` → stable, non-crashing. Returns **bare** hex (no quotes).
@@ -164,5 +174,5 @@ def legend_version(race_id, key_id=""):
     also need the ``is_legend_visible`` flag (e.g. in :class:`LegendView`) to
     avoid a second independent DB read that could race with a visibility flip.
     """
-    version, _ = legend_state(race_id, key_id)
+    version, _ = legend_state(race_id)
     return version

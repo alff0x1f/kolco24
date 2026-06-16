@@ -1,4 +1,4 @@
-from rest_framework.generics import ListAPIView
+from rest_framework.generics import ListAPIView, get_object_or_404
 
 from website.models import Checkpoint, Race
 from website.models.enums import CheckpointType
@@ -21,6 +21,6 @@ class CheckpointView(ListAPIView):
 
     def get_serializer_context(self):
         context = super().get_serializer_context()
-        race = Race.objects.get(pk=self.kwargs.get("race_id"))
+        race = get_object_or_404(Race, pk=self.kwargs.get("race_id"))
         context["is_legend_visible"] = race.is_legend_visible
         return context

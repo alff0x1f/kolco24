@@ -2222,3 +2222,219 @@ def test_race_edit_get_serializes_existing_extras_with_usage_flag():
     assert [r["code"] for r in rows] == ["transfer", "breakfast"]
     assert rows[0]["has_teams"] is True
     assert rows[1]["has_teams"] is False
+
+
+# --- Legend (checkpoints) bulk editor -------------------------------------
+
+
+def _legend_post(rows):
+    return {"checkpoints_json": json.dumps(rows)}
+
+
+@pytest.mark.django_db
+def test_legend_edit_get_anonymous_redirects_to_login(client):
+    race = _make_race()
+    resp = client.get(reverse("edit_legend", kwargs={"race_slug": race.slug}))
+    assert resp.status_code == 302
+    assert reverse("login") in resp.url
+
+
+@pytest.mark.django_db
+def test_legend_edit_get_regular_user_forbidden(client, django_user_model):
+    race = _make_race()
+    user = django_user_model.objects.create_user(username="u", password="x")
+    client.force_login(user)
+    resp = client.get(reverse("edit_legend", kwargs={"race_slug": race.slug}))
+    assert resp.status_code == 403
+
+
+@pytest.mark.django_db
+def test_legend_edit_get_superuser_returns_200_with_existing(client):
+    from website.models import Checkpoint
+
+    race = _make_race()
+    Checkpoint.objects.create(race=race, number=3, cost=40, description="Мост")
+    superuser = User.objects.create_superuser("admin", "a@b.c", "pw")
+    client.force_login(superuser)
+
+    resp = client.get(reverse("edit_legend", kwargs={"race_slug": race.slug}))
+    assert resp.status_code == 200
+    data = _script_json(resp.content.decode(), "checkpoints-data")
+    assert data[0]["number"] == 3
+    assert data[0]["description"] == "Мост"
+
+
+@pytest.mark.django_db
+def test_legend_edit_post_creates_and_updates(client):
+    from website.models import Checkpoint
+
+    race = _make_race()
+    existing = Checkpoint.objects.create(
+        race=race, number=1, cost=10, description="old"
+    )
+    superuser = User.objects.create_superuser("admin", "a@b.c", "pw")
+    client.force_login(superuser)
+
+    resp = client.post(
+        reverse("edit_legend", kwargs={"race_slug": race.slug}),
+        _legend_post(
+            [
+                {
+                    "id": existing.id,
+                    "number": 1,
+                    "type": "kp",
+                    "cost": 15,
+                    "description": "новое",
+                    "is_legend_locked": False,
+                },
+                {
+                    "id": None,
+                    "number": 2,
+                    "type": "start",
+                    "cost": 0,
+                    "description": "Старт",
+                    "is_legend_locked": False,
+                },
+            ]
+        ),
+    )
+    assert resp.status_code == 302
+    existing.refresh_from_db()
+    assert existing.cost == 15 and existing.description == "новое"
+    created = Checkpoint.objects.get(race=race, number=2)
+    assert created.type == "start"
+
+
+@pytest.mark.django_db
+def test_legend_lock_toggle_manages_checkpoint_secret(client):
+    """Toggling is_legend_locked via the editor must fire the crypto signals.
+
+    A locked КП gets a CheckpointSecret (sealed legend); unlocking removes it.
+    A bulk QuerySet.update() would skip this — the regression guard for the
+    cleartext-leak risk.
+    """
+    from website.models import Checkpoint
+    from website.models.checkpoint import CheckpointSecret
+
+    race = _make_race()
+    cp = Checkpoint.objects.create(race=race, number=1, cost=30, description="секрет")
+    superuser = User.objects.create_superuser("admin", "a@b.c", "pw")
+    client.force_login(superuser)
+    url = reverse("edit_legend", kwargs={"race_slug": race.slug})
+
+    client.post(
+        url,
+        _legend_post(
+            [
+                {
+                    "id": cp.id,
+                    "number": 1,
+                    "type": "kp",
+                    "cost": 30,
+                    "description": "секрет",
+                    "is_legend_locked": True,
+                }
+            ]
+        ),
+    )
+    assert CheckpointSecret.objects.filter(checkpoint=cp).exists()
+
+    client.post(
+        url,
+        _legend_post(
+            [
+                {
+                    "id": cp.id,
+                    "number": 1,
+                    "type": "kp",
+                    "cost": 30,
+                    "description": "секрет",
+                    "is_legend_locked": False,
+                }
+            ]
+        ),
+    )
+    assert not CheckpointSecret.objects.filter(checkpoint=cp).exists()
+
+
+@pytest.mark.django_db
+def test_legend_delete_untagged_checkpoint(client):
+    from website.models import Checkpoint
+
+    race = _make_race()
+    keep = Checkpoint.objects.create(race=race, number=1, cost=10, description="a")
+    drop = Checkpoint.objects.create(race=race, number=2, cost=20, description="b")
+    superuser = User.objects.create_superuser("admin", "a@b.c", "pw")
+    client.force_login(superuser)
+
+    resp = client.post(
+        reverse("edit_legend", kwargs={"race_slug": race.slug}),
+        _legend_post(
+            [
+                {
+                    "id": keep.id,
+                    "number": 1,
+                    "type": "kp",
+                    "cost": 10,
+                    "description": "a",
+                    "is_legend_locked": False,
+                }
+            ]
+        ),
+    )
+    assert resp.status_code == 302
+    assert Checkpoint.objects.filter(race=race).count() == 1
+    assert not Checkpoint.objects.filter(id=drop.id).exists()
+
+
+@pytest.mark.django_db
+def test_legend_delete_tagged_checkpoint_refused(client):
+    from website.models import Checkpoint
+    from website.models.checkpoint import CheckpointTag
+
+    race = _make_race()
+    tagged = Checkpoint.objects.create(race=race, number=2, cost=20, description="b")
+    CheckpointTag.objects.create(point=tagged, nfc_uid="aa:bb:cc")
+    superuser = User.objects.create_superuser("admin", "a@b.c", "pw")
+    client.force_login(superuser)
+
+    # Submit an empty legend → would delete the tagged КП, which must be refused.
+    resp = client.post(
+        reverse("edit_legend", kwargs={"race_slug": race.slug}),
+        _legend_post([]),
+    )
+    assert resp.status_code == 200
+    assert Checkpoint.objects.filter(id=tagged.id).exists()
+    assert any("NFC" in e for e in resp.context["form_errors"])
+
+
+@pytest.mark.django_db
+def test_legend_post_invalid_type_reports_row_error(client):
+    from website.models import Checkpoint
+
+    race = _make_race()
+    superuser = User.objects.create_superuser("admin", "a@b.c", "pw")
+    client.force_login(superuser)
+
+    resp = client.post(
+        reverse("edit_legend", kwargs={"race_slug": race.slug}),
+        _legend_post(
+            [
+                {
+                    "id": None,
+                    "number": 1,
+                    "type": "bogus",
+                    "cost": 10,
+                    "description": "x",
+                    "is_legend_locked": False,
+                }
+            ]
+        ),
+    )
+    assert resp.status_code == 200
+    assert Checkpoint.objects.filter(race=race).count() == 0
+    errors = _script_json(resp.content.decode(), "checkpoint-errors")
+    assert "type" in errors["0"]
+
+
+# ---------------------------------------------------------------------------

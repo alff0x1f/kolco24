@@ -6,3 +6,6 @@ class MobileConfig(AppConfig):
     name = "apps.mobile"
     label = "mobile"
     verbose_name = "Mobile app endpoints"
+
+    def ready(self):
+        from . import signals  # noqa: F401  (registers legend-crypto signals)
