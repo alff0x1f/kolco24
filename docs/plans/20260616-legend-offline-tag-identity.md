@@ -205,13 +205,13 @@ Design decisions / rationale:
 - [x] run `uv run pytest src/apps/mobile/tests.py` — must pass before Task 5.
 
 ### Task 5: Verify acceptance criteria
-- [ ] response carries `tags` (not `bundles`); each entry has `bid`, `point`,
+- [x] response carries `tags` (not `bundles`); each entry has `bid`, `point`,
       `check_method`; locked entries additionally carry `iv`/`ct`; open entries do not.
-- [ ] hidden legend → empty `tags`; ETag still set on every exit path; 304 path unchanged.
-- [ ] offline end-to-end: `bid → point` resolves cp_id; locked decrypt still works.
-- [ ] raw `code`/`nfc_uid` never appear in any response body.
-- [ ] run full suite: `uv run pytest`.
-- [ ] `make format && make lint`.
+- [x] hidden legend → empty `tags`; ETag still set on every exit path; 304 path unchanged.
+- [x] offline end-to-end: `bid → point` resolves cp_id; locked decrypt still works.
+- [x] raw `code`/`nfc_uid` never appear in any response body.
+- [x] run full suite: `uv run pytest` (564 passed).
+- [x] `make format && make lint` (clean).
 
 ### Task 6: [Final] Update documentation
 - [ ] `src/apps/mobile/README.md`: re-grep `grep -n bundles src/apps/mobile/README.md` and
