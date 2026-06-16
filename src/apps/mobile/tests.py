@@ -573,28 +573,6 @@ def test_legend_unpublished_race_returns_404(client, settings):
 
 
 @pytest.mark.django_db
-def test_legend_race_deleted_mid_request_returns_404(client, settings, monkeypatch):
-    """legend_state returning visible=None (race deleted after 404 check) → 404."""
-    import apps.mobile.views as mobile_views
-    from website.models.race import Race
-
-    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
-    settings.MOBILE_APP_TS_WINDOW = 300
-
-    race = Race.objects.create(
-        name="Ghost", slug="ghost-legend", is_legend_visible=True
-    )
-    path = f"/app/race/{race.id}/legend/"
-
-    monkeypatch.setattr(
-        mobile_views, "legend_state", lambda *a, **kw: ("deadbeef00000000", None)
-    )
-
-    response = client.get(path, **_signed_headers("GET", path, SECRET))
-    assert response.status_code == 404
-
-
-@pytest.mark.django_db
 def test_legend_records_appinstall_and_increments(
     client, settings, race_with_checkpoints
 ):
@@ -621,17 +599,16 @@ def test_legend_records_appinstall_and_increments(
 
 
 @pytest.mark.django_db
-def test_legend_closed_legend_returns_empty_checkpoints(client, settings):
+def test_legend_always_served_for_published_race(client, settings):
+    """A published race always serves its legend — there is no race-level gate."""
     from website.models.checkpoint import Checkpoint
     from website.models.race import Race
 
     settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
     settings.MOBILE_APP_TS_WINDOW = 300
 
-    race = Race.objects.create(
-        name="Closed race", slug="closed-race", is_legend_visible=False
-    )
-    Checkpoint.objects.create(race=race, number=1, cost=1, description="secret")
+    race = Race.objects.create(name="Served race", slug="served-race")
+    Checkpoint.objects.create(race=race, number=1, cost=1, description="open cp")
 
     path = f"/app/race/{race.id}/legend/"
     response = client.get(path, **_signed_headers("GET", path, SECRET))
@@ -639,8 +616,8 @@ def test_legend_closed_legend_returns_empty_checkpoints(client, settings):
     assert response.status_code == 200
     data = response.json()
     assert data["race"] == race.id
-    assert data["checkpoints"] == []
-    assert data["tags"] == []
+    numbers = [c["number"] for c in data["checkpoints"]]
+    assert numbers == [1]
 
 
 @pytest.mark.django_db
@@ -729,55 +706,6 @@ def test_legend_stale_if_none_match_returns_200_with_new_etag(client, settings):
 
     assert second.status_code == 200
     assert second["ETag"] != old_etag
-
-
-@pytest.mark.django_db
-def test_legend_hidden_response_carries_etag(client, settings):
-    from website.models.checkpoint import Checkpoint
-    from website.models.race import Race
-
-    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
-    settings.MOBILE_APP_TS_WINDOW = 300
-
-    race = Race.objects.create(
-        name="Hidden legend", slug="hidden-legend", is_legend_visible=False
-    )
-    Checkpoint.objects.create(race=race, number=1, cost=1, description="secret")
-
-    path = f"/app/race/{race.id}/legend/"
-    response = client.get(path, **_signed_headers("GET", path, SECRET))
-
-    assert response.status_code == 200
-    assert response.json()["checkpoints"] == []
-    etag = response["ETag"]
-    assert etag.startswith('"') and etag.endswith('"')
-
-
-@pytest.mark.django_db
-def test_legend_hidden_if_none_match_returns_304(client, settings):
-    """304 fires even when is_legend_visible=False."""
-    from website.models.checkpoint import Checkpoint
-    from website.models.race import Race
-
-    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
-    settings.MOBILE_APP_TS_WINDOW = 300
-
-    race = Race.objects.create(
-        name="Hidden 304", slug="hidden-304", is_legend_visible=False
-    )
-    Checkpoint.objects.create(race=race, number=1, cost=1, description="secret")
-
-    path = f"/app/race/{race.id}/legend/"
-    first = client.get(path, **_signed_headers("GET", path, SECRET))
-    etag = first["ETag"]
-
-    headers = _signed_headers("GET", path, SECRET)
-    headers["HTTP_IF_NONE_MATCH"] = etag
-    second = client.get(path, **headers)
-
-    assert second.status_code == 304
-    assert second["ETag"] == etag
-    assert second.content == b""
 
 
 @pytest.mark.django_db
@@ -1037,31 +965,6 @@ def test_legend_build_independent_same_etag_and_body_across_key_ids(client, sett
 
 
 @pytest.mark.django_db
-def test_legend_hidden_still_200_empty_with_etag_when_tags_present(client, settings):
-    from website.models.checkpoint import Checkpoint, CheckpointTag
-    from website.models.race import Race
-
-    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
-    settings.MOBILE_APP_TS_WINDOW = 300
-
-    race = Race.objects.create(
-        name="Hidden with tags", slug="hidden-tags", is_legend_visible=False
-    )
-    cp = Checkpoint.objects.create(race=race, number=1, cost=1, description="secret")
-    CheckpointTag.objects.create(point=cp, nfc_uid="04A1B2C3", check_method="offline")
-
-    path = f"/app/race/{race.id}/legend/"
-    response = client.get(path, **_signed_headers("GET", path, SECRET))
-
-    assert response.status_code == 200
-    assert response.json()["checkpoints"] == []
-    assert response.json()["tags"] == []
-    etag = response["ETag"]
-    assert etag.startswith('"') and etag.endswith('"')
-    assert "04A1B2C3" not in response.content.decode()
-
-
-@pytest.mark.django_db
 def test_legend_tampered_query_string_returns_403(
     client, settings, race_with_checkpoints
 ):
@@ -1085,7 +988,6 @@ RACE_FIELDS = {
     "date_end",
     "place",
     "reg_status",
-    "is_legend_visible",
 }
 
 
@@ -1602,23 +1504,6 @@ def test_legend_version_changes_when_draft_flips_to_kp():
 
 
 @pytest.mark.django_db
-def test_legend_version_changes_when_is_legend_visible_toggled():
-    from apps.mobile.versioning import legend_version
-    from website.models.checkpoint import Checkpoint
-    from website.models.race import Race
-
-    race = Race.objects.create(
-        name="Toggle legend", slug="toggle-legend", is_legend_visible=True
-    )
-    Checkpoint.objects.create(race=race, number=1, cost=1, description="cp")
-    before = legend_version(race.id)
-    race.is_legend_visible = False
-    race.save()
-    after = legend_version(race.id)
-    assert before != after
-
-
-@pytest.mark.django_db
 def test_legend_version_unchanged_when_draft_checkpoint_edited():
     from apps.mobile.versioning import legend_version
     from website.models.checkpoint import Checkpoint
@@ -1679,7 +1564,7 @@ def test_legend_version_changes_when_tag_added_and_removed():
 def test_legend_version_changes_when_open_checkpoint_tag_added():
     """Adding a tag to an *open* (unlocked) КП moves the fingerprint.
 
-    Guards that ``legend_state``'s ``CheckpointTag`` aggregate spans open-КП
+    Guards that ``legend_version``'s ``CheckpointTag`` aggregate spans open-КП
     tags (not just locked ones), so the ``tags`` body — which now carries one
     entry per tag incl. open КП — can never go stale.
     """

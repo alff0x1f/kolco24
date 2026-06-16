@@ -121,13 +121,13 @@ intended; existing `is_legend_visible=False` races must lock their КП or mark 
 - Modify: `src/apps/mobile/views.py`
 - Modify: `src/apps/mobile/versioning.py`
 
-- [ ] Remove `"is_legend_visible"` from the race serializer fields (`serializers.py:27`).
-- [ ] In `versioning.py`: **inline** the aggregate body into `legend_version(race_id)` and **delete** `legend_state` (currently `legend_version` is a thin wrapper over `legend_state` at ~177). `legend_version` aggregates `Checkpoint`/`CheckpointSecret`/`CheckpointTag` over the hidden-excluded queryset — drop the `Race.values_list("is_legend_visible")` read and the `|{visible}` fold. Update docstrings to remove all `is_legend_visible` references.
-- [ ] In `views.py` `LegendView`: remove the `is_legend_visible is None`/short-circuit block (`~155–166`, always serialize), and call `legend_version` instead of `legend_state`.
-- [ ] **Prune now-unused imports** (`make lint`/flake8 F401 will fail otherwise): drop `legend_state` from the `from .versioning import ...` line (`views.py:33`) and `Http404` (`views.py:13`) once its only use — the deleted `is_legend_visible is None` guard — is gone.
-- [ ] Note: the deleted `is_legend_visible is None` check also doubled as a benign TOCTOU guard (race deleted between `get_object_or_404` and the version read). Dropping it is intentional — the window is tiny and the result harmless (empty legend instead of 404).
-- [ ] Update/rewrite affected mobile tests: remove the now-obsolete hidden-legend-empty tests (`tests.py` ~632, 743, 758–766, 1048), the `test_legend_version_changes_when_is_legend_visible_toggled` (~1605), and drop `"is_legend_visible"` from the race field-set test (~1088). Add/adjust a test asserting the legend is served for a published race regardless of any prior flag.
-- [ ] Run `uv run pytest --reuse-db src/apps/mobile/tests.py -q` — failures should now be limited to the leftover `is_legend_visible=` kwargs (fixed in Task 5).
+- [x] Remove `"is_legend_visible"` from the race serializer fields (`serializers.py:27`).
+- [x] In `versioning.py`: **inline** the aggregate body into `legend_version(race_id)` and **delete** `legend_state` (currently `legend_version` is a thin wrapper over `legend_state` at ~177). `legend_version` aggregates `Checkpoint`/`CheckpointSecret`/`CheckpointTag` over the hidden-excluded queryset — drop the `Race.values_list("is_legend_visible")` read and the `|{visible}` fold. Update docstrings to remove all `is_legend_visible` references.
+- [x] In `views.py` `LegendView`: remove the `is_legend_visible is None`/short-circuit block (`~155–166`, always serialize), and call `legend_version` instead of `legend_state`.
+- [x] **Prune now-unused imports** (`make lint`/flake8 F401 will fail otherwise): drop `legend_state` from the `from .versioning import ...` line (`views.py:33`) and `Http404` (`views.py:13`) once its only use — the deleted `is_legend_visible is None` guard — is gone.
+- [x] Note: the deleted `is_legend_visible is None` check also doubled as a benign TOCTOU guard (race deleted between `get_object_or_404` and the version read). Dropping it is intentional — the window is tiny and the result harmless (empty legend instead of 404).
+- [x] Update/rewrite affected mobile tests: remove the now-obsolete hidden-legend-empty tests, the `test_legend_version_changes_when_is_legend_visible_toggled`, and drop `"is_legend_visible"` from the race field-set test. Added `test_legend_always_served_for_published_race` asserting the legend is served for a published race regardless of any prior flag.
+- [x] Run `uv run pytest --reuse-db src/apps/mobile/tests.py -q` — failures confirmed limited to the leftover `is_legend_visible=` kwargs (TypeError; fixed in Task 5).
 
 ### Task 4: Remove the race-form toggle (form + template)
 

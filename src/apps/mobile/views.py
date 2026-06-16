@@ -10,7 +10,7 @@ import logging
 
 from django.conf import settings
 from django.db.models import F, Prefetch
-from django.http import Http404, HttpResponseNotModified
+from django.http import HttpResponseNotModified
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from rest_framework.response import Response
@@ -30,7 +30,7 @@ from .serializers import (
     TagSerializer,
     TeamSerializer,
 )
-from .versioning import legend_state, legend_version, races_version, teams_version
+from .versioning import legend_version, races_version, teams_version
 
 logger = logging.getLogger(__name__)
 
@@ -142,8 +142,7 @@ class LegendView(AppAPIView):
 
     The ETag is the bare :func:`legend_version` fingerprint wrapped in quotes;
     a matching ``If-None-Match`` short-circuits to an empty ``304`` before any
-    serialization. The ETag is set on every exit path (incl. the
-    ``is_legend_visible=False`` empty response) so a later un-hide is detected.
+    serialization. The ETag is set on every exit path.
     """
 
     def get(self, request, race_id):
@@ -152,19 +151,10 @@ class LegendView(AppAPIView):
         # depend on the per-build secret, so the version folds in no key_id and
         # two builds share the ETag. Locked КП expose only their precomputed
         # `enc` blob; the app decrypts offline after scanning a tag's `code`.
-        version, is_legend_visible = legend_state(race_id)
-        if is_legend_visible is None:
-            # Race was deleted between the 404 check and legend_state; treat as gone.
-            raise Http404
-        quoted = f'"{version}"'
+        quoted = f'"{legend_version(race_id)}"'
 
         if request.headers.get("If-None-Match") == quoted:
             resp = HttpResponseNotModified()
-            resp["ETag"] = quoted
-            return resp
-
-        if not is_legend_visible:
-            resp = Response({"race": race_id, "checkpoints": [], "tags": []})
             resp["ETag"] = quoted
             return resp
 
