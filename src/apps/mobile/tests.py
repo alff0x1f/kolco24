@@ -3815,3 +3815,54 @@ def test_admin_regenerate_code_action_changes_code(client, django_user_model):
 
     tag.refresh_from_db()
     assert bytes(tag.code) != code_before
+
+
+@pytest.mark.django_db
+def test_tag_serializer_open_tag_identity_only():
+    """An open-КП tag (no bundle_blob) → {bid, point, check_method}, iv/ct None."""
+    from apps.mobile.serializers import TagSerializer
+    from website.models.checkpoint import Checkpoint, CheckpointTag
+    from website.models.race import Race
+
+    race = Race.objects.create(name="Open tag ser", slug="open-tag-ser")
+    cp = Checkpoint.objects.create(race=race, number=1, cost=2, description="open")
+    tag = CheckpointTag.objects.create(
+        point=cp, nfc_uid="04A1B2C3", check_method="offline"
+    )
+    tag.refresh_from_db()
+    assert tag.bundle_blob is None  # open КП → no unlock envelope
+
+    data = TagSerializer(tag).data
+    assert data["bid"] == tag.bid
+    assert data["point"] == cp.id
+    assert data["check_method"] == "offline"
+    assert data["iv"] is None
+    assert data["ct"] is None
+
+
+@pytest.mark.django_db
+def test_tag_serializer_locked_tag_includes_iv_ct():
+    """A locked-КП tag → identity fields plus non-null iv/ct from bundle_blob."""
+    from apps.mobile.serializers import TagSerializer
+    from website.models.checkpoint import Checkpoint, CheckpointTag
+    from website.models.race import Race
+
+    race = Race.objects.create(name="Locked tag ser", slug="locked-tag-ser")
+    cp = Checkpoint.objects.create(
+        race=race, number=1, cost=4, description="locked", is_legend_locked=True
+    )
+    # Empty unlocks falls back to [point]; signals seal + build the bundle.
+    tag = CheckpointTag.objects.create(
+        point=cp, nfc_uid="04A1B2C3", check_method="offline"
+    )
+    tag.refresh_from_db()
+    assert tag.bundle_blob is not None  # locked КП → unlock envelope present
+
+    data = TagSerializer(tag).data
+    assert data["bid"] == tag.bid
+    assert data["point"] == cp.id
+    assert data["check_method"] == "offline"
+    assert data["iv"] == tag.bundle_blob["iv"]
+    assert data["ct"] == tag.bundle_blob["ct"]
+    assert data["iv"] is not None
+    assert data["ct"] is not None

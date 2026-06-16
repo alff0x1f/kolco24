@@ -28,17 +28,26 @@ class RaceListSerializer(serializers.ModelSerializer):
         ]
 
 
-class BundleSerializer(serializers.Serializer):
-    """Per-tag envelope bundle for the offline legend unlock.
+class TagSerializer(serializers.Serializer):
+    """Per-tag identity (always) plus optional offline-unlock envelope.
 
-    Flattens ``CheckpointTag.bundle_blob``'s ``{"iv", "ct"}`` next to the tag's
-    ``bid`` and ``check_method``. The app finds a bundle by
-    ``bid = sha256(scanned_code).hexdigest()[:16]``, HKDF-decrypts it to
-    ``{cp_id: content_key}``, then decrypts each locked КП's ``enc`` blob — all
-    offline. The raw ``code``/``nfc_uid`` never travel on the wire.
+    Two concerns, cleanly split:
+
+    - **identity** — ``bid → point`` (1:1, **always** present, incl. open КП):
+      the app computes ``bid = sha256(scanned_code).hexdigest()[:16]`` from the
+      code in the tag's NFC user memory and looks it up here to resolve which
+      checkpoint (``point`` = ``point_id``) was physically scanned, fully
+      offline.
+    - **unlock** — ``iv``/``ct`` (locked КП **only**): flattened from
+      ``CheckpointTag.bundle_blob``. When present, HKDF-decrypts to
+      ``{cp_id: content_key}`` and then decrypts each locked КП's ``enc`` blob.
+      ``None`` for an open tag (identity-only, nothing to decrypt).
+
+    The raw ``code``/``nfc_uid`` never travel on the wire.
     """
 
     bid = serializers.CharField()
+    point = serializers.IntegerField(source="point_id")
     iv = serializers.SerializerMethodField()
     ct = serializers.SerializerMethodField()
     check_method = serializers.CharField()
@@ -48,6 +57,11 @@ class BundleSerializer(serializers.Serializer):
 
     def get_ct(self, tag):
         return (tag.bundle_blob or {}).get("ct")
+
+
+# Backwards-compat shim: the view still imports ``BundleSerializer`` until the
+# legend response migrates ``bundles`` → ``tags`` (Task 2). Remove then.
+BundleSerializer = TagSerializer
 
 
 class LegendCheckpointSerializer(serializers.Serializer):

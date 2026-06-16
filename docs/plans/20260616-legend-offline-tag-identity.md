@@ -144,15 +144,15 @@ Design decisions / rationale:
 - Modify: `src/apps/mobile/serializers.py`
 - Modify: `src/apps/mobile/tests.py`
 
-- [ ] rename `BundleSerializer` → `TagSerializer`; update its docstring to describe
+- [x] rename `BundleSerializer` → `TagSerializer`; update its docstring to describe
       identity (`bid → point`, always) vs unlock (`iv`/`ct`, locked only).
-- [ ] add `point = serializers.IntegerField(source="point_id")`.
-- [ ] keep `bid`, `check_method`; keep `iv`/`ct` as `SerializerMethodField` returning
+- [x] add `point = serializers.IntegerField(source="point_id")`.
+- [x] keep `bid`, `check_method`; keep `iv`/`ct` as `SerializerMethodField` returning
       `None` when `bundle_blob` is falsy.
-- [ ] write serializer test: **open** tag (`bundle_blob=None`) → `{bid, point,
+- [x] write serializer test: **open** tag (`bundle_blob=None`) → `{bid, point,
       check_method}` with `iv is None`, `ct is None`.
-- [ ] write serializer test: **locked** tag → same fields **plus** non-null `iv`/`ct`.
-- [ ] run `uv run pytest src/apps/mobile/tests.py` — must pass before Task 2.
+- [x] write serializer test: **locked** tag → same fields **plus** non-null `iv`/`ct`.
+- [x] run `uv run pytest src/apps/mobile/tests.py` — must pass before Task 2.
 
 ### Task 2: `LegendView` — emit `tags` for all tags; hidden → empty `tags`
 
