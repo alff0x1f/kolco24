@@ -107,9 +107,10 @@ Django 4.2 project. Source lives entirely under `src/`, with `manage.py` at `src
       never writes `AppInstall`).
     - **Endpoints** (all GET, see `urls.py`): `/app/races/` (published races), `/app/race/<id>/teams/` (teams **plus the
       embedded category catalogue** — deliberately no separate categories endpoint; inactive categories included so
-      every `category2` id resolves), `/app/race/<id>/legend/` (checkpoints **plus per-tag envelope `bundles`** for the
-      offline legend unlock — see the **Legend encryption** invariant below; a hidden legend returns `200` with empty
-      `checkpoints`/`bundles`, not
+      every `category2` id resolves), `/app/race/<id>/legend/` (checkpoints **plus a per-tag `tags` array** — `bid → point`
+      identity for **every** tag (open + locked), plus `iv`/`ct` for the offline legend unlock on locked КП only — see
+      the **Legend encryption** invariant below; a hidden legend returns `200` with empty
+      `checkpoints`/`tags`, not
       403), `/app/race/<id>/sync/` (pure version manifest — no data, no ETag; lease/handoff stubbed: `data_source` from
       `MOBILE_DATA_SOURCE` env, default `"cloud"`, `lease_expires_at` always `null`).
     - **Conditional GET**: races/teams/legend set a strong `ETag` on **every** exit path; a matching `If-None-Match`
@@ -150,9 +151,13 @@ Django 4.2 project. Source lives entirely under `src/`, with `manage.py` at `src
       `manage.py export_legend_codes --race <id>`. Admin lock/unlock + rebuild-bundle bulk actions **must iterate and
       `save()`/call the service** (never `queryset.update()`, which skips the signals → no secret → cleartext leak). The
       serializer (`LegendCheckpointSerializer`) branches: locked → `{id, number, type, enc}`, open →
-      `{id, number, type, cost, description}`; `BundleSerializer` flattens `bundle_blob` to `{bid, iv, ct, check_method}`.
-      **`tag_hash` is gone** — open-КП recognition is no longer the legend's job; the scoring/scan path lives in the
-      `api` app and matches by `nfc_uid` (unchanged). Per the **`update_fields` discipline** above, every service
+      `{id, number, type, cost, description}`; `TagSerializer` emits **one entry per `CheckpointTag`**:
+      `{bid, point (=point_id), check_method}` for **every** tag (identity, open + locked) plus `iv`/`ct` from
+      `bundle_blob` (`None` for open tags — identity-only, not decryptable). The legend view's tag queryset no longer
+      excludes `bundle_blob=None` (so open-КП tags are emitted) and adds `.exclude(bid="")` (drops un-built rows created
+      bypassing signals); response key is `tags` (was `bundles`).
+      **`tag_hash` is gone** — offline КП identity is now `bid → point` for every tag (open + locked); the online
+      scoring/scan path lives in the `api` app and matches by `nfc_uid` (unchanged). Per the **`update_fields` discipline** above, every service
       `save(update_fields=[...])` on `CheckpointTag`/`CheckpointSecret` includes `"updated_at"`.
     - **`update_fields` discipline**: the fingerprints rely on `auto_now` `updated_at` fields on `Team`/`Athlet`/
       `Checkpoint`/`CheckpointTag`/`CheckpointSecret`/`Category`/`Race`. Any `save(update_fields=[...])` on these models **must** include `"updated_at"`,

@@ -214,18 +214,18 @@ Design decisions / rationale:
 - [x] `make format && make lint` (clean).
 
 ### Task 6: [Final] Update documentation
-- [ ] `src/apps/mobile/README.md`: re-grep `grep -n bundles src/apps/mobile/README.md` and
+- [x] `src/apps/mobile/README.md`: re-grep `grep -n bundles src/apps/mobile/README.md` and
       update **all** sites, not just «Что отдаётся» (today ≈ lines 58-59, 86, 127-128, 139
       JSON example, 416 endpoints table, 429 deep-dive `mobile:legend` note): `bundles` →
       `tags`, add `point`, explain the identity (`bid → point`, always) vs unlock (`iv`/`ct`,
       locked only) split — especially the «Шифрование легенды» intro (≈ 58-59) that
       currently calls `bundles` the only tag→КП link; note `code` is written into **all**
       tags for offline КП recognition.
-- [ ] root `CLAUDE.md` apps.mobile section: `BundleSerializer` → `TagSerializer`; response
+- [x] root `CLAUDE.md` apps.mobile section: `BundleSerializer` → `TagSerializer`; response
       field `tags` with `point`; `tag_hash` stays removed but offline identity is now
       `bid → point` for every tag (open + locked); legend tag queryset no longer excludes
       `bundle_blob=None`.
-- [ ] move this plan to `docs/plans/completed/`.
+- [x] move this plan to `docs/plans/completed/`.
 
 ## Post-Completion
 *Items requiring manual intervention or external systems — informational only.*
