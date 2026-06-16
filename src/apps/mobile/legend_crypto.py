@@ -101,6 +101,10 @@ def build_bundle(tag):
     # not a silent fallback to [point] which would grant an unconfigured key).
     if not tag.unlocks.exists():
         unlocked = [tag.point]
+    elif tag.point.race_id is None:
+        # Orphaned tag (race deleted, race_id=None): filter(race_id=None) would
+        # match all orphaned checkpoints across deleted races — drop unlocks instead.
+        unlocked = []
     else:
         unlocked = list(
             tag.unlocks.filter(race_id=tag.point.race_id).exclude(type="draft")
@@ -124,8 +128,9 @@ def build_bundle(tag):
             derive_wrap_key(code), json.dumps(bundle).encode(), aad=bid.encode()
         )
     else:
-        # No locked КП in the unlock set — nothing to protect. A None blob keeps
-        # the tag out of the /legend/ bundles response (.exclude(bundle_blob=None)).
+        # No locked КП in the unlock set — nothing to protect. The tag still
+        # appears in the /legend/ tags response for identity; only bid="" rows are
+        # excluded by the view (.exclude(bid="")).
         tag.bundle_blob = None
     tag.save(update_fields=TAG_UPDATE_FIELDS)
     return tag
