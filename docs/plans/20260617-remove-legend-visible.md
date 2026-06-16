@@ -195,9 +195,9 @@ intended; existing `is_legend_visible=False` races must lock their КП or mark 
 - Modify: `src/apps/mobile/README.md`
 - Modify: `CLAUDE.md`
 
-- [ ] `apps/mobile/README.md`: remove the `is_legend_visible` gate/fingerprint references (~181, 448, 451) and the empty-when-hidden behavior; describe the always-served legend and the `hidden` type. The surrounding prose is Russian — also rename «draft-исключённого» → «hidden-исключённого» wording.
-- [ ] `CLAUDE.md`: update the `api` `CheckpointSerializer` note (now lock-only, no `is_legend_visible`), the mobile legend/versioning invariants (no race flag, `legend_version` only, no `|{visible}` fold, legend always served), and rename `draft` → `hidden` («Скрытый») in the type wording.
-- [ ] Verify no doc still references `is_legend_visible` or the `draft` type: `grep -rn "is_legend_visible\|draft" CLAUDE.md src/apps/mobile/README.md`.
+- [x] `apps/mobile/README.md`: remove the `is_legend_visible` gate/fingerprint references (~181, 448, 451) and the empty-when-hidden behavior; describe the always-served legend and the `hidden` type. The surrounding prose is Russian — also rename «draft-исключённого» → «hidden-исключённого» wording.
+- [x] `CLAUDE.md`: update the `api` `CheckpointSerializer` note (now lock-only, no `is_legend_visible`), the mobile legend/versioning invariants (no race flag, `legend_version` only, no `|{visible}` fold, legend always served), and rename `draft` → `hidden` («Скрытый») in the type wording.
+- [x] Verify no doc still references `is_legend_visible` or the `draft` type: `grep -rn "is_legend_visible\|draft" CLAUDE.md src/apps/mobile/README.md` — `is_legend_visible` gone; remaining `draft` hits are the payment/reservation `status="draft"` concept (out of scope per Task 7).
 
 ### Task 9: Verify acceptance criteria
 - [ ] `grep -rn is_legend_visible src docs CLAUDE.md` → no results.

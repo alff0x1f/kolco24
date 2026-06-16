@@ -51,8 +51,9 @@ Django 4.2 project. Source lives entirely under `src/`, with `manage.py` at `src
 - `website` — core domain: team registration, race management, payment processing (VTB, Yandex, Sberbank, SBP),
   checkpoint tracking, athlete profiles. Models are split into files under `src/website/models/`.
 - `api` — DRF REST API consumed by the mobile app: member tag scanning, checkpoint events, team CRUD, CSV exports.
-  `CheckpointSerializer` short-circuits `cost`/`description` to `0`/`""` for any КП with `is_legend_locked=True`,
-  regardless of `is_legend_visible` — locked КП must not leak cleartext through the scoring/scanning API.
+  `CheckpointSerializer` short-circuits `cost`/`description` to `0`/`""` for any КП with `is_legend_locked=True`
+  (lock-only — no race-level flag) — locked КП must not leak cleartext through the scoring/scanning API; non-locked КП
+  (any non-`hidden` type) serve cleartext.
 - `donate` — donation flow built on top of `VTBPayment`.
 - `demo` — static HTML mockups served at `/demo/home-multiple/`, `/demo/home-offseason/`, `/demo/home-single/`,
   `/demo/team-register/` for design review. No models or auth required. Templates live in `src/templates/demo/` (common
@@ -118,9 +119,9 @@ Django 4.2 project. Source lives entirely under `src/`, with `manage.py` at `src
       embedded category catalogue** — deliberately no separate categories endpoint; inactive categories included so
       every `category2` id resolves), `/app/race/<id>/legend/` (checkpoints **plus a per-tag `tags` array** — `bid → point`
       identity for **every** tag (open + locked), plus `iv`/`ct` for the offline legend unlock on locked КП only — see
-      the **Legend encryption** invariant below; a hidden legend returns `200` with empty
-      `checkpoints`/`tags`, not
-      403), `/app/race/<id>/sync/` (pure version manifest — no data, no ETag; lease/handoff stubbed: `data_source` from
+      the **Legend encryption** invariant below; the legend is **always served** for a published race (no race-level
+      visibility gate), with `type="hidden"` КП excluded), `/app/race/<id>/sync/` (pure version manifest — no data, no
+      ETag; lease/handoff stubbed: `data_source` from
       `MOBILE_DATA_SOURCE` env, default `"cloud"`, `lease_expires_at` always `null`).
     - **Conditional GET**: races/teams/legend set a strong `ETag` on **every** exit path; a matching `If-None-Match`
       short-circuits to `304` with no serialization. `versioning.py` is the **single source of truth** for both the
@@ -129,11 +130,12 @@ Django 4.2 project. Source lives entirely under `src/`, with `manage.py` at `src
       race is stable). Deliberately **no `versions.categories`** — category edits must move `versions.teams`;
       `races_version()` is global and deliberately absent from the per-race `sync` manifest (the races list is the app's
       entry point, probed via its own conditional GET). The **legend** fingerprint additionally folds in two more
-      `MAX(updated_at)|COUNT` aggregates over the same draft-excluded checkpoints — `CheckpointSecret` (re-seal / enc
+      `MAX(updated_at)|COUNT` aggregates over the same hidden-excluded checkpoints — `CheckpointSecret` (re-seal / enc
       appear/disappear on a lock toggle) and `CheckpointTag` (code/unlocks/bundle/check_method) — so the legend ETag /
-      `versions.legend` move on any lock toggle, re-seal, or tag edit. The legend is now **build-independent**: the
-      ciphertext/bundles are precomputed and stored in the DB (not keyed by the per-build secret), so `legend_state`/
-      `legend_version` take **no** `key_id` and two builds share the legend ETag (an `X-App-Key-Id` rotation no longer
+      `versions.legend` move on any lock toggle, re-seal, or tag edit. The legend fingerprint is `legend_version(race_id)`
+      alone — there is no race-level visibility flag folded in. The legend is **build-independent**: the
+      ciphertext/bundles are precomputed and stored in the DB (not keyed by the per-build secret), so `legend_version`
+      takes **no** `key_id` and two builds share the legend ETag (an `X-App-Key-Id` rotation no longer
       re-fetches the legend).
     - **Legend encryption** (`src/apps/mobile/crypto.py`, `legend_crypto.py`, `signals.py`; models in
       `src/website/models/checkpoint.py`): a **locked** checkpoint (`Checkpoint.is_legend_locked=True`) hides its
