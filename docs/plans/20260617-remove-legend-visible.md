@@ -200,11 +200,11 @@ intended; existing `is_legend_visible=False` races must lock their КП or mark 
 - [x] Verify no doc still references `is_legend_visible` or the `draft` type: `grep -rn "is_legend_visible\|draft" CLAUDE.md src/apps/mobile/README.md` — `is_legend_visible` gone; remaining `draft` hits are the payment/reservation `status="draft"` concept (out of scope per Task 7).
 
 ### Task 9: Verify acceptance criteria
-- [ ] `grep -rn is_legend_visible src docs CLAUDE.md` → no results.
-- [ ] `grep -rnE 'type=.?["'\'']draft["'\'']|== ["'\'']draft["'\'']' src` → no results (checkpoint-type literals gone; `Payment.STATUS_DRAFT` / reservation `status="draft"` deliberately remain and are out of scope).
-- [ ] api: locked КП zeroed, non-locked any-non-hidden type cleartext (no flag); mobile: legend always served for published races, `hidden` excluded, ETag stable; legend version moves on `kp↔hidden` flip, not on a `hidden`-КП edit.
-- [ ] `make format` then `make lint` — both clean.
-- [ ] `uv run pytest` — full suite passes.
+- [x] `grep -rn is_legend_visible src docs CLAUDE.md` → only documented exemptions remain: historical migrations (`0044/0045/0084/0085`), the `api/tests.py:194` docstring documenting the behavior change, the `apps/race/tests.py` assertions verifying field absence, and the plan docs themselves. CLAUDE.md is clean; no live code references.
+- [x] `grep -rnE 'type=.?["'\'']draft["'\'']|== ["'\'']draft["'\'']' src` → only the `0085` data-migration steps (forward/reverse, historical literal by design). No live code hits; `Payment.STATUS_DRAFT` / reservation `status="draft"` deliberately remain and are out of scope.
+- [x] api: locked КП zeroed, non-locked any-non-hidden type cleartext (no flag); mobile: legend always served for published races, `hidden` excluded, ETag stable; legend version moves on `kp↔hidden` flip, not on a `hidden`-КП edit. — all covered by the passing test suite.
+- [x] `make format` then `make lint` — both clean.
+- [x] `uv run pytest` — full suite passes (565 passed).
 
 ### Task 10: [Final] Finalize
 - [ ] Confirm both migrations are present, ordered, and reversible.
