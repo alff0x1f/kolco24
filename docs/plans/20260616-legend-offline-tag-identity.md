@@ -199,10 +199,10 @@ Design decisions / rationale:
 **Files:**
 - Modify: `src/apps/mobile/tests.py`
 
-- [ ] confirm/add a `legend_version` test: adding a tag to an **open** КП changes the
+- [x] confirm/add a `legend_version` test: adding a tag to an **open** КП changes the
       fingerprint (guards that `legend_state`'s `CheckpointTag` aggregate already spans
       open-КП tags, so the new `tags` body can never go stale). No `versioning.py` change.
-- [ ] run `uv run pytest src/apps/mobile/tests.py` — must pass before Task 5.
+- [x] run `uv run pytest src/apps/mobile/tests.py` — must pass before Task 5.
 
 ### Task 5: Verify acceptance criteria
 - [ ] response carries `tags` (not `bundles`); each entry has `bid`, `point`,

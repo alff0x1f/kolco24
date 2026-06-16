@@ -1676,6 +1676,32 @@ def test_legend_version_changes_when_tag_added_and_removed():
 
 
 @pytest.mark.django_db
+def test_legend_version_changes_when_open_checkpoint_tag_added():
+    """Adding a tag to an *open* (unlocked) КП moves the fingerprint.
+
+    Guards that ``legend_state``'s ``CheckpointTag`` aggregate spans open-КП
+    tags (not just locked ones), so the ``tags`` body — which now carries one
+    entry per tag incl. open КП — can never go stale.
+    """
+    from apps.mobile.versioning import legend_version
+    from website.models.checkpoint import Checkpoint, CheckpointTag
+    from website.models.race import Race
+
+    race = Race.objects.create(name="Open tag", slug="open-tag", is_legend_visible=True)
+    cp = Checkpoint.objects.create(race=race, number=1, cost=1, description="open cp")
+    assert cp.is_legend_locked is False  # this is an OPEN КП
+
+    before = legend_version(race.id)
+    tag = CheckpointTag.objects.create(
+        point=cp, nfc_uid="AA:BB", check_method="offline"
+    )
+    after_add = legend_version(race.id)
+    assert before != after_add
+    tag.delete()
+    assert legend_version(race.id) != after_add
+
+
+@pytest.mark.django_db
 def test_legend_version_unchanged_when_tag_on_draft_checkpoint_added():
     from apps.mobile.versioning import legend_version
     from website.models.checkpoint import Checkpoint, CheckpointTag
