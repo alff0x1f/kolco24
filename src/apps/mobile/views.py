@@ -24,10 +24,10 @@ from website.models.race import Category, Race
 from .models import AppAuthFailure, AppInstall
 from .permissions import SignedAppPermission
 from .serializers import (
-    BundleSerializer,
     CategorySerializer,
     LegendCheckpointSerializer,
     RaceListSerializer,
+    TagSerializer,
     TeamSerializer,
 )
 from .versioning import legend_state, legend_version, races_version, teams_version
@@ -164,7 +164,7 @@ class LegendView(AppAPIView):
             return resp
 
         if not is_legend_visible:
-            resp = Response({"race": race_id, "checkpoints": [], "bundles": []})
+            resp = Response({"race": race_id, "checkpoints": [], "tags": []})
             resp["ETag"] = quoted
             return resp
 
@@ -174,17 +174,21 @@ class LegendView(AppAPIView):
             .order_by("number", "id")
             .select_related("secret")
         )
-        bundle_qs = (
+        # Every tag — open and locked — carries identity (`bid → point`). The
+        # locked-only `bundle_blob` is no longer a filter: open tags ride along
+        # for offline cp_id recognition. `.exclude(bid="")` drops un-built tags
+        # (created bypassing the build_bundle signal) that have no usable bid.
+        tag_qs = (
             CheckpointTag.objects.filter(point__race_id=race_id)
             .exclude(point__type=CheckpointType.draft.value)
-            .exclude(bundle_blob=None)
+            .exclude(bid="")
             .order_by("id")
         )
         resp = Response(
             {
                 "race": race_id,
                 "checkpoints": LegendCheckpointSerializer(qs, many=True).data,
-                "bundles": BundleSerializer(bundle_qs, many=True).data,
+                "tags": TagSerializer(tag_qs, many=True).data,
             }
         )
         resp["ETag"] = quoted

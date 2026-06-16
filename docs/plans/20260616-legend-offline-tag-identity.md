@@ -160,26 +160,26 @@ Design decisions / rationale:
 - Modify: `src/apps/mobile/views.py`
 - Modify: `src/apps/mobile/tests.py`
 
-- [ ] import `TagSerializer` (was `BundleSerializer`).
-- [ ] visible branch: drop `.exclude(bundle_blob=None)`, **add `.exclude(bid="")`** to the
+- [x] import `TagSerializer` (was `BundleSerializer`).
+- [x] visible branch: drop `.exclude(bundle_blob=None)`, **add `.exclude(bid="")`** to the
       tag queryset; rename the local `bundle_qs` → `tag_qs`; response key `"bundles"` →
       `"tags"` using `TagSerializer`.
-- [ ] hidden branch: change `"bundles": []` → `"tags": []` (ETag handling unchanged).
-- [ ] re-grep `grep -n 'data\["bundles"\]' src/apps/mobile/tests.py` (suite shifts; don't
+- [x] hidden branch: change `"bundles": []` → `"tags": []` (ETag handling unchanged).
+- [x] re-grep `grep -n 'data\["bundles"\]' src/apps/mobile/tests.py` (suite shifts; don't
       trust line numbers) and update **every** site `data["bundles"]` → `data["tags"]`
       (today ≈ lines 480, 643, 670, 856 plus the end-to-end / build-independent /
       hidden-with-tags tests). Note: `test_legend_excludes_draft_checkpoints` (≈ 670)
       creates a tag on a **draft** КП — `.exclude(point__type=draft)` still drops it, so
       `data["tags"] == []` stays correct there.
-- [ ] add view test: response `tags` includes an **open**-КП tag entry with `point` and
+- [x] add view test: response `tags` includes an **open**-КП tag entry with `point` and
       **no** decryptable `iv`/`ct` (`iv is None`).
-- [ ] add view test: a tag with no `code`/`bid` (`bid=""`, created bypassing signals) is
+- [x] add view test: a tag with no `code`/`bid` (`bid=""`, created bypassing signals) is
       **excluded** from `tags`.
-- [ ] add view test: hidden legend → `data["tags"] == []`.
-- [ ] adapt `test_legend_end_to_end_scan_code_decrypts_locked_checkpoint` to locate the
+- [x] add view test: hidden legend → `data["tags"] == []`.
+- [x] adapt `test_legend_end_to_end_scan_code_decrypts_locked_checkpoint` to locate the
       entry in `tags` by `bid`, assert its `point` equals the locked КП id, then run the
       existing HKDF → bundle → content_key → `enc` decrypt path.
-- [ ] run `uv run pytest src/apps/mobile/tests.py` — must pass before Task 3.
+- [x] run `uv run pytest src/apps/mobile/tests.py` — must pass before Task 3.
 
 ### Task 3: Confirm `export_legend_codes` dumps every tag (incl. open КП)
 

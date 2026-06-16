@@ -477,7 +477,7 @@ def test_legend_valid_signature_returns_200_with_fields_and_order(client, settin
     assert response.status_code == 200
     data = response.json()
     assert data["race"] == race.id
-    assert data["bundles"] == []
+    assert data["tags"] == []
     assert [c["number"] for c in data["checkpoints"]] == [1, 2, 3]
     first = data["checkpoints"][0]
     assert set(first.keys()) == {"id", "number", "cost", "type", "description"}
@@ -640,7 +640,7 @@ def test_legend_closed_legend_returns_empty_checkpoints(client, settings):
     data = response.json()
     assert data["race"] == race.id
     assert data["checkpoints"] == []
-    assert data["bundles"] == []
+    assert data["tags"] == []
 
 
 @pytest.mark.django_db
@@ -667,7 +667,7 @@ def test_legend_excludes_draft_checkpoints(client, settings):
     data = response.json()
     numbers = [c["number"] for c in data["checkpoints"]]
     assert numbers == [1]
-    assert data["bundles"] == []
+    assert data["tags"] == []
 
 
 @pytest.mark.django_db
@@ -851,16 +851,18 @@ def test_legend_end_to_end_scan_code_decrypts_locked_checkpoint(client, settings
     assert response.status_code == 200
     data = response.json()
 
-    # 1. locate the bundle by the bid computed from the scanned code
+    # 1. locate the tag by the bid computed from the scanned code; its `point`
+    #    identifies which КП was physically scanned (always present)
     bid = hashlib.sha256(code).hexdigest()[:16]
-    bundle = next(b for b in data["bundles"] if b["bid"] == bid)
-    assert bundle["check_method"] == "offline"
+    tag_entry = next(t for t in data["tags"] if t["bid"] == bid)
+    assert tag_entry["check_method"] == "offline"
+    assert tag_entry["point"] == cp.id
 
-    # 2. HKDF(code) decrypts the bundle → {cp_id: content_key}
+    # 2. HKDF(code) decrypts the tag's bundle → {cp_id: content_key}
     keys = json.loads(
         unseal(
             derive_wrap_key(code),
-            {"iv": bundle["iv"], "ct": bundle["ct"]},
+            {"iv": tag_entry["iv"], "ct": tag_entry["ct"]},
             aad=bid.encode(),
         )
     )
@@ -870,6 +872,62 @@ def test_legend_end_to_end_scan_code_decrypts_locked_checkpoint(client, settings
     locked = data["checkpoints"][0]
     plaintext = json.loads(unseal(content_key, locked["enc"], aad=str(cp.id).encode()))
     assert plaintext == {"cost": 4, "description": "столб у воды"}
+
+
+@pytest.mark.django_db
+def test_legend_tags_include_open_checkpoint_tag_with_point_no_iv_ct(client, settings):
+    """An open-КП tag rides in `tags` with `point` for identity but no iv/ct."""
+    from website.models.checkpoint import Checkpoint, CheckpointTag
+    from website.models.race import Race
+
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    race = Race.objects.create(name="Open tag", slug="open-tag", is_legend_visible=True)
+    cp = Checkpoint.objects.create(race=race, number=1, cost=2, description="open spot")
+    tag = CheckpointTag.objects.create(
+        point=cp, nfc_uid="04A1B2C3", check_method="offline"
+    )
+    tag.refresh_from_db()
+
+    path = f"/app/race/{race.id}/legend/"
+    response = client.get(path, **_signed_headers("GET", path, SECRET))
+
+    assert response.status_code == 200
+    data = response.json()
+    assert len(data["tags"]) == 1
+    entry = data["tags"][0]
+    assert entry["point"] == cp.id
+    assert entry["check_method"] == "offline"
+    assert entry["bid"] == tag.bid
+    assert entry["iv"] is None
+    assert entry["ct"] is None
+
+
+@pytest.mark.django_db
+def test_legend_tags_exclude_unbuilt_tag_with_empty_bid(client, settings):
+    """A tag with no code/bid (bid="", created bypassing signals) is excluded."""
+    from website.models.checkpoint import Checkpoint, CheckpointTag
+    from website.models.race import Race
+
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    race = Race.objects.create(
+        name="Unbuilt tag", slug="unbuilt-tag", is_legend_visible=True
+    )
+    cp = Checkpoint.objects.create(race=race, number=1, cost=2, description="open spot")
+    # Bypass the build_bundle signal so the row keeps its bid="" default.
+    CheckpointTag.objects.bulk_create(
+        [CheckpointTag(point=cp, nfc_uid="04A1B2C3", check_method="offline")]
+    )
+    assert CheckpointTag.objects.filter(bid="").count() == 1
+
+    path = f"/app/race/{race.id}/legend/"
+    response = client.get(path, **_signed_headers("GET", path, SECRET))
+
+    assert response.status_code == 200
+    assert response.json()["tags"] == []
 
 
 @pytest.mark.django_db
@@ -997,6 +1055,7 @@ def test_legend_hidden_still_200_empty_with_etag_when_tags_present(client, setti
 
     assert response.status_code == 200
     assert response.json()["checkpoints"] == []
+    assert response.json()["tags"] == []
     etag = response["ETag"]
     assert etag.startswith('"') and etag.endswith('"')
     assert "04A1B2C3" not in response.content.decode()
