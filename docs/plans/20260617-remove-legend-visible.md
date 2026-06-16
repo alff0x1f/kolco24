@@ -158,11 +158,11 @@ intended; existing `is_legend_visible=False` races must lock their КП or mark 
 - Modify: `src/website/models/enums.py`
 - Create: `src/website/migrations/00XX_rename_checkpoint_draft_to_hidden.py`
 
-- [ ] Change `draft = "draft", "Черновик"` → `hidden = "hidden", "Скрытый"` in `CheckpointType`.
-- [ ] Create the migration: `AlterField(Checkpoint.type, choices=...)` + a `RunPython` step — forward `Checkpoint.objects.filter(type="draft").update(type="hidden")`, reverse the inverse (use `makemigrations` for the AlterField, then hand-add the `RunPython`).
-- [ ] Apply locally (`migrate`) and confirm any seed/dev `draft` rows become `hidden`.
-- [ ] Confirm the legend-edit type dropdown shows «Скрытый» (enum-driven via `config.types` — no template/JS edit needed; just verify).
-- [ ] Run `uv run pytest --reuse-db -q` — expect failures only where code/tests still use the `"draft"` literal (fixed in Tasks 7–8).
+- [x] Change `draft = "draft", "Черновик"` → `hidden = "hidden", "Скрытый"` in `CheckpointType`.
+- [x] Create the migration: `AlterField(Checkpoint.type, choices=...)` + a `RunPython` step — forward `Checkpoint.objects.filter(type="draft").update(type="hidden")`, reverse the inverse. → `0085_rename_checkpoint_draft_to_hidden.py`.
+- [x] Apply locally (`migrate`) and confirm any seed/dev `draft` rows become `hidden`.
+- [x] Confirm the legend-edit type dropdown shows «Скрытый» (enum-driven via `CheckpointType.choices` → `config.types` in `apps/race/views.py:932`; `legend_form.js:45` reads `config.types` — no template/JS edit needed).
+- [x] Run `uv run pytest --reuse-db -q` — failures confirmed limited to leftover `CheckpointType.draft` references (AttributeError; fixed in Tasks 7–8).
 
 ### Task 7: Replace `"draft"` literals with `CheckpointType.hidden.value`
 
