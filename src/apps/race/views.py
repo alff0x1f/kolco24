@@ -647,7 +647,9 @@ def _reconcile_legend(race, cleaned):
         instance.is_legend_locked = row["is_legend_locked"]
         instance.save()
         seen.add(instance.id)
-    for cp in Checkpoint.objects.filter(race=race).exclude(id__in=seen):
+    for cp in (
+        Checkpoint.objects.filter(race=race).exclude(id__in=seen).select_for_update()
+    ):
         if cp.tags.exists():
             raise ValueError(
                 f"КП «{cp.number}» нельзя удалить: к нему привязаны NFC-теги. "

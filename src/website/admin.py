@@ -166,7 +166,7 @@ class CheckpointTagAdmin(admin.ModelAdmin):
         from apps.mobile.legend_crypto import build_bundle
 
         count = 0
-        for tag in queryset:
+        for tag in queryset.select_related("point"):
             tag.code = None  # forces ensure_code to mint a fresh code
             build_bundle(tag)
             count += 1
@@ -177,7 +177,7 @@ class CheckpointTagAdmin(admin.ModelAdmin):
         from apps.mobile.legend_crypto import build_bundle
 
         count = 0
-        for tag in queryset:
+        for tag in queryset.select_related("point"):
             build_bundle(tag)
             count += 1
         self.message_user(request, f"Пересобрано бандлов: {count}")
