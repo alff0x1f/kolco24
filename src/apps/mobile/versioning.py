@@ -96,83 +96,46 @@ def races_version():
     return hashlib.blake2b(raw.encode(), digest_size=8).hexdigest()
 
 
-def legend_state(race_id):
-    """Return ``(version, is_legend_visible)`` paired within one call.
+def legend_version(race_id):
+    """Return a short, stable fingerprint of a race's legend.
 
-    Both values are computed together so the view uses a single, consistent
-    pair — a visibility flip between two independent calls cannot produce a
-    response body that contradicts its own ETag.  There is no DB-level
-    snapshot: the queries (checkpoint aggregate, secret aggregate, tag
-    aggregate, race row) are independent, so a flip between them yields a
-    version that represents neither state. Self-corrects on the next request.
-
-    Folds in three ``MAX(updated_at)|COUNT`` aggregates over the **non-draft**
-    checkpoints of ``race_id`` (the same draft-exclusion predicate the legend
+    Folds in three ``MAX(updated_at)|COUNT`` aggregates over the **non-hidden**
+    checkpoints of ``race_id`` (the same hidden-exclusion predicate the legend
     view serves):
 
-    1. ``Checkpoint`` — a checkpoint edit / add/remove / lock toggle.
+    1. ``Checkpoint`` — a checkpoint edit, add/remove, a ``kp <-> hidden`` flip
+       (``COUNT`` moves), or a lock toggle.
     2. ``CheckpointSecret`` — a re-seal, or an ``enc`` blob appearing/disappearing
        as a КП is locked/unlocked.
     3. ``CheckpointTag`` — a code/unlocks/bundle/check_method change.
 
-    The legend is **build-independent** (the stored ciphertext/bundles do not
-    depend on the per-build secret), so the fingerprint takes **no** ``key_id``
-    and two builds share the ETag.
+    A hidden-checkpoint edit (and a tag on a hidden checkpoint) deliberately does
+    **not** move it (hidden КП are not in the response). The legend is
+    **build-independent** (the stored ciphertext/bundles do not depend on the
+    per-build secret), so the fingerprint takes **no** ``key_id`` and two builds
+    share the ETag.
 
-    Deliberately re-queries ``is_legend_visible`` by ``race_id`` rather than
-    accepting a ``Race`` object: keeps the bare ``race_id`` signature that is
-    the single source of truth for both the ETag and ``versions.legend``. Do
-    not "optimize" this into a ``Race`` parameter — it would break that
-    contract.
+    None aggregates (empty/all-hidden/tag-less race) render as the literal
+    ``"None"`` → stable, non-crashing. Returns **bare** hex (no quotes).
     """
     agg = (
         Checkpoint.objects.filter(race_id=race_id)
-        .exclude(type=CheckpointType.draft.value)
+        .exclude(type=CheckpointType.hidden.value)
         .aggregate(max_updated=Max("updated_at"), count=Count("id"))
     )
     secrets = (
         CheckpointSecret.objects.filter(checkpoint__race_id=race_id)
-        .exclude(checkpoint__type=CheckpointType.draft.value)
+        .exclude(checkpoint__type=CheckpointType.hidden.value)
         .aggregate(max_updated=Max("updated_at"), count=Count("id"))
     )
     tags = (
         CheckpointTag.objects.filter(point__race_id=race_id)
-        .exclude(point__type=CheckpointType.draft.value)
+        .exclude(point__type=CheckpointType.hidden.value)
         .aggregate(max_updated=Max("updated_at"), count=Count("id"))
     )
-    visible = (
-        Race.objects.filter(pk=race_id)
-        .values_list("is_legend_visible", flat=True)
-        .first()
-    )
     raw = (
-        f"{agg['max_updated']}|{agg['count']}|{visible}"
+        f"{agg['max_updated']}|{agg['count']}"
         f"|{secrets['max_updated']}|{secrets['count']}"
         f"|{tags['max_updated']}|{tags['count']}"
     )
-    version = hashlib.blake2b(raw.encode(), digest_size=8).hexdigest()
-    return version, visible
-
-
-def legend_version(race_id):
-    """Return a short, stable fingerprint of a race's legend.
-
-    Combines the ``MAX(updated_at)|COUNT`` aggregates of ``Checkpoint``,
-    ``CheckpointSecret`` and ``CheckpointTag`` (plus ``is_legend_visible``) over
-    the **draft-excluded** queryset the legend view actually serves, so a
-    checkpoint edit, add/remove, a ``kp <-> draft`` flip (``COUNT`` moves), a
-    hide/show of the legend, a lock toggle / re-seal, **or a tag
-    add/remove/edit** all move the fingerprint. A draft-checkpoint edit (and a
-    tag on a draft checkpoint) deliberately does **not** move it (drafts are
-    not in the response). The fingerprint is **build-independent** (no
-    ``key_id``).
-
-    None aggregates (empty/all-draft/tag-less race) render as the literal
-    ``"None"`` → stable, non-crashing. Returns **bare** hex (no quotes).
-
-    Thin wrapper around :func:`legend_state` — use ``legend_state`` when you
-    also need the ``is_legend_visible`` flag (e.g. in :class:`LegendView`) to
-    avoid a second independent DB read that could race with a visibility flip.
-    """
-    version, _ = legend_state(race_id)
-    return version
+    return hashlib.blake2b(raw.encode(), digest_size=8).hexdigest()

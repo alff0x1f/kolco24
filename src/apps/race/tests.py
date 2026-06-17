@@ -664,7 +664,6 @@ def _race_form_data(**overrides):
         "header_logo": "",
         "reg_status": RegStatus.UPCOMING,
         "is_published": True,
-        "is_legend_visible": False,
         "is_teams_editable": False,
         "is_photo_upload_enabled": False,
     }
@@ -689,6 +688,16 @@ def test_race_form_valid_data_creates_race():
 def test_race_form_does_not_include_is_reg_open():
     form = RaceForm()
     assert "is_reg_open" not in form.fields
+
+
+@pytest.mark.django_db
+def test_race_form_does_not_include_is_legend_visible():
+    form = RaceForm()
+    assert "is_legend_visible" not in form.fields
+    # form still saves cleanly without the removed field
+    save_form = RaceForm(data=_race_form_data())
+    assert save_form.is_valid(), save_form.errors
+    save_form.save()
 
 
 @pytest.mark.django_db
@@ -841,6 +850,8 @@ def test_race_form_template_renders_fields_and_data(client):
 
     assert resp.status_code == 200
     html = resp.content.decode()
+    # The removed legend-visibility toggle leaves no trace in the form.
+    assert "is_legend_visible" not in html
     # Scalar fields render their current values into manual inputs.
     assert 'name="name"' in html and 'value="Шаблонная гонка"' in html
     # reg_status select marks the current choice selected.

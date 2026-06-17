@@ -58,7 +58,6 @@ class RaceForm(forms.ModelForm):
             "header_logo",
             "reg_status",
             "is_published",
-            "is_legend_visible",
             "is_teams_editable",
             "is_photo_upload_enabled",
         ]

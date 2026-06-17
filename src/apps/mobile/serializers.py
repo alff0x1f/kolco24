@@ -24,7 +24,6 @@ class RaceListSerializer(serializers.ModelSerializer):
             "date_end",
             "place",
             "reg_status",
-            "is_legend_visible",
         ]
 
 
