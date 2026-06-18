@@ -2249,9 +2249,10 @@ def test_sync_manifest_shape_and_defaults(client, settings, django_user_model):
     assert data["race"] == race.id
     assert data["data_source"] == "cloud"
     assert data["lease_expires_at"] is None
-    assert set(data["versions"].keys()) == {"teams", "legend"}
+    assert set(data["versions"].keys()) == {"teams", "legend", "member_tags"}
     assert data["versions"]["teams"]  # non-empty fingerprint
     assert data["versions"]["legend"]  # non-empty fingerprint
+    assert data["versions"]["member_tags"]  # non-empty fingerprint
 
 
 @pytest.mark.django_db
@@ -4328,3 +4329,28 @@ def test_member_tags_tampered_query_string_returns_403(client, settings):
     headers = _signed_headers("GET", path, SECRET)
     response = client.get(path + "?foo=bar", **headers)
     assert response.status_code == 403
+
+
+@pytest.mark.django_db
+def test_sync_versions_member_tags_matches_member_tags_etag(client, settings):
+    from website.models.race import Race
+    from website.models.tag import Tag
+
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    race = Race.objects.create(name="Sync member tags", slug="sync-mt-etag")
+    Tag.objects.create(number=11, nfc_uid="bb02")
+
+    mt_path = f"/app/race/{race.id}/member_tags/"
+    mt_resp = client.get(mt_path, **_signed_headers("GET", mt_path, SECRET))
+    etag = mt_resp["ETag"]
+
+    sync_path = f"/app/race/{race.id}/sync/"
+    sync_resp = client.get(sync_path, **_signed_headers("GET", sync_path, SECRET))
+
+    versions = sync_resp.json()["versions"]
+    assert "member_tags" in versions
+    bare = versions["member_tags"]
+    # /member_tags/ ETag is the bare version wrapped in quotes
+    assert etag == f'"{bare}"'

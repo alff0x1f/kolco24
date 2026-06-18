@@ -192,10 +192,10 @@
 **Files:**
 - Modify: `src/apps/mobile/views.py` (SyncView)
 
-- [ ] add `"member_tags": member_tags_version()` to the `SyncView` `versions` dict
-- [ ] update the `SyncView` docstring to mention the new `member_tags` manifest key (and why it's per-race-manifest-included unlike `races`)
-- [ ] write/extend a test asserting `versions.member_tags` is present and **equals** the member-tags endpoint's ETag value (bare vs quoted accounted for)
-- [ ] run tests — must pass before next task
+- [x] add `"member_tags": member_tags_version()` to the `SyncView` `versions` dict
+- [x] update the `SyncView` docstring to mention the new `member_tags` manifest key (and why it's per-race-manifest-included unlike `races`)
+- [x] write/extend a test asserting `versions.member_tags` is present and **equals** the member-tags endpoint's ETag value (bare vs quoted accounted for)
+- [x] run tests — must pass before next task
 
 ### Task 7: Update mobile README
 

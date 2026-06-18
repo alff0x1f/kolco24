@@ -278,10 +278,16 @@ class SyncView(AppAPIView):
     """Return a pure version manifest for a race (no data serialization).
 
     A cheap signed probe: the client compares ``versions.teams`` / ``versions.legend``
-    (the bare :func:`teams_version` / :func:`legend_version` fingerprints, the same
-    values the ``/teams/`` and ``/legend/`` ETags wrap in quotes) against its stored
-    ETags to decide whether to re-fetch. No ``If-None-Match``/304 — there is nothing
-    to short-circuit.
+    / ``versions.member_tags`` (the bare :func:`teams_version` / :func:`legend_version`
+    / :func:`member_tags_version` fingerprints, the same values the ``/teams/`` /
+    ``/legend/`` / ``/member_tags/`` ETags wrap in quotes) against its stored ETags to
+    decide whether to re-fetch. No ``If-None-Match``/304 — there is nothing to
+    short-circuit.
+
+    Unlike ``races_version`` (global, deliberately absent here), ``member_tags`` is
+    included even though it's a global pool: the member-tags endpoint is served at a
+    per-race URL, so the app needs one sync poll to learn what to refetch for the race
+    it's syncing.
     """
 
     def get(self, request, race_id):
@@ -296,6 +302,9 @@ class SyncView(AppAPIView):
                     # Build-independent: versions.legend equals the legend ETag
                     # for every build (stored ciphertext/bundles, no key_id).
                     "legend": legend_version(race_id),
+                    # Global pool today, but served at a per-race URL — see the
+                    # SyncView docstring for why it's in this per-race manifest.
+                    "member_tags": member_tags_version(),
                 },
             }
         )
