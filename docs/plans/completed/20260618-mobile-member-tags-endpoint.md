@@ -213,9 +213,9 @@
 - [x] run `make lint` — all checks passed
 
 ### Task 9: [Final] Update documentation + close out
-- [ ] update `CLAUDE.md` mobile-app section: add the `member_tags` endpoint to the invariants/endpoint list, note the global-pool-today / `race_id`-reserved design, the data-anchored window, the `touch`/`updated_at` carve-out, and the manifest inclusion
-- [ ] run `make format && make lint`
-- [ ] move this plan to `docs/plans/completed/`
+- [x] update `CLAUDE.md` mobile-app section: add the `member_tags` endpoint to the invariants/endpoint list, note the global-pool-today / `race_id`-reserved design, the data-anchored window, the `touch`/`updated_at` carve-out, and the manifest inclusion
+- [x] run `make format && make lint`
+- [x] move this plan to `docs/plans/completed/`
 
 ## Post-Completion
 *Items requiring manual intervention or external systems — informational only.*
