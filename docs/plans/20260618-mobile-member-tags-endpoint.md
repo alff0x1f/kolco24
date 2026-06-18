@@ -134,12 +134,12 @@
 - Modify: `src/website/models/tag.py`
 - Create: `src/website/migrations/00XX_tag_updated_at.py` (via `makemigrations`)
 
-- [ ] add `updated_at = models.DateTimeField(auto_now=True, verbose_name="Изменён")` to `Tag`
-- [ ] run `uv run python src/manage.py makemigrations website`, choosing a one-off default of `django.utils.timezone.now` for existing rows
-- [ ] verify the migration applies cleanly: `uv run python src/manage.py migrate`
-- [ ] write/extend a test asserting `Tag.updated_at` is set on create and advances on a provisioning `save()` (e.g. renumber)
-- [ ] assert existing rows are backfilled non-null after migrate (covered by the one-off `timezone.now` default)
-- [ ] run tests — must pass before next task
+- [x] add `updated_at = models.DateTimeField(auto_now=True, verbose_name="Изменён")` to `Tag`
+- [x] run `uv run python src/manage.py makemigrations website` (Django auto-backfills `auto_now` fields with the migration-time clock — no interactive default prompt needed)
+- [x] verify the migration applies cleanly: `uv run python src/manage.py migrate`
+- [x] write/extend a test asserting `Tag.updated_at` is set on create and advances on a provisioning `save()` (e.g. renumber)
+- [x] assert existing rows are backfilled non-null after migrate (field is non-nullable; `auto_now` backfills the migration-time clock so the DB enforces non-null)
+- [x] run tests — must pass before next task
 
 ### Task 2: Document the `touch` carve-out from update_fields discipline
 

@@ -2456,3 +2456,21 @@ def test_member_tag_save_uppercases_nfc_uid():
     tag.save()
     tag.refresh_from_db()
     assert tag.nfc_uid == "04A1B2C3"
+
+
+@pytest.mark.django_db
+def test_member_tag_updated_at_set_on_create_and_advances_on_save():
+    from website.models.tag import Tag
+
+    tag = Tag.objects.create(number=1, nfc_uid="04a1b2c3")
+    assert tag.updated_at is not None
+    first = tag.updated_at
+
+    # A provisioning save (renumber) advances updated_at.
+    Tag.objects.filter(pk=tag.pk).update(updated_at=first - timedelta(seconds=1))
+    tag.refresh_from_db()
+    tag.number = 2
+    tag.save()
+    tag.refresh_from_db()
+    assert tag.updated_at > first - timedelta(seconds=1)
+    assert tag.number == 2
