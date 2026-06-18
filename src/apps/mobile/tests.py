@@ -4116,3 +4116,215 @@ def test_active_member_tags_never_scanned_returns_all():
 
     ids = set(active_member_tags().values_list("id", flat=True))
     assert ids == {a.id, b.id}
+
+
+# --- MemberTagsView request-level -------------------------------------------
+
+
+@pytest.mark.django_db
+def test_member_tags_valid_signature_returns_200_with_fields(client, settings):
+    from website.models.race import Race
+    from website.models.tag import Tag
+
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    race = Race.objects.create(name="MT race", slug="mt-race")
+    Tag.objects.create(number=7, nfc_uid="aa01")
+
+    path = f"/app/race/{race.id}/member_tags/"
+    response = client.get(path, **_signed_headers("GET", path, SECRET))
+
+    assert response.status_code == 200
+    data = response.json()
+    assert list(data.keys()) == ["member_tags"]
+    assert len(data["member_tags"]) == 1
+    entry = data["member_tags"][0]
+    assert set(entry.keys()) == {"number", "nfc_uid"}
+    assert entry["number"] == 7
+    assert entry["nfc_uid"] == "AA01"
+
+
+@pytest.mark.django_db
+def test_member_tags_no_headers_returns_403(client, settings):
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    race, _ = _make_race_with_category(slug="mt-403")
+    path = f"/app/race/{race.id}/member_tags/"
+    response = client.get(path)
+    assert response.status_code == 403
+    assert response.json() == {"detail": "Forbidden"}
+
+
+@pytest.mark.django_db
+def test_member_tags_wrong_signature_returns_403(client, settings):
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+    race, _ = _make_race_with_category(slug="mt-bad-sig")
+    path = f"/app/race/{race.id}/member_tags/"
+    headers = _signed_headers("GET", path, "wrong-secret")
+    response = client.get(path, **headers)
+    assert response.status_code == 403
+    assert response.json() == {"detail": "Forbidden"}
+
+
+@pytest.mark.django_db
+def test_member_tags_unknown_key_id_returns_403(client, settings):
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+    race, _ = _make_race_with_category(slug="mt-bad-key")
+    path = f"/app/race/{race.id}/member_tags/"
+    headers = _signed_headers("GET", path, SECRET, key_id="not-in-map")
+    response = client.get(path, **headers)
+    assert response.status_code == 403
+    assert response.json() == {"detail": "Forbidden"}
+
+
+@pytest.mark.django_db
+def test_member_tags_valid_sig_nonexistent_race_returns_404(client, settings):
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+    path = "/app/race/999999/member_tags/"
+    response = client.get(path, **_signed_headers("GET", path, SECRET))
+    assert response.status_code == 404
+
+
+@pytest.mark.django_db
+def test_member_tags_unpublished_race_returns_404(client, settings):
+    from website.models.race import Race
+
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+    race = Race.objects.create(name="Unpub", slug="unpub-mt", is_published=False)
+    path = f"/app/race/{race.id}/member_tags/"
+    response = client.get(path, **_signed_headers("GET", path, SECRET))
+    assert response.status_code == 404
+
+
+@pytest.mark.django_db
+def test_member_tags_response_carries_etag(client, settings):
+    from website.models.race import Race
+    from website.models.tag import Tag
+
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    race = Race.objects.create(name="MT etag", slug="mt-etag")
+    Tag.objects.create(number=1, nfc_uid="AA01")
+
+    path = f"/app/race/{race.id}/member_tags/"
+    response = client.get(path, **_signed_headers("GET", path, SECRET))
+
+    assert response.status_code == 200
+    etag = response["ETag"]
+    assert etag.startswith('"') and etag.endswith('"')
+
+
+@pytest.mark.django_db
+def test_member_tags_if_none_match_returns_304_empty_body(client, settings):
+    from website.models.race import Race
+    from website.models.tag import Tag
+
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    race = Race.objects.create(name="MT 304", slug="mt-304")
+    Tag.objects.create(number=1, nfc_uid="AA01")
+
+    path = f"/app/race/{race.id}/member_tags/"
+    first = client.get(path, **_signed_headers("GET", path, SECRET))
+    etag = first["ETag"]
+
+    headers = _signed_headers("GET", path, SECRET)
+    headers["HTTP_IF_NONE_MATCH"] = etag
+    second = client.get(path, **headers)
+
+    assert second.status_code == 304
+    assert second["ETag"] == etag
+    assert second.content == b""
+
+
+@pytest.mark.django_db
+def test_member_tags_stale_if_none_match_returns_200_with_new_etag(client, settings):
+    from django.utils import timezone
+
+    from website.models.race import Race
+    from website.models.tag import Tag
+
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    race = Race.objects.create(name="MT stale", slug="mt-stale")
+    tag = Tag.objects.create(number=1, nfc_uid="AA01", last_seen_at=timezone.now())
+
+    path = f"/app/race/{race.id}/member_tags/"
+    first = client.get(path, **_signed_headers("GET", path, SECRET))
+    old_etag = first["ETag"]
+
+    # A provisioning renumber moves the fingerprint.
+    tag.number = 99
+    tag.save()
+
+    headers = _signed_headers("GET", path, SECRET)
+    headers["HTTP_IF_NONE_MATCH"] = old_etag
+    second = client.get(path, **headers)
+
+    assert second.status_code == 200
+    assert second["ETag"] != old_etag
+
+
+@pytest.mark.django_db
+def test_member_tags_window_excludes_old_includes_fresh(client, settings):
+    """The served set is the data-anchored 30-day window (explicit last_seen_at)."""
+    from datetime import timedelta
+
+    from django.utils import timezone
+
+    from website.models.race import Race
+    from website.models.tag import Tag
+
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    race = Race.objects.create(name="MT window", slug="mt-window")
+    now = timezone.now()
+    Tag.objects.create(number=1, nfc_uid="AA01", last_seen_at=now)
+    Tag.objects.create(number=2, nfc_uid="AA02", last_seen_at=now - timedelta(days=29))
+    Tag.objects.create(number=3, nfc_uid="AA03", last_seen_at=now - timedelta(days=31))
+
+    path = f"/app/race/{race.id}/member_tags/"
+    response = client.get(path, **_signed_headers("GET", path, SECRET))
+
+    assert response.status_code == 200
+    numbers = {t["number"] for t in response.json()["member_tags"]}
+    assert numbers == {1, 2}  # the 31-day-old chip is aged past the floor
+
+
+@pytest.mark.django_db
+def test_member_tags_never_scanned_returns_all(client, settings):
+    from website.models.race import Race
+    from website.models.tag import Tag
+
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    race = Race.objects.create(name="MT never", slug="mt-never")
+    Tag.objects.create(number=1, nfc_uid="AA01")
+    Tag.objects.create(number=2, nfc_uid="AA02")
+
+    path = f"/app/race/{race.id}/member_tags/"
+    response = client.get(path, **_signed_headers("GET", path, SECRET))
+
+    assert response.status_code == 200
+    numbers = {t["number"] for t in response.json()["member_tags"]}
+    assert numbers == {1, 2}
+
+
+@pytest.mark.django_db
+def test_member_tags_tampered_query_string_returns_403(client, settings):
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+    race, _ = _make_race_with_category(slug="mt-qs")
+    path = f"/app/race/{race.id}/member_tags/"
+    headers = _signed_headers("GET", path, SECRET)
+    response = client.get(path + "?foo=bar", **headers)
+    assert response.status_code == 403

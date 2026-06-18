@@ -179,13 +179,13 @@
 - Modify: `src/apps/mobile/views.py`
 - Modify: `src/apps/mobile/urls.py`
 
-- [ ] add `MemberTagsView(AppAPIView)` GET-only: `get_object_or_404(Race, pk=race_id, is_published=True)`; build `quoted = f'"{member_tags_version()}"'`; `If-None-Match` → `HttpResponseNotModified()` with `ETag` header; else `Response({"member_tags": MemberTagSerializer(active_member_tags(), many=True).data})` with `ETag` header
-- [ ] add a comment marking `race_id` as the reserved (currently-unused) hook for per-race chip sets
-- [ ] import `member_tags_version` + `active_member_tags` from `.versioning`, `MemberTagSerializer` from `.serializers`, `Tag` as needed
-- [ ] add the URL route `name="member_tags"` to `apps/mobile/urls.py`
-- [ ] write tests: signed GET returns 200 with `member_tags` list + `ETag`; unsigned/bad-key → `403 {"detail": "Forbidden"}`; `If-None-Match` with the ETag → `304` (no body); unpublished/missing race → `404`; field-set is exactly `{number, nfc_uid}`; filter excludes a tag older than `MAX-30d` and includes a fresh one; never-scanned pool returns all
-- [ ] in the filter/boundary test, construct tags with **explicit** `last_seen_at` values straddling the 30-day floor (do not rely on auto-set save-time clocks) so the window math is deterministic and non-flaky
-- [ ] run tests — must pass before next task
+- [x] add `MemberTagsView(AppAPIView)` GET-only: `get_object_or_404(Race, pk=race_id, is_published=True)`; build `quoted = f'"{member_tags_version()}"'`; `If-None-Match` → `HttpResponseNotModified()` with `ETag` header; else `Response({"member_tags": MemberTagSerializer(active_member_tags(), many=True).data})` with `ETag` header
+- [x] add a comment marking `race_id` as the reserved (currently-unused) hook for per-race chip sets
+- [x] import `member_tags_version` + `active_member_tags` from `.versioning`, `MemberTagSerializer` from `.serializers`, `Tag` as needed
+- [x] add the URL route `name="member_tags"` to `apps/mobile/urls.py`
+- [x] write tests: signed GET returns 200 with `member_tags` list + `ETag`; unsigned/bad-key → `403 {"detail": "Forbidden"}`; `If-None-Match` with the ETag → `304` (no body); unpublished/missing race → `404`; field-set is exactly `{number, nfc_uid}`; filter excludes a tag older than `MAX-30d` and includes a fresh one; never-scanned pool returns all
+- [x] in the filter/boundary test, construct tags with **explicit** `last_seen_at` values straddling the 30-day floor (do not rely on auto-set save-time clocks) so the window math is deterministic and non-flaky
+- [x] run tests — must pass before next task
 
 ### Task 6: Wire `member_tags` into the sync manifest
 

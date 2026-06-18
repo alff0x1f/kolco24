@@ -26,11 +26,18 @@ from .permissions import SignedAppPermission
 from .serializers import (
     CategorySerializer,
     LegendCheckpointSerializer,
+    MemberTagSerializer,
     RaceListSerializer,
     TagSerializer,
     TeamSerializer,
 )
-from .versioning import legend_version, races_version, teams_version
+from .versioning import (
+    active_member_tags,
+    legend_version,
+    member_tags_version,
+    races_version,
+    teams_version,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -227,6 +234,41 @@ class TeamsView(AppAPIView):
                 "categories": CategorySerializer(categories, many=True).data,
                 "teams": TeamSerializer(teams, many=True).data,
             }
+        )
+        resp["ETag"] = quoted
+        return resp
+
+
+class MemberTagsView(AppAPIView):
+    """Return the member-tag (participant bracelet) pool for a race (conditional GET).
+
+    The response is ``{"member_tags": [{number, nfc_uid}, ...]}`` — the offline
+    ``nfc_uid → number`` identity the app uses to resolve a bracelet scan at a
+    checkpoint. The served set is the data-anchored 30-day window from
+    :func:`active_member_tags` (an idle pool is perfectly stable).
+
+    The ETag is the bare :func:`member_tags_version` fingerprint wrapped in
+    quotes; a matching ``If-None-Match`` short-circuits to an empty ``304``
+    before any serialization. A scan (``touch``) cannot churn the ETag on its
+    own — only provisioning edits (and day-scale window-membership shifts) move
+    it (see ``member_tags_version``).
+
+    ``race_id`` is the reserved (currently-unused) hook for a future per-race
+    chip set: the pool is global today (``Tag`` has no race FK), so the id is
+    validated for a published race but does not yet filter the pool.
+    """
+
+    def get(self, request, race_id):
+        get_object_or_404(Race, pk=race_id, is_published=True)
+        quoted = f'"{member_tags_version()}"'
+
+        if request.headers.get("If-None-Match") == quoted:
+            resp = HttpResponseNotModified()
+            resp["ETag"] = quoted
+            return resp
+
+        resp = Response(
+            {"member_tags": MemberTagSerializer(active_member_tags(), many=True).data}
         )
         resp["ETag"] = quoted
         return resp
