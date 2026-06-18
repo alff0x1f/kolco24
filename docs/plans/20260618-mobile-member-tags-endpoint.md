@@ -147,10 +147,10 @@
 - Modify: `src/api/views/tag.py`
 - Modify: `src/api/tests.py`
 
-- [ ] add a comment at `MemberTagTouchView`'s `tag.save(update_fields=["last_seen_at"])` explaining it **intentionally omits** `"updated_at"` so scans stay invisible to the mobile fingerprint (cross-reference the mobile endpoint)
-- [ ] confirm no behavior change (still bumps only `last_seen_at`)
-- [ ] add a test in `src/api/tests.py` (match the file's existing `APITestCase` class style, e.g. `MemberTagAPITestCase`, **not** the CLAUDE.md pytest style — consistency with neighbors wins here) asserting a `touch` advances `last_seen_at` but leaves `Tag.updated_at` unchanged
-- [ ] run tests — must pass before next task
+- [x] add a comment at `MemberTagTouchView`'s `tag.save(update_fields=["last_seen_at"])` explaining it **intentionally omits** `"updated_at"` so scans stay invisible to the mobile fingerprint (cross-reference the mobile endpoint)
+- [x] confirm no behavior change (still bumps only `last_seen_at`)
+- [x] add a test in `src/api/tests.py` (match the file's existing `APITestCase` class style, e.g. `MemberTagAPITestCase`, **not** the CLAUDE.md pytest style — consistency with neighbors wins here) asserting a `touch` advances `last_seen_at` but leaves `Tag.updated_at` unchanged
+- [x] run tests — must pass before next task
 
 ### Task 3: Add `MemberTagSerializer`
 

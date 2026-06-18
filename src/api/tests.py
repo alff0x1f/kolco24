@@ -38,6 +38,23 @@ class MemberTagAPITestCase(APITestCase):
         self.assertEqual(response.data["nfc_uid"], tag.nfc_uid)
         self.assertIsNotNone(response.data["last_seen_at"])
 
+    def test_touch_member_tag_leaves_updated_at_unchanged(self):
+        # A scan (touch) bumps last_seen_at but must NOT move updated_at, so it
+        # stays invisible to the mobile member-tags fingerprint. See the carve-out
+        # comment in api/views/tag.py:MemberTagTouchView.
+        tag = Tag.objects.create(number=1, nfc_uid="123ab")
+        original_updated_at = tag.updated_at
+        original_last_seen_at = tag.last_seen_at
+
+        url = "/api/member_tag/touch/"
+        response = self.client.post(url, {"nfc_uid": tag.nfc_uid}, format="json")
+
+        self.assertEqual(response.status_code, 200)
+        tag.refresh_from_db()
+        self.assertEqual(tag.updated_at, original_updated_at)
+        self.assertNotEqual(tag.last_seen_at, original_last_seen_at)
+        self.assertIsNotNone(tag.last_seen_at)
+
     def test_touch_member_tag_lowercase_uid_finds_tag(self):
         Tag.objects.create(number=1, nfc_uid="123AB")
 
