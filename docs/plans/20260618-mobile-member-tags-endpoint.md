@@ -157,10 +157,10 @@
 **Files:**
 - Modify: `src/apps/mobile/serializers.py`
 
-- [ ] add `MemberTagSerializer(serializers.ModelSerializer)` with `model = Tag`, `fields = ["number", "nfc_uid"]` (distinct name from the existing legend `TagSerializer`)
-- [ ] import `Tag` from `website.models` as needed
-- [ ] write a serializer-level test asserting output keys are exactly `{number, nfc_uid}` for a sample tag
-- [ ] run tests — must pass before next task
+- [x] add `MemberTagSerializer(serializers.ModelSerializer)` with `model = Tag`, `fields = ["number", "nfc_uid"]` (distinct name from the existing legend `TagSerializer`)
+- [x] import `Tag` from `website.models` as needed
+- [x] write a serializer-level test asserting output keys are exactly `{number, nfc_uid}` for a sample tag
+- [x] run tests — must pass before next task
 
 ### Task 4: Add `active_member_tags()` + `member_tags_version()` to versioning
 

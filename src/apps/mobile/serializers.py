@@ -7,6 +7,7 @@ from rest_framework import serializers
 from website.models.checkpoint import CheckpointSecret
 from website.models.models import Athlet, Team
 from website.models.race import Category, Race
+from website.models.tag import Tag
 
 logger = logging.getLogger(__name__)
 
@@ -56,6 +57,20 @@ class TagSerializer(serializers.Serializer):
 
     def get_ct(self, tag):
         return (tag.bundle_blob or {}).get("ct")
+
+
+class MemberTagSerializer(serializers.ModelSerializer):
+    """Mobile view of a member tag (participant bracelet) — identity only.
+
+    Exposes just ``number → nfc_uid`` so the app can resolve a bracelet scan
+    offline. Deliberately omits ``id``/``last_seen_at`` (no internal id or scan
+    timestamp leak). Distinct name from the legend ``TagSerializer`` above,
+    which serializes ``CheckpointTag`` rows, not member ``Tag`` rows.
+    """
+
+    class Meta:
+        model = Tag
+        fields = ["number", "nfc_uid"]
 
 
 class LegendCheckpointSerializer(serializers.Serializer):

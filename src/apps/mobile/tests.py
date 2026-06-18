@@ -79,6 +79,20 @@ def test_verify_false_for_changed_path():
 
 
 @pytest.mark.django_db
+def test_member_tag_serializer_field_set():
+    from apps.mobile.serializers import MemberTagSerializer
+    from website.models.tag import Tag
+
+    tag = Tag.objects.create(number=42, nfc_uid="abc123")
+
+    data = MemberTagSerializer(tag).data
+
+    assert set(data.keys()) == {"number", "nfc_uid"}
+    assert data["number"] == 42
+    assert data["nfc_uid"] == "ABC123"
+
+
+@pytest.mark.django_db
 def test_legend_checkpoint_serializer_open_exposes_cleartext():
     from apps.mobile.serializers import LegendCheckpointSerializer
     from website.models.checkpoint import Checkpoint
