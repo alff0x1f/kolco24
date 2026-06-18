@@ -23,6 +23,7 @@ app's entry point, probed directly via its own conditional GET.
 """
 
 import hashlib
+from datetime import timedelta
 
 from django.db.models import Count, Max
 
@@ -30,6 +31,7 @@ from website.models.checkpoint import Checkpoint, CheckpointSecret, CheckpointTa
 from website.models.enums import CheckpointType
 from website.models.models import Athlet, Team
 from website.models.race import Category, Race
+from website.models.tag import Tag
 
 
 def teams_version(race_id):
@@ -138,4 +140,54 @@ def legend_version(race_id):
         f"|{secrets['max_updated']}|{secrets['count']}"
         f"|{tags['max_updated']}|{tags['count']}"
     )
+    return hashlib.blake2b(raw.encode(), digest_size=8).hexdigest()
+
+
+def active_member_tags():
+    """Return the member-tag (participant bracelet) pool the mobile endpoint serves.
+
+    Uses a **data-anchored** 30-day window rather than wall-clock ``now()``:
+    the floor is ``MAX(last_seen_at) - 30 days``, so an idle race has a perfectly
+    stable served set (the floor only advances with real scan activity). A
+    never-scanned pool (``MAX(last_seen_at) is None``) returns the whole pool.
+
+    This is the **single source** feeding both ``MemberTagsView`` and
+    ``member_tags_version`` so the ETag can never disagree with the body. The
+    pool is **global** today (``Tag`` has no race FK — one chip set is physically
+    reused across races); ``race_id`` will be threaded through here once per-race
+    chip sets exist.
+    """
+    newest = Tag.objects.aggregate(max_seen=Max("last_seen_at"))["max_seen"]
+    if newest is None:
+        return Tag.objects.all()
+    return Tag.objects.filter(last_seen_at__gte=newest - timedelta(days=30))
+
+
+def member_tags_version():
+    """Return a short, stable fingerprint of the member-tag pool.
+
+    Combines ``MAX(updated_at)|COUNT`` over ``active_member_tags()`` (the exact
+    queryset the view serves — single-source contract). A **provisioning** edit
+    (add / renumber / remove) moves ``MAX(Tag.updated_at)`` (``auto_now``); a
+    scan (``touch``) deliberately does **not** — ``MemberTagTouchView`` saves only
+    ``last_seen_at`` (an intentional carve-out from the ``update_fields``
+    discipline) so a bracelet tap cannot churn this version on its own. Scan
+    activity can still shift the fingerprint *gradually* (day-scale) when it
+    advances ``MAX(last_seen_at)`` enough to age the oldest chips past the
+    30-day floor, dropping ``COUNT`` — real membership change, not per-scan churn.
+
+    Like ``races_version`` this is **global** (no ``race_id``). **Unlike**
+    ``races_version`` it **is** included in the per-race ``SyncView`` manifest:
+    it is served at a per-race URL (``/app/race/<id>/member_tags/``), so the app
+    needs one sync poll to learn whether to refetch the pool for the race it is
+    syncing.
+
+    None aggregate (empty pool) renders as the literal ``"None"`` → stable,
+    non-crashing. Returns **bare** hex (no quotes).
+    """
+    agg = active_member_tags().aggregate(
+        max_updated=Max("updated_at"),
+        count=Count("id"),
+    )
+    raw = f"{agg['max_updated']}|{agg['count']}"
     return hashlib.blake2b(raw.encode(), digest_size=8).hexdigest()

@@ -4016,3 +4016,103 @@ def test_signal_bulk_delete_holder_and_target_skips_cascade_deleted_tag():
 
     # The tag was cascade-deleted along with holder.
     assert not CheckpointTag.objects.filter(pk=tag_pk).exists()
+
+
+# --- member_tags_version fingerprint ----------------------------------------
+
+
+@pytest.mark.django_db
+def test_member_tags_version_stable_for_unchanged_pool():
+    from datetime import timedelta
+
+    from django.utils import timezone
+
+    from apps.mobile.versioning import member_tags_version
+    from website.models.tag import Tag
+
+    now = timezone.now()
+    Tag.objects.create(number=1, nfc_uid="AA01", last_seen_at=now)
+    Tag.objects.create(number=2, nfc_uid="AA02", last_seen_at=now - timedelta(days=5))
+
+    assert member_tags_version() == member_tags_version()
+
+
+@pytest.mark.django_db
+def test_member_tags_version_stable_for_empty_pool():
+    from apps.mobile.versioning import member_tags_version
+
+    # None aggregate must render as the literal "None" — stable, non-crashing.
+    assert member_tags_version() == member_tags_version()
+
+
+@pytest.mark.django_db
+def test_member_tags_version_changes_on_provisioning_renumber():
+    from django.utils import timezone
+
+    from apps.mobile.versioning import member_tags_version
+    from website.models.tag import Tag
+
+    tag = Tag.objects.create(number=1, nfc_uid="AA01", last_seen_at=timezone.now())
+    before = member_tags_version()
+
+    tag.number = 99
+    tag.save()
+    assert member_tags_version() != before
+
+
+@pytest.mark.django_db
+def test_member_tags_version_unchanged_by_touch_within_window():
+    """A scan that does not change window membership must not move the version."""
+    from datetime import timedelta
+
+    from django.utils import timezone
+
+    from apps.mobile.versioning import member_tags_version
+    from website.models.tag import Tag
+
+    now = timezone.now()
+    # Two tags well inside the 30-day window; a touch on one keeps both in-window.
+    Tag.objects.create(number=1, nfc_uid="AA01", last_seen_at=now - timedelta(days=1))
+    tag = Tag.objects.create(
+        number=2, nfc_uid="AA02", last_seen_at=now - timedelta(days=2)
+    )
+    before = member_tags_version()
+
+    # Mirror MemberTagTouchView: bump only last_seen_at, not updated_at.
+    tag.last_seen_at = timezone.now()
+    tag.save(update_fields=["last_seen_at"])
+    assert member_tags_version() == before
+
+
+@pytest.mark.django_db
+def test_active_member_tags_window_anchored_on_max_last_seen():
+    from datetime import timedelta
+
+    from django.utils import timezone
+
+    from apps.mobile.versioning import active_member_tags
+    from website.models.tag import Tag
+
+    now = timezone.now()
+    fresh = Tag.objects.create(number=1, nfc_uid="AA01", last_seen_at=now)
+    # Just inside the 30-day floor.
+    inside = Tag.objects.create(
+        number=2, nfc_uid="AA02", last_seen_at=now - timedelta(days=29)
+    )
+    # Just outside the 30-day floor.
+    Tag.objects.create(number=3, nfc_uid="AA03", last_seen_at=now - timedelta(days=31))
+
+    ids = set(active_member_tags().values_list("id", flat=True))
+    assert ids == {fresh.id, inside.id}
+
+
+@pytest.mark.django_db
+def test_active_member_tags_never_scanned_returns_all():
+    from apps.mobile.versioning import active_member_tags
+    from website.models.tag import Tag
+
+    a = Tag.objects.create(number=1, nfc_uid="AA01")
+    b = Tag.objects.create(number=2, nfc_uid="AA02")
+
+    ids = set(active_member_tags().values_list("id", flat=True))
+    assert ids == {a.id, b.id}

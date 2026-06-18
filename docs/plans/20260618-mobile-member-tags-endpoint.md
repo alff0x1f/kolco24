@@ -167,11 +167,11 @@
 **Files:**
 - Modify: `src/apps/mobile/versioning.py`
 
-- [ ] add `active_member_tags()` helper: `MAX(last_seen_at)`; if `None` return `Tag.objects.all()`, else `Tag.objects.filter(last_seen_at__gte=newest - timedelta(days=30))`
-- [ ] add `member_tags_version()`: `blake2b(digest_size=8)` over `f"{MAX(updated_at)}|{COUNT}"` of `active_member_tags()` (no `race_id`)
-- [ ] add a docstring noting: global today / gains `race_id` later; and **why** this version (unlike `races_version`) **is** in the per-race sync manifest (served at a per-race URL)
-- [ ] write tests: stable hash for an unchanged pool; provisioning `save()` (renumber) changes it; a `touch` that does not change membership does **not** change it; empty pool yields a stable (`"None"`-based) hash
-- [ ] run tests — must pass before next task
+- [x] add `active_member_tags()` helper: `MAX(last_seen_at)`; if `None` return `Tag.objects.all()`, else `Tag.objects.filter(last_seen_at__gte=newest - timedelta(days=30))`
+- [x] add `member_tags_version()`: `blake2b(digest_size=8)` over `f"{MAX(updated_at)}|{COUNT}"` of `active_member_tags()` (no `race_id`)
+- [x] add a docstring noting: global today / gains `race_id` later; and **why** this version (unlike `races_version`) **is** in the per-race sync manifest (served at a per-race URL)
+- [x] write tests: stable hash for an unchanged pool; provisioning `save()` (renumber) changes it; a `touch` that does not change membership does **not** change it; empty pool yields a stable (`"None"`-based) hash
+- [x] run tests — must pass before next task
 
 ### Task 5: Add `MemberTagsView` + URL
 
