@@ -260,16 +260,19 @@ class MemberTagsView(AppAPIView):
 
     def get(self, request, race_id):
         get_object_or_404(Race, pk=race_id, is_published=True)
-        quoted = f'"{member_tags_version()}"'
+        # Materialise once so the ETag and the response body come from the same
+        # DB snapshot (a concurrent provisioning edit between two separate queries
+        # would produce payload B with ETag A).
+        tags = list(active_member_tags().order_by("id"))
+        rows = [(t.id, t.number, t.nfc_uid) for t in tags]
+        quoted = f'"{member_tags_version(rows)}"'
 
         if request.headers.get("If-None-Match") == quoted:
             resp = HttpResponseNotModified()
             resp["ETag"] = quoted
             return resp
 
-        resp = Response(
-            {"member_tags": MemberTagSerializer(active_member_tags(), many=True).data}
-        )
+        resp = Response({"member_tags": MemberTagSerializer(tags, many=True).data})
         resp["ETag"] = quoted
         return resp
 

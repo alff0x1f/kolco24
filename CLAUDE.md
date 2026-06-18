@@ -134,20 +134,27 @@ Django 4.2 project. Source lives entirely under `src/`, with `manage.py` at `src
       short-circuits to `304` with no serialization. `versioning.py` is the **single source of truth** for both the
       ETags and the `sync` manifest: each fingerprint is a `blake2b(digest_size=8)` hex over `MAX(updated_at)|COUNT`
       aggregates computed over the exact queryset the view serves (`None` aggregates render as `"None"`, so an empty
-      race is stable). Deliberately **no `versions.categories`** — category edits must move `versions.teams`;
+      race is stable) — **except `member_tags_version()`**, which folds in the sorted active ID list (see **Member
+      tags** below). Deliberately **no `versions.categories`** — category edits must move `versions.teams`;
       `races_version()` is global and deliberately absent from the per-race `sync` manifest (the races list is the app's
       entry point, probed via its own conditional GET).
     - **Member tags** (`active_member_tags()` + `member_tags_version()` in `versioning.py`; `MemberTagSerializer` in
-      `serializers.py` — distinct name from the legend per-`CheckpointTag` `TagSerializer`): the fingerprint is over
-      `MAX(Tag.updated_at)|COUNT` of the same data-anchored window the view serves (single-source contract). `Tag` gained
-      an `auto_now` `updated_at` field **so the version moves on provisioning edits (add / renumber / remove) but not on
-      scans**: `MemberTagTouchView` (`api/views/tag.py`) keeps `save(update_fields=["last_seen_at"])` and **intentionally
-      omits `"updated_at"`** — a deliberate carve-out from the `update_fields` discipline, so a bracelet tap can't churn
-      the mobile ETag and trigger mid-race re-downloads. The ETag can still shift day-scale when scan activity advances
-      `MAX(last_seen_at)` enough to age the oldest chips past the 30-day floor (the `COUNT` term — real membership
-      change, not per-scan churn). `member_tags_version()` is **global** (no `race_id`, like `races_version`) but —
-      unlike `races_version` — **is** included in the per-race `sync` manifest, because it's served at a per-race URL and
-      the app needs one sync poll to learn what to refetch for the race it's syncing. The **legend** fingerprint additionally folds in two more
+      `serializers.py` — distinct name from the legend per-`CheckpointTag` `TagSerializer`): the fingerprint hashes the
+      **actual served field values** — `blake2b` over the canonical JSON encoding of `[(id, number, nfc_uid), …]`
+      ordered by `id` over the same data-anchored window `active_member_tags()` serves (single-source contract;
+      JSON encoding avoids any ambiguity from special characters in `nfc_uid`). Hashing field values (not just
+      `MAX(updated_at)|COUNT|IDs`) ensures a same-COUNT identity swap (one chip ages past the 30-day floor while a
+      touch brings another in) and a same-COUNT field edit under concurrent provisioning (where one write's timestamp
+      falls below the existing `MAX(updated_at)`) both change the fingerprint and avoid a stale 304.
+      `Tag` gained an `auto_now` `updated_at` field **so the version moves on provisioning edits (add / renumber /
+      remove) but not on scans**: `MemberTagTouchView` (`api/views/tag.py`) keeps
+      `save(update_fields=["last_seen_at"])` and **intentionally omits `"updated_at"`** — a deliberate carve-out from
+      the `update_fields` discipline, so a bracelet tap can't churn the mobile ETag and trigger mid-race re-downloads.
+      The ETag can still shift day-scale when scan activity advances `MAX(last_seen_at)` enough to age the oldest chips
+      past the 30-day floor (membership change, not per-scan churn). `member_tags_version()` is **global** (no
+      `race_id`, like `races_version`) but — unlike `races_version` — **is** included in the per-race `sync` manifest,
+      because it's served at a per-race URL and the app needs one sync poll to learn what to refetch for the race it's
+      syncing. The **legend** fingerprint additionally folds in two more
       `MAX(updated_at)|COUNT` aggregates over the same hidden-excluded checkpoints — `CheckpointSecret` (re-seal / enc
       appear/disappear on a lock toggle) and `CheckpointTag` (code/unlocks/bundle/check_method) — so the legend ETag /
       `versions.legend` move on any lock toggle, re-seal, or tag edit. The legend fingerprint is `legend_version(race_id)`

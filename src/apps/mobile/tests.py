@@ -4042,7 +4042,7 @@ def test_member_tags_version_stable_for_unchanged_pool():
 def test_member_tags_version_stable_for_empty_pool():
     from apps.mobile.versioning import member_tags_version
 
-    # None aggregate must render as the literal "None" — stable, non-crashing.
+    # Empty pool uses "empty" sentinel — stable, non-crashing.
     assert member_tags_version() == member_tags_version()
 
 
@@ -4152,6 +4152,116 @@ def test_member_tags_version_changes_on_provisioning_delete():
     tag = Tag.objects.create(number=1, nfc_uid="AA01")
     before = member_tags_version()
     tag.delete()
+    assert member_tags_version() != before
+
+
+@pytest.mark.django_db
+def test_member_tags_version_changes_on_equal_count_swap():
+    """Touch-driven window swap: COUNT and MAX(updated_at) stay equal but
+    identities change — must still produce a new fingerprint."""
+    from datetime import timedelta
+
+    from django.utils import timezone
+
+    from apps.mobile.versioning import member_tags_version
+    from website.models.tag import Tag
+
+    now = timezone.now()
+    # Tag A: the most-recently scanned tag (anchors the window floor).
+    # Keep its auto_now updated_at as the MAX — we backdate B and C below.
+    tag_a = Tag.objects.create(number=1, nfc_uid="AA01", last_seen_at=now)
+    # Tag B: near the edge of the 30-day window; will be evicted after the swap.
+    tag_b = Tag.objects.create(
+        number=2, nfc_uid="AA02", last_seen_at=now - timedelta(days=29)
+    )
+    # Tag C: currently outside the window.
+    tag_c = Tag.objects.create(
+        number=3, nfc_uid="AA03", last_seen_at=now - timedelta(days=31)
+    )
+    # Backdate BOTH B and C so tag_a holds MAX(updated_at) in every state.
+    # Without this, B.updated_at > A.updated_at (created later), meaning the old
+    # MAX|COUNT fingerprint would also change when B leaves (MAX shifts from B to A)
+    # — not a true same-MAX|COUNT swap test.
+    Tag.objects.filter(pk=tag_b.pk).update(updated_at=now - timedelta(days=70))
+    Tag.objects.filter(pk=tag_c.pk).update(updated_at=now - timedelta(days=60))
+
+    # Confirm the active set is {A, B}, not C.
+    from django.db.models import Count, Max
+
+    from apps.mobile.versioning import active_member_tags
+
+    active_ids = set(active_member_tags().values_list("id", flat=True))
+    assert tag_c.id not in active_ids
+    assert tag_b.id in active_ids
+
+    # Confirm A holds MAX(updated_at) over the active set before the swap.
+    tag_a.refresh_from_db()
+    agg_before = active_member_tags().aggregate(
+        max_ua=Max("updated_at"), cnt=Count("id")
+    )
+    assert agg_before["max_ua"] == tag_a.updated_at
+    assert agg_before["cnt"] == 2
+
+    before = member_tags_version()
+
+    # Touch tag_c: advances MAX(last_seen_at) so tag_b falls below the new floor
+    # and tag_c enters. COUNT stays 2; MAX(updated_at) stays at tag_a's value.
+    # A naive MAX|COUNT fingerprint would produce the same hash and return a
+    # stale 304.
+    tag_c.last_seen_at = now + timedelta(days=2)
+    tag_c.save(update_fields=["last_seen_at"])
+
+    # After the swap active set is {A, C}, not {A, B}.
+    active_ids_after = set(active_member_tags().values_list("id", flat=True))
+    assert tag_b.id not in active_ids_after
+    assert tag_c.id in active_ids_after
+
+    # Confirm MAX(updated_at) and COUNT are unchanged — only identities changed.
+    # This is the exact scenario the old MAX|COUNT fingerprint would miss.
+    agg_after = active_member_tags().aggregate(
+        max_ua=Max("updated_at"), cnt=Count("id")
+    )
+    assert (
+        agg_after["max_ua"] == agg_before["max_ua"]
+    ), "MAX(updated_at) must not change"
+    assert agg_after["cnt"] == agg_before["cnt"], "COUNT must not change"
+
+    assert member_tags_version() != before
+
+
+@pytest.mark.django_db
+def test_member_tags_version_changes_on_field_edit_when_updated_at_not_max():
+    """Field change is detected even when the tag's updated_at is below MAX(updated_at).
+
+    Simulates concurrent provisioning: Tag A's write carries an earlier timestamp
+    but commits after Tag B's write. MAX(updated_at) stays at Tag B's value, so a
+    fingerprint based only on MAX|COUNT|IDs would silently return stale data.
+    Hashing (id, number, nfc_uid) detects the change regardless.
+    """
+    from datetime import timedelta
+
+    from django.utils import timezone
+
+    from apps.mobile.versioning import member_tags_version
+    from website.models.tag import Tag
+
+    now = timezone.now()
+
+    # Tag B anchors MAX(updated_at) at a later time.
+    Tag.objects.create(number=2, nfc_uid="BB02", last_seen_at=now)
+    tag_a = Tag.objects.create(number=1, nfc_uid="AA01", last_seen_at=now)
+    # Backdate tag A so its updated_at is below tag B's (simulates the
+    # earlier-timestamp write).
+    Tag.objects.filter(pk=tag_a.pk).update(updated_at=now - timedelta(days=5))
+
+    before = member_tags_version()
+
+    # Simulate the late-committing earlier-timestamped transaction: change the field
+    # without touching updated_at (bypass auto_now via queryset.update).
+    Tag.objects.filter(pk=tag_a.pk).update(number=99)
+
+    # MAX(updated_at) and COUNT are still unchanged — only the field value differs.
+    # The fingerprint must still change.
     assert member_tags_version() != before
 
 

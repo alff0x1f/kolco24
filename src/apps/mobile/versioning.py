@@ -23,6 +23,7 @@ app's entry point, probed directly via its own conditional GET.
 """
 
 import hashlib
+import json
 from datetime import timedelta
 
 from django.db.models import Count, Max, Q
@@ -165,18 +166,28 @@ def active_member_tags():
     )
 
 
-def member_tags_version():
+def member_tags_version(rows=None):
     """Return a short, stable fingerprint of the member-tag pool.
 
-    Combines ``MAX(updated_at)|COUNT`` over ``active_member_tags()`` (the exact
-    queryset the view serves — single-source contract). A **provisioning** edit
-    (add / renumber / remove) moves ``MAX(Tag.updated_at)`` (``auto_now``); a
-    scan (``touch``) deliberately does **not** — ``MemberTagTouchView`` saves only
+    Fetches ``(id, number, nfc_uid)`` for every tag in ``active_member_tags()``
+    (the exact queryset the view serves — single-source contract), serialises the
+    list as canonical JSON (so any special characters in ``nfc_uid`` are escaped
+    and the encoding is unambiguous), then hashes with ``blake2b``. Hashing the
+    **actual served field values** means any provisioning edit — renumber,
+    re-UID, add, remove — is detected regardless of how concurrent writes order
+    their timestamps. A same-COUNT identity swap (one tag ages out while a touch
+    brings another in, leaving ``MAX(updated_at)`` and COUNT unchanged) is also
+    caught because different ``id`` values appear in the hash.
+
+    A **provisioning** edit always moves the fingerprint: **add** inserts a new
+    ``id:number:nfc_uid`` tuple; **renumber** or **re-UID** changes a field
+    value in an existing tuple; **remove** drops a tuple. A scan (``touch``)
+    deliberately does **not** — ``MemberTagTouchView`` saves only
     ``last_seen_at`` (an intentional carve-out from the ``update_fields``
     discipline) so a bracelet tap cannot churn this version on its own. Scan
     activity can still shift the fingerprint *gradually* (day-scale) when it
-    advances ``MAX(last_seen_at)`` enough to age the oldest chips past the
-    30-day floor, dropping ``COUNT`` — real membership change, not per-scan churn.
+    advances ``MAX(last_seen_at)`` enough to age chips past the 30-day floor
+    (membership change, not per-scan churn).
 
     Like ``races_version`` this is **global** (no ``race_id``). **Unlike**
     ``races_version`` it **is** included in the per-race ``SyncView`` manifest:
@@ -184,12 +195,25 @@ def member_tags_version():
     needs one sync poll to learn whether to refetch the pool for the race it is
     syncing.
 
-    None aggregate (empty pool) renders as the literal ``"None"`` → stable,
-    non-crashing. Returns **bare** hex (no quotes).
+    Pass pre-fetched ``rows`` (a list of ``(id, number, nfc_uid)`` tuples,
+    ordered by ``id``) to avoid a second DB round-trip when the caller has
+    already materialised the queryset for serialisation (enforcing the
+    single-snapshot contract). When ``rows`` is ``None`` the function queries
+    ``active_member_tags()`` itself.
+
+    Empty pool yields a stable ``"empty"``-based hash. Returns **bare** hex (no
+    quotes).
     """
-    agg = active_member_tags().aggregate(
-        max_updated=Max("updated_at"),
-        count=Count("id"),
-    )
-    raw = f"{agg['max_updated']}|{agg['count']}"
+    if rows is None:
+        rows = list(
+            active_member_tags().order_by("id").values_list("id", "number", "nfc_uid")
+        )
+    if not rows:
+        raw = "empty"
+    else:
+        # json.dumps encodes the list of tuples as a list of lists and properly
+        # escapes any special characters in nfc_uid (e.g. internal whitespace from
+        # a direct-DB write that bypassed the save() normalizer), eliminating any
+        # ambiguity that a plain newline-joined format would allow.
+        raw = json.dumps(rows)
     return hashlib.blake2b(raw.encode(), digest_size=8).hexdigest()

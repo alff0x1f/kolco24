@@ -81,10 +81,11 @@ class MemberTagTouchView(APIView):
         tag.last_seen_at = timezone.now()
         # Intentionally omits "updated_at" — a scan (touch) must stay invisible to
         # the mobile member-tags fingerprint (apps/mobile/versioning.py:
-        # member_tags_version), which is built over MAX(updated_at). This is a
-        # deliberate carve-out from CLAUDE.md's "update_fields discipline": only
-        # provisioning edits (add / renumber / remove) move updated_at, so a
-        # bracelet tap cannot churn the mobile ETag and trigger re-downloads mid-race.
+        # member_tags_version), which hashes served field values (id, number, nfc_uid).
+        # Deliberate carve-out from CLAUDE.md's "update_fields discipline": only
+        # provisioning edits (add / renumber / remove) should move that fingerprint,
+        # so a bracelet tap cannot churn the mobile ETag and trigger re-downloads
+        # mid-race.
         tag.save(update_fields=["last_seen_at"])
 
         return Response(TagSerializer(tag).data, status=status.HTTP_200_OK)
