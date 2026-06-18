@@ -202,8 +202,8 @@
 **Files:**
 - Modify: `src/apps/mobile/README.md`
 
-- [ ] add `/app/race/<id>/member_tags/` to the endpoints list: global pool today / `race_id` reserved for per-race sets; the `MAX(last_seen_at) − 30d` data-anchored window; the deliberate `touch`/`updated_at` carve-out; and that its version is in the sync manifest
-- [ ] (docs-only task — no new tests; covered by Task 5/6 tests)
+- [x] add `/app/race/<id>/member_tags/` to the endpoints list: global pool today / `race_id` reserved for per-race sets; the `MAX(last_seen_at) − 30d` data-anchored window; the deliberate `touch`/`updated_at` carve-out; and that its version is in the sync manifest
+- [x] (docs-only task — no new tests; covered by Task 5/6 tests)
 
 ### Task 8: Verify acceptance criteria
 - [ ] verify the endpoint serves the pool, is signed, ETag-cached, and per-race-URL-scoped (Overview goals)
