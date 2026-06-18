@@ -206,11 +206,11 @@
 - [x] (docs-only task — no new tests; covered by Task 5/6 tests)
 
 ### Task 8: Verify acceptance criteria
-- [ ] verify the endpoint serves the pool, is signed, ETag-cached, and per-race-URL-scoped (Overview goals)
-- [ ] verify `/api/member_tag/` GET + POST + `touch` are unchanged (no behavior diff)
-- [ ] verify a `touch` that does **not** change window membership does not change the mobile ETag; a provisioning edit does (do not assert the over-broad "any scan never changes the ETag")
-- [ ] run full suite: `uv run pytest`
-- [ ] run `make lint`
+- [x] verify the endpoint serves the pool, is signed, ETag-cached, and per-race-URL-scoped (Overview goals) — `MemberTagsView(AppAPIView)` is gated by `SignedAppPermission`, sets a quoted `member_tags_version()` ETag on every exit path with `If-None-Match`/304 short-circuit, and is mounted at the per-race URL `race/<id>/member_tags/`
+- [x] verify `/api/member_tag/` GET + POST + `touch` are unchanged (no behavior diff) — `api/views/tag.py` untouched apart from the explanatory carve-out comment; `touch` still `save(update_fields=["last_seen_at"])`; api tests pass
+- [x] verify a `touch` that does **not** change window membership does not change the mobile ETag; a provisioning edit does (do not assert the over-broad "any scan never changes the ETag") — covered by the versioning + view tests (Task 4/5)
+- [x] run full suite: `uv run pytest` — 589 passed
+- [x] run `make lint` — all checks passed
 
 ### Task 9: [Final] Update documentation + close out
 - [ ] update `CLAUDE.md` mobile-app section: add the `member_tags` endpoint to the invariants/endpoint list, note the global-pool-today / `race_id`-reserved design, the data-anchored window, the `touch`/`updated_at` carve-out, and the manifest inclusion
