@@ -4119,6 +4119,42 @@ def test_active_member_tags_never_scanned_returns_all():
     assert ids == {a.id, b.id}
 
 
+@pytest.mark.django_db
+def test_active_member_tags_never_scanned_included_alongside_recent():
+    """A never-scanned tag must remain visible once other tags start being scanned."""
+    from django.utils import timezone
+
+    from apps.mobile.versioning import active_member_tags
+    from website.models.tag import Tag
+
+    recent = Tag.objects.create(number=1, nfc_uid="AA01", last_seen_at=timezone.now())
+    never_scanned = Tag.objects.create(number=2, nfc_uid="AA02")
+
+    ids = set(active_member_tags().values_list("id", flat=True))
+    assert ids == {recent.id, never_scanned.id}
+
+
+@pytest.mark.django_db
+def test_member_tags_version_changes_on_provisioning_add():
+    from apps.mobile.versioning import member_tags_version
+    from website.models.tag import Tag
+
+    before = member_tags_version()
+    Tag.objects.create(number=1, nfc_uid="AA01")
+    assert member_tags_version() != before
+
+
+@pytest.mark.django_db
+def test_member_tags_version_changes_on_provisioning_delete():
+    from apps.mobile.versioning import member_tags_version
+    from website.models.tag import Tag
+
+    tag = Tag.objects.create(number=1, nfc_uid="AA01")
+    before = member_tags_version()
+    tag.delete()
+    assert member_tags_version() != before
+
+
 # --- MemberTagsView request-level -------------------------------------------
 
 
@@ -4354,3 +4390,39 @@ def test_sync_versions_member_tags_matches_member_tags_etag(client, settings):
     bare = versions["member_tags"]
     # /member_tags/ ETag is the bare version wrapped in quotes
     assert etag == f'"{bare}"'
+
+
+@pytest.mark.django_db
+def test_member_tags_records_appinstall(client, settings):
+    from website.models.race import Race
+
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+    race = Race.objects.create(name="MT install", slug="mt-install")
+    path = f"/app/race/{race.id}/member_tags/"
+    response = client.get(path, **_signed_headers("GET", path, SECRET))
+    assert response.status_code == 200
+    install = AppInstall.objects.get(install_id="install-abc")
+    assert install.request_count == 1
+
+
+@pytest.mark.django_db
+def test_member_tags_stats_write_failure_does_not_break_response(
+    client, settings, monkeypatch
+):
+    from website.models.race import Race
+
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+    race = Race.objects.create(name="MT stats fail", slug="mt-stats-fail")
+
+    def boom(*args, **kwargs):
+        raise IntegrityError("simulated stats write failure")
+
+    monkeypatch.setattr(AppInstall.objects, "update_or_create", boom)
+
+    path = f"/app/race/{race.id}/member_tags/"
+    response = client.get(path, **_signed_headers("GET", path, SECRET))
+
+    assert response.status_code == 200
+    assert not AppInstall.objects.filter(install_id="install-abc").exists()

@@ -2472,5 +2472,5 @@ def test_member_tag_updated_at_set_on_create_and_advances_on_save():
     tag.number = 2
     tag.save()
     tag.refresh_from_db()
-    assert tag.updated_at > first - timedelta(seconds=1)
+    assert tag.updated_at > first
     assert tag.number == 2

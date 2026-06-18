@@ -25,7 +25,7 @@ app's entry point, probed directly via its own conditional GET.
 import hashlib
 from datetime import timedelta
 
-from django.db.models import Count, Max
+from django.db.models import Count, Max, Q
 
 from website.models.checkpoint import Checkpoint, CheckpointSecret, CheckpointTag
 from website.models.enums import CheckpointType
@@ -160,7 +160,9 @@ def active_member_tags():
     newest = Tag.objects.aggregate(max_seen=Max("last_seen_at"))["max_seen"]
     if newest is None:
         return Tag.objects.all()
-    return Tag.objects.filter(last_seen_at__gte=newest - timedelta(days=30))
+    return Tag.objects.filter(
+        Q(last_seen_at__isnull=True) | Q(last_seen_at__gte=newest - timedelta(days=30))
+    )
 
 
 def member_tags_version():

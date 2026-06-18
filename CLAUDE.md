@@ -189,9 +189,10 @@ Django 4.2 project. Source lives entirely under `src/`, with `manage.py` at `src
       scoring/scan path lives in the `api` app and matches by `nfc_uid` (unchanged). Per the **`update_fields` discipline** above, every service
       `save(update_fields=[...])` on `CheckpointTag`/`CheckpointSecret` includes `"updated_at"`.
     - **`update_fields` discipline**: the fingerprints rely on `auto_now` `updated_at` fields on `Team`/`Athlet`/
-      `Checkpoint`/`CheckpointTag`/`CheckpointSecret`/`Category`/`Race`. Any `save(update_fields=[...])` on these models **must** include `"updated_at"`,
+      `Checkpoint`/`CheckpointTag`/`CheckpointSecret`/`Category`/`Race`/`Tag`. Any `save(update_fields=[...])` on these models **must** include `"updated_at"`,
       otherwise the version/ETag goes stale (e.g. the auto `OPEN → SOLD_OUT` `reg_status` flips in
-      `check_vtb_payments.py` and `website/models/models.py` include it).
+      `check_vtb_payments.py` and `website/models/models.py` include it). **Exception**: `MemberTagTouchView` deliberately
+      omits `"updated_at"` from `save(update_fields=["last_seen_at"])` — see the **Member tags** invariant above.
     - **`nfc_uid` normalized invariant**: `Tag.nfc_uid` and `CheckpointTag.nfc_uid` are auto-normalized (stripped and uppercased) by their
       `save()` overrides. `save()` with or without `update_fields` still runs the override (Django calls the Python method regardless).
       The one case that bypasses the override entirely is `QuerySet.update(nfc_uid=...)` — that generates raw SQL without calling `save()`,
