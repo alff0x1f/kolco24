@@ -1,4 +1,5 @@
 {% extends "website/base-2.html" %}
+{% load custom_filters %}
 
 {% block title %}Вход по коду · Кольцо 24{% endblock %}
 {% block head_descr %}Вход в личный кабинет Кольцо 24 по коду из письма.{% endblock %}
@@ -48,7 +49,7 @@
     </form>
 
     <div class="below">
-      <a href="{% url 'login' %}{% if next %}?next={{ next|urlencode }}{% endif %}">Войти по паролю</a>
+      {% with dest=next|safe_next %}<a href="{% url 'login' %}{% if dest %}?next={{ dest|urlencode }}{% endif %}">Войти по паролю</a>{% endwith %}
       {% if race %}
       <div><a class="back-link" href="{% url 'race' race.slug %}">← Назад к гонке</a></div>
       {% endif %}

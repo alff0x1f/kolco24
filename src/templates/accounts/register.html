@@ -1,4 +1,5 @@
 {% extends "website/base-2.html" %}
+{% load custom_filters %}
 
 {% block title %}Регистрация · Кольцо 24{% endblock %}
 {% block head_descr %}Регистрация участника на Кольцо 24 — соревнования по спортивному ориентированию.{% endblock %}
@@ -21,7 +22,7 @@
                 <div class="sub">Создайте аккаунт, чтобы записать команду на&nbsp;гонку и&nbsp;следить за&nbsp;результатами.</div>
             </div>
             <div class="login-hint">
-                Уже есть аккаунт? <a href="{% url 'login' %}{% if next %}?next={{ next|urlencode }}{% endif %}">Войти&nbsp;→</a>
+                Уже есть аккаунт? {% with dest=next|safe_next %}<a href="{% url 'login' %}{% if dest %}?next={{ dest|urlencode }}{% endif %}">Войти&nbsp;→</a>{% endwith %}
             </div>
         </header>
 

@@ -1,4 +1,4 @@
-{% load static %}
+{% load static custom_filters %}
 <!doctype html>
 <html lang="ru">
 <head>
@@ -67,7 +67,9 @@
                     </div>
                 </div>
                 {% else %}
-                <a class="login" href="{% url 'login' %}?next={{ request.get_full_path|urlencode }}">Войти</a>
+                {% with dest=request.get_full_path|safe_next %}
+                <a class="login" href="{% url 'login' %}{% if dest %}?next={{ dest|urlencode }}{% endif %}">Войти</a>
+                {% endwith %}
                 {% endif %}
             </div>
         </div>
