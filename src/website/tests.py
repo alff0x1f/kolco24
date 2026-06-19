@@ -2095,6 +2095,8 @@ def test_ru_plural_picks_correct_form(n, expected):
         ("https://evil.com/x", ""),
         ("//evil.com/x", ""),
         ("", ""),
+        # Malformed URL (invalid IPv6 bracket) must not raise.
+        ("http://[", ""),
     ],
 )
 def test_safe_next_strips_auth_loops(candidate, expected):

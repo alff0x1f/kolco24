@@ -30,7 +30,10 @@ def safe_next(candidate):
     seen = 0
     while candidate and seen <= len(_AUTH_URL_NAMES):
         seen += 1
-        parts = urlsplit(candidate)
+        try:
+            parts = urlsplit(candidate)
+        except ValueError:
+            return ""
         path = parts.path
         # Same-site absolute paths only; scheme/host or relative values are dropped.
         if parts.scheme or parts.netloc or not path.startswith("/"):
