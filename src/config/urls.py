@@ -16,8 +16,13 @@ Including another URLconf
 
 from django.contrib import admin
 from django.urls import include, path
+from django.views.generic import TemplateView
 
 urlpatterns = [
+    path(
+        "robots.txt",
+        TemplateView.as_view(template_name="robots.txt", content_type="text/plain"),
+    ),
     path("admin/", admin.site.urls),
     path("accounts/", include("apps.accounts.urls")),
     path("app/", include("apps.mobile.urls")),

@@ -2073,6 +2073,52 @@ def test_ru_plural_picks_correct_form(n, expected):
     assert ru_plural(n, "команда,команды,команд") == expected
 
 
+@pytest.mark.parametrize(
+    "candidate, expected",
+    [
+        # A real destination passes through unchanged.
+        ("/race/kolco24_2024/teams/", "/race/kolco24_2024/teams/"),
+        # Query strings on the real destination are preserved.
+        ("/race/kolco24_2024/teams/?sort=name", "/race/kolco24_2024/teams/?sort=name"),
+        # A buried real destination is dug out and flattened.
+        (
+            "/accounts/login/?next=/accounts/register/?next=/race/kolco24_2024/teams/",
+            "/race/kolco24_2024/teams/",
+        ),
+        # An auth-only chain (the crawler trap) collapses to nothing.
+        (
+            "/accounts/register/?next=/accounts/start/%3Fnext%3D/accounts/start/",
+            "",
+        ),
+        ("/accounts/start/", ""),
+        # Off-site and protocol-relative targets are dropped.
+        ("https://evil.com/x", ""),
+        ("//evil.com/x", ""),
+        # Extra leading slashes leave an empty netloc but a protocol-relative
+        # path (//evil.com/x) that a browser still resolves off-site — dropped.
+        ("////evil.com/x", ""),
+        ("", ""),
+        # Malformed URL (invalid IPv6 bracket) must not raise.
+        ("http://[", ""),
+    ],
+)
+def test_safe_next_strips_auth_loops(candidate, expected):
+    from website.templatetags.custom_filters import safe_next
+
+    assert safe_next(candidate) == expected
+
+
+@pytest.mark.django_db
+def test_robots_txt_disallows_accounts(client):
+    resp = client.get("/robots.txt")
+    assert resp.status_code == 200
+    assert resp["Content-Type"] == "text/plain"
+    body = resp.content.decode()
+    assert "Disallow: /accounts/" in body
+    assert "Disallow: /app/" in body
+    assert "Disallow: /admin/" in body
+
+
 # ---------------------------------------------------------------------------
 # Task 4: generic add-ons cutover (extras replace the hardcoded maps feature)
 # ---------------------------------------------------------------------------

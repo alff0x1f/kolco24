@@ -1,6 +1,60 @@
+from urllib.parse import parse_qs, urlsplit
+
 from django import template
+from django.urls import Resolver404, resolve
 
 register = template.Library()
+
+# Auth pages that link into one another via ?next= (login → register → start → …).
+# None of them is ever a valid final redirect target, so a ?next= pointing at one
+# is either drilled through to its buried destination or dropped — otherwise a
+# crawler stacks ever-growing percent-encoded URLs (a spider trap).
+_AUTH_URL_NAMES = {
+    "login",
+    "register",
+    "account_start",
+    "account_verify",
+    "magic_link",
+}
+
+
+@register.filter(name="safe_next")
+def safe_next(candidate):
+    """Reduce a ``?next=`` candidate to a real, local, non-auth destination path.
+
+    Follows nested ``?next=`` chains buried inside auth pages so the login/register/
+    start links can't accumulate, and returns ``""`` when there is no real
+    destination behind the auth page. Off-site and non-absolute values are dropped.
+    Query strings on the final destination are preserved. Loop-bounded.
+    """
+    seen = 0
+    while candidate and seen <= len(_AUTH_URL_NAMES):
+        seen += 1
+        try:
+            parts = urlsplit(candidate)
+        except ValueError:
+            return ""
+        path = parts.path
+        # Same-site absolute paths only; scheme/host or relative values are dropped.
+        # ``//host`` (and ``////host`` etc., which urlsplit leaves in ``path`` with
+        # an empty netloc) is a protocol-relative target — reject it as off-site.
+        if (
+            parts.scheme
+            or parts.netloc
+            or not path.startswith("/")
+            or path.startswith("//")
+        ):
+            return ""
+        dest = path + ("?" + parts.query if parts.query else "")
+        try:
+            match = resolve(path)
+        except Resolver404:
+            return dest
+        if match.url_name not in _AUTH_URL_NAMES:
+            return dest
+        # Auth page: drill into its own buried next, discard the rest.
+        candidate = parse_qs(parts.query).get("next", [""])[0]
+    return ""
 
 
 @register.filter(name="dict_key")

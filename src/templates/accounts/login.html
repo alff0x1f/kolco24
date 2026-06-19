@@ -1,4 +1,5 @@
 {% extends "website/base-2.html" %}
+{% load custom_filters %}
 
 {% block title %}Вход · Кольцо 24{% endblock %}
 {% block head_descr %}Вход в личный кабинет Кольцо 24 — соревнования по спортивному ориентированию.{% endblock %}
@@ -61,14 +62,16 @@
           <button class="btn btn-primary btn-lg btn-block" type="submit">Войти</button>
 
           <p class="alt-login">
-            <a href="{% url 'account_start' %}{% if next %}?next={{ next|urlencode }}{% endif %}">Войти по коду из письма</a>
+            {% with dest=next|safe_next %}
+            <a href="{% url 'account_start' %}{% if dest %}?next={{ dest|urlencode }}{% endif %}">Войти по коду из письма</a>
+            {% endwith %}
           </p>
         </div>
       </div>
     </form>
 
     <div class="below">
-      Ещё нет аккаунта? <a href="{% url 'register' %}{% if next %}?next={{ next|urlencode }}{% endif %}">Зарегистрироваться&nbsp;→</a>
+      Ещё нет аккаунта? {% with dest=next|safe_next %}<a href="{% url 'register' %}{% if dest %}?next={{ dest|urlencode }}{% endif %}">Зарегистрироваться&nbsp;→</a>{% endwith %}
     </div>
 
   </div>
