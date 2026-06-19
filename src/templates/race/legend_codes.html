@@ -1,0 +1,80 @@
+{% extends "website/base-2.html" %}
+{% load static %}
+
+{% block title %}Коды легенды — {{ race.name }} — Кольцо 24{% endblock %}
+
+{% block extra_head %}
+<link href="{% static 'css/legend_codes.css' %}" rel="stylesheet">
+{% endblock %}
+
+{% block content %}
+<div class="legend-codes">
+  <div class="container">
+
+    <!-- Breadcrumb -->
+    <nav class="breadcrumb">
+      <a href="/">Кольцо&nbsp;24</a>
+      <span class="sep">/</span>
+      <a href="{% url 'race' race.slug %}">{{ race.name }}</a>
+      <span class="sep">/</span>
+      <span class="cur">Коды легенды</span>
+    </nav>
+
+    <!-- Header / actions -->
+    <div class="head">
+      <div class="head-l">
+        <div class="head-title">
+          <h1>Коды легенды</h1>
+          <span class="chip edit">{{ race.name }}</span>
+        </div>
+        <div class="sub">
+          Код каждого NFC-тега для записи в чип. Мобильное приложение читает его
+          обратно, чтобы открыть запертую легенду офлайн. «—» — у тега ещё нет
+          кода (запустите <code>rebuild_legend_crypto</code>).
+        </div>
+      </div>
+      <div class="head-actions">
+        <a class="btn btn-ghost" href="{% url 'edit_legend' race.slug %}">К легенде</a>
+        <button class="btn btn-primary" type="button" id="copyCsv">Скопировать CSV</button>
+      </div>
+    </div>
+
+    <!-- Codes table -->
+    <div class="card">
+      <div class="card-head">
+        <h2>Теги КП</h2>
+        <span class="aux">{{ rows|length }} тег.</span>
+      </div>
+      <div class="card-body tight">
+        <div class="grid-wrap">
+          <table class="codes" id="codesTable">
+            <thead>
+              <tr>
+                <th>nfc_uid</th>
+                <th class="num">№ КП</th>
+                <th>code (hex)</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for row in rows %}
+              <tr>
+                <td class="mono">{{ row.nfc_uid }}</td>
+                <td class="num">{{ row.number }}</td>
+                <td class="mono">{{ row.code }}</td>
+              </tr>
+              {% empty %}
+              <tr class="empty"><td colspan="3">У гонки нет тегов.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+{% endblock %}
+
+{% block footer_js_include %}
+<script src="{% static 'js/legend_codes.js' %}"></script>
+{% endblock %}

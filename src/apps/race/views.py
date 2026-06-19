@@ -8,14 +8,17 @@ from django.db.models import Count, OuterRef, ProtectedError, Q, Subquery
 from django.http import Http404, HttpResponseForbidden, HttpResponseRedirect
 from django.shortcuts import get_object_or_404, render
 from django.urls import reverse
+from django.utils.decorators import method_decorator
 from django.utils.safestring import mark_safe
 from django.views import View
+from django.views.decorators.cache import never_cache
 
 from apps.race.forms import RaceForm
 from apps.race.models import RaceExtra
 from apps.race.permissions import can_edit_race
 from website.forms import NewsPostForm
 from website.models import Checkpoint, NewsPost, Race, Team
+from website.models.checkpoint import CheckpointTag
 from website.models.enums import CheckpointType
 from website.models.race import Category, RacePriceTier, RegStatus
 from website.views.views_ import is_race_admin
@@ -993,3 +996,40 @@ class RaceLegendEditView(View):
             form_errors=form_errors,
         )
         return render(request, "race/legend_form.html", context)
+
+
+@method_decorator(never_cache, name="dispatch")
+class RaceLegendCodesView(View):
+    """Read-only view of a race's per-tag NFC codes (legend provisioning).
+
+    The web twin of ``manage.py export_legend_codes --race <id>``: one row per
+    :class:`CheckpointTag` of the race — ``nfc_uid / КП number / code(hex)`` —
+    so the field crew can read each tag's ``code`` (written into the chip's NFC
+    user memory) without shell access. Same queryset, ordering and ``—``
+    placeholder (tags without a code yet) as the command. Gated on
+    :func:`can_edit_race`; codes are admin-only, consistent with the cleartext
+    legend already shown to admins on the edit page.
+    """
+
+    def get(self, request, race_slug):
+        if not request.user.is_authenticated:
+            return HttpResponseRedirect(
+                reverse("login") + "?next=" + quote(request.path, safe="/:@")
+            )
+        race = get_object_or_404(Race, slug=race_slug)
+        if not can_edit_race(request.user, race):
+            return HttpResponseForbidden()
+        tags = (
+            CheckpointTag.objects.filter(point__race_id=race.id)
+            .select_related("point")
+            .order_by("point__number", "id")
+        )
+        rows = [
+            {
+                "nfc_uid": tag.nfc_uid,
+                "number": tag.point.number,
+                "code": bytes(tag.code).hex() if tag.code else "—",
+            }
+            for tag in tags
+        ]
+        return render(request, "race/legend_codes.html", {"race": race, "rows": rows})

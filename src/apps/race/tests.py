@@ -2449,3 +2449,77 @@ def test_legend_post_invalid_type_reports_row_error(client):
 
 
 # ---------------------------------------------------------------------------
+# Legend codes page (read-only NFC codes)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.django_db
+def test_legend_codes_get_anonymous_redirects_to_login(client):
+    race = _make_race()
+    url = reverse("legend_codes", kwargs={"race_slug": race.slug})
+    resp = client.get(url)
+    assert resp.status_code == 302
+    assert reverse("login") in resp.url
+    assert "?next=" in resp.url
+    assert f"/race/{race.slug}/legend/codes/" in resp.url
+
+
+@pytest.mark.django_db
+def test_legend_codes_get_regular_user_forbidden(client, django_user_model):
+    race = _make_race()
+    user = django_user_model.objects.create_user(username="u", password="x")
+    client.force_login(user)
+    resp = client.get(reverse("legend_codes", kwargs={"race_slug": race.slug}))
+    assert resp.status_code == 403
+
+
+@pytest.mark.django_db
+def test_legend_codes_lists_tags_with_hex_and_placeholder(client):
+    from website.models import Checkpoint
+    from website.models.checkpoint import CheckpointTag
+
+    race = _make_race()
+    cp2 = Checkpoint.objects.create(race=race, number=2, cost=20, description="b")
+    cp1 = Checkpoint.objects.create(race=race, number=1, cost=10, description="a")
+    with_code = CheckpointTag.objects.create(
+        point=cp1, nfc_uid="aa:bb:cc", code=b"\x01\x02\x03"
+    )
+    without_code = CheckpointTag.objects.create(point=cp2, nfc_uid="dd:ee:ff")
+    # The post_save signal auto-mints a code; clear it via update() (bypasses
+    # signals) to exercise the "—" placeholder the command also shows.
+    CheckpointTag.objects.filter(id=without_code.id).update(code=None)
+    superuser = User.objects.create_superuser("admin", "a@b.c", "pw")
+    client.force_login(superuser)
+
+    resp = client.get(reverse("legend_codes", kwargs={"race_slug": race.slug}))
+    assert resp.status_code == 200
+    rows = resp.context["rows"]
+    # Ordered by point number, so КП 1 (with code) comes first.
+    assert rows[0]["nfc_uid"] == with_code.nfc_uid
+    assert rows[0]["number"] == 1
+    assert rows[0]["code"] == "010203"
+    assert rows[1]["nfc_uid"] == without_code.nfc_uid
+    assert rows[1]["code"] == "—"
+
+
+@pytest.mark.django_db
+def test_legend_codes_get_race_admin_allowed(client, django_user_model):
+    race = _make_race()
+    user = django_user_model.objects.create_user(username="admin_user", password="x")
+    RaceAdmin.objects.create(race=race, user=user, role=RaceAdmin.Role.ADMIN)
+    client.force_login(user)
+    resp = client.get(reverse("legend_codes", kwargs={"race_slug": race.slug}))
+    assert resp.status_code == 200
+
+
+@pytest.mark.django_db
+def test_legend_codes_get_race_moderator_forbidden(client, django_user_model):
+    race = _make_race()
+    user = django_user_model.objects.create_user(username="mod_user", password="x")
+    RaceAdmin.objects.create(race=race, user=user, role=RaceAdmin.Role.MODERATOR)
+    client.force_login(user)
+    resp = client.get(reverse("legend_codes", kwargs={"race_slug": race.slug}))
+    assert resp.status_code == 403
+
+
+# ---------------------------------------------------------------------------
