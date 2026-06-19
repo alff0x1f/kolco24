@@ -24,23 +24,24 @@ def safe_next(candidate):
 
     Follows nested ``?next=`` chains buried inside auth pages so the login/register/
     start links can't accumulate, and returns ``""`` when there is no real
-    destination behind the auth page. The result is always a bare same-site path
-    (query stripped), safe to feed straight back into ``?next=``. Loop-bounded.
+    destination behind the auth page. Off-site and non-absolute values are dropped.
+    Query strings on the final destination are preserved. Loop-bounded.
     """
     seen = 0
-    while candidate and seen < 6:
+    while candidate and seen <= len(_AUTH_URL_NAMES):
         seen += 1
         parts = urlsplit(candidate)
         path = parts.path
         # Same-site absolute paths only; scheme/host or relative values are dropped.
         if parts.scheme or parts.netloc or not path.startswith("/"):
             return ""
+        dest = path + ("?" + parts.query if parts.query else "")
         try:
             match = resolve(path)
         except Resolver404:
-            return path
+            return dest
         if match.url_name not in _AUTH_URL_NAMES:
-            return path
+            return dest
         # Auth page: drill into its own buried next, discard the rest.
         candidate = parse_qs(parts.query).get("next", [""])[0]
     return ""

@@ -2073,12 +2073,13 @@ def test_ru_plural_picks_correct_form(n, expected):
     assert ru_plural(n, "команда,команды,команд") == expected
 
 
-@pytest.mark.django_db
 @pytest.mark.parametrize(
     "candidate, expected",
     [
         # A real destination passes through unchanged.
         ("/race/kolco24_2024/teams/", "/race/kolco24_2024/teams/"),
+        # Query strings on the real destination are preserved.
+        ("/race/kolco24_2024/teams/?sort=name", "/race/kolco24_2024/teams/?sort=name"),
         # A buried real destination is dug out and flattened.
         (
             "/accounts/login/?next=/accounts/register/?next=/race/kolco24_2024/teams/",
@@ -2109,6 +2110,8 @@ def test_robots_txt_disallows_accounts(client):
     assert resp["Content-Type"] == "text/plain"
     body = resp.content.decode()
     assert "Disallow: /accounts/" in body
+    assert "Disallow: /app/" in body
+    assert "Disallow: /admin/" in body
 
 
 # ---------------------------------------------------------------------------
