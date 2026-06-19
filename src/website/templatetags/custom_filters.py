@@ -36,7 +36,14 @@ def safe_next(candidate):
             return ""
         path = parts.path
         # Same-site absolute paths only; scheme/host or relative values are dropped.
-        if parts.scheme or parts.netloc or not path.startswith("/"):
+        # ``//host`` (and ``////host`` etc., which urlsplit leaves in ``path`` with
+        # an empty netloc) is a protocol-relative target — reject it as off-site.
+        if (
+            parts.scheme
+            or parts.netloc
+            or not path.startswith("/")
+            or path.startswith("//")
+        ):
             return ""
         dest = path + ("?" + parts.query if parts.query else "")
         try:

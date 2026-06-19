@@ -2094,6 +2094,9 @@ def test_ru_plural_picks_correct_form(n, expected):
         # Off-site and protocol-relative targets are dropped.
         ("https://evil.com/x", ""),
         ("//evil.com/x", ""),
+        # Extra leading slashes leave an empty netloc but a protocol-relative
+        # path (//evil.com/x) that a browser still resolves off-site — dropped.
+        ("////evil.com/x", ""),
         ("", ""),
         # Malformed URL (invalid IPv6 bracket) must not raise.
         ("http://[", ""),
