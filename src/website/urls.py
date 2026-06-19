@@ -5,6 +5,7 @@ from django.urls import include, path
 
 from apps.race.views import (
     RaceEditView,
+    RaceLegendCodesView,
     RaceLegendEditView,
     RacePageView,
     RaceTeamsView,
@@ -62,6 +63,11 @@ urlpatterns = [
         "race/<slug:race_slug>/legend/edit/",
         RaceLegendEditView.as_view(),
         name="edit_legend",
+    ),
+    path(
+        "race/<slug:race_slug>/legend/codes/",
+        RaceLegendCodesView.as_view(),
+        name="legend_codes",
     ),
     path("race/<slug:race_slug>/", RacePageView.as_view(), name="race"),
     path("race/<slug:race_slug>/teams/", RaceTeamsView.as_view(), name="all_teams"),
