@@ -138,26 +138,44 @@ class TeamSerializer(serializers.ModelSerializer):
     set is empty it falls back to the legacy ``athlet1..6`` columns that the
     existing web UI still writes to.  The fallback keeps
     member data visible until every team is stored in the ``Athlet`` table.
+
+    The roster is then padded with empty-name slots up to
+    ``min(floor(paid_people), ucount)`` so the app sees one slot per
+    participant the team actually paid for and declared, even when not every
+    name was entered (the web form leaves member-name fields optional). Names
+    are never dropped: if real members exceed that floor (stale data after a
+    size reduction), every named slot is still emitted. ``paid_people`` keeps
+    unpaid/just-registered teams from sprouting synthetic slots. An empty slot
+    is ``{"name": "", "number_in_team": i}`` — the app renders its own
+    placeholder.
     """
 
     category2 = serializers.IntegerField(source="category2_id")
     members = serializers.SerializerMethodField()
 
     def get_members(self, team):
-        # Prefer Athlet rows (ordering comes from the view's Prefetch).
+        # Collect real names keyed by slot. Prefer Athlet rows (ordering comes
+        # from the view's Prefetch); fall back to legacy athlet1..6 columns.
+        names = {}
         athlets = list(team.athlet_set.all())
         if athlets:
-            return MemberSerializer(athlets, many=True).data
-        # Fall back to legacy athlet1..6 columns.
-        # Cap at ucount so slots above the active roster (stale after a size
-        # reduction — the web form hides but does not clear those inputs) are
-        # not exposed.
-        result = []
-        for i in range(1, min(team.ucount, 6) + 1):
-            name = getattr(team, f"athlet{i}", "")
-            if name:
-                result.append({"name": name, "number_in_team": i})
-        return result
+            for a in athlets:
+                names[a.number_in_team] = a.name
+        else:
+            for i in range(1, 7):
+                name = getattr(team, f"athlet{i}", "")
+                if name:
+                    names[i] = name
+
+        # One slot per paid + declared participant; never drop a real member.
+        target = min(int(team.paid_people), team.ucount)
+        if names:
+            target = max(target, max(names))
+
+        return [
+            {"name": names.get(i, ""), "number_in_team": i}
+            for i in range(1, target + 1)
+        ]
 
     class Meta:
         model = Team
