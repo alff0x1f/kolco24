@@ -120,16 +120,41 @@ Django 4.2 project. Source lives entirely under `src/`, with `manage.py` at `src
       every `category2` id resolves), `/app/race/<id>/legend/` (checkpoints **plus a per-tag `tags` array** — `bid → point`
       identity for **every** tag (open + locked), plus `iv`/`ct` for the offline legend unlock on locked КП only — see
       the **Legend encryption** invariant below; the legend is **always served** for a published race (no race-level
-      visibility gate), with `type="hidden"` КП excluded), `/app/race/<id>/sync/` (pure version manifest — no data, no
+      visibility gate), with `type="hidden"` КП excluded), `/app/race/<id>/member_tags/` (the participant-bracelet pool —
+      `{number, nfc_uid}` per `Tag` for offline scan resolution; the chip pool is **global** today (one physical set
+      reused across races) so `race_id` is accepted but **not used for filtering** — a reserved hook for a future
+      per-race chip set; the served set is a **data-anchored** window `last_seen_at >= MAX(last_seen_at) − 30d` (not
+      wall-clock `now()`, so an idle race is stable; a never-scanned pool returns everything); the api read
+      `GET /api/member_tag/` stays unchanged — this only *adds* the read to the mobile app), `/app/race/<id>/sync/`
+      (pure version manifest — no data, no
       ETag; lease/handoff stubbed: `data_source` from
       `MOBILE_DATA_SOURCE` env, default `"cloud"`, `lease_expires_at` always `null`).
-    - **Conditional GET**: races/teams/legend set a strong `ETag` on **every** exit path; a matching `If-None-Match`
+    - **Conditional GET**: races/teams/legend/member_tags set a strong `ETag` on **every** exit path; a matching
+      `If-None-Match`
       short-circuits to `304` with no serialization. `versioning.py` is the **single source of truth** for both the
       ETags and the `sync` manifest: each fingerprint is a `blake2b(digest_size=8)` hex over `MAX(updated_at)|COUNT`
       aggregates computed over the exact queryset the view serves (`None` aggregates render as `"None"`, so an empty
-      race is stable). Deliberately **no `versions.categories`** — category edits must move `versions.teams`;
+      race is stable) — **except `member_tags_version()`**, which folds in the sorted active ID list (see **Member
+      tags** below). Deliberately **no `versions.categories`** — category edits must move `versions.teams`;
       `races_version()` is global and deliberately absent from the per-race `sync` manifest (the races list is the app's
-      entry point, probed via its own conditional GET). The **legend** fingerprint additionally folds in two more
+      entry point, probed via its own conditional GET).
+    - **Member tags** (`active_member_tags()` + `member_tags_version()` in `versioning.py`; `MemberTagSerializer` in
+      `serializers.py` — distinct name from the legend per-`CheckpointTag` `TagSerializer`): the fingerprint hashes the
+      **actual served field values** — `blake2b` over the canonical JSON encoding of `[(id, number, nfc_uid), …]`
+      ordered by `id` over the same data-anchored window `active_member_tags()` serves (single-source contract;
+      JSON encoding avoids any ambiguity from special characters in `nfc_uid`). Hashing field values (not just
+      `MAX(updated_at)|COUNT|IDs`) ensures a same-COUNT identity swap (one chip ages past the 30-day floor while a
+      touch brings another in) and a same-COUNT field edit under concurrent provisioning (where one write's timestamp
+      falls below the existing `MAX(updated_at)`) both change the fingerprint and avoid a stale 304.
+      `Tag` gained an `auto_now` `updated_at` field **so the version moves on provisioning edits (add / renumber /
+      remove) but not on scans**: `MemberTagTouchView` (`api/views/tag.py`) keeps
+      `save(update_fields=["last_seen_at"])` and **intentionally omits `"updated_at"`** — a deliberate carve-out from
+      the `update_fields` discipline, so a bracelet tap can't churn the mobile ETag and trigger mid-race re-downloads.
+      The ETag can still shift day-scale when scan activity advances `MAX(last_seen_at)` enough to age the oldest chips
+      past the 30-day floor (membership change, not per-scan churn). `member_tags_version()` is **global** (no
+      `race_id`, like `races_version`) but — unlike `races_version` — **is** included in the per-race `sync` manifest,
+      because it's served at a per-race URL and the app needs one sync poll to learn what to refetch for the race it's
+      syncing. The **legend** fingerprint additionally folds in two more
       `MAX(updated_at)|COUNT` aggregates over the same hidden-excluded checkpoints — `CheckpointSecret` (re-seal / enc
       appear/disappear on a lock toggle) and `CheckpointTag` (code/unlocks/bundle/check_method) — so the legend ETag /
       `versions.legend` move on any lock toggle, re-seal, or tag edit. The legend fingerprint is `legend_version(race_id)`
@@ -171,9 +196,10 @@ Django 4.2 project. Source lives entirely under `src/`, with `manage.py` at `src
       scoring/scan path lives in the `api` app and matches by `nfc_uid` (unchanged). Per the **`update_fields` discipline** above, every service
       `save(update_fields=[...])` on `CheckpointTag`/`CheckpointSecret` includes `"updated_at"`.
     - **`update_fields` discipline**: the fingerprints rely on `auto_now` `updated_at` fields on `Team`/`Athlet`/
-      `Checkpoint`/`CheckpointTag`/`CheckpointSecret`/`Category`/`Race`. Any `save(update_fields=[...])` on these models **must** include `"updated_at"`,
+      `Checkpoint`/`CheckpointTag`/`CheckpointSecret`/`Category`/`Race`/`Tag`. Any `save(update_fields=[...])` on these models **must** include `"updated_at"`,
       otherwise the version/ETag goes stale (e.g. the auto `OPEN → SOLD_OUT` `reg_status` flips in
-      `check_vtb_payments.py` and `website/models/models.py` include it).
+      `check_vtb_payments.py` and `website/models/models.py` include it). **Exception**: `MemberTagTouchView` deliberately
+      omits `"updated_at"` from `save(update_fields=["last_seen_at"])` — see the **Member tags** invariant above.
     - **`nfc_uid` normalized invariant**: `Tag.nfc_uid` and `CheckpointTag.nfc_uid` are auto-normalized (stripped and uppercased) by their
       `save()` overrides. `save()` with or without `update_fields` still runs the override (Django calls the Python method regardless).
       The one case that bypasses the override entirely is `QuerySet.update(nfc_uid=...)` — that generates raw SQL without calling `save()`,

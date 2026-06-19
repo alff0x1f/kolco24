@@ -26,11 +26,18 @@ from .permissions import SignedAppPermission
 from .serializers import (
     CategorySerializer,
     LegendCheckpointSerializer,
+    MemberTagSerializer,
     RaceListSerializer,
     TagSerializer,
     TeamSerializer,
 )
-from .versioning import legend_version, races_version, teams_version
+from .versioning import (
+    active_member_tags,
+    legend_version,
+    member_tags_version,
+    races_version,
+    teams_version,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -232,14 +239,58 @@ class TeamsView(AppAPIView):
         return resp
 
 
+class MemberTagsView(AppAPIView):
+    """Return the member-tag (participant bracelet) pool for a race (conditional GET).
+
+    The response is ``{"member_tags": [{number, nfc_uid}, ...]}`` — the offline
+    ``nfc_uid → number`` identity the app uses to resolve a bracelet scan at a
+    checkpoint. The served set is the data-anchored 30-day window from
+    :func:`active_member_tags` (an idle pool is perfectly stable).
+
+    The ETag is the bare :func:`member_tags_version` fingerprint wrapped in
+    quotes; a matching ``If-None-Match`` short-circuits to an empty ``304``
+    before any serialization. A scan (``touch``) cannot churn the ETag on its
+    own — only provisioning edits (and day-scale window-membership shifts) move
+    it (see ``member_tags_version``).
+
+    ``race_id`` is the reserved (currently-unused) hook for a future per-race
+    chip set: the pool is global today (``Tag`` has no race FK), so the id is
+    validated for a published race but does not yet filter the pool.
+    """
+
+    def get(self, request, race_id):
+        get_object_or_404(Race, pk=race_id, is_published=True)
+        # Materialise once so the ETag and the response body come from the same
+        # DB snapshot (a concurrent provisioning edit between two separate queries
+        # would produce payload B with ETag A).
+        tags = list(active_member_tags().order_by("id"))
+        rows = [(t.id, t.number, t.nfc_uid) for t in tags]
+        quoted = f'"{member_tags_version(rows)}"'
+
+        if request.headers.get("If-None-Match") == quoted:
+            resp = HttpResponseNotModified()
+            resp["ETag"] = quoted
+            return resp
+
+        resp = Response({"member_tags": MemberTagSerializer(tags, many=True).data})
+        resp["ETag"] = quoted
+        return resp
+
+
 class SyncView(AppAPIView):
     """Return a pure version manifest for a race (no data serialization).
 
     A cheap signed probe: the client compares ``versions.teams`` / ``versions.legend``
-    (the bare :func:`teams_version` / :func:`legend_version` fingerprints, the same
-    values the ``/teams/`` and ``/legend/`` ETags wrap in quotes) against its stored
-    ETags to decide whether to re-fetch. No ``If-None-Match``/304 — there is nothing
-    to short-circuit.
+    / ``versions.member_tags`` (the bare :func:`teams_version` / :func:`legend_version`
+    / :func:`member_tags_version` fingerprints, the same values the ``/teams/`` /
+    ``/legend/`` / ``/member_tags/`` ETags wrap in quotes) against its stored ETags to
+    decide whether to re-fetch. No ``If-None-Match``/304 — there is nothing to
+    short-circuit.
+
+    Unlike ``races_version`` (global, deliberately absent here), ``member_tags`` is
+    included even though it's a global pool: the member-tags endpoint is served at a
+    per-race URL, so the app needs one sync poll to learn what to refetch for the race
+    it's syncing.
     """
 
     def get(self, request, race_id):
@@ -254,6 +305,9 @@ class SyncView(AppAPIView):
                     # Build-independent: versions.legend equals the legend ETag
                     # for every build (stored ciphertext/bundles, no key_id).
                     "legend": legend_version(race_id),
+                    # Global pool today, but served at a per-race URL — see the
+                    # SyncView docstring for why it's in this per-race manifest.
+                    "member_tags": member_tags_version(),
                 },
             }
         )

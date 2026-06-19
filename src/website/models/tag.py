@@ -9,6 +9,7 @@ class Tag(models.Model):
         blank=True,
         verbose_name="Последнее сканирование",
     )
+    updated_at = models.DateTimeField(auto_now=True, verbose_name="Изменён")
 
     def save(self, *args, **kwargs):
         self.nfc_uid = (self.nfc_uid or "").strip().upper()

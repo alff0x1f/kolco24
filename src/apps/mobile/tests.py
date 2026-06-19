@@ -79,6 +79,20 @@ def test_verify_false_for_changed_path():
 
 
 @pytest.mark.django_db
+def test_member_tag_serializer_field_set():
+    from apps.mobile.serializers import MemberTagSerializer
+    from website.models.tag import Tag
+
+    tag = Tag.objects.create(number=42, nfc_uid="abc123")
+
+    data = MemberTagSerializer(tag).data
+
+    assert set(data.keys()) == {"number", "nfc_uid"}
+    assert data["number"] == 42
+    assert data["nfc_uid"] == "ABC123"
+
+
+@pytest.mark.django_db
 def test_legend_checkpoint_serializer_open_exposes_cleartext():
     from apps.mobile.serializers import LegendCheckpointSerializer
     from website.models.checkpoint import Checkpoint
@@ -2235,9 +2249,10 @@ def test_sync_manifest_shape_and_defaults(client, settings, django_user_model):
     assert data["race"] == race.id
     assert data["data_source"] == "cloud"
     assert data["lease_expires_at"] is None
-    assert set(data["versions"].keys()) == {"teams", "legend"}
+    assert set(data["versions"].keys()) == {"teams", "legend", "member_tags"}
     assert data["versions"]["teams"]  # non-empty fingerprint
     assert data["versions"]["legend"]  # non-empty fingerprint
+    assert data["versions"]["member_tags"]  # non-empty fingerprint
 
 
 @pytest.mark.django_db
@@ -4002,3 +4017,522 @@ def test_signal_bulk_delete_holder_and_target_skips_cascade_deleted_tag():
 
     # The tag was cascade-deleted along with holder.
     assert not CheckpointTag.objects.filter(pk=tag_pk).exists()
+
+
+# --- member_tags_version fingerprint ----------------------------------------
+
+
+@pytest.mark.django_db
+def test_member_tags_version_stable_for_unchanged_pool():
+    from datetime import timedelta
+
+    from django.utils import timezone
+
+    from apps.mobile.versioning import member_tags_version
+    from website.models.tag import Tag
+
+    now = timezone.now()
+    Tag.objects.create(number=1, nfc_uid="AA01", last_seen_at=now)
+    Tag.objects.create(number=2, nfc_uid="AA02", last_seen_at=now - timedelta(days=5))
+
+    assert member_tags_version() == member_tags_version()
+
+
+@pytest.mark.django_db
+def test_member_tags_version_stable_for_empty_pool():
+    from apps.mobile.versioning import member_tags_version
+
+    # Empty pool uses "empty" sentinel — stable, non-crashing.
+    assert member_tags_version() == member_tags_version()
+
+
+@pytest.mark.django_db
+def test_member_tags_version_changes_on_provisioning_renumber():
+    from django.utils import timezone
+
+    from apps.mobile.versioning import member_tags_version
+    from website.models.tag import Tag
+
+    tag = Tag.objects.create(number=1, nfc_uid="AA01", last_seen_at=timezone.now())
+    before = member_tags_version()
+
+    tag.number = 99
+    tag.save()
+    assert member_tags_version() != before
+
+
+@pytest.mark.django_db
+def test_member_tags_version_unchanged_by_touch_within_window():
+    """A scan that does not change window membership must not move the version."""
+    from datetime import timedelta
+
+    from django.utils import timezone
+
+    from apps.mobile.versioning import member_tags_version
+    from website.models.tag import Tag
+
+    now = timezone.now()
+    # Two tags well inside the 30-day window; a touch on one keeps both in-window.
+    Tag.objects.create(number=1, nfc_uid="AA01", last_seen_at=now - timedelta(days=1))
+    tag = Tag.objects.create(
+        number=2, nfc_uid="AA02", last_seen_at=now - timedelta(days=2)
+    )
+    before = member_tags_version()
+
+    # Mirror MemberTagTouchView: bump only last_seen_at, not updated_at.
+    tag.last_seen_at = timezone.now()
+    tag.save(update_fields=["last_seen_at"])
+    assert member_tags_version() == before
+
+
+@pytest.mark.django_db
+def test_active_member_tags_window_anchored_on_max_last_seen():
+    from datetime import timedelta
+
+    from django.utils import timezone
+
+    from apps.mobile.versioning import active_member_tags
+    from website.models.tag import Tag
+
+    now = timezone.now()
+    fresh = Tag.objects.create(number=1, nfc_uid="AA01", last_seen_at=now)
+    # Just inside the 30-day floor.
+    inside = Tag.objects.create(
+        number=2, nfc_uid="AA02", last_seen_at=now - timedelta(days=29)
+    )
+    # Just outside the 30-day floor.
+    Tag.objects.create(number=3, nfc_uid="AA03", last_seen_at=now - timedelta(days=31))
+
+    ids = set(active_member_tags().values_list("id", flat=True))
+    assert ids == {fresh.id, inside.id}
+
+
+@pytest.mark.django_db
+def test_active_member_tags_never_scanned_returns_all():
+    from apps.mobile.versioning import active_member_tags
+    from website.models.tag import Tag
+
+    a = Tag.objects.create(number=1, nfc_uid="AA01")
+    b = Tag.objects.create(number=2, nfc_uid="AA02")
+
+    ids = set(active_member_tags().values_list("id", flat=True))
+    assert ids == {a.id, b.id}
+
+
+@pytest.mark.django_db
+def test_active_member_tags_never_scanned_included_alongside_recent():
+    """A never-scanned tag must remain visible once other tags start being scanned."""
+    from django.utils import timezone
+
+    from apps.mobile.versioning import active_member_tags
+    from website.models.tag import Tag
+
+    recent = Tag.objects.create(number=1, nfc_uid="AA01", last_seen_at=timezone.now())
+    never_scanned = Tag.objects.create(number=2, nfc_uid="AA02")
+
+    ids = set(active_member_tags().values_list("id", flat=True))
+    assert ids == {recent.id, never_scanned.id}
+
+
+@pytest.mark.django_db
+def test_member_tags_version_changes_on_provisioning_add():
+    from apps.mobile.versioning import member_tags_version
+    from website.models.tag import Tag
+
+    before = member_tags_version()
+    Tag.objects.create(number=1, nfc_uid="AA01")
+    assert member_tags_version() != before
+
+
+@pytest.mark.django_db
+def test_member_tags_version_changes_on_provisioning_delete():
+    from apps.mobile.versioning import member_tags_version
+    from website.models.tag import Tag
+
+    tag = Tag.objects.create(number=1, nfc_uid="AA01")
+    before = member_tags_version()
+    tag.delete()
+    assert member_tags_version() != before
+
+
+@pytest.mark.django_db
+def test_member_tags_version_changes_on_equal_count_swap():
+    """Touch-driven window swap: COUNT and MAX(updated_at) stay equal but
+    identities change — must still produce a new fingerprint."""
+    from datetime import timedelta
+
+    from django.utils import timezone
+
+    from apps.mobile.versioning import member_tags_version
+    from website.models.tag import Tag
+
+    now = timezone.now()
+    # Tag A: the most-recently scanned tag (anchors the window floor).
+    # Keep its auto_now updated_at as the MAX — we backdate B and C below.
+    tag_a = Tag.objects.create(number=1, nfc_uid="AA01", last_seen_at=now)
+    # Tag B: near the edge of the 30-day window; will be evicted after the swap.
+    tag_b = Tag.objects.create(
+        number=2, nfc_uid="AA02", last_seen_at=now - timedelta(days=29)
+    )
+    # Tag C: currently outside the window.
+    tag_c = Tag.objects.create(
+        number=3, nfc_uid="AA03", last_seen_at=now - timedelta(days=31)
+    )
+    # Backdate BOTH B and C so tag_a holds MAX(updated_at) in every state.
+    # Without this, B.updated_at > A.updated_at (created later), meaning the old
+    # MAX|COUNT fingerprint would also change when B leaves (MAX shifts from B to A)
+    # — not a true same-MAX|COUNT swap test.
+    Tag.objects.filter(pk=tag_b.pk).update(updated_at=now - timedelta(days=70))
+    Tag.objects.filter(pk=tag_c.pk).update(updated_at=now - timedelta(days=60))
+
+    # Confirm the active set is {A, B}, not C.
+    from django.db.models import Count, Max
+
+    from apps.mobile.versioning import active_member_tags
+
+    active_ids = set(active_member_tags().values_list("id", flat=True))
+    assert tag_c.id not in active_ids
+    assert tag_b.id in active_ids
+
+    # Confirm A holds MAX(updated_at) over the active set before the swap.
+    tag_a.refresh_from_db()
+    agg_before = active_member_tags().aggregate(
+        max_ua=Max("updated_at"), cnt=Count("id")
+    )
+    assert agg_before["max_ua"] == tag_a.updated_at
+    assert agg_before["cnt"] == 2
+
+    before = member_tags_version()
+
+    # Touch tag_c: advances MAX(last_seen_at) so tag_b falls below the new floor
+    # and tag_c enters. COUNT stays 2; MAX(updated_at) stays at tag_a's value.
+    # A naive MAX|COUNT fingerprint would produce the same hash and return a
+    # stale 304.
+    tag_c.last_seen_at = now + timedelta(days=2)
+    tag_c.save(update_fields=["last_seen_at"])
+
+    # After the swap active set is {A, C}, not {A, B}.
+    active_ids_after = set(active_member_tags().values_list("id", flat=True))
+    assert tag_b.id not in active_ids_after
+    assert tag_c.id in active_ids_after
+
+    # Confirm MAX(updated_at) and COUNT are unchanged — only identities changed.
+    # This is the exact scenario the old MAX|COUNT fingerprint would miss.
+    agg_after = active_member_tags().aggregate(
+        max_ua=Max("updated_at"), cnt=Count("id")
+    )
+    assert (
+        agg_after["max_ua"] == agg_before["max_ua"]
+    ), "MAX(updated_at) must not change"
+    assert agg_after["cnt"] == agg_before["cnt"], "COUNT must not change"
+
+    assert member_tags_version() != before
+
+
+@pytest.mark.django_db
+def test_member_tags_version_changes_on_field_edit_when_updated_at_not_max():
+    """Field change is detected even when the tag's updated_at is below MAX(updated_at).
+
+    Simulates concurrent provisioning: Tag A's write carries an earlier timestamp
+    but commits after Tag B's write. MAX(updated_at) stays at Tag B's value, so a
+    fingerprint based only on MAX|COUNT|IDs would silently return stale data.
+    Hashing (id, number, nfc_uid) detects the change regardless.
+    """
+    from datetime import timedelta
+
+    from django.utils import timezone
+
+    from apps.mobile.versioning import member_tags_version
+    from website.models.tag import Tag
+
+    now = timezone.now()
+
+    # Tag B anchors MAX(updated_at) at a later time.
+    Tag.objects.create(number=2, nfc_uid="BB02", last_seen_at=now)
+    tag_a = Tag.objects.create(number=1, nfc_uid="AA01", last_seen_at=now)
+    # Backdate tag A so its updated_at is below tag B's (simulates the
+    # earlier-timestamp write).
+    Tag.objects.filter(pk=tag_a.pk).update(updated_at=now - timedelta(days=5))
+
+    before = member_tags_version()
+
+    # Simulate the late-committing earlier-timestamped transaction: change the field
+    # without touching updated_at (bypass auto_now via queryset.update).
+    Tag.objects.filter(pk=tag_a.pk).update(number=99)
+
+    # MAX(updated_at) and COUNT are still unchanged — only the field value differs.
+    # The fingerprint must still change.
+    assert member_tags_version() != before
+
+
+# --- MemberTagsView request-level -------------------------------------------
+
+
+@pytest.mark.django_db
+def test_member_tags_valid_signature_returns_200_with_fields(client, settings):
+    from website.models.race import Race
+    from website.models.tag import Tag
+
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    race = Race.objects.create(name="MT race", slug="mt-race")
+    Tag.objects.create(number=7, nfc_uid="aa01")
+
+    path = f"/app/race/{race.id}/member_tags/"
+    response = client.get(path, **_signed_headers("GET", path, SECRET))
+
+    assert response.status_code == 200
+    data = response.json()
+    assert list(data.keys()) == ["member_tags"]
+    assert len(data["member_tags"]) == 1
+    entry = data["member_tags"][0]
+    assert set(entry.keys()) == {"number", "nfc_uid"}
+    assert entry["number"] == 7
+    assert entry["nfc_uid"] == "AA01"
+
+
+@pytest.mark.django_db
+def test_member_tags_no_headers_returns_403(client, settings):
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    race, _ = _make_race_with_category(slug="mt-403")
+    path = f"/app/race/{race.id}/member_tags/"
+    response = client.get(path)
+    assert response.status_code == 403
+    assert response.json() == {"detail": "Forbidden"}
+
+
+@pytest.mark.django_db
+def test_member_tags_wrong_signature_returns_403(client, settings):
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+    race, _ = _make_race_with_category(slug="mt-bad-sig")
+    path = f"/app/race/{race.id}/member_tags/"
+    headers = _signed_headers("GET", path, "wrong-secret")
+    response = client.get(path, **headers)
+    assert response.status_code == 403
+    assert response.json() == {"detail": "Forbidden"}
+
+
+@pytest.mark.django_db
+def test_member_tags_unknown_key_id_returns_403(client, settings):
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+    race, _ = _make_race_with_category(slug="mt-bad-key")
+    path = f"/app/race/{race.id}/member_tags/"
+    headers = _signed_headers("GET", path, SECRET, key_id="not-in-map")
+    response = client.get(path, **headers)
+    assert response.status_code == 403
+    assert response.json() == {"detail": "Forbidden"}
+
+
+@pytest.mark.django_db
+def test_member_tags_valid_sig_nonexistent_race_returns_404(client, settings):
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+    path = "/app/race/999999/member_tags/"
+    response = client.get(path, **_signed_headers("GET", path, SECRET))
+    assert response.status_code == 404
+
+
+@pytest.mark.django_db
+def test_member_tags_unpublished_race_returns_404(client, settings):
+    from website.models.race import Race
+
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+    race = Race.objects.create(name="Unpub", slug="unpub-mt", is_published=False)
+    path = f"/app/race/{race.id}/member_tags/"
+    response = client.get(path, **_signed_headers("GET", path, SECRET))
+    assert response.status_code == 404
+
+
+@pytest.mark.django_db
+def test_member_tags_response_carries_etag(client, settings):
+    from website.models.race import Race
+    from website.models.tag import Tag
+
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    race = Race.objects.create(name="MT etag", slug="mt-etag")
+    Tag.objects.create(number=1, nfc_uid="AA01")
+
+    path = f"/app/race/{race.id}/member_tags/"
+    response = client.get(path, **_signed_headers("GET", path, SECRET))
+
+    assert response.status_code == 200
+    etag = response["ETag"]
+    assert etag.startswith('"') and etag.endswith('"')
+
+
+@pytest.mark.django_db
+def test_member_tags_if_none_match_returns_304_empty_body(client, settings):
+    from website.models.race import Race
+    from website.models.tag import Tag
+
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    race = Race.objects.create(name="MT 304", slug="mt-304")
+    Tag.objects.create(number=1, nfc_uid="AA01")
+
+    path = f"/app/race/{race.id}/member_tags/"
+    first = client.get(path, **_signed_headers("GET", path, SECRET))
+    etag = first["ETag"]
+
+    headers = _signed_headers("GET", path, SECRET)
+    headers["HTTP_IF_NONE_MATCH"] = etag
+    second = client.get(path, **headers)
+
+    assert second.status_code == 304
+    assert second["ETag"] == etag
+    assert second.content == b""
+
+
+@pytest.mark.django_db
+def test_member_tags_stale_if_none_match_returns_200_with_new_etag(client, settings):
+    from django.utils import timezone
+
+    from website.models.race import Race
+    from website.models.tag import Tag
+
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    race = Race.objects.create(name="MT stale", slug="mt-stale")
+    tag = Tag.objects.create(number=1, nfc_uid="AA01", last_seen_at=timezone.now())
+
+    path = f"/app/race/{race.id}/member_tags/"
+    first = client.get(path, **_signed_headers("GET", path, SECRET))
+    old_etag = first["ETag"]
+
+    # A provisioning renumber moves the fingerprint.
+    tag.number = 99
+    tag.save()
+
+    headers = _signed_headers("GET", path, SECRET)
+    headers["HTTP_IF_NONE_MATCH"] = old_etag
+    second = client.get(path, **headers)
+
+    assert second.status_code == 200
+    assert second["ETag"] != old_etag
+
+
+@pytest.mark.django_db
+def test_member_tags_window_excludes_old_includes_fresh(client, settings):
+    """The served set is the data-anchored 30-day window (explicit last_seen_at)."""
+    from datetime import timedelta
+
+    from django.utils import timezone
+
+    from website.models.race import Race
+    from website.models.tag import Tag
+
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    race = Race.objects.create(name="MT window", slug="mt-window")
+    now = timezone.now()
+    Tag.objects.create(number=1, nfc_uid="AA01", last_seen_at=now)
+    Tag.objects.create(number=2, nfc_uid="AA02", last_seen_at=now - timedelta(days=29))
+    Tag.objects.create(number=3, nfc_uid="AA03", last_seen_at=now - timedelta(days=31))
+
+    path = f"/app/race/{race.id}/member_tags/"
+    response = client.get(path, **_signed_headers("GET", path, SECRET))
+
+    assert response.status_code == 200
+    numbers = {t["number"] for t in response.json()["member_tags"]}
+    assert numbers == {1, 2}  # the 31-day-old chip is aged past the floor
+
+
+@pytest.mark.django_db
+def test_member_tags_never_scanned_returns_all(client, settings):
+    from website.models.race import Race
+    from website.models.tag import Tag
+
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    race = Race.objects.create(name="MT never", slug="mt-never")
+    Tag.objects.create(number=1, nfc_uid="AA01")
+    Tag.objects.create(number=2, nfc_uid="AA02")
+
+    path = f"/app/race/{race.id}/member_tags/"
+    response = client.get(path, **_signed_headers("GET", path, SECRET))
+
+    assert response.status_code == 200
+    numbers = {t["number"] for t in response.json()["member_tags"]}
+    assert numbers == {1, 2}
+
+
+@pytest.mark.django_db
+def test_member_tags_tampered_query_string_returns_403(client, settings):
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+    race, _ = _make_race_with_category(slug="mt-qs")
+    path = f"/app/race/{race.id}/member_tags/"
+    headers = _signed_headers("GET", path, SECRET)
+    response = client.get(path + "?foo=bar", **headers)
+    assert response.status_code == 403
+
+
+@pytest.mark.django_db
+def test_sync_versions_member_tags_matches_member_tags_etag(client, settings):
+    from website.models.race import Race
+    from website.models.tag import Tag
+
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    race = Race.objects.create(name="Sync member tags", slug="sync-mt-etag")
+    Tag.objects.create(number=11, nfc_uid="bb02")
+
+    mt_path = f"/app/race/{race.id}/member_tags/"
+    mt_resp = client.get(mt_path, **_signed_headers("GET", mt_path, SECRET))
+    etag = mt_resp["ETag"]
+
+    sync_path = f"/app/race/{race.id}/sync/"
+    sync_resp = client.get(sync_path, **_signed_headers("GET", sync_path, SECRET))
+
+    versions = sync_resp.json()["versions"]
+    assert "member_tags" in versions
+    bare = versions["member_tags"]
+    # /member_tags/ ETag is the bare version wrapped in quotes
+    assert etag == f'"{bare}"'
+
+
+@pytest.mark.django_db
+def test_member_tags_records_appinstall(client, settings):
+    from website.models.race import Race
+
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+    race = Race.objects.create(name="MT install", slug="mt-install")
+    path = f"/app/race/{race.id}/member_tags/"
+    response = client.get(path, **_signed_headers("GET", path, SECRET))
+    assert response.status_code == 200
+    install = AppInstall.objects.get(install_id="install-abc")
+    assert install.request_count == 1
+
+
+@pytest.mark.django_db
+def test_member_tags_stats_write_failure_does_not_break_response(
+    client, settings, monkeypatch
+):
+    from website.models.race import Race
+
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+    race = Race.objects.create(name="MT stats fail", slug="mt-stats-fail")
+
+    def boom(*args, **kwargs):
+        raise IntegrityError("simulated stats write failure")
+
+    monkeypatch.setattr(AppInstall.objects, "update_or_create", boom)
+
+    path = f"/app/race/{race.id}/member_tags/"
+    response = client.get(path, **_signed_headers("GET", path, SECRET))
+
+    assert response.status_code == 200
+    assert not AppInstall.objects.filter(install_id="install-abc").exists()
