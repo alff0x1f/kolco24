@@ -8,8 +8,10 @@ from django.db.models import Count, OuterRef, ProtectedError, Q, Subquery
 from django.http import Http404, HttpResponseForbidden, HttpResponseRedirect
 from django.shortcuts import get_object_or_404, render
 from django.urls import reverse
+from django.utils.decorators import method_decorator
 from django.utils.safestring import mark_safe
 from django.views import View
+from django.views.decorators.cache import never_cache
 
 from apps.race.forms import RaceForm
 from apps.race.models import RaceExtra
@@ -996,6 +998,7 @@ class RaceLegendEditView(View):
         return render(request, "race/legend_form.html", context)
 
 
+@method_decorator(never_cache, name="dispatch")
 class RaceLegendCodesView(View):
     """Read-only view of a race's per-tag NFC codes (legend provisioning).
 
