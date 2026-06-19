@@ -98,6 +98,12 @@ Django 4.2 project. Source lives entirely under `src/`, with `manage.py` at `src
   and rebuilds bundles; a bulk update would bypass signals and leak cleartext). Deletion guard: a КП absent from the
   submitted payload is only deleted if it has no `CheckpointTag` rows — those represent physically provisioned NFC
   chips that would be silently destroyed; a tag-bearing КП raises `ValueError` and rolls back the whole save.
+  `RaceLegendCodesView` (template `src/templates/race/legend_codes.html`, assets `src/static/css/legend_codes.css` +
+  `src/static/js/legend_codes.js`) is a read-only table of per-tag NFC codes for field-crew provisioning, backing the
+  `legend_codes` (`race/<slug>/legend/codes/`) URL name. It is the web twin of `manage.py export_legend_codes --race
+  <id>` — same `CheckpointTag` queryset ordered by `point__number` then `id`, same `—` placeholder for tags without
+  a `code` yet, same `nfc_uid / КП number / code(hex)` columns. The JS "Скопировать CSV" button builds RFC-4180 CSV
+  from the rendered table and writes it to the clipboard. Gated on `can_edit_race`.
 - `apps.mobile` — **signed read-only endpoints** for the iOS/Android mobile app (`label = "mobile"`, mounted at `/app/*`
   via `config/urls.py`). Self-contained: touches neither `/api/` nor `donate`/`website`. No user accounts — the app
   authenticates **itself**. Full design (background-sync model, two-server lease/handoff, secret-rotation runbook, 403

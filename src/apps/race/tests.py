@@ -2456,9 +2456,12 @@ def test_legend_post_invalid_type_reports_row_error(client):
 @pytest.mark.django_db
 def test_legend_codes_get_anonymous_redirects_to_login(client):
     race = _make_race()
-    resp = client.get(reverse("legend_codes", kwargs={"race_slug": race.slug}))
+    url = reverse("legend_codes", kwargs={"race_slug": race.slug})
+    resp = client.get(url)
     assert resp.status_code == 302
     assert reverse("login") in resp.url
+    assert "?next=" in resp.url
+    assert f"/race/{race.slug}/legend/codes/" in resp.url
 
 
 @pytest.mark.django_db
@@ -2497,6 +2500,26 @@ def test_legend_codes_lists_tags_with_hex_and_placeholder(client):
     assert rows[0]["code"] == "010203"
     assert rows[1]["nfc_uid"] == without_code.nfc_uid
     assert rows[1]["code"] == "—"
+
+
+@pytest.mark.django_db
+def test_legend_codes_get_race_admin_allowed(client, django_user_model):
+    race = _make_race()
+    user = django_user_model.objects.create_user(username="admin_user", password="x")
+    RaceAdmin.objects.create(race=race, user=user, role=RaceAdmin.Role.ADMIN)
+    client.force_login(user)
+    resp = client.get(reverse("legend_codes", kwargs={"race_slug": race.slug}))
+    assert resp.status_code == 200
+
+
+@pytest.mark.django_db
+def test_legend_codes_get_race_moderator_forbidden(client, django_user_model):
+    race = _make_race()
+    user = django_user_model.objects.create_user(username="mod_user", password="x")
+    RaceAdmin.objects.create(race=race, user=user, role=RaceAdmin.Role.MODERATOR)
+    client.force_login(user)
+    resp = client.get(reverse("legend_codes", kwargs={"race_slug": race.slug}))
+    assert resp.status_code == 403
 
 
 # ---------------------------------------------------------------------------
