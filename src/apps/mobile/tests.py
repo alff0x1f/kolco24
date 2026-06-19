@@ -1698,6 +1698,85 @@ def test_team_serializer_members_in_number_order(django_user_model):
 
 
 @pytest.mark.django_db
+def test_team_serializer_pads_empty_slots_to_paid_people(django_user_model):
+    """A team that paid for 6 but named 3 gets 6 slots, 4..6 empty."""
+    from apps.mobile.serializers import TeamSerializer
+    from website.models.models import Team
+
+    race, category = _make_race_with_category(slug="ser-pad")
+    user = django_user_model.objects.create_user(
+        username="ser-pad", email="ser-pad@example.com", password="x"
+    )
+    team = Team.objects.create(
+        owner=user,
+        category2=category,
+        teamname="Padded",
+        ucount=6,
+        paid_people=6,
+        athlet1="A",
+        athlet2="B",
+        athlet3="C",
+    )
+    data = TeamSerializer(team).data
+    assert [(m["number_in_team"], m["name"]) for m in data["members"]] == [
+        (1, "A"),
+        (2, "B"),
+        (3, "C"),
+        (4, ""),
+        (5, ""),
+        (6, ""),
+    ]
+
+
+@pytest.mark.django_db
+def test_team_serializer_caps_slots_at_ucount(django_user_model):
+    """paid_people above ucount is capped by the declared team size."""
+    from apps.mobile.serializers import TeamSerializer
+    from website.models.models import Team
+
+    race, category = _make_race_with_category(slug="ser-cap")
+    user = django_user_model.objects.create_user(
+        username="ser-cap", email="ser-cap@example.com", password="x"
+    )
+    team = Team.objects.create(
+        owner=user,
+        category2=category,
+        teamname="Capped",
+        ucount=5,
+        paid_people=6,
+        athlet1="A",
+    )
+    data = TeamSerializer(team).data
+    assert [m["number_in_team"] for m in data["members"]] == [1, 2, 3, 4, 5]
+    assert data["members"][0]["name"] == "A"
+    assert all(m["name"] == "" for m in data["members"][1:])
+
+
+@pytest.mark.django_db
+def test_team_serializer_never_drops_named_members(django_user_model):
+    """Named members beyond min(paid, ucount) are still emitted (stale data)."""
+    from apps.mobile.serializers import TeamSerializer
+    from website.models.models import Team
+
+    race, category = _make_race_with_category(slug="ser-keep")
+    user = django_user_model.objects.create_user(
+        username="ser-keep", email="ser-keep@example.com", password="x"
+    )
+    team = Team.objects.create(
+        owner=user,
+        category2=category,
+        teamname="Stale",
+        ucount=2,
+        paid_people=2,
+        athlet1="A",
+        athlet2="B",
+        athlet3="C",
+    )
+    data = TeamSerializer(team).data
+    assert [m["name"] for m in data["members"]] == ["A", "B", "C"]
+
+
+@pytest.mark.django_db
 def test_team_serializer_category2_null_when_unset(django_user_model):
     from apps.mobile.serializers import TeamSerializer
     from website.models.models import Team
