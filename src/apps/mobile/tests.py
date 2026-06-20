@@ -4666,3 +4666,163 @@ def test_member_tags_stats_write_failure_does_not_break_response(
 
     assert response.status_code == 200
     assert not AppInstall.objects.filter(install_id="install-abc").exists()
+
+
+# --- Task 1: MobileToken model + token helpers ------------------------------
+
+
+def test_tokens_generate_hash_roundtrip():
+    from apps.mobile.tokens import generate_token, hash_token
+
+    raw, token_hash = generate_token()
+    assert isinstance(raw, str) and raw
+    # token_hash is the sha256 hex of the raw token (64 hex chars).
+    assert token_hash == hashlib.sha256(raw.encode()).hexdigest()
+    assert len(token_hash) == 64
+    assert hash_token(raw) == token_hash
+    # Two mints differ (high entropy).
+    other_raw, _ = generate_token()
+    assert other_raw != raw
+
+
+@pytest.mark.django_db
+def test_mobile_token_is_active_for_fresh(django_user_model):
+    from datetime import timedelta
+
+    from django.utils import timezone
+
+    from apps.mobile.models import MobileToken
+    from apps.mobile.tokens import generate_token
+
+    user = django_user_model.objects.create_user(
+        username="u-active", email="active@example.com", password="x"
+    )
+    _, token_hash = generate_token()
+    token = MobileToken.objects.create(
+        user=user,
+        token_hash=token_hash,
+        expires_at=timezone.now() + timedelta(days=30),
+    )
+    assert token.is_active is True
+
+
+@pytest.mark.django_db
+def test_mobile_token_is_active_false_when_expired(django_user_model):
+    from datetime import timedelta
+
+    from django.utils import timezone
+
+    from apps.mobile.models import MobileToken
+    from apps.mobile.tokens import generate_token
+
+    user = django_user_model.objects.create_user(
+        username="u-exp", email="exp@example.com", password="x"
+    )
+    _, token_hash = generate_token()
+    token = MobileToken.objects.create(
+        user=user,
+        token_hash=token_hash,
+        expires_at=timezone.now() - timedelta(seconds=1),
+    )
+    assert token.is_active is False
+
+
+@pytest.mark.django_db
+def test_mobile_token_is_active_false_when_revoked(django_user_model):
+    from datetime import timedelta
+
+    from django.utils import timezone
+
+    from apps.mobile.models import MobileToken
+    from apps.mobile.tokens import generate_token
+
+    user = django_user_model.objects.create_user(
+        username="u-rev", email="rev@example.com", password="x"
+    )
+    _, token_hash = generate_token()
+    token = MobileToken.objects.create(
+        user=user,
+        token_hash=token_hash,
+        expires_at=timezone.now() + timedelta(days=30),
+        revoked_at=timezone.now(),
+    )
+    assert token.is_active is False
+
+
+@pytest.mark.django_db
+def test_resolve_token_returns_row_and_stamps_last_used(django_user_model):
+    from datetime import timedelta
+
+    from django.utils import timezone
+
+    from apps.mobile.models import MobileToken
+    from apps.mobile.tokens import generate_token, resolve_token
+
+    user = django_user_model.objects.create_user(
+        username="u-resolve", email="resolve@example.com", password="x"
+    )
+    raw, token_hash = generate_token()
+    token = MobileToken.objects.create(
+        user=user,
+        token_hash=token_hash,
+        expires_at=timezone.now() + timedelta(days=30),
+    )
+    assert token.last_used_at is None
+
+    resolved = resolve_token(raw)
+    assert resolved is not None
+    assert resolved.pk == token.pk
+    token.refresh_from_db()
+    assert token.last_used_at is not None
+
+
+@pytest.mark.django_db
+def test_resolve_token_none_for_unknown():
+    from apps.mobile.tokens import resolve_token
+
+    assert resolve_token("no-such-token") is None
+    assert resolve_token("") is None
+    assert resolve_token(None) is None
+
+
+@pytest.mark.django_db
+def test_resolve_token_none_for_expired(django_user_model):
+    from datetime import timedelta
+
+    from django.utils import timezone
+
+    from apps.mobile.models import MobileToken
+    from apps.mobile.tokens import generate_token, resolve_token
+
+    user = django_user_model.objects.create_user(
+        username="u-resolve-exp", email="resolve-exp@example.com", password="x"
+    )
+    raw, token_hash = generate_token()
+    MobileToken.objects.create(
+        user=user,
+        token_hash=token_hash,
+        expires_at=timezone.now() - timedelta(seconds=1),
+    )
+    assert resolve_token(raw) is None
+
+
+@pytest.mark.django_db
+def test_resolve_token_none_for_revoked(django_user_model):
+    from datetime import timedelta
+
+    from django.utils import timezone
+
+    from apps.mobile.models import MobileToken
+    from apps.mobile.tokens import generate_token, resolve_token
+
+    user = django_user_model.objects.create_user(
+        username="u-resolve-rev", email="resolve-rev@example.com", password="x"
+    )
+    raw, token_hash = generate_token()
+    MobileToken.objects.create(
+        user=user,
+        token_hash=token_hash,
+        expires_at=timezone.now() + timedelta(days=30),
+        revoked_at=timezone.now(),
+    )
+    assert resolve_token(raw) is None

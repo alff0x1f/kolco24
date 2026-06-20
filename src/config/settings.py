@@ -13,6 +13,7 @@ https://docs.djangoproject.com/en/2.0/ref/settings/
 import json
 import logging
 import os
+from datetime import timedelta
 
 from dotenv import load_dotenv
 
@@ -69,6 +70,9 @@ if _raw_mobile_keys and not MOBILE_APP_KEYS:
         "MOBILE_APP_KEYS malformed or empty; all /app/* requests will 403"
     )
 MOBILE_APP_TS_WINDOW = 300
+# Lifetime of a per-person mobile bearer token (apps.mobile.MobileToken). A
+# hardcoded constant (sibling of MOBILE_APP_TS_WINDOW), not an env var.
+MOBILE_TOKEN_TTL = timedelta(days=30)
 # Data source advertised by the /app/race/<id>/sync/ manifest. "cloud" → no
 # lease (lease_expires_at: null); a local-race server would set "local".
 MOBILE_DATA_SOURCE = os.getenv("MOBILE_DATA_SOURCE", "cloud")

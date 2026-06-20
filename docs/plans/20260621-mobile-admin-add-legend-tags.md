@@ -197,17 +197,17 @@ it (Approach A from the brainstorm):
 - Create: `src/apps/mobile/migrations/000X_mobiletoken.py` (via `makemigrations`)
 - Modify: `src/apps/mobile/tests.py`
 
-- [ ] add `MobileToken` model (fields per Technical Details) with `is_active`
+- [x] add `MobileToken` model (fields per Technical Details) with `is_active`
       property; `token_hash` is `unique=True` (no separate `Meta.indexes`).
-- [ ] add `MOBILE_TOKEN_TTL = timedelta(days=30)` to `src/config/settings.py`.
-- [ ] create `tokens.py`: `generate_token() -> (raw, token_hash)`,
+- [x] add `MOBILE_TOKEN_TTL = timedelta(days=30)` to `src/config/settings.py`.
+- [x] create `tokens.py`: `generate_token() -> (raw, token_hash)`,
       `hash_token(raw)`, `resolve_token(raw) -> MobileToken | None` (checks
       `is_active`, best-effort `last_used_at`).
-- [ ] generate migration: `uv run python src/manage.py makemigrations mobile`.
-- [ ] write tests: token generate/hash roundtrip; `is_active` true/false for
+- [x] generate migration: `uv run python src/manage.py makemigrations mobile`.
+- [x] write tests: token generate/hash roundtrip; `is_active` true/false for
       fresh/expired/revoked; `resolve_token` returns None for unknown/expired/
       revoked and the row for valid (and stamps `last_used_at`).
-- [ ] run tests — must pass before next task.
+- [x] run tests — must pass before next task.
 
 ### Task 2: `POST /app/login/` — password login mints a token
 
