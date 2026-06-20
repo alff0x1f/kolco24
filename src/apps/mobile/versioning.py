@@ -99,6 +99,13 @@ def races_version():
     return hashlib.blake2b(raw.encode(), digest_size=8).hexdigest()
 
 
+# Bump whenever the legend response schema changes (fields added or removed).
+# Prefixed into every legend_version() hash so a schema change forces a cache
+# bust on all cached clients at deploy time, even when no DB row was touched.
+# History: 1 = initial; 2 = color field added to LegendCheckpointSerializer.
+_LEGEND_SCHEMA_VERSION = 2
+
+
 def legend_version(race_id):
     """Return a short, stable fingerprint of a race's legend.
 
@@ -111,6 +118,10 @@ def legend_version(race_id):
     2. ``CheckpointSecret`` — a re-seal, or an ``enc`` blob appearing/disappearing
        as a КП is locked/unlocked.
     3. ``CheckpointTag`` — a code/unlocks/bundle/check_method change.
+
+    A ``_LEGEND_SCHEMA_VERSION`` prefix is prepended to the hash input so that
+    adding or removing response fields forces a cache bust at deploy time, even
+    when no DB row was touched between the old and new server.
 
     A hidden-checkpoint edit (and a tag on a hidden checkpoint) deliberately does
     **not** move it (hidden КП are not in the response). The legend is
@@ -137,7 +148,8 @@ def legend_version(race_id):
         .aggregate(max_updated=Max("updated_at"), count=Count("id"))
     )
     raw = (
-        f"{agg['max_updated']}|{agg['count']}"
+        f"{_LEGEND_SCHEMA_VERSION}"
+        f"|{agg['max_updated']}|{agg['count']}"
         f"|{secrets['max_updated']}|{secrets['count']}"
         f"|{tags['max_updated']}|{tags['count']}"
     )

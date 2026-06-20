@@ -141,7 +141,10 @@ Django 4.2 project. Source lives entirely under `src/`, with `manage.py` at `src
       ETags and the `sync` manifest: each fingerprint is a `blake2b(digest_size=8)` hex over `MAX(updated_at)|COUNT`
       aggregates computed over the exact queryset the view serves (`None` aggregates render as `"None"`, so an empty
       race is stable) — **except `member_tags_version()`**, which folds in the sorted active ID list (see **Member
-      tags** below). Deliberately **no `versions.categories`** — category edits must move `versions.teams`;
+      tags** below), and **except `legend_version()`**, which additionally prefixes a `_LEGEND_SCHEMA_VERSION` integer
+      so a response-shape change (fields added or removed) forces a cache bust at deploy time even when no DB row
+      changed; bump `_LEGEND_SCHEMA_VERSION` whenever `LegendCheckpointSerializer` fields change (current value: 2,
+      bumped when `color` was added). Deliberately **no `versions.categories`** — category edits must move `versions.teams`;
       `races_version()` is global and deliberately absent from the per-race `sync` manifest (the races list is the app's
       entry point, probed via its own conditional GET).
     - **Member tags** (`active_member_tags()` + `member_tags_version()` in `versioning.py`; `MemberTagSerializer` in
@@ -192,8 +195,14 @@ Django 4.2 project. Source lives entirely under `src/`, with `manage.py` at `src
       `manage.py rebuild_legend_crypto [--race <id>] [--regenerate-codes]`; dump codes for tag provisioning via
       `manage.py export_legend_codes --race <id>`. Admin lock/unlock + rebuild-bundle bulk actions **must iterate and
       `save()`/call the service** (never `queryset.update()`, which skips the signals → no secret → cleartext leak). The
-      serializer (`LegendCheckpointSerializer`) branches: locked → `{id, number, type, enc}`, open →
-      `{id, number, type, cost, description}`; `TagSerializer` emits **one entry per `CheckpointTag`**:
+      serializer (`LegendCheckpointSerializer`) branches: locked → `{id, number, type, color, enc}`, open →
+      `{id, number, type, color, cost, description}` — **both branches carry `color`** (`Checkpoint.color`, a named
+      `CheckpointColor` token `red`/`blue`/`green`/`yellow`/`orange`/`purple`/`""`, **not secret**, the mobile app maps
+      it to its own palette; it lives on `Checkpoint` (not in `enc_blob`/bundles) so the legend ETag /
+      `versions.legend` move on a color edit via `Checkpoint.updated_at` `auto_now` — the reconcile must stay a plain
+      `instance.save()` not `update_fields` omitting `"updated_at"`; adding `color` also bumped `_LEGEND_SCHEMA_VERSION`
+      to 2 in `versioning.py` (schema-change cache bust — see **Conditional GET** above)); the online
+      `api.CheckpointSerializer` intentionally does **not** carry `color`. `TagSerializer` emits **one entry per `CheckpointTag`**:
       `{bid, point (=point_id), check_method}` for **every** tag (identity, open + locked) plus `iv`/`ct` from
       `bundle_blob` (`None` for open tags — identity-only, not decryptable). The legend view's tag queryset no longer
       excludes `bundle_blob=None` (so open-КП tags are emitted) and adds `.exclude(bid="")` (drops un-built rows created

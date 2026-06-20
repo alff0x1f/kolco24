@@ -88,12 +88,12 @@
 
 /* ── The grid ────────────────────────────────────────────── */
 .legend-editor .grid-wrap { overflow-x: auto; }
-.legend-editor .lg-grid { min-width: 720px; }
+.legend-editor .lg-grid { min-width: 840px; }
 
 .legend-editor .lg-headrow,
 .legend-editor .lg-row {
   display: grid;
-  grid-template-columns: 64px 132px 116px minmax(180px, 1fr) 52px 44px;
+  grid-template-columns: 64px 132px 120px 116px minmax(180px, 1fr) 52px 44px;
   align-items: center;
 }
 
@@ -134,7 +134,8 @@
   box-shadow: 0 0 0 3px rgba(69,130,236,.14);
 }
 .legend-editor .lg-cell.has-error { border-color: var(--danger); }
-.legend-editor select.lg-type {
+.legend-editor select.lg-type,
+.legend-editor select.lg-color {
   appearance: none; cursor: pointer; padding-right: 26px;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 14 14' fill='none' stroke='%236b7785' stroke-width='1.5'%3E%3Cpath d='M3 5l4 4 4-4'/%3E%3C/svg%3E");
   background-repeat: no-repeat; background-position: right 8px center;

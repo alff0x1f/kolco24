@@ -43,6 +43,7 @@
 
   var config = readJsonObj("legend-config");
   var TYPES = Array.isArray(config.types) ? config.types : [{ value: "kp", label: "КП" }];
+  var COLORS = Array.isArray(config.colors) ? config.colors : [{ value: "", label: "Без цвета" }];
   var DESC_MAX = parseInt(config.descMaxLen, 10) || 200;
   var DEFAULT_TYPE = "kp";
 
@@ -56,13 +57,26 @@
   });
   if (!TYPE_VALUES[DEFAULT_TYPE]) DEFAULT_TYPE = TYPES[0].value;
 
+  // lower(value|label) → value for color paste; empty value = "no color".
+  var COLOR_LOOKUP = {};
+  COLORS.forEach(function (c) {
+    COLOR_LOOKUP[String(c.value).toLowerCase()] = c.value;
+    COLOR_LOOKUP[String(c.label).toLowerCase()] = c.value;
+  });
+
   // Logical column order — must match the server reconcile + the docs banner.
-  var COLS = ["number", "type", "cost", "description", "is_legend_locked"];
+  var COLS = ["number", "type", "color", "cost", "description", "is_legend_locked"];
 
   function normalizeType(raw) {
     var key = String(raw == null ? "" : raw).trim().toLowerCase();
     if (!key) return DEFAULT_TYPE;
     return TYPE_LOOKUP[key] || DEFAULT_TYPE;
+  }
+
+  function normalizeColor(raw) {
+    var key = String(raw == null ? "" : raw).trim().toLowerCase();
+    if (!key) return "";
+    return COLOR_LOOKUP.hasOwnProperty(key) ? COLOR_LOOKUP[key] : "";
   }
 
   function normalizeLock(raw) {
@@ -91,13 +105,17 @@
     var typeOptions = TYPES.map(function (t) {
       return '<option value="' + t.value + '">' + t.label + "</option>";
     }).join("");
+    var colorOptions = COLORS.map(function (c2) {
+      return '<option value="' + c2.value + '">' + c2.label + "</option>";
+    }).join("");
 
     row.innerHTML =
       '<input class="lg-cell lg-num mono" type="text" inputmode="numeric" data-col="0">' +
       '<select class="lg-cell lg-type" data-col="1">' + typeOptions + "</select>" +
-      '<input class="lg-cell lg-cost mono" type="text" inputmode="numeric" data-col="2">' +
-      '<input class="lg-cell lg-desc" type="text" maxlength="' + DESC_MAX + '" data-col="3">' +
-      '<label class="lg-lockcell"><input class="lg-lock" type="checkbox" data-col="4"></label>' +
+      '<select class="lg-cell lg-color" data-col="2">' + colorOptions + "</select>" +
+      '<input class="lg-cell lg-cost mono" type="text" inputmode="numeric" data-col="3">' +
+      '<input class="lg-cell lg-desc" type="text" maxlength="' + DESC_MAX + '" data-col="4">' +
+      '<label class="lg-lockcell"><input class="lg-lock" type="checkbox" data-col="5"></label>' +
       '<button class="lg-del" type="button" title="Удалить КП">' +
       '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 4h10M6.5 4V2.8h3V4M5 4l.6 9h4.8L11 4"/></svg>' +
       "</button>";
@@ -105,6 +123,7 @@
     row.querySelector(".lg-num").value = c.number != null ? c.number : "";
     var typeSel = row.querySelector(".lg-type");
     typeSel.value = normalizeType(c.type);
+    row.querySelector(".lg-color").value = normalizeColor(c.color);
     row.querySelector(".lg-cost").value = c.cost != null ? c.cost : "";
     row.querySelector(".lg-desc").value = c.description || "";
     var lock = row.querySelector(".lg-lock");
@@ -164,12 +183,14 @@
       controlByCol(row, 0).value = digitsOrEmpty(raw);
     } else if (col === "type") {
       controlByCol(row, 1).value = normalizeType(raw);
+    } else if (col === "color") {
+      controlByCol(row, 2).value = normalizeColor(raw);
     } else if (col === "cost") {
-      controlByCol(row, 2).value = digitsOrEmpty(raw);
+      controlByCol(row, 3).value = digitsOrEmpty(raw);
     } else if (col === "description") {
-      controlByCol(row, 3).value = String(raw == null ? "" : raw).slice(0, DESC_MAX);
+      controlByCol(row, 4).value = String(raw == null ? "" : raw).slice(0, DESC_MAX);
     } else if (col === "is_legend_locked") {
-      var lock = controlByCol(row, 4);
+      var lock = controlByCol(row, 5);
       lock.checked = normalizeLock(raw);
       row.classList.toggle("is-locked", lock.checked);
     }
@@ -219,8 +240,8 @@
   function applyRowErrors(errorsById) {
     var rows = rowList();
     var fieldMap = {
-      number: ".lg-num", type: ".lg-type", cost: ".lg-cost",
-      description: ".lg-desc"
+      number: ".lg-num", type: ".lg-type", color: ".lg-color",
+      cost: ".lg-cost", description: ".lg-desc"
     };
     Object.keys(errorsById).forEach(function (idxStr) {
       var row = rows[parseInt(idxStr, 10)];
@@ -337,6 +358,7 @@
           id: idAttr != null && idAttr !== "" ? parseInt(idAttr, 10) : null,
           number: parseInt(row.querySelector(".lg-num").value, 10) || 0,
           type: row.querySelector(".lg-type").value,
+          color: row.querySelector(".lg-color").value,
           cost: parseInt(row.querySelector(".lg-cost").value, 10) || 0,
           description: row.querySelector(".lg-desc").value.trim(),
           is_legend_locked: row.querySelector(".lg-lock").checked

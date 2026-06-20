@@ -110,12 +110,13 @@ class CheckpointAdmin(admin.ModelAdmin):
         "year",
         "iterator",
         "number",
+        "color",
         "cost",
         "description",
         "is_legend_locked",
         "race",
     )
-    list_filter = ("race", "year", "cost", "is_legend_locked")
+    list_filter = ("race", "year", "color", "cost", "is_legend_locked")
     inlines = [PointTagInline]
     actions = ["lock_legend", "unlock_legend"]
 

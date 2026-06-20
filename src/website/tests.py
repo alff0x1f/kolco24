@@ -2466,6 +2466,23 @@ def test_checkpoint_updated_at_populated_and_advances():
 
 
 @pytest.mark.django_db
+def test_checkpoint_color_defaults_empty_and_persists():
+    from website.models.checkpoint import Checkpoint
+    from website.models.enums import CheckpointColor
+    from website.models.race import Race
+
+    race = Race.objects.create(name="Color test", slug="cp-color")
+    cp = Checkpoint.objects.create(race=race, number=1, cost=1)
+    cp.refresh_from_db()
+    assert cp.color == ""
+
+    cp.color = CheckpointColor.red
+    cp.save()
+    cp.refresh_from_db()
+    assert cp.color == "red"
+
+
+@pytest.mark.django_db
 def test_checkpoint_tag_save_uppercases_nfc_uid():
     from website.models.checkpoint import Checkpoint, CheckpointTag
     from website.models.race import Race
