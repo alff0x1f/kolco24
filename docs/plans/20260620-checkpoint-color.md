@@ -196,11 +196,11 @@
 - [x] run tests — must pass before next task.
 
 ### Task 6: Verify acceptance criteria
-- [ ] verify Overview requirements: enum present, field defaults `""`, locked & open
+- [x] verify Overview requirements: enum present, field defaults `""`, locked & open
       mobile legend both emit `color`, grid edits round-trip, admin shows it.
-- [ ] verify edge cases: empty color, unknown color rejected, existing КП unaffected.
-- [ ] run full suite: `uv run pytest`.
-- [ ] run `make format && make lint`.
+- [x] verify edge cases: empty color, unknown color rejected, existing КП unaffected.
+- [x] run full suite: `uv run pytest`.
+- [x] run `make format && make lint`.
 
 ### Task 7: [Final] Docs + housekeeping
 - [ ] update `CLAUDE.md` — note `Checkpoint.color` in the legend/serializer
