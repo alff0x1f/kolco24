@@ -158,7 +158,10 @@ Django 4.2 project. Source lives entirely under `src/`, with `manage.py` at `src
       ETag via `CheckpointTag.updated_at`. **Throttling** (first use here): plain IP-scoped `ScopedRateThrottle` (no
       subclass, no `request.data` read inside) with `throttle_scope` set **per view** (`mobile-login` 5/min on login,
       `mobile-write` 60/min on tag create); rates in `REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"]` (no global
-      `DEFAULT_THROTTLE_CLASSES`); needs the new `CACHES` (`LocMemCache`) added for it.
+      `DEFAULT_THROTTLE_CLASSES`); needs the new `CACHES` (`LocMemCache`) added for it. **Test isolation**: the
+      `autouse` `_clear_throttle_cache` fixture in `src/apps/mobile/tests.py` calls `cache.clear()` before/after every
+      test to prevent throttle counts leaking across tests (all test requests share the same client IP); any new test
+      module that exercises throttled mobile endpoints must replicate this fixture.
     - **Endpoints** (reads all GET; writes are the three POSTs in the **Per-person write layer** invariant below; see
       `urls.py`): `/app/races/` (published races), `/app/race/<id>/teams/` (teams **plus the
       embedded category catalogue** — deliberately no separate categories endpoint; inactive categories included so

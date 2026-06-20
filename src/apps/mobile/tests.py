@@ -5011,13 +5011,8 @@ def test_login_blank_email_returns_400(client, settings):
 def test_login_throttle_returns_429_after_limit(client, settings, django_user_model):
     import json
 
-    from django.core.cache import cache
-
     settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
     settings.MOBILE_APP_TS_WINDOW = 300
-
-    # Clear the per-process throttle cache so prior tests don't bleed counts in.
-    cache.clear()
 
     django_user_model.objects.create_user(
         username="crew5", email="crew5@example.com", password="right-pass"
@@ -5032,7 +5027,6 @@ def test_login_throttle_returns_429_after_limit(client, settings, django_user_mo
     # The first 5 are allowed (401 here, wrong password); subsequent ones throttle.
     assert statuses[:5] == [401] * 5
     assert 429 in statuses[5:]
-    cache.clear()
 
 
 # --- Task 3: IsMobileUser permission + POST /app/logout/ --------------------
@@ -5780,6 +5774,37 @@ def test_tag_create_moves_legend_version_and_etag(client, settings, django_user_
     headers["HTTP_IF_NONE_MATCH"] = old_etag
     stale = client.get(legend_path, **headers)
     assert stale.status_code == 200
+
+
+@pytest.mark.django_db
+def test_tag_create_throttle_returns_429_after_limit(
+    client, settings, django_user_model
+):
+    """``mobile-write`` ScopedRateThrottle fires 429 when the rate is exceeded."""
+    import json
+
+    from rest_framework.throttling import SimpleRateThrottle
+
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    race, user, raw, cp = _make_admin_race(django_user_model, "throttle-write")
+
+    # DRF caches THROTTLE_RATES as a class attribute at import time, so settings
+    # overrides don't propagate. Patch the class directly for the duration of the
+    # test (autouse fixture already clears the cache counts).
+    original_rates = SimpleRateThrottle.THROTTLE_RATES
+    SimpleRateThrottle.THROTTLE_RATES = {**original_rates, "mobile-write": "2/min"}
+    try:
+        statuses = []
+        for i in range(4):
+            body = json.dumps({"point": cp.id, "nfc_uid": f"AA{i:06X}"}).encode()
+            resp = _signed_post_auth(client, _tags_path(race.id), SECRET, body, raw)
+            statuses.append(resp.status_code)
+    finally:
+        SimpleRateThrottle.THROTTLE_RATES = original_rates
+
+    assert 429 in statuses[2:]
 
 
 # --- Task 7: body-signing roundtrip on POST -------------------------------
