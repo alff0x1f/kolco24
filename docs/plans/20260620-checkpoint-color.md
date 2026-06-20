@@ -188,13 +188,12 @@
 **Files:**
 - Modify: `src/website/admin.py`
 
-- [ ] `CheckpointAdmin`: add `"color"` to `list_display` and `list_filter`.
-- [ ] verify the change form shows `color` (no explicit `fields`/`fieldsets`, so it
-      auto-appears) — load `/admin/website/checkpoint/<id>/change/` mentally or via a
-      smoke test if one exists.
-- [ ] no new test strictly required (admin config); if there's an existing admin
-      smoke test, extend it — otherwise covered by Task 1/4.
-- [ ] run tests — must pass before next task.
+- [x] `CheckpointAdmin`: add `"color"` to `list_display` and `list_filter`.
+- [x] verify the change form shows `color` (no explicit `fields`/`fieldsets`, so it
+      auto-appears) — confirmed: no `fields`/`fieldsets` on `CheckpointAdmin`, so the
+      field renders automatically.
+- [x] no new test strictly required (admin config); covered by Task 1/4.
+- [x] run tests — must pass before next task.
 
 ### Task 6: Verify acceptance criteria
 - [ ] verify Overview requirements: enum present, field defaults `""`, locked & open
