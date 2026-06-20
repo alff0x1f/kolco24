@@ -289,16 +289,16 @@ it (Approach A from the brainstorm):
 - Create: `src/website/migrations/00XX_checkpointtag_created_by.py`
 - Modify: `src/apps/mobile/tests.py` (or `src/website/tests.py`)
 
-- [ ] add `created_by = ForeignKey(AUTH_USER_MODEL, null=True, blank=True,
+- [x] add `created_by = ForeignKey(AUTH_USER_MODEL, null=True, blank=True,
       on_delete=SET_NULL, related_name="provisioned_tags")` to `CheckpointTag`.
-- [ ] confirm the field is **not** folded into any version fingerprint (it isn't;
+- [x] confirm the field is **not** folded into any version fingerprint (it isn't;
       `legend_version` uses `MAX(updated_at)|COUNT`) — no `versioning.py` change.
-- [ ] generate migration: `uv run python src/manage.py makemigrations website`.
-- [ ] write test: a `CheckpointTag` saved with `created_by` set persists it; the
+- [x] generate migration: `uv run python src/manage.py makemigrations website`.
+- [x] write test: a `CheckpointTag` saved with `created_by` set persists it; the
       legend-crypto `post_save` signal still produces `code`/`bid`/`bundle_blob`
       (i.e. adding the field didn't disturb the recursion guard / sentinel
       `update_fields`).
-- [ ] run tests — must pass before next task.
+- [x] run tests — must pass before next task.
 
 ### Task 6: `POST /app/race/<race_id>/tags/` — tag creation endpoint
 

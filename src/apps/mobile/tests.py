@@ -5357,3 +5357,55 @@ def test_can_edit_race_legend_no_mobile_user_returns_false_not_500(django_user_m
     request = RequestFactory().post("/app/race/1/tags/")
     view = _StubView(race_id=race.id)
     assert CanEditRaceLegend().has_permission(request, view) is False
+
+
+# --- Task 5: CheckpointTag.created_by ---------------------------------------
+
+
+@pytest.mark.django_db
+def test_checkpoint_tag_created_by_persists(django_user_model):
+    """``created_by`` round-trips and SET_NULL survives the user's deletion."""
+    from website.models.checkpoint import Checkpoint, CheckpointTag
+    from website.models.race import Race
+
+    user = django_user_model.objects.create_user(
+        username="crew", email="crew@example.com", password="x"
+    )
+    race = Race.objects.create(name="Prov race", slug="prov-race")
+    cp = Checkpoint.objects.create(race=race, number=1, cost=1, description="x")
+    tag = CheckpointTag.objects.create(point=cp, nfc_uid="04A1B2C3", created_by=user)
+
+    tag.refresh_from_db()
+    assert tag.created_by_id == user.id
+    assert tag in user.provisioned_tags.all()
+
+    user.delete()
+    tag.refresh_from_db()
+    assert tag.created_by_id is None  # on_delete=SET_NULL
+
+
+@pytest.mark.django_db
+def test_checkpoint_tag_created_by_does_not_disturb_crypto_signals(
+    django_user_model,
+):
+    """Adding ``created_by`` must not break the legend-crypto ``post_save``
+    signal: a locked-КП tag still gets ``code``/``bid``/``bundle_blob`` and the
+    recursion guard (sentinel ``update_fields``) is intact.
+    """
+    from website.models.checkpoint import Checkpoint, CheckpointTag
+    from website.models.race import Race
+
+    user = django_user_model.objects.create_user(
+        username="crew2", email="crew2@example.com", password="x"
+    )
+    race = Race.objects.create(name="Prov race 2", slug="prov-race-2")
+    cp = Checkpoint.objects.create(
+        race=race, number=1, cost=4, description="столб", is_legend_locked=True
+    )
+    tag = CheckpointTag.objects.create(point=cp, nfc_uid="04A1B2C3", created_by=user)
+
+    tag.refresh_from_db()
+    assert tag.created_by_id == user.id
+    assert tag.code is not None
+    assert tag.bid == hashlib.sha256(bytes(tag.code)).hexdigest()[:16]
+    assert tag.bundle_blob is not None

@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.db import models
 
 from .enums import CheckpointColor, CheckpointType
@@ -93,6 +94,14 @@ class CheckpointTag(models.Model):
         verbose_name="Отпирает КП",
         related_name="unlocked_by",
         blank=True,
+    )
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        verbose_name="Кем создан",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="provisioned_tags",
     )
     updated_at = models.DateTimeField(auto_now=True)
 
