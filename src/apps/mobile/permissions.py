@@ -13,8 +13,11 @@ import ipaddress
 import time
 
 from django.conf import settings
+from django.shortcuts import get_object_or_404
 from rest_framework.exceptions import APIException
 from rest_framework.permissions import BasePermission
+
+from website.models.race import Race
 
 from .signing import build_canonical, verify
 from .tokens import resolve_token
@@ -159,3 +162,31 @@ class IsMobileUser(BasePermission):
         request.mobile_user = token.user
         request.mobile_token = token
         return True
+
+
+class CanEditRaceLegend(BasePermission):
+    """Authorize the resolved mobile user to edit a race's legend (per-race).
+
+    Reads ``view.kwargs["race_id"]``, loads the :class:`Race` (a missing race
+    raises ``Http404`` → HTTP **404**, not a 403, so a probe can't distinguish
+    "no such race" from "not allowed" any differently than the web editor does),
+    and delegates to :func:`apps.race.permissions.can_edit_race` — the **same**
+    superuser-or-``RaceAdmin(role=ADMIN)`` check the web ``RaceLegendEditView``
+    uses. A user without rights gets an **actionable 403** (the default DRF
+    ``PermissionDenied`` message), unlike the neutral build-layer 403.
+
+    **Ordering:** stack this **after** :class:`IsMobileUser`, which sets
+    ``request.mobile_user``. The user is read defensively via
+    ``getattr(request, "mobile_user", None)`` so a reordered stack, or the
+    permission tested in isolation, returns ``False`` (→ 403) rather than
+    raising ``AttributeError`` (→ 500).
+    """
+
+    def has_permission(self, request, view):
+        from apps.race.permissions import can_edit_race
+
+        user = getattr(request, "mobile_user", None)
+        if user is None:
+            return False
+        race = get_object_or_404(Race, pk=view.kwargs["race_id"])
+        return can_edit_race(user, race)

@@ -269,18 +269,18 @@ it (Approach A from the brainstorm):
 - Modify: `src/apps/mobile/permissions.py`
 - Modify: `src/apps/mobile/tests.py`
 
-- [ ] add `CanEditRaceLegend(BasePermission)`: read `view.kwargs["race_id"]`,
+- [x] add `CanEditRaceLegend(BasePermission)`: read `view.kwargs["race_id"]`,
       load `Race` (404 if missing), return `can_edit_race(mobile_user, race)`
       (import from `apps.race.permissions`); False → 403 actionable. **Read
       `request.mobile_user` defensively** (`getattr(request, "mobile_user",
       None)`) and return False if absent — don't `AttributeError` (500) if the
       stack is reordered or the permission is tested in isolation. Document the
       required ordering (after `IsMobileUser`) in the docstring.
-- [ ] write tests (against the Task 6 endpoint): superuser and
-      `RaceAdmin(role=ADMIN)` → pass; authenticated user without rights → 403;
-      unknown `race_id` → 404; **valid build signature but no bearer token →
-      401** (not 500) — guards the defensive `mobile_user` read.
-- [ ] run tests — must pass before next task.
+- [x] write tests (in isolation; the Task 6 endpoint exercises the full stack):
+      superuser and `RaceAdmin(role=ADMIN)` → pass; MODERATOR and authenticated
+      user without rights → 403; unknown `race_id` → 404; **no `mobile_user` on
+      the request → False (403), not 500** — guards the defensive read.
+- [x] run tests — must pass before next task.
 
 ### Task 5: `CheckpointTag.created_by` field + migration
 

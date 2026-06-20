@@ -5247,3 +5247,113 @@ def test_is_mobile_user_raises_401_for_unknown_token(settings):
     with pytest.raises(MobileTokenInvalid) as exc:
         IsMobileUser().has_permission(request, None)
     assert exc.value.status_code == 401
+
+
+# --- Task 4: CanEditRaceLegend permission -----------------------------------
+# Tested in isolation here (RequestFactory + the permission object with a stub
+# view carrying .kwargs). The Task 6 write endpoint exercises the full stack.
+
+
+class _StubView:
+    """Minimal stand-in for a DRF view exposing only ``kwargs`` to a permission."""
+
+    def __init__(self, **kwargs):
+        self.kwargs = kwargs
+
+
+def _race_admin_request(user):
+    """A request that already passed IsMobileUser (mobile_user resolved)."""
+    request = RequestFactory().post("/app/race/1/tags/")
+    request.mobile_user = user
+    return request
+
+
+@pytest.mark.django_db
+def test_can_edit_race_legend_superuser_passes(django_user_model):
+    from apps.mobile.permissions import CanEditRaceLegend
+    from website.models.race import Race
+
+    su = django_user_model.objects.create_superuser(
+        username="su", email="su@example.com", password="x"
+    )
+    race = Race.objects.create(name="Legend race", slug="legend-race-su")
+
+    request = _race_admin_request(su)
+    view = _StubView(race_id=race.id)
+    assert CanEditRaceLegend().has_permission(request, view) is True
+
+
+@pytest.mark.django_db
+def test_can_edit_race_legend_raceadmin_passes(django_user_model):
+    from apps.mobile.permissions import CanEditRaceLegend
+    from website.models.race import Race, RaceAdmin
+
+    user = django_user_model.objects.create_user(
+        username="ra", email="ra@example.com", password="x"
+    )
+    race = Race.objects.create(name="Legend race", slug="legend-race-ra")
+    RaceAdmin.objects.create(race=race, user=user, role=RaceAdmin.Role.ADMIN)
+
+    request = _race_admin_request(user)
+    view = _StubView(race_id=race.id)
+    assert CanEditRaceLegend().has_permission(request, view) is True
+
+
+@pytest.mark.django_db
+def test_can_edit_race_legend_moderator_denied(django_user_model):
+    """A MODERATOR is not an editor — can_edit_race requires role=ADMIN."""
+    from apps.mobile.permissions import CanEditRaceLegend
+    from website.models.race import Race, RaceAdmin
+
+    user = django_user_model.objects.create_user(
+        username="mod", email="mod@example.com", password="x"
+    )
+    race = Race.objects.create(name="Legend race", slug="legend-race-mod")
+    RaceAdmin.objects.create(race=race, user=user, role=RaceAdmin.Role.MODERATOR)
+
+    request = _race_admin_request(user)
+    view = _StubView(race_id=race.id)
+    assert CanEditRaceLegend().has_permission(request, view) is False
+
+
+@pytest.mark.django_db
+def test_can_edit_race_legend_plain_user_denied(django_user_model):
+    from apps.mobile.permissions import CanEditRaceLegend
+    from website.models.race import Race
+
+    user = django_user_model.objects.create_user(
+        username="plain", email="plain@example.com", password="x"
+    )
+    race = Race.objects.create(name="Legend race", slug="legend-race-plain")
+
+    request = _race_admin_request(user)
+    view = _StubView(race_id=race.id)
+    assert CanEditRaceLegend().has_permission(request, view) is False
+
+
+@pytest.mark.django_db
+def test_can_edit_race_legend_unknown_race_raises_404(django_user_model):
+    from django.http import Http404
+
+    from apps.mobile.permissions import CanEditRaceLegend
+
+    su = django_user_model.objects.create_superuser(
+        username="su404", email="su404@example.com", password="x"
+    )
+    request = _race_admin_request(su)
+    view = _StubView(race_id=999999)
+    with pytest.raises(Http404):
+        CanEditRaceLegend().has_permission(request, view)
+
+
+@pytest.mark.django_db
+def test_can_edit_race_legend_no_mobile_user_returns_false_not_500(django_user_model):
+    """Defensive: missing request.mobile_user → False (403), not AttributeError."""
+    from apps.mobile.permissions import CanEditRaceLegend
+    from website.models.race import Race
+
+    race = Race.objects.create(name="Legend race", slug="legend-race-anon")
+    # No mobile_user attribute set on the request (stack reordered / isolated).
+    request = RequestFactory().post("/app/race/1/tags/")
+    view = _StubView(race_id=race.id)
+    assert CanEditRaceLegend().has_permission(request, view) is False
