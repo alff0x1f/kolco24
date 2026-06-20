@@ -203,9 +203,9 @@
 - [x] run `make format && make lint`.
 
 ### Task 7: [Final] Docs + housekeeping
-- [ ] update `CLAUDE.md` — note `Checkpoint.color` in the legend/serializer
+- [x] update `CLAUDE.md` — note `Checkpoint.color` in the legend/serializer
       invariants (locked & open both carry `color`; not secret; ETag via `updated_at`).
-- [ ] move this plan to `docs/plans/completed/`.
+- [x] move this plan to `docs/plans/completed/`.
 
 ## Post-Completion
 *Manual / external — no checkboxes.*
