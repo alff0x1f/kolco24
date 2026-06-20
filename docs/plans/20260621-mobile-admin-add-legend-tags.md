@@ -361,13 +361,13 @@ it (Approach A from the brainstorm):
 - [x] run tests — must pass before next task.
 
 ### Task 8: Verify acceptance criteria
-- [ ] all Overview requirements implemented: per-person password login, revocable
+- [x] all Overview requirements implemented: per-person password login, revocable
       token, layered permissions, online add-tag through existing crypto signals,
       actionable vs neutral error split, throttling.
-- [ ] edge cases handled: enumeration-safe login, expired/revoked token,
+- [x] edge cases handled: enumeration-safe login, expired/revoked token,
       non-admin user, cross-КП conflict, hidden/absent КП, nfc normalization.
-- [ ] run full suite: `uv run pytest`.
-- [ ] `make format && make lint` clean.
+- [x] run full suite: `uv run pytest`. (677 passed)
+- [x] `make format && make lint` clean.
 
 ### Task 9: [Final] Documentation
 - [ ] update `src/apps/mobile/README.md`: new login/logout/tag endpoints, token
