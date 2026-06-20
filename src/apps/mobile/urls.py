@@ -7,6 +7,7 @@ from .views import (
     MemberTagsView,
     RaceListView,
     SyncView,
+    TagCreateView,
     TeamsView,
 )
 
@@ -24,4 +25,9 @@ urlpatterns = [
         name="member_tags",
     ),
     path("race/<int:race_id>/sync/", SyncView.as_view(), name="sync"),
+    path(
+        "race/<int:race_id>/tags/",
+        TagCreateView.as_view(),
+        name="tag_create",
+    ),
 ]

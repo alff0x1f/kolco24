@@ -5409,3 +5409,374 @@ def test_checkpoint_tag_created_by_does_not_disturb_crypto_signals(
     assert tag.code is not None
     assert tag.bid == hashlib.sha256(bytes(tag.code)).hexdigest()[:16]
     assert tag.bundle_blob is not None
+
+
+# --- Task 6: POST /app/race/<race_id>/tags/ ---------------------------------
+
+
+def _make_admin_race(django_user_model, slug, locked=False):
+    """A published race + ADMIN RaceAdmin user + their active token + a КП.
+
+    Returns ``(race, user, raw_token, checkpoint)``.
+    """
+    from website.models.checkpoint import Checkpoint
+    from website.models.race import Race, RaceAdmin
+
+    race = Race.objects.create(name=f"Tag race {slug}", slug=slug)
+    user = django_user_model.objects.create_user(
+        username=f"crew-{slug}", email=f"crew-{slug}@example.com", password="x"
+    )
+    RaceAdmin.objects.create(race=race, user=user, role=RaceAdmin.Role.ADMIN)
+    raw = _make_active_token(user)
+    cp = Checkpoint.objects.create(
+        race=race, number=7, cost=4, description="столб", is_legend_locked=locked
+    )
+    return race, user, raw, cp
+
+
+def _tags_path(race_id):
+    return f"/app/race/{race_id}/tags/"
+
+
+@pytest.mark.django_db
+def test_tag_create_happy_path_201_with_crypto_via_signals(
+    client, settings, django_user_model
+):
+    import json
+
+    from apps.mobile.models import MobileToken  # noqa: F401
+    from website.models.checkpoint import CheckpointTag
+
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    race, user, raw, cp = _make_admin_race(django_user_model, "happy", locked=True)
+    path = _tags_path(race.id)
+    body = json.dumps({"point": cp.id, "nfc_uid": "04A1B2C3"}).encode()
+
+    response = _signed_post_auth(client, path, SECRET, body, raw)
+
+    assert response.status_code == 201
+    data = response.json()
+    assert set(data.keys()) == {"bid", "point", "nfc_uid", "code"}
+    assert data["point"] == cp.number
+    assert data["nfc_uid"] == "04A1B2C3"
+
+    tag = CheckpointTag.objects.get(point=cp, nfc_uid="04A1B2C3")
+    assert tag.created_by_id == user.id
+    # crypto populated by the post_save signal
+    assert tag.code is not None
+    assert tag.bid == hashlib.sha256(bytes(tag.code)).hexdigest()[:16]
+    assert tag.bundle_blob is not None
+    # response echoes the freshly minted code (hex) + bid
+    assert data["bid"] == tag.bid
+    assert data["code"] == bytes(tag.code).hex()
+
+
+@pytest.mark.django_db
+def test_tag_create_idempotent_same_uid_same_cp_no_duplicate(
+    client, settings, django_user_model
+):
+    import json
+
+    from website.models.checkpoint import CheckpointTag
+
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    race, user, raw, cp = _make_admin_race(django_user_model, "idem")
+    path = _tags_path(race.id)
+    body = json.dumps({"point": cp.id, "nfc_uid": "04A1B2C3"}).encode()
+
+    first = _signed_post_auth(client, path, SECRET, body, raw)
+    assert first.status_code == 201
+
+    second = _signed_post_auth(client, path, SECRET, body, raw)
+    assert second.status_code == 200
+
+    assert CheckpointTag.objects.filter(point=cp, nfc_uid="04A1B2C3").count() == 1
+    # the idempotent hit returns the same bid/code as the create
+    assert second.json()["bid"] == first.json()["bid"]
+    assert second.json()["code"] == first.json()["code"]
+
+
+@pytest.mark.django_db
+def test_tag_create_same_uid_different_cp_returns_409(
+    client, settings, django_user_model
+):
+    import json
+
+    from website.models.checkpoint import Checkpoint, CheckpointTag
+
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    race, user, raw, cp = _make_admin_race(django_user_model, "xcp")
+    other_cp = Checkpoint.objects.create(
+        race=race, number=8, cost=1, description="other"
+    )
+    path = _tags_path(race.id)
+
+    first = _signed_post_auth(
+        client,
+        path,
+        SECRET,
+        json.dumps({"point": cp.id, "nfc_uid": "04A1B2C3"}).encode(),
+        raw,
+    )
+    assert first.status_code == 201
+
+    conflict = _signed_post_auth(
+        client,
+        path,
+        SECRET,
+        json.dumps({"point": other_cp.id, "nfc_uid": "04A1B2C3"}).encode(),
+        raw,
+    )
+    assert conflict.status_code == 409
+    # no rebind: the chip stays on the original КП only
+    assert CheckpointTag.objects.filter(nfc_uid="04A1B2C3").count() == 1
+    assert CheckpointTag.objects.get(nfc_uid="04A1B2C3").point_id == cp.id
+
+
+@pytest.mark.django_db
+def test_tag_create_idempotent_hit_on_unbuilt_tag_rebuilds_no_500(
+    client, settings, django_user_model
+):
+    """An existing tag with bid=''/code=None (created bypassing signals) is
+    rebuilt on the idempotent hit rather than crashing on None.hex()."""
+    import json
+
+    from website.models.checkpoint import CheckpointTag
+
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    race, user, raw, cp = _make_admin_race(django_user_model, "unbuilt")
+    # Bypass the build_bundle signal so the row keeps bid=""/code=None.
+    CheckpointTag.objects.bulk_create([CheckpointTag(point=cp, nfc_uid="04A1B2C3")])
+    assert CheckpointTag.objects.filter(point=cp, bid="").count() == 1
+
+    path = _tags_path(race.id)
+    body = json.dumps({"point": cp.id, "nfc_uid": "04A1B2C3"}).encode()
+    response = _signed_post_auth(client, path, SECRET, body, raw)
+
+    assert response.status_code == 200
+    data = response.json()
+    tag = CheckpointTag.objects.get(point=cp, nfc_uid="04A1B2C3")
+    assert tag.bid != ""
+    assert tag.code is not None
+    assert data["bid"] == tag.bid
+    assert data["code"] == bytes(tag.code).hex()
+
+
+@pytest.mark.django_db
+def test_tag_create_unknown_checkpoint_returns_404(client, settings, django_user_model):
+    import json
+
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    race, user, raw, cp = _make_admin_race(django_user_model, "nocp")
+    path = _tags_path(race.id)
+    body = json.dumps({"point": 999999, "nfc_uid": "04A1B2C3"}).encode()
+    response = _signed_post_auth(client, path, SECRET, body, raw)
+    assert response.status_code == 404
+
+
+@pytest.mark.django_db
+def test_tag_create_checkpoint_in_other_race_returns_404(
+    client, settings, django_user_model
+):
+    import json
+
+    from website.models.checkpoint import Checkpoint
+    from website.models.race import Race
+
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    race, user, raw, cp = _make_admin_race(django_user_model, "othrace")
+    other_race = Race.objects.create(name="Other", slug="other-tag-race")
+    other_cp = Checkpoint.objects.create(
+        race=other_race, number=1, cost=1, description="elsewhere"
+    )
+    path = _tags_path(race.id)
+    body = json.dumps({"point": other_cp.id, "nfc_uid": "04A1B2C3"}).encode()
+    response = _signed_post_auth(client, path, SECRET, body, raw)
+    assert response.status_code == 404
+
+
+@pytest.mark.django_db
+def test_tag_create_hidden_checkpoint_returns_404(client, settings, django_user_model):
+    import json
+
+    from website.models.checkpoint import Checkpoint
+
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    race, user, raw, cp = _make_admin_race(django_user_model, "hidden")
+    hidden = Checkpoint.objects.create(
+        race=race, number=9, cost=0, description="hidden", type="hidden"
+    )
+    path = _tags_path(race.id)
+    body = json.dumps({"point": hidden.id, "nfc_uid": "04A1B2C3"}).encode()
+    response = _signed_post_auth(client, path, SECRET, body, raw)
+    assert response.status_code == 404
+
+
+@pytest.mark.django_db
+def test_tag_create_normalizes_nfc_uid(client, settings, django_user_model):
+    import json
+
+    from website.models.checkpoint import CheckpointTag
+
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    race, user, raw, cp = _make_admin_race(django_user_model, "norm")
+    path = _tags_path(race.id)
+    body = json.dumps({"point": cp.id, "nfc_uid": "  04a1b2c3 "}).encode()
+    response = _signed_post_auth(client, path, SECRET, body, raw)
+
+    assert response.status_code == 201
+    assert response.json()["nfc_uid"] == "04A1B2C3"
+    assert CheckpointTag.objects.filter(point=cp, nfc_uid="04A1B2C3").exists()
+
+
+@pytest.mark.django_db
+def test_tag_create_blank_nfc_uid_returns_400(client, settings, django_user_model):
+    import json
+
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    race, user, raw, cp = _make_admin_race(django_user_model, "blank")
+    path = _tags_path(race.id)
+    body = json.dumps({"point": cp.id, "nfc_uid": "   "}).encode()
+    response = _signed_post_auth(client, path, SECRET, body, raw)
+    assert response.status_code == 400
+
+
+@pytest.mark.django_db
+def test_tag_create_missing_bearer_returns_401(client, settings, django_user_model):
+    import json
+
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    race, user, raw, cp = _make_admin_race(django_user_model, "nobearer")
+    path = _tags_path(race.id)
+    body = json.dumps({"point": cp.id, "nfc_uid": "04A1B2C3"}).encode()
+    # valid build sig but no Authorization header → actionable 401
+    response = _signed_post_auth(client, path, SECRET, body, None)
+    assert response.status_code == 401
+
+
+@pytest.mark.django_db
+def test_tag_create_missing_build_signature_returns_403(
+    client, settings, django_user_model
+):
+    import json
+
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    race, user, raw, cp = _make_admin_race(django_user_model, "nosig")
+    path = _tags_path(race.id)
+    body = json.dumps({"point": cp.id, "nfc_uid": "04A1B2C3"}).encode()
+    response = client.post(
+        path,
+        data=body,
+        content_type="application/json",
+        HTTP_AUTHORIZATION=f"Bearer {raw}",
+    )
+    assert response.status_code == 403
+    assert response.json() == {"detail": "Forbidden"}
+
+
+@pytest.mark.django_db
+def test_tag_create_non_admin_user_returns_403(client, settings, django_user_model):
+    import json
+
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    from website.models.checkpoint import Checkpoint
+    from website.models.race import Race
+
+    race = Race.objects.create(name="Tag race plain", slug="tag-race-plain")
+    cp = Checkpoint.objects.create(race=race, number=1, cost=1, description="x")
+    # a valid user + token, but no RaceAdmin row → CanEditRaceLegend denies
+    user = django_user_model.objects.create_user(
+        username="plain-crew", email="plain-crew@example.com", password="x"
+    )
+    raw = _make_active_token(user)
+
+    path = _tags_path(race.id)
+    body = json.dumps({"point": cp.id, "nfc_uid": "04A1B2C3"}).encode()
+    response = _signed_post_auth(client, path, SECRET, body, raw)
+    assert response.status_code == 403
+    # actionable (not the neutral build-layer "Forbidden")
+    assert response.json() != {"detail": "Forbidden"}
+
+
+@pytest.mark.django_db
+def test_tag_create_unpublished_race_returns_404(client, settings, django_user_model):
+    import json
+
+    from website.models.checkpoint import Checkpoint
+    from website.models.race import Race, RaceAdmin
+
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    race = Race.objects.create(name="Unpub tag", slug="unpub-tag", is_published=False)
+    user = django_user_model.objects.create_user(
+        username="unpub-crew", email="unpub-crew@example.com", password="x"
+    )
+    RaceAdmin.objects.create(race=race, user=user, role=RaceAdmin.Role.ADMIN)
+    raw = _make_active_token(user)
+    cp = Checkpoint.objects.create(race=race, number=1, cost=1, description="x")
+
+    path = _tags_path(race.id)
+    body = json.dumps({"point": cp.id, "nfc_uid": "04A1B2C3"}).encode()
+    response = _signed_post_auth(client, path, SECRET, body, raw)
+    assert response.status_code == 404
+
+
+@pytest.mark.django_db
+def test_tag_create_moves_legend_version_and_etag(client, settings, django_user_model):
+    """Creating a tag bumps versions.legend; the new ETag 304s, the old 200s."""
+    import json
+
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    race, user, raw, cp = _make_admin_race(django_user_model, "etagmove")
+    legend_path = f"/app/race/{race.id}/legend/"
+
+    before = client.get(legend_path, **_signed_headers("GET", legend_path, SECRET))
+    old_etag = before["ETag"]
+
+    path = _tags_path(race.id)
+    body = json.dumps({"point": cp.id, "nfc_uid": "04A1B2C3"}).encode()
+    created = _signed_post_auth(client, path, SECRET, body, raw)
+    assert created.status_code == 201
+
+    after = client.get(legend_path, **_signed_headers("GET", legend_path, SECRET))
+    new_etag = after["ETag"]
+    assert new_etag != old_etag
+
+    # the new ETag short-circuits to 304
+    headers = _signed_headers("GET", legend_path, SECRET)
+    headers["HTTP_IF_NONE_MATCH"] = new_etag
+    fresh = client.get(legend_path, **headers)
+    assert fresh.status_code == 304
+
+    # the stale (old) ETag does not
+    headers = _signed_headers("GET", legend_path, SECRET)
+    headers["HTTP_IF_NONE_MATCH"] = old_etag
+    stale = client.get(legend_path, **headers)
+    assert stale.status_code == 200

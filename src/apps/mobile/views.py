@@ -10,6 +10,7 @@ import logging
 
 from django.conf import settings
 from django.contrib.auth import authenticate
+from django.db import IntegrityError, transaction
 from django.db.models import F, Prefetch
 from django.http import HttpResponseNotModified
 from django.shortcuts import get_object_or_404
@@ -24,14 +25,16 @@ from website.models.enums import CheckpointType
 from website.models.models import Athlet, Team
 from website.models.race import Category, Race
 
+from .legend_crypto import build_bundle
 from .models import AppAuthFailure, AppInstall, MobileToken
-from .permissions import IsMobileUser, SignedAppPermission
+from .permissions import CanEditRaceLegend, IsMobileUser, SignedAppPermission
 from .serializers import (
     CategorySerializer,
     LegendCheckpointSerializer,
     LoginSerializer,
     MemberTagSerializer,
     RaceListSerializer,
+    TagCreateSerializer,
     TagSerializer,
     TeamSerializer,
 )
@@ -188,6 +191,96 @@ class LogoutView(AppAPIView):
         token.revoked_at = timezone.now()
         token.save(update_fields=["revoked_at"])
         return Response(status=status.HTTP_200_OK)
+
+
+class TagCreateView(AppAPIView):
+    """``POST /app/race/<race_id>/tags/`` — bind a scanned NFC chip to a КП.
+
+    The online-only provisioning endpoint: it creates a :class:`CheckpointTag`
+    via ``instance.save()`` so the existing legend-crypto ``post_save`` signal
+    fires (``ensure_code`` / ``build_bundle``), keeping the server the single
+    source of crypto. The response carries the freshly-minted hex ``code`` for
+    the app to write into the chip's NFC user memory, plus ``bid`` / ``point``
+    (``Checkpoint.number``) / ``nfc_uid``.
+
+    Permission stack (order matters):
+
+    1. :class:`SignedAppPermission` — per-build HMAC (over the request **body**);
+    2. :class:`IsMobileUser` — resolves the bearer to ``request.mobile_user``;
+    3. :class:`CanEditRaceLegend` — per-race ``can_edit_race`` authorization.
+
+    Idempotency / conflicts (see the plan's §Tag-create):
+
+    - same ``nfc_uid`` already on the **same** КП → idempotent 200 (no duplicate);
+    - same ``nfc_uid`` on a **different** КП → 409 (never auto-rebind);
+    - КП id not in this race, or a ``type="hidden"`` КП → 404.
+    """
+
+    permission_classes = [SignedAppPermission, IsMobileUser, CanEditRaceLegend]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "mobile-write"
+
+    @staticmethod
+    def _tag_response(tag, http_status):
+        """Build the ``{bid, point, nfc_uid, code}`` payload for a tag.
+
+        A tag created bypassing the signals (``bid == ""`` / ``code is None``)
+        is repaired via :func:`build_bundle` before responding, so the hex of a
+        missing ``code`` is never attempted (``None.hex()`` → 500).
+        """
+        if not tag.bid or tag.code is None:
+            build_bundle(tag)
+            tag.refresh_from_db()
+        code = bytes(tag.code) if tag.code is not None else None
+        return Response(
+            {
+                "bid": tag.bid,
+                "point": tag.point.number,
+                "nfc_uid": tag.nfc_uid,
+                "code": code.hex() if code is not None else None,
+            },
+            status=http_status,
+        )
+
+    def post(self, request, race_id):
+        get_object_or_404(Race, pk=race_id, is_published=True)
+
+        serializer = TagCreateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        point_id = serializer.validated_data["point"]
+        nfc_uid = serializer.validated_data["nfc_uid"].strip().upper()
+
+        cp = get_object_or_404(
+            Checkpoint.objects.exclude(type=CheckpointType.hidden.value),
+            pk=point_id,
+            race_id=race_id,
+        )
+
+        existing = list(CheckpointTag.objects.filter(nfc_uid=nfc_uid))
+        for tag in existing:
+            if tag.point_id == cp.id:
+                # Same chip, same КП → idempotent success (no duplicate row).
+                return self._tag_response(tag, status.HTTP_200_OK)
+        if existing:
+            # Chip already bound to a different КП — refuse to auto-rebind.
+            return Response(
+                {"detail": "Этот тег уже привязан к другому КП"},
+                status=status.HTTP_409_CONFLICT,
+            )
+
+        try:
+            with transaction.atomic():
+                tag = CheckpointTag(
+                    point=cp, nfc_uid=nfc_uid, created_by=request.mobile_user
+                )
+                tag.save()  # fires post_save → ensure_code/build_bundle
+        except IntegrityError:
+            # Concurrent double-tap hit the unique_together(point, nfc_uid).
+            tag = CheckpointTag.objects.get(point=cp, nfc_uid=nfc_uid)
+            return self._tag_response(tag, status.HTTP_200_OK)
+
+        tag.refresh_from_db()
+        return self._tag_response(tag, status.HTTP_201_CREATED)
 
 
 class RaceListView(AppAPIView):

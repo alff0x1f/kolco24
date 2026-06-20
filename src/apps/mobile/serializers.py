@@ -25,6 +25,19 @@ class LoginSerializer(serializers.Serializer):
     password = serializers.CharField()
 
 
+class TagCreateSerializer(serializers.Serializer):
+    """Validate the ``POST /app/race/<race_id>/tags/`` body.
+
+    ``point`` is the **checkpoint id** (``Checkpoint.number`` is not unique per
+    race — see the plan's "КП identity" decision), ``nfc_uid`` is the scanned
+    chip UID. Both required; a blank ``nfc_uid`` is rejected here (400) before it
+    reaches the model's ``save()``, which raises ``ValueError`` on blank (→ 500).
+    """
+
+    point = serializers.IntegerField()
+    nfc_uid = serializers.CharField(allow_blank=False, trim_whitespace=True)
+
+
 class RaceListSerializer(serializers.ModelSerializer):
     """Public list view of a published race (no images)."""
 

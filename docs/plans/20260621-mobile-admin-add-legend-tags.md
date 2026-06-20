@@ -308,33 +308,33 @@ it (Approach A from the brainstorm):
 - Modify: `src/apps/mobile/urls.py`
 - Modify: `src/apps/mobile/tests.py`
 
-- [ ] add `TagCreateSerializer` (`point` int = **checkpoint id**, `nfc_uid` str)
+- [x] add `TagCreateSerializer` (`point` int = **checkpoint id**, `nfc_uid` str)
       for input validation (400 on missing/blank `nfc_uid` — before the model
       `save()` blank-raise).
-- [ ] add `TagCreateView` with `permission_classes = [SignedAppPermission,
+- [x] add `TagCreateView` with `permission_classes = [SignedAppPermission,
       IsMobileUser, CanEditRaceLegend]`, `throttle_classes = [ScopedRateThrottle]`,
       `throttle_scope = "mobile-write"`.
-- [ ] implement the flow (Technical Details §Tag-create): resolve published race
+- [x] implement the flow (Technical Details §Tag-create): resolve published race
       → resolve non-hidden `Checkpoint` by **id** within race (404) → normalize
       `nfc_uid` → idempotent same-КП / 409 cross-КП → else create with
       `created_by` inside `transaction.atomic()` catching `IntegrityError`
       (unique_together / double-tap → re-query, idempotent 200) and
       `instance.save()` → response `{bid, point: cp.number, nfc_uid, code:
       code.hex() if code else None}`.
-- [ ] wire `path("race/<int:race_id>/tags/", …, name="tag_create")`.
-- [ ] write tests (happy path): full signed POST (build-sig over body + bearer +
+- [x] wire `path("race/<int:race_id>/tags/", …, name="tag_create")`.
+- [x] write tests (happy path): full signed POST (build-sig over body + bearer +
       RaceAdmin) → 201, `CheckpointTag` created, `code`/`bid`/`bundle_blob`
       populated **via signals**, response carries hex `code` + `bid` + `point` +
       `nfc_uid`, `created_by` set to the user.
-- [ ] write tests (idempotency/conflicts): re-POST same `nfc_uid`+same КП → no
+- [x] write tests (idempotency/conflicts): re-POST same `nfc_uid`+same КП → no
       duplicate row, **no `IntegrityError` leak**, success; same `nfc_uid`
       different КП → 409; idempotent hit on a tag with `bid==""`/`code is None`
       → no `None.hex()` 500 (rebuilt); КП id not in race → 404; hidden КП → 404;
       `nfc_uid` normalization (lowercase/whitespace in → stored upper/stripped).
-- [ ] write tests (legend version moves): capture `versions.legend` (or legend
+- [x] write tests (legend version moves): capture `versions.legend` (or legend
       `ETag`) before/after create → changes; a follow-up `If-None-Match` with the
       **new** ETag → 304, with the **old** ETag → 200.
-- [ ] run tests — must pass before next task.
+- [x] run tests — must pass before next task.
 
 ### Task 7: Body-signing roundtrip on POST (lift GET-only restriction)
 
