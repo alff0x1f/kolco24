@@ -73,8 +73,16 @@ class AppAPIView(APIView):
         super().permission_denied(request, message=message, code=code)
 
     def _record_denial(self, request):
-        """Best-effort 403 log + aggregated DB row — must never break the 403."""
-        d = getattr(request, "app_denial", {"reason": "unknown"})
+        """Best-effort 403 log + aggregated DB row — must never break the 403.
+
+        Only fires for HMAC-layer failures (``app_denial`` set by
+        ``SignedAppPermission``).  Authorization denials from later layers (e.g.
+        ``CanEditRaceLegend`` returning ``False``) do not set ``app_denial`` and
+        are silently skipped so they don't pollute the AppAuthFailure table.
+        """
+        d = getattr(request, "app_denial", None)
+        if not d:
+            return
         reason = d.get("reason", "unknown")
         ip = d.get("ip") or "0.0.0.0"
         key_id = d.get("key_id", "")
