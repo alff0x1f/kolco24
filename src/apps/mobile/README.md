@@ -1,12 +1,17 @@
 # apps.mobile — подписанные эндпоинты мобильного приложения
 
-Read-only API для iOS/Android-приложения. Без регистрации пользователей:
-приложение аутентифицирует **само себя** общим секретом и HMAC-подписью каждого
-запроса. Секрет выбирается по `key_id`: сервер держит JSON-карту key-id → секрет
-(`MOBILE_APP_KEYS`), а клиент шлёт заголовок `X-App-Key-Id` (напр. `android-v1`),
-по которому сервер находит нужный секрет и проверяет подпись. Смонтировано на
-`/app/*`, `label = "mobile"`, самодостаточно — не трогает `/api/`, `donate`,
-`website`.
+Преимущественно read-only API для iOS/Android-приложения. Без регистрации
+пользователей **на уровне сборки**: приложение аутентифицирует **само себя**
+общим секретом и HMAC-подписью каждого запроса. Секрет выбирается по `key_id`:
+сервер держит JSON-карту key-id → секрет (`MOBILE_APP_KEYS`), а клиент шлёт
+заголовок `X-App-Key-Id` (напр. `android-v1`), по которому сервер находит нужный
+секрет и проверяет подпись. Смонтировано на `/app/*`, `label = "mobile"`,
+самодостаточно — не трогает `/api/`, `donate`, `website`.
+
+Поверх подписи сборки есть **тонкий слой записи** — вход по человеку
+(`POST /app/login/` → отзываемый bearer-токен) и добавление тегов легенды
+(`POST /app/race/<id>/tags/`). Запись надстраивается, а не заменяет read-only
+контракт: см. раздел **Запись: вход по человеку и добавление тегов легенды**.
 
 Детали схемы подписи (канонная строка, заголовки `X-App-*` включая
 `X-App-Key-Id`, `SignedAppPermission`, replay-окно `±MOBILE_APP_TS_WINDOW`,
@@ -45,6 +50,142 @@ Read-only API для iOS/Android-приложения. Без регистрац
 возвращается нейтральный `403 {"detail": "Forbidden"}` без подсказки о
 причине. Таблица читается через read-only `AppAuthFailureAdmin` в Django admin
 (фильтры по `reason`, `key_id`; сортировка по `count` убыванием).
+
+## Запись: вход по человеку и добавление тегов легенды
+
+Read-эндпоинты аутентифицируют **сборку**. Запись требует знать **кто** именно
+действует (полевой админ привязывает NFC-чип к КП), поэтому поверх подписи сборки
+лежит **слоистый стек прав**: подпись сборки → личность → авторизация на гонку.
+
+```
+POST /app/login/                 SignedAppPermission                      → bearer-токен
+POST /app/logout/                SignedAppPermission + IsMobileUser       → revoke
+POST /app/race/<id>/tags/        SignedAppPermission + IsMobileUser
+                                   + CanEditRaceLegend                    → CheckpointTag
+```
+
+**Scope — только ADD:** добавление тега. Нет редактирования/удаления тегов,
+правки КП, офлайн-очереди и клиентской криптографии — сервер остаётся
+единственным источником крипты (теги создаются через `instance.save()`, чтобы
+отработали те же сигналы `ensure_code`/`build_bundle`, что и в вебе/`manage.py`).
+
+### Токен (`MobileToken`)
+
+Личная учётка кладётся **поверх** HMAC сборки, а не вместо него: сборка
+доказывает «я — наш билд», токен — «я — такой-то человек». Токен —
+**непрозрачный, отзываемый, в БД** (не JWT): для админ-доступа приоритет —
+мгновенный отзыв (потерянный телефон / снятый из крю), а blocklist у JWT убивает
+его же statelessness. Модель `MobileToken` (`src/apps/mobile/models.py`):
+
+- `user` FK, `token_hash` (`unique`), `created_at`, `last_used_at`, `expires_at`,
+  `revoked_at`; `@property is_active = revoked_at is None and expires_at > now`.
+- Хранится **только** `sha256`-хекс высокоэнтропийного `secrets.token_urlsafe(32)`
+  — сырой токен отдаётся клиенту **ровно один раз** при входе. Хеш токена ≠ хеш
+  пароля: 256-битный случайный токен не брутфорсится, поэтому быстрый
+  несолёный `sha256` корректен (и сильнее DRF authtoken, хранящего плейнтекст);
+  поиск идёт по индексированной колонке `token_hash`.
+- **Не** ETag-фингерпринтится → нет дисциплины `updated_at`.
+- TTL — `MOBILE_TOKEN_TTL = timedelta(days=30)` в `settings.py` (сосед
+  `MOBILE_APP_TS_WINDOW`). Хелперы — `tokens.py`: `generate_token() -> (raw,
+  token_hash)`, `hash_token(raw)`, `resolve_token(raw)` (проверяет `is_active`,
+  best-effort штампует `last_used_at`).
+
+Несколько одновременных токенов на пользователя (строка-на-вход), каждый
+отзывается индивидуально.
+
+### `POST /app/login/`
+
+Гейтится **только** `SignedAppPermission` (HMAC сборки), своего токена не
+требует — так даже парольный вход достижим только из наших сборок. Логин
+**общий**, не админ-специфичный: любой валидный пользователь получает токен,
+а админ-способность решается **по-действию** через `can_edit_race` — дверь
+открыта под будущие фичи обычных пользователей без переделки. Тело — `{email,
+password}` (`LoginSerializer`); аутентификация через
+`apps.accounts.backends.EmailBackend` (`email__iexact`), как в вебе.
+
+Ответ: `{token, expires_at}` (200). Ошибки **enumeration-safe**: неверный пароль
+и неизвестный email оба → `401` с **одинаковым** сообщением «Неверный email или
+пароль», без подсказки. Кривое тело (нет поля / не-JSON) → `400` от сериализатора
+(отличается от 401, но тоже ничего не выдаёт о существовании учётки).
+
+### `POST /app/logout/`
+
+Стек `SignedAppPermission + IsMobileUser`. Флипает `revoked_at = now()` на
+**предъявленном** токене — другие токены того же пользователя остаются валидны
+(отзыв пер-устройство, не пер-аккаунт).
+
+### `POST /app/race/<id>/tags/`
+
+Полный стек `SignedAppPermission + IsMobileUser + CanEditRaceLegend`,
+троттлинг `mobile-write`. Тело — `{point, nfc_uid}` (`TagCreateSerializer`), где
+**`point` = id КП, а не `number`** (`Checkpoint.number` не уникален в гонке →
+риск `MultipleObjectsReturned`; приложение уже знает `id` из синканной легенды).
+Пустой `nfc_uid` отбивается сериализатором (400) до модельного `save()`, который
+на пустом UID кидает `ValueError` (иначе 500).
+
+Поток: резолв published-гонки (404) → резолв **не-`hidden`** КП по `id` внутри
+гонки (404) → нормализация `nfc_uid` (`.strip().upper()`) → идемпотентность/
+конфликт → создание `CheckpointTag(point, nfc_uid, created_by=request.mobile_user)`
+в `transaction.atomic()` с `instance.save()` (ловим `IntegrityError` от
+`unique_together("point","nfc_uid")` при гонке двойного тапа → перезапрос строки,
+идемпотентный 200). Ответ `{bid, point: cp.number, nfc_uid, code: code.hex()}`
+(201, либо 200 на идемпотентном попадании) — `code` приложение пишет в
+NFC-user-память чипа.
+
+- тот же `nfc_uid` на **той же** КП → идемпотентный 200 (без дубля строки);
+- тот же `nfc_uid` на **другой** КП → `409` (не авто-перепривязываем);
+- если у идемпотентной строки `bid == ""`/`code is None` (создана в обход
+  сигналов) — она чинится через `build_bundle` до ответа, без `None.hex()` (500).
+
+`CheckpointTag.created_by` — `FK(AUTH_USER_MODEL, null, on_delete=SET_NULL,
+related_name="provisioned_tags")` (миграция `website/0088`), проставляется из
+`request.mobile_user`. В фингерпринт легенды **не** входит (`legend_version` —
+`MAX(updated_at)|COUNT`), но создание тега двигает `versions.legend`/ETag через
+`CheckpointTag.updated_at` — без правок `versioning.py`.
+
+### Слой прав (`permissions.py`)
+
+- **`IsMobileUser`** — личность: читает `Authorization: Bearer <token>`, через
+  `resolve_token` ставит `request.mobile_user` + `request.mobile_token`. Только
+  идентичность, ничего не авторизует. Стек — **после** `SignedAppPermission`.
+- **`CanEditRaceLegend`** — авторизация на гонку: читает `view.kwargs["race_id"]`,
+  грузит `Race` (нет → 404), делегирует в `apps.race.permissions.can_edit_race`
+  (тот же superuser-или-`RaceAdmin(role=ADMIN)`, что у вебового
+  `RaceLegendEditView`). `request.mobile_user` читается защитно
+  (`getattr(..., None)` → `False`/403, не `AttributeError`/500 при
+  перестановке стека). Стек — **после** `IsMobileUser`.
+
+**Нейтральная vs действенная ошибка — намеренный раскол.** Анонимный слой сборки
+(`SignedAppPermission`) отдаёт нейтральный `403 {"detail":"Forbidden"}` без
+подсказки (чтобы не помогать брутфорсу). Аутентифицированные слои — действенные:
+- невалидный/просроченный/отозванный токен → **401**. Тонкость: при
+  `authentication_classes = []` поднятые DRF-ные `NotAuthenticated`/
+  `AuthenticationFailed` рендерятся как **403** (нет аутентикатора для
+  `WWW-Authenticate`), поэтому `IsMobileUser` кидает свой `MobileTokenInvalid`
+  (`APIException` с `status_code = 401`);
+- юзер без прав на гонку → действенный **403** (дефолтное сообщение DRF).
+
+### Троттлинг
+
+Первое применение в этом приложении — намеренно минимальное. Логин уже за
+HMAC-сборки, так что брутфорс «в масштабе» требует валидного секрета сборки;
+троттл — второй потолок. Плоский IP-keyed `ScopedRateThrottle` (без сабкласса,
+без чтения `request.data`/email внутри троттла — чтобы не зацепить порядок чтения
+тела). `DEFAULT_THROTTLE_RATES = {"mobile-login": "5/min", "mobile-write":
+"60/min"}` в `REST_FRAMEWORK`; `throttle_scope` ставится **по-вью** (глобального
+`DEFAULT_THROTTLE_CLASSES` нет). Превышение → `429`. Троттлингу нужен кеш-бэкенд:
+добавлен явный `CACHES` (Django `LocMemCache` — пер-процессный, счётчики
+приблизительны под несколькими воркерами, что приемлемо при гейте HMAC-сборки).
+Email-keyed троттл сознательно **отложен** (YAGNI при гейте сборки).
+
+### Подпись тела на POST
+
+`build_canonical` подписывает `method\nfull_path\nts\nsha256_hex(body)` — тело
+**уже** входит в канонную строку, так что подпись POST структурно работает.
+Django буферизует `request.body`, поэтому чтение тела в `SignedAppPermission` до
+DRF-парсинга `request.data` **не** роняет `RawPostDataException` (раньше в
+`CLAUDE.md` была пометка «подпись тела только для GET» — снята). Подделанное тело
+(подпись над устаревшим телом) → нейтральный `403`.
 
 ## Что обновляется
 
@@ -476,6 +617,9 @@ ETag/`If-None-Match` на ресурсах остаётся (см. выше) —
 | GET | `/app/race/<id>/legend/` | `mobile:legend` | КП (запертые — только `enc`) + пер-тег `tags` (`bid → point` идентичность всегда; `iv`/`ct` только у запертых); легенда published-гонки отдаётся всегда, КП типа `hidden` («Скрытый») исключены |
 | GET | `/app/race/<id>/member_tags/` | `mobile:member_tags` | пул браслетов участников (`number → nfc_uid`); см. **Браслеты участников** ниже |
 | GET | `/app/race/<id>/sync/` | `mobile:sync` | манифест: версии ресурсов + `data_source`/`lease_expires_at` |
+| POST | `/app/login/` | `mobile:login` | вход email+пароль → `{token, expires_at}`; см. **Запись** выше |
+| POST | `/app/logout/` | `mobile:logout` | отзыв предъявленного токена |
+| POST | `/app/race/<id>/tags/` | `mobile:tag_create` | привязка NFC-чипа к КП → `{bid, point, nfc_uid, code}` |
 
 Все — наследники `AppAPIView` (подпись + `AppInstall`-статистика); у `races`,
 `teams`, `legend` и `member_tags` — поддержка `ETag`/`If-None-Match` (304), у

@@ -370,13 +370,13 @@ it (Approach A from the brainstorm):
 - [x] `make format && make lint` clean.
 
 ### Task 9: [Final] Documentation
-- [ ] update `src/apps/mobile/README.md`: new login/logout/tag endpoints, token
+- [x] update `src/apps/mobile/README.md`: new login/logout/tag endpoints, token
       model + lifecycle, layered permission stack, error semantics, throttling.
-- [ ] update `CLAUDE.md` `apps.mobile` section: lift the "Body signing is
+- [x] update `CLAUDE.md` `apps.mobile` section: lift the "Body signing is
       GET-only" caveat; document `MobileToken`, `IsMobileUser`,
       `CanEditRaceLegend`, the write endpoint, `CheckpointTag.created_by`, and the
       neutral-vs-actionable error split.
-- [ ] move this plan to `docs/plans/completed/`.
+- [x] move this plan to `docs/plans/completed/`.
 
 ## Post-Completion
 *Informational — external/manual, no checkboxes.*
