@@ -13,9 +13,27 @@ import ipaddress
 import time
 
 from django.conf import settings
+from rest_framework.exceptions import APIException
 from rest_framework.permissions import BasePermission
 
 from .signing import build_canonical, verify
+from .tokens import resolve_token
+
+
+class MobileTokenInvalid(APIException):
+    """Actionable 401 for a missing/expired/revoked bearer token.
+
+    With ``authentication_classes = []`` on :class:`AppAPIView`, raising DRF's
+    own ``NotAuthenticated``/``AuthenticationFailed`` renders as **403** (DRF
+    has no authenticator to attach a ``WWW-Authenticate`` header, so it
+    downgrades the status). To emit a genuine **401** — distinct from the
+    neutral build-layer 403 — :class:`IsMobileUser` raises this small
+    ``APIException`` subclass with an explicit ``status_code``.
+    """
+
+    status_code = 401
+    default_detail = "Недействительный или просроченный токен"
+    default_code = "token_invalid"
 
 
 def _client_ip(request):
@@ -111,4 +129,33 @@ class SignedAppPermission(BasePermission):
             "key_id": key_id,
             "ip": _client_ip(request),
         }
+        return True
+
+
+class IsMobileUser(BasePermission):
+    """Resolve ``Authorization: Bearer <token>`` to ``request.mobile_user``.
+
+    Identity only — it authorizes **nothing** (per-action authorization is
+    :class:`CanEditRaceLegend`). Stack it **after** :class:`SignedAppPermission`
+    so the per-build HMAC is already proven; on success it sets
+    ``request.mobile_user`` (the :class:`~django.contrib.auth` user) and
+    ``request.mobile_token`` (the resolved :class:`MobileToken`, for a later
+    revoke).
+
+    Unlike the neutral build layer, a token failure is **actionable**: a missing
+    header, a malformed ``Authorization`` value, or an unknown/expired/revoked
+    token raises :class:`MobileTokenInvalid` → HTTP **401** (see that class for
+    why a raised exception, not ``return False``, is required to get a 401 here).
+    """
+
+    def has_permission(self, request, view):
+        auth = request.headers.get("Authorization", "")
+        parts = auth.split()
+        if len(parts) != 2 or parts[0].lower() != "bearer":
+            raise MobileTokenInvalid()
+        token = resolve_token(parts[1])
+        if token is None:
+            raise MobileTokenInvalid()
+        request.mobile_user = token.user
+        request.mobile_token = token
         return True

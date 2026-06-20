@@ -25,7 +25,7 @@ from website.models.models import Athlet, Team
 from website.models.race import Category, Race
 
 from .models import AppAuthFailure, AppInstall, MobileToken
-from .permissions import SignedAppPermission
+from .permissions import IsMobileUser, SignedAppPermission
 from .serializers import (
     CategorySerializer,
     LegendCheckpointSerializer,
@@ -169,6 +169,25 @@ class LoginView(AppAPIView):
             user=user, token_hash=token_hash, expires_at=expires_at
         )
         return Response({"token": raw, "expires_at": expires_at})
+
+
+class LogoutView(AppAPIView):
+    """``POST /app/logout/`` — revoke the presented bearer token.
+
+    Stacks :class:`SignedAppPermission` (build HMAC) then :class:`IsMobileUser`
+    (identity), so it is reachable only from one of our builds **and** with a
+    valid token. It flips ``revoked_at`` on the exact token presented in the
+    ``Authorization`` header — other tokens of the same user stay valid (each
+    login mints its own row; revocation is per-device, not per-account).
+    """
+
+    permission_classes = [SignedAppPermission, IsMobileUser]
+
+    def post(self, request):
+        token = request.mobile_token
+        token.revoked_at = timezone.now()
+        token.save(update_fields=["revoked_at"])
+        return Response(status=status.HTTP_200_OK)
 
 
 class RaceListView(AppAPIView):

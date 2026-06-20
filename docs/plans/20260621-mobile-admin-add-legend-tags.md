@@ -246,22 +246,22 @@ it (Approach A from the brainstorm):
 - Modify: `src/apps/mobile/urls.py`
 - Modify: `src/apps/mobile/tests.py`
 
-- [ ] add `IsMobileUser(BasePermission)`: read `Authorization: Bearer <token>`,
+- [x] add `IsMobileUser(BasePermission)`: read `Authorization: Bearer <token>`,
       `resolve_token`, set `request.mobile_user` on success; return False (→ 401)
       otherwise. Identity only — no authorization.
-- [ ] make the 401 actionable: missing/expired/revoked token yields HTTP **401**
+- [x] make the 401 actionable: missing/expired/revoked token yields HTTP **401**
       (not the neutral 403). **Pin the mechanism** — with
       `authentication_classes = []`, a raised `NotAuthenticated`/`AuthenticationFailed`
       renders as **403** (DRF has no authenticator to emit `WWW-Authenticate`).
       So raise a small `APIException` subclass with `status_code = 401` (e.g.
       `MobileTokenInvalid`) from the permission. Document in the docstring.
-- [ ] add `LogoutView`: stack `[SignedAppPermission, IsMobileUser]`; flip
+- [x] add `LogoutView`: stack `[SignedAppPermission, IsMobileUser]`; flip
       `revoked_at = now()` on the presented token; 200.
-- [ ] wire `path("logout/", …, name="logout")`.
-- [ ] write tests: valid token → `request.mobile_user` resolved (assert via a
+- [x] wire `path("logout/", …, name="logout")`.
+- [x] write tests: valid token → `request.mobile_user` resolved (assert via a
       probe/logout 200); missing header / expired / revoked token → 401; logout
       revokes (token then rejected, other tokens of same user still valid).
-- [ ] run tests — must pass before next task.
+- [x] run tests — must pass before next task.
 
 ### Task 4: `CanEditRaceLegend` permission (per-race authorization)
 

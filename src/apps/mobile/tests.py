@@ -5033,3 +5033,217 @@ def test_login_throttle_returns_429_after_limit(client, settings, django_user_mo
     assert statuses[:5] == [401] * 5
     assert 429 in statuses[5:]
     cache.clear()
+
+
+# --- Task 3: IsMobileUser permission + POST /app/logout/ --------------------
+
+LOGOUT_PATH = "/app/logout/"
+
+
+def _make_active_token(user):
+    """Create an active MobileToken for ``user`` and return its raw value."""
+    from datetime import timedelta
+
+    from django.utils import timezone
+
+    from apps.mobile.models import MobileToken
+    from apps.mobile.tokens import generate_token
+
+    raw, token_hash = generate_token()
+    MobileToken.objects.create(
+        user=user,
+        token_hash=token_hash,
+        expires_at=timezone.now() + timedelta(days=30),
+    )
+    return raw
+
+
+def _signed_post_auth(client, path, secret, body_bytes, bearer, key_id="test-v1"):
+    """Signed POST that also carries an ``Authorization: Bearer`` header."""
+    headers = _signed_headers("POST", path, secret, body=body_bytes, key_id=key_id)
+    if bearer is not None:
+        headers["HTTP_AUTHORIZATION"] = f"Bearer {bearer}"
+    return client.post(
+        path, data=body_bytes, content_type="application/json", **headers
+    )
+
+
+@pytest.mark.django_db
+def test_logout_valid_token_returns_200_and_revokes(
+    client, settings, django_user_model
+):
+    from apps.mobile.models import MobileToken
+    from apps.mobile.tokens import hash_token
+
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    user = django_user_model.objects.create_user(
+        username="lo1", email="lo1@example.com", password="x"
+    )
+    raw = _make_active_token(user)
+
+    response = _signed_post_auth(client, LOGOUT_PATH, SECRET, b"", raw)
+    assert response.status_code == 200
+
+    token = MobileToken.objects.get(token_hash=hash_token(raw))
+    assert token.revoked_at is not None
+    assert token.is_active is False
+
+
+@pytest.mark.django_db
+def test_logout_missing_bearer_returns_401(client, settings, django_user_model):
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    # Valid build signature but no Authorization header → actionable 401.
+    response = _signed_post_auth(client, LOGOUT_PATH, SECRET, b"", None)
+    assert response.status_code == 401
+
+
+@pytest.mark.django_db
+def test_logout_malformed_authorization_returns_401(
+    client, settings, django_user_model
+):
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    user = django_user_model.objects.create_user(
+        username="lo-mal", email="lo-mal@example.com", password="x"
+    )
+    raw = _make_active_token(user)
+
+    # Token value present but no "Bearer " scheme prefix → 401.
+    headers = _signed_headers("POST", LOGOUT_PATH, SECRET, body=b"")
+    headers["HTTP_AUTHORIZATION"] = raw  # no scheme
+    response = client.post(
+        LOGOUT_PATH, data=b"", content_type="application/json", **headers
+    )
+    assert response.status_code == 401
+
+
+@pytest.mark.django_db
+def test_logout_expired_token_returns_401(client, settings, django_user_model):
+    from datetime import timedelta
+
+    from django.utils import timezone
+
+    from apps.mobile.models import MobileToken
+    from apps.mobile.tokens import generate_token
+
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    user = django_user_model.objects.create_user(
+        username="lo-exp", email="lo-exp@example.com", password="x"
+    )
+    raw, token_hash = generate_token()
+    MobileToken.objects.create(
+        user=user,
+        token_hash=token_hash,
+        expires_at=timezone.now() - timedelta(seconds=1),
+    )
+
+    response = _signed_post_auth(client, LOGOUT_PATH, SECRET, b"", raw)
+    assert response.status_code == 401
+
+
+@pytest.mark.django_db
+def test_logout_revoked_token_returns_401(client, settings, django_user_model):
+    from django.utils import timezone
+
+    from apps.mobile.models import MobileToken
+    from apps.mobile.tokens import hash_token
+
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    user = django_user_model.objects.create_user(
+        username="lo-rev", email="lo-rev@example.com", password="x"
+    )
+    raw = _make_active_token(user)
+    MobileToken.objects.filter(token_hash=hash_token(raw)).update(
+        revoked_at=timezone.now()
+    )
+
+    response = _signed_post_auth(client, LOGOUT_PATH, SECRET, b"", raw)
+    assert response.status_code == 401
+
+
+@pytest.mark.django_db
+def test_logout_missing_build_signature_returns_403(
+    client, settings, django_user_model
+):
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    user = django_user_model.objects.create_user(
+        username="lo-403", email="lo-403@example.com", password="x"
+    )
+    raw = _make_active_token(user)
+
+    # No build-HMAC headers at all → the build layer rejects first (neutral 403),
+    # never reaching the token layer, even with a valid bearer.
+    response = client.post(
+        LOGOUT_PATH,
+        data=b"",
+        content_type="application/json",
+        HTTP_AUTHORIZATION=f"Bearer {raw}",
+    )
+    assert response.status_code == 403
+    assert response.json() == {"detail": "Forbidden"}
+
+
+@pytest.mark.django_db
+def test_logout_revokes_only_presented_token(client, settings, django_user_model):
+    from apps.mobile.models import MobileToken
+    from apps.mobile.tokens import hash_token
+
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    user = django_user_model.objects.create_user(
+        username="lo-multi", email="lo-multi@example.com", password="x"
+    )
+    raw_a = _make_active_token(user)
+    raw_b = _make_active_token(user)
+
+    response = _signed_post_auth(client, LOGOUT_PATH, SECRET, b"", raw_a)
+    assert response.status_code == 200
+
+    token_a = MobileToken.objects.get(token_hash=hash_token(raw_a))
+    token_b = MobileToken.objects.get(token_hash=hash_token(raw_b))
+    assert token_a.is_active is False
+    assert token_b.is_active is True
+
+    # The other token still works for a fresh logout.
+    again = _signed_post_auth(client, LOGOUT_PATH, SECRET, b"", raw_b)
+    assert again.status_code == 200
+
+
+@pytest.mark.django_db
+def test_is_mobile_user_sets_request_mobile_user(settings, django_user_model):
+    """Identity layer resolves the bearer to request.mobile_user (+ mobile_token)."""
+    from apps.mobile.permissions import IsMobileUser
+
+    user = django_user_model.objects.create_user(
+        username="ident", email="ident@example.com", password="x"
+    )
+    raw = _make_active_token(user)
+
+    request = RequestFactory().post(LOGOUT_PATH, HTTP_AUTHORIZATION=f"Bearer {raw}")
+    assert IsMobileUser().has_permission(request, None) is True
+    assert request.mobile_user == user
+    assert request.mobile_token.user == user
+
+
+@pytest.mark.django_db
+def test_is_mobile_user_raises_401_for_unknown_token(settings):
+    from apps.mobile.permissions import IsMobileUser, MobileTokenInvalid
+
+    request = RequestFactory().post(
+        LOGOUT_PATH, HTTP_AUTHORIZATION="Bearer no-such-token"
+    )
+    with pytest.raises(MobileTokenInvalid) as exc:
+        IsMobileUser().has_permission(request, None)
+    assert exc.value.status_code == 401
