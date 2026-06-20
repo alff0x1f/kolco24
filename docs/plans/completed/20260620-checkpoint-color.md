@@ -31,10 +31,12 @@
 - **Admin**: `src/website/admin.py` — `CheckpointAdmin` (107) `list_display` +
   `list_filter`, no explicit `fields`/`fieldsets` (so the new field auto-appears
   in the form).
-- **Versioning / crypto**: `src/apps/mobile/versioning.py` (`legend_version`) and
-  the crypto stack (`signals.py`, `legend_crypto.py`, `CheckpointSecret`) are
-  **untouched** — `color` lives on `Checkpoint`, not in `enc_blob`/bundles, and
-  `updated_at`/`auto_now` already moves the legend ETag on save.
+- **Versioning / crypto**: the crypto stack (`signals.py`, `legend_crypto.py`,
+  `CheckpointSecret`) is **untouched** — `color` lives on `Checkpoint`, not in
+  `enc_blob`/bundles, and `updated_at`/`auto_now` moves the legend ETag on save.
+  `src/apps/mobile/versioning.py` **was changed**: `_LEGEND_SCHEMA_VERSION` was
+  bumped from 1 → 2 to force a cache bust on all clients at deploy time because
+  `LegendCheckpointSerializer` gained a new `color` field.
 
 ## Development Approach
 - **Testing approach**: Regular (code first, then tests) — small, well-scoped
@@ -67,8 +69,9 @@
   `_validate_legend_rows` → `_reconcile_legend` (`instance.save()`, signals
   preserved) → DB → mobile `LegendCheckpointSerializer` → app.
 - Admin gets the field for one-off edits.
-- ETag/`legend_version` move automatically via `Checkpoint.updated_at` — no
-  `versioning.py` change.
+- ETag/`legend_version` move automatically via `Checkpoint.updated_at`; additionally
+  `_LEGEND_SCHEMA_VERSION` in `versioning.py` was bumped 1 → 2 to force a deploy-time
+  cache bust for the new `color` field in the serializer response.
 
 ## Technical Details
 - `CheckpointColor(TextChoices)`: `none=""` (default, "Без цвета"), `red`, `blue`,
@@ -177,10 +180,11 @@
 - [x] tests: legend endpoint returns `color` for an **open** КП and a **locked** КП;
       update the existing legend field-set/contract test to include `color`.
 - [x] confirm (test or assertion) that a `color` change moves the legend ETag /
-      `versions.legend` via `updated_at` — no `versioning.py` change required. This
-      holds because `_reconcile_legend` does a **plain** `instance.save()` (no
-      `update_fields`), so `auto_now` bumps `updated_at`; keep the reconcile a full
-      save (don't switch it to `update_fields` omitting `"updated_at"`).
+      `versions.legend` via `updated_at` — this holds because `_reconcile_legend` does
+      a **plain** `instance.save()` (no `update_fields`), so `auto_now` bumps
+      `updated_at`; keep the reconcile a full save (don't switch it to `update_fields`
+      omitting `"updated_at"`). Additionally `_LEGEND_SCHEMA_VERSION` in `versioning.py`
+      was bumped 1 → 2 to force a deploy-time cache bust for the new serializer field.
 - [x] run tests — must pass before next task.
 
 ### Task 5: Django admin exposes `color`
