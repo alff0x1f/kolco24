@@ -343,19 +343,22 @@ it (Approach A from the brainstorm):
   (only if a fix is needed)
 - Modify: `src/apps/mobile/tests.py`
 
-- [ ] verify `SignedAppPermission` + DRF parse `request.data` correctly **after**
+- [x] verify `SignedAppPermission` + DRF parse `request.data` correctly **after**
       the permission reads `request.body` for a JSON POST (no
       `RawPostDataException`). `build_canonical` already reads `request.body`
       first, so this should hold; if it fails, ensure body is read before DRF
-      parsing. Add a focused note.
-- [ ] reuse the existing `_signed_headers(method, path, secret, body=…)` helper
+      parsing. Add a focused note. (Verified: login/tag-create POST tests pass;
+      added a unit-level pin `test_signed_permission_reads_body_before_drf_parse`
+      that reads `request.body` in the permission then parses `request.data` —
+      Django buffers the body, so no `RawPostDataException`. No code change.)
+- [x] reuse the existing `_signed_headers(method, path, secret, body=…)` helper
       (it **already** signs the body via `build_canonical`); ensure the signed
       bytes are **byte-identical** to the request body the test client sends
       (same encoding/content-type) so `sha256_hex(body)` matches.
-- [ ] write test: POST with a correct body-inclusive signature → passes;
+- [x] write test: POST with a correct body-inclusive signature → passes;
       tampered body (signature over a stale body) → neutral 403; empty-vs-present
       body both handled.
-- [ ] run tests — must pass before next task.
+- [x] run tests — must pass before next task.
 
 ### Task 8: Verify acceptance criteria
 - [ ] all Overview requirements implemented: per-person password login, revocable

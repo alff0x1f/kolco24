@@ -5780,3 +5780,134 @@ def test_tag_create_moves_legend_version_and_etag(client, settings, django_user_
     headers["HTTP_IF_NONE_MATCH"] = old_etag
     stale = client.get(legend_path, **headers)
     assert stale.status_code == 200
+
+
+# --- Task 7: body-signing roundtrip on POST -------------------------------
+#
+# These tests pin the previously-GET-only body-signing contract for POST.
+# `SignedAppPermission` reads `request.body` to rebuild the canonical string;
+# the view then reads `request.data` (DRF JSON parse). Django/DRF buffer the
+# body, so reading it in the permission does NOT raise `RawPostDataException`
+# in the view — the roundtrip below proves that end to end (a 200/201 means the
+# serializer parsed `request.data` after the permission consumed `request.body`).
+
+
+@pytest.mark.django_db
+def test_post_body_signature_roundtrip_passes_and_parses_data(
+    client, settings, django_user_model
+):
+    """Correct body-inclusive signature → permission passes AND `request.data`
+    parses (no `RawPostDataException` after the body read)."""
+    import json
+
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    django_user_model.objects.create_user(
+        username="bsr1", email="bsr1@example.com", password="pw-123456"
+    )
+    body = json.dumps({"email": "bsr1@example.com", "password": "pw-123456"}).encode()
+    headers = _signed_headers("POST", LOGIN_PATH, SECRET, body=body)
+
+    response = client.post(
+        LOGIN_PATH, data=body, content_type="application/json", **headers
+    )
+    # 200 proves both layers: build-HMAC over the body verified, then the view
+    # read request.data (the email/password) without RawPostDataException.
+    assert response.status_code == 200
+    assert "token" in response.json()
+
+
+@pytest.mark.django_db
+def test_post_tampered_body_returns_neutral_403(client, settings, django_user_model):
+    """Signature computed over a stale body but a different body sent → the
+    `sha256_hex(body)` term mismatches → neutral build-layer 403 (no hint)."""
+    import json
+
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    django_user_model.objects.create_user(
+        username="bsr2", email="bsr2@example.com", password="pw-123456"
+    )
+    signed_body = json.dumps(
+        {"email": "bsr2@example.com", "password": "pw-123456"}
+    ).encode()
+    headers = _signed_headers("POST", LOGIN_PATH, SECRET, body=signed_body)
+
+    # Send a *different* body than the one the signature covers.
+    tampered_body = json.dumps(
+        {"email": "bsr2@example.com", "password": "TAMPERED"}
+    ).encode()
+    response = client.post(
+        LOGIN_PATH, data=tampered_body, content_type="application/json", **headers
+    )
+    assert response.status_code == 403
+    assert response.json() == {"detail": "Forbidden"}
+
+
+@pytest.mark.django_db
+def test_post_empty_body_signature_handled(client, settings, django_user_model):
+    """Empty-body POST (logout) signed over `b""` verifies — the empty-body
+    branch of the canonical (`sha256_hex(b"")`) is handled the same as GET."""
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    user = django_user_model.objects.create_user(
+        username="bsr3", email="bsr3@example.com", password="x"
+    )
+    raw = _make_active_token(user)
+
+    response = _signed_post_auth(client, LOGOUT_PATH, SECRET, b"", raw)
+    assert response.status_code == 200
+
+
+@pytest.mark.django_db
+def test_post_present_body_signature_handled(client, settings, django_user_model):
+    """Present-body POST (tag create) signed over the JSON body verifies and
+    the view parses it — the present-body counterpart to the empty-body case."""
+    import json
+
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    race, user, raw, cp = _make_admin_race(django_user_model, "bsr-present")
+    path = _tags_path(race.id)
+    body = json.dumps({"point": cp.id, "nfc_uid": "04A1B2C3"}).encode()
+
+    response = _signed_post_auth(client, path, SECRET, body, raw)
+    assert response.status_code == 201
+    assert response.json()["nfc_uid"] == "04A1B2C3"
+
+
+def test_signed_permission_reads_body_before_drf_parse():
+    """Unit-level pin: the permission's `request.body` read leaves the body
+    intact for a subsequent `request.data` parse (Django buffers it), so the
+    documented `RawPostDataException` hazard does not bite for JSON POST."""
+    import json
+
+    from django.test import override_settings
+    from rest_framework.parsers import JSONParser
+    from rest_framework.request import Request
+
+    body = json.dumps({"point": 1, "nfc_uid": "AB"}).encode()
+    factory = RequestFactory()
+    raw_request = factory.post(
+        "/app/race/1/tags/", data=body, content_type="application/json"
+    )
+
+    ts = str(int(time.time()))
+    canonical = build_canonical("POST", "/app/race/1/tags/", ts, body)
+    raw_request.META["HTTP_X_APP_KEY_ID"] = "test-v1"
+    raw_request.META["HTTP_X_APP_SIG"] = sign(SECRET, canonical)
+    raw_request.META["HTTP_X_APP_TS"] = ts
+    raw_request.META["HTTP_X_INSTALL_ID"] = "install-abc"
+
+    with override_settings(
+        MOBILE_APP_KEYS={"test-v1": SECRET}, MOBILE_APP_TS_WINDOW=300
+    ):
+        # 1) permission reads request.body to build the canonical
+        assert SignedAppPermission().has_permission(raw_request, view=None) is True
+        # 2) DRF can still parse the same body afterwards (no RawPostDataException)
+        drf_request = Request(raw_request, parsers=[JSONParser()])
+        assert drf_request.data == {"point": 1, "nfc_uid": "AB"}
