@@ -113,20 +113,20 @@
 - Modify: `src/apps/race/views.py`
 - Modify: `src/apps/race/tests.py`
 
-- [ ] add module constant `_CHECKPOINT_COLOR_VALUES = {value for value, _ in CheckpointColor.choices}`
+- [x] add module constant `_CHECKPOINT_COLOR_VALUES = {value for value, _ in CheckpointColor.choices}`
       next to `_CHECKPOINT_TYPE_VALUES` (~574); import `CheckpointColor`.
-- [ ] `_existing_checkpoints` (~909): add `"color": cp.color` to each row dict.
-- [ ] `_validate_legend_rows` (~577): `color = str(row.get("color") or "").strip()`;
+- [x] `_existing_checkpoints` (~909): add `"color": cp.color` to each row dict.
+- [x] `_validate_legend_rows` (~577): `color = str(row.get("color") or "").strip()`;
       if `color not in _CHECKPOINT_COLOR_VALUES` → `row_errors["color"] = "Неизвестный цвет."`;
       add `"color": color` to the cleaned dict (empty stays `""`).
-- [ ] `_reconcile_legend` (~623): set `instance.color = row["color"]` before
+- [x] `_reconcile_legend` (~623): set `instance.color = row["color"]` before
       `instance.save()` (keep `save()` — never `QuerySet.update()`; signals must fire).
-- [ ] `_build_context` `legend_config` (~933): add
+- [x] `_build_context` `legend_config` (~933): add
       `"colors": [{"value": v, "label": l} for v, l in CheckpointColor.choices]`.
-- [ ] write tests: POST `checkpoints_json` with a valid color persists it on the КП;
+- [x] write tests: POST `checkpoints_json` with a valid color persists it on the КП;
       unknown color → row error + re-render (no save); empty/missing color → `""`;
       existing-КП edit preserves color round-trip.
-- [ ] run tests — must pass before next task.
+- [x] run tests — must pass before next task.
 
 ### Task 3: Legend grid UI — header, `<select>` cell, serialize, CSS
 

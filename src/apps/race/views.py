@@ -19,7 +19,7 @@ from apps.race.permissions import can_edit_race
 from website.forms import NewsPostForm
 from website.models import Checkpoint, NewsPost, Race, Team
 from website.models.checkpoint import CheckpointTag
-from website.models.enums import CheckpointType
+from website.models.enums import CheckpointColor, CheckpointType
 from website.models.race import Category, RacePriceTier, RegStatus
 from website.views.views_ import is_race_admin
 
@@ -572,6 +572,7 @@ def _reconcile_price_tiers(race, cleaned):
 
 
 _CHECKPOINT_TYPE_VALUES = {value for value, _ in CheckpointType.choices}
+_CHECKPOINT_COLOR_VALUES = {value for value, _ in CheckpointColor.choices}
 
 
 def _validate_legend_rows(rows):
@@ -579,9 +580,9 @@ def _validate_legend_rows(rows):
 
     Returns ``(cleaned, errors)`` like :func:`_validate_category_rows`.
     ``number``/``cost`` are non-negative integers (empty → ``0``); ``type`` must
-    be a valid :class:`CheckpointType` (empty → ``kp``); ``description`` is
-    trimmed and capped at the model's 200-char limit; ``is_legend_locked`` is a
-    bool.
+    be a valid :class:`CheckpointType` (empty → ``kp``); ``color`` must be a valid
+    :class:`CheckpointColor` (empty → ``""``); ``description`` is trimmed and
+    capped at the model's 200-char limit; ``is_legend_locked`` is a bool.
     """
     errors = {}
     cleaned = []
@@ -600,6 +601,9 @@ def _validate_legend_rows(rows):
         type_ = str(row.get("type") or "").strip() or CheckpointType.kp.value
         if type_ not in _CHECKPOINT_TYPE_VALUES:
             row_errors["type"] = "Неизвестный тип точки."
+        color = str(row.get("color") or "").strip()
+        if color not in _CHECKPOINT_COLOR_VALUES:
+            row_errors["color"] = "Неизвестный цвет."
         description = str(row.get("description") or "").strip()
         if len(description) > 200:
             row_errors["description"] = "Не длиннее 200 символов."
@@ -614,6 +618,7 @@ def _validate_legend_rows(rows):
                     "cost": cost,
                     "description": description,
                     "type": type_,
+                    "color": color,
                     "is_legend_locked": bool(row.get("is_legend_locked")),
                 }
             )
@@ -647,6 +652,7 @@ def _reconcile_legend(race, cleaned):
         instance.cost = row["cost"]
         instance.description = row["description"]
         instance.type = row["type"]
+        instance.color = row["color"]
         instance.is_legend_locked = row["is_legend_locked"]
         instance.save()
         seen.add(instance.id)
@@ -911,6 +917,7 @@ class RaceLegendEditView(View):
                 "id": cp.id,
                 "number": cp.number,
                 "type": cp.type,
+                "color": cp.color,
                 "cost": cp.cost,
                 "description": cp.description,
                 "is_legend_locked": cp.is_legend_locked,
@@ -935,6 +942,10 @@ class RaceLegendEditView(View):
                     "types": [
                         {"value": value, "label": label}
                         for value, label in CheckpointType.choices
+                    ],
+                    "colors": [
+                        {"value": value, "label": label}
+                        for value, label in CheckpointColor.choices
                     ],
                     "descMaxLen": 200,
                 }

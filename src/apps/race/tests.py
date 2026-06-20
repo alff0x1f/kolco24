@@ -2448,6 +2448,143 @@ def test_legend_post_invalid_type_reports_row_error(client):
     assert "type" in errors["0"]
 
 
+@pytest.mark.django_db
+def test_legend_post_saves_valid_color(client):
+    from website.models import Checkpoint
+
+    race = _make_race()
+    superuser = User.objects.create_superuser("admin", "a@b.c", "pw")
+    client.force_login(superuser)
+
+    resp = client.post(
+        reverse("edit_legend", kwargs={"race_slug": race.slug}),
+        _legend_post(
+            [
+                {
+                    "id": None,
+                    "number": 1,
+                    "type": "kp",
+                    "color": "red",
+                    "cost": 10,
+                    "description": "x",
+                    "is_legend_locked": False,
+                }
+            ]
+        ),
+    )
+    assert resp.status_code == 302
+    cp = Checkpoint.objects.get(race=race, number=1)
+    assert cp.color == "red"
+
+
+@pytest.mark.django_db
+def test_legend_post_unknown_color_reports_row_error(client):
+    from website.models import Checkpoint
+
+    race = _make_race()
+    superuser = User.objects.create_superuser("admin", "a@b.c", "pw")
+    client.force_login(superuser)
+
+    resp = client.post(
+        reverse("edit_legend", kwargs={"race_slug": race.slug}),
+        _legend_post(
+            [
+                {
+                    "id": None,
+                    "number": 1,
+                    "type": "kp",
+                    "color": "rainbow",
+                    "cost": 10,
+                    "description": "x",
+                    "is_legend_locked": False,
+                }
+            ]
+        ),
+    )
+    assert resp.status_code == 200
+    assert Checkpoint.objects.filter(race=race).count() == 0
+    errors = _script_json(resp.content.decode(), "checkpoint-errors")
+    assert "color" in errors["0"]
+
+
+@pytest.mark.django_db
+def test_legend_post_missing_color_defaults_empty(client):
+    from website.models import Checkpoint
+
+    race = _make_race()
+    superuser = User.objects.create_superuser("admin", "a@b.c", "pw")
+    client.force_login(superuser)
+
+    resp = client.post(
+        reverse("edit_legend", kwargs={"race_slug": race.slug}),
+        _legend_post(
+            [
+                {
+                    "id": None,
+                    "number": 1,
+                    "type": "kp",
+                    "cost": 10,
+                    "description": "x",
+                    "is_legend_locked": False,
+                }
+            ]
+        ),
+    )
+    assert resp.status_code == 302
+    cp = Checkpoint.objects.get(race=race, number=1)
+    assert cp.color == ""
+
+
+@pytest.mark.django_db
+def test_legend_color_round_trip_on_existing(client):
+    from website.models import Checkpoint
+
+    race = _make_race()
+    existing = Checkpoint.objects.create(
+        race=race, number=1, cost=10, description="a", color="blue"
+    )
+    superuser = User.objects.create_superuser("admin", "a@b.c", "pw")
+    client.force_login(superuser)
+
+    # The existing КП's color is surfaced in the rendered checkpoints-data island.
+    resp = client.get(reverse("edit_legend", kwargs={"race_slug": race.slug}))
+    rows = _script_json(resp.content.decode(), "checkpoints-data")
+    assert rows[0]["color"] == "blue"
+
+    # Editing to a different color persists.
+    resp = client.post(
+        reverse("edit_legend", kwargs={"race_slug": race.slug}),
+        _legend_post(
+            [
+                {
+                    "id": existing.id,
+                    "number": 1,
+                    "type": "kp",
+                    "color": "green",
+                    "cost": 10,
+                    "description": "a",
+                    "is_legend_locked": False,
+                }
+            ]
+        ),
+    )
+    assert resp.status_code == 302
+    existing.refresh_from_db()
+    assert existing.color == "green"
+
+
+@pytest.mark.django_db
+def test_legend_config_island_includes_colors(client):
+    race = _make_race()
+    superuser = User.objects.create_superuser("admin", "a@b.c", "pw")
+    client.force_login(superuser)
+
+    resp = client.get(reverse("edit_legend", kwargs={"race_slug": race.slug}))
+    config = _script_json(resp.content.decode(), "legend-config")
+    values = {c["value"] for c in config["colors"]}
+    assert {"", "red", "blue", "green", "yellow", "orange", "purple"} <= values
+
+
 # ---------------------------------------------------------------------------
 # Legend codes page (read-only NFC codes)
 # ---------------------------------------------------------------------------
