@@ -1,6 +1,6 @@
 from django.db import models
 
-from .enums import CheckpointType
+from .enums import CheckpointColor, CheckpointType
 
 
 class Checkpoint(models.Model):
@@ -17,6 +17,13 @@ class Checkpoint(models.Model):
         max_length=50,
         choices=CheckpointType.choices,
         default="kp",
+    )
+    color = models.CharField(
+        "Цвет КП",
+        max_length=20,
+        choices=CheckpointColor.choices,
+        default="",
+        blank=True,
     )
     is_legend_locked = models.BooleanField("Легенда заперта", default=False)
     updated_at = models.DateTimeField(auto_now=True)

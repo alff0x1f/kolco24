@@ -96,16 +96,16 @@
 - Modify: `src/website/tests.py` (model lives in `website`, so the model-level test
   goes here per the `src/<app>/tests.py` convention)
 
-- [ ] add `CheckpointColor(TextChoices)` to `enums.py` with values
+- [x] add `CheckpointColor(TextChoices)` to `enums.py` with values
       `none=""`, `red`, `blue`, `green`, `yellow`, `orange`, `purple` (Russian labels).
-- [ ] import `CheckpointColor` in `checkpoint.py`; add
+- [x] import `CheckpointColor` in `checkpoint.py`; add
       `color = models.CharField("Цвет КП", max_length=20, choices=CheckpointColor.choices, default="", blank=True)`
       on `Checkpoint`, placed next to `type`.
-- [ ] run `uv run python src/manage.py makemigrations website` — verify it produces a
+- [x] run `uv run python src/manage.py makemigrations website` — verify it produces a
       single clean `AddField` (no data migration, no other model churn).
-- [ ] write a model test: a new `Checkpoint` defaults to `color == ""`; assigning a
+- [x] write a model test: a new `Checkpoint` defaults to `color == ""`; assigning a
       valid value persists; the migration applies cleanly (`migrate`).
-- [ ] run tests — must pass before next task.
+- [x] run tests — must pass before next task.
 
 ### Task 2: Legend-edit backend — validate + reconcile + config
 
