@@ -283,9 +283,16 @@ class TagCreateView(AppAPIView):
                 )
                 tag.save()  # fires post_save → ensure_code/build_bundle
         except IntegrityError:
-            # Concurrent double-tap hit the unique_together(point, nfc_uid).
-            tag = CheckpointTag.objects.get(point=cp, nfc_uid=nfc_uid)
-            return self._tag_response(tag, status.HTTP_200_OK)
+            # nfc_uid unique constraint: re-query to determine outcome.
+            try:
+                tag = CheckpointTag.objects.get(point=cp, nfc_uid=nfc_uid)
+                return self._tag_response(tag, status.HTTP_200_OK)
+            except CheckpointTag.DoesNotExist:
+                # A different КП won the race — refuse to rebind.
+                return Response(
+                    {"detail": "Этот тег уже привязан к другому КП"},
+                    status=status.HTTP_409_CONFLICT,
+                )
 
         tag.refresh_from_db()
         return self._tag_response(tag, status.HTTP_201_CREATED)

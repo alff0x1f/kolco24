@@ -71,7 +71,7 @@ class CheckpointTag(models.Model):
         on_delete=models.CASCADE,
         related_name="tags",
     )
-    nfc_uid = models.CharField(max_length=255, verbose_name="UID тега")
+    nfc_uid = models.CharField(max_length=255, verbose_name="UID тега", unique=True)
     check_method = models.CharField(
         "Метод проверки",
         max_length=20,
@@ -118,4 +118,4 @@ class CheckpointTag(models.Model):
         verbose_name = "Тег КП"
         verbose_name_plural = "Теги КП"
         ordering = ["id"]
-        unique_together = [("point", "nfc_uid")]
+        unique_together = []
