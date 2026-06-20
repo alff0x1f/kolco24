@@ -77,15 +77,17 @@ class LegendCheckpointSerializer(serializers.Serializer):
     """Public legend view of a checkpoint.
 
     Branches on ``is_legend_locked``: a **locked** КП exposes only
-    ``{id, number, type, enc}`` (the precomputed ``secret.enc_blob`` ciphertext),
-    so its ``cost``/``description`` never leave the server in cleartext; an
-    **open** КП exposes ``{id, number, type, cost, description}``. Never exposes
-    ``iterator``/``year``. The view must ``select_related("secret")`` so the
-    locked branch reads the prefetched secret without an extra query.
+    ``{id, number, type, color, enc}`` (the precomputed ``secret.enc_blob``
+    ciphertext), so its ``cost``/``description`` never leave the server in
+    cleartext; an **open** КП exposes ``{id, number, type, color, cost,
+    description}``. ``color`` is a non-secret display token carried by **both**
+    branches. Never exposes ``iterator``/``year``. The view must
+    ``select_related("secret")`` so the locked branch reads the prefetched
+    secret without an extra query.
     """
 
     def to_representation(self, cp):
-        data = {"id": cp.id, "number": cp.number, "type": cp.type}
+        data = {"id": cp.id, "number": cp.number, "type": cp.type, "color": cp.color}
         if cp.is_legend_locked:
             try:
                 secret = cp.secret

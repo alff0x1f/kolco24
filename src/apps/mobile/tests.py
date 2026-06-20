@@ -103,9 +103,10 @@ def test_legend_checkpoint_serializer_open_exposes_cleartext():
 
     data = LegendCheckpointSerializer(point).data
 
-    assert set(data.keys()) == {"id", "number", "type", "cost", "description"}
+    assert set(data.keys()) == {"id", "number", "type", "color", "cost", "description"}
     assert data["cost"] == 4
     assert data["description"] == "tree"
+    assert data["color"] == ""
     assert "enc" not in data
 
 
@@ -119,13 +120,19 @@ def test_legend_checkpoint_serializer_locked_exposes_only_enc():
 
     race = Race.objects.create(name="Locked ser", slug="locked-ser")
     point = Checkpoint.objects.create(
-        race=race, number=1, cost=4, description="tree", is_legend_locked=True
+        race=race,
+        number=1,
+        cost=4,
+        description="tree",
+        color="blue",
+        is_legend_locked=True,
     )
     secret = seal_checkpoint(point)
 
     data = LegendCheckpointSerializer(point).data
 
-    assert set(data.keys()) == {"id", "number", "type", "enc"}
+    assert set(data.keys()) == {"id", "number", "type", "color", "enc"}
+    assert data["color"] == "blue"
     assert "cost" not in data
     assert "description" not in data
     # the served enc blob decrypts (with the stored content_key) to the cleartext
@@ -160,7 +167,7 @@ def test_legend_checkpoint_serializer_locked_no_secret_fails_closed():
     assert "cost" not in data
     assert "description" not in data
     assert "enc" not in data
-    assert set(data.keys()) == {"id", "number", "type"}
+    assert set(data.keys()) == {"id", "number", "type", "color"}
 
 
 @pytest.mark.django_db
@@ -492,9 +499,10 @@ def test_legend_valid_signature_returns_200_with_fields_and_order(client, settin
     assert data["tags"] == []
     assert [c["number"] for c in data["checkpoints"]] == [1, 2, 3]
     first = data["checkpoints"][0]
-    assert set(first.keys()) == {"id", "number", "cost", "type", "description"}
+    assert set(first.keys()) == {"id", "number", "cost", "type", "color", "description"}
     assert first["type"] == "kp"
     assert first["description"] == "first"
+    assert first["color"] == ""
 
 
 # --- End-to-end gate + stats (request-level) -------------------------------
@@ -717,6 +725,32 @@ def test_legend_stale_if_none_match_returns_200_with_new_etag(client, settings):
 
 
 @pytest.mark.django_db
+def test_legend_etag_changes_when_color_edited(client, settings):
+    """A color edit bumps Checkpoint.updated_at, so the legend ETag moves."""
+    from website.models.checkpoint import Checkpoint
+    from website.models.race import Race
+
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    race = Race.objects.create(name="Color etag", slug="color-etag")
+    cp = Checkpoint.objects.create(race=race, number=1, cost=1, description="first")
+
+    path = f"/app/race/{race.id}/legend/"
+    first = client.get(path, **_signed_headers("GET", path, SECRET))
+    old_etag = first["ETag"]
+
+    # A plain save() (no update_fields) lets auto_now bump updated_at.
+    cp.color = "purple"
+    cp.save()
+
+    second = client.get(path, **_signed_headers("GET", path, SECRET))
+    assert second.status_code == 200
+    assert second["ETag"] != old_etag
+    assert second.json()["checkpoints"][0]["color"] == "purple"
+
+
+@pytest.mark.django_db
 def test_legend_locked_cp_serves_enc_not_cleartext_open_serves_cleartext(
     client, settings
 ):
@@ -729,9 +763,16 @@ def test_legend_locked_cp_serves_enc_not_cleartext_open_serves_cleartext(
 
     race = Race.objects.create(name="Mixed legend", slug="mixed-legend")
     Checkpoint.objects.create(
-        race=race, number=1, cost=4, description="secret tree", is_legend_locked=True
+        race=race,
+        number=1,
+        cost=4,
+        description="secret tree",
+        color="red",
+        is_legend_locked=True,
     )
-    Checkpoint.objects.create(race=race, number=2, cost=2, description="open spot")
+    Checkpoint.objects.create(
+        race=race, number=2, cost=2, description="open spot", color="green"
+    )
 
     path = f"/app/race/{race.id}/legend/"
     response = client.get(path, **_signed_headers("GET", path, SECRET))
@@ -740,12 +781,21 @@ def test_legend_locked_cp_serves_enc_not_cleartext_open_serves_cleartext(
     data = response.json()
     locked, open_cp = data["checkpoints"]
 
-    assert set(locked.keys()) == {"id", "number", "type", "enc"}
+    assert set(locked.keys()) == {"id", "number", "type", "color", "enc"}
     assert set(locked["enc"].keys()) == {"iv", "ct"}
+    assert locked["color"] == "red"
     assert "cost" not in locked
     assert "description" not in locked
 
-    assert set(open_cp.keys()) == {"id", "number", "type", "cost", "description"}
+    assert set(open_cp.keys()) == {
+        "id",
+        "number",
+        "type",
+        "color",
+        "cost",
+        "description",
+    }
+    assert open_cp["color"] == "green"
     assert open_cp["description"] == "open spot"
 
     # the locked КП's cleartext never appears anywhere in the serialized body

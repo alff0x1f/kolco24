@@ -169,19 +169,19 @@
 - Modify: `src/apps/mobile/serializers.py`
 - Modify: `src/apps/mobile/tests.py`
 
-- [ ] `LegendCheckpointSerializer.to_representation` (~88): build
+- [x] `LegendCheckpointSerializer.to_representation` (~88): build
       `data = {"id": cp.id, "number": cp.number, "type": cp.type, "color": cp.color}`
       **before** the `is_legend_locked` branch, so both branches carry `color`.
-- [ ] update the docstring: locked → `{id, number, type, color, enc}`;
+- [x] update the docstring: locked → `{id, number, type, color, enc}`;
       open → `+ cost, description`.
-- [ ] tests: legend endpoint returns `color` for an **open** КП and a **locked** КП;
+- [x] tests: legend endpoint returns `color` for an **open** КП and a **locked** КП;
       update the existing legend field-set/contract test to include `color`.
-- [ ] confirm (test or assertion) that a `color` change moves the legend ETag /
+- [x] confirm (test or assertion) that a `color` change moves the legend ETag /
       `versions.legend` via `updated_at` — no `versioning.py` change required. This
       holds because `_reconcile_legend` does a **plain** `instance.save()` (no
       `update_fields`), so `auto_now` bumps `updated_at`; keep the reconcile a full
       save (don't switch it to `update_fields` omitting `"updated_at"`).
-- [ ] run tests — must pass before next task.
+- [x] run tests — must pass before next task.
 
 ### Task 5: Django admin exposes `color`
 
