@@ -218,25 +218,25 @@ it (Approach A from the brainstorm):
 - Modify: `src/config/settings.py` (throttle scopes)
 - Modify: `src/apps/mobile/tests.py`
 
-- [ ] add a `LoginSerializer` (`email`, `password`) for input validation.
-- [ ] add `LoginView(AppAPIView)` (or subclass with only `SignedAppPermission`):
+- [x] add a `LoginSerializer` (`email`, `password`) for input validation.
+- [x] add `LoginView(AppAPIView)` (or subclass with only `SignedAppPermission`):
       `authenticate(request, username=email, password=password)`; on success mint
       `MobileToken` (`expires_at = now + MOBILE_TOKEN_TTL`), return
       `{token: raw, expires_at}` 200; on failure 401 generic message
       `"Неверный email или пароль"` (no enumeration); override to use POST.
-- [ ] wire `path("login/", …, name="login")` in `urls.py`.
-- [ ] add a `CACHES` setting (Django `LocMemCache`) — required for throttling.
-- [ ] add `DEFAULT_THROTTLE_RATES` (`mobile-login`, `mobile-write`) to
+- [x] wire `path("login/", …, name="login")` in `urls.py`.
+- [x] add a `CACHES` setting (Django `LocMemCache`) — required for throttling.
+- [x] add `DEFAULT_THROTTLE_RATES` (`mobile-login`, `mobile-write`) to
       `REST_FRAMEWORK`; set `throttle_classes = [ScopedRateThrottle]` +
       `throttle_scope = "mobile-login"` on `LoginView` (plain IP keying, **no**
       subclass, no `request.data` read). Do not set a global throttle class.
-- [ ] write tests: valid build-sig + correct creds → 200 + token, exactly one
+- [x] write tests: valid build-sig + correct creds → 200 + token, exactly one
       `MobileToken` row, `token_hash` stored (raw token **not** in DB), `is_active`.
-- [ ] write tests: wrong password and unknown email → 401 with the **same**
+- [x] write tests: wrong password and unknown email → 401 with the **same**
       message; missing/bad build signature → neutral 403; **malformed body**
       (missing email / non-JSON) → 400 (no 500, no throttle crash); throttle →
       429 after the limit.
-- [ ] run tests — must pass before next task.
+- [x] run tests — must pass before next task.
 
 ### Task 3: `IsMobileUser` permission (identity) + `POST /app/logout/`
 

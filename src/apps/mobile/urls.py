@@ -1,10 +1,18 @@
 from django.urls import path
 
-from .views import LegendView, MemberTagsView, RaceListView, SyncView, TeamsView
+from .views import (
+    LegendView,
+    LoginView,
+    MemberTagsView,
+    RaceListView,
+    SyncView,
+    TeamsView,
+)
 
 app_name = "mobile"
 
 urlpatterns = [
+    path("login/", LoginView.as_view(), name="login"),
     path("races/", RaceListView.as_view(), name="races"),
     path("race/<int:race_id>/legend/", LegendView.as_view(), name="legend"),
     path("race/<int:race_id>/teams/", TeamsView.as_view(), name="teams"),

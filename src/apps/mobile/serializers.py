@@ -12,6 +12,19 @@ from website.models.tag import Tag
 logger = logging.getLogger(__name__)
 
 
+class LoginSerializer(serializers.Serializer):
+    """Validate the ``POST /app/login/`` body (``email`` + ``password``).
+
+    Input-shape validation only — it never authenticates. A missing/blank field
+    yields a 400 before the view touches ``authenticate``; bad credentials are a
+    401 from the view (deliberately a different status from the 400, but with a
+    generic, enumeration-safe message).
+    """
+
+    email = serializers.EmailField()
+    password = serializers.CharField()
+
+
 class RaceListSerializer(serializers.ModelSerializer):
     """Public list view of a published race (no images)."""
 

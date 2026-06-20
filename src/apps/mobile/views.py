@@ -9,11 +9,14 @@ failure break the response.
 import logging
 
 from django.conf import settings
+from django.contrib.auth import authenticate
 from django.db.models import F, Prefetch
 from django.http import HttpResponseNotModified
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
+from rest_framework import status
 from rest_framework.response import Response
+from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
 
 from website.models.checkpoint import Checkpoint, CheckpointTag
@@ -21,16 +24,18 @@ from website.models.enums import CheckpointType
 from website.models.models import Athlet, Team
 from website.models.race import Category, Race
 
-from .models import AppAuthFailure, AppInstall
+from .models import AppAuthFailure, AppInstall, MobileToken
 from .permissions import SignedAppPermission
 from .serializers import (
     CategorySerializer,
     LegendCheckpointSerializer,
+    LoginSerializer,
     MemberTagSerializer,
     RaceListSerializer,
     TagSerializer,
     TeamSerializer,
 )
+from .tokens import generate_token
 from .versioning import (
     active_member_tags,
     legend_version,
@@ -119,6 +124,51 @@ class AppAPIView(APIView):
             )
         except Exception:
             logger.exception("Failed to record AppInstall stats")
+
+
+class LoginView(AppAPIView):
+    """``POST /app/login/`` — exchange email+password for an opaque bearer token.
+
+    Gated by :class:`SignedAppPermission` **only** (the per-build HMAC), so even
+    this password endpoint is reachable only from one of our builds; it mints no
+    token of its own and requires no bearer. On success it authenticates via the
+    project's :class:`apps.accounts.backends.EmailBackend` (``email__iexact``),
+    creates a :class:`MobileToken` row (storing only the sha256 hash) and returns
+    the raw token **once** plus ``expires_at``.
+
+    Failures are deliberately enumeration-safe: a wrong password and an unknown
+    email both return ``401`` with the **same** generic message, never hinting
+    which was wrong. A malformed body (missing field / non-JSON) is a ``400``
+    from the serializer — distinct from the 401, but it leaks nothing about
+    account existence.
+
+    Throttled by a plain IP-scoped :class:`ScopedRateThrottle` (``mobile-login``)
+    — no subclass, no ``request.data`` read inside the throttle, so it cannot
+    re-trip the body-read ordering hazard.
+    """
+
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "mobile-login"
+
+    def post(self, request):
+        serializer = LoginSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        email = serializer.validated_data["email"]
+        password = serializer.validated_data["password"]
+
+        user = authenticate(request, username=email, password=password)
+        if user is None:
+            return Response(
+                {"detail": "Неверный email или пароль"},
+                status=status.HTTP_401_UNAUTHORIZED,
+            )
+
+        raw, token_hash = generate_token()
+        expires_at = timezone.now() + settings.MOBILE_TOKEN_TTL
+        MobileToken.objects.create(
+            user=user, token_hash=token_hash, expires_at=expires_at
+        )
+        return Response({"token": raw, "expires_at": expires_at})
 
 
 class RaceListView(AppAPIView):

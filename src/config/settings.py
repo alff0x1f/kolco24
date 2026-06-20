@@ -190,6 +190,25 @@ REST_FRAMEWORK = {
     "DEFAULT_RENDERER_CLASSES": [
         "rest_framework.renderers.JSONRenderer",
     ],
+    # Throttle rates for the mobile per-person endpoints. No global
+    # DEFAULT_THROTTLE_CLASSES — each throttled view opts in with a
+    # ScopedRateThrottle + throttle_scope. Login is also behind the build-HMAC,
+    # so a brute-force run already needs a valid build secret; this is a second
+    # ceiling. mobile-write caps the authenticated tag-create endpoint.
+    "DEFAULT_THROTTLE_RATES": {
+        "mobile-login": "5/min",
+        "mobile-write": "60/min",
+    },
+}
+
+# DRF throttling needs a cache backend to count requests. There was no CACHES
+# config before the mobile per-person endpoints; the default LocMemCache is fine
+# for this rate ceiling (per-process, so counts are approximate under multiple
+# workers — acceptable given the build-HMAC gate in front of login).
+CACHES = {
+    "default": {
+        "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+    },
 }
 
 AUTHENTICATION_BACKENDS = [

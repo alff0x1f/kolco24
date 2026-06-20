@@ -12,6 +12,21 @@ from apps.mobile.permissions import SignedAppPermission, _client_ip
 from apps.mobile.signing import build_canonical, sha256_hex, sign, verify
 
 
+@pytest.fixture(autouse=True)
+def _clear_throttle_cache():
+    """Isolate DRF's per-process LocMemCache throttle counts between tests.
+
+    The mobile-login/mobile-write ScopedRateThrottle keys on the client IP, and
+    every test request comes from the same test IP — without a clear, counts
+    accumulate across tests and trip a spurious 429.
+    """
+    from django.core.cache import cache
+
+    cache.clear()
+    yield
+    cache.clear()
+
+
 def test_build_canonical_exact_format():
     canonical = build_canonical("get", "/app/race/1/legend/", "1700000000", b"")
     expected = "\n".join(
@@ -4826,3 +4841,195 @@ def test_resolve_token_none_for_revoked(django_user_model):
         revoked_at=timezone.now(),
     )
     assert resolve_token(raw) is None
+
+
+# --- Task 2: POST /app/login/ -----------------------------------------------
+
+LOGIN_PATH = "/app/login/"
+
+
+def _signed_post(client, path, secret, body_bytes, key_id="test-v1"):
+    """POST a JSON body with a build-HMAC signature over that exact body."""
+    headers = _signed_headers("POST", path, secret, body=body_bytes, key_id=key_id)
+    return client.post(
+        path, data=body_bytes, content_type="application/json", **headers
+    )
+
+
+@pytest.mark.django_db
+def test_login_valid_creds_returns_token(client, settings, django_user_model):
+    import json
+
+    from apps.mobile.models import MobileToken
+    from apps.mobile.tokens import hash_token
+
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    django_user_model.objects.create_user(
+        username="crew1", email="crew1@example.com", password="s3cret-pass"
+    )
+    body = json.dumps(
+        {"email": "crew1@example.com", "password": "s3cret-pass"}
+    ).encode()
+    response = _signed_post(client, LOGIN_PATH, SECRET, body)
+
+    assert response.status_code == 200
+    data = response.json()
+    assert set(data.keys()) == {"token", "expires_at"}
+    raw = data["token"]
+    assert raw
+
+    # exactly one token row, storing only the hash (raw never persisted)
+    assert MobileToken.objects.count() == 1
+    token = MobileToken.objects.get()
+    assert token.token_hash == hash_token(raw)
+    assert not MobileToken.objects.filter(token_hash=raw).exists()
+    assert token.is_active
+
+
+@pytest.mark.django_db
+def test_login_case_insensitive_email(client, settings, django_user_model):
+    import json
+
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    django_user_model.objects.create_user(
+        username="crewmixed", email="Mixed@Example.com", password="pw-123456"
+    )
+    body = json.dumps({"email": "mixed@example.com", "password": "pw-123456"}).encode()
+    response = _signed_post(client, LOGIN_PATH, SECRET, body)
+    assert response.status_code == 200
+
+
+@pytest.mark.django_db
+def test_login_wrong_password_returns_401_generic(client, settings, django_user_model):
+    import json
+
+    from apps.mobile.models import MobileToken
+
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    django_user_model.objects.create_user(
+        username="crew2", email="crew2@example.com", password="right-pass"
+    )
+    body = json.dumps({"email": "crew2@example.com", "password": "WRONG"}).encode()
+    response = _signed_post(client, LOGIN_PATH, SECRET, body)
+
+    assert response.status_code == 401
+    assert response.json() == {"detail": "Неверный email или пароль"}
+    assert MobileToken.objects.count() == 0
+
+
+@pytest.mark.django_db
+def test_login_unknown_email_returns_same_401(client, settings):
+    import json
+
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    body = json.dumps({"email": "ghost@example.com", "password": "whatever"}).encode()
+    response = _signed_post(client, LOGIN_PATH, SECRET, body)
+
+    # Same status + message as a wrong password: no account enumeration.
+    assert response.status_code == 401
+    assert response.json() == {"detail": "Неверный email или пароль"}
+
+
+@pytest.mark.django_db
+def test_login_missing_build_signature_returns_403(client, settings, django_user_model):
+    import json
+
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    django_user_model.objects.create_user(
+        username="crew3", email="crew3@example.com", password="pw-123456"
+    )
+    body = json.dumps({"email": "crew3@example.com", "password": "pw-123456"}).encode()
+    # No signed headers at all → neutral build-layer 403.
+    response = client.post(LOGIN_PATH, data=body, content_type="application/json")
+    assert response.status_code == 403
+    assert response.json() == {"detail": "Forbidden"}
+
+
+@pytest.mark.django_db
+def test_login_bad_build_signature_returns_403(client, settings, django_user_model):
+    import json
+
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    django_user_model.objects.create_user(
+        username="crew4", email="crew4@example.com", password="pw-123456"
+    )
+    body = json.dumps({"email": "crew4@example.com", "password": "pw-123456"}).encode()
+    response = _signed_post(client, LOGIN_PATH, "wrong-secret", body)
+    assert response.status_code == 403
+    assert response.json() == {"detail": "Forbidden"}
+
+
+@pytest.mark.django_db
+def test_login_missing_email_field_returns_400(client, settings):
+    import json
+
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    body = json.dumps({"password": "pw-123456"}).encode()
+    response = _signed_post(client, LOGIN_PATH, SECRET, body)
+    # Serializer validation failure → 400, not a 500 and not a 401.
+    assert response.status_code == 400
+
+
+@pytest.mark.django_db
+def test_login_non_json_body_returns_400(client, settings):
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    body = b"not-json-at-all"
+    response = _signed_post(client, LOGIN_PATH, SECRET, body)
+    # Malformed JSON parsed by DRF → 400 (no 500, no throttle crash).
+    assert response.status_code == 400
+
+
+@pytest.mark.django_db
+def test_login_blank_email_returns_400(client, settings):
+    import json
+
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    body = json.dumps({"email": "", "password": "pw-123456"}).encode()
+    response = _signed_post(client, LOGIN_PATH, SECRET, body)
+    assert response.status_code == 400
+
+
+@pytest.mark.django_db
+def test_login_throttle_returns_429_after_limit(client, settings, django_user_model):
+    import json
+
+    from django.core.cache import cache
+
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    # Clear the per-process throttle cache so prior tests don't bleed counts in.
+    cache.clear()
+
+    django_user_model.objects.create_user(
+        username="crew5", email="crew5@example.com", password="right-pass"
+    )
+    body = json.dumps({"email": "crew5@example.com", "password": "WRONG"}).encode()
+
+    statuses = []
+    for _ in range(7):  # rate is 5/min
+        resp = _signed_post(client, LOGIN_PATH, SECRET, body)
+        statuses.append(resp.status_code)
+
+    # The first 5 are allowed (401 here, wrong password); subsequent ones throttle.
+    assert statuses[:5] == [401] * 5
+    assert 429 in statuses[5:]
+    cache.clear()
