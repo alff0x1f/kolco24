@@ -258,3 +258,4 @@ def test_checkpoint_api_exposes_open_cp(client):
     cp = response.json()[0]
     assert cp["cost"] == 3
     assert cp["description"] == "open spot"
+    assert "color" not in cp

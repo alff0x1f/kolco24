@@ -738,6 +738,7 @@ def test_legend_etag_changes_when_color_edited(client, settings):
 
     path = f"/app/race/{race.id}/legend/"
     first = client.get(path, **_signed_headers("GET", path, SECRET))
+    assert first.status_code == 200
     old_etag = first["ETag"]
 
     # A plain save() (no update_fields) lets auto_now bump updated_at.

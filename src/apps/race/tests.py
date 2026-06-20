@@ -2574,6 +2574,38 @@ def test_legend_color_round_trip_on_existing(client):
 
 
 @pytest.mark.django_db
+def test_legend_color_cleared_to_empty_on_existing(client):
+    from website.models import Checkpoint
+
+    race = _make_race()
+    existing = Checkpoint.objects.create(
+        race=race, number=1, cost=10, description="a", color="blue"
+    )
+    superuser = User.objects.create_superuser("admin2", "admin2@b.c", "pw")
+    client.force_login(superuser)
+
+    resp = client.post(
+        reverse("edit_legend", kwargs={"race_slug": race.slug}),
+        _legend_post(
+            [
+                {
+                    "id": existing.id,
+                    "number": 1,
+                    "type": "kp",
+                    "color": "",
+                    "cost": 10,
+                    "description": "a",
+                    "is_legend_locked": False,
+                }
+            ]
+        ),
+    )
+    assert resp.status_code == 302
+    existing.refresh_from_db()
+    assert existing.color == ""
+
+
+@pytest.mark.django_db
 def test_legend_config_island_includes_colors(client):
     race = _make_race()
     superuser = User.objects.create_superuser("admin", "a@b.c", "pw")
