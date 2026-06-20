@@ -135,31 +135,33 @@
 - Modify: `src/static/js/legend_form.js`
 - Modify: `src/static/css/legend_form.css`
 
-- [ ] template (`legend_form.html`): add a `Цвет` header `<span class="lg-h lg-h-color">`
+- [x] template (`legend_form.html`): add a `Цвет` header `<span class="lg-h lg-h-color">`
       in the `.lg-headrow` (between `Тип` and `Стоимость`).
-- [ ] JS: read `var COLORS = Array.isArray(config.colors) ? config.colors : [...]`;
+- [x] JS: read `var COLORS = Array.isArray(config.colors) ? config.colors : [...]`;
       add `"color"` to the `COLS` array (insert after `"type"`); render a
       `<select class="lg-cell lg-color" data-col="N">` from `COLORS` in the row
       builder; set its value from `c.color` (default `""`). **Re-index every
       subsequent `data-col`** (cost/desc/lock) so the indices stay contiguous.
-- [ ] JS `setCell` (~161): this is a `COLS`-index `if/else` dispatch using
+- [x] JS `setCell` (~161): this is a `COLS`-index `if/else` dispatch using
       **hardcoded** `controlByCol(row, N)` literals (`0..4`). Add a `color` branch
       (normalize a pasted value against the colors value/label set, default `""`,
       mirroring `normalizeType`) **and bump the hardcoded literals** for
       cost/desc/lock to their new indices — both the `data-col` attributes (above)
       and these literals must match, or paste-fill writes to the wrong cells.
-- [ ] JS error `fieldMap` (~221): add `color: ".lg-color"`; JS row serializer
+- [x] JS error `fieldMap` (~221): add `color: ".lg-color"`; JS row serializer
       (~338): add `color: row.querySelector(".lg-color").value`. Confirm the
       `has-error` highlight applies to a `<select>` (`.lg-color`) the same as inputs;
-      add a CSS rule if `has-error` is input-scoped.
-- [ ] JS TSV-paste path: account for the new column when mapping pasted cells
+      add a CSS rule if `has-error` is input-scoped. (`.lg-color` is a `.lg-cell`, so
+      `.lg-cell.has-error` already covers it — no new rule.)
+- [x] JS TSV-paste path: account for the new column when mapping pasted cells
       (color is a `<select>`, so a pasted free-text color should match by value or be
       ignored/left default — keep paste robust, don't crash on extra/short rows).
-- [ ] CSS (`legend_form.css`): add the new column to the grid `grid-template-columns`
+      (`setCell` color branch routes paste through `normalizeColor` → unknown → `""`.)
+- [x] CSS (`legend_form.css`): add the new column to the grid `grid-template-columns`
       for both `.lg-headrow` and `.lg-row`, plus any `.lg-h-color`/`.lg-color` width.
-- [ ] manual check noted in Post-Completion (no JS unit harness); add/extend a view
+- [x] manual check noted in Post-Completion (no JS unit harness); add/extend a view
       test asserting the rendered `legend_config` JSON island contains `colors`.
-- [ ] run tests — must pass before next task.
+- [x] run tests — must pass before next task.
 
 ### Task 4: Mobile legend serializer emits `color`
 

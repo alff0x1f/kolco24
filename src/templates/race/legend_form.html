@@ -60,6 +60,7 @@
             <div class="lg-headrow" role="row">
               <span class="lg-h lg-h-num">№</span>
               <span class="lg-h lg-h-type">Тип</span>
+              <span class="lg-h lg-h-color">Цвет</span>
               <span class="lg-h lg-h-cost">Стоимость</span>
               <span class="lg-h lg-h-desc">Описание</span>
               <span class="lg-h lg-h-lock" title="Легенда заперта — открывается только после сканирования КП">🔒</span>
@@ -74,7 +75,8 @@
         <button class="btn btn-outline btn-sm" type="button" id="pasteOpen">📋 Вставить из таблицы</button>
         <span class="foot-hint">
           Порядок колонок при вставке: <code>№</code> · <code>тип</code> ·
-          <code>стоимость</code> · <code>описание</code> · <code>🔒&nbsp;(0/1)</code>
+          <code>цвет</code> · <code>стоимость</code> · <code>описание</code> ·
+          <code>🔒&nbsp;(0/1)</code>
         </span>
       </div>
     </div>
@@ -93,14 +95,15 @@
         <p class="lg-modal-note">
           Скопируйте ячейки из таблицы и вставьте сюда. Колонки разделяются
           табуляцией. Ожидаемый порядок:
-          <strong>№ · тип · стоимость · описание · 🔒</strong>.
+          <strong>№ · тип · цвет · стоимость · описание · 🔒</strong>.
           Строка-заголовок (если первая ячейка не&nbsp;число) пропускается.
           Тип можно указывать кодом (<code>kp</code>, <code>start</code>,
           <code>finish</code>, <code>test</code>) или оставить пустым — будет
-          <code>КП</code>. Запертость: <code>1</code>/<code>да</code>/<code>+</code>.
+          <code>КП</code>. Цвет — кодом (<code>red</code>, <code>blue</code>, …)
+          или пустым. Запертость: <code>1</code>/<code>да</code>/<code>+</code>.
         </p>
         <textarea class="lg-paste-area" id="pasteArea" rows="10"
-          placeholder="1&#9;kp&#9;30&#9;Опора ЛЭП у реки&#9;1&#10;2&#9;kp&#9;45&#9;Старая мельница&#9;0"></textarea>
+          placeholder="1&#9;kp&#9;red&#9;30&#9;Опора ЛЭП у реки&#9;1&#10;2&#9;kp&#9;blue&#9;45&#9;Старая мельница&#9;0"></textarea>
         <div class="lg-paste-count" id="pastePreview"></div>
       </div>
       <div class="lg-modal-foot">
