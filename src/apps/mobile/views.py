@@ -301,7 +301,7 @@ class TagCreateView(AppAPIView):
             tag = CheckpointTag.objects.filter(checkpoint=cp, nfc_uid=nfc_uid).first()
             if tag is not None:
                 return self._tag_response(tag, status.HTTP_200_OK)
-            # No row for this (point, nfc_uid). Only return 409 if the UID
+            # No row for this (checkpoint, nfc_uid). Only return 409 if the UID
             # was claimed by a different КП (concurrent race); otherwise
             # re-raise so an unrelated DB failure surfaces as a 500.
             if CheckpointTag.objects.filter(nfc_uid=nfc_uid).exists():
@@ -365,7 +365,7 @@ class LegendView(AppAPIView):
             .order_by("number", "id")
             .select_related("secret")
         )
-        # Every tag — open and locked — carries identity (`bid → point`). The
+        # Every tag — open and locked — carries identity (`bid → checkpoint_id`). The
         # locked-only `bundle_blob` is no longer a filter: open tags ride along
         # for offline cp_id recognition. `.exclude(bid="")` drops un-built tags
         # (created bypassing the build_bundle signal) that have no usable bid.

@@ -67,8 +67,8 @@ class TagSerializer(serializers.Serializer):
     - **identity** — ``bid → checkpoint_id`` (1:1, **always** present, incl. open
       КП): the app computes ``bid = sha256(scanned_code).hexdigest()[:16]`` from
       the code in the tag's NFC user memory and looks it up here to resolve which
-      checkpoint (``checkpoint_id`` = ``checkpoint_id``) was physically scanned,
-      fully offline.
+      checkpoint (``checkpoint_id`` = ``CheckpointTag.checkpoint_id``) was
+      physically scanned, fully offline.
     - **unlock** — ``iv``/``ct`` (locked КП **only**): flattened from
       ``CheckpointTag.bundle_blob``. When present, HKDF-decrypts to
       ``{cp_id: content_key}`` and then decrypts each locked КП's ``enc`` blob.

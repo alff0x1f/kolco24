@@ -917,6 +917,8 @@ def test_legend_tags_include_open_checkpoint_tag_with_checkpoint_id_no_iv_ct(
     data = response.json()
     assert len(data["tags"]) == 1
     entry = data["tags"][0]
+    assert set(entry.keys()) == {"bid", "checkpoint_id", "iv", "ct", "check_method"}
+    assert "point" not in entry
     assert entry["checkpoint_id"] == cp.id
     assert entry["check_method"] == "offline"
     assert entry["bid"] == tag.bid
@@ -5555,6 +5557,8 @@ def test_tag_create_idempotent_same_uid_same_cp_no_duplicate(
     # the idempotent hit returns the same bid/code as the create
     assert second.json()["bid"] == first.json()["bid"]
     assert second.json()["code"] == first.json()["code"]
+    assert second.json()["checkpoint_id"] == cp.id
+    assert second.json()["number"] == cp.number
 
 
 @pytest.mark.django_db
@@ -5627,6 +5631,8 @@ def test_tag_create_idempotent_hit_on_unbuilt_tag_rebuilds_no_500(
     assert tag.code is not None
     assert data["bid"] == tag.bid
     assert data["code"] == bytes(tag.code).hex()
+    assert data["checkpoint_id"] == cp.id
+    assert data["number"] == cp.number
 
 
 @pytest.mark.django_db

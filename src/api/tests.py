@@ -330,11 +330,12 @@ def test_checkpoint_tag_create_cross_cp_conflict(client, django_user_model):
     cp2 = Checkpoint.objects.create(race=race, number=2, cost=5)
 
     url = f"/api/race/{race.id}/checkpoint_tag/"
-    client.post(
+    first = client.post(
         url,
         {"checkpoint_id": cp1.id, "nfc_uid": "shared"},
         content_type="application/json",
     )
+    assert first.status_code == 201
     response = client.post(
         url,
         {"checkpoint_id": cp2.id, "nfc_uid": "shared"},
@@ -360,6 +361,46 @@ def test_checkpoint_tag_create_unknown_id_returns_404(client, django_user_model)
     )
 
     assert response.status_code == 404
+    assert "checkpoint_id" in response.json()
+
+
+@pytest.mark.django_db
+def test_checkpoint_tag_create_non_superuser_returns_401(client, django_user_model):
+    """Non-superuser requests to the disabled endpoint return 401."""
+    from website.models.race import Race
+
+    regular = django_user_model.objects.create_user(
+        username="reg", email="reg@example.com", password="pw"
+    )
+    client.force_login(regular)
+    race = Race.objects.create(name="Tag auth", slug="tag-auth-api")
+
+    response = client.post(
+        f"/api/race/{race.id}/checkpoint_tag/",
+        {"checkpoint_id": 1, "nfc_uid": "abc"},
+        content_type="application/json",
+    )
+
+    assert response.status_code == 401
+
+
+@pytest.mark.django_db
+def test_checkpoint_tag_create_missing_checkpoint_id_returns_400(
+    client, django_user_model
+):
+    """Body missing checkpoint_id returns 400 (serializer validation error)."""
+    from website.models.race import Race
+
+    client.force_login(_make_superuser(django_user_model))
+    race = Race.objects.create(name="Tag 400", slug="tag-400-api")
+
+    response = client.post(
+        f"/api/race/{race.id}/checkpoint_tag/",
+        {"nfc_uid": "abc"},
+        content_type="application/json",
+    )
+
+    assert response.status_code == 400
     assert "checkpoint_id" in response.json()
 
 

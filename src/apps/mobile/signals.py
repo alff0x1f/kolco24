@@ -10,8 +10,8 @@ Receivers:
   **toggle** (a ``content_key`` just appeared or disappeared) it also rebuilds
   the bundles of every dependent tag — ``cp.tags.all()`` **∪**
   ``cp.unlocked_by.all()``. The ``∪ cp.tags`` half is required because a tag
-  with an empty ``unlocks`` M2M unlocks its own КП via the ``[point]`` runtime
-  default and is therefore **not** in ``cp.unlocked_by``.
+  with an empty ``unlocks`` M2M unlocks its own КП via the ``[tag.checkpoint]``
+  runtime default and is therefore **not** in ``cp.unlocked_by``.
 - ``post_save(CheckpointTag)`` and ``m2m_changed(CheckpointTag.unlocks)``
   rebuild that tag's bundle.
 
