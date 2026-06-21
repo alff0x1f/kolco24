@@ -271,8 +271,8 @@ was written but not committed), so changing it now is cheap.
 
 ### Task 7: Finalize documentation
 
-- [ ] confirm `CLAUDE.md` reflects the rename + new wire vocabulary
-- [ ] move this plan to `docs/plans/completed/`
+- [x] confirm `CLAUDE.md` reflects the rename + new wire vocabulary
+- [x] move this plan to `docs/plans/completed/`
 
 ## Post-Completion
 
