@@ -44,16 +44,24 @@ class CheckpointTagCreateView(APIView):
             control_point = self.get_control_point(race_id, number)
             # nfc_uid is globally unique (website migration 0089). If this UID is
             # already bound to a different КП, get_or_create's create() raises an
-            # uncaught IntegrityError → 500; translate it to a clean 409 conflict.
+            # IntegrityError; re-query to confirm it's a UID conflict and not an
+            # unrelated failure (FK violation, crypto signal, etc.) before 409.
             try:
                 checkpoint_tag, created = CheckpointTag.objects.get_or_create(
                     point=control_point, nfc_uid=nfc_uid
                 )
-            except IntegrityError:
-                return Response(
-                    {"nfc_uid": ["Этот тег уже привязан к другому КП"]},
-                    status=status.HTTP_409_CONFLICT,
+            except IntegrityError as original_exc:
+                conflict = (
+                    CheckpointTag.objects.filter(nfc_uid=nfc_uid)
+                    .exclude(point=control_point)
+                    .exists()
                 )
+                if conflict:
+                    return Response(
+                        {"nfc_uid": ["Этот тег уже привязан к другому КП"]},
+                        status=status.HTTP_409_CONFLICT,
+                    )
+                raise original_exc
 
             return Response(
                 {

@@ -154,9 +154,10 @@ class LoginView(AppAPIView):
     account existence.
 
     Throttled by an IP-scoped :class:`ClientIPScopedRateThrottle`
-    (``mobile-login``) — keyed by the un-spoofable client IP (last
-    ``X-Forwarded-For`` entry), with no ``request.data`` read inside the
-    throttle, so it cannot re-trip the body-read ordering hazard.
+    (``mobile-login``) — keyed by the un-spoofable client IP (``X-Real-IP``
+    set by nginx, or last ``X-Forwarded-For`` entry as fallback), with no
+    ``request.data`` read inside the throttle, so it cannot re-trip the
+    body-read ordering hazard.
     """
 
     throttle_classes = [ClientIPScopedRateThrottle]
@@ -290,17 +291,23 @@ class TagCreateView(AppAPIView):
                     point=cp, nfc_uid=nfc_uid, created_by=request.mobile_user
                 )
                 tag.save()  # fires post_save → ensure_code/build_bundle
-        except IntegrityError:
-            # nfc_uid unique constraint: re-query to determine outcome.
-            try:
-                tag = CheckpointTag.objects.get(point=cp, nfc_uid=nfc_uid)
+        except IntegrityError as original_exc:
+            # Could be the nfc_uid unique constraint (expected) or an unrelated
+            # failure (FK violation, crypto signal, etc.). Re-query to determine.
+            # Use filter().first() to avoid a nested exception context that would
+            # re-raise CheckpointTag.DoesNotExist instead of the original error.
+            tag = CheckpointTag.objects.filter(point=cp, nfc_uid=nfc_uid).first()
+            if tag is not None:
                 return self._tag_response(tag, status.HTTP_200_OK)
-            except CheckpointTag.DoesNotExist:
-                # A different КП won the race — refuse to rebind.
+            # No row for this (point, nfc_uid). Only return 409 if the UID
+            # was claimed by a different КП (concurrent race); otherwise
+            # re-raise so an unrelated DB failure surfaces as a 500.
+            if CheckpointTag.objects.filter(nfc_uid=nfc_uid).exists():
                 return Response(
                     {"detail": "Этот тег уже привязан к другому КП"},
                     status=status.HTTP_409_CONFLICT,
                 )
+            raise original_exc
 
         tag.refresh_from_db()
         return self._tag_response(tag, status.HTTP_201_CREATED)

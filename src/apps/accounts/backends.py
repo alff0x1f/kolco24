@@ -14,7 +14,15 @@ class EmailBackend(ModelBackend):
         # Try to fetch the user by email
         try:
             user = UserModel.objects.get(email__iexact=username)
-        except (UserModel.DoesNotExist, UserModel.MultipleObjectsReturned):
+        except UserModel.DoesNotExist:
+            # Run the default password hasher once to reduce the timing
+            # difference between an existing and a nonexistent user (#20760).
+            UserModel().set_password(password)
+            return None
+        except UserModel.MultipleObjectsReturned:
+            # Run the dummy hash here too so this branch is not faster than the
+            # normal wrong-password path and cannot be distinguished by timing.
+            UserModel().set_password(password)
             return None
 
         # If user is found, check password and active status

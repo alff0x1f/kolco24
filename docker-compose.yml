@@ -19,10 +19,12 @@ services:
     image: nginx:alpine
     container_name: kolco24_nginx
     restart: unless-stopped
+    environment:
+      TRUSTED_PROXY_CIDR: "${TRUSTED_PROXY_CIDR:-127.0.0.1/32}"
     volumes:
       - ./src/staticfiles:/app/staticfiles:ro
       - ./src/media:/app/media:ro
-      - ./deploy/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./deploy/nginx.conf:/etc/nginx/templates/default.conf.template:ro
     depends_on:
       - kolco24_web
     networks:

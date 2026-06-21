@@ -40,13 +40,27 @@ class MobileTokenInvalid(APIException):
 
 
 def _client_ip(request):
-    """Trusted client IP: last ``X-Forwarded-For`` entry, else ``REMOTE_ADDR``.
+    """Trusted client IP: ``X-Real-IP`` set by nginx, else ``REMOTE_ADDR``.
 
-    Nginx's ``proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for``
-    *appends* ``$remote_addr`` to whatever the client sent, so the last entry
-    is the actual connection IP and cannot be forged by the client.  Taking the
-    first entry would accept an attacker-supplied value.
+    Nginx resolves the actual client IP via the ``real_ip`` module (configured
+    in ``deploy/nginx.conf`` with ``set_real_ip_from`` for Docker private ranges
+    and ``real_ip_header X-Forwarded-For``) and then emits
+    ``proxy_set_header X-Real-IP $remote_addr`` — at that point ``$remote_addr``
+    is already the resolved real client IP, not the upstream proxy's address.
+
+    Relying on the last ``X-Forwarded-For`` entry alone fails in the production
+    docker-compose_v2.yml topology, where an external reverse proxy sits in front
+    of nginx: nginx's ``$remote_addr`` (= upstream proxy's Docker IP) would be
+    appended to XFF, collapsing all clients into one throttle bucket.
     """
+    real_ip = request.META.get("HTTP_X_REAL_IP", "").strip()
+    if real_ip:
+        try:
+            ipaddress.ip_address(real_ip)
+            return real_ip
+        except ValueError:
+            pass
+    # Fallback for environments without nginx (local runserver, tests).
     forwarded = request.META.get("HTTP_X_FORWARDED_FOR", "")
     if forwarded:
         candidate = forwarded.split(",")[-1].strip()
