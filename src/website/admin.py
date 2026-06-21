@@ -145,18 +145,18 @@ class CheckpointAdmin(admin.ModelAdmin):
 
 @admin.register(CheckpointTag)
 class CheckpointTagAdmin(admin.ModelAdmin):
-    list_display = ("id", "point", "point_number", "nfc_uid", "bid")
-    list_filter = ("point__race",)
+    list_display = ("id", "checkpoint", "point_number", "nfc_uid", "bid")
+    list_filter = ("checkpoint__race",)
     filter_horizontal = ("unlocks",)
     readonly_fields = ("bid", "code_hex")
     actions = ["regenerate_code", "rebuild_bundle"]
 
     def get_queryset(self, request):
         queryset = super().get_queryset(request)
-        return queryset.select_related("point")
+        return queryset.select_related("checkpoint")
 
     def point_number(self, obj) -> int:
-        return obj.point.number
+        return obj.checkpoint.number
 
     @admin.display(description="Код (hex)")
     def code_hex(self, obj) -> str:
@@ -167,7 +167,7 @@ class CheckpointTagAdmin(admin.ModelAdmin):
         from apps.mobile.legend_crypto import build_bundle
 
         count = 0
-        for tag in queryset.select_related("point"):
+        for tag in queryset.select_related("checkpoint"):
             tag.code = None  # forces ensure_code to mint a fresh code
             build_bundle(tag)
             count += 1
@@ -178,7 +178,7 @@ class CheckpointTagAdmin(admin.ModelAdmin):
         from apps.mobile.legend_crypto import build_bundle
 
         count = 0
-        for tag in queryset.select_related("point"):
+        for tag in queryset.select_related("checkpoint"):
             build_bundle(tag)
             count += 1
         self.message_user(request, f"Пересобрано бандлов: {count}")

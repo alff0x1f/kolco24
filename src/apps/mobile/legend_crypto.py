@@ -89,7 +89,7 @@ def build_bundle(tag):
     """(Re)compute ``code``/``bid``/``bundle_blob`` for a tag.
 
     The unlock set is ``tag.unlocks`` (M2M) or — when empty — its own КП
-    (``[tag.point]`` runtime default). Only **locked** КП in that set contribute
+    (``[tag.checkpoint]`` runtime default). Only **locked** КП in that set contribute
     a ``content_key``; open КП are skipped (they have no secret).
     """
     from website.models.checkpoint import CheckpointSecret
@@ -102,14 +102,14 @@ def build_bundle(tag):
     # dropped; if all are invalid the filtered list stays empty → bundle_blob=None,
     # not a silent fallback to [point] which would grant an unconfigured key).
     if not tag.unlocks.exists():
-        unlocked = [tag.point]
-    elif tag.point.race_id is None:
+        unlocked = [tag.checkpoint]
+    elif tag.checkpoint.race_id is None:
         # Orphaned tag (race deleted, race_id=None): filter(race_id=None) would
         # match all orphaned checkpoints across deleted races — drop unlocks instead.
         unlocked = []
     else:
         unlocked = list(
-            tag.unlocks.filter(race_id=tag.point.race_id).exclude(
+            tag.unlocks.filter(race_id=tag.checkpoint.race_id).exclude(
                 type=CheckpointType.hidden.value
             )
         )

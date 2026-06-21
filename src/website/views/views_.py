@@ -333,7 +333,7 @@ class PointTagsView(View):
                 return JsonResponse({"error": "nfc_uid must not be blank."}, status=400)
 
             _, created = CheckpointTag.objects.get_or_create(
-                point=point, nfc_uid=nfc_uid
+                checkpoint=point, nfc_uid=nfc_uid
             )
             if created:
                 return JsonResponse(

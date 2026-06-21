@@ -10,8 +10,8 @@ Receivers:
   **toggle** (a ``content_key`` just appeared or disappeared) it also rebuilds
   the bundles of every dependent tag — ``cp.tags.all()`` **∪**
   ``cp.unlocked_by.all()``. The ``∪ cp.tags`` half is required because a tag
-  with an empty ``unlocks`` M2M unlocks its own КП via the ``[point]`` runtime
-  default and is therefore **not** in ``cp.unlocked_by``.
+  with an empty ``unlocks`` M2M unlocks its own КП via the ``[tag.checkpoint]``
+  runtime default and is therefore **not** in ``cp.unlocked_by``.
 - ``post_save(CheckpointTag)`` and ``m2m_changed(CheckpointTag.unlocks)``
   rebuild that tag's bundle.
 
@@ -112,8 +112,8 @@ def checkpoint_saved(sender, instance, **kwargs):
     )
 
     if lock_toggled or bundle_filter_changed:
-        dependents = set(instance.tags.select_related("point").all()) | set(
-            instance.unlocked_by.select_related("point").all()
+        dependents = set(instance.tags.select_related("checkpoint").all()) | set(
+            instance.unlocked_by.select_related("checkpoint").all()
         )
         for tag in dependents:
             _build_bundle_guarded(tag)
@@ -146,7 +146,9 @@ def checkpoint_post_delete(sender, instance, **kwargs):
     if not by_cp:
         _pre_delete_tags.by_cp = None
     if pks:
-        tags = list(CheckpointTag.objects.select_related("point").filter(pk__in=pks))
+        tags = list(
+            CheckpointTag.objects.select_related("checkpoint").filter(pk__in=pks)
+        )
         for tag in tags:
             _build_bundle_guarded(tag)
 
@@ -157,9 +159,9 @@ def checkpointtag_saved(sender, instance, **kwargs):
     if update_fields is not None and set(update_fields) == SENTINEL_UPDATE_FIELDS:
         # build_bundle's own write — do not recurse.
         return
-    # Re-fetch with select_related so build_bundle can access tag.point without
+    # Re-fetch with select_related so build_bundle can access tag.checkpoint without
     # an extra query — post_save instances may not have the FK relation cached.
-    tag = CheckpointTag.objects.select_related("point").get(pk=instance.pk)
+    tag = CheckpointTag.objects.select_related("checkpoint").get(pk=instance.pk)
     _build_bundle_guarded(tag)
 
 
@@ -187,11 +189,11 @@ def checkpointtag_unlocks_changed(sender, instance, action, pk_set, **kwargs):
             pks = getattr(_pre_clear_pks, "value", None) or []
             _pre_clear_pks.value = None
             tags = list(
-                CheckpointTag.objects.select_related("point").filter(pk__in=pks)
+                CheckpointTag.objects.select_related("checkpoint").filter(pk__in=pks)
             )
         elif pk_set:
             tags = list(
-                CheckpointTag.objects.select_related("point").filter(pk__in=pk_set)
+                CheckpointTag.objects.select_related("checkpoint").filter(pk__in=pk_set)
             )
         else:
             tags = []

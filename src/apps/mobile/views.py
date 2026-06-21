@@ -210,8 +210,9 @@ class TagCreateView(AppAPIView):
     via ``instance.save()`` so the existing legend-crypto ``post_save`` signal
     fires (``ensure_code`` / ``build_bundle``), keeping the server the single
     source of crypto. The response carries the freshly-minted hex ``code`` for
-    the app to write into the chip's NFC user memory, plus ``bid`` / ``point``
-    (``Checkpoint.number``) / ``nfc_uid``.
+    the app to write into the chip's NFC user memory, plus ``bid`` /
+    ``checkpoint_id`` (``Checkpoint.id``) / ``number`` (``Checkpoint.number``) /
+    ``nfc_uid``.
 
     Permission stack (order matters):
 
@@ -232,7 +233,7 @@ class TagCreateView(AppAPIView):
 
     @staticmethod
     def _tag_response(tag, http_status):
-        """Build the ``{bid, point, nfc_uid, code}`` payload for a tag.
+        """Build the ``{bid, checkpoint_id, number, nfc_uid, code}`` payload.
 
         A tag created bypassing the signals (``bid == ""`` / ``code is None``)
         is repaired via :func:`build_bundle` before responding, so the hex of a
@@ -252,7 +253,8 @@ class TagCreateView(AppAPIView):
         return Response(
             {
                 "bid": tag.bid,
-                "point": tag.point.number,
+                "checkpoint_id": tag.checkpoint_id,
+                "number": tag.checkpoint.number,
                 "nfc_uid": tag.nfc_uid,
                 "code": code.hex() if code is not None else None,
             },
@@ -264,18 +266,18 @@ class TagCreateView(AppAPIView):
 
         serializer = TagCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        point_id = serializer.validated_data["point"]
+        checkpoint_id = serializer.validated_data["checkpoint_id"]
         nfc_uid = serializer.validated_data["nfc_uid"].strip().upper()
 
         cp = get_object_or_404(
             Checkpoint.objects.exclude(type=CheckpointType.hidden.value),
-            pk=point_id,
+            pk=checkpoint_id,
             race_id=race_id,
         )
 
         existing = list(CheckpointTag.objects.filter(nfc_uid=nfc_uid))
         for tag in existing:
-            if tag.point_id == cp.id:
+            if tag.checkpoint_id == cp.id:
                 # Same chip, same КП → idempotent success (no duplicate row).
                 return self._tag_response(tag, status.HTTP_200_OK)
         if existing:
@@ -288,7 +290,7 @@ class TagCreateView(AppAPIView):
         try:
             with transaction.atomic():
                 tag = CheckpointTag(
-                    point=cp, nfc_uid=nfc_uid, created_by=request.mobile_user
+                    checkpoint=cp, nfc_uid=nfc_uid, created_by=request.mobile_user
                 )
                 tag.save()  # fires post_save → ensure_code/build_bundle
         except IntegrityError as original_exc:
@@ -296,10 +298,10 @@ class TagCreateView(AppAPIView):
             # failure (FK violation, crypto signal, etc.). Re-query to determine.
             # Use filter().first() to avoid a nested exception context that would
             # re-raise CheckpointTag.DoesNotExist instead of the original error.
-            tag = CheckpointTag.objects.filter(point=cp, nfc_uid=nfc_uid).first()
+            tag = CheckpointTag.objects.filter(checkpoint=cp, nfc_uid=nfc_uid).first()
             if tag is not None:
                 return self._tag_response(tag, status.HTTP_200_OK)
-            # No row for this (point, nfc_uid). Only return 409 if the UID
+            # No row for this (checkpoint, nfc_uid). Only return 409 if the UID
             # was claimed by a different КП (concurrent race); otherwise
             # re-raise so an unrelated DB failure surfaces as a 500.
             if CheckpointTag.objects.filter(nfc_uid=nfc_uid).exists():
@@ -363,13 +365,13 @@ class LegendView(AppAPIView):
             .order_by("number", "id")
             .select_related("secret")
         )
-        # Every tag — open and locked — carries identity (`bid → point`). The
+        # Every tag — open and locked — carries identity (`bid → checkpoint_id`). The
         # locked-only `bundle_blob` is no longer a filter: open tags ride along
         # for offline cp_id recognition. `.exclude(bid="")` drops un-built tags
         # (created bypassing the build_bundle signal) that have no usable bid.
         tag_qs = (
-            CheckpointTag.objects.filter(point__race_id=race_id)
-            .exclude(point__type=CheckpointType.hidden.value)
+            CheckpointTag.objects.filter(checkpoint__race_id=race_id)
+            .exclude(checkpoint__type=CheckpointType.hidden.value)
             .exclude(bid="")
             .order_by("id")
         )

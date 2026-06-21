@@ -65,7 +65,7 @@ class CheckpointSecret(models.Model):
 
 
 class CheckpointTag(models.Model):
-    point = models.ForeignKey(
+    checkpoint = models.ForeignKey(
         "website.Checkpoint",
         verbose_name="КП",
         on_delete=models.CASCADE,

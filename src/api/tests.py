@@ -259,3 +259,201 @@ def test_checkpoint_api_exposes_open_cp(client):
     assert cp["cost"] == 3
     assert cp["description"] == "open spot"
     assert "color" not in cp
+
+
+def _make_superuser(django_user_model):
+    return django_user_model.objects.create_superuser(
+        username="su", email="su@example.com", password="pw"
+    )
+
+
+@pytest.mark.django_db
+def test_checkpoint_tag_create_by_id(client, django_user_model):
+    """Legacy api tag-create resolves the КП by id and echoes both ids."""
+    from website.models.checkpoint import Checkpoint
+    from website.models.race import Race
+
+    client.force_login(_make_superuser(django_user_model))
+    race = Race.objects.create(name="Tag create", slug="tag-create-api")
+    cp = Checkpoint.objects.create(race=race, number=42, cost=5)
+
+    response = client.post(
+        f"/api/race/{race.id}/checkpoint_tag/",
+        {"checkpoint_id": cp.id, "nfc_uid": "abc123"},
+        content_type="application/json",
+    )
+
+    assert response.status_code == 201
+    body = response.json()
+    assert body["checkpoint_id"] == cp.id
+    assert body["number"] == 42
+    assert body["nfc_uid"] == "ABC123"
+    assert body["bid"] != ""
+    assert body["code"] is not None
+    assert "id" not in body
+    assert "point" not in body
+
+
+@pytest.mark.django_db
+def test_checkpoint_tag_create_idempotent_same_cp(client, django_user_model):
+    """Same UID on the same КП returns 200 (idempotent), not a duplicate."""
+    from website.models.checkpoint import Checkpoint
+    from website.models.race import Race
+
+    client.force_login(_make_superuser(django_user_model))
+    race = Race.objects.create(name="Tag idem", slug="tag-idem-api")
+    cp = Checkpoint.objects.create(race=race, number=1, cost=5)
+
+    url = f"/api/race/{race.id}/checkpoint_tag/"
+    first = client.post(
+        url,
+        {"checkpoint_id": cp.id, "nfc_uid": "uid1"},
+        content_type="application/json",
+    )
+    second = client.post(
+        url,
+        {"checkpoint_id": cp.id, "nfc_uid": "uid1"},
+        content_type="application/json",
+    )
+
+    assert first.status_code == 201
+    assert second.status_code == 200
+    assert second.json()["checkpoint_id"] == cp.id
+
+
+@pytest.mark.django_db
+def test_checkpoint_tag_create_cross_cp_conflict(client, django_user_model):
+    """A UID already bound to a different КП returns 409 (no auto-rebind)."""
+    from website.models.checkpoint import Checkpoint
+    from website.models.race import Race
+
+    client.force_login(_make_superuser(django_user_model))
+    race = Race.objects.create(name="Tag conflict", slug="tag-conflict-api")
+    cp1 = Checkpoint.objects.create(race=race, number=1, cost=5)
+    cp2 = Checkpoint.objects.create(race=race, number=2, cost=5)
+
+    url = f"/api/race/{race.id}/checkpoint_tag/"
+    first = client.post(
+        url,
+        {"checkpoint_id": cp1.id, "nfc_uid": "shared"},
+        content_type="application/json",
+    )
+    assert first.status_code == 201
+    response = client.post(
+        url,
+        {"checkpoint_id": cp2.id, "nfc_uid": "shared"},
+        content_type="application/json",
+    )
+
+    assert response.status_code == 409
+    assert "nfc_uid" in response.json()
+
+
+@pytest.mark.django_db
+def test_checkpoint_tag_create_unknown_id_returns_404(client, django_user_model):
+    """An id that does not resolve to a КП in the race returns 404."""
+    from website.models.race import Race
+
+    client.force_login(_make_superuser(django_user_model))
+    race = Race.objects.create(name="Tag 404", slug="tag-404-api")
+
+    response = client.post(
+        f"/api/race/{race.id}/checkpoint_tag/",
+        {"checkpoint_id": 999999, "nfc_uid": "abc"},
+        content_type="application/json",
+    )
+
+    assert response.status_code == 404
+    assert "checkpoint_id" in response.json()
+
+
+@pytest.mark.django_db
+def test_checkpoint_tag_create_non_superuser_returns_401(client, django_user_model):
+    """Non-superuser requests to the disabled endpoint return 401."""
+    from website.models.race import Race
+
+    regular = django_user_model.objects.create_user(
+        username="reg", email="reg@example.com", password="pw"
+    )
+    client.force_login(regular)
+    race = Race.objects.create(name="Tag auth", slug="tag-auth-api")
+
+    response = client.post(
+        f"/api/race/{race.id}/checkpoint_tag/",
+        {"checkpoint_id": 1, "nfc_uid": "abc"},
+        content_type="application/json",
+    )
+
+    assert response.status_code == 401
+
+
+@pytest.mark.django_db
+def test_checkpoint_tag_create_missing_checkpoint_id_returns_400(
+    client, django_user_model
+):
+    """Body missing checkpoint_id returns 400 (serializer validation error)."""
+    from website.models.race import Race
+
+    client.force_login(_make_superuser(django_user_model))
+    race = Race.objects.create(name="Tag 400", slug="tag-400-api")
+
+    response = client.post(
+        f"/api/race/{race.id}/checkpoint_tag/",
+        {"nfc_uid": "abc"},
+        content_type="application/json",
+    )
+
+    assert response.status_code == 400
+    assert "checkpoint_id" in response.json()
+
+
+@pytest.mark.django_db
+def test_checkpoint_tag_create_rejects_hidden_cp(client, django_user_model):
+    """A hidden КП must not be bindable by id (resolved set excludes hidden)."""
+    from website.models.checkpoint import Checkpoint
+    from website.models.enums import CheckpointType
+    from website.models.race import Race
+
+    client.force_login(_make_superuser(django_user_model))
+    race = Race.objects.create(name="Tag hidden", slug="tag-hidden-api")
+    hidden = Checkpoint.objects.create(
+        race=race, number=1, cost=5, type=CheckpointType.hidden.value
+    )
+
+    response = client.post(
+        f"/api/race/{race.id}/checkpoint_tag/",
+        {"checkpoint_id": hidden.id, "nfc_uid": "abc"},
+        content_type="application/json",
+    )
+
+    assert response.status_code == 404
+
+
+@pytest.mark.django_db
+def test_checkpoint_tag_create_repairs_stale_bid_code_on_idempotent(
+    client, django_user_model
+):
+    """Idempotent 200 for an existing row with bid=="" / code=None must repair and
+    return valid bid+code instead of an invalid payload."""
+    from website.models.checkpoint import Checkpoint, CheckpointTag
+    from website.models.race import Race
+
+    client.force_login(_make_superuser(django_user_model))
+    race = Race.objects.create(name="Tag repair", slug="tag-repair-api")
+    cp = Checkpoint.objects.create(race=race, number=5, cost=5)
+
+    # Create a row that bypassed signals (bid empty, code null) — use QuerySet.update()
+    # which issues raw SQL and skips Python save() / post_save signals.
+    tag = CheckpointTag.objects.create(checkpoint=cp, nfc_uid="REPAIR01")
+    CheckpointTag.objects.filter(pk=tag.pk).update(bid="", code=None)
+
+    response = client.post(
+        f"/api/race/{race.id}/checkpoint_tag/",
+        {"checkpoint_id": cp.id, "nfc_uid": "REPAIR01"},
+        content_type="application/json",
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["bid"] != ""
+    assert body["code"] is not None

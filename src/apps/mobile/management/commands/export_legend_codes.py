@@ -32,10 +32,10 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         race_id = options["race"]
         tags = (
-            CheckpointTag.objects.filter(point__race_id=race_id)
-            .select_related("point")
-            .order_by("point__number", "id")
+            CheckpointTag.objects.filter(checkpoint__race_id=race_id)
+            .select_related("checkpoint")
+            .order_by("checkpoint__number", "id")
         )
         for tag in tags:
             code_hex = bytes(tag.code).hex() if tag.code else "—"
-            self.stdout.write(f"{tag.nfc_uid}\t{tag.point.number}\t{code_hex}")
+            self.stdout.write(f"{tag.nfc_uid}\t{tag.checkpoint.number}\t{code_hex}")

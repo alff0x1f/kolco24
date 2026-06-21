@@ -1,4 +1,4 @@
-from django.db import IntegrityError
+from django.db import IntegrityError, transaction
 from django.utils import timezone
 from rest_framework import status
 from rest_framework.exceptions import NotFound
@@ -6,7 +6,9 @@ from rest_framework.generics import ListCreateAPIView
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from apps.mobile.legend_crypto import build_bundle
 from website.models import Checkpoint, CheckpointTag, Tag
+from website.models.enums import CheckpointType
 
 from ..serializers import CheckpointTagSerializer, TagSerializer, TagTouchSerializer
 
@@ -38,22 +40,22 @@ class CheckpointTagCreateView(APIView):
 
         serializer = CheckpointTagSerializer(data=request.data)
         if serializer.is_valid():
-            number = serializer.validated_data.get("number")
+            checkpoint_id = serializer.validated_data.get("checkpoint_id")
             nfc_uid = serializer.validated_data.get("nfc_uid")
 
-            control_point = self.get_control_point(race_id, number)
+            control_point = self.get_control_point(race_id, checkpoint_id)
             # nfc_uid is globally unique (website migration 0089). If this UID is
             # already bound to a different КП, get_or_create's create() raises an
             # IntegrityError; re-query to confirm it's a UID conflict and not an
             # unrelated failure (FK violation, crypto signal, etc.) before 409.
             try:
                 checkpoint_tag, created = CheckpointTag.objects.get_or_create(
-                    point=control_point, nfc_uid=nfc_uid
+                    checkpoint=control_point, nfc_uid=nfc_uid
                 )
             except IntegrityError as original_exc:
                 conflict = (
                     CheckpointTag.objects.filter(nfc_uid=nfc_uid)
-                    .exclude(point=control_point)
+                    .exclude(checkpoint=control_point)
                     .exists()
                 )
                 if conflict:
@@ -63,11 +65,33 @@ class CheckpointTagCreateView(APIView):
                     )
                 raise original_exc
 
+            # The post_save signal writes bid/code/bundle_blob to a freshly-fetched
+            # DB instance, leaving the get_or_create return value stale on creation.
+            checkpoint_tag.refresh_from_db()
+
+            # Existing rows created bypassing the signals (bid=="" / code is None)
+            # must be repaired before attempting code.hex(). Mirror mobile
+            # TagCreateView._tag_response(): re-fetch under a lock so concurrent
+            # repairs can't mint different codes.
+            if not checkpoint_tag.bid or checkpoint_tag.code is None:
+                with transaction.atomic():
+                    checkpoint_tag = CheckpointTag.objects.select_for_update().get(
+                        pk=checkpoint_tag.pk
+                    )
+                    if not checkpoint_tag.bid or checkpoint_tag.code is None:
+                        build_bundle(checkpoint_tag)
+                        checkpoint_tag.refresh_from_db()
+
+            code = (
+                bytes(checkpoint_tag.code) if checkpoint_tag.code is not None else None
+            )
             return Response(
                 {
-                    "id": checkpoint_tag.id,
-                    "point": checkpoint_tag.point.id,
+                    "bid": checkpoint_tag.bid,
+                    "checkpoint_id": checkpoint_tag.checkpoint_id,
+                    "number": checkpoint_tag.checkpoint.number,
                     "nfc_uid": checkpoint_tag.nfc_uid,
+                    "code": code.hex() if code is not None else None,
                 },
                 status=status.HTTP_201_CREATED if created else status.HTTP_200_OK,
             )
@@ -75,12 +99,20 @@ class CheckpointTagCreateView(APIView):
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     @staticmethod
-    def get_control_point(race_id: int, number: int) -> Checkpoint:
+    def get_control_point(race_id: int, checkpoint_id: int) -> Checkpoint:
+        # Resolve by id (number is not unique per race) and never bind a tag to a
+        # hidden КП. 404 on miss, matching the mobile tag-create endpoint.
         try:
-            return Checkpoint.objects.get(race_id=race_id, number=number)
+            return Checkpoint.objects.exclude(type=CheckpointType.hidden.value).get(
+                race_id=race_id, id=checkpoint_id
+            )
         except Checkpoint.DoesNotExist:
             raise NotFound(
-                {"number": [f"Контрольная точка с номером {number} не найдена"]}
+                {
+                    "checkpoint_id": [
+                        f"Контрольная точка с id {checkpoint_id} не найдена"
+                    ]
+                }
             )
 
 

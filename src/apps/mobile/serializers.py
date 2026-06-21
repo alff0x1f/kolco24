@@ -28,13 +28,14 @@ class LoginSerializer(serializers.Serializer):
 class TagCreateSerializer(serializers.Serializer):
     """Validate the ``POST /app/race/<race_id>/tags/`` body.
 
-    ``point`` is the **checkpoint id** (``Checkpoint.number`` is not unique per
-    race — see the plan's "КП identity" decision), ``nfc_uid`` is the scanned
-    chip UID. Both required; a blank ``nfc_uid`` is rejected here (400) before it
-    reaches the model's ``save()``, which raises ``ValueError`` on blank (→ 500).
+    ``checkpoint_id`` is the **checkpoint id** (``Checkpoint.number`` is not
+    unique per race — see the plan's "КП identity" decision), ``nfc_uid`` is the
+    scanned chip UID. Both required; a blank ``nfc_uid`` is rejected here (400)
+    before it reaches the model's ``save()``, which raises ``ValueError`` on
+    blank (→ 500).
     """
 
-    point = serializers.IntegerField()
+    checkpoint_id = serializers.IntegerField()
     # max_length mirrors CheckpointTag.nfc_uid (255). Without it an oversized UID
     # reaches the INSERT and PostgreSQL raises → 500 instead of a clean 400.
     nfc_uid = serializers.CharField(
@@ -63,11 +64,11 @@ class TagSerializer(serializers.Serializer):
 
     Two concerns, cleanly split:
 
-    - **identity** — ``bid → point`` (1:1, **always** present, incl. open КП):
-      the app computes ``bid = sha256(scanned_code).hexdigest()[:16]`` from the
-      code in the tag's NFC user memory and looks it up here to resolve which
-      checkpoint (``point`` = ``point_id``) was physically scanned, fully
-      offline.
+    - **identity** — ``bid → checkpoint_id`` (1:1, **always** present, incl. open
+      КП): the app computes ``bid = sha256(scanned_code).hexdigest()[:16]`` from
+      the code in the tag's NFC user memory and looks it up here to resolve which
+      checkpoint (``checkpoint_id`` = ``CheckpointTag.checkpoint_id``) was
+      physically scanned, fully offline.
     - **unlock** — ``iv``/``ct`` (locked КП **only**): flattened from
       ``CheckpointTag.bundle_blob``. When present, HKDF-decrypts to
       ``{cp_id: content_key}`` and then decrypts each locked КП's ``enc`` blob.
@@ -77,7 +78,7 @@ class TagSerializer(serializers.Serializer):
     """
 
     bid = serializers.CharField()
-    point = serializers.IntegerField(source="point_id")
+    checkpoint_id = serializers.IntegerField()
     iv = serializers.SerializerMethodField()
     ct = serializers.SerializerMethodField()
     check_method = serializers.CharField()
