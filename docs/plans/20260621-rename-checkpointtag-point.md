@@ -257,16 +257,17 @@ was written but not committed), so changing it now is cheap.
 
 ### Task 6: Verify acceptance criteria
 
-- [ ] grep confirms no stale `CheckpointTag` FK refs remain: search `point__` /
+- [x] grep confirms no stale `CheckpointTag` FK refs remain: search `point__` /
       `point=` / `\.point\b` / `point_id`, then exclude the known-unrelated
       survivors (`point_number`, `point.point` `TakenKP` loop var, `points_`,
       `endpoint`, `control_point`). Cross-check positively by grepping
       `checkpoint__` / `\.checkpoint\b` to confirm the refs actually moved (proving
-      presence beats proving absence)
-- [ ] no JSON key `point` remains in any `/app/` or `/api/` tag/legend response
-- [ ] `uv run python src/manage.py makemigrations --check` is clean
-- [ ] run full suite: `uv run pytest`
-- [ ] `make format && make lint` clean
+      presence beats proving absence) — only survivor is `models.py:277`
+      `point.point.cost` (TakenKP loop var, expected)
+- [x] no JSON key `point` remains in any `/app/` or `/api/` tag/legend response
+- [x] `uv run python src/manage.py makemigrations --check` is clean
+- [x] run full suite: `uv run pytest` (687 passed)
+- [x] `make format && make lint` clean
 
 ### Task 7: Finalize documentation
 
