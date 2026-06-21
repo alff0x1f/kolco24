@@ -241,18 +241,19 @@ was written but not committed), so changing it now is cheap.
 - Modify: `docs/mobile-admin-auth-and-tags.md`
 - Modify: `CLAUDE.md`
 
-- [ ] `docs/mobile-admin-auth-and-tags.md` §4 «Привязка тега»: request
+- [x] `docs/mobile-admin-auth-and-tags.md` §4 «Привязка тега»: request
       `{checkpoint_id, nfc_uid}`, response `{bid, checkpoint_id, number, nfc_uid,
       code}`; update the request/response tables and the curl example
-- [ ] remove **both** ⚠️ id-vs-number warnings (§4 and §8) — no longer applicable;
+- [x] remove **both** ⚠️ id-vs-number warnings (§4 and §8) — no longer applicable;
       update §8 «Частые ошибки» (drop the "`point` перепутан" bullet)
-- [ ] update legend description if it references the `tags[]` `point` key →
-      `checkpoint_id`
-- [ ] `CLAUDE.md`: update the `apps.mobile` per-person-write-layer and legend
+- [x] update legend description if it references the `tags[]` `point` key →
+      `checkpoint_id` (N/A — this doc has no legend `tags[]` section; legend shape
+      lives only in CLAUDE.md, updated below)
+- [x] `CLAUDE.md`: update the `apps.mobile` per-person-write-layer and legend
       sections that state «`point` is the checkpoint `id`, not `number`» to the
       new `checkpoint_id` vocabulary; note the model field is now
       `CheckpointTag.checkpoint`
-- [ ] (no automated tests for docs — verify links/anchors render)
+- [x] (no automated tests for docs — verify links/anchors render)
 
 ### Task 6: Verify acceptance criteria
 

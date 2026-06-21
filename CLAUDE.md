@@ -101,7 +101,7 @@ Django 4.2 project. Source lives entirely under `src/`, with `manage.py` at `src
   `RaceLegendCodesView` (template `src/templates/race/legend_codes.html`, assets `src/static/css/legend_codes.css` +
   `src/static/js/legend_codes.js`) is a read-only table of per-tag NFC codes for field-crew provisioning, backing the
   `legend_codes` (`race/<slug>/legend/codes/`) URL name. It is the web twin of `manage.py export_legend_codes --race
-  <id>` — same `CheckpointTag` queryset ordered by `point__number` then `id`, same `—` placeholder for tags without
+  <id>` — same `CheckpointTag` queryset ordered by `checkpoint__number` then `id`, same `—` placeholder for tags without
   a `code` yet, same `nfc_uid / КП number / code(hex)` columns. The JS "Скопировать CSV" button builds RFC-4180 CSV
   from the rendered table and writes it to the clipboard. Gated on `can_edit_race`.
 - `apps.mobile` — **signed mobile-app endpoints** for iOS/Android (`label = "mobile"`, mounted at `/app/*`
@@ -145,10 +145,12 @@ Django 4.2 project. Source lives entirely under `src/`, with `manage.py` at `src
       message, malformed body 400); `POST /app/logout/` (`SignedAppPermission + IsMobileUser`; flips `revoked_at` on the
       **presented** token only, other tokens of the user stay valid); `POST /app/race/<id>/tags/`
       (`SignedAppPermission + IsMobileUser + CanEditRaceLegend`; the online-only NFC-chip→КП provisioning endpoint). Tag
-      create takes body `{point, nfc_uid}` where **`point` is the checkpoint `id`, not `number`** (`number` is not unique
-      per race), resolves a **non-`hidden`** КП by id within the race (404), normalizes `nfc_uid` (`.strip().upper()`),
+      create takes body `{checkpoint_id, nfc_uid}` where **`checkpoint_id` is the checkpoint `id`** (`number` is not unique
+      per race, hence id) — the single wire vocabulary across `/app/`: a checkpoint's stable id is always `checkpoint_id`,
+      its display number always `number`, no key overloaded. Resolves a **non-`hidden`** КП by id within the race (404),
+      normalizes `nfc_uid` (`.strip().upper()`),
       then: same `nfc_uid` on the **same** КП → idempotent 200; on a **different** КП → 409 (no auto-rebind); else
-      `CheckpointTag(point, nfc_uid, created_by=request.mobile_user)` created in `transaction.atomic()` via
+      `CheckpointTag(checkpoint, nfc_uid, created_by=request.mobile_user)` created in `transaction.atomic()` via
       `instance.save()` (**fires the legend-crypto signals** — server stays the single crypto source; catches
       `IntegrityError` from the **global** `CheckpointTag.nfc_uid` unique constraint (migration `website/0089`, which
       replaced the old `unique_together("point","nfc_uid")` — a UID is now globally unique; `0089` aborts with a
@@ -156,7 +158,8 @@ Django 4.2 project. Source lives entirely under `src/`, with `manage.py` at `src
       The legacy superuser `api` write `CheckpointTagCreateView` (`api/views/tag.py`) likewise translates that
       `IntegrityError` to a 409. The mobile `TagCreateSerializer.nfc_uid` caps `max_length=255` (mirrors the column) so
       an oversized UID is a 400, not a DB-insert 500. Response
-      `{bid, point: cp.number, nfc_uid, code: code.hex()}` (201, or 200 idempotent); a row with `bid==""`/`code is None`
+      `{bid, checkpoint_id: cp.id, number: cp.number, nfc_uid, code: code.hex()}` (201, or 200 idempotent; both ids under
+      honest keys) — the same key set the legacy `api` `CheckpointTagCreateView` now returns; a row with `bid==""`/`code is None`
       (created bypassing signals) is repaired via `build_bundle` before responding (no `None.hex()` 500) — the repair
       runs under `select_for_update()` and re-checks the row inside the lock so two concurrent repairs can't mint
       different codes (the first response could otherwise be written to the chip before the second overwrites it).
@@ -178,7 +181,7 @@ Django 4.2 project. Source lives entirely under `src/`, with `manage.py` at `src
     - **Endpoints** (reads all GET; writes are the three POSTs in the **Per-person write layer** invariant below; see
       `urls.py`): `/app/races/` (published races), `/app/race/<id>/teams/` (teams **plus the
       embedded category catalogue** — deliberately no separate categories endpoint; inactive categories included so
-      every `category2` id resolves), `/app/race/<id>/legend/` (checkpoints **plus a per-tag `tags` array** — `bid → point`
+      every `category2` id resolves), `/app/race/<id>/legend/` (checkpoints **plus a per-tag `tags` array** — `bid → checkpoint_id`
       identity for **every** tag (open + locked), plus `iv`/`ct` for the offline legend unlock on locked КП only — see
       the **Legend encryption** invariant below; the legend is **always served** for a published race (no race-level
       visibility gate), with `type="hidden"` КП excluded), `/app/race/<id>/member_tags/` (the participant-bracelet pool —
@@ -198,8 +201,9 @@ Django 4.2 project. Source lives entirely under `src/`, with `manage.py` at `src
       race is stable) — **except `member_tags_version()`**, which folds in the sorted active ID list (see **Member
       tags** below), and **except `legend_version()`**, which additionally prefixes a `_LEGEND_SCHEMA_VERSION` integer
       so a response-shape change (fields added or removed) forces a cache bust at deploy time even when no DB row
-      changed; bump `_LEGEND_SCHEMA_VERSION` whenever `LegendCheckpointSerializer` fields change (current value: 2,
-      bumped when `color` was added). Deliberately **no `versions.categories`** — category edits must move `versions.teams`;
+      changed; bump `_LEGEND_SCHEMA_VERSION` whenever the legend response shape changes (`LegendCheckpointSerializer` or the
+      per-tag `TagSerializer` fields) (current value: 3, bumped to 2 when `color` was added, to 3 when the `tags[]` identity
+      key was renamed `point` → `checkpoint_id`). Deliberately **no `versions.categories`** — category edits must move `versions.teams`;
       `races_version()` is global and deliberately absent from the per-race `sync` manifest (the races list is the app's
       entry point, probed via its own conditional GET).
     - **Member tags** (`active_member_tags()` + `member_tags_version()` in `versioning.py`; `MemberTagSerializer` in
@@ -235,11 +239,12 @@ Django 4.2 project. Source lives entirely under `src/`, with `manage.py` at `src
       feature; `crypto.py:seal`/`unseal`/`derive_wrap_key`; `unseal` is **not** named `open` to avoid
       shadowing the builtin/tripping flake8): each locked КП is sealed with its own random 32-B `content_key` into
       `CheckpointSecret` (`O2O → Checkpoint`, `related_name="secret"`; `enc_blob={"iv","ct"}` over `{cost, description}`,
-      `aad=str(cp.id)`); each `CheckpointTag` carries a random 16-B `code` (written into the tag's NFC user memory
+      `aad=str(cp.id)`); each `CheckpointTag` (its FK to `Checkpoint` is `CheckpointTag.checkpoint`, `related_name="tags"`,
+      renamed from `point` in migration `website/0090`) carries a random 16-B `code` (written into the tag's NFC user memory
       out-of-band) and a per-tag `bundle_blob` = AES-GCM of `{cp_id: content_key}` over the tag's `unlocks` set, wrap
       key `HKDF(code)`, `aad=bid` where **`bid = sha256(code).hexdigest()[:16]`** (16 hex chars — the mobile client must
       compute it identically). `unlocks` is an M2M (`related_name="unlocked_by"`); an **empty** `unlocks` means the tag
-      unlocks its own `point` (runtime `[point]` default in `build_bundle`). The envelope (content-key indirection) is
+      unlocks its own `checkpoint` (runtime `[tag.checkpoint]` default in `build_bundle`). The envelope (content-key indirection) is
       what lets one code open a configurable subset of КП with overlaps without re-encrypting a КП per code. Ciphertext
       + bundles are **precomputed and stored** so ETags stay stable. The service layer (`legend_crypto.py`:
       `seal_checkpoint`/`ensure_code`/`build_bundle`) is driven by **signals** (`post_save(Checkpoint)` re-seals + on a
@@ -258,11 +263,11 @@ Django 4.2 project. Source lives entirely under `src/`, with `manage.py` at `src
       `instance.save()` not `update_fields` omitting `"updated_at"`; adding `color` also bumped `_LEGEND_SCHEMA_VERSION`
       to 2 in `versioning.py` (schema-change cache bust — see **Conditional GET** above)); the online
       `api.CheckpointSerializer` intentionally does **not** carry `color`. `TagSerializer` emits **one entry per `CheckpointTag`**:
-      `{bid, point (=point_id), check_method}` for **every** tag (identity, open + locked) plus `iv`/`ct` from
+      `{bid, checkpoint_id, check_method}` for **every** tag (identity, open + locked) plus `iv`/`ct` from
       `bundle_blob` (`None` for open tags — identity-only, not decryptable). The legend view's tag queryset no longer
       excludes `bundle_blob=None` (so open-КП tags are emitted) and adds `.exclude(bid="")` (drops un-built rows created
       bypassing signals); response key is `tags` (was `bundles`).
-      **`tag_hash` is gone** — offline КП identity is now `bid → point` for every tag (open + locked); the online
+      **`tag_hash` is gone** — offline КП identity is now `bid → checkpoint_id` for every tag (open + locked); the online
       scoring/scan path lives in the `api` app and matches by `nfc_uid` (unchanged). Per the **`update_fields` discipline** above, every service
       `save(update_fields=[...])` on `CheckpointTag`/`CheckpointSecret` includes `"updated_at"`.
     - **`update_fields` discipline**: the fingerprints rely on `auto_now` `updated_at` fields on `Team`/`Athlet`/
