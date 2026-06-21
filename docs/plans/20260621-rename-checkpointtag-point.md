@@ -183,17 +183,17 @@ was written but not committed), so changing it now is cheap.
 - Modify: `src/apps/mobile/views.py` (`TagCreateView`)
 - Modify: `src/apps/mobile/tests.py`
 
-- [ ] `TagCreateSerializer`: rename request field `point` → `checkpoint_id`
+- [x] `TagCreateSerializer`: rename request field `point` → `checkpoint_id`
       (`IntegerField`); update docstring (it documents "point is the checkpoint id")
-- [ ] `TagCreateView.post`: read `validated_data["checkpoint_id"]`; keep
+- [x] `TagCreateView.post`: read `validated_data["checkpoint_id"]`; keep
       resolve-by-id within race + `exclude(type=hidden)` logic
-- [ ] `TagCreateView._tag_response`: emit `{"bid", "checkpoint_id": tag.checkpoint_id,
+- [x] `TagCreateView._tag_response`: emit `{"bid", "checkpoint_id": tag.checkpoint_id,
       "number": tag.checkpoint.number, "nfc_uid", "code"}` (both ids, honest keys);
       update the method docstring
-- [ ] update tag-create tests: request body uses `checkpoint_id`; assert response
+- [x] update tag-create tests: request body uses `checkpoint_id`; assert response
       carries `checkpoint_id` (= id) **and** `number` (= number); cover 201 / 200
       idempotent / 409 / 404 / 400 paths
-- [ ] run `uv run pytest src/apps/mobile/tests.py` — must pass before Task 3
+- [x] run `uv run pytest src/apps/mobile/tests.py` — must pass before Task 3
 
 ### Task 3: Mobile legend wire contract + schema-version bump
 

@@ -28,13 +28,14 @@ class LoginSerializer(serializers.Serializer):
 class TagCreateSerializer(serializers.Serializer):
     """Validate the ``POST /app/race/<race_id>/tags/`` body.
 
-    ``point`` is the **checkpoint id** (``Checkpoint.number`` is not unique per
-    race — see the plan's "КП identity" decision), ``nfc_uid`` is the scanned
-    chip UID. Both required; a blank ``nfc_uid`` is rejected here (400) before it
-    reaches the model's ``save()``, which raises ``ValueError`` on blank (→ 500).
+    ``checkpoint_id`` is the **checkpoint id** (``Checkpoint.number`` is not
+    unique per race — see the plan's "КП identity" decision), ``nfc_uid`` is the
+    scanned chip UID. Both required; a blank ``nfc_uid`` is rejected here (400)
+    before it reaches the model's ``save()``, which raises ``ValueError`` on
+    blank (→ 500).
     """
 
-    point = serializers.IntegerField()
+    checkpoint_id = serializers.IntegerField()
     # max_length mirrors CheckpointTag.nfc_uid (255). Without it an oversized UID
     # reaches the INSERT and PostgreSQL raises → 500 instead of a clean 400.
     nfc_uid = serializers.CharField(

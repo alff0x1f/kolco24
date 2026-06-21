@@ -210,8 +210,9 @@ class TagCreateView(AppAPIView):
     via ``instance.save()`` so the existing legend-crypto ``post_save`` signal
     fires (``ensure_code`` / ``build_bundle``), keeping the server the single
     source of crypto. The response carries the freshly-minted hex ``code`` for
-    the app to write into the chip's NFC user memory, plus ``bid`` / ``point``
-    (``Checkpoint.number``) / ``nfc_uid``.
+    the app to write into the chip's NFC user memory, plus ``bid`` /
+    ``checkpoint_id`` (``Checkpoint.id``) / ``number`` (``Checkpoint.number``) /
+    ``nfc_uid``.
 
     Permission stack (order matters):
 
@@ -232,7 +233,7 @@ class TagCreateView(AppAPIView):
 
     @staticmethod
     def _tag_response(tag, http_status):
-        """Build the ``{bid, point, nfc_uid, code}`` payload for a tag.
+        """Build the ``{bid, checkpoint_id, number, nfc_uid, code}`` payload.
 
         A tag created bypassing the signals (``bid == ""`` / ``code is None``)
         is repaired via :func:`build_bundle` before responding, so the hex of a
@@ -252,7 +253,8 @@ class TagCreateView(AppAPIView):
         return Response(
             {
                 "bid": tag.bid,
-                "point": tag.checkpoint.number,
+                "checkpoint_id": tag.checkpoint_id,
+                "number": tag.checkpoint.number,
                 "nfc_uid": tag.nfc_uid,
                 "code": code.hex() if code is not None else None,
             },
@@ -264,12 +266,12 @@ class TagCreateView(AppAPIView):
 
         serializer = TagCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        point_id = serializer.validated_data["point"]
+        checkpoint_id = serializer.validated_data["checkpoint_id"]
         nfc_uid = serializer.validated_data["nfc_uid"].strip().upper()
 
         cp = get_object_or_404(
             Checkpoint.objects.exclude(type=CheckpointType.hidden.value),
-            pk=point_id,
+            pk=checkpoint_id,
             race_id=race_id,
         )
 

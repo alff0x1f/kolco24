@@ -5506,14 +5506,15 @@ def test_tag_create_happy_path_201_with_crypto_via_signals(
 
     race, user, raw, cp = _make_admin_race(django_user_model, "happy", locked=True)
     path = _tags_path(race.id)
-    body = json.dumps({"point": cp.id, "nfc_uid": "04A1B2C3"}).encode()
+    body = json.dumps({"checkpoint_id": cp.id, "nfc_uid": "04A1B2C3"}).encode()
 
     response = _signed_post_auth(client, path, SECRET, body, raw)
 
     assert response.status_code == 201
     data = response.json()
-    assert set(data.keys()) == {"bid", "point", "nfc_uid", "code"}
-    assert data["point"] == cp.number
+    assert set(data.keys()) == {"bid", "checkpoint_id", "number", "nfc_uid", "code"}
+    assert data["checkpoint_id"] == cp.id
+    assert data["number"] == cp.number
     assert data["nfc_uid"] == "04A1B2C3"
 
     tag = CheckpointTag.objects.get(checkpoint=cp, nfc_uid="04A1B2C3")
@@ -5540,7 +5541,7 @@ def test_tag_create_idempotent_same_uid_same_cp_no_duplicate(
 
     race, user, raw, cp = _make_admin_race(django_user_model, "idem")
     path = _tags_path(race.id)
-    body = json.dumps({"point": cp.id, "nfc_uid": "04A1B2C3"}).encode()
+    body = json.dumps({"checkpoint_id": cp.id, "nfc_uid": "04A1B2C3"}).encode()
 
     first = _signed_post_auth(client, path, SECRET, body, raw)
     assert first.status_code == 201
@@ -5575,7 +5576,7 @@ def test_tag_create_same_uid_different_cp_returns_409(
         client,
         path,
         SECRET,
-        json.dumps({"point": cp.id, "nfc_uid": "04A1B2C3"}).encode(),
+        json.dumps({"checkpoint_id": cp.id, "nfc_uid": "04A1B2C3"}).encode(),
         raw,
     )
     assert first.status_code == 201
@@ -5584,7 +5585,7 @@ def test_tag_create_same_uid_different_cp_returns_409(
         client,
         path,
         SECRET,
-        json.dumps({"point": other_cp.id, "nfc_uid": "04A1B2C3"}).encode(),
+        json.dumps({"checkpoint_id": other_cp.id, "nfc_uid": "04A1B2C3"}).encode(),
         raw,
     )
     assert conflict.status_code == 409
@@ -5614,7 +5615,7 @@ def test_tag_create_idempotent_hit_on_unbuilt_tag_rebuilds_no_500(
     assert CheckpointTag.objects.filter(checkpoint=cp, bid="").count() == 1
 
     path = _tags_path(race.id)
-    body = json.dumps({"point": cp.id, "nfc_uid": "04A1B2C3"}).encode()
+    body = json.dumps({"checkpoint_id": cp.id, "nfc_uid": "04A1B2C3"}).encode()
     response = _signed_post_auth(client, path, SECRET, body, raw)
 
     assert response.status_code == 200
@@ -5635,7 +5636,7 @@ def test_tag_create_unknown_checkpoint_returns_404(client, settings, django_user
 
     race, user, raw, cp = _make_admin_race(django_user_model, "nocp")
     path = _tags_path(race.id)
-    body = json.dumps({"point": 999999, "nfc_uid": "04A1B2C3"}).encode()
+    body = json.dumps({"checkpoint_id": 999999, "nfc_uid": "04A1B2C3"}).encode()
     response = _signed_post_auth(client, path, SECRET, body, raw)
     assert response.status_code == 404
 
@@ -5658,7 +5659,7 @@ def test_tag_create_checkpoint_in_other_race_returns_404(
         race=other_race, number=1, cost=1, description="elsewhere"
     )
     path = _tags_path(race.id)
-    body = json.dumps({"point": other_cp.id, "nfc_uid": "04A1B2C3"}).encode()
+    body = json.dumps({"checkpoint_id": other_cp.id, "nfc_uid": "04A1B2C3"}).encode()
     response = _signed_post_auth(client, path, SECRET, body, raw)
     assert response.status_code == 404
 
@@ -5677,7 +5678,7 @@ def test_tag_create_hidden_checkpoint_returns_404(client, settings, django_user_
         race=race, number=9, cost=0, description="hidden", type="hidden"
     )
     path = _tags_path(race.id)
-    body = json.dumps({"point": hidden.id, "nfc_uid": "04A1B2C3"}).encode()
+    body = json.dumps({"checkpoint_id": hidden.id, "nfc_uid": "04A1B2C3"}).encode()
     response = _signed_post_auth(client, path, SECRET, body, raw)
     assert response.status_code == 404
 
@@ -5693,7 +5694,7 @@ def test_tag_create_normalizes_nfc_uid(client, settings, django_user_model):
 
     race, user, raw, cp = _make_admin_race(django_user_model, "norm")
     path = _tags_path(race.id)
-    body = json.dumps({"point": cp.id, "nfc_uid": "  04a1b2c3 "}).encode()
+    body = json.dumps({"checkpoint_id": cp.id, "nfc_uid": "  04a1b2c3 "}).encode()
     response = _signed_post_auth(client, path, SECRET, body, raw)
 
     assert response.status_code == 201
@@ -5710,7 +5711,7 @@ def test_tag_create_blank_nfc_uid_returns_400(client, settings, django_user_mode
 
     race, user, raw, cp = _make_admin_race(django_user_model, "blank")
     path = _tags_path(race.id)
-    body = json.dumps({"point": cp.id, "nfc_uid": "   "}).encode()
+    body = json.dumps({"checkpoint_id": cp.id, "nfc_uid": "   "}).encode()
     response = _signed_post_auth(client, path, SECRET, body, raw)
     assert response.status_code == 400
 
@@ -5725,7 +5726,7 @@ def test_tag_create_oversized_nfc_uid_returns_400(client, settings, django_user_
 
     race, user, raw, cp = _make_admin_race(django_user_model, "oversize")
     path = _tags_path(race.id)
-    body = json.dumps({"point": cp.id, "nfc_uid": "A" * 256}).encode()
+    body = json.dumps({"checkpoint_id": cp.id, "nfc_uid": "A" * 256}).encode()
     response = _signed_post_auth(client, path, SECRET, body, raw)
     assert response.status_code == 400
 
@@ -5739,7 +5740,7 @@ def test_tag_create_missing_bearer_returns_401(client, settings, django_user_mod
 
     race, user, raw, cp = _make_admin_race(django_user_model, "nobearer")
     path = _tags_path(race.id)
-    body = json.dumps({"point": cp.id, "nfc_uid": "04A1B2C3"}).encode()
+    body = json.dumps({"checkpoint_id": cp.id, "nfc_uid": "04A1B2C3"}).encode()
     # valid build sig but no Authorization header → actionable 401
     response = _signed_post_auth(client, path, SECRET, body, None)
     assert response.status_code == 401
@@ -5756,7 +5757,7 @@ def test_tag_create_missing_build_signature_returns_403(
 
     race, user, raw, cp = _make_admin_race(django_user_model, "nosig")
     path = _tags_path(race.id)
-    body = json.dumps({"point": cp.id, "nfc_uid": "04A1B2C3"}).encode()
+    body = json.dumps({"checkpoint_id": cp.id, "nfc_uid": "04A1B2C3"}).encode()
     response = client.post(
         path,
         data=body,
@@ -5786,7 +5787,7 @@ def test_tag_create_non_admin_user_returns_403(client, settings, django_user_mod
     raw = _make_active_token(user)
 
     path = _tags_path(race.id)
-    body = json.dumps({"point": cp.id, "nfc_uid": "04A1B2C3"}).encode()
+    body = json.dumps({"checkpoint_id": cp.id, "nfc_uid": "04A1B2C3"}).encode()
     response = _signed_post_auth(client, path, SECRET, body, raw)
     assert response.status_code == 403
     # actionable (not the neutral build-layer "Forbidden")
@@ -5812,7 +5813,7 @@ def test_tag_create_unpublished_race_returns_404(client, settings, django_user_m
     cp = Checkpoint.objects.create(race=race, number=1, cost=1, description="x")
 
     path = _tags_path(race.id)
-    body = json.dumps({"point": cp.id, "nfc_uid": "04A1B2C3"}).encode()
+    body = json.dumps({"checkpoint_id": cp.id, "nfc_uid": "04A1B2C3"}).encode()
     response = _signed_post_auth(client, path, SECRET, body, raw)
     assert response.status_code == 404
 
@@ -5832,7 +5833,7 @@ def test_tag_create_moves_legend_version_and_etag(client, settings, django_user_
     old_etag = before["ETag"]
 
     path = _tags_path(race.id)
-    body = json.dumps({"point": cp.id, "nfc_uid": "04A1B2C3"}).encode()
+    body = json.dumps({"checkpoint_id": cp.id, "nfc_uid": "04A1B2C3"}).encode()
     created = _signed_post_auth(client, path, SECRET, body, raw)
     assert created.status_code == 201
 
@@ -5875,7 +5876,9 @@ def test_tag_create_throttle_returns_429_after_limit(
     try:
         statuses = []
         for i in range(4):
-            body = json.dumps({"point": cp.id, "nfc_uid": f"AA{i:06X}"}).encode()
+            body = json.dumps(
+                {"checkpoint_id": cp.id, "nfc_uid": f"AA{i:06X}"}
+            ).encode()
             resp = _signed_post_auth(client, _tags_path(race.id), SECRET, body, raw)
             statuses.append(resp.status_code)
     finally:
@@ -5975,7 +5978,7 @@ def test_post_present_body_signature_handled(client, settings, django_user_model
 
     race, user, raw, cp = _make_admin_race(django_user_model, "bsr-present")
     path = _tags_path(race.id)
-    body = json.dumps({"point": cp.id, "nfc_uid": "04A1B2C3"}).encode()
+    body = json.dumps({"checkpoint_id": cp.id, "nfc_uid": "04A1B2C3"}).encode()
 
     response = _signed_post_auth(client, path, SECRET, body, raw)
     assert response.status_code == 201
@@ -5992,7 +5995,7 @@ def test_signed_permission_reads_body_before_drf_parse():
     from rest_framework.parsers import JSONParser
     from rest_framework.request import Request
 
-    body = json.dumps({"point": 1, "nfc_uid": "AB"}).encode()
+    body = json.dumps({"checkpoint_id": 1, "nfc_uid": "AB"}).encode()
     factory = RequestFactory()
     raw_request = factory.post(
         "/app/race/1/tags/", data=body, content_type="application/json"
@@ -6012,4 +6015,4 @@ def test_signed_permission_reads_body_before_drf_parse():
         assert SignedAppPermission().has_permission(raw_request, view=None) is True
         # 2) DRF can still parse the same body afterwards (no RawPostDataException)
         drf_request = Request(raw_request, parsers=[JSONParser()])
-        assert drf_request.data == {"point": 1, "nfc_uid": "AB"}
+        assert drf_request.data == {"checkpoint_id": 1, "nfc_uid": "AB"}
