@@ -102,8 +102,9 @@ def races_version():
 # Bump whenever the legend response schema changes (fields added or removed).
 # Prefixed into every legend_version() hash so a schema change forces a cache
 # bust on all cached clients at deploy time, even when no DB row was touched.
-# History: 1 = initial; 2 = color field added to LegendCheckpointSerializer.
-_LEGEND_SCHEMA_VERSION = 2
+# History: 1 = initial; 2 = color field added to LegendCheckpointSerializer;
+# 3 = legend tags[] identity key renamed point -> checkpoint_id (TagSerializer).
+_LEGEND_SCHEMA_VERSION = 3
 
 
 def legend_version(race_id):

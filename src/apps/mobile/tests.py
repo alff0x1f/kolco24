@@ -869,12 +869,12 @@ def test_legend_end_to_end_scan_code_decrypts_locked_checkpoint(client, settings
     assert response.status_code == 200
     data = response.json()
 
-    # 1. locate the tag by the bid computed from the scanned code; its `point`
-    #    identifies which КП was physically scanned (always present)
+    # 1. locate the tag by the bid computed from the scanned code; its
+    #    `checkpoint_id` identifies which КП was physically scanned (always present)
     bid = hashlib.sha256(code).hexdigest()[:16]
     tag_entry = next(t for t in data["tags"] if t["bid"] == bid)
     assert tag_entry["check_method"] == "offline"
-    assert tag_entry["point"] == cp.id
+    assert tag_entry["checkpoint_id"] == cp.id
 
     # 2. HKDF(code) decrypts the tag's bundle → {cp_id: content_key}
     keys = json.loads(
@@ -893,8 +893,10 @@ def test_legend_end_to_end_scan_code_decrypts_locked_checkpoint(client, settings
 
 
 @pytest.mark.django_db
-def test_legend_tags_include_open_checkpoint_tag_with_point_no_iv_ct(client, settings):
-    """An open-КП tag rides in `tags` with `point` for identity but no iv/ct."""
+def test_legend_tags_include_open_checkpoint_tag_with_checkpoint_id_no_iv_ct(
+    client, settings
+):
+    """An open-КП tag rides in `tags` with `checkpoint_id` for identity, no iv/ct."""
     from website.models.checkpoint import Checkpoint, CheckpointTag
     from website.models.race import Race
 
@@ -915,7 +917,7 @@ def test_legend_tags_include_open_checkpoint_tag_with_point_no_iv_ct(client, set
     data = response.json()
     assert len(data["tags"]) == 1
     entry = data["tags"][0]
-    assert entry["point"] == cp.id
+    assert entry["checkpoint_id"] == cp.id
     assert entry["check_method"] == "offline"
     assert entry["bid"] == tag.bid
     assert entry["iv"] is None
@@ -4038,7 +4040,7 @@ def test_admin_regenerate_code_action_changes_code(client, django_user_model):
 
 @pytest.mark.django_db
 def test_tag_serializer_open_tag_identity_only():
-    """An open-КП tag (no bundle_blob) → {bid, point, check_method}, iv/ct None."""
+    """Open-КП tag (no bundle_blob) → {bid, checkpoint_id, check_method}, iv/ct None."""
     from apps.mobile.serializers import TagSerializer
     from website.models.checkpoint import Checkpoint, CheckpointTag
     from website.models.race import Race
@@ -4053,7 +4055,7 @@ def test_tag_serializer_open_tag_identity_only():
 
     data = TagSerializer(tag).data
     assert data["bid"] == tag.bid
-    assert data["point"] == cp.id
+    assert data["checkpoint_id"] == cp.id
     assert data["check_method"] == "offline"
     assert data["iv"] is None
     assert data["ct"] is None
@@ -4079,7 +4081,7 @@ def test_tag_serializer_locked_tag_includes_iv_ct():
 
     data = TagSerializer(tag).data
     assert data["bid"] == tag.bid
-    assert data["point"] == cp.id
+    assert data["checkpoint_id"] == cp.id
     assert data["check_method"] == "offline"
     assert data["iv"] == tag.bundle_blob["iv"]
     assert data["ct"] == tag.bundle_blob["ct"]

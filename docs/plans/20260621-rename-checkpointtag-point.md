@@ -202,16 +202,17 @@ was written but not committed), so changing it now is cheap.
 - Modify: `src/apps/mobile/versioning.py` (`_LEGEND_SCHEMA_VERSION`)
 - Modify: `src/apps/mobile/tests.py`
 
-- [ ] `TagSerializer`: rename legend identity key `point` → `checkpoint_id`
+- [x] `TagSerializer`: rename legend identity key `point` → `checkpoint_id`
       (reads `tag.checkpoint_id`); update docstring (the `bid → point` identity
       wording becomes `bid → checkpoint_id`)
-- [ ] bump `_LEGEND_SCHEMA_VERSION` 2 → 3 in `versioning.py` (forces legend
+- [x] bump `_LEGEND_SCHEMA_VERSION` 2 → 3 in `versioning.py` (forces legend
       ETag / `versions.legend` cache bust on the response-shape change); update
       the inline comment noting the bump reason
-- [ ] update legend tests: assert `tags[]` entries carry `checkpoint_id`;
+- [x] update legend tests: assert `tags[]` entries carry `checkpoint_id`;
       assert the legend ETag/version changed vs the pre-bump fingerprint if such
-      a test exists
-- [ ] run `uv run pytest src/apps/mobile/tests.py` — must pass before Task 4
+      a test exists (none asserts a hardcoded fingerprint — all are relative
+      before/after comparisons, unaffected by the bump)
+- [x] run `uv run pytest src/apps/mobile/tests.py` — must pass before Task 4
 
 ### Task 4: Legacy api tag-create — align vocabulary + resolve by id
 
