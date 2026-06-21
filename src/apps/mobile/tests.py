@@ -437,6 +437,26 @@ def test_permission_valid_key_id_wrong_secret_false(settings):
     assert SignedAppPermission().has_permission(request, None) is False
 
 
+def test_client_ip_uses_x_real_ip_when_set():
+    # Production path: nginx resolves the real IP and emits X-Real-IP.
+    request = RequestFactory().get(
+        PATH,
+        headers={"X-Real-IP": "203.0.113.5", "X-Forwarded-For": "1.2.3.4"},
+        REMOTE_ADDR="10.0.0.1",
+    )
+    assert _client_ip(request) == "203.0.113.5"
+
+
+def test_client_ip_invalid_x_real_ip_falls_back_to_forwarded_for():
+    # Invalid X-Real-IP should not be trusted; fall through to XFF.
+    request = RequestFactory().get(
+        PATH,
+        headers={"X-Real-IP": "not-an-ip", "X-Forwarded-For": "10.0.0.1, 10.0.0.2"},
+        REMOTE_ADDR="10.0.0.3",
+    )
+    assert _client_ip(request) == "10.0.0.2"
+
+
 def test_client_ip_uses_last_forwarded_for_entry():
     # Last entry is the one nginx appended ($remote_addr); the first can be spoofed.
     request = RequestFactory().get(

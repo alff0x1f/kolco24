@@ -151,8 +151,8 @@ Django 4.2 project. Source lives entirely under `src/`, with `manage.py` at `src
       `CheckpointTag(point, nfc_uid, created_by=request.mobile_user)` created in `transaction.atomic()` via
       `instance.save()` (**fires the legend-crypto signals** — server stays the single crypto source; catches
       `IntegrityError` from the **global** `CheckpointTag.nfc_uid` unique constraint (migration `website/0089`, which
-      replaced the old `unique_together("point","nfc_uid")` — a UID is now globally unique; `0089` first dedupes any
-      pre-existing duplicate UIDs, keeping the lowest-id row) → re-query: same КП ⇒ idempotent 200, different КП ⇒ 409).
+      replaced the old `unique_together("point","nfc_uid")` — a UID is now globally unique; `0089` aborts with a
+      `RuntimeError` if any duplicate UIDs exist, requiring manual resolution before the migration can proceed) → re-query: same КП ⇒ idempotent 200, different КП ⇒ 409).
       The legacy superuser `api` write `CheckpointTagCreateView` (`api/views/tag.py`) likewise translates that
       `IntegrityError` to a 409. The mobile `TagCreateSerializer.nfc_uid` caps `max_length=255` (mirrors the column) so
       an oversized UID is a 400, not a DB-insert 500. Response
