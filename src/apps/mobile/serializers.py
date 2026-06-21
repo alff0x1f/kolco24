@@ -35,7 +35,11 @@ class TagCreateSerializer(serializers.Serializer):
     """
 
     point = serializers.IntegerField()
-    nfc_uid = serializers.CharField(allow_blank=False, trim_whitespace=True)
+    # max_length mirrors CheckpointTag.nfc_uid (255). Without it an oversized UID
+    # reaches the INSERT and PostgreSQL raises → 500 instead of a clean 400.
+    nfc_uid = serializers.CharField(
+        allow_blank=False, trim_whitespace=True, max_length=255
+    )
 
 
 class RaceListSerializer(serializers.ModelSerializer):

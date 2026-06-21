@@ -17,7 +17,6 @@ from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from rest_framework import status
 from rest_framework.response import Response
-from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
 
 from website.models.checkpoint import Checkpoint, CheckpointTag
@@ -38,6 +37,7 @@ from .serializers import (
     TagSerializer,
     TeamSerializer,
 )
+from .throttling import ClientIPScopedRateThrottle
 from .tokens import generate_token
 from .versioning import (
     active_member_tags,
@@ -153,12 +153,13 @@ class LoginView(AppAPIView):
     from the serializer — distinct from the 401, but it leaks nothing about
     account existence.
 
-    Throttled by a plain IP-scoped :class:`ScopedRateThrottle` (``mobile-login``)
-    — no subclass, no ``request.data`` read inside the throttle, so it cannot
-    re-trip the body-read ordering hazard.
+    Throttled by an IP-scoped :class:`ClientIPScopedRateThrottle`
+    (``mobile-login``) — keyed by the un-spoofable client IP (last
+    ``X-Forwarded-For`` entry), with no ``request.data`` read inside the
+    throttle, so it cannot re-trip the body-read ordering hazard.
     """
 
-    throttle_classes = [ScopedRateThrottle]
+    throttle_classes = [ClientIPScopedRateThrottle]
     throttle_scope = "mobile-login"
 
     def post(self, request):
@@ -225,7 +226,7 @@ class TagCreateView(AppAPIView):
     """
 
     permission_classes = [SignedAppPermission, IsMobileUser, CanEditRaceLegend]
-    throttle_classes = [ScopedRateThrottle]
+    throttle_classes = [ClientIPScopedRateThrottle]
     throttle_scope = "mobile-write"
 
     @staticmethod
@@ -234,11 +235,18 @@ class TagCreateView(AppAPIView):
 
         A tag created bypassing the signals (``bid == ""`` / ``code is None``)
         is repaired via :func:`build_bundle` before responding, so the hex of a
-        missing ``code`` is never attempted (``None.hex()`` → 500).
+        missing ``code`` is never attempted (``None.hex()`` → 500). The repair
+        runs under ``select_for_update`` and re-checks the row inside the lock so
+        two concurrent repairs can't mint different codes — the first response
+        could otherwise be written to the chip before the second overwrites the
+        code in the DB.
         """
         if not tag.bid or tag.code is None:
-            build_bundle(tag)
-            tag.refresh_from_db()
+            with transaction.atomic():
+                tag = CheckpointTag.objects.select_for_update().get(pk=tag.pk)
+                if not tag.bid or tag.code is None:
+                    build_bundle(tag)
+                    tag.refresh_from_db()
         code = bytes(tag.code) if tag.code is not None else None
         return Response(
             {

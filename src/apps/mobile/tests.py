@@ -4843,6 +4843,31 @@ def test_resolve_token_none_for_revoked(django_user_model):
     assert resolve_token(raw) is None
 
 
+@pytest.mark.django_db
+def test_resolve_token_none_for_deactivated_user(django_user_model):
+    """A live token whose owner was deactivated must not resolve."""
+    from datetime import timedelta
+
+    from django.utils import timezone
+
+    from apps.mobile.models import MobileToken
+    from apps.mobile.tokens import generate_token, resolve_token
+
+    user = django_user_model.objects.create_user(
+        username="u-deactivated", email="deactivated@example.com", password="x"
+    )
+    raw, token_hash = generate_token()
+    MobileToken.objects.create(
+        user=user,
+        token_hash=token_hash,
+        expires_at=timezone.now() + timedelta(days=30),
+    )
+    # Token itself is still active; only the user is disabled.
+    user.is_active = False
+    user.save(update_fields=["is_active"])
+    assert resolve_token(raw) is None
+
+
 # --- Task 2: POST /app/login/ -----------------------------------------------
 
 LOGIN_PATH = "/app/login/"
@@ -5649,6 +5674,21 @@ def test_tag_create_blank_nfc_uid_returns_400(client, settings, django_user_mode
     race, user, raw, cp = _make_admin_race(django_user_model, "blank")
     path = _tags_path(race.id)
     body = json.dumps({"point": cp.id, "nfc_uid": "   "}).encode()
+    response = _signed_post_auth(client, path, SECRET, body, raw)
+    assert response.status_code == 400
+
+
+@pytest.mark.django_db
+def test_tag_create_oversized_nfc_uid_returns_400(client, settings, django_user_model):
+    """A UID longer than the model's 255-char column is a clean 400, not a 500."""
+    import json
+
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    race, user, raw, cp = _make_admin_race(django_user_model, "oversize")
+    path = _tags_path(race.id)
+    body = json.dumps({"point": cp.id, "nfc_uid": "A" * 256}).encode()
     response = _signed_post_auth(client, path, SECRET, body, raw)
     assert response.status_code == 400
 

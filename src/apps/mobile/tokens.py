@@ -28,16 +28,21 @@ def generate_token():
 def resolve_token(raw):
     """Resolve a presented raw bearer to its active ``MobileToken``, or ``None``.
 
-    Returns ``None`` for unknown / expired / revoked tokens. On success stamps
-    ``last_used_at`` best-effort (a stamp failure never blocks the lookup).
+    Returns ``None`` for unknown / expired / revoked tokens, or a token whose
+    owner has been deactivated (``user.is_active=False``) — so disabling a
+    compromised admin instantly cuts off provisioning without waiting for the
+    token's 30-day TTL. On success stamps ``last_used_at`` best-effort (a stamp
+    failure never blocks the lookup).
     """
     if not raw:
         return None
     try:
-        token = MobileToken.objects.get(token_hash=hash_token(raw))
+        token = MobileToken.objects.select_related("user").get(
+            token_hash=hash_token(raw)
+        )
     except MobileToken.DoesNotExist:
         return None
-    if not token.is_active:
+    if not token.is_active or not token.user.is_active:
         return None
     token.last_used_at = timezone.now()
     try:

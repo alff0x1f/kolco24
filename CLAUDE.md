@@ -150,15 +150,28 @@ Django 4.2 project. Source lives entirely under `src/`, with `manage.py` at `src
       then: same `nfc_uid` on the **same** КП → idempotent 200; on a **different** КП → 409 (no auto-rebind); else
       `CheckpointTag(point, nfc_uid, created_by=request.mobile_user)` created in `transaction.atomic()` via
       `instance.save()` (**fires the legend-crypto signals** — server stays the single crypto source; catches
-      `IntegrityError` from `unique_together("point","nfc_uid")` → re-query, idempotent 200). Response
+      `IntegrityError` from the **global** `CheckpointTag.nfc_uid` unique constraint (migration `website/0089`, which
+      replaced the old `unique_together("point","nfc_uid")` — a UID is now globally unique; `0089` first dedupes any
+      pre-existing duplicate UIDs, keeping the lowest-id row) → re-query: same КП ⇒ idempotent 200, different КП ⇒ 409).
+      The legacy superuser `api` write `CheckpointTagCreateView` (`api/views/tag.py`) likewise translates that
+      `IntegrityError` to a 409. The mobile `TagCreateSerializer.nfc_uid` caps `max_length=255` (mirrors the column) so
+      an oversized UID is a 400, not a DB-insert 500. Response
       `{bid, point: cp.number, nfc_uid, code: code.hex()}` (201, or 200 idempotent); a row with `bid==""`/`code is None`
-      (created bypassing signals) is repaired via `build_bundle` before responding (no `None.hex()` 500).
+      (created bypassing signals) is repaired via `build_bundle` before responding (no `None.hex()` 500) — the repair
+      runs under `select_for_update()` and re-checks the row inside the lock so two concurrent repairs can't mint
+      different codes (the first response could otherwise be written to the chip before the second overwrites it).
+      Token resolution (`tokens.py:resolve_token`) also rejects a token whose owner is `is_active=False`, so disabling a
+      compromised admin cuts off provisioning instantly without waiting out the 30-day TTL.
       `CheckpointTag.created_by` (`FK(AUTH_USER_MODEL, null, SET_NULL, related_name="provisioned_tags")`, migration
       `website/0088`) is **not** in any version fingerprint, but creating a tag still moves `versions.legend`/the legend
-      ETag via `CheckpointTag.updated_at`. **Throttling** (first use here): plain IP-scoped `ScopedRateThrottle` (no
-      subclass, no `request.data` read inside) with `throttle_scope` set **per view** (`mobile-login` 5/min on login,
-      `mobile-write` 60/min on tag create); rates in `REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"]` (no global
-      `DEFAULT_THROTTLE_CLASSES`); needs the new `CACHES` (`LocMemCache`) added for it. **Test isolation**: the
+      ETag via `CheckpointTag.updated_at`. **Throttling** (first use here): IP-scoped
+      `ClientIPScopedRateThrottle` (`throttling.py`) — a thin `ScopedRateThrottle` subclass that overrides only
+      `get_ident` to key on the un-spoofable `_client_ip` (last `X-Forwarded-For` entry, the one nginx appends), so a
+      client can't rotate a forged XFF prefix for a fresh bucket (DRF's stock `get_ident` trusts the *first* entry
+      unless `NUM_PROXIES` is set). It still reads no `request.data`/`request.body`, so the body-read ordering hazard
+      stays closed. `throttle_scope` is set **per view** (`mobile-login` 5/min on login, `mobile-write` 60/min on tag
+      create); rates in `REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"]` (no global `DEFAULT_THROTTLE_CLASSES`); needs the new
+      `CACHES` (`LocMemCache`) added for it. **Test isolation**: the
       `autouse` `_clear_throttle_cache` fixture in `src/apps/mobile/tests.py` calls `cache.clear()` before/after every
       test to prevent throttle counts leaking across tests (all test requests share the same client IP); any new test
       module that exercises throttled mobile endpoints must replicate this fixture.
