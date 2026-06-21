@@ -49,20 +49,11 @@ services:
     image: nginx:alpine
     container_name: kolco24_nginx
     restart: unless-stopped
-    # nginx:alpine processes /etc/nginx/templates/*.conf.template with envsubst
-    # at startup, writing the result to /etc/nginx/conf.d/.  Only shell variables
-    # that are set in the container environment are substituted, so nginx's own
-    # $remote_addr, $host, etc. are left untouched.
-    #
-    # TRUSTED_PROXY_CIDR: must be set explicitly in the host shell environment
-    # or the project .env file (same file as KOLCO24_IMAGE / DATA_LOCATION).
-    # Set it to the reverse-proxy container's specific IP (e.g. 172.18.0.2/32)
-    # or, at broadest, its dedicated network subnet.  Trusting a wider range
-    # lets any container in that range forge X-Forwarded-For and spoof the
-    # per-IP throttle key.  Find the right value with:
+    # nginx:alpine рендерит templates/*.conf.template через envsubst при старте.
+    # TRUSTED_PROXY_CIDR (из env хоста или .env проекта) — это IP/подсеть
+    # обратного прокси (например 172.18.0.2/32); более широкий диапазон позволит
+    # контейнерам подделать X-Forwarded-For и обойти лимит по IP. Узнать значение:
     #   docker network inspect proxy | grep Subnet
-    # deploy/kolco24.env is intentionally NOT passed to nginx — nginx needs only
-    # this one variable and the full env file would expose DB/payment/HMAC secrets.
     environment:
       TRUSTED_PROXY_CIDR: "${TRUSTED_PROXY_CIDR:?TRUSTED_PROXY_CIDR is required. Set it to the reverse-proxy IP or its network CIDR (e.g. 172.18.0.2/32). Find it with: docker network inspect proxy | grep Subnet}"
     volumes:
