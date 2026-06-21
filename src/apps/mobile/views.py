@@ -9,10 +9,13 @@ failure break the response.
 import logging
 
 from django.conf import settings
+from django.contrib.auth import authenticate
+from django.db import IntegrityError, transaction
 from django.db.models import F, Prefetch
 from django.http import HttpResponseNotModified
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
+from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -21,16 +24,21 @@ from website.models.enums import CheckpointType
 from website.models.models import Athlet, Team
 from website.models.race import Category, Race
 
-from .models import AppAuthFailure, AppInstall
-from .permissions import SignedAppPermission
+from .legend_crypto import build_bundle
+from .models import AppAuthFailure, AppInstall, MobileToken
+from .permissions import CanEditRaceLegend, IsMobileUser, SignedAppPermission
 from .serializers import (
     CategorySerializer,
     LegendCheckpointSerializer,
+    LoginSerializer,
     MemberTagSerializer,
     RaceListSerializer,
+    TagCreateSerializer,
     TagSerializer,
     TeamSerializer,
 )
+from .throttling import ClientIPScopedRateThrottle
+from .tokens import generate_token
 from .versioning import (
     active_member_tags,
     legend_version,
@@ -65,8 +73,16 @@ class AppAPIView(APIView):
         super().permission_denied(request, message=message, code=code)
 
     def _record_denial(self, request):
-        """Best-effort 403 log + aggregated DB row — must never break the 403."""
-        d = getattr(request, "app_denial", {"reason": "unknown"})
+        """Best-effort 403 log + aggregated DB row — must never break the 403.
+
+        Only fires for HMAC-layer failures (``app_denial`` set by
+        ``SignedAppPermission``).  Authorization denials from later layers (e.g.
+        ``CanEditRaceLegend`` returning ``False``) do not set ``app_denial`` and
+        are silently skipped so they don't pollute the AppAuthFailure table.
+        """
+        d = getattr(request, "app_denial", None)
+        if not d:
+            return
         reason = d.get("reason", "unknown")
         ip = d.get("ip") or "0.0.0.0"
         key_id = d.get("key_id", "")
@@ -119,6 +135,182 @@ class AppAPIView(APIView):
             )
         except Exception:
             logger.exception("Failed to record AppInstall stats")
+
+
+class LoginView(AppAPIView):
+    """``POST /app/login/`` — exchange email+password for an opaque bearer token.
+
+    Gated by :class:`SignedAppPermission` **only** (the per-build HMAC), so even
+    this password endpoint is reachable only from one of our builds; it mints no
+    token of its own and requires no bearer. On success it authenticates via the
+    project's :class:`apps.accounts.backends.EmailBackend` (``email__iexact``),
+    creates a :class:`MobileToken` row (storing only the sha256 hash) and returns
+    the raw token **once** plus ``expires_at``.
+
+    Failures are deliberately enumeration-safe: a wrong password and an unknown
+    email both return ``401`` with the **same** generic message, never hinting
+    which was wrong. A malformed body (missing field / non-JSON) is a ``400``
+    from the serializer — distinct from the 401, but it leaks nothing about
+    account existence.
+
+    Throttled by an IP-scoped :class:`ClientIPScopedRateThrottle`
+    (``mobile-login``) — keyed by the un-spoofable client IP (``X-Real-IP``
+    set by nginx, or last ``X-Forwarded-For`` entry as fallback), with no
+    ``request.data`` read inside the throttle, so it cannot re-trip the
+    body-read ordering hazard.
+    """
+
+    throttle_classes = [ClientIPScopedRateThrottle]
+    throttle_scope = "mobile-login"
+
+    def post(self, request):
+        serializer = LoginSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        email = serializer.validated_data["email"]
+        password = serializer.validated_data["password"]
+
+        user = authenticate(request, username=email, password=password)
+        if user is None:
+            return Response(
+                {"detail": "Неверный email или пароль"},
+                status=status.HTTP_401_UNAUTHORIZED,
+            )
+
+        raw, token_hash = generate_token()
+        expires_at = timezone.now() + settings.MOBILE_TOKEN_TTL
+        MobileToken.objects.create(
+            user=user, token_hash=token_hash, expires_at=expires_at
+        )
+        return Response({"token": raw, "expires_at": expires_at})
+
+
+class LogoutView(AppAPIView):
+    """``POST /app/logout/`` — revoke the presented bearer token.
+
+    Stacks :class:`SignedAppPermission` (build HMAC) then :class:`IsMobileUser`
+    (identity), so it is reachable only from one of our builds **and** with a
+    valid token. It flips ``revoked_at`` on the exact token presented in the
+    ``Authorization`` header — other tokens of the same user stay valid (each
+    login mints its own row; revocation is per-device, not per-account).
+    """
+
+    permission_classes = [SignedAppPermission, IsMobileUser]
+
+    def post(self, request):
+        token = request.mobile_token
+        token.revoked_at = timezone.now()
+        token.save(update_fields=["revoked_at"])
+        return Response(status=status.HTTP_200_OK)
+
+
+class TagCreateView(AppAPIView):
+    """``POST /app/race/<race_id>/tags/`` — bind a scanned NFC chip to a КП.
+
+    The online-only provisioning endpoint: it creates a :class:`CheckpointTag`
+    via ``instance.save()`` so the existing legend-crypto ``post_save`` signal
+    fires (``ensure_code`` / ``build_bundle``), keeping the server the single
+    source of crypto. The response carries the freshly-minted hex ``code`` for
+    the app to write into the chip's NFC user memory, plus ``bid`` / ``point``
+    (``Checkpoint.number``) / ``nfc_uid``.
+
+    Permission stack (order matters):
+
+    1. :class:`SignedAppPermission` — per-build HMAC (over the request **body**);
+    2. :class:`IsMobileUser` — resolves the bearer to ``request.mobile_user``;
+    3. :class:`CanEditRaceLegend` — per-race ``can_edit_race`` authorization.
+
+    Idempotency / conflicts (see the plan's §Tag-create):
+
+    - same ``nfc_uid`` already on the **same** КП → idempotent 200 (no duplicate);
+    - same ``nfc_uid`` on a **different** КП → 409 (never auto-rebind);
+    - КП id not in this race, or a ``type="hidden"`` КП → 404.
+    """
+
+    permission_classes = [SignedAppPermission, IsMobileUser, CanEditRaceLegend]
+    throttle_classes = [ClientIPScopedRateThrottle]
+    throttle_scope = "mobile-write"
+
+    @staticmethod
+    def _tag_response(tag, http_status):
+        """Build the ``{bid, point, nfc_uid, code}`` payload for a tag.
+
+        A tag created bypassing the signals (``bid == ""`` / ``code is None``)
+        is repaired via :func:`build_bundle` before responding, so the hex of a
+        missing ``code`` is never attempted (``None.hex()`` → 500). The repair
+        runs under ``select_for_update`` and re-checks the row inside the lock so
+        two concurrent repairs can't mint different codes — the first response
+        could otherwise be written to the chip before the second overwrites the
+        code in the DB.
+        """
+        if not tag.bid or tag.code is None:
+            with transaction.atomic():
+                tag = CheckpointTag.objects.select_for_update().get(pk=tag.pk)
+                if not tag.bid or tag.code is None:
+                    build_bundle(tag)
+                    tag.refresh_from_db()
+        code = bytes(tag.code) if tag.code is not None else None
+        return Response(
+            {
+                "bid": tag.bid,
+                "point": tag.point.number,
+                "nfc_uid": tag.nfc_uid,
+                "code": code.hex() if code is not None else None,
+            },
+            status=http_status,
+        )
+
+    def post(self, request, race_id):
+        get_object_or_404(Race, pk=race_id, is_published=True)
+
+        serializer = TagCreateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        point_id = serializer.validated_data["point"]
+        nfc_uid = serializer.validated_data["nfc_uid"].strip().upper()
+
+        cp = get_object_or_404(
+            Checkpoint.objects.exclude(type=CheckpointType.hidden.value),
+            pk=point_id,
+            race_id=race_id,
+        )
+
+        existing = list(CheckpointTag.objects.filter(nfc_uid=nfc_uid))
+        for tag in existing:
+            if tag.point_id == cp.id:
+                # Same chip, same КП → idempotent success (no duplicate row).
+                return self._tag_response(tag, status.HTTP_200_OK)
+        if existing:
+            # Chip already bound to a different КП — refuse to auto-rebind.
+            return Response(
+                {"detail": "Этот тег уже привязан к другому КП"},
+                status=status.HTTP_409_CONFLICT,
+            )
+
+        try:
+            with transaction.atomic():
+                tag = CheckpointTag(
+                    point=cp, nfc_uid=nfc_uid, created_by=request.mobile_user
+                )
+                tag.save()  # fires post_save → ensure_code/build_bundle
+        except IntegrityError as original_exc:
+            # Could be the nfc_uid unique constraint (expected) or an unrelated
+            # failure (FK violation, crypto signal, etc.). Re-query to determine.
+            # Use filter().first() to avoid a nested exception context that would
+            # re-raise CheckpointTag.DoesNotExist instead of the original error.
+            tag = CheckpointTag.objects.filter(point=cp, nfc_uid=nfc_uid).first()
+            if tag is not None:
+                return self._tag_response(tag, status.HTTP_200_OK)
+            # No row for this (point, nfc_uid). Only return 409 if the UID
+            # was claimed by a different КП (concurrent race); otherwise
+            # re-raise so an unrelated DB failure surfaces as a 500.
+            if CheckpointTag.objects.filter(nfc_uid=nfc_uid).exists():
+                return Response(
+                    {"detail": "Этот тег уже привязан к другому КП"},
+                    status=status.HTTP_409_CONFLICT,
+                )
+            raise original_exc
+
+        tag.refresh_from_db()
+        return self._tag_response(tag, status.HTTP_201_CREATED)
 
 
 class RaceListView(AppAPIView):

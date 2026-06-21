@@ -13,6 +13,7 @@ https://docs.djangoproject.com/en/2.0/ref/settings/
 import json
 import logging
 import os
+from datetime import timedelta
 
 from dotenv import load_dotenv
 
@@ -69,6 +70,9 @@ if _raw_mobile_keys and not MOBILE_APP_KEYS:
         "MOBILE_APP_KEYS malformed or empty; all /app/* requests will 403"
     )
 MOBILE_APP_TS_WINDOW = 300
+# Lifetime of a per-person mobile bearer token (apps.mobile.MobileToken). A
+# hardcoded constant (sibling of MOBILE_APP_TS_WINDOW), not an env var.
+MOBILE_TOKEN_TTL = timedelta(days=30)
 # Data source advertised by the /app/race/<id>/sync/ manifest. "cloud" → no
 # lease (lease_expires_at: null); a local-race server would set "local".
 MOBILE_DATA_SOURCE = os.getenv("MOBILE_DATA_SOURCE", "cloud")
@@ -186,6 +190,25 @@ REST_FRAMEWORK = {
     "DEFAULT_RENDERER_CLASSES": [
         "rest_framework.renderers.JSONRenderer",
     ],
+    # Throttle rates for the mobile per-person endpoints. No global
+    # DEFAULT_THROTTLE_CLASSES — each throttled view opts in with a
+    # ScopedRateThrottle + throttle_scope. Login is also behind the build-HMAC,
+    # so a brute-force run already needs a valid build secret; this is a second
+    # ceiling. mobile-write caps the authenticated tag-create endpoint.
+    "DEFAULT_THROTTLE_RATES": {
+        "mobile-login": "5/min",
+        "mobile-write": "60/min",
+    },
+}
+
+# DRF throttling needs a cache backend to count requests. There was no CACHES
+# config before the mobile per-person endpoints; the default LocMemCache is fine
+# for this rate ceiling (per-process, so counts are approximate under multiple
+# workers — acceptable given the build-HMAC gate in front of login).
+CACHES = {
+    "default": {
+        "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+    },
 }
 
 AUTHENTICATION_BACKENDS = [

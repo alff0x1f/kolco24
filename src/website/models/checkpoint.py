@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.db import models
 
 from .enums import CheckpointColor, CheckpointType
@@ -70,7 +71,7 @@ class CheckpointTag(models.Model):
         on_delete=models.CASCADE,
         related_name="tags",
     )
-    nfc_uid = models.CharField(max_length=255, verbose_name="UID тега")
+    nfc_uid = models.CharField(max_length=255, verbose_name="UID тега", unique=True)
     check_method = models.CharField(
         "Метод проверки",
         max_length=20,
@@ -94,6 +95,14 @@ class CheckpointTag(models.Model):
         related_name="unlocked_by",
         blank=True,
     )
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        verbose_name="Кем создан",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="provisioned_tags",
+    )
     updated_at = models.DateTimeField(auto_now=True)
 
     def save(self, *args, **kwargs):
@@ -109,4 +118,4 @@ class CheckpointTag(models.Model):
         verbose_name = "Тег КП"
         verbose_name_plural = "Теги КП"
         ordering = ["id"]
-        unique_together = [("point", "nfc_uid")]
+        unique_together = []

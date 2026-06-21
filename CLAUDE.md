@@ -104,24 +104,79 @@ Django 4.2 project. Source lives entirely under `src/`, with `manage.py` at `src
   <id>` — same `CheckpointTag` queryset ordered by `point__number` then `id`, same `—` placeholder for tags without
   a `code` yet, same `nfc_uid / КП number / code(hex)` columns. The JS "Скопировать CSV" button builds RFC-4180 CSV
   from the rendered table and writes it to the clipboard. Gated on `can_edit_race`.
-- `apps.mobile` — **signed read-only endpoints** for the iOS/Android mobile app (`label = "mobile"`, mounted at `/app/*`
-  via `config/urls.py`). Self-contained: touches neither `/api/` nor `donate`/`website`. No user accounts — the app
-  authenticates **itself**. Full design (background-sync model, two-server lease/handoff, secret-rotation runbook, 403
-  reason codes) lives in `src/apps/mobile/README.md`; exact response fields are pinned by the serializers and the
-  field-set tests in `tests.py`. Invariants to preserve:
+- `apps.mobile` — **signed mobile-app endpoints** for iOS/Android (`label = "mobile"`, mounted at `/app/*`
+  via `config/urls.py`). Self-contained: touches neither `/api/` nor `donate`/`website`. The reads are accountless — the
+  app authenticates **itself** (per-build HMAC); a thin **write layer** adds a per-person bearer token on top (login +
+  legend-tag create — see the **Per-person write layer** invariant below). Full design (background-sync model,
+  two-server lease/handoff, secret-rotation runbook, 403 reason codes) lives in `src/apps/mobile/README.md`; exact
+  response fields are pinned by the serializers and the field-set tests in `tests.py`. Invariants to preserve:
     - **Auth**: per-build shared secret selected by `X-App-Key-Id` from `MOBILE_APP_KEYS` (JSON key-id → secret map env,
       parsed once at startup, **fail-closed** — a missing/malformed map means every `/app/*` request 403s; a
       non-empty-but-bad value also logs a settings-import `WARNING`). HMAC-SHA256 over the canonical
       `method + "\n" + full_path + "\n" + ts + "\n" + sha256_hex(body)` (`signing.py`); replay window ±
-      `MOBILE_APP_TS_WINDOW` = 300 s — a hardcoded constant in `settings.py`, not an env var; no nonce. Body signing is
-      GET-only for now — revisit `request.body` reading before adding any body-bearing endpoint (DRF can raise
-      `RawPostDataException`).
+      `MOBILE_APP_TS_WINDOW` = 300 s — a hardcoded constant in `settings.py`, not an env var; no nonce. **Body signing
+      works for POST too** (the canonical already folds `sha256_hex(body)`): the `RawPostDataException` caveat does not
+      bite because Django buffers `request.body`, so `SignedAppPermission` reading it before DRF parses `request.data` is
+      safe (pinned by `test_signed_permission_reads_body_before_drf_parse`).
     - **Neutral failures, no writes in the permission**: every verification failure returns the same
       `403 {"detail": "Forbidden"}` — no hint which check failed. `SignedAppPermission` does no DB writes; the log +
       aggregated `AppAuthFailure` row happen in `AppAPIView.permission_denied()`, and `AppInstall` stats are recorded
       best-effort in `initial()` after permissions pass (a stats-write failure never breaks a response; a denied request
       never writes `AppInstall`).
-    - **Endpoints** (all GET, see `urls.py`): `/app/races/` (published races), `/app/race/<id>/teams/` (teams **plus the
+    - **Per-person write layer** (login + legend-tag create, on top of the build HMAC): a **layered permission stack** —
+      build HMAC → person identity → per-race authorization. `MobileToken` (`models.py`) is a revocable **opaque** bearer
+      (not JWT — instant revoke via `revoked_at` is the priority for an admin credential): only `sha256(raw)` is stored
+      in `token_hash` (unique-indexed), the raw `secrets.token_urlsafe(32)` is returned **once** at login (a high-entropy
+      token needs no salt/slow hash); `is_active = revoked_at is None and expires_at > now`; TTL `MOBILE_TOKEN_TTL =
+      timedelta(days=30)` in `settings.py`. **Not** ETag-fingerprinted → no `updated_at`. Helpers in `tokens.py`
+      (`generate_token`/`hash_token`/`resolve_token` — `resolve_token` best-effort stamps `last_used_at`). Permissions
+      (`permissions.py`): `IsMobileUser` resolves `Authorization: Bearer <token>` → `request.mobile_user` +
+      `request.mobile_token` (identity only, authorizes nothing; stack **after** `SignedAppPermission`);
+      `CanEditRaceLegend` reads `view.kwargs["race_id"]`, loads `Race` (missing → 404), returns
+      `apps.race.permissions.can_edit_race` (same superuser-or-`RaceAdmin(role=ADMIN)` as the web `RaceLegendEditView`);
+      it reads `request.mobile_user` defensively (`getattr(..., None)` → `False`/403, not 500) and must stack **after**
+      `IsMobileUser`. **Actionable-vs-neutral error split**: the anonymous build layer stays a neutral
+      `403 {"detail":"Forbidden"}` (no brute-force hint), but the authenticated layers are actionable — an invalid/
+      expired/revoked token raises `MobileTokenInvalid` (an `APIException` with `status_code = 401`; needed because with
+      `authentication_classes = []` a raised `NotAuthenticated` renders as 403), and a non-admin user gets an actionable
+      403. Endpoints (all POST, `views.py`): `POST /app/login/` (gated by `SignedAppPermission` **only** — even the
+      password endpoint is build-only; authenticates email+password via `EmailBackend`, mints a `MobileToken`, returns
+      `{token, expires_at}`; failures are enumeration-safe — wrong password and unknown email both 401 with the **same**
+      message, malformed body 400); `POST /app/logout/` (`SignedAppPermission + IsMobileUser`; flips `revoked_at` on the
+      **presented** token only, other tokens of the user stay valid); `POST /app/race/<id>/tags/`
+      (`SignedAppPermission + IsMobileUser + CanEditRaceLegend`; the online-only NFC-chip→КП provisioning endpoint). Tag
+      create takes body `{point, nfc_uid}` where **`point` is the checkpoint `id`, not `number`** (`number` is not unique
+      per race), resolves a **non-`hidden`** КП by id within the race (404), normalizes `nfc_uid` (`.strip().upper()`),
+      then: same `nfc_uid` on the **same** КП → idempotent 200; on a **different** КП → 409 (no auto-rebind); else
+      `CheckpointTag(point, nfc_uid, created_by=request.mobile_user)` created in `transaction.atomic()` via
+      `instance.save()` (**fires the legend-crypto signals** — server stays the single crypto source; catches
+      `IntegrityError` from the **global** `CheckpointTag.nfc_uid` unique constraint (migration `website/0089`, which
+      replaced the old `unique_together("point","nfc_uid")` — a UID is now globally unique; `0089` aborts with a
+      `RuntimeError` if any duplicate UIDs exist, requiring manual resolution before the migration can proceed) → re-query: same КП ⇒ idempotent 200, different КП ⇒ 409).
+      The legacy superuser `api` write `CheckpointTagCreateView` (`api/views/tag.py`) likewise translates that
+      `IntegrityError` to a 409. The mobile `TagCreateSerializer.nfc_uid` caps `max_length=255` (mirrors the column) so
+      an oversized UID is a 400, not a DB-insert 500. Response
+      `{bid, point: cp.number, nfc_uid, code: code.hex()}` (201, or 200 idempotent); a row with `bid==""`/`code is None`
+      (created bypassing signals) is repaired via `build_bundle` before responding (no `None.hex()` 500) — the repair
+      runs under `select_for_update()` and re-checks the row inside the lock so two concurrent repairs can't mint
+      different codes (the first response could otherwise be written to the chip before the second overwrites it).
+      Token resolution (`tokens.py:resolve_token`) also rejects a token whose owner is `is_active=False`, so disabling a
+      compromised admin cuts off provisioning instantly without waiting out the 30-day TTL.
+      `CheckpointTag.created_by` (`FK(AUTH_USER_MODEL, null, SET_NULL, related_name="provisioned_tags")`, migration
+      `website/0088`) is **not** in any version fingerprint, but creating a tag still moves `versions.legend`/the legend
+      ETag via `CheckpointTag.updated_at`. **Throttling** (first use here): IP-scoped
+      `ClientIPScopedRateThrottle` (`throttling.py`) — a thin `ScopedRateThrottle` subclass that overrides only
+      `get_ident` to key on the un-spoofable `_client_ip` (last `X-Forwarded-For` entry, the one nginx appends), so a
+      client can't rotate a forged XFF prefix for a fresh bucket (DRF's stock `get_ident` trusts the *first* entry
+      unless `NUM_PROXIES` is set). It still reads no `request.data`/`request.body`, so the body-read ordering hazard
+      stays closed. `throttle_scope` is set **per view** (`mobile-login` 5/min on login, `mobile-write` 60/min on tag
+      create); rates in `REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"]` (no global `DEFAULT_THROTTLE_CLASSES`); needs the new
+      `CACHES` (`LocMemCache`) added for it. **Test isolation**: the
+      `autouse` `_clear_throttle_cache` fixture in `src/apps/mobile/tests.py` calls `cache.clear()` before/after every
+      test to prevent throttle counts leaking across tests (all test requests share the same client IP); any new test
+      module that exercises throttled mobile endpoints must replicate this fixture.
+    - **Endpoints** (reads all GET; writes are the three POSTs in the **Per-person write layer** invariant below; see
+      `urls.py`): `/app/races/` (published races), `/app/race/<id>/teams/` (teams **plus the
       embedded category catalogue** — deliberately no separate categories endpoint; inactive categories included so
       every `category2` id resolves), `/app/race/<id>/legend/` (checkpoints **plus a per-tag `tags` array** — `bid → point`
       identity for **every** tag (open + locked), plus `iv`/`ct` for the offline legend unlock on locked КП only — see

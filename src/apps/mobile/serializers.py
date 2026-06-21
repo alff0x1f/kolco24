@@ -12,6 +12,36 @@ from website.models.tag import Tag
 logger = logging.getLogger(__name__)
 
 
+class LoginSerializer(serializers.Serializer):
+    """Validate the ``POST /app/login/`` body (``email`` + ``password``).
+
+    Input-shape validation only — it never authenticates. A missing/blank field
+    yields a 400 before the view touches ``authenticate``; bad credentials are a
+    401 from the view (deliberately a different status from the 400, but with a
+    generic, enumeration-safe message).
+    """
+
+    email = serializers.EmailField()
+    password = serializers.CharField()
+
+
+class TagCreateSerializer(serializers.Serializer):
+    """Validate the ``POST /app/race/<race_id>/tags/`` body.
+
+    ``point`` is the **checkpoint id** (``Checkpoint.number`` is not unique per
+    race — see the plan's "КП identity" decision), ``nfc_uid`` is the scanned
+    chip UID. Both required; a blank ``nfc_uid`` is rejected here (400) before it
+    reaches the model's ``save()``, which raises ``ValueError`` on blank (→ 500).
+    """
+
+    point = serializers.IntegerField()
+    # max_length mirrors CheckpointTag.nfc_uid (255). Without it an oversized UID
+    # reaches the INSERT and PostgreSQL raises → 500 instead of a clean 400.
+    nfc_uid = serializers.CharField(
+        allow_blank=False, trim_whitespace=True, max_length=255
+    )
+
+
 class RaceListSerializer(serializers.ModelSerializer):
     """Public list view of a published race (no images)."""
 

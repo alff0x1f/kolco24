@@ -49,10 +49,17 @@ services:
     image: nginx:alpine
     container_name: kolco24_nginx
     restart: unless-stopped
+    # nginx:alpine рендерит templates/*.conf.template через envsubst при старте.
+    # TRUSTED_PROXY_CIDR (из env хоста или .env проекта) — это IP/подсеть
+    # обратного прокси (например 172.18.0.2/32); более широкий диапазон позволит
+    # контейнерам подделать X-Forwarded-For и обойти лимит по IP. Узнать значение:
+    #   docker network inspect proxy | grep Subnet
+    environment:
+      TRUSTED_PROXY_CIDR: "${TRUSTED_PROXY_CIDR:?TRUSTED_PROXY_CIDR is required. Set it to the reverse-proxy IP or its network CIDR (e.g. 172.18.0.2/32). Find it with: docker network inspect proxy | grep Subnet}"
     volumes:
       - ${DATA_LOCATION}/static:/app/staticfiles:ro
       - ${DATA_LOCATION}/media:/app/media:ro
-      - ./deploy/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./deploy/nginx.conf:/etc/nginx/templates/default.conf.template:ro
     depends_on:
       kolco24_migrate:
         condition: service_completed_successfully

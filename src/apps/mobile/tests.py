@@ -12,6 +12,21 @@ from apps.mobile.permissions import SignedAppPermission, _client_ip
 from apps.mobile.signing import build_canonical, sha256_hex, sign, verify
 
 
+@pytest.fixture(autouse=True)
+def _clear_throttle_cache():
+    """Isolate DRF's per-process LocMemCache throttle counts between tests.
+
+    The mobile-login/mobile-write ScopedRateThrottle keys on the client IP, and
+    every test request comes from the same test IP — without a clear, counts
+    accumulate across tests and trip a spurious 429.
+    """
+    from django.core.cache import cache
+
+    cache.clear()
+    yield
+    cache.clear()
+
+
 def test_build_canonical_exact_format():
     canonical = build_canonical("get", "/app/race/1/legend/", "1700000000", b"")
     expected = "\n".join(
@@ -420,6 +435,26 @@ def test_permission_valid_key_id_wrong_secret_false(settings):
     settings.MOBILE_APP_TS_WINDOW = 300
     request = _signed_get_request(secret="wrong-secret", key_id="test-v1")
     assert SignedAppPermission().has_permission(request, None) is False
+
+
+def test_client_ip_uses_x_real_ip_when_set():
+    # Production path: nginx resolves the real IP and emits X-Real-IP.
+    request = RequestFactory().get(
+        PATH,
+        headers={"X-Real-IP": "203.0.113.5", "X-Forwarded-For": "1.2.3.4"},
+        REMOTE_ADDR="10.0.0.1",
+    )
+    assert _client_ip(request) == "203.0.113.5"
+
+
+def test_client_ip_invalid_x_real_ip_falls_back_to_forwarded_for():
+    # Invalid X-Real-IP should not be trusted; fall through to XFF.
+    request = RequestFactory().get(
+        PATH,
+        headers={"X-Real-IP": "not-an-ip", "X-Forwarded-For": "10.0.0.1, 10.0.0.2"},
+        REMOTE_ADDR="10.0.0.3",
+    )
+    assert _client_ip(request) == "10.0.0.2"
 
 
 def test_client_ip_uses_last_forwarded_for_entry():
@@ -4666,3 +4701,1298 @@ def test_member_tags_stats_write_failure_does_not_break_response(
 
     assert response.status_code == 200
     assert not AppInstall.objects.filter(install_id="install-abc").exists()
+
+
+# --- Task 1: MobileToken model + token helpers ------------------------------
+
+
+def test_tokens_generate_hash_roundtrip():
+    from apps.mobile.tokens import generate_token, hash_token
+
+    raw, token_hash = generate_token()
+    assert isinstance(raw, str) and raw
+    # token_hash is the sha256 hex of the raw token (64 hex chars).
+    assert token_hash == hashlib.sha256(raw.encode()).hexdigest()
+    assert len(token_hash) == 64
+    assert hash_token(raw) == token_hash
+    # Two mints differ (high entropy).
+    other_raw, _ = generate_token()
+    assert other_raw != raw
+
+
+@pytest.mark.django_db
+def test_mobile_token_is_active_for_fresh(django_user_model):
+    from datetime import timedelta
+
+    from django.utils import timezone
+
+    from apps.mobile.models import MobileToken
+    from apps.mobile.tokens import generate_token
+
+    user = django_user_model.objects.create_user(
+        username="u-active", email="active@example.com", password="x"
+    )
+    _, token_hash = generate_token()
+    token = MobileToken.objects.create(
+        user=user,
+        token_hash=token_hash,
+        expires_at=timezone.now() + timedelta(days=30),
+    )
+    assert token.is_active is True
+
+
+@pytest.mark.django_db
+def test_mobile_token_is_active_false_when_expired(django_user_model):
+    from datetime import timedelta
+
+    from django.utils import timezone
+
+    from apps.mobile.models import MobileToken
+    from apps.mobile.tokens import generate_token
+
+    user = django_user_model.objects.create_user(
+        username="u-exp", email="exp@example.com", password="x"
+    )
+    _, token_hash = generate_token()
+    token = MobileToken.objects.create(
+        user=user,
+        token_hash=token_hash,
+        expires_at=timezone.now() - timedelta(seconds=1),
+    )
+    assert token.is_active is False
+
+
+@pytest.mark.django_db
+def test_mobile_token_is_active_false_when_revoked(django_user_model):
+    from datetime import timedelta
+
+    from django.utils import timezone
+
+    from apps.mobile.models import MobileToken
+    from apps.mobile.tokens import generate_token
+
+    user = django_user_model.objects.create_user(
+        username="u-rev", email="rev@example.com", password="x"
+    )
+    _, token_hash = generate_token()
+    token = MobileToken.objects.create(
+        user=user,
+        token_hash=token_hash,
+        expires_at=timezone.now() + timedelta(days=30),
+        revoked_at=timezone.now(),
+    )
+    assert token.is_active is False
+
+
+@pytest.mark.django_db
+def test_resolve_token_returns_row_and_stamps_last_used(django_user_model):
+    from datetime import timedelta
+
+    from django.utils import timezone
+
+    from apps.mobile.models import MobileToken
+    from apps.mobile.tokens import generate_token, resolve_token
+
+    user = django_user_model.objects.create_user(
+        username="u-resolve", email="resolve@example.com", password="x"
+    )
+    raw, token_hash = generate_token()
+    token = MobileToken.objects.create(
+        user=user,
+        token_hash=token_hash,
+        expires_at=timezone.now() + timedelta(days=30),
+    )
+    assert token.last_used_at is None
+
+    resolved = resolve_token(raw)
+    assert resolved is not None
+    assert resolved.pk == token.pk
+    token.refresh_from_db()
+    assert token.last_used_at is not None
+
+
+@pytest.mark.django_db
+def test_resolve_token_none_for_unknown():
+    from apps.mobile.tokens import resolve_token
+
+    assert resolve_token("no-such-token") is None
+    assert resolve_token("") is None
+    assert resolve_token(None) is None
+
+
+@pytest.mark.django_db
+def test_resolve_token_none_for_expired(django_user_model):
+    from datetime import timedelta
+
+    from django.utils import timezone
+
+    from apps.mobile.models import MobileToken
+    from apps.mobile.tokens import generate_token, resolve_token
+
+    user = django_user_model.objects.create_user(
+        username="u-resolve-exp", email="resolve-exp@example.com", password="x"
+    )
+    raw, token_hash = generate_token()
+    MobileToken.objects.create(
+        user=user,
+        token_hash=token_hash,
+        expires_at=timezone.now() - timedelta(seconds=1),
+    )
+    assert resolve_token(raw) is None
+
+
+@pytest.mark.django_db
+def test_resolve_token_none_for_revoked(django_user_model):
+    from datetime import timedelta
+
+    from django.utils import timezone
+
+    from apps.mobile.models import MobileToken
+    from apps.mobile.tokens import generate_token, resolve_token
+
+    user = django_user_model.objects.create_user(
+        username="u-resolve-rev", email="resolve-rev@example.com", password="x"
+    )
+    raw, token_hash = generate_token()
+    MobileToken.objects.create(
+        user=user,
+        token_hash=token_hash,
+        expires_at=timezone.now() + timedelta(days=30),
+        revoked_at=timezone.now(),
+    )
+    assert resolve_token(raw) is None
+
+
+@pytest.mark.django_db
+def test_resolve_token_none_for_deactivated_user(django_user_model):
+    """A live token whose owner was deactivated must not resolve."""
+    from datetime import timedelta
+
+    from django.utils import timezone
+
+    from apps.mobile.models import MobileToken
+    from apps.mobile.tokens import generate_token, resolve_token
+
+    user = django_user_model.objects.create_user(
+        username="u-deactivated", email="deactivated@example.com", password="x"
+    )
+    raw, token_hash = generate_token()
+    MobileToken.objects.create(
+        user=user,
+        token_hash=token_hash,
+        expires_at=timezone.now() + timedelta(days=30),
+    )
+    # Token itself is still active; only the user is disabled.
+    user.is_active = False
+    user.save(update_fields=["is_active"])
+    assert resolve_token(raw) is None
+
+
+# --- Task 2: POST /app/login/ -----------------------------------------------
+
+LOGIN_PATH = "/app/login/"
+
+
+def _signed_post(client, path, secret, body_bytes, key_id="test-v1"):
+    """POST a JSON body with a build-HMAC signature over that exact body."""
+    headers = _signed_headers("POST", path, secret, body=body_bytes, key_id=key_id)
+    return client.post(
+        path, data=body_bytes, content_type="application/json", **headers
+    )
+
+
+@pytest.mark.django_db
+def test_login_valid_creds_returns_token(client, settings, django_user_model):
+    import json
+
+    from apps.mobile.models import MobileToken
+    from apps.mobile.tokens import hash_token
+
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    django_user_model.objects.create_user(
+        username="crew1", email="crew1@example.com", password="s3cret-pass"
+    )
+    body = json.dumps(
+        {"email": "crew1@example.com", "password": "s3cret-pass"}
+    ).encode()
+    response = _signed_post(client, LOGIN_PATH, SECRET, body)
+
+    assert response.status_code == 200
+    data = response.json()
+    assert set(data.keys()) == {"token", "expires_at"}
+    raw = data["token"]
+    assert raw
+
+    # exactly one token row, storing only the hash (raw never persisted)
+    assert MobileToken.objects.count() == 1
+    token = MobileToken.objects.get()
+    assert token.token_hash == hash_token(raw)
+    assert not MobileToken.objects.filter(token_hash=raw).exists()
+    assert token.is_active
+
+
+@pytest.mark.django_db
+def test_login_case_insensitive_email(client, settings, django_user_model):
+    import json
+
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    django_user_model.objects.create_user(
+        username="crewmixed", email="Mixed@Example.com", password="pw-123456"
+    )
+    body = json.dumps({"email": "mixed@example.com", "password": "pw-123456"}).encode()
+    response = _signed_post(client, LOGIN_PATH, SECRET, body)
+    assert response.status_code == 200
+
+
+@pytest.mark.django_db
+def test_login_wrong_password_returns_401_generic(client, settings, django_user_model):
+    import json
+
+    from apps.mobile.models import MobileToken
+
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    django_user_model.objects.create_user(
+        username="crew2", email="crew2@example.com", password="right-pass"
+    )
+    body = json.dumps({"email": "crew2@example.com", "password": "WRONG"}).encode()
+    response = _signed_post(client, LOGIN_PATH, SECRET, body)
+
+    assert response.status_code == 401
+    assert response.json() == {"detail": "Неверный email или пароль"}
+    assert MobileToken.objects.count() == 0
+
+
+@pytest.mark.django_db
+def test_login_unknown_email_returns_same_401(client, settings):
+    import json
+
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    body = json.dumps({"email": "ghost@example.com", "password": "whatever"}).encode()
+    response = _signed_post(client, LOGIN_PATH, SECRET, body)
+
+    # Same status + message as a wrong password: no account enumeration.
+    assert response.status_code == 401
+    assert response.json() == {"detail": "Неверный email или пароль"}
+
+
+@pytest.mark.django_db
+def test_login_missing_build_signature_returns_403(client, settings, django_user_model):
+    import json
+
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    django_user_model.objects.create_user(
+        username="crew3", email="crew3@example.com", password="pw-123456"
+    )
+    body = json.dumps({"email": "crew3@example.com", "password": "pw-123456"}).encode()
+    # No signed headers at all → neutral build-layer 403.
+    response = client.post(LOGIN_PATH, data=body, content_type="application/json")
+    assert response.status_code == 403
+    assert response.json() == {"detail": "Forbidden"}
+
+
+@pytest.mark.django_db
+def test_login_bad_build_signature_returns_403(client, settings, django_user_model):
+    import json
+
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    django_user_model.objects.create_user(
+        username="crew4", email="crew4@example.com", password="pw-123456"
+    )
+    body = json.dumps({"email": "crew4@example.com", "password": "pw-123456"}).encode()
+    response = _signed_post(client, LOGIN_PATH, "wrong-secret", body)
+    assert response.status_code == 403
+    assert response.json() == {"detail": "Forbidden"}
+
+
+@pytest.mark.django_db
+def test_login_missing_email_field_returns_400(client, settings):
+    import json
+
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    body = json.dumps({"password": "pw-123456"}).encode()
+    response = _signed_post(client, LOGIN_PATH, SECRET, body)
+    # Serializer validation failure → 400, not a 500 and not a 401.
+    assert response.status_code == 400
+
+
+@pytest.mark.django_db
+def test_login_non_json_body_returns_400(client, settings):
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    body = b"not-json-at-all"
+    response = _signed_post(client, LOGIN_PATH, SECRET, body)
+    # Malformed JSON parsed by DRF → 400 (no 500, no throttle crash).
+    assert response.status_code == 400
+
+
+@pytest.mark.django_db
+def test_login_blank_email_returns_400(client, settings):
+    import json
+
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    body = json.dumps({"email": "", "password": "pw-123456"}).encode()
+    response = _signed_post(client, LOGIN_PATH, SECRET, body)
+    assert response.status_code == 400
+
+
+@pytest.mark.django_db
+def test_login_throttle_returns_429_after_limit(client, settings, django_user_model):
+    import json
+
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    django_user_model.objects.create_user(
+        username="crew5", email="crew5@example.com", password="right-pass"
+    )
+    body = json.dumps({"email": "crew5@example.com", "password": "WRONG"}).encode()
+
+    statuses = []
+    for _ in range(7):  # rate is 5/min
+        resp = _signed_post(client, LOGIN_PATH, SECRET, body)
+        statuses.append(resp.status_code)
+
+    # The first 5 are allowed (401 here, wrong password); subsequent ones throttle.
+    assert statuses[:5] == [401] * 5
+    assert 429 in statuses[5:]
+
+
+# --- Task 3: IsMobileUser permission + POST /app/logout/ --------------------
+
+LOGOUT_PATH = "/app/logout/"
+
+
+def _make_active_token(user):
+    """Create an active MobileToken for ``user`` and return its raw value."""
+    from datetime import timedelta
+
+    from django.utils import timezone
+
+    from apps.mobile.models import MobileToken
+    from apps.mobile.tokens import generate_token
+
+    raw, token_hash = generate_token()
+    MobileToken.objects.create(
+        user=user,
+        token_hash=token_hash,
+        expires_at=timezone.now() + timedelta(days=30),
+    )
+    return raw
+
+
+def _signed_post_auth(client, path, secret, body_bytes, bearer, key_id="test-v1"):
+    """Signed POST that also carries an ``Authorization: Bearer`` header."""
+    headers = _signed_headers("POST", path, secret, body=body_bytes, key_id=key_id)
+    if bearer is not None:
+        headers["HTTP_AUTHORIZATION"] = f"Bearer {bearer}"
+    return client.post(
+        path, data=body_bytes, content_type="application/json", **headers
+    )
+
+
+@pytest.mark.django_db
+def test_logout_valid_token_returns_200_and_revokes(
+    client, settings, django_user_model
+):
+    from apps.mobile.models import MobileToken
+    from apps.mobile.tokens import hash_token
+
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    user = django_user_model.objects.create_user(
+        username="lo1", email="lo1@example.com", password="x"
+    )
+    raw = _make_active_token(user)
+
+    response = _signed_post_auth(client, LOGOUT_PATH, SECRET, b"", raw)
+    assert response.status_code == 200
+
+    token = MobileToken.objects.get(token_hash=hash_token(raw))
+    assert token.revoked_at is not None
+    assert token.is_active is False
+
+
+@pytest.mark.django_db
+def test_logout_missing_bearer_returns_401(client, settings, django_user_model):
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    # Valid build signature but no Authorization header → actionable 401.
+    response = _signed_post_auth(client, LOGOUT_PATH, SECRET, b"", None)
+    assert response.status_code == 401
+
+
+@pytest.mark.django_db
+def test_logout_malformed_authorization_returns_401(
+    client, settings, django_user_model
+):
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    user = django_user_model.objects.create_user(
+        username="lo-mal", email="lo-mal@example.com", password="x"
+    )
+    raw = _make_active_token(user)
+
+    # Token value present but no "Bearer " scheme prefix → 401.
+    headers = _signed_headers("POST", LOGOUT_PATH, SECRET, body=b"")
+    headers["HTTP_AUTHORIZATION"] = raw  # no scheme
+    response = client.post(
+        LOGOUT_PATH, data=b"", content_type="application/json", **headers
+    )
+    assert response.status_code == 401
+
+
+@pytest.mark.django_db
+def test_logout_expired_token_returns_401(client, settings, django_user_model):
+    from datetime import timedelta
+
+    from django.utils import timezone
+
+    from apps.mobile.models import MobileToken
+    from apps.mobile.tokens import generate_token
+
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    user = django_user_model.objects.create_user(
+        username="lo-exp", email="lo-exp@example.com", password="x"
+    )
+    raw, token_hash = generate_token()
+    MobileToken.objects.create(
+        user=user,
+        token_hash=token_hash,
+        expires_at=timezone.now() - timedelta(seconds=1),
+    )
+
+    response = _signed_post_auth(client, LOGOUT_PATH, SECRET, b"", raw)
+    assert response.status_code == 401
+
+
+@pytest.mark.django_db
+def test_logout_revoked_token_returns_401(client, settings, django_user_model):
+    from django.utils import timezone
+
+    from apps.mobile.models import MobileToken
+    from apps.mobile.tokens import hash_token
+
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    user = django_user_model.objects.create_user(
+        username="lo-rev", email="lo-rev@example.com", password="x"
+    )
+    raw = _make_active_token(user)
+    MobileToken.objects.filter(token_hash=hash_token(raw)).update(
+        revoked_at=timezone.now()
+    )
+
+    response = _signed_post_auth(client, LOGOUT_PATH, SECRET, b"", raw)
+    assert response.status_code == 401
+
+
+@pytest.mark.django_db
+def test_logout_missing_build_signature_returns_403(
+    client, settings, django_user_model
+):
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    user = django_user_model.objects.create_user(
+        username="lo-403", email="lo-403@example.com", password="x"
+    )
+    raw = _make_active_token(user)
+
+    # No build-HMAC headers at all → the build layer rejects first (neutral 403),
+    # never reaching the token layer, even with a valid bearer.
+    response = client.post(
+        LOGOUT_PATH,
+        data=b"",
+        content_type="application/json",
+        HTTP_AUTHORIZATION=f"Bearer {raw}",
+    )
+    assert response.status_code == 403
+    assert response.json() == {"detail": "Forbidden"}
+
+
+@pytest.mark.django_db
+def test_logout_revokes_only_presented_token(client, settings, django_user_model):
+    from apps.mobile.models import MobileToken
+    from apps.mobile.tokens import hash_token
+
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    user = django_user_model.objects.create_user(
+        username="lo-multi", email="lo-multi@example.com", password="x"
+    )
+    raw_a = _make_active_token(user)
+    raw_b = _make_active_token(user)
+
+    response = _signed_post_auth(client, LOGOUT_PATH, SECRET, b"", raw_a)
+    assert response.status_code == 200
+
+    token_a = MobileToken.objects.get(token_hash=hash_token(raw_a))
+    token_b = MobileToken.objects.get(token_hash=hash_token(raw_b))
+    assert token_a.is_active is False
+    assert token_b.is_active is True
+
+    # The other token still works for a fresh logout.
+    again = _signed_post_auth(client, LOGOUT_PATH, SECRET, b"", raw_b)
+    assert again.status_code == 200
+
+
+@pytest.mark.django_db
+def test_is_mobile_user_sets_request_mobile_user(settings, django_user_model):
+    """Identity layer resolves the bearer to request.mobile_user (+ mobile_token)."""
+    from apps.mobile.permissions import IsMobileUser
+
+    user = django_user_model.objects.create_user(
+        username="ident", email="ident@example.com", password="x"
+    )
+    raw = _make_active_token(user)
+
+    request = RequestFactory().post(LOGOUT_PATH, HTTP_AUTHORIZATION=f"Bearer {raw}")
+    assert IsMobileUser().has_permission(request, None) is True
+    assert request.mobile_user == user
+    assert request.mobile_token.user == user
+
+
+@pytest.mark.django_db
+def test_is_mobile_user_raises_401_for_unknown_token(settings):
+    from apps.mobile.permissions import IsMobileUser, MobileTokenInvalid
+
+    request = RequestFactory().post(
+        LOGOUT_PATH, HTTP_AUTHORIZATION="Bearer no-such-token"
+    )
+    with pytest.raises(MobileTokenInvalid) as exc:
+        IsMobileUser().has_permission(request, None)
+    assert exc.value.status_code == 401
+
+
+# --- Task 4: CanEditRaceLegend permission -----------------------------------
+# Tested in isolation here (RequestFactory + the permission object with a stub
+# view carrying .kwargs). The Task 6 write endpoint exercises the full stack.
+
+
+class _StubView:
+    """Minimal stand-in for a DRF view exposing only ``kwargs`` to a permission."""
+
+    def __init__(self, **kwargs):
+        self.kwargs = kwargs
+
+
+def _race_admin_request(user):
+    """A request that already passed IsMobileUser (mobile_user resolved)."""
+    request = RequestFactory().post("/app/race/1/tags/")
+    request.mobile_user = user
+    return request
+
+
+@pytest.mark.django_db
+def test_can_edit_race_legend_superuser_passes(django_user_model):
+    from apps.mobile.permissions import CanEditRaceLegend
+    from website.models.race import Race
+
+    su = django_user_model.objects.create_superuser(
+        username="su", email="su@example.com", password="x"
+    )
+    race = Race.objects.create(name="Legend race", slug="legend-race-su")
+
+    request = _race_admin_request(su)
+    view = _StubView(race_id=race.id)
+    assert CanEditRaceLegend().has_permission(request, view) is True
+
+
+@pytest.mark.django_db
+def test_can_edit_race_legend_raceadmin_passes(django_user_model):
+    from apps.mobile.permissions import CanEditRaceLegend
+    from website.models.race import Race, RaceAdmin
+
+    user = django_user_model.objects.create_user(
+        username="ra", email="ra@example.com", password="x"
+    )
+    race = Race.objects.create(name="Legend race", slug="legend-race-ra")
+    RaceAdmin.objects.create(race=race, user=user, role=RaceAdmin.Role.ADMIN)
+
+    request = _race_admin_request(user)
+    view = _StubView(race_id=race.id)
+    assert CanEditRaceLegend().has_permission(request, view) is True
+
+
+@pytest.mark.django_db
+def test_can_edit_race_legend_moderator_denied(django_user_model):
+    """A MODERATOR is not an editor — can_edit_race requires role=ADMIN."""
+    from apps.mobile.permissions import CanEditRaceLegend
+    from website.models.race import Race, RaceAdmin
+
+    user = django_user_model.objects.create_user(
+        username="mod", email="mod@example.com", password="x"
+    )
+    race = Race.objects.create(name="Legend race", slug="legend-race-mod")
+    RaceAdmin.objects.create(race=race, user=user, role=RaceAdmin.Role.MODERATOR)
+
+    request = _race_admin_request(user)
+    view = _StubView(race_id=race.id)
+    assert CanEditRaceLegend().has_permission(request, view) is False
+
+
+@pytest.mark.django_db
+def test_can_edit_race_legend_plain_user_denied(django_user_model):
+    from apps.mobile.permissions import CanEditRaceLegend
+    from website.models.race import Race
+
+    user = django_user_model.objects.create_user(
+        username="plain", email="plain@example.com", password="x"
+    )
+    race = Race.objects.create(name="Legend race", slug="legend-race-plain")
+
+    request = _race_admin_request(user)
+    view = _StubView(race_id=race.id)
+    assert CanEditRaceLegend().has_permission(request, view) is False
+
+
+@pytest.mark.django_db
+def test_can_edit_race_legend_unknown_race_raises_404(django_user_model):
+    from django.http import Http404
+
+    from apps.mobile.permissions import CanEditRaceLegend
+
+    su = django_user_model.objects.create_superuser(
+        username="su404", email="su404@example.com", password="x"
+    )
+    request = _race_admin_request(su)
+    view = _StubView(race_id=999999)
+    with pytest.raises(Http404):
+        CanEditRaceLegend().has_permission(request, view)
+
+
+@pytest.mark.django_db
+def test_can_edit_race_legend_no_mobile_user_returns_false_not_500(django_user_model):
+    """Defensive: missing request.mobile_user → False (403), not AttributeError."""
+    from apps.mobile.permissions import CanEditRaceLegend
+    from website.models.race import Race
+
+    race = Race.objects.create(name="Legend race", slug="legend-race-anon")
+    # No mobile_user attribute set on the request (stack reordered / isolated).
+    request = RequestFactory().post("/app/race/1/tags/")
+    view = _StubView(race_id=race.id)
+    assert CanEditRaceLegend().has_permission(request, view) is False
+
+
+# --- Task 5: CheckpointTag.created_by ---------------------------------------
+
+
+@pytest.mark.django_db
+def test_checkpoint_tag_created_by_persists(django_user_model):
+    """``created_by`` round-trips and SET_NULL survives the user's deletion."""
+    from website.models.checkpoint import Checkpoint, CheckpointTag
+    from website.models.race import Race
+
+    user = django_user_model.objects.create_user(
+        username="crew", email="crew@example.com", password="x"
+    )
+    race = Race.objects.create(name="Prov race", slug="prov-race")
+    cp = Checkpoint.objects.create(race=race, number=1, cost=1, description="x")
+    tag = CheckpointTag.objects.create(point=cp, nfc_uid="04A1B2C3", created_by=user)
+
+    tag.refresh_from_db()
+    assert tag.created_by_id == user.id
+    assert tag in user.provisioned_tags.all()
+
+    user.delete()
+    tag.refresh_from_db()
+    assert tag.created_by_id is None  # on_delete=SET_NULL
+
+
+@pytest.mark.django_db
+def test_checkpoint_tag_created_by_does_not_disturb_crypto_signals(
+    django_user_model,
+):
+    """Adding ``created_by`` must not break the legend-crypto ``post_save``
+    signal: a locked-КП tag still gets ``code``/``bid``/``bundle_blob`` and the
+    recursion guard (sentinel ``update_fields``) is intact.
+    """
+    from website.models.checkpoint import Checkpoint, CheckpointTag
+    from website.models.race import Race
+
+    user = django_user_model.objects.create_user(
+        username="crew2", email="crew2@example.com", password="x"
+    )
+    race = Race.objects.create(name="Prov race 2", slug="prov-race-2")
+    cp = Checkpoint.objects.create(
+        race=race, number=1, cost=4, description="столб", is_legend_locked=True
+    )
+    tag = CheckpointTag.objects.create(point=cp, nfc_uid="04A1B2C3", created_by=user)
+
+    tag.refresh_from_db()
+    assert tag.created_by_id == user.id
+    assert tag.code is not None
+    assert tag.bid == hashlib.sha256(bytes(tag.code)).hexdigest()[:16]
+    assert tag.bundle_blob is not None
+
+
+# --- Task 6: POST /app/race/<race_id>/tags/ ---------------------------------
+
+
+def _make_admin_race(django_user_model, slug, locked=False):
+    """A published race + ADMIN RaceAdmin user + their active token + a КП.
+
+    Returns ``(race, user, raw_token, checkpoint)``.
+    """
+    from website.models.checkpoint import Checkpoint
+    from website.models.race import Race, RaceAdmin
+
+    race = Race.objects.create(name=f"Tag race {slug}", slug=slug)
+    user = django_user_model.objects.create_user(
+        username=f"crew-{slug}", email=f"crew-{slug}@example.com", password="x"
+    )
+    RaceAdmin.objects.create(race=race, user=user, role=RaceAdmin.Role.ADMIN)
+    raw = _make_active_token(user)
+    cp = Checkpoint.objects.create(
+        race=race, number=7, cost=4, description="столб", is_legend_locked=locked
+    )
+    return race, user, raw, cp
+
+
+def _tags_path(race_id):
+    return f"/app/race/{race_id}/tags/"
+
+
+@pytest.mark.django_db
+def test_tag_create_happy_path_201_with_crypto_via_signals(
+    client, settings, django_user_model
+):
+    import json
+
+    from apps.mobile.models import MobileToken  # noqa: F401
+    from website.models.checkpoint import CheckpointTag
+
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    race, user, raw, cp = _make_admin_race(django_user_model, "happy", locked=True)
+    path = _tags_path(race.id)
+    body = json.dumps({"point": cp.id, "nfc_uid": "04A1B2C3"}).encode()
+
+    response = _signed_post_auth(client, path, SECRET, body, raw)
+
+    assert response.status_code == 201
+    data = response.json()
+    assert set(data.keys()) == {"bid", "point", "nfc_uid", "code"}
+    assert data["point"] == cp.number
+    assert data["nfc_uid"] == "04A1B2C3"
+
+    tag = CheckpointTag.objects.get(point=cp, nfc_uid="04A1B2C3")
+    assert tag.created_by_id == user.id
+    # crypto populated by the post_save signal
+    assert tag.code is not None
+    assert tag.bid == hashlib.sha256(bytes(tag.code)).hexdigest()[:16]
+    assert tag.bundle_blob is not None
+    # response echoes the freshly minted code (hex) + bid
+    assert data["bid"] == tag.bid
+    assert data["code"] == bytes(tag.code).hex()
+
+
+@pytest.mark.django_db
+def test_tag_create_idempotent_same_uid_same_cp_no_duplicate(
+    client, settings, django_user_model
+):
+    import json
+
+    from website.models.checkpoint import CheckpointTag
+
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    race, user, raw, cp = _make_admin_race(django_user_model, "idem")
+    path = _tags_path(race.id)
+    body = json.dumps({"point": cp.id, "nfc_uid": "04A1B2C3"}).encode()
+
+    first = _signed_post_auth(client, path, SECRET, body, raw)
+    assert first.status_code == 201
+
+    second = _signed_post_auth(client, path, SECRET, body, raw)
+    assert second.status_code == 200
+
+    assert CheckpointTag.objects.filter(point=cp, nfc_uid="04A1B2C3").count() == 1
+    # the idempotent hit returns the same bid/code as the create
+    assert second.json()["bid"] == first.json()["bid"]
+    assert second.json()["code"] == first.json()["code"]
+
+
+@pytest.mark.django_db
+def test_tag_create_same_uid_different_cp_returns_409(
+    client, settings, django_user_model
+):
+    import json
+
+    from website.models.checkpoint import Checkpoint, CheckpointTag
+
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    race, user, raw, cp = _make_admin_race(django_user_model, "xcp")
+    other_cp = Checkpoint.objects.create(
+        race=race, number=8, cost=1, description="other"
+    )
+    path = _tags_path(race.id)
+
+    first = _signed_post_auth(
+        client,
+        path,
+        SECRET,
+        json.dumps({"point": cp.id, "nfc_uid": "04A1B2C3"}).encode(),
+        raw,
+    )
+    assert first.status_code == 201
+
+    conflict = _signed_post_auth(
+        client,
+        path,
+        SECRET,
+        json.dumps({"point": other_cp.id, "nfc_uid": "04A1B2C3"}).encode(),
+        raw,
+    )
+    assert conflict.status_code == 409
+    # no rebind: the chip stays on the original КП only
+    assert CheckpointTag.objects.filter(nfc_uid="04A1B2C3").count() == 1
+    assert CheckpointTag.objects.get(nfc_uid="04A1B2C3").point_id == cp.id
+
+
+@pytest.mark.django_db
+def test_tag_create_idempotent_hit_on_unbuilt_tag_rebuilds_no_500(
+    client, settings, django_user_model
+):
+    """An existing tag with bid=''/code=None (created bypassing signals) is
+    rebuilt on the idempotent hit rather than crashing on None.hex()."""
+    import json
+
+    from website.models.checkpoint import CheckpointTag
+
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    race, user, raw, cp = _make_admin_race(django_user_model, "unbuilt")
+    # Bypass the build_bundle signal so the row keeps bid=""/code=None.
+    CheckpointTag.objects.bulk_create([CheckpointTag(point=cp, nfc_uid="04A1B2C3")])
+    assert CheckpointTag.objects.filter(point=cp, bid="").count() == 1
+
+    path = _tags_path(race.id)
+    body = json.dumps({"point": cp.id, "nfc_uid": "04A1B2C3"}).encode()
+    response = _signed_post_auth(client, path, SECRET, body, raw)
+
+    assert response.status_code == 200
+    data = response.json()
+    tag = CheckpointTag.objects.get(point=cp, nfc_uid="04A1B2C3")
+    assert tag.bid != ""
+    assert tag.code is not None
+    assert data["bid"] == tag.bid
+    assert data["code"] == bytes(tag.code).hex()
+
+
+@pytest.mark.django_db
+def test_tag_create_unknown_checkpoint_returns_404(client, settings, django_user_model):
+    import json
+
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    race, user, raw, cp = _make_admin_race(django_user_model, "nocp")
+    path = _tags_path(race.id)
+    body = json.dumps({"point": 999999, "nfc_uid": "04A1B2C3"}).encode()
+    response = _signed_post_auth(client, path, SECRET, body, raw)
+    assert response.status_code == 404
+
+
+@pytest.mark.django_db
+def test_tag_create_checkpoint_in_other_race_returns_404(
+    client, settings, django_user_model
+):
+    import json
+
+    from website.models.checkpoint import Checkpoint
+    from website.models.race import Race
+
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    race, user, raw, cp = _make_admin_race(django_user_model, "othrace")
+    other_race = Race.objects.create(name="Other", slug="other-tag-race")
+    other_cp = Checkpoint.objects.create(
+        race=other_race, number=1, cost=1, description="elsewhere"
+    )
+    path = _tags_path(race.id)
+    body = json.dumps({"point": other_cp.id, "nfc_uid": "04A1B2C3"}).encode()
+    response = _signed_post_auth(client, path, SECRET, body, raw)
+    assert response.status_code == 404
+
+
+@pytest.mark.django_db
+def test_tag_create_hidden_checkpoint_returns_404(client, settings, django_user_model):
+    import json
+
+    from website.models.checkpoint import Checkpoint
+
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    race, user, raw, cp = _make_admin_race(django_user_model, "hidden")
+    hidden = Checkpoint.objects.create(
+        race=race, number=9, cost=0, description="hidden", type="hidden"
+    )
+    path = _tags_path(race.id)
+    body = json.dumps({"point": hidden.id, "nfc_uid": "04A1B2C3"}).encode()
+    response = _signed_post_auth(client, path, SECRET, body, raw)
+    assert response.status_code == 404
+
+
+@pytest.mark.django_db
+def test_tag_create_normalizes_nfc_uid(client, settings, django_user_model):
+    import json
+
+    from website.models.checkpoint import CheckpointTag
+
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    race, user, raw, cp = _make_admin_race(django_user_model, "norm")
+    path = _tags_path(race.id)
+    body = json.dumps({"point": cp.id, "nfc_uid": "  04a1b2c3 "}).encode()
+    response = _signed_post_auth(client, path, SECRET, body, raw)
+
+    assert response.status_code == 201
+    assert response.json()["nfc_uid"] == "04A1B2C3"
+    assert CheckpointTag.objects.filter(point=cp, nfc_uid="04A1B2C3").exists()
+
+
+@pytest.mark.django_db
+def test_tag_create_blank_nfc_uid_returns_400(client, settings, django_user_model):
+    import json
+
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    race, user, raw, cp = _make_admin_race(django_user_model, "blank")
+    path = _tags_path(race.id)
+    body = json.dumps({"point": cp.id, "nfc_uid": "   "}).encode()
+    response = _signed_post_auth(client, path, SECRET, body, raw)
+    assert response.status_code == 400
+
+
+@pytest.mark.django_db
+def test_tag_create_oversized_nfc_uid_returns_400(client, settings, django_user_model):
+    """A UID longer than the model's 255-char column is a clean 400, not a 500."""
+    import json
+
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    race, user, raw, cp = _make_admin_race(django_user_model, "oversize")
+    path = _tags_path(race.id)
+    body = json.dumps({"point": cp.id, "nfc_uid": "A" * 256}).encode()
+    response = _signed_post_auth(client, path, SECRET, body, raw)
+    assert response.status_code == 400
+
+
+@pytest.mark.django_db
+def test_tag_create_missing_bearer_returns_401(client, settings, django_user_model):
+    import json
+
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    race, user, raw, cp = _make_admin_race(django_user_model, "nobearer")
+    path = _tags_path(race.id)
+    body = json.dumps({"point": cp.id, "nfc_uid": "04A1B2C3"}).encode()
+    # valid build sig but no Authorization header → actionable 401
+    response = _signed_post_auth(client, path, SECRET, body, None)
+    assert response.status_code == 401
+
+
+@pytest.mark.django_db
+def test_tag_create_missing_build_signature_returns_403(
+    client, settings, django_user_model
+):
+    import json
+
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    race, user, raw, cp = _make_admin_race(django_user_model, "nosig")
+    path = _tags_path(race.id)
+    body = json.dumps({"point": cp.id, "nfc_uid": "04A1B2C3"}).encode()
+    response = client.post(
+        path,
+        data=body,
+        content_type="application/json",
+        HTTP_AUTHORIZATION=f"Bearer {raw}",
+    )
+    assert response.status_code == 403
+    assert response.json() == {"detail": "Forbidden"}
+
+
+@pytest.mark.django_db
+def test_tag_create_non_admin_user_returns_403(client, settings, django_user_model):
+    import json
+
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    from website.models.checkpoint import Checkpoint
+    from website.models.race import Race
+
+    race = Race.objects.create(name="Tag race plain", slug="tag-race-plain")
+    cp = Checkpoint.objects.create(race=race, number=1, cost=1, description="x")
+    # a valid user + token, but no RaceAdmin row → CanEditRaceLegend denies
+    user = django_user_model.objects.create_user(
+        username="plain-crew", email="plain-crew@example.com", password="x"
+    )
+    raw = _make_active_token(user)
+
+    path = _tags_path(race.id)
+    body = json.dumps({"point": cp.id, "nfc_uid": "04A1B2C3"}).encode()
+    response = _signed_post_auth(client, path, SECRET, body, raw)
+    assert response.status_code == 403
+    # actionable (not the neutral build-layer "Forbidden")
+    assert response.json() != {"detail": "Forbidden"}
+
+
+@pytest.mark.django_db
+def test_tag_create_unpublished_race_returns_404(client, settings, django_user_model):
+    import json
+
+    from website.models.checkpoint import Checkpoint
+    from website.models.race import Race, RaceAdmin
+
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    race = Race.objects.create(name="Unpub tag", slug="unpub-tag", is_published=False)
+    user = django_user_model.objects.create_user(
+        username="unpub-crew", email="unpub-crew@example.com", password="x"
+    )
+    RaceAdmin.objects.create(race=race, user=user, role=RaceAdmin.Role.ADMIN)
+    raw = _make_active_token(user)
+    cp = Checkpoint.objects.create(race=race, number=1, cost=1, description="x")
+
+    path = _tags_path(race.id)
+    body = json.dumps({"point": cp.id, "nfc_uid": "04A1B2C3"}).encode()
+    response = _signed_post_auth(client, path, SECRET, body, raw)
+    assert response.status_code == 404
+
+
+@pytest.mark.django_db
+def test_tag_create_moves_legend_version_and_etag(client, settings, django_user_model):
+    """Creating a tag bumps versions.legend; the new ETag 304s, the old 200s."""
+    import json
+
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    race, user, raw, cp = _make_admin_race(django_user_model, "etagmove")
+    legend_path = f"/app/race/{race.id}/legend/"
+
+    before = client.get(legend_path, **_signed_headers("GET", legend_path, SECRET))
+    old_etag = before["ETag"]
+
+    path = _tags_path(race.id)
+    body = json.dumps({"point": cp.id, "nfc_uid": "04A1B2C3"}).encode()
+    created = _signed_post_auth(client, path, SECRET, body, raw)
+    assert created.status_code == 201
+
+    after = client.get(legend_path, **_signed_headers("GET", legend_path, SECRET))
+    new_etag = after["ETag"]
+    assert new_etag != old_etag
+
+    # the new ETag short-circuits to 304
+    headers = _signed_headers("GET", legend_path, SECRET)
+    headers["HTTP_IF_NONE_MATCH"] = new_etag
+    fresh = client.get(legend_path, **headers)
+    assert fresh.status_code == 304
+
+    # the stale (old) ETag does not
+    headers = _signed_headers("GET", legend_path, SECRET)
+    headers["HTTP_IF_NONE_MATCH"] = old_etag
+    stale = client.get(legend_path, **headers)
+    assert stale.status_code == 200
+
+
+@pytest.mark.django_db
+def test_tag_create_throttle_returns_429_after_limit(
+    client, settings, django_user_model
+):
+    """``mobile-write`` ScopedRateThrottle fires 429 when the rate is exceeded."""
+    import json
+
+    from rest_framework.throttling import SimpleRateThrottle
+
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    race, user, raw, cp = _make_admin_race(django_user_model, "throttle-write")
+
+    # DRF caches THROTTLE_RATES as a class attribute at import time, so settings
+    # overrides don't propagate. Patch the class directly for the duration of the
+    # test (autouse fixture already clears the cache counts).
+    original_rates = SimpleRateThrottle.THROTTLE_RATES
+    SimpleRateThrottle.THROTTLE_RATES = {**original_rates, "mobile-write": "2/min"}
+    try:
+        statuses = []
+        for i in range(4):
+            body = json.dumps({"point": cp.id, "nfc_uid": f"AA{i:06X}"}).encode()
+            resp = _signed_post_auth(client, _tags_path(race.id), SECRET, body, raw)
+            statuses.append(resp.status_code)
+    finally:
+        SimpleRateThrottle.THROTTLE_RATES = original_rates
+
+    assert 429 in statuses[2:]
+
+
+# --- Task 7: body-signing roundtrip on POST -------------------------------
+#
+# These tests pin the previously-GET-only body-signing contract for POST.
+# `SignedAppPermission` reads `request.body` to rebuild the canonical string;
+# the view then reads `request.data` (DRF JSON parse). Django/DRF buffer the
+# body, so reading it in the permission does NOT raise `RawPostDataException`
+# in the view — the roundtrip below proves that end to end (a 200/201 means the
+# serializer parsed `request.data` after the permission consumed `request.body`).
+
+
+@pytest.mark.django_db
+def test_post_body_signature_roundtrip_passes_and_parses_data(
+    client, settings, django_user_model
+):
+    """Correct body-inclusive signature → permission passes AND `request.data`
+    parses (no `RawPostDataException` after the body read)."""
+    import json
+
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    django_user_model.objects.create_user(
+        username="bsr1", email="bsr1@example.com", password="pw-123456"
+    )
+    body = json.dumps({"email": "bsr1@example.com", "password": "pw-123456"}).encode()
+    headers = _signed_headers("POST", LOGIN_PATH, SECRET, body=body)
+
+    response = client.post(
+        LOGIN_PATH, data=body, content_type="application/json", **headers
+    )
+    # 200 proves both layers: build-HMAC over the body verified, then the view
+    # read request.data (the email/password) without RawPostDataException.
+    assert response.status_code == 200
+    assert "token" in response.json()
+
+
+@pytest.mark.django_db
+def test_post_tampered_body_returns_neutral_403(client, settings, django_user_model):
+    """Signature computed over a stale body but a different body sent → the
+    `sha256_hex(body)` term mismatches → neutral build-layer 403 (no hint)."""
+    import json
+
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    django_user_model.objects.create_user(
+        username="bsr2", email="bsr2@example.com", password="pw-123456"
+    )
+    signed_body = json.dumps(
+        {"email": "bsr2@example.com", "password": "pw-123456"}
+    ).encode()
+    headers = _signed_headers("POST", LOGIN_PATH, SECRET, body=signed_body)
+
+    # Send a *different* body than the one the signature covers.
+    tampered_body = json.dumps(
+        {"email": "bsr2@example.com", "password": "TAMPERED"}
+    ).encode()
+    response = client.post(
+        LOGIN_PATH, data=tampered_body, content_type="application/json", **headers
+    )
+    assert response.status_code == 403
+    assert response.json() == {"detail": "Forbidden"}
+
+
+@pytest.mark.django_db
+def test_post_empty_body_signature_handled(client, settings, django_user_model):
+    """Empty-body POST (logout) signed over `b""` verifies — the empty-body
+    branch of the canonical (`sha256_hex(b"")`) is handled the same as GET."""
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    user = django_user_model.objects.create_user(
+        username="bsr3", email="bsr3@example.com", password="x"
+    )
+    raw = _make_active_token(user)
+
+    response = _signed_post_auth(client, LOGOUT_PATH, SECRET, b"", raw)
+    assert response.status_code == 200
+
+
+@pytest.mark.django_db
+def test_post_present_body_signature_handled(client, settings, django_user_model):
+    """Present-body POST (tag create) signed over the JSON body verifies and
+    the view parses it — the present-body counterpart to the empty-body case."""
+    import json
+
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    race, user, raw, cp = _make_admin_race(django_user_model, "bsr-present")
+    path = _tags_path(race.id)
+    body = json.dumps({"point": cp.id, "nfc_uid": "04A1B2C3"}).encode()
+
+    response = _signed_post_auth(client, path, SECRET, body, raw)
+    assert response.status_code == 201
+    assert response.json()["nfc_uid"] == "04A1B2C3"
+
+
+def test_signed_permission_reads_body_before_drf_parse():
+    """Unit-level pin: the permission's `request.body` read leaves the body
+    intact for a subsequent `request.data` parse (Django buffers it), so the
+    documented `RawPostDataException` hazard does not bite for JSON POST."""
+    import json
+
+    from django.test import override_settings
+    from rest_framework.parsers import JSONParser
+    from rest_framework.request import Request
+
+    body = json.dumps({"point": 1, "nfc_uid": "AB"}).encode()
+    factory = RequestFactory()
+    raw_request = factory.post(
+        "/app/race/1/tags/", data=body, content_type="application/json"
+    )
+
+    ts = str(int(time.time()))
+    canonical = build_canonical("POST", "/app/race/1/tags/", ts, body)
+    raw_request.META["HTTP_X_APP_KEY_ID"] = "test-v1"
+    raw_request.META["HTTP_X_APP_SIG"] = sign(SECRET, canonical)
+    raw_request.META["HTTP_X_APP_TS"] = ts
+    raw_request.META["HTTP_X_INSTALL_ID"] = "install-abc"
+
+    with override_settings(
+        MOBILE_APP_KEYS={"test-v1": SECRET}, MOBILE_APP_TS_WINDOW=300
+    ):
+        # 1) permission reads request.body to build the canonical
+        assert SignedAppPermission().has_permission(raw_request, view=None) is True
+        # 2) DRF can still parse the same body afterwards (no RawPostDataException)
+        drf_request = Request(raw_request, parsers=[JSONParser()])
+        assert drf_request.data == {"point": 1, "nfc_uid": "AB"}

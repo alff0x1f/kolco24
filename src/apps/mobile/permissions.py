@@ -13,19 +13,54 @@ import ipaddress
 import time
 
 from django.conf import settings
+from django.shortcuts import get_object_or_404
+from rest_framework.exceptions import APIException
 from rest_framework.permissions import BasePermission
 
+from website.models.race import Race
+
 from .signing import build_canonical, verify
+from .tokens import resolve_token
+
+
+class MobileTokenInvalid(APIException):
+    """Actionable 401 for a missing/expired/revoked bearer token.
+
+    With ``authentication_classes = []`` on :class:`AppAPIView`, raising DRF's
+    own ``NotAuthenticated``/``AuthenticationFailed`` renders as **403** (DRF
+    has no authenticator to attach a ``WWW-Authenticate`` header, so it
+    downgrades the status). To emit a genuine **401** — distinct from the
+    neutral build-layer 403 — :class:`IsMobileUser` raises this small
+    ``APIException`` subclass with an explicit ``status_code``.
+    """
+
+    status_code = 401
+    default_detail = "Недействительный или просроченный токен"
+    default_code = "token_invalid"
 
 
 def _client_ip(request):
-    """Trusted client IP: last ``X-Forwarded-For`` entry, else ``REMOTE_ADDR``.
+    """Trusted client IP: ``X-Real-IP`` set by nginx, else ``REMOTE_ADDR``.
 
-    Nginx's ``proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for``
-    *appends* ``$remote_addr`` to whatever the client sent, so the last entry
-    is the actual connection IP and cannot be forged by the client.  Taking the
-    first entry would accept an attacker-supplied value.
+    Nginx resolves the actual client IP via the ``real_ip`` module (configured
+    in ``deploy/nginx.conf`` with ``set_real_ip_from`` for Docker private ranges
+    and ``real_ip_header X-Forwarded-For``) and then emits
+    ``proxy_set_header X-Real-IP $remote_addr`` — at that point ``$remote_addr``
+    is already the resolved real client IP, not the upstream proxy's address.
+
+    Relying on the last ``X-Forwarded-For`` entry alone fails in the production
+    docker-compose_v2.yml topology, where an external reverse proxy sits in front
+    of nginx: nginx's ``$remote_addr`` (= upstream proxy's Docker IP) would be
+    appended to XFF, collapsing all clients into one throttle bucket.
     """
+    real_ip = request.META.get("HTTP_X_REAL_IP", "").strip()
+    if real_ip:
+        try:
+            ipaddress.ip_address(real_ip)
+            return real_ip
+        except ValueError:
+            pass
+    # Fallback for environments without nginx (local runserver, tests).
     forwarded = request.META.get("HTTP_X_FORWARDED_FOR", "")
     if forwarded:
         candidate = forwarded.split(",")[-1].strip()
@@ -112,3 +147,60 @@ class SignedAppPermission(BasePermission):
             "ip": _client_ip(request),
         }
         return True
+
+
+class IsMobileUser(BasePermission):
+    """Resolve ``Authorization: Bearer <token>`` to ``request.mobile_user``.
+
+    Identity only — it authorizes **nothing** (per-action authorization is
+    :class:`CanEditRaceLegend`). Stack it **after** :class:`SignedAppPermission`
+    so the per-build HMAC is already proven; on success it sets
+    ``request.mobile_user`` (the :class:`~django.contrib.auth` user) and
+    ``request.mobile_token`` (the resolved :class:`MobileToken`, for a later
+    revoke).
+
+    Unlike the neutral build layer, a token failure is **actionable**: a missing
+    header, a malformed ``Authorization`` value, or an unknown/expired/revoked
+    token raises :class:`MobileTokenInvalid` → HTTP **401** (see that class for
+    why a raised exception, not ``return False``, is required to get a 401 here).
+    """
+
+    def has_permission(self, request, view):
+        auth = request.headers.get("Authorization", "")
+        parts = auth.split()
+        if len(parts) != 2 or parts[0].lower() != "bearer":
+            raise MobileTokenInvalid()
+        token = resolve_token(parts[1])
+        if token is None:
+            raise MobileTokenInvalid()
+        request.mobile_user = token.user
+        request.mobile_token = token
+        return True
+
+
+class CanEditRaceLegend(BasePermission):
+    """Authorize the resolved mobile user to edit a race's legend (per-race).
+
+    Reads ``view.kwargs["race_id"]``, loads the :class:`Race` (a missing race
+    raises ``Http404`` → HTTP **404**, not a 403, so a probe can't distinguish
+    "no such race" from "not allowed" any differently than the web editor does),
+    and delegates to :func:`apps.race.permissions.can_edit_race` — the **same**
+    superuser-or-``RaceAdmin(role=ADMIN)`` check the web ``RaceLegendEditView``
+    uses. A user without rights gets an **actionable 403** (the default DRF
+    ``PermissionDenied`` message), unlike the neutral build-layer 403.
+
+    **Ordering:** stack this **after** :class:`IsMobileUser`, which sets
+    ``request.mobile_user``. The user is read defensively via
+    ``getattr(request, "mobile_user", None)`` so a reordered stack, or the
+    permission tested in isolation, returns ``False`` (→ 403) rather than
+    raising ``AttributeError`` (→ 500).
+    """
+
+    def has_permission(self, request, view):
+        from apps.race.permissions import can_edit_race
+
+        user = getattr(request, "mobile_user", None)
+        if user is None:
+            return False
+        race = get_object_or_404(Race, pk=view.kwargs["race_id"])
+        return can_edit_race(user, race)
