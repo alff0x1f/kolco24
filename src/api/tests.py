@@ -288,6 +288,9 @@ def test_checkpoint_tag_create_by_id(client, django_user_model):
     assert body["checkpoint_id"] == cp.id
     assert body["number"] == 42
     assert body["nfc_uid"] == "ABC123"
+    assert body["bid"] != ""
+    assert body["code"] is not None
+    assert "id" not in body
     assert "point" not in body
 
 
@@ -424,3 +427,33 @@ def test_checkpoint_tag_create_rejects_hidden_cp(client, django_user_model):
     )
 
     assert response.status_code == 404
+
+
+@pytest.mark.django_db
+def test_checkpoint_tag_create_repairs_stale_bid_code_on_idempotent(
+    client, django_user_model
+):
+    """Idempotent 200 for an existing row with bid=="" / code=None must repair and
+    return valid bid+code instead of an invalid payload."""
+    from website.models.checkpoint import Checkpoint, CheckpointTag
+    from website.models.race import Race
+
+    client.force_login(_make_superuser(django_user_model))
+    race = Race.objects.create(name="Tag repair", slug="tag-repair-api")
+    cp = Checkpoint.objects.create(race=race, number=5, cost=5)
+
+    # Create a row that bypassed signals (bid empty, code null) — use QuerySet.update()
+    # which issues raw SQL and skips Python save() / post_save signals.
+    tag = CheckpointTag.objects.create(checkpoint=cp, nfc_uid="REPAIR01")
+    CheckpointTag.objects.filter(pk=tag.pk).update(bid="", code=None)
+
+    response = client.post(
+        f"/api/race/{race.id}/checkpoint_tag/",
+        {"checkpoint_id": cp.id, "nfc_uid": "REPAIR01"},
+        content_type="application/json",
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["bid"] != ""
+    assert body["code"] is not None

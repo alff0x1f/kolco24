@@ -1,4 +1,4 @@
-from django.db import IntegrityError
+from django.db import IntegrityError, transaction
 from django.utils import timezone
 from rest_framework import status
 from rest_framework.exceptions import NotFound
@@ -6,6 +6,7 @@ from rest_framework.generics import ListCreateAPIView
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from apps.mobile.legend_crypto import build_bundle
 from website.models import Checkpoint, CheckpointTag, Tag
 from website.models.enums import CheckpointType
 
@@ -64,12 +65,33 @@ class CheckpointTagCreateView(APIView):
                     )
                 raise original_exc
 
+            # The post_save signal writes bid/code/bundle_blob to a freshly-fetched
+            # DB instance, leaving the get_or_create return value stale on creation.
+            checkpoint_tag.refresh_from_db()
+
+            # Existing rows created bypassing the signals (bid=="" / code is None)
+            # must be repaired before attempting code.hex(). Mirror mobile
+            # TagCreateView._tag_response(): re-fetch under a lock so concurrent
+            # repairs can't mint different codes.
+            if not checkpoint_tag.bid or checkpoint_tag.code is None:
+                with transaction.atomic():
+                    checkpoint_tag = CheckpointTag.objects.select_for_update().get(
+                        pk=checkpoint_tag.pk
+                    )
+                    if not checkpoint_tag.bid or checkpoint_tag.code is None:
+                        build_bundle(checkpoint_tag)
+                        checkpoint_tag.refresh_from_db()
+
+            code = (
+                bytes(checkpoint_tag.code) if checkpoint_tag.code is not None else None
+            )
             return Response(
                 {
-                    "id": checkpoint_tag.id,
+                    "bid": checkpoint_tag.bid,
                     "checkpoint_id": checkpoint_tag.checkpoint_id,
                     "number": checkpoint_tag.checkpoint.number,
                     "nfc_uid": checkpoint_tag.nfc_uid,
+                    "code": code.hex() if code is not None else None,
                 },
                 status=status.HTTP_201_CREATED if created else status.HTTP_200_OK,
             )
