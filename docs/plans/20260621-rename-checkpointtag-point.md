@@ -221,19 +221,19 @@ was written but not committed), so changing it now is cheap.
 - Modify: `src/api/views/tag.py` (`CheckpointTagCreateView`)
 - Modify: api tag tests (in `src/api/` test module)
 
-- [ ] `CheckpointTagSerializer`: replace `number` field with `checkpoint_id`
+- [x] `CheckpointTagSerializer`: replace `number` field with `checkpoint_id`
       (`IntegerField`)
-- [ ] grep `get_control_point` to confirm `CheckpointTagCreateView` is its only
+- [x] grep `get_control_point` to confirm `CheckpointTagCreateView` is its only
       caller before changing its resolution semantics
-- [ ] `CheckpointTagCreateView`: resolve `Checkpoint` by **id** within race +
+- [x] `CheckpointTagCreateView`: resolve `Checkpoint` by **id** within race +
       `exclude(type=hidden)` (replace `get_control_point(race_id, number)` by-number
       lookup → by-id, 404 on miss); respond `{checkpoint_id: tag.checkpoint_id,
       number: tag.checkpoint.number, nfc_uid, ...}` matching the mobile key set
       (was `{point: tag.point.id, ...}`); keep the `IntegrityError` → 409/200
       re-query handling
-- [ ] update api tag tests: request uses `checkpoint_id`; response key set
+- [x] update api tag tests: request uses `checkpoint_id`; response key set
       matches; cover the cross-КП 409 and idempotent 200 paths
-- [ ] run `uv run pytest src/api/` — must pass before Task 5
+- [x] run `uv run pytest src/api/` — must pass before Task 5
 
 ### Task 5: Documentation
 

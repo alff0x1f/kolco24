@@ -259,3 +259,127 @@ def test_checkpoint_api_exposes_open_cp(client):
     assert cp["cost"] == 3
     assert cp["description"] == "open spot"
     assert "color" not in cp
+
+
+def _make_superuser(django_user_model):
+    return django_user_model.objects.create_superuser(
+        username="su", email="su@example.com", password="pw"
+    )
+
+
+@pytest.mark.django_db
+def test_checkpoint_tag_create_by_id(client, django_user_model):
+    """Legacy api tag-create resolves the КП by id and echoes both ids."""
+    from website.models.checkpoint import Checkpoint
+    from website.models.race import Race
+
+    client.force_login(_make_superuser(django_user_model))
+    race = Race.objects.create(name="Tag create", slug="tag-create-api")
+    cp = Checkpoint.objects.create(race=race, number=42, cost=5)
+
+    response = client.post(
+        f"/api/race/{race.id}/checkpoint_tag/",
+        {"checkpoint_id": cp.id, "nfc_uid": "abc123"},
+        content_type="application/json",
+    )
+
+    assert response.status_code == 201
+    body = response.json()
+    assert body["checkpoint_id"] == cp.id
+    assert body["number"] == 42
+    assert body["nfc_uid"] == "ABC123"
+    assert "point" not in body
+
+
+@pytest.mark.django_db
+def test_checkpoint_tag_create_idempotent_same_cp(client, django_user_model):
+    """Same UID on the same КП returns 200 (idempotent), not a duplicate."""
+    from website.models.checkpoint import Checkpoint
+    from website.models.race import Race
+
+    client.force_login(_make_superuser(django_user_model))
+    race = Race.objects.create(name="Tag idem", slug="tag-idem-api")
+    cp = Checkpoint.objects.create(race=race, number=1, cost=5)
+
+    url = f"/api/race/{race.id}/checkpoint_tag/"
+    first = client.post(
+        url,
+        {"checkpoint_id": cp.id, "nfc_uid": "uid1"},
+        content_type="application/json",
+    )
+    second = client.post(
+        url,
+        {"checkpoint_id": cp.id, "nfc_uid": "uid1"},
+        content_type="application/json",
+    )
+
+    assert first.status_code == 201
+    assert second.status_code == 200
+    assert second.json()["checkpoint_id"] == cp.id
+
+
+@pytest.mark.django_db
+def test_checkpoint_tag_create_cross_cp_conflict(client, django_user_model):
+    """A UID already bound to a different КП returns 409 (no auto-rebind)."""
+    from website.models.checkpoint import Checkpoint
+    from website.models.race import Race
+
+    client.force_login(_make_superuser(django_user_model))
+    race = Race.objects.create(name="Tag conflict", slug="tag-conflict-api")
+    cp1 = Checkpoint.objects.create(race=race, number=1, cost=5)
+    cp2 = Checkpoint.objects.create(race=race, number=2, cost=5)
+
+    url = f"/api/race/{race.id}/checkpoint_tag/"
+    client.post(
+        url,
+        {"checkpoint_id": cp1.id, "nfc_uid": "shared"},
+        content_type="application/json",
+    )
+    response = client.post(
+        url,
+        {"checkpoint_id": cp2.id, "nfc_uid": "shared"},
+        content_type="application/json",
+    )
+
+    assert response.status_code == 409
+    assert "nfc_uid" in response.json()
+
+
+@pytest.mark.django_db
+def test_checkpoint_tag_create_unknown_id_returns_404(client, django_user_model):
+    """An id that does not resolve to a КП in the race returns 404."""
+    from website.models.race import Race
+
+    client.force_login(_make_superuser(django_user_model))
+    race = Race.objects.create(name="Tag 404", slug="tag-404-api")
+
+    response = client.post(
+        f"/api/race/{race.id}/checkpoint_tag/",
+        {"checkpoint_id": 999999, "nfc_uid": "abc"},
+        content_type="application/json",
+    )
+
+    assert response.status_code == 404
+    assert "checkpoint_id" in response.json()
+
+
+@pytest.mark.django_db
+def test_checkpoint_tag_create_rejects_hidden_cp(client, django_user_model):
+    """A hidden КП must not be bindable by id (resolved set excludes hidden)."""
+    from website.models.checkpoint import Checkpoint
+    from website.models.enums import CheckpointType
+    from website.models.race import Race
+
+    client.force_login(_make_superuser(django_user_model))
+    race = Race.objects.create(name="Tag hidden", slug="tag-hidden-api")
+    hidden = Checkpoint.objects.create(
+        race=race, number=1, cost=5, type=CheckpointType.hidden.value
+    )
+
+    response = client.post(
+        f"/api/race/{race.id}/checkpoint_tag/",
+        {"checkpoint_id": hidden.id, "nfc_uid": "abc"},
+        content_type="application/json",
+    )
+
+    assert response.status_code == 404

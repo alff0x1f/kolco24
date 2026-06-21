@@ -7,6 +7,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from website.models import Checkpoint, CheckpointTag, Tag
+from website.models.enums import CheckpointType
 
 from ..serializers import CheckpointTagSerializer, TagSerializer, TagTouchSerializer
 
@@ -38,22 +39,22 @@ class CheckpointTagCreateView(APIView):
 
         serializer = CheckpointTagSerializer(data=request.data)
         if serializer.is_valid():
-            number = serializer.validated_data.get("number")
+            checkpoint_id = serializer.validated_data.get("checkpoint_id")
             nfc_uid = serializer.validated_data.get("nfc_uid")
 
-            control_point = self.get_control_point(race_id, number)
+            control_point = self.get_control_point(race_id, checkpoint_id)
             # nfc_uid is globally unique (website migration 0089). If this UID is
             # already bound to a different КП, get_or_create's create() raises an
             # IntegrityError; re-query to confirm it's a UID conflict and not an
             # unrelated failure (FK violation, crypto signal, etc.) before 409.
             try:
                 checkpoint_tag, created = CheckpointTag.objects.get_or_create(
-                    point=control_point, nfc_uid=nfc_uid
+                    checkpoint=control_point, nfc_uid=nfc_uid
                 )
             except IntegrityError as original_exc:
                 conflict = (
                     CheckpointTag.objects.filter(nfc_uid=nfc_uid)
-                    .exclude(point=control_point)
+                    .exclude(checkpoint=control_point)
                     .exists()
                 )
                 if conflict:
@@ -66,7 +67,8 @@ class CheckpointTagCreateView(APIView):
             return Response(
                 {
                     "id": checkpoint_tag.id,
-                    "point": checkpoint_tag.point.id,
+                    "checkpoint_id": checkpoint_tag.checkpoint_id,
+                    "number": checkpoint_tag.checkpoint.number,
                     "nfc_uid": checkpoint_tag.nfc_uid,
                 },
                 status=status.HTTP_201_CREATED if created else status.HTTP_200_OK,
@@ -75,12 +77,20 @@ class CheckpointTagCreateView(APIView):
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     @staticmethod
-    def get_control_point(race_id: int, number: int) -> Checkpoint:
+    def get_control_point(race_id: int, checkpoint_id: int) -> Checkpoint:
+        # Resolve by id (number is not unique per race) and never bind a tag to a
+        # hidden КП. 404 on miss, matching the mobile tag-create endpoint.
         try:
-            return Checkpoint.objects.get(race_id=race_id, number=number)
+            return Checkpoint.objects.exclude(type=CheckpointType.hidden.value).get(
+                race_id=race_id, id=checkpoint_id
+            )
         except Checkpoint.DoesNotExist:
             raise NotFound(
-                {"number": [f"Контрольная точка с номером {number} не найдена"]}
+                {
+                    "checkpoint_id": [
+                        f"Контрольная точка с id {checkpoint_id} не найдена"
+                    ]
+                }
             )
 
 
