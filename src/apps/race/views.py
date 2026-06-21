@@ -1031,14 +1031,14 @@ class RaceLegendCodesView(View):
         if not can_edit_race(request.user, race):
             return HttpResponseForbidden()
         tags = (
-            CheckpointTag.objects.filter(point__race_id=race.id)
-            .select_related("point")
-            .order_by("point__number", "id")
+            CheckpointTag.objects.filter(checkpoint__race_id=race.id)
+            .select_related("checkpoint")
+            .order_by("checkpoint__number", "id")
         )
         rows = [
             {
                 "nfc_uid": tag.nfc_uid,
-                "number": tag.point.number,
+                "number": tag.checkpoint.number,
                 "code": bytes(tag.code).hex() if tag.code else "—",
             }
             for tag in tags

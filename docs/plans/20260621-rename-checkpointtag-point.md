@@ -153,27 +153,27 @@ was written but not committed), so changing it now is cheap.
   `src/website/models/models.py` (its `point.point` at ~line 277 is a `TakenKP`
   loop variable, unrelated to this FK)
 
-- [ ] rename `CheckpointTag.point` → `checkpoint` in `checkpoint.py` (keep
+- [x] rename `CheckpointTag.point` → `checkpoint` in `checkpoint.py` (keep
       `verbose_name="КП"`, `on_delete=CASCADE`, `related_name="tags"`); leave
       `unlocks`/`unlocked_by` untouched
-- [ ] create migration `0090` with `migrations.RenameField("checkpointtag",
+- [x] create migration `0090` with `migrations.RenameField("checkpointtag",
       "point", "checkpoint")`; verify `uv run python src/manage.py makemigrations
       --check` reports no further changes
-- [ ] update every ORM/attribute reference `point__` / `point=` / `tag.point` /
+- [x] update every ORM/attribute reference `point__` / `point=` / `tag.point` /
       `tag.point_id` → `checkpoint*` across the source files above (signals
       `cp.tags`/`unlocked_by` related_names are unchanged; only the forward
       accessor moves) — Edit only, file by file
-- [ ] `serializers.py`: `TagSerializer` — change **only** `source="point_id"` →
+- [x] `serializers.py`: `TagSerializer` — change **only** `source="point_id"` →
       `source="checkpoint_id"`; **keep the field name `point`** (the wire key
       moves in Task 3). Leave `TagCreateSerializer.point` as-is (moves in Task 2)
-- [ ] `views.py`: `LegendView` queryset `point__race_id`/`point__type` →
+- [x] `views.py`: `LegendView` queryset `point__race_id`/`point__type` →
       `checkpoint__…`; `TagCreateView` `tag.point_id`/`filter(point=cp)`/
       `CheckpointTag(point=cp,…)` → `checkpoint*`; **keep** the response dict key
       `"point": tag.checkpoint.number` and `validated_data["point"]` (move in Task 2)
-- [ ] update `.point` ORM/attribute references in `src/website/tests.py` and
+- [x] update `.point` ORM/attribute references in `src/website/tests.py` and
       `src/apps/race/tests.py`; legend `tags[].point` / tag-create response
       `point` **JSON-key assertions stay as-is** (keys unchanged in this task)
-- [ ] run `uv run pytest` — suite green before Task 2 (wire shape unchanged;
+- [x] run `uv run pytest` — suite green before Task 2 (wire shape unchanged;
       only the internal attribute moved)
 
 ### Task 2: Mobile tag-create wire contract (`checkpoint_id` + `number`)

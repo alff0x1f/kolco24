@@ -252,7 +252,7 @@ class TagCreateView(AppAPIView):
         return Response(
             {
                 "bid": tag.bid,
-                "point": tag.point.number,
+                "point": tag.checkpoint.number,
                 "nfc_uid": tag.nfc_uid,
                 "code": code.hex() if code is not None else None,
             },
@@ -275,7 +275,7 @@ class TagCreateView(AppAPIView):
 
         existing = list(CheckpointTag.objects.filter(nfc_uid=nfc_uid))
         for tag in existing:
-            if tag.point_id == cp.id:
+            if tag.checkpoint_id == cp.id:
                 # Same chip, same КП → idempotent success (no duplicate row).
                 return self._tag_response(tag, status.HTTP_200_OK)
         if existing:
@@ -288,7 +288,7 @@ class TagCreateView(AppAPIView):
         try:
             with transaction.atomic():
                 tag = CheckpointTag(
-                    point=cp, nfc_uid=nfc_uid, created_by=request.mobile_user
+                    checkpoint=cp, nfc_uid=nfc_uid, created_by=request.mobile_user
                 )
                 tag.save()  # fires post_save → ensure_code/build_bundle
         except IntegrityError as original_exc:
@@ -296,7 +296,7 @@ class TagCreateView(AppAPIView):
             # failure (FK violation, crypto signal, etc.). Re-query to determine.
             # Use filter().first() to avoid a nested exception context that would
             # re-raise CheckpointTag.DoesNotExist instead of the original error.
-            tag = CheckpointTag.objects.filter(point=cp, nfc_uid=nfc_uid).first()
+            tag = CheckpointTag.objects.filter(checkpoint=cp, nfc_uid=nfc_uid).first()
             if tag is not None:
                 return self._tag_response(tag, status.HTTP_200_OK)
             # No row for this (point, nfc_uid). Only return 409 if the UID
@@ -368,8 +368,8 @@ class LegendView(AppAPIView):
         # for offline cp_id recognition. `.exclude(bid="")` drops un-built tags
         # (created bypassing the build_bundle signal) that have no usable bid.
         tag_qs = (
-            CheckpointTag.objects.filter(point__race_id=race_id)
-            .exclude(point__type=CheckpointType.hidden.value)
+            CheckpointTag.objects.filter(checkpoint__race_id=race_id)
+            .exclude(checkpoint__type=CheckpointType.hidden.value)
             .exclude(bid="")
             .order_by("id")
         )

@@ -2405,7 +2405,7 @@ def test_legend_delete_tagged_checkpoint_refused(client):
 
     race = _make_race()
     tagged = Checkpoint.objects.create(race=race, number=2, cost=20, description="b")
-    CheckpointTag.objects.create(point=tagged, nfc_uid="aa:bb:cc")
+    CheckpointTag.objects.create(checkpoint=tagged, nfc_uid="aa:bb:cc")
     superuser = User.objects.create_superuser("admin", "a@b.c", "pw")
     client.force_login(superuser)
 
@@ -2651,9 +2651,9 @@ def test_legend_codes_lists_tags_with_hex_and_placeholder(client):
     cp2 = Checkpoint.objects.create(race=race, number=2, cost=20, description="b")
     cp1 = Checkpoint.objects.create(race=race, number=1, cost=10, description="a")
     with_code = CheckpointTag.objects.create(
-        point=cp1, nfc_uid="aa:bb:cc", code=b"\x01\x02\x03"
+        checkpoint=cp1, nfc_uid="aa:bb:cc", code=b"\x01\x02\x03"
     )
-    without_code = CheckpointTag.objects.create(point=cp2, nfc_uid="dd:ee:ff")
+    without_code = CheckpointTag.objects.create(checkpoint=cp2, nfc_uid="dd:ee:ff")
     # The post_save signal auto-mints a code; clear it via update() (bypasses
     # signals) to exercise the "—" placeholder the command also shows.
     CheckpointTag.objects.filter(id=without_code.id).update(code=None)

@@ -2489,7 +2489,7 @@ def test_checkpoint_tag_save_uppercases_nfc_uid():
 
     race = Race.objects.create(name="Tag test", slug="cp-tag-upper")
     cp = Checkpoint.objects.create(race=race, number=1, cost=1)
-    tag = CheckpointTag.objects.create(point=cp, nfc_uid="04a1b2c3")
+    tag = CheckpointTag.objects.create(checkpoint=cp, nfc_uid="04a1b2c3")
     assert tag.nfc_uid == "04A1B2C3"
 
     tag.nfc_uid = "deadbeef"

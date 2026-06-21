@@ -77,7 +77,7 @@ class TagSerializer(serializers.Serializer):
     """
 
     bid = serializers.CharField()
-    point = serializers.IntegerField(source="point_id")
+    point = serializers.IntegerField(source="checkpoint_id")
     iv = serializers.SerializerMethodField()
     ct = serializers.SerializerMethodField()
     check_method = serializers.CharField()

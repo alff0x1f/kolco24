@@ -143,8 +143,8 @@ def legend_version(race_id):
         .aggregate(max_updated=Max("updated_at"), count=Count("id"))
     )
     tags = (
-        CheckpointTag.objects.filter(point__race_id=race_id)
-        .exclude(point__type=CheckpointType.hidden.value)
+        CheckpointTag.objects.filter(checkpoint__race_id=race_id)
+        .exclude(checkpoint__type=CheckpointType.hidden.value)
         .aggregate(max_updated=Max("updated_at"), count=Count("id"))
     )
     raw = (

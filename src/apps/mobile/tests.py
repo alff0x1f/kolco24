@@ -688,7 +688,7 @@ def test_legend_excludes_hidden_checkpoints(client, settings):
     hidden = Checkpoint.objects.create(
         race=race, number=2, cost=0, description="hidden cp", type="hidden"
     )
-    CheckpointTag.objects.create(point=hidden, nfc_uid="HIDDEN:TAG")
+    CheckpointTag.objects.create(checkpoint=hidden, nfc_uid="HIDDEN:TAG")
 
     path = f"/app/race/{race.id}/legend/"
     response = client.get(path, **_signed_headers("GET", path, SECRET))
@@ -860,7 +860,7 @@ def test_legend_end_to_end_scan_code_decrypts_locked_checkpoint(client, settings
         race=race, number=1, cost=4, description="столб у воды", is_legend_locked=True
     )
     # The tag's empty unlocks falls back to [point]; signals seal + build bundle.
-    tag = CheckpointTag.objects.create(point=cp, nfc_uid="04A1B2C3")
+    tag = CheckpointTag.objects.create(checkpoint=cp, nfc_uid="04A1B2C3")
     tag.refresh_from_db()
     code = bytes(tag.code)  # what is written into the physical NFC tag's memory
 
@@ -904,7 +904,7 @@ def test_legend_tags_include_open_checkpoint_tag_with_point_no_iv_ct(client, set
     race = Race.objects.create(name="Open tag", slug="open-tag")
     cp = Checkpoint.objects.create(race=race, number=1, cost=2, description="open spot")
     tag = CheckpointTag.objects.create(
-        point=cp, nfc_uid="04A1B2C3", check_method="offline"
+        checkpoint=cp, nfc_uid="04A1B2C3", check_method="offline"
     )
     tag.refresh_from_db()
 
@@ -935,7 +935,7 @@ def test_legend_tags_exclude_unbuilt_tag_with_empty_bid(client, settings):
     cp = Checkpoint.objects.create(race=race, number=1, cost=2, description="open spot")
     # Bypass the build_bundle signal so the row keeps its bid="" default.
     CheckpointTag.objects.bulk_create(
-        [CheckpointTag(point=cp, nfc_uid="04A1B2C3", check_method="offline")]
+        [CheckpointTag(checkpoint=cp, nfc_uid="04A1B2C3", check_method="offline")]
     )
     assert CheckpointTag.objects.filter(bid="").count() == 1
 
@@ -957,7 +957,7 @@ def test_legend_etag_changes_when_tag_edited_and_304_with_new_etag(client, setti
     race = Race.objects.create(name="Tag etag", slug="tag-etag")
     cp = Checkpoint.objects.create(race=race, number=1, cost=1, description="first")
     tag = CheckpointTag.objects.create(
-        point=cp, nfc_uid="04A1B2C3", check_method="offline"
+        checkpoint=cp, nfc_uid="04A1B2C3", check_method="offline"
     )
 
     path = f"/app/race/{race.id}/legend/"
@@ -996,7 +996,7 @@ def test_legend_etag_changes_when_tag_edited_with_update_fields(client, settings
     race = Race.objects.create(name="Tag etag uf", slug="tag-etag-uf")
     cp = Checkpoint.objects.create(race=race, number=1, cost=1, description="first")
     tag = CheckpointTag.objects.create(
-        point=cp, nfc_uid="04A1B2C3", check_method="offline"
+        checkpoint=cp, nfc_uid="04A1B2C3", check_method="offline"
     )
 
     path = f"/app/race/{race.id}/legend/"
@@ -1028,7 +1028,9 @@ def test_legend_build_independent_same_etag_and_body_across_key_ids(client, sett
     cp = Checkpoint.objects.create(
         race=race, number=1, cost=1, description="first", is_legend_locked=True
     )
-    CheckpointTag.objects.create(point=cp, nfc_uid="04A1B2C3", check_method="offline")
+    CheckpointTag.objects.create(
+        checkpoint=cp, nfc_uid="04A1B2C3", check_method="offline"
+    )
 
     path = f"/app/race/{race.id}/legend/"
     resp_a = client.get(
@@ -1602,7 +1604,7 @@ def test_legend_version_changes_when_tag_check_method_edited():
     race = Race.objects.create(name="Tag edit", slug="tag-edit")
     cp = Checkpoint.objects.create(race=race, number=1, cost=1, description="cp")
     tag = CheckpointTag.objects.create(
-        point=cp, nfc_uid="AA:BB", check_method="offline"
+        checkpoint=cp, nfc_uid="AA:BB", check_method="offline"
     )
     before = legend_version(race.id)
     tag.check_method = "online"
@@ -1621,7 +1623,7 @@ def test_legend_version_changes_when_tag_added_and_removed():
     cp = Checkpoint.objects.create(race=race, number=1, cost=1, description="cp")
     before = legend_version(race.id)
     tag = CheckpointTag.objects.create(
-        point=cp, nfc_uid="AA:BB", check_method="offline"
+        checkpoint=cp, nfc_uid="AA:BB", check_method="offline"
     )
     after_add = legend_version(race.id)
     assert before != after_add
@@ -1648,7 +1650,7 @@ def test_legend_version_changes_when_open_checkpoint_tag_added():
 
     before = legend_version(race.id)
     tag = CheckpointTag.objects.create(
-        point=cp, nfc_uid="AA:BB", check_method="offline"
+        checkpoint=cp, nfc_uid="AA:BB", check_method="offline"
     )
     after_add = legend_version(race.id)
     assert before != after_add
@@ -1668,7 +1670,9 @@ def test_legend_version_unchanged_when_tag_on_hidden_checkpoint_added():
         race=race, number=2, cost=0, description="hidden", type="hidden"
     )
     before = legend_version(race.id)
-    CheckpointTag.objects.create(point=hidden, nfc_uid="AA:BB", check_method="offline")
+    CheckpointTag.objects.create(
+        checkpoint=hidden, nfc_uid="AA:BB", check_method="offline"
+    )
     after = legend_version(race.id)
     assert before == after
 
@@ -1708,7 +1712,7 @@ def test_legend_version_build_independent():
     cp = Checkpoint.objects.create(
         race=race, number=1, cost=1, description="cp", is_legend_locked=True
     )
-    CheckpointTag.objects.create(point=cp, nfc_uid="AA:BB", check_method="offline")
+    CheckpointTag.objects.create(checkpoint=cp, nfc_uid="AA:BB", check_method="offline")
     # No key_id argument any more; deterministic regardless of build.
     assert legend_version(race.id) == legend_version(race.id)
 
@@ -2479,7 +2483,9 @@ def test_sync_versions_legend_matches_legend_etag_per_key_id(client, settings):
 
     race = Race.objects.create(name="Sync per build", slug="sync-legend-per-key")
     cp = Checkpoint.objects.create(race=race, number=1, cost=1, description="first")
-    CheckpointTag.objects.create(point=cp, nfc_uid="04A1B2C3", check_method="offline")
+    CheckpointTag.objects.create(
+        checkpoint=cp, nfc_uid="04A1B2C3", check_method="offline"
+    )
 
     legend_path = f"/app/race/{race.id}/legend/"
     sync_path = f"/app/race/{race.id}/sync/"
@@ -2508,7 +2514,9 @@ def test_sync_versions_legend_same_across_key_ids(client, settings):
     cp = Checkpoint.objects.create(
         race=race, number=1, cost=1, description="first", is_legend_locked=True
     )
-    CheckpointTag.objects.create(point=cp, nfc_uid="04A1B2C3", check_method="offline")
+    CheckpointTag.objects.create(
+        checkpoint=cp, nfc_uid="04A1B2C3", check_method="offline"
+    )
 
     sync_path = f"/app/race/{race.id}/sync/"
     resp_a = client.get(
@@ -2965,7 +2973,7 @@ def test_checkpoint_tag_unlocks_m2m_add_and_clear():
     race = Race.objects.create(name="Unlock race", slug="unlock-race")
     p1 = Checkpoint.objects.create(race=race, number=1, cost=1)
     p2 = Checkpoint.objects.create(race=race, number=2, cost=1)
-    tag = CheckpointTag.objects.create(point=p1, nfc_uid="DEADBEEF")
+    tag = CheckpointTag.objects.create(checkpoint=p1, nfc_uid="DEADBEEF")
 
     tag.unlocks.add(p1, p2)
     assert set(tag.unlocks.values_list("id", flat=True)) == {p1.id, p2.id}
@@ -2988,7 +2996,7 @@ def test_checkpoint_tag_new_fields_nullable_defaults():
 
     race = Race.objects.create(name="Tag defaults", slug="tag-defaults")
     point = Checkpoint.objects.create(race=race, number=1, cost=1)
-    tag = CheckpointTag(point=point, nfc_uid="CAFEBABE")  # unsaved
+    tag = CheckpointTag(checkpoint=point, nfc_uid="CAFEBABE")  # unsaved
 
     assert tag.code is None
     assert tag.bundle_blob is None
@@ -3089,7 +3097,7 @@ def test_ensure_code_generates_only_when_missing():
     point = Checkpoint.objects.create(race=race, number=1, cost=1)
     # Unsaved instance: the Task 4 post_save signal auto-populates code on a
     # saved tag, so test ensure_code's in-memory logic on a fresh instance.
-    tag = CheckpointTag(point=point, nfc_uid="04A1B2C3")
+    tag = CheckpointTag(checkpoint=point, nfc_uid="04A1B2C3")
 
     assert tag.code is None
     ensure_code(tag)
@@ -3116,7 +3124,7 @@ def test_build_bundle_empty_unlocks_falls_back_to_own_locked_point():
         race=race, number=1, cost=1, description="x", is_legend_locked=True
     )
     secret = seal_checkpoint(cp)
-    tag = CheckpointTag.objects.create(point=cp, nfc_uid="04A1B2C3")
+    tag = CheckpointTag.objects.create(checkpoint=cp, nfc_uid="04A1B2C3")
 
     build_bundle(tag)
     tag.refresh_from_db()
@@ -3146,7 +3154,7 @@ def test_build_bundle_skips_open_checkpoints():
     )
     seal_checkpoint(locked)
     open_cp = Checkpoint.objects.create(race=race, number=2, cost=1, description="open")
-    tag = CheckpointTag.objects.create(point=locked, nfc_uid="04A1B2C3")
+    tag = CheckpointTag.objects.create(checkpoint=locked, nfc_uid="04A1B2C3")
     tag.unlocks.set([locked, open_cp])
 
     build_bundle(tag)
@@ -3197,7 +3205,7 @@ def test_build_bundle_excludes_cross_race_and_hidden_unlocks():
     )
     seal_checkpoint(hidden_locked)
 
-    tag = CheckpointTag.objects.create(point=local_locked, nfc_uid="04AABBCC")
+    tag = CheckpointTag.objects.create(checkpoint=local_locked, nfc_uid="04AABBCC")
     tag.unlocks.set([local_locked, cross_race_locked, hidden_locked])
 
     build_bundle(tag)
@@ -3216,7 +3224,7 @@ def test_build_bundle_excludes_cross_race_and_hidden_unlocks():
 @pytest.mark.django_db
 def test_build_bundle_invalid_only_unlocks_produces_none_not_fallback():
     """A tag whose explicit unlocks contain *only* cross-race/hidden КП must get
-    bundle_blob=None, not silently fall back to [tag.point].
+    bundle_blob=None, not silently fall back to [tag.checkpoint].
 
     Regression for: build_bundle checked ``if not unlocked`` (post-filter) instead
     of ``if not tag.unlocks.exists()`` (raw M2M), so all-invalid explicit unlocks
@@ -3249,7 +3257,7 @@ def test_build_bundle_invalid_only_unlocks_produces_none_not_fallback():
     )
     seal_checkpoint(hidden_cp)
 
-    tag = CheckpointTag.objects.create(point=local_cp, nfc_uid="04DEADBEEF")
+    tag = CheckpointTag.objects.create(checkpoint=local_cp, nfc_uid="04DEADBEEF")
     # Both explicit unlocks are invalid — cross-race and hidden only
     tag.unlocks.set([cross_race_cp, hidden_cp])
 
@@ -3282,8 +3290,8 @@ def test_build_bundle_overlap_one_checkpoint_in_two_bundles():
 
     p_a = Checkpoint.objects.create(race=race, number=3, cost=1)
     p_b = Checkpoint.objects.create(race=race, number=4, cost=1)
-    tag_a = CheckpointTag.objects.create(point=p_a, nfc_uid="0A0A0A0A")
-    tag_b = CheckpointTag.objects.create(point=p_b, nfc_uid="0B0B0B0B")
+    tag_a = CheckpointTag.objects.create(checkpoint=p_a, nfc_uid="0A0A0A0A")
+    tag_b = CheckpointTag.objects.create(checkpoint=p_b, nfc_uid="0B0B0B0B")
     tag_a.unlocks.set([shared])
     tag_b.unlocks.set([shared, extra])
 
@@ -3323,7 +3331,7 @@ def test_build_bundle_preserves_existing_code():
     cp = Checkpoint.objects.create(
         race=race, number=1, cost=1, description="x", is_legend_locked=True
     )
-    tag = CheckpointTag.objects.create(point=cp, nfc_uid="04A1B2C3")
+    tag = CheckpointTag.objects.create(checkpoint=cp, nfc_uid="04A1B2C3")
     ensure_code(tag)
     tag.save()
     code_before = bytes(tag.code)
@@ -3386,7 +3394,9 @@ def test_signal_lock_toggle_rebuilds_implicit_point_tag_bundle():
 
     race = Race.objects.create(name="Sig implicit", slug="sig-implicit")
     cp = Checkpoint.objects.create(race=race, number=1, cost=1, description="x")
-    tag = CheckpointTag.objects.create(point=cp, nfc_uid="04A1B2C3")  # empty unlocks
+    tag = CheckpointTag.objects.create(
+        checkpoint=cp, nfc_uid="04A1B2C3"
+    )  # empty unlocks
 
     tag.refresh_from_db()
     assert tag.bundle_blob is None  # open КП → no content_key, no bundle
@@ -3415,7 +3425,7 @@ def test_signal_lock_toggle_rebuilds_unlocked_by_tag_bundle():
     race = Race.objects.create(name="Sig unlocked-by", slug="sig-unlocked-by")
     target = Checkpoint.objects.create(race=race, number=1, cost=1, description="t")
     holder = Checkpoint.objects.create(race=race, number=2, cost=1, description="h")
-    tag = CheckpointTag.objects.create(point=holder, nfc_uid="0B0B0B0B")
+    tag = CheckpointTag.objects.create(checkpoint=holder, nfc_uid="0B0B0B0B")
     tag.unlocks.set([target])  # holder tag unlocks the target КП
 
     target.is_legend_locked = True
@@ -3445,7 +3455,7 @@ def test_signal_editing_unlocks_rebuilds_bundle():
         race=race, number=1, cost=1, description="locked", is_legend_locked=True
     )
     holder = Checkpoint.objects.create(race=race, number=2, cost=1, description="h")
-    tag = CheckpointTag.objects.create(point=holder, nfc_uid="0C0C0C0C")
+    tag = CheckpointTag.objects.create(checkpoint=holder, nfc_uid="0C0C0C0C")
 
     tag.unlocks.add(locked)  # m2m_changed → build_bundle
 
@@ -3477,7 +3487,7 @@ def test_signal_reverse_m2m_add_rebuilds_bundle():
         race=race, number=1, cost=1, description="locked", is_legend_locked=True
     )
     holder = Checkpoint.objects.create(race=race, number=2, cost=1, description="h")
-    tag = CheckpointTag.objects.create(point=holder, nfc_uid="0D0D0D0D")
+    tag = CheckpointTag.objects.create(checkpoint=holder, nfc_uid="0D0D0D0D")
 
     # Via reverse accessor: fires m2m_changed with instance=locked, pk_set={tag.pk}
     locked.unlocked_by.add(tag)
@@ -3507,7 +3517,7 @@ def test_signal_reverse_m2m_clear_rebuilds_bundle():
         race=race, number=1, cost=1, description="locked", is_legend_locked=True
     )
     holder = Checkpoint.objects.create(race=race, number=2, cost=1, description="h")
-    tag = CheckpointTag.objects.create(point=holder, nfc_uid="0E0E0E0E")
+    tag = CheckpointTag.objects.create(checkpoint=holder, nfc_uid="0E0E0E0E")
 
     locked.unlocked_by.add(tag)
     tag.refresh_from_db()
@@ -3558,7 +3568,7 @@ def test_signal_reverse_m2m_remove_rebuilds_bundle():
         race=race, number=1, cost=1, description="locked", is_legend_locked=True
     )
     holder = Checkpoint.objects.create(race=race, number=2, cost=1, description="h")
-    tag = CheckpointTag.objects.create(point=holder, nfc_uid="0F0F0F0F")
+    tag = CheckpointTag.objects.create(checkpoint=holder, nfc_uid="0F0F0F0F")
 
     locked.unlocked_by.add(tag)
     tag.refresh_from_db()
@@ -3592,8 +3602,8 @@ def test_signal_lock_toggle_rebuilds_all_dependent_tag_bundles():
         race=race, number=1, cost=5, description="sec", is_legend_locked=False
     )
     holder = Checkpoint.objects.create(race=race, number=2, cost=1, description="h")
-    tag_a = CheckpointTag.objects.create(point=holder, nfc_uid="A1A1A1A1")
-    tag_b = CheckpointTag.objects.create(point=holder, nfc_uid="B2B2B2B2")
+    tag_a = CheckpointTag.objects.create(checkpoint=holder, nfc_uid="A1A1A1A1")
+    tag_b = CheckpointTag.objects.create(checkpoint=holder, nfc_uid="B2B2B2B2")
 
     # Both tags explicitly unlock target (currently open → no content_key yet).
     target.unlocked_by.add(tag_a)
@@ -3659,7 +3669,7 @@ def test_signal_no_infinite_recursion():
     cp = Checkpoint.objects.create(
         race=race, number=1, cost=1, description="x", is_legend_locked=True
     )
-    tag = CheckpointTag.objects.create(point=cp, nfc_uid="04A1B2C3")
+    tag = CheckpointTag.objects.create(checkpoint=cp, nfc_uid="04A1B2C3")
 
     # Each of these would blow the stack if the receivers re-triggered each other.
     tag.check_method = "online"
@@ -3691,7 +3701,7 @@ def test_signal_bundle_rebuild_moves_legend_etag():
         race=race, number=2, cost=1, description="b", is_legend_locked=True
     )
     holder = Checkpoint.objects.create(race=race, number=3, cost=1, description="h")
-    tag = CheckpointTag.objects.create(point=holder, nfc_uid="04A1B2C3")
+    tag = CheckpointTag.objects.create(checkpoint=holder, nfc_uid="04A1B2C3")
     tag.unlocks.set([first])
 
     before = legend_version(race.id)
@@ -3727,7 +3737,7 @@ def test_signal_hidden_to_kp_on_locked_cp_rebuilds_dependent_bundle():
         is_legend_locked=True,
     )
     holder = Checkpoint.objects.create(race=race, number=2, cost=1, description="h")
-    tag = CheckpointTag.objects.create(point=holder, nfc_uid="DDDDDDDD")
+    tag = CheckpointTag.objects.create(checkpoint=holder, nfc_uid="DDDDDDDD")
     tag.unlocks.add(locked_hidden)  # hidden at add time → bundle excludes its key
 
     tag.refresh_from_db()
@@ -3771,7 +3781,7 @@ def test_rebuild_legend_crypto_backfills_secrets_and_bundles():
     cp = Checkpoint.objects.create(
         race=race, number=1, cost=4, description="tree", is_legend_locked=True
     )
-    tag = CheckpointTag.objects.create(point=cp, nfc_uid="04A1B2C3")
+    tag = CheckpointTag.objects.create(checkpoint=cp, nfc_uid="04A1B2C3")
 
     # Wipe to a pre-backfill state, bypassing signals.
     CheckpointSecret.objects.filter(checkpoint=cp).delete()
@@ -3805,7 +3815,7 @@ def test_rebuild_regenerate_codes_changes_codes_else_preserved():
     cp = Checkpoint.objects.create(
         race=race, number=1, cost=1, description="x", is_legend_locked=True
     )
-    tag = CheckpointTag.objects.create(point=cp, nfc_uid="04A1B2C3")
+    tag = CheckpointTag.objects.create(checkpoint=cp, nfc_uid="04A1B2C3")
     tag.refresh_from_db()
     code_before = bytes(tag.code)
 
@@ -3836,8 +3846,8 @@ def test_export_legend_codes_lists_every_tag_code():
     cp2 = Checkpoint.objects.create(
         race=race, number=2, cost=1, description="b", is_legend_locked=True
     )
-    tag1 = CheckpointTag.objects.create(point=cp1, nfc_uid="0A0A0A0A")
-    tag2 = CheckpointTag.objects.create(point=cp2, nfc_uid="0B0B0B0B")
+    tag1 = CheckpointTag.objects.create(checkpoint=cp1, nfc_uid="0A0A0A0A")
+    tag2 = CheckpointTag.objects.create(checkpoint=cp2, nfc_uid="0B0B0B0B")
     tag1.refresh_from_db()
     tag2.refresh_from_db()
 
@@ -3888,7 +3898,7 @@ def test_export_legend_codes_placeholder_for_missing_code():
 
     race = Race.objects.create(name="Export2", slug="export2")
     cp = Checkpoint.objects.create(race=race, number=1, cost=1, description="x")
-    tag = CheckpointTag.objects.create(point=cp, nfc_uid="0C0C0C0C")
+    tag = CheckpointTag.objects.create(checkpoint=cp, nfc_uid="0C0C0C0C")
     # Bypass signals to leave code as None.
     CheckpointTag.objects.filter(pk=tag.pk).update(code=None)
 
@@ -3971,7 +3981,7 @@ def test_admin_rebuild_bundle_action_repopulates_blob(client, django_user_model)
     cp = Checkpoint.objects.create(
         race=race, number=1, cost=4, description="tree", is_legend_locked=True
     )
-    tag = CheckpointTag.objects.create(point=cp, nfc_uid="04A1B2C3")
+    tag = CheckpointTag.objects.create(checkpoint=cp, nfc_uid="04A1B2C3")
     # Wipe the bundle without firing signals (simulate a stale row).
     CheckpointTag.objects.filter(pk=tag.pk).update(bundle_blob=None)
     tag.refresh_from_db()
@@ -4007,7 +4017,7 @@ def test_admin_regenerate_code_action_changes_code(client, django_user_model):
     cp = Checkpoint.objects.create(
         race=race, number=1, cost=4, description="tree", is_legend_locked=True
     )
-    tag = CheckpointTag.objects.create(point=cp, nfc_uid="04A1B2C3")
+    tag = CheckpointTag.objects.create(checkpoint=cp, nfc_uid="04A1B2C3")
     tag.refresh_from_db()
     code_before = bytes(tag.code)
 
@@ -4036,7 +4046,7 @@ def test_tag_serializer_open_tag_identity_only():
     race = Race.objects.create(name="Open tag ser", slug="open-tag-ser")
     cp = Checkpoint.objects.create(race=race, number=1, cost=2, description="open")
     tag = CheckpointTag.objects.create(
-        point=cp, nfc_uid="04A1B2C3", check_method="offline"
+        checkpoint=cp, nfc_uid="04A1B2C3", check_method="offline"
     )
     tag.refresh_from_db()
     assert tag.bundle_blob is None  # open КП → no unlock envelope
@@ -4062,7 +4072,7 @@ def test_tag_serializer_locked_tag_includes_iv_ct():
     )
     # Empty unlocks falls back to [point]; signals seal + build the bundle.
     tag = CheckpointTag.objects.create(
-        point=cp, nfc_uid="04A1B2C3", check_method="offline"
+        checkpoint=cp, nfc_uid="04A1B2C3", check_method="offline"
     )
     tag.refresh_from_db()
     assert tag.bundle_blob is not None  # locked КП → unlock envelope present
@@ -4095,8 +4105,8 @@ def test_export_legend_codes_dumps_open_and_locked_tags():
         race=race, number=2, cost=4, description="locked", is_legend_locked=True
     )
     # Signals mint a code for every tag (open КП too — open just gets bundle_blob=None).
-    open_tag = CheckpointTag.objects.create(point=open_cp, nfc_uid="0A0A0A0A")
-    locked_tag = CheckpointTag.objects.create(point=locked_cp, nfc_uid="0B0B0B0B")
+    open_tag = CheckpointTag.objects.create(checkpoint=open_cp, nfc_uid="0A0A0A0A")
+    locked_tag = CheckpointTag.objects.create(checkpoint=locked_cp, nfc_uid="0B0B0B0B")
     open_tag.refresh_from_db()
     locked_tag.refresh_from_db()
     assert open_tag.bundle_blob is None  # open КП → no unlock envelope
@@ -4136,8 +4146,8 @@ def test_signal_bulk_delete_checkpoints_rebuilds_all_dependent_tags():
         race=race, number=2, cost=20, description="B", is_legend_locked=True
     )
     holder = Checkpoint.objects.create(race=race, number=3, cost=1, description="H")
-    tag_a = CheckpointTag.objects.create(point=holder, nfc_uid="AA000001")
-    tag_b = CheckpointTag.objects.create(point=holder, nfc_uid="BB000002")
+    tag_a = CheckpointTag.objects.create(checkpoint=holder, nfc_uid="AA000001")
+    tag_b = CheckpointTag.objects.create(checkpoint=holder, nfc_uid="BB000002")
     tag_a.unlocks.set([cp_a])  # tag_a unlocks only cp_a
     tag_b.unlocks.set([cp_b])  # tag_b unlocks only cp_b
 
@@ -4160,7 +4170,8 @@ def test_signal_bulk_delete_checkpoints_rebuilds_all_dependent_tags():
 def test_signal_bulk_delete_holder_and_target_skips_cascade_deleted_tag():
     """Bulk-deleting both the tag's holder KP and the locked target KP must not crash.
 
-    Repro: tag.point=holder, tag.unlocks=[target], delete [holder, target] together.
+    Repro: tag.checkpoint=holder, tag.unlocks=[target], delete [holder, target]
+    together.
     Django cascade-deletes the CheckpointTag row when holder is deleted. The
     post_delete for target must not try to call build_bundle on the now-deleted tag
     (which would attempt tag.save() on a non-existent row).
@@ -4173,7 +4184,7 @@ def test_signal_bulk_delete_holder_and_target_skips_cascade_deleted_tag():
         race=race, number=1, cost=10, description="T", is_legend_locked=True
     )
     holder = Checkpoint.objects.create(race=race, number=2, cost=1, description="H")
-    tag = CheckpointTag.objects.create(point=holder, nfc_uid="CC000003")
+    tag = CheckpointTag.objects.create(checkpoint=holder, nfc_uid="CC000003")
     tag.unlocks.set([target])
     tag_pk = tag.pk
 
@@ -5412,7 +5423,9 @@ def test_checkpoint_tag_created_by_persists(django_user_model):
     )
     race = Race.objects.create(name="Prov race", slug="prov-race")
     cp = Checkpoint.objects.create(race=race, number=1, cost=1, description="x")
-    tag = CheckpointTag.objects.create(point=cp, nfc_uid="04A1B2C3", created_by=user)
+    tag = CheckpointTag.objects.create(
+        checkpoint=cp, nfc_uid="04A1B2C3", created_by=user
+    )
 
     tag.refresh_from_db()
     assert tag.created_by_id == user.id
@@ -5441,7 +5454,9 @@ def test_checkpoint_tag_created_by_does_not_disturb_crypto_signals(
     cp = Checkpoint.objects.create(
         race=race, number=1, cost=4, description="столб", is_legend_locked=True
     )
-    tag = CheckpointTag.objects.create(point=cp, nfc_uid="04A1B2C3", created_by=user)
+    tag = CheckpointTag.objects.create(
+        checkpoint=cp, nfc_uid="04A1B2C3", created_by=user
+    )
 
     tag.refresh_from_db()
     assert tag.created_by_id == user.id
@@ -5501,7 +5516,7 @@ def test_tag_create_happy_path_201_with_crypto_via_signals(
     assert data["point"] == cp.number
     assert data["nfc_uid"] == "04A1B2C3"
 
-    tag = CheckpointTag.objects.get(point=cp, nfc_uid="04A1B2C3")
+    tag = CheckpointTag.objects.get(checkpoint=cp, nfc_uid="04A1B2C3")
     assert tag.created_by_id == user.id
     # crypto populated by the post_save signal
     assert tag.code is not None
@@ -5533,7 +5548,7 @@ def test_tag_create_idempotent_same_uid_same_cp_no_duplicate(
     second = _signed_post_auth(client, path, SECRET, body, raw)
     assert second.status_code == 200
 
-    assert CheckpointTag.objects.filter(point=cp, nfc_uid="04A1B2C3").count() == 1
+    assert CheckpointTag.objects.filter(checkpoint=cp, nfc_uid="04A1B2C3").count() == 1
     # the idempotent hit returns the same bid/code as the create
     assert second.json()["bid"] == first.json()["bid"]
     assert second.json()["code"] == first.json()["code"]
@@ -5575,7 +5590,7 @@ def test_tag_create_same_uid_different_cp_returns_409(
     assert conflict.status_code == 409
     # no rebind: the chip stays on the original КП only
     assert CheckpointTag.objects.filter(nfc_uid="04A1B2C3").count() == 1
-    assert CheckpointTag.objects.get(nfc_uid="04A1B2C3").point_id == cp.id
+    assert CheckpointTag.objects.get(nfc_uid="04A1B2C3").checkpoint_id == cp.id
 
 
 @pytest.mark.django_db
@@ -5593,8 +5608,10 @@ def test_tag_create_idempotent_hit_on_unbuilt_tag_rebuilds_no_500(
 
     race, user, raw, cp = _make_admin_race(django_user_model, "unbuilt")
     # Bypass the build_bundle signal so the row keeps bid=""/code=None.
-    CheckpointTag.objects.bulk_create([CheckpointTag(point=cp, nfc_uid="04A1B2C3")])
-    assert CheckpointTag.objects.filter(point=cp, bid="").count() == 1
+    CheckpointTag.objects.bulk_create(
+        [CheckpointTag(checkpoint=cp, nfc_uid="04A1B2C3")]
+    )
+    assert CheckpointTag.objects.filter(checkpoint=cp, bid="").count() == 1
 
     path = _tags_path(race.id)
     body = json.dumps({"point": cp.id, "nfc_uid": "04A1B2C3"}).encode()
@@ -5602,7 +5619,7 @@ def test_tag_create_idempotent_hit_on_unbuilt_tag_rebuilds_no_500(
 
     assert response.status_code == 200
     data = response.json()
-    tag = CheckpointTag.objects.get(point=cp, nfc_uid="04A1B2C3")
+    tag = CheckpointTag.objects.get(checkpoint=cp, nfc_uid="04A1B2C3")
     assert tag.bid != ""
     assert tag.code is not None
     assert data["bid"] == tag.bid
@@ -5681,7 +5698,7 @@ def test_tag_create_normalizes_nfc_uid(client, settings, django_user_model):
 
     assert response.status_code == 201
     assert response.json()["nfc_uid"] == "04A1B2C3"
-    assert CheckpointTag.objects.filter(point=cp, nfc_uid="04A1B2C3").exists()
+    assert CheckpointTag.objects.filter(checkpoint=cp, nfc_uid="04A1B2C3").exists()
 
 
 @pytest.mark.django_db
