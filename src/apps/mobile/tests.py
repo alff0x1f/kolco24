@@ -531,6 +531,7 @@ def test_legend_valid_signature_returns_200_with_fields_and_order(client, settin
     assert response.status_code == 200
     data = response.json()
     assert data["race"] == race.id
+    assert data["total_cost"] == 4  # 2 + 1 + 1 over all non-hidden КП
     assert data["tags"] == []
     assert [c["number"] for c in data["checkpoints"]] == [1, 2, 3]
     first = data["checkpoints"][0]
@@ -839,6 +840,52 @@ def test_legend_locked_cp_serves_enc_not_cleartext_open_serves_cleartext(
     assert "secret tree" not in body
     # ...but the open КП's cleartext does
     assert "open spot" in body
+
+    # total_cost folds in the locked КП's cost (4 + 2) as an aggregate only —
+    # the per-КП locked cost still isn't exposed (no "cost" key on the locked КП).
+    assert data["total_cost"] == 6
+
+
+@pytest.mark.django_db
+def test_legend_total_cost_sums_non_hidden_only(client, settings):
+    """total_cost = Σ cost over open + locked КП, excluding hidden КП."""
+    from website.models.checkpoint import Checkpoint
+    from website.models.race import Race
+
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    race = Race.objects.create(name="Totals race", slug="totals-race")
+    Checkpoint.objects.create(race=race, number=1, cost=3, description="open")
+    Checkpoint.objects.create(
+        race=race, number=2, cost=5, description="locked", is_legend_locked=True
+    )
+    Checkpoint.objects.create(
+        race=race, number=3, cost=99, description="hidden", type="hidden"
+    )
+
+    path = f"/app/race/{race.id}/legend/"
+    response = client.get(path, **_signed_headers("GET", path, SECRET))
+
+    assert response.status_code == 200
+    # 3 (open) + 5 (locked); the hidden КП's cost of 99 is excluded.
+    assert response.json()["total_cost"] == 8
+
+
+@pytest.mark.django_db
+def test_legend_total_cost_empty_race_is_zero(client, settings):
+    """An empty race yields total_cost == 0 (Sum None coalesced to 0)."""
+    from website.models.race import Race
+
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    race = Race.objects.create(name="Empty race", slug="empty-totals-race")
+    path = f"/app/race/{race.id}/legend/"
+    response = client.get(path, **_signed_headers("GET", path, SECRET))
+
+    assert response.status_code == 200
+    assert response.json()["total_cost"] == 0
 
 
 @pytest.mark.django_db
