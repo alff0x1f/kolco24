@@ -11,7 +11,7 @@ import logging
 from django.conf import settings
 from django.contrib.auth import authenticate
 from django.db import IntegrityError, transaction
-from django.db.models import F, Prefetch
+from django.db.models import F, Prefetch, Sum
 from django.http import HttpResponseNotModified
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
@@ -375,9 +375,18 @@ class LegendView(AppAPIView):
             .exclude(bid="")
             .order_by("id")
         )
+        # Progress-bar denominator: the sum of `cost` over the same non-hidden
+        # КП the legend serves (open + locked). Sent in cleartext as an aggregate
+        # only — the per-КП cost of a locked КП still never leaves the server, so
+        # the legend lock (which hides strategic per-КП values) is preserved.
+        # `Sum` ignores order_by/select_related; an empty race yields None → 0.
+        # Derives purely from `Checkpoint.cost`, which `legend_version` already
+        # fingerprints via `MAX(updated_at)|COUNT`, so no new ETag input is needed.
+        total_cost = qs.aggregate(total=Sum("cost"))["total"] or 0
         resp = Response(
             {
                 "race": race_id,
+                "total_cost": total_cost,
                 "checkpoints": LegendCheckpointSerializer(qs, many=True).data,
                 "tags": TagSerializer(tag_qs, many=True).data,
             }
