@@ -6071,3 +6071,604 @@ def test_signed_permission_reads_body_before_drf_parse():
         # 2) DRF can still parse the same body afterwards (no RawPostDataException)
         drf_request = Request(raw_request, parsers=[JSONParser()])
         assert drf_request.data == {"checkpoint_id": 1, "nfc_uid": "AB"}
+
+
+# --- TrackPoint model (Task 1) ---------------------------------------------
+
+
+def _make_team_in_race(django_user_model, name="Track team", slug="track-race"):
+    """Create a published race with a category and one team in it."""
+    from website.models.models import Team
+    from website.models.race import Category, Race
+
+    race = Race.objects.create(name=name, slug=slug, is_published=True)
+    category = Category.objects.create(code="open", name="Open", race=race)
+    user = django_user_model.objects.create_user(
+        username=f"owner-{slug}", email=f"{slug}@example.com", password="x"
+    )
+    team = Team.objects.create(owner=user, category2=category, teamname="Alpha")
+    return race, team
+
+
+@pytest.mark.django_db
+def test_trackpoint_round_trips_all_fields(django_user_model):
+    from apps.mobile.models import TrackPoint
+
+    race, team = _make_team_in_race(django_user_model)
+    pk = "11111111-1111-1111-1111-111111111111"
+    TrackPoint.objects.create(
+        id=pk,
+        team=team,
+        race=race,
+        install_id="install-abc",
+        segment_id="seg-1",
+        lat=55.75,
+        lon=37.62,
+        accuracy=4.5,
+        altitude=None,
+        vertical_accuracy=None,
+        gps_time_ms=1700000000000,
+        trusted_ms=None,
+        elapsed_at=123456,
+        boot_count=None,
+    )
+
+    tp = TrackPoint.objects.get(pk=pk)
+    assert tp.pk == pk
+    assert tp.team_id == team.id
+    assert tp.race_id == race.id
+    assert tp.install_id == "install-abc"
+    assert tp.segment_id == "seg-1"
+    assert tp.lat == 55.75
+    assert tp.lon == 37.62
+    assert tp.accuracy == 4.5
+    assert tp.altitude is None
+    assert tp.vertical_accuracy is None
+    assert tp.gps_time_ms == 1700000000000
+    assert tp.trusted_ms is None
+    assert tp.elapsed_at == 123456
+    assert tp.boot_count is None
+    assert tp.created_at is not None
+
+
+@pytest.mark.django_db
+def test_trackpoint_round_trips_non_null_optionals(django_user_model):
+    from apps.mobile.models import TrackPoint
+
+    race, team = _make_team_in_race(django_user_model, slug="track-race-2")
+    TrackPoint.objects.create(
+        id="pk-with-optionals",
+        team=team,
+        race=race,
+        install_id="install-abc",
+        segment_id="seg-1",
+        lat=10.0,
+        lon=20.0,
+        accuracy=3.0,
+        altitude=-12.5,  # below sea level
+        vertical_accuracy=2.0,
+        gps_time_ms=1,
+        trusted_ms=2,
+        elapsed_at=3,
+        boot_count=7,
+    )
+    tp = TrackPoint.objects.get(pk="pk-with-optionals")
+    assert tp.altitude == -12.5
+    assert tp.vertical_accuracy == 2.0
+    assert tp.trusted_ms == 2
+    assert tp.boot_count == 7
+
+
+@pytest.mark.django_db
+def test_trackpoint_bulk_create_ignore_conflicts_is_idempotent(django_user_model):
+    from apps.mobile.models import TrackPoint
+
+    race, team = _make_team_in_race(django_user_model, slug="track-race-3")
+    pk = "dup-point-id"
+
+    def _point(lat):
+        return TrackPoint(
+            id=pk,
+            team=team,
+            race=race,
+            install_id="install-abc",
+            segment_id="seg-1",
+            lat=lat,
+            lon=20.0,
+            accuracy=3.0,
+            gps_time_ms=1,
+            elapsed_at=3,
+        )
+
+    TrackPoint.objects.bulk_create([_point(11.0)], ignore_conflicts=True)
+    assert TrackPoint.objects.count() == 1
+
+    # second bulk_create with the same id silently no-ops; original row untouched
+    TrackPoint.objects.bulk_create([_point(99.0)], ignore_conflicts=True)
+    assert TrackPoint.objects.count() == 1
+    assert TrackPoint.objects.get(pk=pk).lat == 11.0
+
+
+@pytest.mark.django_db
+def test_trackpoint_create_duplicate_pk_raises(django_user_model):
+    from apps.mobile.models import TrackPoint
+
+    race, team = _make_team_in_race(django_user_model, slug="track-race-4")
+    TrackPoint.objects.create(
+        id="same-pk",
+        team=team,
+        race=race,
+        install_id="install-abc",
+        segment_id="seg-1",
+        lat=1.0,
+        lon=2.0,
+        accuracy=3.0,
+        gps_time_ms=1,
+        elapsed_at=3,
+    )
+    with pytest.raises(IntegrityError):
+        TrackPoint.objects.create(
+            id="same-pk",
+            team=team,
+            race=race,
+            install_id="install-abc",
+            segment_id="seg-1",
+            lat=4.0,
+            lon=5.0,
+            accuracy=6.0,
+            gps_time_ms=1,
+            elapsed_at=3,
+        )
+
+
+# --- Track upload serializers (Task 2) -------------------------------------
+
+
+def _valid_track_point(**overrides):
+    """A fully-populated, valid GPS fix dict for serializer tests."""
+    point = {
+        "id": "11111111-1111-1111-1111-111111111111",
+        "segment_id": "seg-1",
+        "lat": 55.75,
+        "lon": 37.62,
+        "accuracy": 4.5,
+        "altitude": 120.0,
+        "vertical_accuracy": 2.0,
+        "gps_time_ms": 1700000000000,
+        "trusted_ms": 1700000000001,
+        "elapsed_at": 123456,
+        "boot_count": 7,
+    }
+    point.update(overrides)
+    return point
+
+
+def test_track_upload_serializer_valid_batch():
+    from apps.mobile.serializers import TrackUploadSerializer
+
+    payload = {"team_id": 42, "points": [_valid_track_point()]}
+    serializer = TrackUploadSerializer(data=payload)
+    assert serializer.is_valid(), serializer.errors
+    data = serializer.validated_data
+    assert data["team_id"] == 42
+    assert len(data["points"]) == 1
+    assert data["points"][0]["id"] == "11111111-1111-1111-1111-111111111111"
+    assert data["points"][0]["lat"] == 55.75
+
+
+def test_track_upload_serializer_omitted_nullables_resolve_absent():
+    from apps.mobile.serializers import TrackUploadSerializer
+
+    point = _valid_track_point()
+    for field in ("altitude", "vertical_accuracy", "trusted_ms", "boot_count"):
+        point.pop(field)
+    serializer = TrackUploadSerializer(data={"team_id": 1, "points": [point]})
+    assert serializer.is_valid(), serializer.errors
+    parsed = serializer.validated_data["points"][0]
+    # Omitted optional fields are simply absent (not defaulted to None).
+    assert "altitude" not in parsed
+    assert "vertical_accuracy" not in parsed
+    assert "trusted_ms" not in parsed
+    assert "boot_count" not in parsed
+
+
+def test_track_upload_serializer_explicit_null_nullables():
+    from apps.mobile.serializers import TrackUploadSerializer
+
+    point = _valid_track_point(
+        altitude=None, vertical_accuracy=None, trusted_ms=None, boot_count=None
+    )
+    serializer = TrackUploadSerializer(data={"team_id": 1, "points": [point]})
+    assert serializer.is_valid(), serializer.errors
+    parsed = serializer.validated_data["points"][0]
+    assert parsed["altitude"] is None
+    assert parsed["vertical_accuracy"] is None
+    assert parsed["trusted_ms"] is None
+    assert parsed["boot_count"] is None
+
+
+def test_track_upload_serializer_missing_required_field_invalid():
+    from apps.mobile.serializers import TrackUploadSerializer
+
+    point = _valid_track_point()
+    point.pop("lat")
+    serializer = TrackUploadSerializer(data={"team_id": 1, "points": [point]})
+    assert not serializer.is_valid()
+    assert "points" in serializer.errors
+
+
+def test_track_upload_serializer_out_of_range_lat_lon_invalid():
+    from apps.mobile.serializers import TrackUploadSerializer
+
+    for field, bad in [("lat", 91.0), ("lat", -91.0), ("lon", 181.0), ("lon", -181.0)]:
+        point = _valid_track_point(**{field: bad})
+        serializer = TrackUploadSerializer(data={"team_id": 1, "points": [point]})
+        assert not serializer.is_valid(), f"{field}={bad} should be invalid"
+
+
+def test_track_upload_serializer_negative_magnitudes_invalid():
+    from apps.mobile.serializers import TrackUploadSerializer
+
+    for field in (
+        "accuracy",
+        "gps_time_ms",
+        "elapsed_at",
+        "trusted_ms",
+        "boot_count",
+        "vertical_accuracy",
+    ):
+        point = _valid_track_point(**{field: -1})
+        serializer = TrackUploadSerializer(data={"team_id": 1, "points": [point]})
+        assert not serializer.is_valid(), f"negative {field} should be invalid"
+
+
+def test_track_upload_serializer_empty_id_or_segment_invalid():
+    from apps.mobile.serializers import TrackUploadSerializer
+
+    for field in ("id", "segment_id"):
+        point = _valid_track_point(**{field: ""})
+        serializer = TrackUploadSerializer(data={"team_id": 1, "points": [point]})
+        assert not serializer.is_valid(), f"empty {field} should be invalid"
+
+
+def test_track_upload_serializer_negative_altitude_valid():
+    from apps.mobile.serializers import TrackUploadSerializer
+
+    point = _valid_track_point(altitude=-50.0)  # below sea level
+    serializer = TrackUploadSerializer(data={"team_id": 1, "points": [point]})
+    assert serializer.is_valid(), serializer.errors
+    assert serializer.validated_data["points"][0]["altitude"] == -50.0
+
+
+def test_track_upload_serializer_empty_points_valid():
+    from apps.mobile.serializers import TrackUploadSerializer
+
+    serializer = TrackUploadSerializer(data={"team_id": 1, "points": []})
+    assert serializer.is_valid(), serializer.errors
+    assert serializer.validated_data["points"] == []
+
+
+def test_track_upload_serializer_over_500_points_invalid():
+    from apps.mobile.serializers import TrackUploadSerializer
+
+    points = [_valid_track_point(id=f"pt-{i}") for i in range(501)]
+    serializer = TrackUploadSerializer(data={"team_id": 1, "points": points})
+    assert not serializer.is_valid()
+    assert "points" in serializer.errors
+
+
+def test_track_upload_serializer_nan_float_fields_invalid():
+    """NaN must be rejected for all float GPS fields — it passes min/max validators
+    because NaN comparisons always return False in Python."""
+    from apps.mobile.serializers import TrackUploadSerializer
+
+    nan_fields = ["lat", "lon", "accuracy", "altitude", "vertical_accuracy"]
+    for field in nan_fields:
+        point = _valid_track_point(**{field: "NaN"})
+        serializer = TrackUploadSerializer(data={"team_id": 1, "points": [point]})
+        assert not serializer.is_valid(), f"NaN in {field!r} should be invalid"
+
+
+def test_track_upload_serializer_infinity_float_fields_invalid():
+    """Infinity must be rejected for all float GPS fields — fields without a
+    max_value (accuracy, altitude, vertical_accuracy) would otherwise accept inf."""
+    from apps.mobile.serializers import TrackUploadSerializer
+
+    inf_fields = ["lat", "lon", "accuracy", "altitude", "vertical_accuracy"]
+    for field in inf_fields:
+        for inf_str in ["1e309", "-1e309", "Inf", "-Inf"]:
+            point = _valid_track_point(**{field: inf_str})
+            serializer = TrackUploadSerializer(data={"team_id": 1, "points": [point]})
+            assert (
+                not serializer.is_valid()
+            ), f"Value {inf_str!r} in {field!r} should be invalid (non-finite)"
+
+
+# --- Track upload endpoint (Task 3) ----------------------------------------
+
+
+def _track_path(race_id):
+    return f"/app/race/{race_id}/track/"
+
+
+@pytest.mark.django_db
+def test_track_upload_wrong_signature_returns_403(client, settings, django_user_model):
+    import json
+
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    race, team = _make_team_in_race(django_user_model, slug="track-403")
+    path = _track_path(race.id)
+    body = json.dumps({"team_id": team.id, "points": [_valid_track_point()]}).encode()
+    # build the signature with the WRONG secret → build gate must reject
+    response = _signed_post(client, path, "wrong-secret", body)
+    assert response.status_code == 403
+    assert response.json() == {"detail": "Forbidden"}
+
+
+@pytest.mark.django_db
+def test_track_upload_happy_path_persists_and_acks(client, settings, django_user_model):
+    import json
+
+    from apps.mobile.models import TrackPoint
+
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    race, team = _make_team_in_race(django_user_model, slug="track-happy")
+    path = _track_path(race.id)
+    p1 = _valid_track_point(id="pt-a")
+    p2 = _valid_track_point(id="pt-b", lat=10.0, lon=20.0)
+    body = json.dumps({"team_id": team.id, "points": [p1, p2]}).encode()
+
+    response = _signed_post(client, path, SECRET, body)
+    assert response.status_code == 200
+    assert response.json() == {"accepted": ["pt-a", "pt-b"]}
+
+    assert TrackPoint.objects.count() == 2
+    row = TrackPoint.objects.get(pk="pt-a")
+    assert row.race_id == race.id
+    assert row.team_id == team.id
+    assert row.install_id == "install-abc"  # from the signed header
+    assert row.segment_id == "seg-1"
+    assert row.lat == 55.75
+
+
+@pytest.mark.django_db
+def test_track_upload_idempotent_no_duplicate_rows(client, settings, django_user_model):
+    import json
+
+    from apps.mobile.models import TrackPoint
+
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    race, team = _make_team_in_race(django_user_model, slug="track-idem")
+    path = _track_path(race.id)
+    body = json.dumps(
+        {"team_id": team.id, "points": [_valid_track_point(id="pt-x")]}
+    ).encode()
+
+    r1 = _signed_post(client, path, SECRET, body)
+    r2 = _signed_post(client, path, SECRET, body)
+    assert r1.status_code == 200
+    assert r2.status_code == 200
+    assert r1.json() == r2.json() == {"accepted": ["pt-x"]}
+    assert TrackPoint.objects.count() == 1
+
+
+@pytest.mark.django_db
+def test_track_upload_install_id_stamping(client, settings, django_user_model):
+    import json
+
+    from apps.mobile.models import TrackPoint
+
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    race, team = _make_team_in_race(django_user_model, slug="track-install")
+    path = _track_path(race.id)
+
+    def _post_with_install(install_id, point_id):
+        body = json.dumps(
+            {"team_id": team.id, "points": [_valid_track_point(id=point_id)]}
+        ).encode()
+        # install_id is OUTSIDE the signed canonical (method + path + ts + body),
+        # so overriding the header post-signing keeps the signature valid.
+        headers = _signed_headers("POST", path, SECRET, body=body)
+        headers["HTTP_X_INSTALL_ID"] = install_id
+        return client.post(path, data=body, content_type="application/json", **headers)
+
+    r1 = _post_with_install("phone-A", "pt-a")
+    r2 = _post_with_install("phone-B", "pt-b")
+    assert r1.status_code == 200
+    assert r2.status_code == 200
+    assert TrackPoint.objects.get(pk="pt-a").install_id == "phone-A"
+    assert TrackPoint.objects.get(pk="pt-b").install_id == "phone-B"
+
+
+@pytest.mark.django_db
+def test_track_upload_team_not_in_race_returns_404(client, settings, django_user_model):
+    import json
+
+    from website.models.models import Team
+    from website.models.race import Category, Race
+
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    race, _team = _make_team_in_race(django_user_model, slug="track-other-race")
+    # a team that lives in a *different* race
+    other_race = Race.objects.create(
+        name="Other", slug="track-other", is_published=True
+    )
+    other_cat = Category.objects.create(code="open", name="Open", race=other_race)
+    user = django_user_model.objects.create_user(
+        username="other-owner", email="other-owner@example.com", password="x"
+    )
+    other_team = Team.objects.create(
+        owner=user, category2=other_cat, teamname="Outsider"
+    )
+
+    path = _track_path(race.id)
+    body = json.dumps(
+        {"team_id": other_team.id, "points": [_valid_track_point()]}
+    ).encode()
+    response = _signed_post(client, path, SECRET, body)
+    assert response.status_code == 404
+
+
+@pytest.mark.django_db
+def test_track_upload_unpublished_race_returns_404(client, settings, django_user_model):
+    import json
+
+    from website.models.models import Team
+    from website.models.race import Category, Race
+
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    race = Race.objects.create(name="Hidden", slug="track-hidden", is_published=False)
+    category = Category.objects.create(code="open", name="Open", race=race)
+    user = django_user_model.objects.create_user(
+        username="hidden-owner", email="hidden-owner@example.com", password="x"
+    )
+    team = Team.objects.create(owner=user, category2=category, teamname="Ghost")
+
+    path = _track_path(race.id)
+    body = json.dumps({"team_id": team.id, "points": [_valid_track_point()]}).encode()
+    response = _signed_post(client, path, SECRET, body)
+    assert response.status_code == 404
+
+
+@pytest.mark.django_db
+def test_track_upload_nonexistent_race_returns_404(client, settings, django_user_model):
+    import json
+
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    path = _track_path(999999)
+    body = json.dumps({"team_id": 1, "points": [_valid_track_point()]}).encode()
+    response = _signed_post(client, path, SECRET, body)
+    assert response.status_code == 404
+
+
+@pytest.mark.django_db
+def test_track_upload_malformed_point_returns_400(client, settings, django_user_model):
+    import json
+
+    from apps.mobile.models import TrackPoint
+
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    race, team = _make_team_in_race(django_user_model, slug="track-bad")
+    path = _track_path(race.id)
+
+    bad_points = [
+        _valid_track_point(lat=91.0),  # out of range
+        _valid_track_point(accuracy=-1.0),  # negative magnitude
+    ]
+    for bad in bad_points:
+        body = json.dumps({"team_id": team.id, "points": [bad]}).encode()
+        response = _signed_post(client, path, SECRET, body)
+        assert response.status_code == 400
+
+    # a missing required field
+    missing = _valid_track_point()
+    missing.pop("lat")
+    body = json.dumps({"team_id": team.id, "points": [missing]}).encode()
+    assert _signed_post(client, path, SECRET, body).status_code == 400
+
+    # nothing got written on a rejected batch
+    assert TrackPoint.objects.count() == 0
+
+
+@pytest.mark.django_db
+def test_track_upload_mixed_valid_invalid_batch_all_or_nothing(
+    client, settings, django_user_model
+):
+    """All-or-nothing: a batch with one valid and one invalid point writes nothing."""
+    import json
+
+    from apps.mobile.models import TrackPoint
+
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    race, team = _make_team_in_race(django_user_model, slug="track-mixed")
+    path = _track_path(race.id)
+    body = json.dumps(
+        {
+            "team_id": team.id,
+            "points": [
+                _valid_track_point(id="pt-good"),
+                _valid_track_point(id="pt-bad", lat=91.0),  # lat out of range
+            ],
+        }
+    ).encode()
+
+    response = _signed_post(client, path, SECRET, body)
+    assert response.status_code == 400
+    assert TrackPoint.objects.count() == 0
+
+
+@pytest.mark.django_db
+def test_track_upload_over_500_points_returns_400(client, settings, django_user_model):
+    import json
+
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    race, team = _make_team_in_race(django_user_model, slug="track-big")
+    path = _track_path(race.id)
+    points = [_valid_track_point(id=f"pt-{i}") for i in range(501)]
+    body = json.dumps({"team_id": team.id, "points": points}).encode()
+    response = _signed_post(client, path, SECRET, body)
+    assert response.status_code == 400
+
+
+@pytest.mark.django_db
+def test_track_upload_empty_points_acks_empty(client, settings, django_user_model):
+    import json
+
+    from apps.mobile.models import TrackPoint
+
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    race, team = _make_team_in_race(django_user_model, slug="track-empty")
+    path = _track_path(race.id)
+    body = json.dumps({"team_id": team.id, "points": []}).encode()
+    response = _signed_post(client, path, SECRET, body)
+    assert response.status_code == 200
+    assert response.json() == {"accepted": []}
+    assert TrackPoint.objects.count() == 0
+
+
+@pytest.mark.django_db
+def test_track_upload_nullable_round_trip(client, settings, django_user_model):
+    import json
+
+    from apps.mobile.models import TrackPoint
+
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    race, team = _make_team_in_race(django_user_model, slug="track-null")
+    path = _track_path(race.id)
+
+    point = _valid_track_point(id="pt-null")
+    for field in ("altitude", "vertical_accuracy", "trusted_ms", "boot_count"):
+        point.pop(field)
+    body = json.dumps({"team_id": team.id, "points": [point]}).encode()
+    response = _signed_post(client, path, SECRET, body)
+    assert response.status_code == 200
+
+    row = TrackPoint.objects.get(pk="pt-null")
+    assert row.altitude is None
+    assert row.vertical_accuracy is None
+    assert row.trusted_ms is None
+    assert row.boot_count is None

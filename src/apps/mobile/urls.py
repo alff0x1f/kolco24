@@ -9,6 +9,7 @@ from .views import (
     SyncView,
     TagCreateView,
     TeamsView,
+    TrackUploadView,
 )
 
 app_name = "mobile"
@@ -29,5 +30,10 @@ urlpatterns = [
         "race/<int:race_id>/tags/",
         TagCreateView.as_view(),
         name="tag_create",
+    ),
+    path(
+        "race/<int:race_id>/track/",
+        TrackUploadView.as_view(),
+        name="track",
     ),
 ]
