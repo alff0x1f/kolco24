@@ -105,9 +105,13 @@ Django 4.2 project. Source lives entirely under `src/`, with `manage.py` at `src
   a `code` yet, same `nfc_uid / КП number / code(hex)` columns. The JS "Скопировать CSV" button builds RFC-4180 CSV
   from the rendered table and writes it to the clipboard. Gated on `can_edit_race`.
 - `apps.mobile` — **signed mobile-app endpoints** for iOS/Android (`label = "mobile"`, mounted at `/app/*`
-  via `config/urls.py`). Self-contained: touches neither `/api/` nor `donate`/`website`. The reads are accountless — the
+  via `config/urls.py`). The **read** path is self-contained: touches neither `/api/` nor `donate`/`website` — but the
+  **track-upload write** (`TrackPoint`, see the **Track upload** invariant below) is the documented exception, holding
+  cross-app FKs into `website.Team`/`website.Race` (like `apps.race`). The reads are accountless — the
   app authenticates **itself** (per-build HMAC); a thin **write layer** adds a per-person bearer token on top (login +
-  legend-tag create — see the **Per-person write layer** invariant below). Full design (background-sync model,
+  legend-tag create — see the **Per-person write layer** invariant below). A **third POST** —
+  `POST /app/race/<id>/track/` (`track`) — is **build-HMAC-only** like the reads (NOT part of the per-person write
+  layer); see the **Track upload** invariant below. Full design (background-sync model,
   two-server lease/handoff, secret-rotation runbook, 403 reason codes) lives in `src/apps/mobile/README.md`; exact
   response fields are pinned by the serializers and the field-set tests in `tests.py`. Invariants to preserve:
     - **Auth**: per-build shared secret selected by `X-App-Key-Id` from `MOBILE_APP_KEYS` (JSON key-id → secret map env,
@@ -281,6 +285,29 @@ Django 4.2 project. Source lives entirely under `src/`, with `manage.py` at `src
       so callers **must normalize the value themselves** (`.strip().upper()`) before passing it to `update()`. Lookups against `nfc_uid`
       should use the plain exact-match (`nfc_uid=value.strip().upper()`) rather than `__iexact`, since stored values are always stripped
       and uppercase.
+    - **Track upload** (`POST /app/race/<id>/track/`, name `track` — the **third POST**, but **build-HMAC-only**: gated
+      by `AppAPIView`'s default `[SignedAppPermission]`, **NOT** the per-person write layer — track recording runs on
+      participants' phones, no bearer token; throttle `mobile-write`, 60/min). GPS-track ingestion for the Android app:
+      receive a batch, store idempotently, ack the accepted ids — the organizer-facing map that reads tracks back is a
+      separate later task, **out of scope** here. `TrackPoint` (`models.py`) is **write-only / immutable**: one row per
+      GPS fix, **PK = the client-generated UUID** (`id`) so the idempotency key *is* the PK and upsert collapses to
+      `bulk_create(objs, ignore_conflicts=True)` (a re-sent point hits a PK conflict and is silently skipped — no
+      secondary index, no `update_or_create`). It is the documented exception to `apps.mobile`'s "self-contained" read
+      path — it holds **cross-app FKs** into `website.Team`/`website.Race` (like `apps.race`). **No `updated_at`,
+      deliberately not in `versioning.py`** (immutable rows never touch the fingerprint/`sync` machinery). `install_id`
+      (from `request.app_meta["install_id"]`, the `X-Install-Id` header set by `SignedAppPermission` before the view
+      runs) is stored for device attribution (a team recording from two phones is separable: `segment_id` distinguishes
+      recording sessions, `install_id` groups a phone's sessions). **`accepted` = every submitted id** (with
+      `ignore_conflicts=True` a point is either newly inserted or already present — both are success for the client's
+      retry loop). **Validation is all-or-nothing (400 on a bad batch)**, not partial-accept: `TrackPointSerializer`/
+      `TrackUploadSerializer` (`serializers.py`) bound `lat ∈ [-90,90]`, `lon ∈ [-180,180]`, `min_value=0` on the
+      physically-non-negative magnitudes (`accuracy`/`gps_time_ms`/`elapsed_at`/`trusted_ms`/`vertical_accuracy`/
+      `boot_count`), `altitude` **unbounded** (may be below sea level), `id`/`segment_id` `min_length=1`, `points`
+      `max_length=500` (the app's batch cap). Flow (`views.py:TrackUploadView`): resolve a published `Race` (404) →
+      validate body (400) → check the team is in the race (`category2__race_id=race_id`, else 404) →
+      `bulk_create(ignore_conflicts=True)` → 200 `{"accepted": [all submitted ids]}`. Same trust boundary as the reads:
+      a genuine build can post a track for any `team_id` in the race; `team_id`/`install_id` are spoofable, accepted
+      as-is.
 
 New feature apps that don't fit in `website` live under `src/apps/<name>/`. Each needs a unique `AppConfig` label (e.g.
 `label = "race_app"`).

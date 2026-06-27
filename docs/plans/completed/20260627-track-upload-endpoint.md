@@ -264,15 +264,15 @@
 - [x] run `make format && make lint` — must be clean
 
 ### Task 5: [Final] Update documentation
-- [ ] add a subsection to `src/apps/mobile/README.md` documenting `POST /app/race/<id>/track/` (build-HMAC-only,
+- [x] add a subsection to `src/apps/mobile/README.md` documenting `POST /app/race/<id>/track/` (build-HMAC-only,
       body/response contract, `TrackPoint` model incl. client-id-as-PK idempotency + `install_id` device
       attribution, `accepted`=all-ids, all-or-nothing validation, no versioning/ETag)
-- [ ] add a one-line bullet to the `CLAUDE.md` `apps.mobile` section noting the **third POST** (`track`) alongside
+- [x] add a one-line bullet to the `CLAUDE.md` `apps.mobile` section noting the **third POST** (`track`) alongside
       `login` + tag-create, but **build-HMAC-only** — NOT part of the per-person write layer; immutable rows, no
       `updated_at`/versioning. Also note `apps.mobile` now has a **write model (`TrackPoint`) with FKs into
       `website`** — the existing "self-contained / touches neither `/api/` nor `website`" wording describes the
       *read* path; the track write is the documented exception (cross-app FKs like `apps.race`)
-- [ ] move this plan to `docs/plans/completed/`
+- [x] move this plan to `docs/plans/completed/`
 
 ## Post-Completion
 *Items requiring manual intervention or external systems — informational only*
