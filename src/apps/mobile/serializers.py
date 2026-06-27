@@ -43,6 +43,48 @@ class TagCreateSerializer(serializers.Serializer):
     )
 
 
+class TrackPointSerializer(serializers.Serializer):
+    """Validate one GPS fix in a ``POST /app/race/<race_id>/track/`` batch.
+
+    ``id``/``segment_id`` are **opaque client strings** (the Kotlin DTO type is
+    ``String``, not ``UUID`` — production mints UUIDs but the server must not
+    police the client id format; ``id`` is just the PK). ``min_length=1`` only
+    guards against an empty PK.
+
+    GPS magnitudes are physically non-negative (meters / epoch-ms / monotonic-ms
+    / boot counter), so they carry ``min_value=0`` — an out-of-range point is a
+    client bug that surfaces as a 400. ``altitude`` is the one exception: it may
+    be negative (below sea level), so it is unbounded.
+    """
+
+    id = serializers.CharField(max_length=64, min_length=1)
+    segment_id = serializers.CharField(max_length=64, min_length=1)
+    lat = serializers.FloatField(min_value=-90, max_value=90)
+    lon = serializers.FloatField(min_value=-180, max_value=180)
+    accuracy = serializers.FloatField(min_value=0)
+    altitude = serializers.FloatField(required=False, allow_null=True)
+    vertical_accuracy = serializers.FloatField(
+        required=False, allow_null=True, min_value=0
+    )
+    gps_time_ms = serializers.IntegerField(min_value=0)
+    trusted_ms = serializers.IntegerField(required=False, allow_null=True, min_value=0)
+    elapsed_at = serializers.IntegerField(min_value=0)
+    boot_count = serializers.IntegerField(required=False, allow_null=True, min_value=0)
+
+
+class TrackUploadSerializer(serializers.Serializer):
+    """Validate the ``POST /app/race/<race_id>/track/`` body.
+
+    ``team_id`` identifies the team the points belong to (the view checks it is
+    in the race). ``points`` is a batch of up to 500 fixes (the app's batch cap)
+    — an oversized batch is a 400 (all-or-nothing), bounding memory + the single
+    ``bulk_create`` insert. An empty list is valid and acks ``[]``.
+    """
+
+    team_id = serializers.IntegerField()
+    points = TrackPointSerializer(many=True, allow_empty=True, max_length=500)
+
+
 class RaceListSerializer(serializers.ModelSerializer):
     """Public list view of a published race (no images)."""
 

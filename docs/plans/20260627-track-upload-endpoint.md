@@ -208,20 +208,20 @@
 - Modify: `src/apps/mobile/serializers.py`
 - Modify: `src/apps/mobile/tests.py`
 
-- [ ] add `TrackPointSerializer` (nested, with `lat` bounds `-90..90`, `lon` bounds `-180..180`, `id`/`segment_id`
+- [x] add `TrackPointSerializer` (nested, with `lat` bounds `-90..90`, `lon` bounds `-180..180`, `id`/`segment_id`
       `min_length=1`, the non-negative `min_value=0` bounds on `accuracy`/`vertical_accuracy`/`gps_time_ms`/
       `trusted_ms`/`elapsed_at`/`boot_count` (**not** `altitude` — it may be negative), nullable fields
       `required=False, allow_null=True`) and `TrackUploadSerializer` (`team_id` IntegerField,
       `points = TrackPointSerializer(many=True, allow_empty=True, max_length=500)`) — exactly as in
       **Technical Details**
-- [ ] write tests: a valid batch validates and `validated_data` carries the parsed points (incl. omitted nullable
+- [x] write tests: a valid batch validates and `validated_data` carries the parsed points (incl. omitted nullable
       fields resolving to absent/`None`)
-- [ ] write tests: missing required field (e.g. no `lat`) → invalid; out-of-range `lat`/`lon` → invalid; a
+- [x] write tests: missing required field (e.g. no `lat`) → invalid; out-of-range `lat`/`lon` → invalid; a
       **negative** `accuracy`/`gps_time_ms`/`elapsed_at`/`trusted_ms`/`boot_count`/`vertical_accuracy` → invalid (the
       `min_value=0` bounds); empty-string `id`/`segment_id` → invalid (`min_length=1`); a **negative `altitude`** →
       **valid** (altitude is unbounded); empty `points` list → **valid** (acks `[]`); a `points` list **over 500** →
       invalid (the `max_length` cap)
-- [ ] run `uv run pytest src/apps/mobile/tests.py` — must pass before next task
+- [x] run `uv run pytest src/apps/mobile/tests.py` — must pass before next task
 
 ### Task 3: Add `TrackUploadView` + URL wiring
 

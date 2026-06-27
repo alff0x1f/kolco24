@@ -6219,3 +6219,139 @@ def test_trackpoint_create_duplicate_pk_raises(django_user_model):
             gps_time_ms=1,
             elapsed_at=3,
         )
+
+
+# --- Track upload serializers (Task 2) -------------------------------------
+
+
+def _valid_track_point(**overrides):
+    """A fully-populated, valid GPS fix dict for serializer tests."""
+    point = {
+        "id": "11111111-1111-1111-1111-111111111111",
+        "segment_id": "seg-1",
+        "lat": 55.75,
+        "lon": 37.62,
+        "accuracy": 4.5,
+        "altitude": 120.0,
+        "vertical_accuracy": 2.0,
+        "gps_time_ms": 1700000000000,
+        "trusted_ms": 1700000000001,
+        "elapsed_at": 123456,
+        "boot_count": 7,
+    }
+    point.update(overrides)
+    return point
+
+
+def test_track_upload_serializer_valid_batch():
+    from apps.mobile.serializers import TrackUploadSerializer
+
+    payload = {"team_id": 42, "points": [_valid_track_point()]}
+    serializer = TrackUploadSerializer(data=payload)
+    assert serializer.is_valid(), serializer.errors
+    data = serializer.validated_data
+    assert data["team_id"] == 42
+    assert len(data["points"]) == 1
+    assert data["points"][0]["id"] == "11111111-1111-1111-1111-111111111111"
+    assert data["points"][0]["lat"] == 55.75
+
+
+def test_track_upload_serializer_omitted_nullables_resolve_absent():
+    from apps.mobile.serializers import TrackUploadSerializer
+
+    point = _valid_track_point()
+    for field in ("altitude", "vertical_accuracy", "trusted_ms", "boot_count"):
+        point.pop(field)
+    serializer = TrackUploadSerializer(data={"team_id": 1, "points": [point]})
+    assert serializer.is_valid(), serializer.errors
+    parsed = serializer.validated_data["points"][0]
+    # Omitted optional fields are simply absent (not defaulted to None).
+    assert "altitude" not in parsed
+    assert "vertical_accuracy" not in parsed
+    assert "trusted_ms" not in parsed
+    assert "boot_count" not in parsed
+
+
+def test_track_upload_serializer_explicit_null_nullables():
+    from apps.mobile.serializers import TrackUploadSerializer
+
+    point = _valid_track_point(
+        altitude=None, vertical_accuracy=None, trusted_ms=None, boot_count=None
+    )
+    serializer = TrackUploadSerializer(data={"team_id": 1, "points": [point]})
+    assert serializer.is_valid(), serializer.errors
+    parsed = serializer.validated_data["points"][0]
+    assert parsed["altitude"] is None
+    assert parsed["vertical_accuracy"] is None
+    assert parsed["trusted_ms"] is None
+    assert parsed["boot_count"] is None
+
+
+def test_track_upload_serializer_missing_required_field_invalid():
+    from apps.mobile.serializers import TrackUploadSerializer
+
+    point = _valid_track_point()
+    point.pop("lat")
+    serializer = TrackUploadSerializer(data={"team_id": 1, "points": [point]})
+    assert not serializer.is_valid()
+    assert "points" in serializer.errors
+
+
+def test_track_upload_serializer_out_of_range_lat_lon_invalid():
+    from apps.mobile.serializers import TrackUploadSerializer
+
+    for field, bad in [("lat", 91.0), ("lat", -91.0), ("lon", 181.0), ("lon", -181.0)]:
+        point = _valid_track_point(**{field: bad})
+        serializer = TrackUploadSerializer(data={"team_id": 1, "points": [point]})
+        assert not serializer.is_valid(), f"{field}={bad} should be invalid"
+
+
+def test_track_upload_serializer_negative_magnitudes_invalid():
+    from apps.mobile.serializers import TrackUploadSerializer
+
+    for field in (
+        "accuracy",
+        "gps_time_ms",
+        "elapsed_at",
+        "trusted_ms",
+        "boot_count",
+        "vertical_accuracy",
+    ):
+        point = _valid_track_point(**{field: -1})
+        serializer = TrackUploadSerializer(data={"team_id": 1, "points": [point]})
+        assert not serializer.is_valid(), f"negative {field} should be invalid"
+
+
+def test_track_upload_serializer_empty_id_or_segment_invalid():
+    from apps.mobile.serializers import TrackUploadSerializer
+
+    for field in ("id", "segment_id"):
+        point = _valid_track_point(**{field: ""})
+        serializer = TrackUploadSerializer(data={"team_id": 1, "points": [point]})
+        assert not serializer.is_valid(), f"empty {field} should be invalid"
+
+
+def test_track_upload_serializer_negative_altitude_valid():
+    from apps.mobile.serializers import TrackUploadSerializer
+
+    point = _valid_track_point(altitude=-50.0)  # below sea level
+    serializer = TrackUploadSerializer(data={"team_id": 1, "points": [point]})
+    assert serializer.is_valid(), serializer.errors
+    assert serializer.validated_data["points"][0]["altitude"] == -50.0
+
+
+def test_track_upload_serializer_empty_points_valid():
+    from apps.mobile.serializers import TrackUploadSerializer
+
+    serializer = TrackUploadSerializer(data={"team_id": 1, "points": []})
+    assert serializer.is_valid(), serializer.errors
+    assert serializer.validated_data["points"] == []
+
+
+def test_track_upload_serializer_over_500_points_invalid():
+    from apps.mobile.serializers import TrackUploadSerializer
+
+    points = [_valid_track_point(id=f"pt-{i}") for i in range(501)]
+    serializer = TrackUploadSerializer(data={"team_id": 1, "points": points})
+    assert not serializer.is_valid()
+    assert "points" in serializer.errors
