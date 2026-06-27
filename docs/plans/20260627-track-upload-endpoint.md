@@ -256,12 +256,12 @@
 - [x] run `uv run pytest src/apps/mobile/tests.py` — must pass before next task
 
 ### Task 4: Verify acceptance criteria
-- [ ] confirm the wire contract matches the app exactly (path, body keys, point field names/nullability, response
+- [x] confirm the wire contract matches the app exactly (path, body keys, point field names/nullability, response
       `{"accepted": [...]}`) against `kolco24_app_v2` `TrackDtos.kt` / `ApiClient.kt`
-- [ ] confirm auth is build-HMAC-only (no bearer required) and the throttle scope is `mobile-write`
-- [ ] run the full mobile suite: `uv run pytest src/apps/mobile/tests.py`
-- [ ] run the full project suite: `uv run pytest`
-- [ ] run `make format && make lint` — must be clean
+- [x] confirm auth is build-HMAC-only (no bearer required) and the throttle scope is `mobile-write`
+- [x] run the full mobile suite: `uv run pytest src/apps/mobile/tests.py` (325 passed)
+- [x] run the full project suite: `uv run pytest` (716 passed)
+- [x] run `make format && make lint` — must be clean
 
 ### Task 5: [Final] Update documentation
 - [ ] add a subsection to `src/apps/mobile/README.md` documenting `POST /app/race/<id>/track/` (build-HMAC-only,
