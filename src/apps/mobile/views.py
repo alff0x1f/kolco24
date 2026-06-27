@@ -25,7 +25,7 @@ from website.models.models import Athlet, Team
 from website.models.race import Category, Race
 
 from .legend_crypto import build_bundle
-from .models import AppAuthFailure, AppInstall, MobileToken
+from .models import AppAuthFailure, AppInstall, MobileToken, TrackPoint
 from .permissions import CanEditRaceLegend, IsMobileUser, SignedAppPermission
 from .serializers import (
     CategorySerializer,
@@ -36,6 +36,7 @@ from .serializers import (
     TagCreateSerializer,
     TagSerializer,
     TeamSerializer,
+    TrackUploadSerializer,
 )
 from .throttling import ClientIPScopedRateThrottle
 from .tokens import generate_token
@@ -313,6 +314,75 @@ class TagCreateView(AppAPIView):
 
         tag.refresh_from_db()
         return self._tag_response(tag, status.HTTP_201_CREATED)
+
+
+class TrackUploadView(AppAPIView):
+    """``POST /app/race/<race_id>/track/`` — ingest a batch of GPS track points.
+
+    The **third POST** under ``/app/`` but, unlike ``login`` and tag-create, it
+    is **build-HMAC-only** (the default ``[SignedAppPermission]``) — it is **not**
+    part of the per-person write layer. Track recording runs on participants'
+    phones (not admins), so there is no bearer token; the trust boundary is the
+    same as the read endpoints — a genuine build may post a track for any
+    ``team_id`` in the race, and ``team_id``/``install_id`` are accepted as-is.
+
+    Semantics:
+
+    - ``install_id`` is taken from ``request.app_meta`` (the ``X-Install-Id``
+      header, set by :class:`SignedAppPermission` before the view runs) so a
+      team recording from two phones is separable — zero app change.
+    - ``accepted`` echoes **all** submitted ids. The PK is the client UUID, so
+      :meth:`bulk_create` with ``ignore_conflicts=True`` either inserts a new
+      row or silently skips a re-sent one — both are success for the client's
+      retry loop, which only wants confirmation it can stop resending.
+    - Validation is **all-or-nothing**: a malformed/out-of-range point (or an
+      over-500 batch) fails the whole request with a 400, never a partial accept.
+
+    Rows are immutable and write-only — ``TrackPoint`` has no ``updated_at`` and
+    stays out of ``versioning.py``/ETag/``sync`` machinery.
+    """
+
+    throttle_classes = [ClientIPScopedRateThrottle]
+    throttle_scope = "mobile-write"
+
+    def post(self, request, race_id):
+        get_object_or_404(Race, pk=race_id, is_published=True)
+
+        serializer = TrackUploadSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)  # 400 on malformed/out-of-range
+        team_id = serializer.validated_data["team_id"]
+        points = serializer.validated_data["points"]
+
+        if not Team.objects.filter(pk=team_id, category2__race_id=race_id).exists():
+            return Response(
+                {"detail": "Команда не найдена в этой гонке"},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        install_id = request.app_meta["install_id"]
+        objs = [
+            TrackPoint(
+                id=p["id"],
+                team_id=team_id,
+                race_id=race_id,
+                install_id=install_id,
+                segment_id=p["segment_id"],
+                lat=p["lat"],
+                lon=p["lon"],
+                accuracy=p["accuracy"],
+                altitude=p.get("altitude"),
+                vertical_accuracy=p.get("vertical_accuracy"),
+                gps_time_ms=p["gps_time_ms"],
+                trusted_ms=p.get("trusted_ms"),
+                elapsed_at=p["elapsed_at"],
+                boot_count=p.get("boot_count"),
+            )
+            for p in points
+        ]
+        TrackPoint.objects.bulk_create(objs, ignore_conflicts=True)
+        return Response(
+            {"accepted": [p["id"] for p in points]}, status=status.HTTP_200_OK
+        )
 
 
 class RaceListView(AppAPIView):

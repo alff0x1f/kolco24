@@ -230,30 +230,30 @@
 - Modify: `src/apps/mobile/urls.py`
 - Modify: `src/apps/mobile/tests.py`
 
-- [ ] add `TrackUploadView(AppAPIView)` to `views.py` (inherit the default `[SignedAppPermission]` — **do not** add
+- [x] add `TrackUploadView(AppAPIView)` to `views.py` (inherit the default `[SignedAppPermission]` — **do not** add
       `IsMobileUser`; `throttle_classes = [ClientIPScopedRateThrottle]`, `throttle_scope = "mobile-write"`),
       implementing the `post(self, request, race_id)` flow from **Technical Details**. Add a docstring noting it is
       the **third POST** but **build-HMAC-only** (not part of the per-person write layer), and that `install_id`
       comes from `request.app_meta`, `accepted` = all submitted ids, validation is all-or-nothing.
-- [ ] import `TrackPoint`, `TrackUploadSerializer`, `Team`, `Race` as needed (mirror existing import style in
+- [x] import `TrackPoint`, `TrackUploadSerializer`, `Team`, `Race` as needed (mirror existing import style in
       `views.py`)
-- [ ] wire `urls.py`: import `TrackUploadView`, add
+- [x] wire `urls.py`: import `TrackUploadView`, add
       `path("race/<int:race_id>/track/", TrackUploadView.as_view(), name="track")`
-- [ ] write test: **403 without a valid HMAC signature** (e.g. wrong secret / tampered sig) — build-level gate holds
-- [ ] write test: **happy path** → 200 `{"accepted": [all submitted ids]}` and rows persisted with correct field
+- [x] write test: **403 without a valid HMAC signature** (e.g. wrong secret / tampered sig) — build-level gate holds
+- [x] write test: **happy path** → 200 `{"accepted": [all submitted ids]}` and rows persisted with correct field
       values (assert a couple of fields incl. `race_id`/`team_id`/`install_id` from the signed header)
-- [ ] write test: **idempotency** — POST the same batch twice → both 200, same `accepted`, no duplicate rows
-- [ ] write test: **install_id stamping** — two signed POSTs with **different** `HTTP_X_INSTALL_ID` → rows carry the
+- [x] write test: **idempotency** — POST the same batch twice → both 200, same `accepted`, no duplicate rows
+- [x] write test: **install_id stamping** — two signed POSTs with **different** `HTTP_X_INSTALL_ID` → rows carry the
       respective `install_id`. This test **bypasses `_signed_post`** (which exposes no extra-header arg): call
       `_signed_headers(...)`, merge a custom `HTTP_X_INSTALL_ID`, and `client.post` directly. Safe because
       `install_id` is **outside** the signed canonical (`build_canonical` folds only method + path + ts + body), so
       overriding it post-signing does **not** invalidate the signature — no re-signing needed
-- [ ] write test: **team not in race** → 404; **unpublished race** → 404; **nonexistent race** → 404
-- [ ] write test: **malformed / out-of-range point** (bad `lat`, negative `accuracy`, missing field) → 400, and an
+- [x] write test: **team not in race** → 404; **unpublished race** → 404; **nonexistent race** → 404
+- [x] write test: **malformed / out-of-range point** (bad `lat`, negative `accuracy`, missing field) → 400, and an
       **over-500-point batch** → 400 (end-to-end through the endpoint, not just the serializer)
-- [ ] write test: **nullable round-trip** — a point with `altitude`/`trusted_ms`/`boot_count` omitted or `null`
+- [x] write test: **nullable round-trip** — a point with `altitude`/`trusted_ms`/`boot_count` omitted or `null`
       stores `NULL` and still 200s
-- [ ] run `uv run pytest src/apps/mobile/tests.py` — must pass before next task
+- [x] run `uv run pytest src/apps/mobile/tests.py` — must pass before next task
 
 ### Task 4: Verify acceptance criteria
 - [ ] confirm the wire contract matches the app exactly (path, body keys, point field names/nullability, response
