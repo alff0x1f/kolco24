@@ -6357,6 +6357,33 @@ def test_track_upload_serializer_over_500_points_invalid():
     assert "points" in serializer.errors
 
 
+def test_track_upload_serializer_nan_float_fields_invalid():
+    """NaN must be rejected for all float GPS fields — it passes min/max validators
+    because NaN comparisons always return False in Python."""
+    from apps.mobile.serializers import TrackUploadSerializer
+
+    nan_fields = ["lat", "lon", "accuracy", "altitude", "vertical_accuracy"]
+    for field in nan_fields:
+        point = _valid_track_point(**{field: "NaN"})
+        serializer = TrackUploadSerializer(data={"team_id": 1, "points": [point]})
+        assert not serializer.is_valid(), f"NaN in {field!r} should be invalid"
+
+
+def test_track_upload_serializer_infinity_float_fields_invalid():
+    """Infinity must be rejected for all float GPS fields — fields without a
+    max_value (accuracy, altitude, vertical_accuracy) would otherwise accept inf."""
+    from apps.mobile.serializers import TrackUploadSerializer
+
+    inf_fields = ["lat", "lon", "accuracy", "altitude", "vertical_accuracy"]
+    for field in inf_fields:
+        for inf_str in ["1e309", "-1e309", "Inf", "-Inf"]:
+            point = _valid_track_point(**{field: inf_str})
+            serializer = TrackUploadSerializer(data={"team_id": 1, "points": [point]})
+            assert (
+                not serializer.is_valid()
+            ), f"Value {inf_str!r} in {field!r} should be invalid (non-finite)"
+
+
 # --- Track upload endpoint (Task 3) ----------------------------------------
 
 
@@ -6365,9 +6392,7 @@ def _track_path(race_id):
 
 
 @pytest.mark.django_db
-def test_track_upload_missing_signature_returns_403(
-    client, settings, django_user_model
-):
+def test_track_upload_wrong_signature_returns_403(client, settings, django_user_model):
     import json
 
     settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
@@ -6558,6 +6583,35 @@ def test_track_upload_malformed_point_returns_400(client, settings, django_user_
     assert _signed_post(client, path, SECRET, body).status_code == 400
 
     # nothing got written on a rejected batch
+    assert TrackPoint.objects.count() == 0
+
+
+@pytest.mark.django_db
+def test_track_upload_mixed_valid_invalid_batch_all_or_nothing(
+    client, settings, django_user_model
+):
+    """All-or-nothing: a batch with one valid and one invalid point writes nothing."""
+    import json
+
+    from apps.mobile.models import TrackPoint
+
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    race, team = _make_team_in_race(django_user_model, slug="track-mixed")
+    path = _track_path(race.id)
+    body = json.dumps(
+        {
+            "team_id": team.id,
+            "points": [
+                _valid_track_point(id="pt-good"),
+                _valid_track_point(id="pt-bad", lat=91.0),  # lat out of range
+            ],
+        }
+    ).encode()
+
+    response = _signed_post(client, path, SECRET, body)
+    assert response.status_code == 400
     assert TrackPoint.objects.count() == 0
 
 

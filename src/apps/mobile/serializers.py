@@ -1,6 +1,7 @@
 """Serializers for the mobile-app endpoints."""
 
 import logging
+import math
 
 from rest_framework import serializers
 
@@ -43,6 +44,22 @@ class TagCreateSerializer(serializers.Serializer):
     )
 
 
+class FiniteFloatField(serializers.FloatField):
+    """FloatField that rejects NaN and infinity.
+
+    DRF's FloatField converts strings like "NaN" / "1e309" to nan/inf via
+    Python's float() — these pass min/max validators because NaN comparisons
+    always return False and inf only fails when an explicit max_value is set.
+    This subclass adds a math.isfinite() check after the standard conversion.
+    """
+
+    def to_internal_value(self, data):
+        value = super().to_internal_value(data)
+        if not math.isfinite(value):
+            self.fail("invalid")
+        return value
+
+
 class TrackPointSerializer(serializers.Serializer):
     """Validate one GPS fix in a ``POST /app/race/<race_id>/track/`` batch.
 
@@ -59,17 +76,22 @@ class TrackPointSerializer(serializers.Serializer):
 
     id = serializers.CharField(max_length=64, min_length=1)
     segment_id = serializers.CharField(max_length=64, min_length=1)
-    lat = serializers.FloatField(min_value=-90, max_value=90)
-    lon = serializers.FloatField(min_value=-180, max_value=180)
-    accuracy = serializers.FloatField(min_value=0)
-    altitude = serializers.FloatField(required=False, allow_null=True)
-    vertical_accuracy = serializers.FloatField(
-        required=False, allow_null=True, min_value=0
+    lat = FiniteFloatField(min_value=-90, max_value=90)
+    lon = FiniteFloatField(min_value=-180, max_value=180)
+    accuracy = FiniteFloatField(min_value=0)
+    altitude = FiniteFloatField(required=False, allow_null=True)
+    vertical_accuracy = FiniteFloatField(required=False, allow_null=True, min_value=0)
+    # max_value mirrors BigIntegerField cap (2^63 − 1); without it a malicious
+    # client can send an arbitrarily-large int that passes DRF validation but
+    # causes a DataError at bulk_create → 500 instead of a clean 400.
+    gps_time_ms = serializers.IntegerField(min_value=0, max_value=9223372036854775807)
+    trusted_ms = serializers.IntegerField(
+        required=False, allow_null=True, min_value=0, max_value=9223372036854775807
     )
-    gps_time_ms = serializers.IntegerField(min_value=0)
-    trusted_ms = serializers.IntegerField(required=False, allow_null=True, min_value=0)
-    elapsed_at = serializers.IntegerField(min_value=0)
-    boot_count = serializers.IntegerField(required=False, allow_null=True, min_value=0)
+    elapsed_at = serializers.IntegerField(min_value=0, max_value=9223372036854775807)
+    boot_count = serializers.IntegerField(
+        required=False, allow_null=True, min_value=0, max_value=2147483647
+    )
 
 
 class TrackUploadSerializer(serializers.Serializer):
@@ -81,7 +103,7 @@ class TrackUploadSerializer(serializers.Serializer):
     ``bulk_create`` insert. An empty list is valid and acks ``[]``.
     """
 
-    team_id = serializers.IntegerField()
+    team_id = serializers.IntegerField(min_value=1, max_value=2147483647)
     points = TrackPointSerializer(many=True, allow_empty=True, max_length=500)
 
 
