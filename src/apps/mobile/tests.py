@@ -6071,3 +6071,151 @@ def test_signed_permission_reads_body_before_drf_parse():
         # 2) DRF can still parse the same body afterwards (no RawPostDataException)
         drf_request = Request(raw_request, parsers=[JSONParser()])
         assert drf_request.data == {"checkpoint_id": 1, "nfc_uid": "AB"}
+
+
+# --- TrackPoint model (Task 1) ---------------------------------------------
+
+
+def _make_team_in_race(django_user_model, name="Track team", slug="track-race"):
+    """Create a published race with a category and one team in it."""
+    from website.models.models import Team
+    from website.models.race import Category, Race
+
+    race = Race.objects.create(name=name, slug=slug, is_published=True)
+    category = Category.objects.create(code="open", name="Open", race=race)
+    user = django_user_model.objects.create_user(
+        username=f"owner-{slug}", email=f"{slug}@example.com", password="x"
+    )
+    team = Team.objects.create(owner=user, category2=category, teamname="Alpha")
+    return race, team
+
+
+@pytest.mark.django_db
+def test_trackpoint_round_trips_all_fields(django_user_model):
+    from apps.mobile.models import TrackPoint
+
+    race, team = _make_team_in_race(django_user_model)
+    pk = "11111111-1111-1111-1111-111111111111"
+    TrackPoint.objects.create(
+        id=pk,
+        team=team,
+        race=race,
+        install_id="install-abc",
+        segment_id="seg-1",
+        lat=55.75,
+        lon=37.62,
+        accuracy=4.5,
+        altitude=None,
+        vertical_accuracy=None,
+        gps_time_ms=1700000000000,
+        trusted_ms=None,
+        elapsed_at=123456,
+        boot_count=None,
+    )
+
+    tp = TrackPoint.objects.get(pk=pk)
+    assert tp.pk == pk
+    assert tp.team_id == team.id
+    assert tp.race_id == race.id
+    assert tp.install_id == "install-abc"
+    assert tp.segment_id == "seg-1"
+    assert tp.lat == 55.75
+    assert tp.lon == 37.62
+    assert tp.accuracy == 4.5
+    assert tp.altitude is None
+    assert tp.vertical_accuracy is None
+    assert tp.gps_time_ms == 1700000000000
+    assert tp.trusted_ms is None
+    assert tp.elapsed_at == 123456
+    assert tp.boot_count is None
+    assert tp.created_at is not None
+
+
+@pytest.mark.django_db
+def test_trackpoint_round_trips_non_null_optionals(django_user_model):
+    from apps.mobile.models import TrackPoint
+
+    race, team = _make_team_in_race(django_user_model, slug="track-race-2")
+    TrackPoint.objects.create(
+        id="pk-with-optionals",
+        team=team,
+        race=race,
+        install_id="install-abc",
+        segment_id="seg-1",
+        lat=10.0,
+        lon=20.0,
+        accuracy=3.0,
+        altitude=-12.5,  # below sea level
+        vertical_accuracy=2.0,
+        gps_time_ms=1,
+        trusted_ms=2,
+        elapsed_at=3,
+        boot_count=7,
+    )
+    tp = TrackPoint.objects.get(pk="pk-with-optionals")
+    assert tp.altitude == -12.5
+    assert tp.vertical_accuracy == 2.0
+    assert tp.trusted_ms == 2
+    assert tp.boot_count == 7
+
+
+@pytest.mark.django_db
+def test_trackpoint_bulk_create_ignore_conflicts_is_idempotent(django_user_model):
+    from apps.mobile.models import TrackPoint
+
+    race, team = _make_team_in_race(django_user_model, slug="track-race-3")
+    pk = "dup-point-id"
+
+    def _point(lat):
+        return TrackPoint(
+            id=pk,
+            team=team,
+            race=race,
+            install_id="install-abc",
+            segment_id="seg-1",
+            lat=lat,
+            lon=20.0,
+            accuracy=3.0,
+            gps_time_ms=1,
+            elapsed_at=3,
+        )
+
+    TrackPoint.objects.bulk_create([_point(11.0)], ignore_conflicts=True)
+    assert TrackPoint.objects.count() == 1
+
+    # second bulk_create with the same id silently no-ops; original row untouched
+    TrackPoint.objects.bulk_create([_point(99.0)], ignore_conflicts=True)
+    assert TrackPoint.objects.count() == 1
+    assert TrackPoint.objects.get(pk=pk).lat == 11.0
+
+
+@pytest.mark.django_db
+def test_trackpoint_create_duplicate_pk_raises(django_user_model):
+    from apps.mobile.models import TrackPoint
+
+    race, team = _make_team_in_race(django_user_model, slug="track-race-4")
+    TrackPoint.objects.create(
+        id="same-pk",
+        team=team,
+        race=race,
+        install_id="install-abc",
+        segment_id="seg-1",
+        lat=1.0,
+        lon=2.0,
+        accuracy=3.0,
+        gps_time_ms=1,
+        elapsed_at=3,
+    )
+    with pytest.raises(IntegrityError):
+        TrackPoint.objects.create(
+            id="same-pk",
+            team=team,
+            race=race,
+            install_id="install-abc",
+            segment_id="seg-1",
+            lat=4.0,
+            lon=5.0,
+            accuracy=6.0,
+            gps_time_ms=1,
+            elapsed_at=3,
+        )

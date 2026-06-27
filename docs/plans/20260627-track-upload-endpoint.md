@@ -184,23 +184,23 @@
 - Create: `src/apps/mobile/migrations/0007_trackpoint.py`
 - Modify: `src/apps/mobile/tests.py`
 
-- [ ] add the `TrackPoint` model to `models.py` exactly as in **Technical Details** (PK = client `id`, FKs to
+- [x] add the `TrackPoint` model to `models.py` exactly as in **Technical Details** (PK = client `id`, FKs to
       `website.Team`/`website.Race`, `install_id`, `segment_id`, the GPS fields with the documented nullability,
       `created_at` `auto_now_add`, **no secondary index** — see Technical Details). Add a class docstring noting: PK
       is the client UUID (idempotency key), it is **write-only / immutable** with **no `updated_at`** and deliberately
       **not** in `versioning.py`.
-- [ ] generate the migration: `uv run python src/manage.py makemigrations mobile` → verify it is named/renamed
+- [x] generate the migration: `uv run python src/manage.py makemigrations mobile` → verify it is named/renamed
       `0007_trackpoint.py`. `makemigrations` **auto-adds** the dependencies (the latest `mobile` migration
       `0006_mobiletoken` and the `website` migration for the `Team`/`Race` FK targets) — just verify they're present,
       do **not** hand-write a specific `website` migration number (unlike `apps.race/0001` which pinned `0072` only
       because it was that app's first migration)
-- [ ] write a test: applying migrations + `TrackPoint.objects.create(...)` round-trips all fields (incl. null
+- [x] write a test: applying migrations + `TrackPoint.objects.create(...)` round-trips all fields (incl. null
       `altitude`/`vertical_accuracy`/`trusted_ms`/`boot_count`) and the PK accepts a UUID string
-- [ ] write a test for the behavior the endpoint relies on: a second `bulk_create([...], ignore_conflicts=True)`
+- [x] write a test for the behavior the endpoint relies on: a second `bulk_create([...], ignore_conflicts=True)`
       with an already-stored `id` **silently no-ops** (row count unchanged, original row's fields untouched). Keep
       this distinct from a plain `TrackPoint.objects.create(id=same)`, which **raises `IntegrityError`** (assert that
       separately if you cover it) — do not conflate the two in one test
-- [ ] run `uv run pytest src/apps/mobile/tests.py` — must pass before next task
+- [x] run `uv run pytest src/apps/mobile/tests.py` — must pass before next task
 
 ### Task 2: Add the request serializers
 
