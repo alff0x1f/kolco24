@@ -6672,3 +6672,1119 @@ def test_track_upload_nullable_round_trip(client, settings, django_user_model):
     assert row.vertical_accuracy is None
     assert row.trusted_ms is None
     assert row.boot_count is None
+
+
+# --- Mark / MarkPresent models (Task 1) ------------------------------------
+
+
+def _make_mark(team, race, **overrides):
+    """Build (unsaved) a fully-populated Mark for model tests."""
+    from apps.mobile.models import Mark
+
+    fields = {
+        "id": "mark-1",
+        "team": team,
+        "race": race,
+        "source_install_id": "install-abc",
+        "checkpoint_id": 264,
+        "method": "nfc",
+        "cp_code": "9f1a2b3c",
+        "cp_nfc_uid": "04A2B3C4D5E680",
+        "expected_count": 4,
+        "complete": True,
+        "verified": True,
+        "trusted_ms": 1718900000123,
+        "wall_ms": 1718900000000,
+        "elapsed_at": 9876543,
+        "boot_count": 7,
+        "loc_lat": 55.75,
+        "loc_lon": 37.61,
+        "loc_accuracy": 6.5,
+        "loc_altitude": 184.2,
+        "loc_vertical_accuracy": 3.2,
+        "loc_gps_time_ms": 1718899999000,
+        "loc_elapsed_at": 9876100,
+    }
+    fields.update(overrides)
+    return Mark(**fields)
+
+
+@pytest.mark.django_db
+def test_mark_round_trips_all_fields(django_user_model):
+    from apps.mobile.models import Mark
+
+    race, team = _make_team_in_race(django_user_model, slug="mark-race-1")
+    _make_mark(team, race).save()
+
+    m = Mark.objects.get(pk="mark-1")
+    assert m.team_id == team.id
+    assert m.race_id == race.id
+    assert m.source_install_id == "install-abc"
+    assert m.checkpoint_id == 264
+    assert m.method == "nfc"
+    assert m.cp_code == "9f1a2b3c"
+    assert m.cp_nfc_uid == "04A2B3C4D5E680"
+    assert m.expected_count == 4
+    assert m.complete is True
+    assert m.verified is True
+    assert m.trusted_ms == 1718900000123
+    assert m.wall_ms == 1718900000000
+    assert m.elapsed_at == 9876543
+    assert m.boot_count == 7
+    assert m.loc_lat == 55.75
+    assert m.loc_lon == 37.61
+    assert m.loc_accuracy == 6.5
+    assert m.loc_altitude == 184.2
+    assert m.loc_vertical_accuracy == 3.2
+    assert m.loc_gps_time_ms == 1718899999000
+    assert m.loc_elapsed_at == 9876100
+    assert m.created_at is not None
+
+
+@pytest.mark.django_db
+def test_mark_round_trips_nulls(django_user_model):
+    from apps.mobile.models import Mark
+
+    race, team = _make_team_in_race(django_user_model, slug="mark-race-2")
+    _make_mark(
+        team,
+        race,
+        id="mark-nulls",
+        cp_code="",
+        cp_nfc_uid="",
+        trusted_ms=None,
+        elapsed_at=None,
+        boot_count=None,
+        loc_lat=None,
+        loc_lon=None,
+        loc_accuracy=None,
+        loc_altitude=None,
+        loc_vertical_accuracy=None,
+        loc_gps_time_ms=None,
+        loc_elapsed_at=None,
+    ).save()
+
+    m = Mark.objects.get(pk="mark-nulls")
+    assert m.cp_code == ""
+    assert m.cp_nfc_uid == ""
+    assert m.trusted_ms is None
+    assert m.elapsed_at is None
+    assert m.boot_count is None
+    assert m.loc_lat is None
+    assert m.loc_elapsed_at is None
+    # wall_ms is required (sole fallback) and stays set
+    assert m.wall_ms == 1718900000000
+
+
+@pytest.mark.django_db
+def test_markpresent_round_trips_and_sentinel(django_user_model):
+    from apps.mobile.models import MarkPresent
+
+    race, team = _make_team_in_race(django_user_model, slug="mark-race-3")
+    mark = _make_mark(team, race, id="mark-present")
+    mark.save()
+
+    real = MarkPresent.objects.create(
+        mark=mark,
+        nfc_uid="04F1E2D3C4B5A6",
+        code="c3d4",
+        number=101,
+        number_in_team=1,
+    )
+    sentinel = MarkPresent.objects.create(
+        mark=mark,
+        nfc_uid=None,
+        code=None,
+        number=0,
+        number_in_team=2,
+    )
+
+    assert real.nfc_uid == "04F1E2D3C4B5A6"
+    assert real.code == "c3d4"
+    assert real.number == 101
+    sentinel.refresh_from_db()
+    assert sentinel.nfc_uid is None
+    assert sentinel.code is None
+    assert sentinel.number == 0
+    assert mark.present.count() == 2
+
+
+@pytest.mark.django_db
+def test_mark_bulk_create_update_conflicts_upserts_and_preserves_created_at(
+    django_user_model,
+):
+    from apps.mobile.models import MARK_UPDATE_FIELDS, Mark
+
+    race, team = _make_team_in_race(django_user_model, slug="mark-race-4")
+
+    # first insert: no GPS, incomplete
+    first = _make_mark(
+        team,
+        race,
+        id="mark-upsert",
+        complete=False,
+        verified=False,
+        loc_lat=None,
+        loc_lon=None,
+        loc_accuracy=None,
+        loc_altitude=None,
+        loc_vertical_accuracy=None,
+        loc_gps_time_ms=None,
+        loc_elapsed_at=None,
+    )
+    Mark.objects.bulk_create(
+        [first],
+        update_conflicts=True,
+        unique_fields=["id"],
+        update_fields=MARK_UPDATE_FIELDS,
+    )
+    assert Mark.objects.count() == 1
+    original_created_at = Mark.objects.get(pk="mark-upsert").created_at
+
+    # second send: same id, enriched payload (GPS + complete)
+    enriched = _make_mark(
+        team,
+        race,
+        id="mark-upsert",
+        complete=True,
+        verified=True,
+        loc_lat=55.75,
+        loc_lon=37.61,
+    )
+    Mark.objects.bulk_create(
+        [enriched],
+        update_conflicts=True,
+        unique_fields=["id"],
+        update_fields=MARK_UPDATE_FIELDS,
+    )
+
+    assert Mark.objects.count() == 1
+    m = Mark.objects.get(pk="mark-upsert")
+    assert m.complete is True
+    assert m.verified is True
+    assert m.loc_lat == 55.75
+    assert m.loc_lon == 37.61
+    # created_at preserved (excluded from update_fields)
+    assert m.created_at == original_created_at
+
+
+@pytest.mark.django_db
+def test_markpresent_unique_together_and_ignore_conflicts(django_user_model):
+    from apps.mobile.models import MarkPresent
+
+    race, team = _make_team_in_race(django_user_model, slug="mark-race-5")
+    mark = _make_mark(team, race, id="mark-uniq")
+    mark.save()
+
+    MarkPresent.objects.create(
+        mark=mark, nfc_uid="aa", code=None, number=1, number_in_team=1
+    )
+
+    # a duplicate (mark, number_in_team) is rejected
+    with pytest.raises(IntegrityError):
+        MarkPresent.objects.create(
+            mark=mark, nfc_uid="bb", code=None, number=2, number_in_team=1
+        )
+
+
+@pytest.mark.django_db
+def test_markpresent_bulk_create_ignore_conflicts_is_additive(django_user_model):
+    from apps.mobile.models import MarkPresent
+
+    race, team = _make_team_in_race(django_user_model, slug="mark-race-6")
+    mark = _make_mark(team, race, id="mark-additive")
+    mark.save()
+
+    MarkPresent.objects.bulk_create(
+        [MarkPresent(mark=mark, nfc_uid="aa", number=1, number_in_team=1)],
+        ignore_conflicts=True,
+    )
+    assert mark.present.count() == 1
+
+    # re-send slot 1 (collapsed) + a new slot 2 (inserted)
+    MarkPresent.objects.bulk_create(
+        [
+            MarkPresent(mark=mark, nfc_uid="zz", number=9, number_in_team=1),
+            MarkPresent(mark=mark, nfc_uid="bb", number=2, number_in_team=2),
+        ],
+        ignore_conflicts=True,
+    )
+    assert mark.present.count() == 2
+    # existing slot 1 untouched
+    assert mark.present.get(number_in_team=1).nfc_uid == "aa"
+
+
+# --- Mark upload serializers (Task 2) --------------------------------------
+
+
+def _valid_present_member(**overrides):
+    member = {
+        "nfc_uid": "04F1E2D3C4B5A6",
+        "code": "c3d4e5f6",
+        "number": 101,
+        "number_in_team": 1,
+    }
+    member.update(overrides)
+    return member
+
+
+def _valid_location(**overrides):
+    loc = {
+        "lat": 55.7501,
+        "lon": 37.6109,
+        "accuracy": 6.5,
+        "altitude": 184.2,
+        "vertical_accuracy": 3.2,
+        "gps_time_ms": 1718899999000,
+        "elapsed_at": 9876100,
+    }
+    loc.update(overrides)
+    return loc
+
+
+def _valid_mark(**overrides):
+    mark = {
+        "id": "0f9c1111-1111-1111-1111-111111111111",
+        "checkpoint_id": 264,
+        "method": "nfc",
+        "cp_code": "9f1a2b3c4d5e6f70",
+        "cp_nfc_uid": "04A2B3C4D5E680",
+        "present": [_valid_present_member()],
+        "expected_count": 4,
+        "complete": True,
+        "trusted_ms": 1718900000123,
+        "wall_ms": 1718900000000,
+        "elapsed_at": 9876543,
+        "boot_count": 7,
+        "location": _valid_location(),
+    }
+    mark.update(overrides)
+    return mark
+
+
+def _mark_upload_body(**overrides):
+    body = {
+        "team_id": 1234,
+        "source_install_id": "b3c4-uuid",
+        "marks": [_valid_mark()],
+    }
+    body.update(overrides)
+    return body
+
+
+def test_mark_upload_serializer_valid_batch():
+    from apps.mobile.serializers import MarkUploadSerializer
+
+    serializer = MarkUploadSerializer(data=_mark_upload_body())
+    assert serializer.is_valid(), serializer.errors
+    data = serializer.validated_data
+    assert data["team_id"] == 1234
+    assert data["source_install_id"] == "b3c4-uuid"
+    assert len(data["marks"]) == 1
+    mark = data["marks"][0]
+    assert mark["id"] == "0f9c1111-1111-1111-1111-111111111111"
+    assert mark["method"] == "nfc"
+    assert mark["location"]["lat"] == 55.7501
+    assert len(mark["present"]) == 1
+    assert mark["present"][0]["number_in_team"] == 1
+
+
+def test_mark_serializer_omitted_nullables_resolve_absent():
+    from apps.mobile.serializers import MarkUploadSerializer
+
+    mark = _valid_mark()
+    for field in ("trusted_ms", "elapsed_at", "boot_count", "location"):
+        mark.pop(field)
+    serializer = MarkUploadSerializer(data=_mark_upload_body(marks=[mark]))
+    assert serializer.is_valid(), serializer.errors
+    parsed = serializer.validated_data["marks"][0]
+    assert "trusted_ms" not in parsed
+    assert "elapsed_at" not in parsed
+    assert "boot_count" not in parsed
+    assert "location" not in parsed
+
+
+def test_mark_serializer_explicit_null_nullables():
+    from apps.mobile.serializers import MarkUploadSerializer
+
+    mark = _valid_mark(trusted_ms=None, elapsed_at=None, boot_count=None, location=None)
+    serializer = MarkUploadSerializer(data=_mark_upload_body(marks=[mark]))
+    assert serializer.is_valid(), serializer.errors
+    parsed = serializer.validated_data["marks"][0]
+    assert parsed["trusted_ms"] is None
+    assert parsed["elapsed_at"] is None
+    assert parsed["boot_count"] is None
+    assert parsed["location"] is None
+
+
+def test_mark_serializer_location_null_accepted():
+    from apps.mobile.serializers import MarkUploadSerializer
+
+    mark = _valid_mark(location=None)
+    serializer = MarkUploadSerializer(data=_mark_upload_body(marks=[mark]))
+    assert serializer.is_valid(), serializer.errors
+    assert serializer.validated_data["marks"][0]["location"] is None
+
+
+def test_mark_serializer_empty_present_accepted():
+    from apps.mobile.serializers import MarkUploadSerializer
+
+    mark = _valid_mark(present=[])
+    serializer = MarkUploadSerializer(data=_mark_upload_body(marks=[mark]))
+    assert serializer.is_valid(), serializer.errors
+    assert serializer.validated_data["marks"][0]["present"] == []
+
+
+def test_mark_serializer_over_100_present_invalid():
+    from apps.mobile.serializers import MarkUploadSerializer
+
+    members = [_valid_present_member(number_in_team=i) for i in range(101)]
+    mark = _valid_mark(present=members)
+    serializer = MarkUploadSerializer(data=_mark_upload_body(marks=[mark]))
+    assert not serializer.is_valid()
+
+
+def test_mark_serializer_present_sentinel_accepted():
+    from apps.mobile.serializers import MarkUploadSerializer
+
+    member = _valid_present_member(nfc_uid=None, code=None, number=0)
+    mark = _valid_mark(present=[member])
+    serializer = MarkUploadSerializer(data=_mark_upload_body(marks=[mark]))
+    assert serializer.is_valid(), serializer.errors
+    parsed = serializer.validated_data["marks"][0]["present"][0]
+    assert parsed["nfc_uid"] is None
+    assert parsed["code"] is None
+    assert parsed["number"] == 0
+
+
+def test_mark_serializer_blank_cp_fields_accepted():
+    """A future photo mark carries no scanned КП code/uid."""
+    from apps.mobile.serializers import MarkUploadSerializer
+
+    mark = _valid_mark(method="photo", cp_code="", cp_nfc_uid="")
+    serializer = MarkUploadSerializer(data=_mark_upload_body(marks=[mark]))
+    assert serializer.is_valid(), serializer.errors
+    parsed = serializer.validated_data["marks"][0]
+    assert parsed["cp_code"] == ""
+    assert parsed["cp_nfc_uid"] == ""
+
+
+def test_mark_serializer_missing_required_field_invalid():
+    from apps.mobile.serializers import MarkUploadSerializer
+
+    for field in (
+        "id",
+        "wall_ms",
+        "checkpoint_id",
+        "method",
+        "cp_code",
+        "cp_nfc_uid",
+        "expected_count",
+        "complete",
+        "present",
+    ):
+        mark = _valid_mark()
+        mark.pop(field)
+        serializer = MarkUploadSerializer(data=_mark_upload_body(marks=[mark]))
+        assert not serializer.is_valid(), f"missing {field} should be invalid"
+        assert "marks" in serializer.errors
+
+
+def test_mark_serializer_out_of_range_location_lat_lon_invalid():
+    from apps.mobile.serializers import MarkUploadSerializer
+
+    for field, bad in [
+        ("lat", 91.0),
+        ("lat", -91.0),
+        ("lon", 181.0),
+        ("lon", -181.0),
+        ("accuracy", -0.1),
+        ("vertical_accuracy", -0.1),
+    ]:
+        mark = _valid_mark(location=_valid_location(**{field: bad}))
+        serializer = MarkUploadSerializer(data=_mark_upload_body(marks=[mark]))
+        assert not serializer.is_valid(), f"location {field}={bad} should be invalid"
+
+
+def test_mark_serializer_nan_inf_location_floats_invalid():
+    from apps.mobile.serializers import MarkUploadSerializer
+
+    float_fields = ["lat", "lon", "accuracy", "altitude", "vertical_accuracy"]
+    for field in float_fields:
+        for bad in ["NaN", "1e309", "-1e309", "Inf"]:
+            mark = _valid_mark(location=_valid_location(**{field: bad}))
+            serializer = MarkUploadSerializer(data=_mark_upload_body(marks=[mark]))
+            assert (
+                not serializer.is_valid()
+            ), f"{bad!r} in location {field!r} should be invalid"
+
+
+def test_mark_serializer_bad_method_invalid():
+    from apps.mobile.serializers import MarkUploadSerializer
+
+    mark = _valid_mark(method="qrcode")
+    serializer = MarkUploadSerializer(data=_mark_upload_body(marks=[mark]))
+    assert not serializer.is_valid()
+    assert "marks" in serializer.errors
+
+
+def test_mark_serializer_empty_id_invalid():
+    from apps.mobile.serializers import MarkUploadSerializer
+
+    mark = _valid_mark(id="")
+    serializer = MarkUploadSerializer(data=_mark_upload_body(marks=[mark]))
+    assert not serializer.is_valid()
+
+
+def test_mark_upload_serializer_over_500_marks_invalid():
+    from apps.mobile.serializers import MarkUploadSerializer
+
+    marks = [_valid_mark(id=f"mark-{i}") for i in range(501)]
+    serializer = MarkUploadSerializer(data=_mark_upload_body(marks=marks))
+    assert not serializer.is_valid()
+    assert "marks" in serializer.errors
+
+
+def test_mark_upload_serializer_empty_marks_valid():
+    from apps.mobile.serializers import MarkUploadSerializer
+
+    serializer = MarkUploadSerializer(data=_mark_upload_body(marks=[]))
+    assert serializer.is_valid(), serializer.errors
+    assert serializer.validated_data["marks"] == []
+
+
+def test_mark_upload_serializer_missing_source_install_id_invalid():
+    from apps.mobile.serializers import MarkUploadSerializer
+
+    body = _mark_upload_body()
+    body.pop("source_install_id")
+    serializer = MarkUploadSerializer(data=body)
+    assert not serializer.is_valid()
+    assert "source_install_id" in serializer.errors
+
+
+def test_mark_serializer_oversized_32bit_ints_invalid():
+    """32-bit IntegerField columns must 400, not 500, on an oversized int."""
+    from apps.mobile.serializers import MarkUploadSerializer
+
+    too_big = 2147483648  # 2^31, one past the 32-bit signed max
+    for field in ("checkpoint_id", "expected_count", "boot_count"):
+        mark = _valid_mark(**{field: too_big})
+        serializer = MarkUploadSerializer(data=_mark_upload_body(marks=[mark]))
+        assert not serializer.is_valid(), f"oversized {field} should be invalid"
+
+    for field in ("number", "number_in_team"):
+        member = _valid_present_member(**{field: too_big})
+        mark = _valid_mark(present=[member])
+        serializer = MarkUploadSerializer(data=_mark_upload_body(marks=[mark]))
+        assert not serializer.is_valid(), f"oversized present.{field} should be invalid"
+
+
+def test_mark_serializer_bigint_fields_accept_over_32bit():
+    """BigInt columns accept a 2^31..2^63 value (wider cap than the 32-bit ones)."""
+    from apps.mobile.serializers import MarkUploadSerializer
+
+    big = 2147483648  # past 32-bit max, well within BigInt
+    mark = _valid_mark(trusted_ms=big, wall_ms=big, elapsed_at=big)
+    mark["location"] = _valid_location(gps_time_ms=big, elapsed_at=big)
+    serializer = MarkUploadSerializer(data=_mark_upload_body(marks=[mark]))
+    assert serializer.is_valid(), serializer.errors
+    parsed = serializer.validated_data["marks"][0]
+    assert parsed["trusted_ms"] == big
+    assert parsed["wall_ms"] == big
+    assert parsed["elapsed_at"] == big
+
+
+def test_mark_serializer_oversized_bigint_invalid():
+    """A 2^63 value still 400s on the BigInt fields (DataError guard)."""
+    from apps.mobile.serializers import MarkUploadSerializer
+
+    too_big = 9223372036854775808  # 2^63, one past the BigInt signed max
+    for field in ("trusted_ms", "wall_ms", "elapsed_at"):
+        mark = _valid_mark(**{field: too_big})
+        serializer = MarkUploadSerializer(data=_mark_upload_body(marks=[mark]))
+        assert not serializer.is_valid(), f"oversized {field} should be invalid"
+
+    for loc_field in ("gps_time_ms", "elapsed_at"):
+        mark = _valid_mark(location=_valid_location(**{loc_field: too_big}))
+        serializer = MarkUploadSerializer(data=_mark_upload_body(marks=[mark]))
+        assert (
+            not serializer.is_valid()
+        ), f"oversized location.{loc_field} should be invalid"
+
+
+def test_mark_serializer_oversized_present_strings_invalid():
+    from apps.mobile.serializers import MarkUploadSerializer
+
+    member = _valid_present_member(nfc_uid="A" * 256)
+    mark = _valid_mark(present=[member])
+    serializer = MarkUploadSerializer(data=_mark_upload_body(marks=[mark]))
+    assert not serializer.is_valid(), "oversized nfc_uid should be invalid"
+
+    member = _valid_present_member(code="B" * 65)
+    mark = _valid_mark(present=[member])
+    serializer = MarkUploadSerializer(data=_mark_upload_body(marks=[mark]))
+    assert not serializer.is_valid(), "oversized code should be invalid"
+
+
+# --- Mark upload endpoint (Task 3) -----------------------------------------
+
+
+def _marks_path(race_id):
+    return f"/app/race/{race_id}/marks/"
+
+
+def _make_cp_with_tag(race, number=1):
+    """Create a КП + a CheckpointTag whose signals populate code/bid.
+
+    Returns ``(checkpoint, cp_code_hex)`` where ``cp_code_hex`` is the wire
+    ``cp_code`` (hex of the tag's raw 16-byte code) that verifies against the
+    tag's ``bid`` — i.e. ``sha256(bytes.fromhex(cp_code))[:16] == tag.bid``.
+    """
+    from website.models.checkpoint import Checkpoint, CheckpointTag
+
+    cp = Checkpoint.objects.create(race=race, number=number, cost=3, description="tree")
+    tag = CheckpointTag.objects.create(checkpoint=cp, nfc_uid=f"04AABBCC{number:02X}")
+    tag.refresh_from_db()
+    return cp, bytes(tag.code).hex()
+
+
+@pytest.mark.django_db
+def test_mark_upload_happy_path_persists_and_acks(client, settings, django_user_model):
+    import json
+
+    from apps.mobile.models import Mark, MarkPresent
+
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    race, team = _make_team_in_race(django_user_model, slug="marks-happy")
+    cp, cp_code = _make_cp_with_tag(race)
+    path = _marks_path(race.id)
+    mark = _valid_mark(id="mk-a", checkpoint_id=cp.id, cp_code=cp_code)
+    body = json.dumps(
+        {"team_id": team.id, "source_install_id": "phone-1", "marks": [mark]}
+    ).encode()
+
+    response = _signed_post(client, path, SECRET, body)
+    assert response.status_code == 200
+    assert response.json() == {"accepted": ["mk-a"]}
+
+    assert Mark.objects.count() == 1
+    row = Mark.objects.get(pk="mk-a")
+    assert row.race_id == race.id
+    assert row.team_id == team.id
+    # source_install_id comes from the signed BODY, not the X-Install-Id header.
+    assert row.source_install_id == "phone-1"
+    assert row.checkpoint_id == cp.id
+    assert row.verified is True
+    assert row.loc_lat == 55.7501
+    assert MarkPresent.objects.filter(mark=row).count() == 1
+
+
+@pytest.mark.django_db
+def test_mark_upload_idempotent_no_duplicate_rows(client, settings, django_user_model):
+    import json
+
+    from apps.mobile.models import Mark, MarkPresent
+
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    race, team = _make_team_in_race(django_user_model, slug="marks-idem")
+    cp, cp_code = _make_cp_with_tag(race)
+    path = _marks_path(race.id)
+    mark = _valid_mark(id="mk-x", checkpoint_id=cp.id, cp_code=cp_code)
+    body = json.dumps(
+        {"team_id": team.id, "source_install_id": "ph", "marks": [mark]}
+    ).encode()
+
+    r1 = _signed_post(client, path, SECRET, body)
+    r2 = _signed_post(client, path, SECRET, body)
+    assert r1.status_code == 200
+    assert r2.status_code == 200
+    assert r1.json() == r2.json() == {"accepted": ["mk-x"]}
+    assert Mark.objects.count() == 1
+    assert MarkPresent.objects.count() == 1
+
+
+@pytest.mark.django_db
+def test_mark_upload_enrichment_merge_late_gps_and_member(
+    client, settings, django_user_model
+):
+    """A repeat id enriches (GPS + grown roster + complete) without losing data."""
+    import json
+
+    from apps.mobile.models import Mark, MarkPresent
+
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    race, team = _make_team_in_race(django_user_model, slug="marks-enrich")
+    cp, cp_code = _make_cp_with_tag(race)
+    path = _marks_path(race.id)
+
+    # First POST: no GPS fix yet, partial roster, not complete.
+    first = _valid_mark(
+        id="mk-e",
+        checkpoint_id=cp.id,
+        cp_code=cp_code,
+        complete=False,
+        location=None,
+        present=[_valid_present_member(number_in_team=1)],
+    )
+    body1 = json.dumps(
+        {"team_id": team.id, "source_install_id": "ph", "marks": [first]}
+    ).encode()
+    r1 = _signed_post(client, path, SECRET, body1)
+    assert r1.status_code == 200
+
+    row = Mark.objects.get(pk="mk-e")
+    created_at = row.created_at
+    assert row.loc_lat is None
+    assert row.complete is False
+    assert MarkPresent.objects.filter(mark=row).count() == 1
+
+    # Second POST: same id, now carrying the GPS fix + a second member + complete.
+    second = _valid_mark(
+        id="mk-e",
+        checkpoint_id=cp.id,
+        cp_code=cp_code,
+        complete=True,
+        location=_valid_location(),
+        present=[
+            _valid_present_member(number_in_team=1),
+            _valid_present_member(nfc_uid="04DEAD01", number=202, number_in_team=2),
+        ],
+    )
+    body2 = json.dumps(
+        {"team_id": team.id, "source_install_id": "ph", "marks": [second]}
+    ).encode()
+    r2 = _signed_post(client, path, SECRET, body2)
+    assert r2.status_code == 200
+
+    assert Mark.objects.count() == 1  # no duplicate row
+    row.refresh_from_db()
+    assert row.loc_lat == 55.7501  # enriched
+    assert row.complete is True  # false -> true
+    assert row.created_at == created_at  # insert time preserved
+    members = MarkPresent.objects.filter(mark=row).order_by("number_in_team")
+    assert [m.number_in_team for m in members] == [1, 2]  # added slot, kept old
+
+
+@pytest.mark.django_db
+def test_mark_upload_verified_matrix(client, settings, django_user_model):
+    """good code -> True; bad hex / unknown cp / mismatch -> False; all stored."""
+    import json
+
+    from apps.mobile.models import Mark
+
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    race, team = _make_team_in_race(django_user_model, slug="marks-verify")
+    cp, cp_code = _make_cp_with_tag(race)
+    path = _marks_path(race.id)
+
+    cases = [
+        # (id, checkpoint_id, cp_code, expected_verified)
+        ("mk-good", cp.id, cp_code, True),
+        ("mk-badhex", cp.id, "ZZZZ", False),  # non-hex
+        ("mk-blank", cp.id, "", False),  # blank cp_code (future photo)
+        ("mk-unknown", 999999, cp_code, False),  # unknown КП
+        ("mk-mismatch", cp.id, "00112233", False),  # valid hex, wrong code
+    ]
+    for mid, cp_id, code, _ in cases:
+        mark = _valid_mark(id=mid, checkpoint_id=cp_id, cp_code=code)
+        body = json.dumps(
+            {"team_id": team.id, "source_install_id": "ph", "marks": [mark]}
+        ).encode()
+        assert _signed_post(client, path, SECRET, body).status_code == 200
+
+    for mid, _cp_id, _code, expected in cases:
+        assert Mark.objects.get(pk=mid).verified is expected
+
+
+@pytest.mark.django_db
+def test_mark_upload_null_location_and_times_stored(
+    client, settings, django_user_model
+):
+    import json
+
+    from apps.mobile.models import Mark
+
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    race, team = _make_team_in_race(django_user_model, slug="marks-null")
+    path = _marks_path(race.id)
+    mark = _valid_mark(id="mk-null", checkpoint_id=1, location=None)
+    for field in ("trusted_ms", "elapsed_at", "boot_count"):
+        mark.pop(field)
+    body = json.dumps(
+        {"team_id": team.id, "source_install_id": "ph", "marks": [mark]}
+    ).encode()
+    assert _signed_post(client, path, SECRET, body).status_code == 200
+
+    row = Mark.objects.get(pk="mk-null")
+    assert row.loc_lat is None
+    assert row.loc_gps_time_ms is None
+    assert row.trusted_ms is None
+    assert row.elapsed_at is None
+    assert row.boot_count is None
+
+
+@pytest.mark.django_db
+def test_mark_upload_present_sentinel_row_stored(client, settings, django_user_model):
+    import json
+
+    from apps.mobile.models import MarkPresent
+
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    race, team = _make_team_in_race(django_user_model, slug="marks-sentinel")
+    path = _marks_path(race.id)
+    sentinel = _valid_present_member(nfc_uid=None, code=None, number=0)
+    mark = _valid_mark(id="mk-sent", checkpoint_id=1, present=[sentinel])
+    body = json.dumps(
+        {"team_id": team.id, "source_install_id": "ph", "marks": [mark]}
+    ).encode()
+    assert _signed_post(client, path, SECRET, body).status_code == 200
+
+    row = MarkPresent.objects.get(mark_id="mk-sent")
+    assert row.nfc_uid is None
+    assert row.number == 0
+
+
+@pytest.mark.django_db
+def test_mark_upload_blank_cp_code_stored_unverified(
+    client, settings, django_user_model
+):
+    import json
+
+    from apps.mobile.models import Mark
+
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    race, team = _make_team_in_race(django_user_model, slug="marks-photo")
+    path = _marks_path(race.id)
+    mark = _valid_mark(
+        id="mk-photo", checkpoint_id=1, method="photo", cp_code="", cp_nfc_uid=""
+    )
+    body = json.dumps(
+        {"team_id": team.id, "source_install_id": "ph", "marks": [mark]}
+    ).encode()
+    assert _signed_post(client, path, SECRET, body).status_code == 200
+
+    row = Mark.objects.get(pk="mk-photo")
+    assert row.cp_code == ""
+    assert row.verified is False
+
+
+@pytest.mark.django_db
+def test_mark_upload_in_batch_duplicate_id(client, settings, django_user_model):
+    """Same id twice in one batch -> 200, one row with last data, no 500."""
+    import json
+
+    from apps.mobile.models import Mark, MarkPresent
+
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    race, team = _make_team_in_race(django_user_model, slug="marks-dupid")
+    path = _marks_path(race.id)
+    m1 = _valid_mark(id="mk-dup", checkpoint_id=1, complete=False, location=None)
+    m2 = _valid_mark(
+        id="mk-dup", checkpoint_id=1, complete=True, location=_valid_location()
+    )
+    body = json.dumps(
+        {"team_id": team.id, "source_install_id": "ph", "marks": [m1, m2]}
+    ).encode()
+    response = _signed_post(client, path, SECRET, body)
+    assert response.status_code == 200
+    # accepted echoes every submitted id (incl. the in-batch duplicate).
+    assert response.json() == {"accepted": ["mk-dup", "mk-dup"]}
+
+    assert Mark.objects.count() == 1
+    row = Mark.objects.get(pk="mk-dup")
+    assert row.complete is True  # last occurrence wins
+    assert row.loc_lat == 55.7501
+    # Only one MarkPresent row — the de-dup keeps last occurrence's present[].
+    assert MarkPresent.objects.filter(mark_id="mk-dup").count() == 1
+
+
+@pytest.mark.django_db
+def test_mark_upload_team_not_in_race_returns_404(client, settings, django_user_model):
+    import json
+
+    from website.models.models import Team
+    from website.models.race import Category, Race
+
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    race, _team = _make_team_in_race(django_user_model, slug="marks-other-race")
+    other_race = Race.objects.create(
+        name="Other", slug="marks-other", is_published=True
+    )
+    other_cat = Category.objects.create(code="open", name="Open", race=other_race)
+    user = django_user_model.objects.create_user(
+        username="m-other-owner", email="m-other-owner@example.com", password="x"
+    )
+    other_team = Team.objects.create(
+        owner=user, category2=other_cat, teamname="Outsider"
+    )
+
+    path = _marks_path(race.id)
+    body = json.dumps(
+        {
+            "team_id": other_team.id,
+            "source_install_id": "ph",
+            "marks": [_valid_mark(checkpoint_id=1)],
+        }
+    ).encode()
+    assert _signed_post(client, path, SECRET, body).status_code == 404
+
+
+@pytest.mark.django_db
+def test_mark_upload_unpublished_race_returns_404(client, settings, django_user_model):
+    import json
+
+    from website.models.models import Team
+    from website.models.race import Category, Race
+
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    race = Race.objects.create(name="Hidden", slug="marks-hidden", is_published=False)
+    category = Category.objects.create(code="open", name="Open", race=race)
+    user = django_user_model.objects.create_user(
+        username="m-hidden-owner", email="m-hidden-owner@example.com", password="x"
+    )
+    team = Team.objects.create(owner=user, category2=category, teamname="Ghost")
+
+    path = _marks_path(race.id)
+    body = json.dumps(
+        {
+            "team_id": team.id,
+            "source_install_id": "ph",
+            "marks": [_valid_mark(checkpoint_id=1)],
+        }
+    ).encode()
+    assert _signed_post(client, path, SECRET, body).status_code == 404
+
+
+@pytest.mark.django_db
+def test_mark_upload_nonexistent_race_returns_404(client, settings, django_user_model):
+    import json
+
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    path = _marks_path(999999)
+    body = json.dumps(
+        {
+            "team_id": 1,
+            "source_install_id": "ph",
+            "marks": [_valid_mark(checkpoint_id=1)],
+        }
+    ).encode()
+    assert _signed_post(client, path, SECRET, body).status_code == 404
+
+
+@pytest.mark.django_db
+def test_mark_upload_wrong_signature_returns_403(client, settings, django_user_model):
+    import json
+
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    race, team = _make_team_in_race(django_user_model, slug="marks-403")
+    path = _marks_path(race.id)
+    body = json.dumps(
+        {
+            "team_id": team.id,
+            "source_install_id": "ph",
+            "marks": [_valid_mark(checkpoint_id=1)],
+        }
+    ).encode()
+    response = _signed_post(client, path, "wrong-secret", body)
+    assert response.status_code == 403
+    assert response.json() == {"detail": "Forbidden"}
+
+
+@pytest.mark.django_db
+def test_mark_upload_over_500_marks_returns_400(client, settings, django_user_model):
+    import json
+
+    from apps.mobile.models import Mark
+
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    race, team = _make_team_in_race(django_user_model, slug="marks-big")
+    path = _marks_path(race.id)
+    marks = [_valid_mark(id=f"mk-{i}", checkpoint_id=1) for i in range(501)]
+    body = json.dumps(
+        {"team_id": team.id, "source_install_id": "ph", "marks": marks}
+    ).encode()
+    assert _signed_post(client, path, SECRET, body).status_code == 400
+    assert Mark.objects.count() == 0
+
+
+@pytest.mark.django_db
+def test_mark_upload_mixed_valid_invalid_batch_all_or_nothing(
+    client, settings, django_user_model
+):
+    """A bad mark anywhere in the batch -> 400, zero rows written (all-or-nothing)."""
+    import json
+
+    from apps.mobile.models import Mark
+
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    race, team = _make_team_in_race(django_user_model, slug="marks-mixed")
+    path = _marks_path(race.id)
+    marks = [
+        _valid_mark(id="mk-good", checkpoint_id=1),
+        _valid_mark(id="mk-bad", checkpoint_id=1, location=_valid_location(lat=91.0)),
+    ]
+    body = json.dumps(
+        {"team_id": team.id, "source_install_id": "ph", "marks": marks}
+    ).encode()
+    assert _signed_post(client, path, SECRET, body).status_code == 400
+    assert Mark.objects.count() == 0
+
+
+@pytest.mark.django_db
+def test_mark_upload_oversized_int_returns_400_not_500(
+    client, settings, django_user_model
+):
+    import json
+
+    from apps.mobile.models import Mark
+
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    race, team = _make_team_in_race(django_user_model, slug="marks-overint")
+    path = _marks_path(race.id)
+    too_big = 2147483648  # 2^31, one past the 32-bit signed max
+    for field in ("checkpoint_id", "expected_count", "boot_count"):
+        mark = _valid_mark(**{field: too_big})
+        body = json.dumps(
+            {"team_id": team.id, "source_install_id": "ph", "marks": [mark]}
+        ).encode()
+        assert _signed_post(client, path, SECRET, body).status_code == 400
+
+    member = _valid_present_member(number=too_big)
+    mark = _valid_mark(checkpoint_id=1, present=[member])
+    body = json.dumps(
+        {"team_id": team.id, "source_install_id": "ph", "marks": [mark]}
+    ).encode()
+    assert _signed_post(client, path, SECRET, body).status_code == 400
+
+    member = _valid_present_member(number_in_team=too_big)
+    mark = _valid_mark(checkpoint_id=1, present=[member])
+    body = json.dumps(
+        {"team_id": team.id, "source_install_id": "ph", "marks": [mark]}
+    ).encode()
+    assert _signed_post(client, path, SECRET, body).status_code == 400
+
+    assert Mark.objects.count() == 0
+
+
+@pytest.mark.django_db
+def test_mark_upload_invalid_method_returns_400(client, settings, django_user_model):
+    import json
+
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    race, team = _make_team_in_race(django_user_model, slug="marks-method")
+    path = _marks_path(race.id)
+    mark = _valid_mark(checkpoint_id=1, method="qr")
+    body = json.dumps(
+        {"team_id": team.id, "source_install_id": "ph", "marks": [mark]}
+    ).encode()
+    assert _signed_post(client, path, SECRET, body).status_code == 400
+
+
+@pytest.mark.django_db
+def test_mark_upload_empty_batch_acks_empty(client, settings, django_user_model):
+    import json
+
+    from apps.mobile.models import Mark
+
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    race, team = _make_team_in_race(django_user_model, slug="marks-empty")
+    path = _marks_path(race.id)
+    body = json.dumps(
+        {"team_id": team.id, "source_install_id": "ph", "marks": []}
+    ).encode()
+    response = _signed_post(client, path, SECRET, body)
+    assert response.status_code == 200
+    assert response.json() == {"accepted": []}
+    assert Mark.objects.count() == 0
+
+
+@pytest.mark.django_db
+def test_mark_upload_duplicate_number_in_team_collapsed_on_resend(
+    client, settings, django_user_model
+):
+    """A re-sent present slot collapses via unique_together (additive insert)."""
+    import json
+
+    from apps.mobile.models import MarkPresent
+
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    race, team = _make_team_in_race(django_user_model, slug="marks-collapse")
+    path = _marks_path(race.id)
+    mark = _valid_mark(
+        id="mk-c", checkpoint_id=1, present=[_valid_present_member(number_in_team=1)]
+    )
+    body = json.dumps(
+        {"team_id": team.id, "source_install_id": "ph", "marks": [mark]}
+    ).encode()
+
+    _signed_post(client, path, SECRET, body)
+    _signed_post(client, path, SECRET, body)  # same slot again
+    assert MarkPresent.objects.filter(mark_id="mk-c", number_in_team=1).count() == 1
+
+
+@pytest.mark.django_db
+def test_mark_upload_throttle_returns_429_after_limit(
+    client, settings, django_user_model
+):
+    """``mobile-write`` ScopedRateThrottle fires 429 when the rate is exceeded."""
+    import json
+
+    from rest_framework.throttling import SimpleRateThrottle
+
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    race, team = _make_team_in_race(django_user_model, slug="marks-throttle")
+    path = _marks_path(race.id)
+
+    original_rates = SimpleRateThrottle.THROTTLE_RATES
+    SimpleRateThrottle.THROTTLE_RATES = {**original_rates, "mobile-write": "2/min"}
+    try:
+        statuses = []
+        for i in range(4):
+            mark = _valid_mark(id=f"mk-t{i}", checkpoint_id=1)
+            body = json.dumps(
+                {"team_id": team.id, "source_install_id": "ph", "marks": [mark]}
+            ).encode()
+            statuses.append(_signed_post(client, path, SECRET, body).status_code)
+    finally:
+        SimpleRateThrottle.THROTTLE_RATES = original_rates
+
+    assert 429 in statuses[2:]

@@ -4,6 +4,7 @@ from .views import (
     LegendView,
     LoginView,
     LogoutView,
+    MarkUploadView,
     MemberTagsView,
     RaceListView,
     SyncView,
@@ -35,5 +36,10 @@ urlpatterns = [
         "race/<int:race_id>/track/",
         TrackUploadView.as_view(),
         name="track",
+    ),
+    path(
+        "race/<int:race_id>/marks/",
+        MarkUploadView.as_view(),
+        name="marks",
     ),
 ]

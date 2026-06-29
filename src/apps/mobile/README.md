@@ -6,17 +6,19 @@
 сервер держит JSON-карту key-id → секрет (`MOBILE_APP_KEYS`), а клиент шлёт
 заголовок `X-App-Key-Id` (напр. `android-v1`), по которому сервер находит нужный
 секрет и проверяет подпись. Смонтировано на `/app/*`, `label = "mobile"`.
-Read-путь самодостаточен — не трогает `/api/`, `donate`, `website`; **исключение
-— загрузка GPS-треков** (`POST /app/race/<id>/track/`): её модель `TrackPoint`
-держит FK в `website.Team`/`website.Race` (cross-app FK, как у `apps.race`).
+Read-путь самодостаточен — не трогает `/api/`, `donate`, `website`; **исключения
+— загрузка GPS-треков и взятий КП** (`POST /app/race/<id>/track/` и
+`POST /app/race/<id>/marks/`): их модели `TrackPoint`/`Mark`+`MarkPresent`
+держат FK в `website.Team`/`website.Race` (cross-app FK, как у `apps.race`).
 
 Поверх подписи сборки есть **тонкий слой записи** — вход по человеку
 (`POST /app/login/` → отзываемый bearer-токен) и добавление тегов легенды
 (`POST /app/race/<id>/tags/`). Запись надстраивается, а не заменяет read-only
 контракт: см. раздел **Запись: вход по человеку и добавление тегов легенды**.
-Загрузка GPS-треков (`POST /app/race/<id>/track/`) — **третий POST**, но
-гейтится **только подписью сборки** (без bearer-токена); см. раздел
-**Загрузка GPS-треков**.
+Загрузка GPS-треков (`POST /app/race/<id>/track/`) и взятий КП
+(`POST /app/race/<id>/marks/`) — **третий и четвёртый POST**, но гейтятся
+**только подписью сборки** (без bearer-токена); см. разделы
+**Загрузка GPS-треков** и **Загрузка взятий КП**.
 
 Детали схемы подписи (канонная строка, заголовки `X-App-*` включая
 `X-App-Key-Id`, `SignedAppPermission`, replay-окно `±MOBILE_APP_TS_WINDOW`,
@@ -246,6 +248,110 @@ gps_time_ms, trusted_ms?, elapsed_at, boot_count?`; ответ `{"accepted": [id
   команда в этой гонке (`category2__race_id=race_id`, иначе 404) → `install_id` из
   `request.app_meta` → `bulk_create(ignore_conflicts=True)` → 200 `{"accepted":
   […все id…]}`. Пустой `points` → `bulk_create([])` (no-op), ack `[]`.
+
+## Загрузка взятий КП (`POST /app/race/<id>/marks/`)
+
+Серверный приёмник **взятий КП** (отметок участников на контрольных точках),
+которые Android-приложение шлёт батчами в фоне. Эндпоинт — почти клон
+`/track/`: та же база `AppAPIView`, тот же **build-HMAC-only** конверт (без
+bearer-токена — отметки идут с телефонов **участников**, не админов), тот же
+троттл `mobile-write` (60/min), тот же client-UUID-PK + `bulk_create`. Граница
+доверия та же, что у read/`track`: валидная сборка может запостить отметку на
+**любой** `team_id` гонки; `team_id`/`source_install_id` спуфятся, принимаются
+как есть, но подписанное тело делает их tamper-evident. `source_install_id`
+читается из **подписанного тела** (ключ провенанса по контракту), а заголовок
+`X-Install-Id` остаётся для `AppInstall`-статистики.
+
+**Главное отличие от `/track/`: `Mark` не immutable.** `TrackPoint` строго
+неизменяем (`ignore_conflicts` — повторный id молча пропускается), а `Mark`
+**обогащается-апсёртится** (`update_conflicts`). Клиент **намеренно пере-шлёт тот
+же `id`**, когда данные доезжают посреди запроса: GPS-фикс (`attachLocation`) или
+новый участник (`addMember`) приходят после сериализации DTO, но до пометки
+строки как загруженной — первый POST несёт `location=null`/частичный `present[]`,
+а второй с **тем же `id`** — обогащённый payload. Pre-filter-and-skip **навсегда
+потерял бы** поздний GPS/состав, поэтому повтор `id` обязан **мержить**.
+Обогащение **монотонно** (location `null→значение`, `present` только растёт,
+`complete` `false→true`; момент-времени и `cp_*` стабильны), поэтому слепой
+**last-write-wins** апсёрт скаляров корректен и проще всего — без полевой логики
+«только если полнее».
+
+**Две нормализованные модели** (`models.py`, FK cross-app в `website`, как у
+`apps.race`/`TrackPoint`):
+
+- **`Mark`** — одна строка на отчёт о взятии, **PK = клиентский UUID** (`id`,
+  ключ идемпотентности). Плоские поля: провенанс (`team`/`race`/
+  `source_install_id`), КП (`checkpoint_id` — **plain int, не FK**, чтобы
+  неизвестная КП всё равно принялась; `method` `nfc`/`photo`; `cp_code` hex
+  кода КП и `cp_nfc_uid`, оба `blank` под будущий `photo`), мнение клиента
+  (`expected_count`/`complete`), серверный `verified`, времена момента
+  (`trusted_ms?`/`wall_ms`/`elapsed_at?`/`boot_count?`) и 7 плоских колонок
+  `loc_*` (вся `location` может быть `null`). **Нет `updated_at`** — но в отличие
+  от `TrackPoint` строка не immutable (обогащается-апсёртится); `updated_at` всё
+  равно нет, и модель сознательно **не** в `versioning.py` (никто не читает
+  версию с `Mark` — нечего держать свежим). `created_at` (`auto_now_add`)
+  **исключён** из `MARK_UPDATE_FIELDS`, поэтому апсёрт сохраняет исходное время
+  вставки.
+- **`MarkPresent`** — одна строка на присутствующего участника, FK
+  `related_name="present"`, с `unique_together("mark", "number_in_team")`.
+  Нормализована (а не JSON-колонка), чтобы состав был запрашиваемым для будущей
+  (вне области) задачи скоринга/переатрибуции. Идентичность — **физический чип**
+  (`nfc_uid`/`code`), сервер резолвит `uid/code → участник` по своему пулу, не
+  доверяя клиентскому `number`. Строка `{nfc_uid: null, number: 0}` — **сентинел**
+  «снимка нет» (учтённый, но неснятый участник).
+
+**`verified` — серверный, считается при приёме** одним пер-батч префетчем
+тег-bid'ов гонки (`_bids_by_checkpoint`, без запроса на каждую отметку): отметка
+верифицирована ⇔ `sha256(bytes.fromhex(cp_code))[:16]` совпадает с
+`CheckpointTag.bid` заявленной `checkpoint_id` — доказательство физического
+скана NFC-кода КП. На проводе `cp_code` — **hex** 16 байт кода, поэтому проверка
+`sha256(bytes.fromhex(cp_code)).hexdigest()[:16] == tag.bid`. Неизвестная КП /
+несовпадение / не-hex `cp_code` (напр. пустой у будущего `photo`) →
+`verified=False`, **строка всё равно сохраняется**. Запрос `.exclude(bid="")`
+дропает несобранные теги (`bid` по умолчанию `""`), зеркалит legend-view.
+
+**Идемпотентный merge (НЕ strict-immutable).** Механизм:
+`Mark.objects.bulk_create(objs, update_conflicts=True, unique_fields=["id"],
+update_fields=MARK_UPDATE_FIELDS)` (Postgres `ON CONFLICT (id) DO UPDATE` — один
+атомарный стейтмент, без pre-filter `SELECT`), затем
+`MarkPresent.objects.bulk_create(present_objs, ignore_conflicts=True)` для **всех**
+отметок батча (аддитивно: `unique_together` пропускает уже сохранённые слоты).
+`accepted` эхом возвращает **все** присланные id.
+
+- **In-batch де-дуп по `id` (единственная gotcha `update_conflicts`).** В отличие
+  от `ignore_conflicts`, один `INSERT … ON CONFLICT (id) DO UPDATE`, содержащий
+  **один и тот же `id` дважды**, кидает Postgres `CardinalityViolation` («cannot
+  affect row a second time») → 500. Реальный клиент дублей в батче не шлёт (его
+  `unuploaded*`-запрос отдаёт distinct PK), но малформный body не должен 500-ить.
+  Поэтому view **де-дупит `marks` по `id` до сборки объектов, оставляя последнее
+  вхождение** (консистентно с last-write-wins); `accepted` по-прежнему эхает
+  изначально присланные id. `MarkPresent` не затронут — он на `ignore_conflicts`,
+  который терпит in-batch дубли.
+
+**Поток** (`MarkUploadView`): резолв published-гонки (404) → валидация тела
+(400, all-or-nothing) → проверка, что команда в гонке (`category2__race_id`,
+иначе 404) → построить `bids_by_cp` и посчитать `verified` → **де-дуп батча по
+`id`** + flatten `location` в 7 `loc_*` (`location is None` → все `loc_*=None`) +
+сборка `MarkPresent` из `present[]` → `transaction.atomic()`: **апсёрт** `Mark`
+(parent до child, FK-порядок) затем **аддитивная** вставка `MarkPresent` →
+200 `{"accepted": [все присланные id]}`. Пустой `marks` → ранний ack `[]` (запрос
+тег-bid'ов пропускается).
+
+**Контракт провода** (точно совпадает с `scratch/UPLOAD.md` и клиентским
+`MarkDtos.kt`/`ApiClient.uploadMarks`): тело `{team_id, source_install_id, marks:
+[…]}`, до **500** отметок; ответ `{"accepted": [id, …]}`. Сериализаторы
+(`MarkUploadSerializer`/`MarkSerializer`/`PresentMemberSerializer`/
+`MarkLocationSerializer`) переиспользуют `FiniteFloatField` (отбивает NaN/inf),
+границы зеркалят `TrackUploadSerializer`. **400-not-500 дисциплина:**
+32-битные `IntegerField`-колонки (`checkpoint_id`/`expected_count`/`number`/
+`number_in_team`/`boot_count`) несут `max_value=2147483647`, а BigInt-поля
+(`trusted_ms`/`wall_ms`/`elapsed_at`/`loc_gps_time_ms`/`loc_elapsed_at`) —
+`2**63-1`; перепутать каплю нельзя (2⁶³ в `boot_count` всё ещё 500-ит).
+`location` — `required=False` (load-bearing: клиент сериализует с kotlinx
+`encodeDefaults=false`, отметка без фикса **опускает** ключ, а не шлёт
+`location: null`). `method` — `ChoiceField(["nfc","photo"])`: иное значение → 400.
+
+**Out-of-`versioning.py` посыл — тот же, что у `TrackPoint`.** Никто не читает
+версию с `Mark`/`MarkPresent`; они не трогают ETag/`sync`-машинерию.
 
 ## Что обновляется
 
@@ -681,6 +787,7 @@ ETag/`If-None-Match` на ресурсах остаётся (см. выше) —
 | POST | `/app/logout/` | `mobile:logout` | отзыв предъявленного токена |
 | POST | `/app/race/<id>/tags/` | `mobile:tag_create` | привязка NFC-чипа к КП → `{bid, checkpoint_id, number, nfc_uid, code}` |
 | POST | `/app/race/<id>/track/` | `mobile:track` | приём батча GPS-точек (только подпись сборки) → `{"accepted": [id, …]}`; см. **Загрузка GPS-треков** |
+| POST | `/app/race/<id>/marks/` | `mobile:marks` | приём батча взятий КП (только подпись сборки; `Mark` обогащается-апсёртится) → `{"accepted": [id, …]}`; см. **Загрузка взятий КП** |
 
 Все — наследники `AppAPIView` (подпись + `AppInstall`-статистика); у `races`,
 `teams`, `legend` и `member_tags` — поддержка `ETag`/`If-None-Match` (304), у

@@ -106,12 +106,14 @@ Django 4.2 project. Source lives entirely under `src/`, with `manage.py` at `src
   from the rendered table and writes it to the clipboard. Gated on `can_edit_race`.
 - `apps.mobile` — **signed mobile-app endpoints** for iOS/Android (`label = "mobile"`, mounted at `/app/*`
   via `config/urls.py`). The **read** path is self-contained: touches neither `/api/` nor `donate`/`website` — but the
-  **track-upload write** (`TrackPoint`, see the **Track upload** invariant below) is the documented exception, holding
+  **track-upload and marks-upload writes** (`TrackPoint`/`Mark`+`MarkPresent`, see the **Track upload** and **Marks
+  upload** invariants below) are the documented exceptions, holding
   cross-app FKs into `website.Team`/`website.Race` (like `apps.race`). The reads are accountless — the
   app authenticates **itself** (per-build HMAC); a thin **write layer** adds a per-person bearer token on top (login +
-  legend-tag create — see the **Per-person write layer** invariant below). A **third POST** —
-  `POST /app/race/<id>/track/` (`track`) — is **build-HMAC-only** like the reads (NOT part of the per-person write
-  layer); see the **Track upload** invariant below. Full design (background-sync model,
+  legend-tag create — see the **Per-person write layer** invariant below). Two further POSTs —
+  `POST /app/race/<id>/track/` (`track`) and `POST /app/race/<id>/marks/` (`marks`) — are **build-HMAC-only** like the
+  reads (NOT part of the per-person write layer); see the **Track upload** / **Marks upload** invariants below. Full
+  design (background-sync model,
   two-server lease/handoff, secret-rotation runbook, 403 reason codes) lives in `src/apps/mobile/README.md`; exact
   response fields are pinned by the serializers and the field-set tests in `tests.py`. Invariants to preserve:
     - **Auth**: per-build shared secret selected by `X-App-Key-Id` from `MOBILE_APP_KEYS` (JSON key-id → secret map env,
@@ -308,6 +310,55 @@ Django 4.2 project. Source lives entirely under `src/`, with `manage.py` at `src
       `bulk_create(ignore_conflicts=True)` → 200 `{"accepted": [all submitted ids]}`. Same trust boundary as the reads:
       a genuine build can post a track for any `team_id` in the race; `team_id`/`install_id` are spoofable, accepted
       as-is.
+    - **Marks upload** (`POST /app/race/<id>/marks/`, name `marks` — a **fourth POST**, also **build-HMAC-only** like
+      `/track/`: gated by `AppAPIView`'s default `[SignedAppPermission]`, NOT the per-person write layer — takes run on
+      participants' phones, no bearer token; throttle `mobile-write`, 60/min). Checkpoint-take (взятие КП) ingestion for
+      the Android app: receive a batch, store, compute a per-mark `verified`, ack the accepted ids — the read-side
+      scoring/dedup/reattribution feature is a separate future task, **out of scope** here. **Two normalized models**
+      (`models.py`, cross-app FKs into `website.Team`/`website.Race` like `apps.race`): `Mark` is one row per take report,
+      **PK = the client UUID** (`id`, the idempotency key); `MarkPresent` is one row per present member, FK back
+      (`related_name="present"`) with `unique_together("mark","number_in_team")` so child inserts are conflict-safe on
+      re-send (normalized over a JSON column so the roster is queryable for the future scoring task; member identity is the
+      physical chip `nfc_uid`/`code`, not the client `number`; `{nfc_uid:null, number:0}` is the "no snapshot"
+      sentinel). `Mark` has `checkpoint_id` as a **plain int, not an FK** (an unknown КП is still accepted — data is never
+      lost), `cp_code`/`cp_nfc_uid` `blank=True` (blank for a future `photo` mark), 7 flat nullable `loc_*` columns (the
+      whole `location` may be null), and a server-computed `verified`. **No `updated_at`, deliberately out of
+      `versioning.py`** (nothing reads a version off `Mark`) — but unlike `TrackPoint` the row is **NOT immutable**.
+      **One deliberate divergence from `/track/`: enrichment-upsert, not strict-immutable.** The client deliberately
+      **re-sends the same `id`** when a late GPS fix (`attachLocation`) or a new roster member (`addMember`) lands after
+      the DTO was serialized but before the row was marked uploaded — the first POST carries `location=null`/a partial
+      `present[]`, a later POST carries the enriched payload. A pre-filter-and-skip design would **permanently lose** the
+      late data, so a repeat `id` must **merge**. Enrichment is monotonic (location null→value, `present` only grows,
+      `complete` false→true; take-moment times and `cp_*` are stable), so a blind **last-write-wins upsert** of the
+      scalars is correct and simplest: `Mark.objects.bulk_create(objs, update_conflicts=True, unique_fields=["id"],
+      update_fields=MARK_UPDATE_FIELDS)` (Postgres `ON CONFLICT (id) DO UPDATE`, `MARK_UPDATE_FIELDS` = every scalar
+      **except** `id` and `created_at` so the original insert time is preserved), then
+      `MarkPresent.objects.bulk_create(present_objs, ignore_conflicts=True)` for **all** marks (additive — the
+      `unique_together` skips already-stored slots, inserts the late roster members). `accepted` echoes **all** submitted
+      ids. **In-batch `id` de-dup (the one `update_conflicts` gotcha)**: a single `INSERT … ON CONFLICT (id) DO UPDATE`
+      with the same `id` twice raises Postgres `CardinalityViolation` → 500. The real client never sends in-batch dup ids,
+      but a malformed body must not 500, so the view **de-dups `marks` by `id` (keeping the last occurrence)** before
+      building the upsert objects; `accepted` still echoes the originally-submitted ids (`MarkPresent` is unaffected — it
+      uses `ignore_conflicts`, which tolerates in-batch dups). **`verified` computed at ingest** with a single per-batch
+      prefetch (`_bids_by_checkpoint`, no per-mark query): true iff `sha256(bytes.fromhex(cp_code)).hexdigest()[:16]`
+      matches a `CheckpointTag.bid` of the claimed `checkpoint_id` (`cp_code` is the **hex** of the tag's 16 raw bytes) —
+      proof the КП was physically scanned. Unknown КП / mismatch / bad-hex / blank `cp_code` → `verified=False`, **row
+      still stored**; `.exclude(bid="")` drops un-built tags (mirrors the legend view). **Same trust boundary as the
+      reads / `/track/`**: build-HMAC only, `team_id`/`source_install_id` spoofable and accepted as-is — but
+      `source_install_id` is read from the **signed body** (the contract's provenance key), the `X-Install-Id` header
+      stays for `AppInstall` stats. Serializers (`MarkUploadSerializer`/`MarkSerializer`/`PresentMemberSerializer`/
+      `MarkLocationSerializer`) reuse `FiniteFloatField` and mirror `TrackUploadSerializer` bounds (`lat`/`lon`
+      `[-90,90]`/`[-180,180]`, `altitude` unbounded, `min_value=0` on non-negative magnitudes, `marks` `max_length=500`,
+      all-or-nothing 400); **400-not-500 caps**: 32-bit `IntegerField` columns (`checkpoint_id`/`expected_count`/`number`/
+      `number_in_team`/**`boot_count`**) carry `max_value=2147483647`, BigInt fields (`trusted_ms`/`wall_ms`/`elapsed_at`/
+      `loc_gps_time_ms`/`loc_elapsed_at`) the wider `2**63-1` — don't cross the two (a 2⁶³ value in `boot_count` still
+      500s). `location` is `required=False` (load-bearing: the client uses kotlinx `encodeDefaults=false`, so a fix-less
+      take **omits** the key rather than sending `location:null`); `method` is `ChoiceField(["nfc","photo"])` (any other
+      value 400). Flow (`views.py:MarkUploadView`): resolve published `Race` (404) → validate (400) → team-in-race check
+      (`category2__race_id`, else 404) → build `bids_by_cp` + compute `verified` → de-dup batch + flatten `location` to
+      `loc_*` (`location is None` → all `loc_*=None`) + build `MarkPresent` objs → `transaction.atomic()` (parent upsert
+      before child insert) → 200 `{"accepted": [all submitted ids]}`. Empty `marks` → early ack `[]` (tag-bid query
+      skipped).
 
 New feature apps that don't fit in `website` live under `src/apps/<name>/`. Each needs a unique `AppConfig` label (e.g.
 `label = "race_app"`).

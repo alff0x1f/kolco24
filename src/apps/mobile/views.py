@@ -6,6 +6,7 @@ in :meth:`initial` — *after* permissions pass — and never lets a stats-write
 failure break the response.
 """
 
+import hashlib
 import logging
 
 from django.conf import settings
@@ -25,12 +26,21 @@ from website.models.models import Athlet, Team
 from website.models.race import Category, Race
 
 from .legend_crypto import build_bundle
-from .models import AppAuthFailure, AppInstall, MobileToken, TrackPoint
+from .models import (
+    MARK_UPDATE_FIELDS,
+    AppAuthFailure,
+    AppInstall,
+    Mark,
+    MarkPresent,
+    MobileToken,
+    TrackPoint,
+)
 from .permissions import CanEditRaceLegend, IsMobileUser, SignedAppPermission
 from .serializers import (
     CategorySerializer,
     LegendCheckpointSerializer,
     LoginSerializer,
+    MarkUploadSerializer,
     MemberTagSerializer,
     RaceListSerializer,
     TagCreateSerializer,
@@ -383,6 +393,158 @@ class TrackUploadView(AppAPIView):
         return Response(
             {"accepted": [p["id"] for p in points]}, status=status.HTTP_200_OK
         )
+
+
+def _bids_by_checkpoint(race_id):
+    """Map ``checkpoint_id -> {bid, ...}`` for a race's built tags.
+
+    A single query (no per-mark lookup). ``.exclude(bid="")`` drops un-built
+    rows (``bid`` default ``""``, created bypassing the ``build_bundle`` signal),
+    mirroring the legend view. A КП may carry several tags, hence a set per КП.
+    """
+    bids_by_cp = {}
+    for cp_id, bid in (
+        CheckpointTag.objects.filter(checkpoint__race_id=race_id)
+        .exclude(bid="")
+        .values_list("checkpoint_id", "bid")
+    ):
+        bids_by_cp.setdefault(cp_id, set()).add(bid)
+    return bids_by_cp
+
+
+def _is_verified(bids_by_cp, checkpoint_id, cp_code_hex):
+    """``True`` iff ``sha256(bytes.fromhex(cp_code))[:16]`` matches a tag bid.
+
+    Proof the КП was physically scanned. A non-hex ``cp_code`` (e.g. a blank for
+    a future ``photo`` mark), an unknown ``checkpoint_id``, or a mismatch all
+    yield ``False`` — the row is still stored.
+    """
+    if not cp_code_hex:
+        return False
+    try:
+        digest = hashlib.sha256(bytes.fromhex(cp_code_hex)).hexdigest()[:16]
+    except ValueError:
+        return False  # non-hex cp_code
+    return digest in bids_by_cp.get(checkpoint_id, set())
+
+
+class MarkUploadView(AppAPIView):
+    """``POST /app/race/<race_id>/marks/`` — ingest a batch of checkpoint takes.
+
+    A near-clone of :class:`TrackUploadView`: same ``AppAPIView`` base, same
+    **build-HMAC-only** trust boundary (no per-person bearer — takes run on
+    participants' phones), same ``mobile-write`` throttle, same client-UUID-PK
+    idempotency. ``team_id``/``source_install_id`` are spoofable and accepted
+    as-is; ``source_install_id`` is read from the **signed body** (the contract's
+    provenance key), not the ``X-Install-Id`` header.
+
+    **One deliberate divergence from ``/track/``**: a ``Mark`` is **not**
+    immutable. The client deliberately re-sends the same ``id`` when a late GPS
+    fix (``location``) or a new roster member (``present``) lands after the DTO
+    was serialized but before the row was marked uploaded. So a repeat ``id``
+    must **enrichment-merge**, not no-op: ``Mark`` upserts via
+    ``bulk_create(update_conflicts=True, unique_fields=["id"],
+    update_fields=MARK_UPDATE_FIELDS)`` (Postgres ``ON CONFLICT (id) DO UPDATE``,
+    last-write-wins on the scalars, ``created_at`` preserved) and ``MarkPresent``
+    inserts additively via ``bulk_create(ignore_conflicts=True)`` (the
+    ``unique_together("mark", "number_in_team")`` skips already-stored slots).
+
+    ``update_conflicts`` 500s (``CardinalityViolation``) on an in-batch duplicate
+    conflict key, so the view **de-dups ``marks`` by ``id`` (keeping the last
+    occurrence)** before building the upsert objects; ``accepted`` still echoes
+    every originally-submitted id.
+
+    ``verified`` is computed at ingest from a single per-batch prefetch of the
+    race's tag bids (see :func:`_is_verified`); an unknown КП / mismatch / bad
+    hex stores the row with ``verified=False``. ``Mark`` carries no ``updated_at``
+    and stays out of ``versioning.py`` (nothing reads a version off it).
+    """
+
+    throttle_classes = [ClientIPScopedRateThrottle]
+    throttle_scope = "mobile-write"
+
+    def post(self, request, race_id):
+        get_object_or_404(Race, pk=race_id, is_published=True)
+
+        serializer = MarkUploadSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)  # 400 on malformed/out-of-range
+        team_id = serializer.validated_data["team_id"]
+        source_install_id = serializer.validated_data["source_install_id"]
+        marks = serializer.validated_data["marks"]
+
+        if not Team.objects.filter(pk=team_id, category2__race_id=race_id).exists():
+            return Response(
+                {"detail": "Команда не найдена в этой гонке"},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        accepted = [m["id"] for m in marks]
+
+        if not marks:
+            return Response({"accepted": accepted}, status=status.HTTP_200_OK)
+
+        bids_by_cp = _bids_by_checkpoint(race_id)
+
+        # De-dup the batch by id (keep last occurrence) — update_conflicts raises
+        # CardinalityViolation on an in-batch duplicate conflict key. The real
+        # client never sends dup ids, but a malformed body must 400/200, not 500.
+        deduped = {m["id"]: m for m in marks}  # dict preserves last write
+
+        mark_objs = []
+        present_objs = []
+        for m in deduped.values():
+            loc = m.get("location") or {}
+            mark_objs.append(
+                Mark(
+                    id=m["id"],
+                    team_id=team_id,
+                    race_id=race_id,
+                    source_install_id=source_install_id,
+                    checkpoint_id=m["checkpoint_id"],
+                    method=m["method"],
+                    cp_code=m["cp_code"],
+                    cp_nfc_uid=m["cp_nfc_uid"],
+                    expected_count=m["expected_count"],
+                    complete=m["complete"],
+                    verified=_is_verified(bids_by_cp, m["checkpoint_id"], m["cp_code"]),
+                    trusted_ms=m.get("trusted_ms"),
+                    wall_ms=m["wall_ms"],
+                    elapsed_at=m.get("elapsed_at"),
+                    boot_count=m.get("boot_count"),
+                    loc_lat=loc.get("lat"),
+                    loc_lon=loc.get("lon"),
+                    loc_accuracy=loc.get("accuracy"),
+                    loc_altitude=loc.get("altitude"),
+                    loc_vertical_accuracy=loc.get("vertical_accuracy"),
+                    loc_gps_time_ms=loc.get("gps_time_ms"),
+                    loc_elapsed_at=loc.get("elapsed_at"),
+                )
+            )
+            for member in m["present"]:
+                present_objs.append(
+                    MarkPresent(
+                        mark_id=m["id"],
+                        nfc_uid=member.get("nfc_uid"),
+                        code=member.get("code"),
+                        number=member["number"],
+                        number_in_team=member["number_in_team"],
+                    )
+                )
+
+        with transaction.atomic():
+            # Parent upsert before child insert (FK ordering). Enrichment-merge:
+            # a repeat id last-write-wins-overwrites the scalars; a new id inserts.
+            Mark.objects.bulk_create(
+                mark_objs,
+                update_conflicts=True,
+                unique_fields=["id"],
+                update_fields=MARK_UPDATE_FIELDS,
+            )
+            # Additive: unique_together skips slots already stored, inserts the
+            # rest (the late roster members of an enrichment re-send).
+            MarkPresent.objects.bulk_create(present_objs, ignore_conflicts=True)
+
+        return Response({"accepted": accepted}, status=status.HTTP_200_OK)
 
 
 class RaceListView(AppAPIView):
