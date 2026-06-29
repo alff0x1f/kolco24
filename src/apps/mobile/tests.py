@@ -6672,3 +6672,243 @@ def test_track_upload_nullable_round_trip(client, settings, django_user_model):
     assert row.vertical_accuracy is None
     assert row.trusted_ms is None
     assert row.boot_count is None
+
+
+# --- Mark / MarkPresent models (Task 1) ------------------------------------
+
+
+def _make_mark(team, race, **overrides):
+    """Build (unsaved) a fully-populated Mark for model tests."""
+    from apps.mobile.models import Mark
+
+    fields = {
+        "id": "mark-1",
+        "team": team,
+        "race": race,
+        "source_install_id": "install-abc",
+        "checkpoint_id": 264,
+        "method": "nfc",
+        "cp_code": "9f1a2b3c",
+        "cp_nfc_uid": "04A2B3C4D5E680",
+        "expected_count": 4,
+        "complete": True,
+        "verified": True,
+        "trusted_ms": 1718900000123,
+        "wall_ms": 1718900000000,
+        "elapsed_at": 9876543,
+        "boot_count": 7,
+        "loc_lat": 55.75,
+        "loc_lon": 37.61,
+        "loc_accuracy": 6.5,
+        "loc_altitude": 184.2,
+        "loc_vertical_accuracy": 3.2,
+        "loc_gps_time_ms": 1718899999000,
+        "loc_elapsed_at": 9876100,
+    }
+    fields.update(overrides)
+    return Mark(**fields)
+
+
+@pytest.mark.django_db
+def test_mark_round_trips_all_fields(django_user_model):
+    from apps.mobile.models import Mark
+
+    race, team = _make_team_in_race(django_user_model, slug="mark-race-1")
+    _make_mark(team, race).save()
+
+    m = Mark.objects.get(pk="mark-1")
+    assert m.team_id == team.id
+    assert m.race_id == race.id
+    assert m.source_install_id == "install-abc"
+    assert m.checkpoint_id == 264
+    assert m.method == "nfc"
+    assert m.cp_code == "9f1a2b3c"
+    assert m.cp_nfc_uid == "04A2B3C4D5E680"
+    assert m.expected_count == 4
+    assert m.complete is True
+    assert m.verified is True
+    assert m.trusted_ms == 1718900000123
+    assert m.wall_ms == 1718900000000
+    assert m.elapsed_at == 9876543
+    assert m.boot_count == 7
+    assert m.loc_lat == 55.75
+    assert m.loc_lon == 37.61
+    assert m.loc_accuracy == 6.5
+    assert m.loc_altitude == 184.2
+    assert m.loc_vertical_accuracy == 3.2
+    assert m.loc_gps_time_ms == 1718899999000
+    assert m.loc_elapsed_at == 9876100
+    assert m.created_at is not None
+
+
+@pytest.mark.django_db
+def test_mark_round_trips_nulls(django_user_model):
+    from apps.mobile.models import Mark
+
+    race, team = _make_team_in_race(django_user_model, slug="mark-race-2")
+    _make_mark(
+        team,
+        race,
+        id="mark-nulls",
+        cp_code="",
+        cp_nfc_uid="",
+        trusted_ms=None,
+        elapsed_at=None,
+        boot_count=None,
+        loc_lat=None,
+        loc_lon=None,
+        loc_accuracy=None,
+        loc_altitude=None,
+        loc_vertical_accuracy=None,
+        loc_gps_time_ms=None,
+        loc_elapsed_at=None,
+    ).save()
+
+    m = Mark.objects.get(pk="mark-nulls")
+    assert m.cp_code == ""
+    assert m.cp_nfc_uid == ""
+    assert m.trusted_ms is None
+    assert m.elapsed_at is None
+    assert m.boot_count is None
+    assert m.loc_lat is None
+    assert m.loc_elapsed_at is None
+    # wall_ms is required (sole fallback) and stays set
+    assert m.wall_ms == 1718900000000
+
+
+@pytest.mark.django_db
+def test_markpresent_round_trips_and_sentinel(django_user_model):
+    from apps.mobile.models import MarkPresent
+
+    race, team = _make_team_in_race(django_user_model, slug="mark-race-3")
+    mark = _make_mark(team, race, id="mark-present")
+    mark.save()
+
+    real = MarkPresent.objects.create(
+        mark=mark,
+        nfc_uid="04F1E2D3C4B5A6",
+        code="c3d4",
+        number=101,
+        number_in_team=1,
+    )
+    sentinel = MarkPresent.objects.create(
+        mark=mark,
+        nfc_uid=None,
+        code=None,
+        number=0,
+        number_in_team=2,
+    )
+
+    assert real.nfc_uid == "04F1E2D3C4B5A6"
+    assert real.code == "c3d4"
+    assert real.number == 101
+    sentinel.refresh_from_db()
+    assert sentinel.nfc_uid is None
+    assert sentinel.code is None
+    assert sentinel.number == 0
+    assert mark.present.count() == 2
+
+
+@pytest.mark.django_db
+def test_mark_bulk_create_update_conflicts_upserts_and_preserves_created_at(
+    django_user_model,
+):
+    from apps.mobile.models import MARK_UPDATE_FIELDS, Mark
+
+    race, team = _make_team_in_race(django_user_model, slug="mark-race-4")
+
+    # first insert: no GPS, incomplete
+    first = _make_mark(
+        team,
+        race,
+        id="mark-upsert",
+        complete=False,
+        verified=False,
+        loc_lat=None,
+        loc_lon=None,
+        loc_accuracy=None,
+        loc_altitude=None,
+        loc_vertical_accuracy=None,
+        loc_gps_time_ms=None,
+        loc_elapsed_at=None,
+    )
+    Mark.objects.bulk_create(
+        [first],
+        update_conflicts=True,
+        unique_fields=["id"],
+        update_fields=MARK_UPDATE_FIELDS,
+    )
+    assert Mark.objects.count() == 1
+    original_created_at = Mark.objects.get(pk="mark-upsert").created_at
+
+    # second send: same id, enriched payload (GPS + complete)
+    enriched = _make_mark(
+        team,
+        race,
+        id="mark-upsert",
+        complete=True,
+        verified=True,
+        loc_lat=55.75,
+        loc_lon=37.61,
+    )
+    Mark.objects.bulk_create(
+        [enriched],
+        update_conflicts=True,
+        unique_fields=["id"],
+        update_fields=MARK_UPDATE_FIELDS,
+    )
+
+    assert Mark.objects.count() == 1
+    m = Mark.objects.get(pk="mark-upsert")
+    assert m.complete is True
+    assert m.verified is True
+    assert m.loc_lat == 55.75
+    assert m.loc_lon == 37.61
+    # created_at preserved (excluded from update_fields)
+    assert m.created_at == original_created_at
+
+
+@pytest.mark.django_db
+def test_markpresent_unique_together_and_ignore_conflicts(django_user_model):
+    from apps.mobile.models import MarkPresent
+
+    race, team = _make_team_in_race(django_user_model, slug="mark-race-5")
+    mark = _make_mark(team, race, id="mark-uniq")
+    mark.save()
+
+    MarkPresent.objects.create(
+        mark=mark, nfc_uid="aa", code=None, number=1, number_in_team=1
+    )
+
+    # a duplicate (mark, number_in_team) is rejected
+    with pytest.raises(IntegrityError):
+        MarkPresent.objects.create(
+            mark=mark, nfc_uid="bb", code=None, number=2, number_in_team=1
+        )
+
+
+@pytest.mark.django_db
+def test_markpresent_bulk_create_ignore_conflicts_is_additive(django_user_model):
+    from apps.mobile.models import MarkPresent
+
+    race, team = _make_team_in_race(django_user_model, slug="mark-race-6")
+    mark = _make_mark(team, race, id="mark-additive")
+    mark.save()
+
+    MarkPresent.objects.bulk_create(
+        [MarkPresent(mark=mark, nfc_uid="aa", number=1, number_in_team=1)],
+        ignore_conflicts=True,
+    )
+    assert mark.present.count() == 1
+
+    # re-send slot 1 (collapsed) + a new slot 2 (inserted)
+    MarkPresent.objects.bulk_create(
+        [
+            MarkPresent(mark=mark, nfc_uid="zz", number=9, number_in_team=1),
+            MarkPresent(mark=mark, nfc_uid="bb", number=2, number_in_team=2),
+        ],
+        ignore_conflicts=True,
+    )
+    assert mark.present.count() == 2
+    # existing slot 1 untouched
+    assert mark.present.get(number_in_team=1).nfc_uid == "aa"

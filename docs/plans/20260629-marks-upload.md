@@ -306,7 +306,7 @@ only — inherit from `AppAPIView`, do **not** add the bearer layer).
 - Create: `src/apps/mobile/migrations/0008_mark_markpresent.py` (via `makemigrations`)
 - Modify: `src/apps/mobile/tests.py`
 
-- [ ] add `Mark` model after `TrackPoint` with all fields from the Technical
+- [x] add `Mark` model after `TrackPoint` with all fields from the Technical
       Details table (client-UUID PK, cross-app `team`/`race` FKs
       `related_name="marks"`, plain `checkpoint_id` IntegerField, `cp_code`/
       `cp_nfc_uid` `blank=True`, 7 flat `loc_*`
@@ -314,20 +314,20 @@ only — inherit from `AppAPIView`, do **not** add the bearer layer).
       enrichment-upserted, not immutable — see the idempotency note); add a
       `__str__`. Define `MARK_UPDATE_FIELDS` (all scalars except `id`/`created_at`)
       next to the model for the view's upsert.
-- [ ] add `MarkPresent` model with `mark` FK (`related_name="present"`),
+- [x] add `MarkPresent` model with `mark` FK (`related_name="present"`),
       nullable `nfc_uid`/`code`, `number`/`number_in_team`, and
       `Meta.unique_together = ("mark", "number_in_team")`.
-- [ ] generate the migration: `uv run python src/manage.py makemigrations mobile`
+- [x] generate the migration: `uv run python src/manage.py makemigrations mobile`
       (verify it is `0008`, declares the cross-app FKs into `website`, and a
       dependency on the latest `website` migration as `0007_trackpoint` does).
-- [ ] write model tests: `Mark` round-trips all fields incl. nulls; `MarkPresent`
+- [x] write model tests: `Mark` round-trips all fields incl. nulls; `MarkPresent`
       round-trips incl. sentinel (`nfc_uid=None`, `number=0`); `Mark`
       `bulk_create(update_conflicts=True, unique_fields=["id"], update_fields=...)`
       **upserts** a duplicate PK — assert a second create with the same `id` and an
       enriched payload (GPS + `complete=True`) overwrites the scalars while
       `created_at` is preserved; `MarkPresent` `unique_together` rejects a
       duplicate `(mark, number_in_team)` and `ignore_conflicts=True` collapses it.
-- [ ] run tests — must pass before next task:
+- [x] run tests — must pass before next task:
       `uv run pytest src/apps/mobile/tests.py -k "mark" --reuse-db`
 
 ### Task 2: Add mark-upload serializers
