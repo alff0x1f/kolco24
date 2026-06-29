@@ -336,22 +336,22 @@ only — inherit from `AppAPIView`, do **not** add the bearer layer).
 - Modify: `src/apps/mobile/serializers.py`
 - Modify: `src/apps/mobile/tests.py`
 
-- [ ] add `MarkLocationSerializer`, `PresentMemberSerializer`, `MarkSerializer`,
+- [x] add `MarkLocationSerializer`, `PresentMemberSerializer`, `MarkSerializer`,
       `MarkUploadSerializer` per the Technical Details (reuse the existing
       `FiniteFloatField`; mirror `TrackUploadSerializer` bounds and the `2**63-1`
       int caps; `method` as `ChoiceField(["nfc","photo"])`; `marks` `max_length=500`).
-- [ ] write serializer tests: valid full batch; omitted nullables resolve absent;
+- [x] write serializer tests: valid full batch; omitted nullables resolve absent;
       explicit-null nullables accepted; `location=null` accepted; `present=[]`
       accepted; blank `cp_code`/`cp_nfc_uid` accepted (future photo mark);
       missing required field (`wall_ms`, `checkpoint_id`) → invalid;
       out-of-range `lat`/`lon` → invalid; NaN/inf floats → invalid; bad `method`
       → invalid; empty `id` → invalid; >500 marks → invalid; empty `marks` valid.
-- [ ] write bound tests (lock 400-not-500): oversized 32-bit ints —
+- [x] write bound tests (lock 400-not-500): oversized 32-bit ints —
       `checkpoint_id`/`expected_count`/`number`/`number_in_team`/`boot_count`
       > 2147483647 → invalid; a 2³¹..2⁶³ value in the BigInt fields
       (`trusted_ms`/`wall_ms`/`elapsed_at`) **valid**; oversized `nfc_uid` (>255)
       / `code` (>64) in `present` → invalid.
-- [ ] run tests — must pass before next task:
+- [x] run tests — must pass before next task:
       `uv run pytest src/apps/mobile/tests.py -k "mark_upload_serializer or mark_serializer" --reuse-db`
 
 ### Task 3: Add `MarkUploadView` and wire the URL
@@ -361,7 +361,7 @@ only — inherit from `AppAPIView`, do **not** add the bearer layer).
 - Modify: `src/apps/mobile/urls.py`
 - Modify: `src/apps/mobile/tests.py`
 
-- [ ] add `MarkUploadView(AppAPIView)` mirroring `TrackUploadView`: race 404 →
+- [x] add `MarkUploadView(AppAPIView)` mirroring `TrackUploadView`: race 404 →
       serializer 400 → team-in-race 404 → build `bids_by_cp` → compute `verified`
       → **de-dup batch by `id` (keep last)** → **flatten each mark's `location`
       dict to the 7 `loc_*` fields (`location is None` → all `loc_*=None`)** and
@@ -373,13 +373,13 @@ only — inherit from `AppAPIView`, do **not** add the bearer layer).
       `200 {"accepted": [all originally submitted ids]}`. Set `throttle_classes =
       [ClientIPScopedRateThrottle]`, `throttle_scope = "mobile-write"`; store
       `source_install_id` from the validated **body**.
-- [ ] add `bids_by_cp` helper (module-level function or inline) using
+- [x] add `bids_by_cp` helper (module-level function or inline) using
       `CheckpointTag.objects.filter(checkpoint__race_id=race_id).exclude(bid="")
       .values_list("checkpoint_id", "bid")` and the `bytes.fromhex` try/except
       verify logic; skip the query when `marks` is empty.
-- [ ] add `path("race/<int:race_id>/marks/", MarkUploadView.as_view(),
+- [x] add `path("race/<int:race_id>/marks/", MarkUploadView.as_view(),
       name="marks")` to `urls.py` and import the view.
-- [ ] write view tests (use `_signed_post` at `tests.py:4958`): signed happy-path
+- [x] write view tests (use `_signed_post` at `tests.py:4958`): signed happy-path
       200 with rows created and `accepted` == submitted ids; idempotent re-send
       (counts unchanged, still in `accepted`); **enrichment merge** — first POST
       with `location=null` + partial `present` (e.g. `[1]`), second POST with the
@@ -399,21 +399,21 @@ only — inherit from `AppAPIView`, do **not** add the bearer layer).
       duplicate `id`** (same `id` twice in one `marks` array, the second enriched)
       → 200, one stored row with the last occurrence's data, `id` in `accepted`
       (no `CardinalityViolation`/500); invalid `method` value → 400.
-- [ ] run tests — must pass before next task:
+- [x] run tests — must pass before next task:
       `uv run pytest src/apps/mobile/tests.py -k "mark" --reuse-db`
 
 ### Task 4: Verify acceptance criteria
 
-- [ ] verify the response shape matches `scratch/UPLOAD.md`
+- [x] verify the response shape matches `scratch/UPLOAD.md`
       (`{"accepted": [...ids...]}`) and the client `MarkUploadResponse`.
-- [ ] verify every "accept and store" edge case from the contract is covered by a
+- [x] verify every "accept and store" edge case from the contract is covered by a
       test (null fields, unknown cp, bad hex, wrong-team roster accepted, empty
       batch, repeat id), and that a repeat `id` **enriches** rather than dropping
       late data (the GPS/member-adds merge test exists and passes).
-- [ ] confirm `Mark` is absent from `versioning.py` (no ETag/`sync` impact).
-- [ ] run full mobile suite: `uv run pytest src/apps/mobile/tests.py --reuse-db`
-- [ ] run full suite: `uv run pytest`
-- [ ] `make format && make lint` clean.
+- [x] confirm `Mark` is absent from `versioning.py` (no ETag/`sync` impact).
+- [x] run full mobile suite: `uv run pytest src/apps/mobile/tests.py --reuse-db` (370 passed)
+- [x] run full suite: `uv run pytest` (761 passed)
+- [x] `make format && make lint` clean.
 
 ### Task 5: Update documentation
 
@@ -422,18 +422,18 @@ only — inherit from `AppAPIView`, do **not** add the bearer layer).
 - Modify: `CLAUDE.md`
 - Modify: this plan (move to completed)
 
-- [ ] add a "Marks upload" section to `src/apps/mobile/README.md` describing the
+- [x] add a "Marks upload" section to `src/apps/mobile/README.md` describing the
       endpoint, models, `verified` semantics, and the **enrichment-merge**
       idempotency (why a repeat `id` upserts rather than no-ops), matching the
       depth of the existing Track upload docs.
-- [ ] add a "Marks upload" invariant block to `CLAUDE.md` (the `apps.mobile`
+- [x] add a "Marks upload" invariant block to `CLAUDE.md` (the `apps.mobile`
       architecture note) matching the style/depth of the existing "Track upload"
       entry: build-HMAC-only, `source_install_id` from body, `verified` rule,
       normalized `Mark`/`MarkPresent`, **enrichment-upsert** (NOT immutable —
       `update_conflicts` for `Mark`, additive `ignore_conflicts` for `MarkPresent`;
       contrast with `TrackPoint`) + out-of-`versioning.py`, accept-and-store edge
       cases.
-- [ ] move this plan to `docs/plans/completed/`.
+- [x] move this plan to `docs/plans/completed/`.
 
 ## Post-Completion
 

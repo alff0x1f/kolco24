@@ -107,6 +107,100 @@ class TrackUploadSerializer(serializers.Serializer):
     points = TrackPointSerializer(many=True, allow_empty=True, max_length=500)
 
 
+class MarkLocationSerializer(serializers.Serializer):
+    """Validate the nested ``location`` of one mark (anti-cheat coordinate).
+
+    The whole object may be ``null`` (no fix yet — see ``MarkSerializer.location``)
+    so every field is optional/nullable here. ``lat``/``lon`` are bounded like the
+    track fixes; ``accuracy``/``vertical_accuracy`` are physically non-negative;
+    ``altitude`` is unbounded (below sea level is valid). ``gps_time_ms``/
+    ``elapsed_at`` are BigInt columns (``2^63 − 1`` cap) — note these are the
+    *fix's* times, deliberately namespaced under ``location`` so they don't
+    collide with the take-moment times on the mark itself.
+    """
+
+    lat = FiniteFloatField(required=False, allow_null=True, min_value=-90, max_value=90)
+    lon = FiniteFloatField(
+        required=False, allow_null=True, min_value=-180, max_value=180
+    )
+    accuracy = FiniteFloatField(required=False, allow_null=True, min_value=0)
+    altitude = FiniteFloatField(required=False, allow_null=True)
+    vertical_accuracy = FiniteFloatField(required=False, allow_null=True, min_value=0)
+    gps_time_ms = serializers.IntegerField(
+        required=False, allow_null=True, min_value=0, max_value=9223372036854775807
+    )
+    elapsed_at = serializers.IntegerField(
+        required=False, allow_null=True, min_value=0, max_value=9223372036854775807
+    )
+
+
+class PresentMemberSerializer(serializers.Serializer):
+    """Validate one present-member snapshot inside a mark's ``present[]``.
+
+    Identity is the physical chip (``nfc_uid``/``code``); a
+    ``{nfc_uid: null, number: 0}`` row is the sentinel "no snapshot". ``number``/
+    ``number_in_team`` back 32-bit ``IntegerField`` columns, so they carry the
+    ``2^31 − 1`` cap (not the BigInt one) — an oversized int is a clean 400.
+    """
+
+    nfc_uid = serializers.CharField(max_length=255, allow_null=True, required=False)
+    code = serializers.CharField(max_length=64, allow_null=True, required=False)
+    number = serializers.IntegerField(min_value=0, max_value=2147483647)
+    number_in_team = serializers.IntegerField(min_value=0, max_value=2147483647)
+
+
+class MarkSerializer(serializers.Serializer):
+    """Validate one checkpoint-take in a ``POST /app/race/<race_id>/marks/`` batch.
+
+    ``id`` is the opaque client UUID (the idempotency key / PK; ``min_length=1``
+    only guards an empty PK). ``method`` is a ``ChoiceField`` — only the two
+    contract values ``nfc``/``photo`` are accepted, any other is a 400 by
+    decision. ``cp_code``/``cp_nfc_uid`` are ``allow_blank`` (a future ``photo``
+    mark carries no scanned code). ``wall_ms`` is **required** (the sole fallback
+    when ``trusted_ms`` is null); ``trusted_ms``/``elapsed_at`` are nullable BigInt
+    (``2^63 − 1`` cap); ``boot_count`` backs a **32-bit** column, so the ``2^31 − 1``
+    cap (crossing the two up still 500s). ``location`` is ``required=False`` —
+    load-bearing: the kotlinx client serializes with ``encodeDefaults=false`` and
+    ``MarkDto.location`` defaults to ``null``, so a fix-less take **omits** the key
+    rather than sending ``location: null``.
+    """
+
+    id = serializers.CharField(min_length=1, max_length=64)
+    checkpoint_id = serializers.IntegerField(min_value=0, max_value=2147483647)
+    method = serializers.ChoiceField(choices=["nfc", "photo"])
+    cp_code = serializers.CharField(max_length=64, allow_blank=True)
+    cp_nfc_uid = serializers.CharField(max_length=255, allow_blank=True)
+    expected_count = serializers.IntegerField(min_value=0, max_value=2147483647)
+    complete = serializers.BooleanField()
+    trusted_ms = serializers.IntegerField(
+        required=False, allow_null=True, min_value=0, max_value=9223372036854775807
+    )
+    wall_ms = serializers.IntegerField(min_value=0, max_value=9223372036854775807)
+    elapsed_at = serializers.IntegerField(
+        required=False, allow_null=True, min_value=0, max_value=9223372036854775807
+    )
+    boot_count = serializers.IntegerField(
+        required=False, allow_null=True, min_value=0, max_value=2147483647
+    )
+    present = PresentMemberSerializer(many=True, allow_empty=True, max_length=100)
+    location = MarkLocationSerializer(required=False, allow_null=True)
+
+
+class MarkUploadSerializer(serializers.Serializer):
+    """Validate the ``POST /app/race/<race_id>/marks/`` body.
+
+    ``team_id`` identifies the team the marks belong to (the view checks it is in
+    the race). ``source_install_id`` is the provenance grouping key, read from the
+    **signed body** (not the ``X-Install-Id`` header). ``marks`` is a batch of up
+    to 500 takes (all-or-nothing — an oversized batch is a 400); an empty list is
+    valid and acks ``[]``.
+    """
+
+    team_id = serializers.IntegerField(min_value=1, max_value=2147483647)
+    source_install_id = serializers.CharField(max_length=64)
+    marks = MarkSerializer(many=True, allow_empty=True, max_length=500)
+
+
 class RaceListSerializer(serializers.ModelSerializer):
     """Public list view of a published race (no images)."""
 
