@@ -254,3 +254,36 @@ class MarkPresent(models.Model):
 
     def __str__(self):
         return f"MarkPresent(mark={self.mark_id} n={self.number_in_team})"
+
+
+def _mark_photo_path(instance, filename):
+    """Deterministic, unguessable path: two client UUIDs. ``filename`` is ignored."""
+    return f"mark_photos/{instance.mark_id}/{instance.frame_id}.jpg"
+
+
+class MarkPhoto(models.Model):
+    """One JPEG frame uploaded for a ``method="photo"`` :class:`Mark`.
+
+    The primary key is the default auto id; idempotency is enforced by
+    ``unique_together("mark", "frame_id")`` — a client-resent frame is detected
+    by the view before insert, and a concurrent duplicate is caught via
+    ``IntegrityError`` on this constraint.
+
+    Rows are **write-only / immutable** like :class:`TrackPoint`: there is no
+    ``updated_at`` and the model is deliberately **not** in ``versioning.py`` —
+    nothing reads a version off it.
+    """
+
+    mark = models.ForeignKey(Mark, on_delete=models.CASCADE, related_name="photos")
+    frame_id = models.CharField(max_length=64)
+    # "mark_photos/" + 64-char mark_id + "/" + 64-char frame_id + ".jpg" = 145
+    # chars at most (both ids capped at 64 by SAFE_ID_RE); default max_length=100
+    # would raise a DB error on insert for a near-max-length id pair.
+    image = models.FileField(upload_to=_mark_photo_path, max_length=255)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ("mark", "frame_id")
+
+    def __str__(self):
+        return f"MarkPhoto(mark={self.mark_id} frame={self.frame_id})"

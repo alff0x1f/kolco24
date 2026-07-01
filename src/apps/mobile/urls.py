@@ -4,6 +4,7 @@ from .views import (
     LegendView,
     LoginView,
     LogoutView,
+    MarkPhotoUploadView,
     MarkUploadView,
     MemberTagsView,
     RaceListView,
@@ -41,5 +42,14 @@ urlpatterns = [
         "race/<int:race_id>/marks/",
         MarkUploadView.as_view(),
         name="marks",
+    ),
+    # No trailing slash: the contract path (UPLOAD.md) ends at <frame_id>, and
+    # the signed canonical string is the request's full_path, so the route must
+    # match the client byte-for-byte — deliberate divergence from every other
+    # /app/ endpoint's trailing-slash convention.
+    path(
+        "race/<int:race_id>/mark/<str:mark_id>/photo/<str:frame_id>",
+        MarkPhotoUploadView.as_view(),
+        name="mark_photo",
     ),
 ]

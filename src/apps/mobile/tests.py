@@ -6914,6 +6914,71 @@ def test_markpresent_bulk_create_ignore_conflicts_is_additive(django_user_model)
     assert mark.present.get(number_in_team=1).nfc_uid == "aa"
 
 
+@pytest.mark.django_db
+def test_markphoto_model_persists(django_user_model, settings, tmp_path):
+    from django.core.files.base import ContentFile
+
+    from apps.mobile.models import MarkPhoto
+
+    settings.MEDIA_ROOT = str(tmp_path)
+    race, team = _make_team_in_race(django_user_model, slug="mark-photo-race-1")
+    mark = _make_mark(team, race, id="mark-photo-1", method="photo")
+    mark.save()
+
+    photo = MarkPhoto(mark=mark, frame_id="frame-1")
+    photo.image.save("frame-1.jpg", ContentFile(b"fake-jpeg-bytes"), save=False)
+    photo.save()
+
+    stored = MarkPhoto.objects.get(mark=mark, frame_id="frame-1")
+    assert stored.image.name == "mark_photos/mark-photo-1/frame-1.jpg"
+    assert stored.created_at is not None
+
+
+@pytest.mark.django_db
+def test_markphoto_unique_together_raises_on_duplicate(
+    django_user_model, settings, tmp_path
+):
+    from django.core.files.base import ContentFile
+
+    from apps.mobile.models import MarkPhoto
+
+    settings.MEDIA_ROOT = str(tmp_path)
+    race, team = _make_team_in_race(django_user_model, slug="mark-photo-race-2")
+    mark = _make_mark(team, race, id="mark-photo-2", method="photo")
+    mark.save()
+
+    def _photo():
+        p = MarkPhoto(mark=mark, frame_id="frame-1")
+        p.image.save("frame-1.jpg", ContentFile(b"bytes"), save=False)
+        return p
+
+    _photo().save()
+    with pytest.raises(IntegrityError):
+        _photo().save()
+
+
+# --- Photo upload settings (mark-photo-upload plan, Task 2) ----------------
+
+
+def test_data_upload_max_memory_size_raised_above_photo_cap():
+    from django.conf import settings
+
+    # Must exceed the view's PHOTO_MAX_BYTES (10 MB): SignedAppPermission reads
+    # request.body before the view's own size check runs, so a body between the
+    # Django default (2.5 MB) and the app cap must not be rejected by Django's
+    # own RequestDataTooBig first. See settings.py for the full rationale.
+    assert settings.DATA_UPLOAD_MAX_MEMORY_SIZE == 12 * 1024 * 1024
+    assert settings.DATA_UPLOAD_MAX_MEMORY_SIZE > 10 * 1024 * 1024
+
+
+def test_mobile_photo_throttle_rate_configured():
+    from django.conf import settings
+
+    assert (
+        settings.REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"]["mobile-photo"] == "120/min"
+    )
+
+
 # --- Mark upload serializers (Task 2) --------------------------------------
 
 
@@ -7788,3 +7853,477 @@ def test_mark_upload_throttle_returns_429_after_limit(
         SimpleRateThrottle.THROTTLE_RATES = original_rates
 
     assert 429 in statuses[2:]
+
+
+# --- Mark photo upload endpoint (Task 3) ------------------------------------
+
+
+def _photo_path(race_id, mark_id, frame_id):
+    return f"/app/race/{race_id}/mark/{mark_id}/photo/{frame_id}"
+
+
+def _signed_photo_post(client, path, secret, body_bytes, key_id="test-v1"):
+    """POST a raw JPEG body with a build-HMAC signature over the raw bytes.
+
+    Distinct from ``_signed_post``: sends ``Content-Type: image/jpeg`` so the
+    binary path (never ``request.data``) is genuinely exercised.
+    """
+    headers = _signed_headers("POST", path, secret, body=body_bytes, key_id=key_id)
+    return client.post(path, data=body_bytes, content_type="image/jpeg", **headers)
+
+
+def _make_photo_mark(team, race, mark_id="mk-photo-1"):
+    mark = _make_mark(team, race, id=mark_id, method="photo", cp_code="", cp_nfc_uid="")
+    mark.save()
+    return mark
+
+
+@pytest.mark.django_db
+def test_mark_photo_upload_happy_path_creates_row_and_file(
+    client, settings, django_user_model, tmp_path
+):
+    from apps.mobile.models import MarkPhoto
+
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+    settings.MEDIA_ROOT = str(tmp_path)
+
+    race, team = _make_team_in_race(django_user_model, slug="photo-happy")
+    mark = _make_photo_mark(team, race)
+    path = _photo_path(race.id, mark.id, "frame-1")
+    body = b"\xff\xd8fake-jpeg-bytes"
+
+    response = _signed_photo_post(client, path, SECRET, body)
+    assert response.status_code == 201
+
+    photo = MarkPhoto.objects.get(mark=mark, frame_id="frame-1")
+    assert photo.image.name == f"mark_photos/{mark.id}/frame-1.jpg"
+    with photo.image.open("rb") as f:
+        assert f.read() == body
+
+
+@pytest.mark.django_db
+def test_mark_photo_upload_idempotent_resend_no_duplicate(
+    client, settings, django_user_model, tmp_path
+):
+    from apps.mobile.models import MarkPhoto
+
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+    settings.MEDIA_ROOT = str(tmp_path)
+
+    race, team = _make_team_in_race(django_user_model, slug="photo-idem")
+    mark = _make_photo_mark(team, race)
+    path = _photo_path(race.id, mark.id, "frame-1")
+    body = b"\xff\xd8fake-jpeg-bytes"
+
+    first = _signed_photo_post(client, path, SECRET, body)
+    second = _signed_photo_post(client, path, SECRET, body)
+    assert first.status_code == 201
+    assert second.status_code == 200
+    assert MarkPhoto.objects.filter(mark=mark, frame_id="frame-1").count() == 1
+
+
+@pytest.mark.django_db
+def test_mark_photo_upload_unpublished_race_returns_404(
+    client, settings, django_user_model, tmp_path
+):
+    from website.models.models import Team
+    from website.models.race import Category, Race
+
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+    settings.MEDIA_ROOT = str(tmp_path)
+
+    race = Race.objects.create(name="Unpub", slug="photo-unpub", is_published=False)
+    category = Category.objects.create(code="open", name="Open", race=race)
+    user = django_user_model.objects.create_user(
+        username="owner-photo-unpub", email="photo-unpub@example.com", password="x"
+    )
+    team = Team.objects.create(owner=user, category2=category, teamname="Alpha")
+    mark = _make_photo_mark(team, race)
+    path = _photo_path(race.id, mark.id, "frame-1")
+
+    response = _signed_photo_post(client, path, SECRET, b"\xff\xd8bytes")
+    assert response.status_code == 404
+
+
+@pytest.mark.django_db
+def test_mark_photo_upload_unknown_race_returns_404(
+    client, settings, django_user_model, tmp_path
+):
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+    settings.MEDIA_ROOT = str(tmp_path)
+
+    path = _photo_path(999999, "mk-none", "frame-1")
+    response = _signed_photo_post(client, path, SECRET, b"\xff\xd8bytes")
+    assert response.status_code == 404
+
+
+@pytest.mark.django_db
+def test_mark_photo_upload_mark_not_arrived_returns_404(
+    client, settings, django_user_model, tmp_path
+):
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+    settings.MEDIA_ROOT = str(tmp_path)
+
+    race, team = _make_team_in_race(django_user_model, slug="photo-no-mark")
+    path = _photo_path(race.id, "mk-never-uploaded", "frame-1")
+    response = _signed_photo_post(client, path, SECRET, b"\xff\xd8bytes")
+    assert response.status_code == 404
+
+
+@pytest.mark.django_db
+def test_mark_photo_upload_mark_belongs_to_other_race_returns_404(
+    client, settings, django_user_model, tmp_path
+):
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+    settings.MEDIA_ROOT = str(tmp_path)
+
+    race_a, team_a = _make_team_in_race(django_user_model, slug="photo-race-a")
+    race_b, _team_b = _make_team_in_race(django_user_model, slug="photo-race-b")
+    mark = _make_photo_mark(team_a, race_a)
+
+    path = _photo_path(race_b.id, mark.id, "frame-1")
+    response = _signed_photo_post(client, path, SECRET, b"\xff\xd8bytes")
+    assert response.status_code == 404
+
+
+@pytest.mark.django_db
+def test_mark_photo_upload_empty_body_returns_400(
+    client, settings, django_user_model, tmp_path
+):
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+    settings.MEDIA_ROOT = str(tmp_path)
+
+    race, team = _make_team_in_race(django_user_model, slug="photo-empty")
+    mark = _make_photo_mark(team, race)
+    path = _photo_path(race.id, mark.id, "frame-1")
+
+    response = _signed_photo_post(client, path, SECRET, b"")
+    assert response.status_code == 400
+
+
+@pytest.mark.django_db
+def test_mark_photo_upload_wrong_signature_returns_403(
+    client, settings, django_user_model, tmp_path
+):
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+    settings.MEDIA_ROOT = str(tmp_path)
+
+    race, team = _make_team_in_race(django_user_model, slug="photo-403")
+    mark = _make_photo_mark(team, race)
+    path = _photo_path(race.id, mark.id, "frame-1")
+
+    response = _signed_photo_post(client, path, "wrong-secret", b"\xff\xd8bytes")
+    assert response.status_code == 403
+    assert response.json() == {"detail": "Forbidden"}
+
+
+@pytest.mark.django_db
+def test_mark_photo_upload_throttle_returns_429_after_limit(
+    client, settings, django_user_model, tmp_path
+):
+    from rest_framework.throttling import SimpleRateThrottle
+
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+    settings.MEDIA_ROOT = str(tmp_path)
+
+    race, team = _make_team_in_race(django_user_model, slug="photo-throttle")
+    mark = _make_photo_mark(team, race)
+
+    original_rates = SimpleRateThrottle.THROTTLE_RATES
+    SimpleRateThrottle.THROTTLE_RATES = {**original_rates, "mobile-photo": "2/min"}
+    try:
+        statuses = []
+        for i in range(4):
+            path = _photo_path(race.id, mark.id, f"frame-{i}")
+            statuses.append(
+                _signed_photo_post(client, path, SECRET, b"\xff\xd8bytes").status_code
+            )
+    finally:
+        SimpleRateThrottle.THROTTLE_RATES = original_rates
+
+    assert 429 in statuses[2:]
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("bad_frame_id", ["a.b", "a.jpg", "a~b"])
+def test_mark_photo_upload_bad_charset_frame_id_returns_400(
+    client, settings, django_user_model, tmp_path, bad_frame_id
+):
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+    settings.MEDIA_ROOT = str(tmp_path)
+
+    race, team = _make_team_in_race(
+        django_user_model,
+        slug=f"photo-bad-{bad_frame_id.replace('.', '_').replace('~', '_')}",
+    )
+    mark = _make_photo_mark(team, race)
+    path = _photo_path(race.id, mark.id, bad_frame_id)
+
+    response = _signed_photo_post(client, path, SECRET, b"\xff\xd8bytes")
+    assert response.status_code == 400
+
+
+@pytest.mark.django_db
+def test_mark_photo_upload_trailing_newline_frame_id_returns_400(
+    client, settings, django_user_model, tmp_path
+):
+    """A frame_id ending in a newline (e.g. URL-decoded from ``%0A``) must be
+    rejected, not treated as safe -- Python's ``$`` anchor matches just before
+    a trailing newline, so a ``match()``-based check would let it slip past
+    the charset guard while Django's storage layer sanitizes the newline out
+    of the final filename, letting two distinct frame_ids collide on one
+    canonical path."""
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+    settings.MEDIA_ROOT = str(tmp_path)
+
+    race, team = _make_team_in_race(django_user_model, slug="photo-newline")
+    mark = _make_photo_mark(team, race)
+    path = _photo_path(race.id, mark.id, "frame-1%0A")
+
+    response = _signed_photo_post(client, path, SECRET, b"\xff\xd8bytes")
+    assert response.status_code == 400
+
+
+@pytest.mark.django_db
+def test_mark_photo_upload_unrouteable_frame_id_returns_url_level_404(
+    client, settings, django_user_model, tmp_path
+):
+    """A frame_id that is empty or contains a slash never routes to the view
+    at all -- the <str:frame_id> URL converter itself rejects it before
+    resolving, so this is a plain Django 404, not the view's explicit 400."""
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+    settings.MEDIA_ROOT = str(tmp_path)
+
+    race, team = _make_team_in_race(django_user_model, slug="photo-unrouteable")
+    mark = _make_photo_mark(team, race)
+    base = f"/app/race/{race.id}/mark/{mark.id}/photo/"
+
+    for unrouteable_path in [base, base + "../x", base + "a/b"]:
+        response = _signed_photo_post(
+            client, unrouteable_path, SECRET, b"\xff\xd8bytes"
+        )
+        assert response.status_code == 404, unrouteable_path
+
+
+@pytest.mark.django_db
+def test_mark_photo_upload_orphan_canonical_file_reused_on_retry(
+    client, settings, django_user_model, tmp_path
+):
+    """A canonical file left by a crashed prior attempt (write succeeded, row
+    commit didn't) must be reused on retry -- not suffixed ``_XXXX`` by
+    storage's ``get_available_name``."""
+    from apps.mobile.models import MarkPhoto
+
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+    settings.MEDIA_ROOT = str(tmp_path)
+
+    race, team = _make_team_in_race(django_user_model, slug="photo-orphan")
+    mark = _make_photo_mark(team, race)
+    canonical_rel = f"mark_photos/{mark.id}/frame-1.jpg"
+    canonical_abs = tmp_path / canonical_rel
+    canonical_abs.parent.mkdir(parents=True, exist_ok=True)
+    canonical_abs.write_bytes(b"leftover-from-crash")
+
+    path = _photo_path(race.id, mark.id, "frame-1")
+    response = _signed_photo_post(client, path, SECRET, b"\xff\xd8fresh-bytes")
+    assert response.status_code == 201
+
+    photo = MarkPhoto.objects.get(mark=mark, frame_id="frame-1")
+    assert photo.image.name == canonical_rel  # no "_XXXX" suffix
+    with photo.image.open("rb") as f:
+        assert f.read() == b"\xff\xd8fresh-bytes"
+
+
+@pytest.mark.django_db(transaction=True)
+def test_mark_photo_upload_losing_race_does_not_delete_winners_file(
+    client, settings, django_user_model, tmp_path, monkeypatch
+):
+    """A genuine concurrent duplicate loses the unique_together race after
+    already passing the exists() idempotency pre-check (simulated here by
+    forcing the pre-check to miss, since a real race can't be reproduced
+    deterministically in a single-threaded test). The loser's IntegrityError
+    cleanup must not delete the canonical file the already-committed winning
+    row still references -- both writers target the same deterministic path,
+    so deleting "the file we just wrote" would delete the winner's file too.
+    ``transaction=True`` avoids pytest-django's default outer-transaction
+    wrapping, which would otherwise mark the whole test's connection as
+    broken after the (correctly handled) IntegrityError -- production has no
+    ``ATOMIC_REQUESTS``, so this isn't a real per-request concern."""
+    from django.core.files.base import ContentFile
+
+    from apps.mobile.models import MarkPhoto
+
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+    settings.MEDIA_ROOT = str(tmp_path)
+
+    race, team = _make_team_in_race(django_user_model, slug="photo-race-loser")
+    mark = _make_photo_mark(team, race)
+
+    winner = MarkPhoto(mark=mark, frame_id="frame-1")
+    winner.image.save("frame-1.jpg", ContentFile(b"winner-bytes"), save=False)
+    winner.save()
+
+    class _MissingQuerySet:
+        def exists(self):
+            return False
+
+    # Only the *first* filter() call (the pre-check) is forced to miss --
+    # the view's post-IntegrityError re-query must see the real, now-committed
+    # winning row (matching what a genuine concurrent duplicate looks like in
+    # production) so it can tell "expected duplicate" apart from "unrelated
+    # failure" instead of blindly re-raising.
+    real_filter = MarkPhoto.objects.filter
+    calls = []
+
+    def _filter(**kwargs):
+        calls.append(kwargs)
+        if len(calls) == 1:
+            return _MissingQuerySet()
+        return real_filter(**kwargs)
+
+    path = _photo_path(race.id, mark.id, "frame-1")
+    with monkeypatch.context() as m:
+        m.setattr(MarkPhoto.objects, "filter", _filter)
+        response = _signed_photo_post(client, path, SECRET, b"\xff\xd8loser-bytes")
+    assert response.status_code == 200  # idempotent ack via IntegrityError
+
+    # The winning row survives, and its referenced file must still exist --
+    # not deleted by the loser's cleanup. (Which bytes physically ended up at
+    # the shared canonical path is a write-ordering detail, not something this
+    # test pins: the design already assumes retried frames are content-
+    # identical, same as the sequential orphan-file-reuse guard.)
+    assert MarkPhoto.objects.filter(mark=mark, frame_id="frame-1").count() == 1
+    survivor = MarkPhoto.objects.get(mark=mark, frame_id="frame-1")
+    assert survivor.pk == winner.pk
+    assert survivor.image.storage.exists(survivor.image.name)
+
+
+@pytest.mark.django_db(transaction=True)
+def test_mark_photo_upload_unrelated_integrity_error_is_not_swallowed(
+    client, settings, django_user_model, tmp_path, monkeypatch
+):
+    """An IntegrityError that is NOT the (mark, frame_id) unique constraint
+    (e.g. an unrelated DB failure) must propagate as a 500, not be swallowed
+    as an idempotent 200 -- mirrors TagCreateView's re-query-before-ack
+    pattern. ``transaction=True`` for the same reason as the losing-race
+    test above."""
+    from django.db import IntegrityError
+
+    from apps.mobile.models import MarkPhoto
+
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+    settings.MEDIA_ROOT = str(tmp_path)
+
+    race, team = _make_team_in_race(django_user_model, slug="photo-race-unrelated")
+    mark = _make_photo_mark(team, race)
+
+    def _boom(self, *args, **kwargs):
+        raise IntegrityError("simulated unrelated failure")
+
+    path = _photo_path(race.id, mark.id, "frame-1")
+    with monkeypatch.context() as m:
+        m.setattr(MarkPhoto, "save", _boom)
+        with pytest.raises(IntegrityError):
+            _signed_photo_post(client, path, SECRET, b"\xff\xd8bytes")
+
+    assert not MarkPhoto.objects.filter(mark=mark, frame_id="frame-1").exists()
+
+
+@pytest.mark.django_db
+def test_mark_photo_upload_over_app_cap_under_django_cap_returns_413(
+    client, settings, django_user_model, tmp_path
+):
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+    settings.MEDIA_ROOT = str(tmp_path)
+    settings.DATA_UPLOAD_MAX_MEMORY_SIZE = 12 * 1024 * 1024
+
+    race, team = _make_team_in_race(django_user_model, slug="photo-413")
+    mark = _make_photo_mark(team, race)
+    path = _photo_path(race.id, mark.id, "frame-1")
+    body = b"x" * (11 * 1024 * 1024)  # > PHOTO_MAX_BYTES (10MB), < Django cap (12MB)
+
+    response = _signed_photo_post(client, path, SECRET, body)
+    assert response.status_code == 413
+
+
+@pytest.mark.django_db
+def test_mark_photo_upload_over_django_cap_returns_400(
+    client, settings, django_user_model, tmp_path
+):
+    """Above DATA_UPLOAD_MAX_MEMORY_SIZE, Django's own RequestDataTooBig fires
+    inside SignedAppPermission (reading request.body) before the view's 413
+    check ever runs. The contract treats 400/413 as equivalent -- this test
+    just documents which one fires for a body this large."""
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+    settings.MEDIA_ROOT = str(tmp_path)
+    settings.DATA_UPLOAD_MAX_MEMORY_SIZE = 12 * 1024 * 1024
+
+    race, team = _make_team_in_race(django_user_model, slug="photo-400-big")
+    mark = _make_photo_mark(team, race)
+    path = _photo_path(race.id, mark.id, "frame-1")
+    body = b"x" * (13 * 1024 * 1024)  # > Django cap (12MB)
+
+    response = _signed_photo_post(client, path, SECRET, body)
+    assert response.status_code == 400
+
+
+@pytest.mark.django_db
+def test_mark_photo_upload_no_accept_header_not_406(
+    client, settings, django_user_model, tmp_path
+):
+    """Guards gotcha #4: DRF's response content negotiation runs before the
+    view. Our bare-status responses have no body, so this only matters if the
+    client sends an Accept header DRF's JSONRenderer can't satisfy -- the
+    Android client sends none (or ``*/*``), never ``image/jpeg``."""
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+    settings.MEDIA_ROOT = str(tmp_path)
+
+    race, team = _make_team_in_race(django_user_model, slug="photo-accept")
+    mark = _make_photo_mark(team, race)
+    path = _photo_path(race.id, mark.id, "frame-1")
+    body = b"\xff\xd8bytes"
+
+    headers = _signed_headers("POST", path, SECRET, body=body)
+    headers["HTTP_ACCEPT"] = "*/*"
+    response = client.post(path, data=body, content_type="image/jpeg", **headers)
+    assert response.status_code != 406
+
+
+@pytest.mark.django_db
+def test_mark_photo_upload_over_django_default_cap_is_accepted(
+    client, settings, django_user_model, tmp_path
+):
+    """A body over Django's 2.5MB default (but under the app's 10MB cap) must
+    be accepted end-to-end through SignedAppPermission, which reads
+    request.body before the view runs. Relies on the real
+    DATA_UPLOAD_MAX_MEMORY_SIZE from settings.py, not an override, to prove
+    the global bump actually takes effect."""
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+    settings.MEDIA_ROOT = str(tmp_path)
+
+    race, team = _make_team_in_race(django_user_model, slug="photo-over-default")
+    mark = _make_photo_mark(team, race)
+    path = _photo_path(race.id, mark.id, "frame-1")
+    body = b"\xff\xd8" + b"x" * (3 * 1024 * 1024)  # > 2.5MB Django default
+
+    response = _signed_photo_post(client, path, SECRET, body)
+    assert response.status_code == 201

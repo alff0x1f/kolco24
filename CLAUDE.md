@@ -359,6 +359,52 @@ Django 4.2 project. Source lives entirely under `src/`, with `manage.py` at `src
       `loc_*` (`location is None` → all `loc_*=None`) + build `MarkPresent` objs → `transaction.atomic()` (parent upsert
       before child insert) → 200 `{"accepted": [all submitted ids]}`. Empty `marks` → early ack `[]` (tag-bid query
       skipped).
+    - **Photo upload** (`POST /app/race/<id>/mark/<mark_id>/photo/<frame_id>`, name `mark_photo` — a **fifth POST**, also
+      **build-HMAC-only** like `/track/`/`/marks/`: gated by `AppAPIView`'s default `[SignedAppPermission]`, NOT the
+      per-person write layer; throttle scope `mobile-photo`, `120/min`). Stores one raw JPEG frame for a
+      `method="photo"` `Mark` — the client posts one request per frame; the organizer-facing read/render side is a
+      separate future task, **out of scope** here. **Binary body, not JSON**: the view reads `request.body` directly
+      and never touches `request.data` (DRF's default parsers don't handle `image/jpeg`; touching `.data` 415s) —
+      `SignedAppPermission` already reads `request.body` before the view (Django buffers it), so HMAC-over-raw-bytes
+      works unchanged. `MarkPhoto` (`models.py`, child FK `mark → Mark` CASCADE `related_name="photos"`) is stored at
+      a deterministic, unguessable path `mark_photos/<mark_id>/<frame_id>.jpg` (two client UUIDs) via a `FileField`
+      on the persisted `/app/media` volume; **no `race` field** — `mark.race_id` carries it, and the URL `race_id` is
+      validated against the mark by the `Mark.objects.get(pk=mark_id, race_id=race_id)` lookup (404 on mismatch).
+      **No `updated_at`, deliberately absent from `versioning.py`** — same immutable-model precedent as `TrackPoint`.
+      **Idempotent by `(mark, frame_id)`**: `unique_together` plus an `exists()` pre-check short-circuits a re-send to
+      `200`. **Row-first write ordering, single transaction**: the `MarkPhoto` row (with an empty `image`) is inserted
+      *and* the storage write happens inside the same `transaction.atomic()` block — the DB's `unique_together` is the
+      single arbiter of which of two truly concurrent requests owns a given `(mark, frame_id)`; only the insert's
+      winner ever touches storage (a losing `IntegrityError` returns `200` without writing anything), so two racing
+      requests can never both write the shared canonical path and have one silently overwrite the other's bytes.
+      Keeping the storage write inside the same atomic block means a storage failure rolls the row insert back too —
+      a retry never finds a committed row with an empty `image` (which would otherwise make the `exists()`
+      idempotency pre-check permanently ack a frame that was never actually stored). `image` is
+      `FileField(max_length=255, ...)` (not the Django default 100) since the deterministic path can reach 145 chars
+      (`mark_photos/` + a 64-char `mark_id` + `/` + a 64-char `frame_id` + `.jpg`) — both ids are capped at 64 by
+      `SAFE_ID_RE`. **Orphan-file guard**: because only the row's owner ever reaches the
+      storage step, a canonical file left by a crashed prior attempt (write started, then crashed before completing)
+      can be safely reused — the view `storage.exists()`/`storage.delete()`s any stale file at the canonical path
+      first so a re-post reuses the deterministic name instead of getting a storage-suffixed `_XXXX` copy. **`mark_id`/
+      `frame_id` charset guard**: both are interpolated into a filesystem path (`mark_photos/<mark_id>/<frame_id>.jpg`),
+      so the view validates each against `^[A-Za-z0-9_-]{1,64}$` and 400s before the `Mark` lookup or touching storage
+      — `mark_id` needs this too because `Mark.id` is a client-chosen string with no charset restriction at `/marks/`
+      ingestion (e.g. a literal `".."` would otherwise reach Django's `upload_to` path-building unvalidated); the URL's
+      `<str:frame_id>`/`<str:mark_id>` converters (`[^/]+`) already 404 an empty or slash-containing segment at the
+      routing layer before the view runs, so the view guard only fires for a single bad-charset segment (e.g. `a.jpg`
+      or a literal `..`). Flow: `Race` 404 (published only) → `mark_id`/`frame_id` charset 400 → `Mark` 404
+      (`pk=mark_id, race_id=race_id`) → empty-body 400 → oversized 413 (`PHOTO_MAX_BYTES = 10 MB`) → idempotent 200 →
+      row insert + storage write in one transaction (200 on `IntegrityError`) → 201. **`DATA_UPLOAD_MAX_MEMORY_SIZE = 12 * 1024 * 1024`**
+      (`settings.py`) had to be raised above
+      the Django default 2.5 MB — it's enforced the moment `request.body` is first read, which happens inside
+      `SignedAppPermission` **before** the view, so an under-cap JPEG over the old 2.5 MB default would have hit an
+      opaque `RequestDataTooBig` 400 before the explicit 413 ever ran; this is a **global** relaxation (any non-
+      multipart POST may now buffer up to 12 MB), accepted because nginx already gates all bodies at `client_max_body_
+      size 50m`. **URL has no trailing slash** (diverging from every other `/app/` route) because the signed canonical
+      string is the request's `full_path` and must match the client byte-for-byte. Not admin-registered, matching the
+      `Mark`/`TrackPoint`/`MarkPresent` convention (only the stats models `AppInstall`/`AppAuthFailure` are registered).
+      A frame arriving before its parent `Mark` 404s — contract-safe, since the client only drains a mark's frames
+      after that mark's own upload is acknowledged, and treats a photo `404` as transient (self-heals on the next sync).
 
 New feature apps that don't fit in `website` live under `src/apps/<name>/`. Each needs a unique `AppConfig` label (e.g.
 `label = "race_app"`).
