@@ -6957,6 +6957,28 @@ def test_markphoto_unique_together_raises_on_duplicate(
         _photo().save()
 
 
+# --- Photo upload settings (mark-photo-upload plan, Task 2) ----------------
+
+
+def test_data_upload_max_memory_size_raised_above_photo_cap():
+    from django.conf import settings
+
+    # Must exceed the view's PHOTO_MAX_BYTES (10 MB): SignedAppPermission reads
+    # request.body before the view's own size check runs, so a body between the
+    # Django default (2.5 MB) and the app cap must not be rejected by Django's
+    # own RequestDataTooBig first. See settings.py for the full rationale.
+    assert settings.DATA_UPLOAD_MAX_MEMORY_SIZE == 12 * 1024 * 1024
+    assert settings.DATA_UPLOAD_MAX_MEMORY_SIZE > 10 * 1024 * 1024
+
+
+def test_mobile_photo_throttle_rate_configured():
+    from django.conf import settings
+
+    assert (
+        settings.REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"]["mobile-photo"] == "120/min"
+    )
+
+
 # --- Mark upload serializers (Task 2) --------------------------------------
 
 

@@ -297,17 +297,21 @@ future reader doesn't "fix" the 404 into a speculative insert.
 **Files:**
 - Modify: `src/config/settings.py`
 
-- [ ] add `"mobile-photo": "120/min"` to
+- [x] add `"mobile-photo": "120/min"` to
       `REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"]`
-- [ ] add `DATA_UPLOAD_MAX_MEMORY_SIZE = 12 * 1024 * 1024` with a comment
+- [x] add `DATA_UPLOAD_MAX_MEMORY_SIZE = 12 * 1024 * 1024` with a comment
       explaining it must exceed the app-level photo cap because
       `SignedAppPermission` reads `request.body` before the view (see gotcha 2)
-- [ ] confirm `MEDIA_ROOT`/`MEDIA_URL` already exist (they do, lines 252–253) —
+- [x] confirm `MEDIA_ROOT`/`MEDIA_URL` already exist (they do, lines 252–253) —
       no change needed
-- [ ] write/extend a settings-level assertion test (or a focused endpoint test in
+- [x] write/extend a settings-level assertion test (or a focused endpoint test in
       Task 4) proving a >2.5 MB but <12 MB body is accepted rather than 400'd by
-      `RequestDataTooBig`
-- [ ] run tests — must pass before next task
+      `RequestDataTooBig` — added settings-level assertions
+      (`test_data_upload_max_memory_size_raised_above_photo_cap`,
+      `test_mobile_photo_throttle_rate_configured`); the full end-to-end proof
+      through the permission layer is Task 4's dedicated checkbox once the view
+      exists
+- [x] run tests — must pass before next task
 
 ### Task 3: Add `MarkPhotoUploadView` + URL wiring
 

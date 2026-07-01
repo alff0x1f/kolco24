@@ -198,6 +198,7 @@ REST_FRAMEWORK = {
     "DEFAULT_THROTTLE_RATES": {
         "mobile-login": "5/min",
         "mobile-write": "60/min",
+        "mobile-photo": "120/min",
     },
 }
 
@@ -252,6 +253,15 @@ if not DEBUG:
 MEDIA_URL = "/media/"
 MEDIA_ROOT = os.path.join(BASE_DIR, "media/")
 #
+
+# Django's 2.5 MB default is enforced the moment request.body is first read,
+# which for /app/race/<id>/mark/<id>/photo/<frame_id> happens inside
+# SignedAppPermission, before the view's own 10 MB PHOTO_MAX_BYTES check runs.
+# Raise it just above that app-level cap so an oversized-but-plausible JPEG hits
+# our explicit 413 instead of an opaque RequestDataTooBig 400. This is global
+# (applies to every non-multipart POST), but nginx already gates all bodies at
+# client_max_body_size 50m, so the effective exposure is unchanged.
+DATA_UPLOAD_MAX_MEMORY_SIZE = 12 * 1024 * 1024
 
 # VTB
 VTB = {
