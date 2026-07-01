@@ -359,14 +359,16 @@ future reader doesn't "fix" the 404 into a speculative insert.
 
 ### Task 4: Verify acceptance criteria
 
-- [ ] verify all Overview requirements: binary JPEG accepted, idempotent by
+- [x] verify all Overview requirements: binary JPEG accepted, idempotent by
       `(race, mark, frame)`, `201`/`200` semantics, build-HMAC-only auth
-- [ ] verify all response codes from the contract table are covered by tests
+- [x] verify all response codes from the contract table are covered by tests
       (200, 201, 400, 403, 404, 413, 429)
-- [ ] verify a >2.5 MB frame is accepted (proves the `DATA_UPLOAD_MAX_MEMORY_SIZE`
-      bump works end-to-end through the permission layer)
-- [ ] run the full suite: `uv run pytest`
-- [ ] run `make format && make lint` and fix any findings
+- [x] verify a >2.5 MB frame is accepted (proves the `DATA_UPLOAD_MAX_MEMORY_SIZE`
+      bump works end-to-end through the permission layer) — added
+      `test_mark_photo_upload_over_django_default_cap_is_accepted` (3 MB body,
+      no settings override, relies on the real `settings.py` value) → 201
+- [x] run the full suite: `uv run pytest` — 786 passed
+- [x] run `make format && make lint` and fix any findings — clean
 
 ### Task 5: Update documentation & finalize
 

@@ -8186,3 +8186,25 @@ def test_mark_photo_upload_no_accept_header_not_406(
     headers["HTTP_ACCEPT"] = "*/*"
     response = client.post(path, data=body, content_type="image/jpeg", **headers)
     assert response.status_code != 406
+
+
+@pytest.mark.django_db
+def test_mark_photo_upload_over_django_default_cap_is_accepted(
+    client, settings, django_user_model, tmp_path
+):
+    """A body over Django's 2.5MB default (but under the app's 10MB cap) must
+    be accepted end-to-end through SignedAppPermission, which reads
+    request.body before the view runs. Relies on the real
+    DATA_UPLOAD_MAX_MEMORY_SIZE from settings.py, not an override, to prove
+    the global bump actually takes effect."""
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+    settings.MEDIA_ROOT = str(tmp_path)
+
+    race, team = _make_team_in_race(django_user_model, slug="photo-over-default")
+    mark = _make_photo_mark(team, race)
+    path = _photo_path(race.id, mark.id, "frame-1")
+    body = b"\xff\xd8" + b"x" * (3 * 1024 * 1024)  # > 2.5MB Django default
+
+    response = _signed_photo_post(client, path, SECRET, body)
+    assert response.status_code == 201
