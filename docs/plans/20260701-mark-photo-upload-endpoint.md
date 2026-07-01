@@ -158,29 +158,49 @@ class MarkPhotoUploadView(AppAPIView):
             return Response(status=200)  # idempotent — already stored
 
         photo = MarkPhoto(mark=mark, frame_id=frame_id)
+        canonical = _mark_photo_path(photo, "")  # mark_photos/<mark_id>/<frame_id>.jpg
+        # Reuse the deterministic name even if a crashed prior attempt left an
+        # orphan canonical file (see below) — delete it so storage doesn't suffix
+        # a new "_XXXX" copy. The bytes for a given frame_id are immutable, so an
+        # overwrite is content-identical.
+        if photo.image.storage.exists(canonical):
+            photo.image.storage.delete(canonical)
         photo.image.save(f"{frame_id}.jpg", ContentFile(body), save=False)
         try:
             photo.save()
         except IntegrityError:
             # Concurrent duplicate: both passed the exists() pre-check, we lost
-            # the unique_together race. The file we just wrote is now an orphan
-            # (get_available_name may have suffixed it) — delete it so a rare
+            # the unique_together race. Delete the file we just wrote so a rare
             # race doesn't leak storage, then ack idempotently.
             photo.image.delete(save=False)
             return Response(status=200)
         return Response(status=201)
 ```
 
-**`frame_id` charset (defense-in-depth).** `frame_id` is a client-supplied string
-interpolated directly into `_mark_photo_path`. The contract says it is a UUID
-stem, but the trust model is "participant's phone with the extracted HMAC secret"
-— so validate it against `^[A-Za-z0-9_-]{1,64}$` and return a clean `400` **before**
-touching storage. Without this, a `frame_id` containing `..` or path separators
-trips Django's `SuspiciousFileOperation` (opaque error, not our clean 400) or gets
-silently mangled by `get_valid_name` (breaking the deterministic-path idempotency
-assumption). `mark_id` needs no such guard — `get_object_or_404(Mark, pk=mark_id)`
-runs first, so a hostile `mark_id` simply matches no row → `404` before any path
-is built.
+**`frame_id` charset + routing (defense-in-depth).** `frame_id` is a client-supplied
+string interpolated directly into `_mark_photo_path`, so validate it against
+`^[A-Za-z0-9_-]{1,64}$` and return a clean `400` **before** touching storage. Note
+the split with URL routing: the `<str:frame_id>` converter is `[^/]+`, so a
+`frame_id` that is **empty or contains `/`** (e.g. `../x`) never routes to the view
+at all — Django returns a **URL-level `404`**. The view guard therefore only fires
+for a **single path segment with disallowed characters** (e.g. `a.b`, `a.jpg`,
+`a~b`). Both outcomes are safe (nothing hostile reaches the filesystem path); the
+tests must expect `404` for the unrouteable cases and `400` for the bad-charset
+single-segment case. Keep `<str:frame_id>` (the contract `frame_id` is a slash-free
+UUID); do **not** switch to `<path:frame_id>` — that would let slashes into the
+storage path, which is exactly what the guard exists to prevent. `mark_id` needs no
+guard — `get_object_or_404(Mark, pk=mark_id)` runs first, so a hostile `mark_id`
+matches no row → `404` before any path is built.
+
+**Orphan canonical file (crash window).** The file is written by `image.save()`
+*before* the row is committed by `photo.save()`. If the process dies in that narrow
+window, a canonical file `mark_photos/<mark_id>/<frame_id>.jpg` exists with no
+`MarkPhoto` row. A retry sees no row (idempotency pre-check misses) and would, by
+default, get a `get_available_name`-suffixed `<frame_id>_XXXX.jpg` — breaking the
+deterministic-path guarantee. The `storage.exists() → storage.delete()` step above
+reuses the canonical name on retry, so the deterministic path holds. (The residual
+window — crash *between* delete and re-save — is self-correcting on the next retry
+and is an accepted limitation.)
 
 ### Critical gotchas (must be honored)
 
@@ -215,12 +235,33 @@ is built.
 New imports for the view module: `re`, `django.core.files.base.ContentFile`,
 `django.db.IntegrityError`.
 
+### Parent-mark ordering (the `404` is contract-safe)
+
+Returning `404` when the parent `Mark` has not arrived is only safe because the
+client contract guarantees both halves:
+
+- **metadata-first ordering** — the client starts draining a mark's frames only
+  after that mark's `uploaded*` flag for the target is already `1`
+  (UPLOAD.md §photo, "драйн кадров… стартует только когда uploadedLocal/
+  uploadedCloud… уже 1"), so a frame should not normally race ahead of its
+  `/marks/` batch;
+- **`404` self-heal** — even if it does (or the endpoint is briefly down), the
+  client treats a photo `404` as transient: `photosUploaded*` stays `0` and it
+  **retries on the next upload** (UPLOAD.md §"Коды ответов (эндпоинт кадра)":
+  `404` → "self-heal… повтор на следующей выгрузке").
+
+So the server side needs no queue/hold for out-of-order frames — a plain `404`
+is correct and the client re-drives it. Cite this in the view docstring so a
+future reader doesn't "fix" the 404 into a speculative insert.
+
 ### Deliberate non-goals
 
 - Endpoint does **not** check `mark.method == "photo"`; it accepts a frame for
   any existing mark (accept-and-store philosophy, same as `/marks/`/`/track/`).
 - No JPEG magic-byte check, no Pillow re-encode.
 - No auth-gated read view for retrieving frames (read/scoring side is future).
+- No server-side hold/queue for a frame that arrives before its parent mark —
+  the client's metadata-first ordering + `404` self-heal cover it (see above).
 
 ## What Goes Where
 
@@ -293,9 +334,15 @@ New imports for the view module: `re`, `django.core.files.base.ContentFile`,
       `mark_photos/<mark_id>/`, row created) and idempotent re-send (`200`, no
       duplicate row/file)
 - [ ] write tests for error/edge cases: unpublished race → 404, unknown race →
-      404, mark-not-arrived → 404, mark-belongs-to-other-race → 404, **bad
-      `frame_id` (e.g. `../x`, `a.b`, empty) → 400**, empty body → 400, bad/
-      missing signature → 403, throttle over `mobile-photo` rate → 429
+      404, mark-not-arrived → 404, mark-belongs-to-other-race → 404, empty body →
+      400, bad/missing signature → 403, throttle over `mobile-photo` rate → 429
+- [ ] write **`frame_id` tests split by layer**: bad-charset single segment
+      (`a.b`, `a.jpg`) → **view 400**; unrouteable (`../x`, trailing-empty) →
+      **URL-level 404** (the `<str>` converter never reaches the view — do not
+      assert 400 for these)
+- [ ] add a crash-orphan retry test: pre-create a canonical file
+      `mark_photos/<mark_id>/<frame_id>.jpg` with no row, then POST — assert the
+      row's `image.name` is the canonical path (no `_XXXX` suffix)
 - [ ] write **oversize tests pinned by size band**: a body in the 10–12 MB band
       → `413` (our explicit check), a body >12 MB → `400` (`RequestDataTooBig`
       raised in the permission before the view; the contract treats 400/413
