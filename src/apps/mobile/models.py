@@ -276,7 +276,10 @@ class MarkPhoto(models.Model):
 
     mark = models.ForeignKey(Mark, on_delete=models.CASCADE, related_name="photos")
     frame_id = models.CharField(max_length=64)
-    image = models.FileField(upload_to=_mark_photo_path)
+    # "mark_photos/" + 64-char mark_id + "/" + 64-char frame_id + ".jpg" = 145
+    # chars at most (both ids capped at 64 by SAFE_ID_RE); default max_length=100
+    # would raise a DB error on insert for a near-max-length id pair.
+    image = models.FileField(upload_to=_mark_photo_path, max_length=255)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

@@ -8074,6 +8074,28 @@ def test_mark_photo_upload_bad_charset_frame_id_returns_400(
 
 
 @pytest.mark.django_db
+def test_mark_photo_upload_trailing_newline_frame_id_returns_400(
+    client, settings, django_user_model, tmp_path
+):
+    """A frame_id ending in a newline (e.g. URL-decoded from ``%0A``) must be
+    rejected, not treated as safe -- Python's ``$`` anchor matches just before
+    a trailing newline, so a ``match()``-based check would let it slip past
+    the charset guard while Django's storage layer sanitizes the newline out
+    of the final filename, letting two distinct frame_ids collide on one
+    canonical path."""
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+    settings.MEDIA_ROOT = str(tmp_path)
+
+    race, team = _make_team_in_race(django_user_model, slug="photo-newline")
+    mark = _make_photo_mark(team, race)
+    path = _photo_path(race.id, mark.id, "frame-1%0A")
+
+    response = _signed_photo_post(client, path, SECRET, b"\xff\xd8bytes")
+    assert response.status_code == 400
+
+
+@pytest.mark.django_db
 def test_mark_photo_upload_unrouteable_frame_id_returns_url_level_404(
     client, settings, django_user_model, tmp_path
 ):
@@ -8123,6 +8145,103 @@ def test_mark_photo_upload_orphan_canonical_file_reused_on_retry(
     assert photo.image.name == canonical_rel  # no "_XXXX" suffix
     with photo.image.open("rb") as f:
         assert f.read() == b"\xff\xd8fresh-bytes"
+
+
+@pytest.mark.django_db(transaction=True)
+def test_mark_photo_upload_losing_race_does_not_delete_winners_file(
+    client, settings, django_user_model, tmp_path, monkeypatch
+):
+    """A genuine concurrent duplicate loses the unique_together race after
+    already passing the exists() idempotency pre-check (simulated here by
+    forcing the pre-check to miss, since a real race can't be reproduced
+    deterministically in a single-threaded test). The loser's IntegrityError
+    cleanup must not delete the canonical file the already-committed winning
+    row still references -- both writers target the same deterministic path,
+    so deleting "the file we just wrote" would delete the winner's file too.
+    ``transaction=True`` avoids pytest-django's default outer-transaction
+    wrapping, which would otherwise mark the whole test's connection as
+    broken after the (correctly handled) IntegrityError -- production has no
+    ``ATOMIC_REQUESTS``, so this isn't a real per-request concern."""
+    from django.core.files.base import ContentFile
+
+    from apps.mobile.models import MarkPhoto
+
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+    settings.MEDIA_ROOT = str(tmp_path)
+
+    race, team = _make_team_in_race(django_user_model, slug="photo-race-loser")
+    mark = _make_photo_mark(team, race)
+
+    winner = MarkPhoto(mark=mark, frame_id="frame-1")
+    winner.image.save("frame-1.jpg", ContentFile(b"winner-bytes"), save=False)
+    winner.save()
+
+    class _MissingQuerySet:
+        def exists(self):
+            return False
+
+    # Only the *first* filter() call (the pre-check) is forced to miss --
+    # the view's post-IntegrityError re-query must see the real, now-committed
+    # winning row (matching what a genuine concurrent duplicate looks like in
+    # production) so it can tell "expected duplicate" apart from "unrelated
+    # failure" instead of blindly re-raising.
+    real_filter = MarkPhoto.objects.filter
+    calls = []
+
+    def _filter(**kwargs):
+        calls.append(kwargs)
+        if len(calls) == 1:
+            return _MissingQuerySet()
+        return real_filter(**kwargs)
+
+    path = _photo_path(race.id, mark.id, "frame-1")
+    with monkeypatch.context() as m:
+        m.setattr(MarkPhoto.objects, "filter", _filter)
+        response = _signed_photo_post(client, path, SECRET, b"\xff\xd8loser-bytes")
+    assert response.status_code == 200  # idempotent ack via IntegrityError
+
+    # The winning row survives, and its referenced file must still exist --
+    # not deleted by the loser's cleanup. (Which bytes physically ended up at
+    # the shared canonical path is a write-ordering detail, not something this
+    # test pins: the design already assumes retried frames are content-
+    # identical, same as the sequential orphan-file-reuse guard.)
+    assert MarkPhoto.objects.filter(mark=mark, frame_id="frame-1").count() == 1
+    survivor = MarkPhoto.objects.get(mark=mark, frame_id="frame-1")
+    assert survivor.pk == winner.pk
+    assert survivor.image.storage.exists(survivor.image.name)
+
+
+@pytest.mark.django_db(transaction=True)
+def test_mark_photo_upload_unrelated_integrity_error_is_not_swallowed(
+    client, settings, django_user_model, tmp_path, monkeypatch
+):
+    """An IntegrityError that is NOT the (mark, frame_id) unique constraint
+    (e.g. an unrelated DB failure) must propagate as a 500, not be swallowed
+    as an idempotent 200 -- mirrors TagCreateView's re-query-before-ack
+    pattern. ``transaction=True`` for the same reason as the losing-race
+    test above."""
+    from django.db import IntegrityError
+
+    from apps.mobile.models import MarkPhoto
+
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+    settings.MEDIA_ROOT = str(tmp_path)
+
+    race, team = _make_team_in_race(django_user_model, slug="photo-race-unrelated")
+    mark = _make_photo_mark(team, race)
+
+    def _boom(self, *args, **kwargs):
+        raise IntegrityError("simulated unrelated failure")
+
+    path = _photo_path(race.id, mark.id, "frame-1")
+    with monkeypatch.context() as m:
+        m.setattr(MarkPhoto, "save", _boom)
+        with pytest.raises(IntegrityError):
+            _signed_photo_post(client, path, SECRET, b"\xff\xd8bytes")
+
+    assert not MarkPhoto.objects.filter(mark=mark, frame_id="frame-1").exists()
 
 
 @pytest.mark.django_db

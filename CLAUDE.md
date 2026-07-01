@@ -372,18 +372,30 @@ Django 4.2 project. Source lives entirely under `src/`, with `manage.py` at `src
       validated against the mark by the `Mark.objects.get(pk=mark_id, race_id=race_id)` lookup (404 on mismatch).
       **No `updated_at`, deliberately absent from `versioning.py`** — same immutable-model precedent as `TrackPoint`.
       **Idempotent by `(mark, frame_id)`**: `unique_together` plus an `exists()` pre-check short-circuits a re-send to
-      `200`; a concurrent duplicate that slips past the pre-check is caught via `IntegrityError` on the constraint and
-      also acked `200` (deleting the file it just wrote so a rare race doesn't leak storage). **Orphan-file guard**: the
-      file is written by `image.save()` *before* the row is committed, so a crash in that window leaves a canonical
-      file with no row; on retry the view `storage.exists()`/`storage.delete()`s any stale file at the canonical path
-      first so a re-post reuses the deterministic name instead of getting a storage-suffixed `_XXXX` copy. **`frame_id`
-      charset guard**: `frame_id` is interpolated into a filesystem path, so the view validates it against
-      `^[A-Za-z0-9_-]{1,64}$` and 400s before touching storage — but the URL's `<str:frame_id>` converter (`[^/]+`)
-      already 404s an empty or slash-containing segment at the routing layer before the view runs, so the view guard
-      only fires for a single bad-charset segment (e.g. `a.jpg`); `mark_id` needs no such guard since a hostile value
-      simply matches no `Mark` row (404). Flow: `Race` 404 (published only) → `Mark` 404 (`pk=mark_id, race_id=race_id`)
-      → frame_id charset 400 → empty-body 400 → oversized 413 (`PHOTO_MAX_BYTES = 10 MB`) → idempotent 200 → save 201 /
-      `IntegrityError` 200. **`DATA_UPLOAD_MAX_MEMORY_SIZE = 12 * 1024 * 1024`** (`settings.py`) had to be raised above
+      `200`. **Row-first write ordering, single transaction**: the `MarkPhoto` row (with an empty `image`) is inserted
+      *and* the storage write happens inside the same `transaction.atomic()` block — the DB's `unique_together` is the
+      single arbiter of which of two truly concurrent requests owns a given `(mark, frame_id)`; only the insert's
+      winner ever touches storage (a losing `IntegrityError` returns `200` without writing anything), so two racing
+      requests can never both write the shared canonical path and have one silently overwrite the other's bytes.
+      Keeping the storage write inside the same atomic block means a storage failure rolls the row insert back too —
+      a retry never finds a committed row with an empty `image` (which would otherwise make the `exists()`
+      idempotency pre-check permanently ack a frame that was never actually stored). `image` is
+      `FileField(max_length=255, ...)` (not the Django default 100) since the deterministic path can reach 145 chars
+      (`mark_photos/` + a 64-char `mark_id` + `/` + a 64-char `frame_id` + `.jpg`) — both ids are capped at 64 by
+      `SAFE_ID_RE`. **Orphan-file guard**: because only the row's owner ever reaches the
+      storage step, a canonical file left by a crashed prior attempt (write started, then crashed before completing)
+      can be safely reused — the view `storage.exists()`/`storage.delete()`s any stale file at the canonical path
+      first so a re-post reuses the deterministic name instead of getting a storage-suffixed `_XXXX` copy. **`mark_id`/
+      `frame_id` charset guard**: both are interpolated into a filesystem path (`mark_photos/<mark_id>/<frame_id>.jpg`),
+      so the view validates each against `^[A-Za-z0-9_-]{1,64}$` and 400s before the `Mark` lookup or touching storage
+      — `mark_id` needs this too because `Mark.id` is a client-chosen string with no charset restriction at `/marks/`
+      ingestion (e.g. a literal `".."` would otherwise reach Django's `upload_to` path-building unvalidated); the URL's
+      `<str:frame_id>`/`<str:mark_id>` converters (`[^/]+`) already 404 an empty or slash-containing segment at the
+      routing layer before the view runs, so the view guard only fires for a single bad-charset segment (e.g. `a.jpg`
+      or a literal `..`). Flow: `Race` 404 (published only) → `mark_id`/`frame_id` charset 400 → `Mark` 404
+      (`pk=mark_id, race_id=race_id`) → empty-body 400 → oversized 413 (`PHOTO_MAX_BYTES = 10 MB`) → idempotent 200 →
+      row insert + storage write in one transaction (200 on `IntegrityError`) → 201. **`DATA_UPLOAD_MAX_MEMORY_SIZE = 12 * 1024 * 1024`**
+      (`settings.py`) had to be raised above
       the Django default 2.5 MB — it's enforced the moment `request.body` is first read, which happens inside
       `SignedAppPermission` **before** the view, so an under-cap JPEG over the old 2.5 MB default would have hit an
       opaque `RequestDataTooBig` 400 before the explicit 413 ever ran; this is a **global** relaxation (any non-

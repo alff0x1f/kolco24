@@ -575,9 +575,10 @@ class MarkPhotoUploadView(AppAPIView):
     Idempotency mirrors the sibling batch endpoints but keyed by
     ``(mark, frame_id)`` instead of a client-UUID PK: a pre-check short-circuits
     a re-send to ``200``, and a concurrent duplicate that slips past the
-    pre-check is caught via ``IntegrityError`` on ``unique_together`` and also
-    acked ``200`` (deleting the file it just wrote, so a rare race doesn't leak
-    storage).
+    pre-check is caught via ``IntegrityError`` on ``unique_together`` — the row
+    insert happens before the storage write inside the same atomic block, so
+    the loser's ``IntegrityError`` fires before it ever touches storage — and
+    is also acked ``200``.
 
     A frame arriving before its parent ``Mark`` row 404s. This is contract-safe:
     the client only starts draining a mark's frames after that mark's upload is
@@ -588,16 +589,19 @@ class MarkPhotoUploadView(AppAPIView):
     throttle_classes = [ClientIPScopedRateThrottle]
     throttle_scope = "mobile-photo"
 
-    # frame_id is interpolated into a filesystem path; it must be a safe stem.
-    FRAME_ID_RE = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
+    # mark_id/frame_id are both interpolated into a filesystem path (see
+    # _mark_photo_path); each must be a safe stem. mark_id is a client-chosen
+    # Mark.id (no charset restriction at /marks/ ingestion), so a literal ".."
+    # could otherwise reach Django's upload_to path-building unvalidated.
+    SAFE_ID_RE = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
 
     def post(self, request, race_id, mark_id, frame_id):
         get_object_or_404(Race, pk=race_id, is_published=True)
+        if not self.SAFE_ID_RE.fullmatch(mark_id) or not self.SAFE_ID_RE.fullmatch(
+            frame_id
+        ):
+            return Response({"detail": "bad id"}, status=status.HTTP_400_BAD_REQUEST)
         mark = get_object_or_404(Mark, pk=mark_id, race_id=race_id)
-        if not self.FRAME_ID_RE.match(frame_id):
-            return Response(
-                {"detail": "bad frame_id"}, status=status.HTTP_400_BAD_REQUEST
-            )
 
         body = request.body  # raw JPEG — never touch request.data (415 on image/jpeg)
         if not body:
@@ -612,23 +616,35 @@ class MarkPhotoUploadView(AppAPIView):
         if MarkPhoto.objects.filter(mark_id=mark_id, frame_id=frame_id).exists():
             return Response(status=status.HTTP_200_OK)  # idempotent — already stored
 
+        # Insert the (empty-image) row first, so the DB's unique_together is the
+        # single arbiter of which concurrent request owns this (mark, frame_id) —
+        # only the winner ever touches storage, so two racing requests can never
+        # both write the canonical path (one overwriting the other's bytes). The
+        # storage write stays inside the same atomic block: if it raises, the row
+        # insert rolls back too, so a retry never finds a committed row with no
+        # backing file (which would make the exists() pre-check ack a frame that
+        # was never actually stored).
         photo = MarkPhoto(mark=mark, frame_id=frame_id)
         canonical = _mark_photo_path(photo, "")  # mark_photos/<mark_id>/<frame_id>.jpg
-        # Reuse the deterministic name even if a crashed prior attempt left an
-        # orphan canonical file — delete it so storage doesn't suffix a new
-        # "_XXXX" copy. The bytes for a given frame_id are immutable, so an
-        # overwrite is content-identical.
-        if photo.image.storage.exists(canonical):
-            photo.image.storage.delete(canonical)
-        photo.image.save(f"{frame_id}.jpg", ContentFile(body), save=False)
         try:
-            photo.save()
+            with transaction.atomic():
+                photo.save()
+                # Reuse the deterministic name even if a crashed prior attempt
+                # left an orphan canonical file at this path — safe because
+                # we're now the sole owner of this row, so no other request
+                # can be writing here too.
+                if photo.image.storage.exists(canonical):
+                    photo.image.storage.delete(canonical)
+                photo.image.save(f"{frame_id}.jpg", ContentFile(body), save=True)
         except IntegrityError:
-            # Concurrent duplicate: both passed the exists() pre-check, we lost
-            # the unique_together race. Delete the file we just wrote so a rare
-            # race doesn't leak storage, then ack idempotently.
-            photo.image.delete(save=False)
-            return Response(status=status.HTTP_200_OK)
+            # Could be the (mark, frame_id) unique constraint (expected
+            # concurrent duplicate) or an unrelated failure. Re-query to
+            # determine, mirroring TagCreateView's pattern.
+            if not MarkPhoto.objects.filter(
+                mark_id=mark_id, frame_id=frame_id
+            ).exists():
+                raise
+            return Response(status=status.HTTP_200_OK)  # concurrent duplicate
         return Response(status=status.HTTP_201_CREATED)
 
 
