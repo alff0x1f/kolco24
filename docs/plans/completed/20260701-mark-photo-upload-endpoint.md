@@ -376,12 +376,12 @@ future reader doesn't "fix" the 404 into a speculative insert.
 - Modify: `CLAUDE.md` (mobile app section)
 - Modify: `src/apps/mobile/README.md` (if it enumerates endpoints)
 
-- [ ] add a "Photo upload" invariant paragraph to `CLAUDE.md` mirroring the
+- [x] add a "Photo upload" invariant paragraph to `CLAUDE.md` mirroring the
       "Track upload" / "Marks upload" notes (binary body, build-HMAC-only,
       idempotent `(mark, frame_id)`, immutable/out-of-`versioning.py`, no-trailing-
       slash URL, `DATA_UPLOAD_MAX_MEMORY_SIZE` dependency)
-- [ ] update `src/apps/mobile/README.md` endpoint list if present
-- [ ] move this plan to `docs/plans/completed/` (create dir if needed)
+- [x] update `src/apps/mobile/README.md` endpoint list if present
+- [x] move this plan to `docs/plans/completed/` (create dir if needed)
 
 ## Post-Completion
 
