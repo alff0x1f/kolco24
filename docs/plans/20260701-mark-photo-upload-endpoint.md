@@ -319,43 +319,43 @@ future reader doesn't "fix" the 404 into a speculative insert.
 - Modify: `src/apps/mobile/views.py`
 - Modify: `src/apps/mobile/urls.py`
 
-- [ ] add `PHOTO_MAX_BYTES = 10 * 1024 * 1024` and `FRAME_ID_RE` and the `re` /
+- [x] add `PHOTO_MAX_BYTES = 10 * 1024 * 1024` and `FRAME_ID_RE` and the `re` /
       `ContentFile` / `IntegrityError` imports to `views.py`
-- [ ] implement `MarkPhotoUploadView(AppAPIView)` per the Technical Details flow
+- [x] implement `MarkPhotoUploadView(AppAPIView)` per the Technical Details flow
       (Race 404 → Mark 404 → **frame_id charset 400** → empty 400 → oversized 413
       → idempotent 200 → save 201 / IntegrityError 200 with orphan-file cleanup),
       with `throttle_scope = "mobile-photo"` and a docstring cross-referencing
       gotchas 1, 3 & 4
-- [ ] add the URL route **without** a trailing slash, with an inline comment that
+- [x] add the URL route **without** a trailing slash, with an inline comment that
       the missing slash is intentional (byte-for-byte signed `full_path`)
-- [ ] **skip `admin.py`** — the data-model siblings `Mark`/`TrackPoint`/
+- [x] **skip `admin.py`** — the data-model siblings `Mark`/`TrackPoint`/
       `MarkPresent` are deliberately not admin-registered (only the stats models
       `AppInstall`/`AppAuthFailure` are), so registering `MarkPhoto` would break
       convention, not follow it
-- [ ] add a `_signed_photo_post(...)` test helper sending `Content-Type:
+- [x] add a `_signed_photo_post(...)` test helper sending `Content-Type:
       image/jpeg` over signed raw bytes (see Testing Strategy)
-- [ ] write tests for the happy path (`201`, file exists on disk under
+- [x] write tests for the happy path (`201`, file exists on disk under
       `mark_photos/<mark_id>/`, row created) and idempotent re-send (`200`, no
       duplicate row/file)
-- [ ] write tests for error/edge cases: unpublished race → 404, unknown race →
+- [x] write tests for error/edge cases: unpublished race → 404, unknown race →
       404, mark-not-arrived → 404, mark-belongs-to-other-race → 404, empty body →
       400, bad/missing signature → 403, throttle over `mobile-photo` rate → 429
-- [ ] write **`frame_id` tests split by layer**: bad-charset single segment
+- [x] write **`frame_id` tests split by layer**: bad-charset single segment
       (`a.b`, `a.jpg`) → **view 400**; unrouteable (`../x`, trailing-empty) →
       **URL-level 404** (the `<str>` converter never reaches the view — do not
       assert 400 for these)
-- [ ] add a crash-orphan retry test: pre-create a canonical file
+- [x] add a crash-orphan retry test: pre-create a canonical file
       `mark_photos/<mark_id>/<frame_id>.jpg` with no row, then POST — assert the
       row's `image.name` is the canonical path (no `_XXXX` suffix)
-- [ ] write **oversize tests pinned by size band**: a body in the 10–12 MB band
+- [x] write **oversize tests pinned by size band**: a body in the 10–12 MB band
       → `413` (our explicit check), a body >12 MB → `400` (`RequestDataTooBig`
       raised in the permission before the view; the contract treats 400/413
       identically, so both are acceptable — the test just documents which fires)
-- [ ] add a test posting with the client's real `Accept` header (no `Accept` or
+- [x] add a test posting with the client's real `Accept` header (no `Accept` or
       `*/*`) asserting it is **not** a `406` (guards gotcha #4)
-- [ ] all photo tests use `_signed_photo_post`, the autouse
+- [x] all photo tests use `_signed_photo_post`, the autouse
       `_clear_throttle_cache` fixture, and `override_settings(MEDIA_ROOT=tmp_path)`
-- [ ] run `uv run pytest src/apps/mobile/tests.py` — must pass before next task
+- [x] run `uv run pytest src/apps/mobile/tests.py` — must pass before next task
 
 ### Task 4: Verify acceptance criteria
 

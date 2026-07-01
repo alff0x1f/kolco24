@@ -8,9 +8,11 @@ failure break the response.
 
 import hashlib
 import logging
+import re
 
 from django.conf import settings
 from django.contrib.auth import authenticate
+from django.core.files.base import ContentFile
 from django.db import IntegrityError, transaction
 from django.db.models import F, Prefetch, Sum
 from django.http import HttpResponseNotModified
@@ -31,9 +33,11 @@ from .models import (
     AppAuthFailure,
     AppInstall,
     Mark,
+    MarkPhoto,
     MarkPresent,
     MobileToken,
     TrackPoint,
+    _mark_photo_path,
 )
 from .permissions import CanEditRaceLegend, IsMobileUser, SignedAppPermission
 from .serializers import (
@@ -545,6 +549,87 @@ class MarkUploadView(AppAPIView):
             MarkPresent.objects.bulk_create(present_objs, ignore_conflicts=True)
 
         return Response({"accepted": accepted}, status=status.HTTP_200_OK)
+
+
+PHOTO_MAX_BYTES = 10 * 1024 * 1024  # 10 MB app-level cap (nginx gates at 50m)
+
+
+class MarkPhotoUploadView(AppAPIView):
+    """``POST /app/race/<race_id>/mark/<mark_id>/photo/<frame_id>`` — store one
+    raw JPEG frame for a ``method="photo"`` :class:`Mark`.
+
+    **Build-HMAC-only** like :class:`TrackUploadView`/:class:`MarkUploadView` —
+    not part of the per-person write layer. The URL has **no trailing slash**
+    (deliberately diverging from every other ``/app/`` route) because the
+    signed canonical string is the request's ``full_path``, and the contract
+    path (``UPLOAD.md``) ends at ``<frame_id>``.
+
+    Gotcha #1: read ``request.body`` directly, never ``request.data`` — DRF's
+    default parsers don't handle ``image/jpeg`` and touching ``.data`` 415s.
+    ``SignedAppPermission`` already reads ``request.body`` (Django buffers it),
+    so the HMAC signature over the raw bytes works unchanged. Gotcha #4: our
+    responses carry no body, so a client ``Accept: image/jpeg`` would still
+    406 in DRF's response content negotiation before the view runs — the
+    Android client sends no such header.
+
+    Idempotency mirrors the sibling batch endpoints but keyed by
+    ``(mark, frame_id)`` instead of a client-UUID PK: a pre-check short-circuits
+    a re-send to ``200``, and a concurrent duplicate that slips past the
+    pre-check is caught via ``IntegrityError`` on ``unique_together`` and also
+    acked ``200`` (deleting the file it just wrote, so a rare race doesn't leak
+    storage).
+
+    A frame arriving before its parent ``Mark`` row 404s. This is contract-safe:
+    the client only starts draining a mark's frames after that mark's upload is
+    already acknowledged, and it treats a photo ``404`` as transient — it
+    retries on the next sync. No server-side hold/queue is needed.
+    """
+
+    throttle_classes = [ClientIPScopedRateThrottle]
+    throttle_scope = "mobile-photo"
+
+    # frame_id is interpolated into a filesystem path; it must be a safe stem.
+    FRAME_ID_RE = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
+
+    def post(self, request, race_id, mark_id, frame_id):
+        get_object_or_404(Race, pk=race_id, is_published=True)
+        mark = get_object_or_404(Mark, pk=mark_id, race_id=race_id)
+        if not self.FRAME_ID_RE.match(frame_id):
+            return Response(
+                {"detail": "bad frame_id"}, status=status.HTTP_400_BAD_REQUEST
+            )
+
+        body = request.body  # raw JPEG — never touch request.data (415 on image/jpeg)
+        if not body:
+            return Response(
+                {"detail": "empty body"}, status=status.HTTP_400_BAD_REQUEST
+            )
+        if len(body) > PHOTO_MAX_BYTES:
+            return Response(
+                {"detail": "too large"}, status=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE
+            )
+
+        if MarkPhoto.objects.filter(mark_id=mark_id, frame_id=frame_id).exists():
+            return Response(status=status.HTTP_200_OK)  # idempotent — already stored
+
+        photo = MarkPhoto(mark=mark, frame_id=frame_id)
+        canonical = _mark_photo_path(photo, "")  # mark_photos/<mark_id>/<frame_id>.jpg
+        # Reuse the deterministic name even if a crashed prior attempt left an
+        # orphan canonical file — delete it so storage doesn't suffix a new
+        # "_XXXX" copy. The bytes for a given frame_id are immutable, so an
+        # overwrite is content-identical.
+        if photo.image.storage.exists(canonical):
+            photo.image.storage.delete(canonical)
+        photo.image.save(f"{frame_id}.jpg", ContentFile(body), save=False)
+        try:
+            photo.save()
+        except IntegrityError:
+            # Concurrent duplicate: both passed the exists() pre-check, we lost
+            # the unique_together race. Delete the file we just wrote so a rare
+            # race doesn't leak storage, then ack idempotently.
+            photo.image.delete(save=False)
+            return Response(status=status.HTTP_200_OK)
+        return Response(status=status.HTTP_201_CREATED)
 
 
 class RaceListView(AppAPIView):
