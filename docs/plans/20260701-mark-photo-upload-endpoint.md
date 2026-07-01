@@ -279,18 +279,18 @@ future reader doesn't "fix" the 404 into a speculative insert.
 - Modify: `src/apps/mobile/models.py`
 - Create: `src/apps/mobile/migrations/00NN_markphoto.py` (via makemigrations)
 
-- [ ] add `_mark_photo_path(instance, filename)` helper to `models.py`
-- [ ] add `MarkPhoto` model (FK `mark`→`Mark` CASCADE `related_name="photos"`,
+- [x] add `_mark_photo_path(instance, filename)` helper to `models.py`
+- [x] add `MarkPhoto` model (FK `mark`→`Mark` CASCADE `related_name="photos"`,
       `frame_id` CharField(64), `image` FileField(upload_to=`_mark_photo_path`),
       `created_at` auto_now_add, `unique_together("mark", "frame_id")`, `__str__`)
-- [ ] add a docstring noting it is immutable (no `updated_at`, not in
+- [x] add a docstring noting it is immutable (no `updated_at`, not in
       `versioning.py`), mirroring the `TrackPoint` note
-- [ ] generate the migration: `uv run python src/manage.py makemigrations mobile`
-- [ ] write a test that `MarkPhoto` persists and enforces the
+- [x] generate the migration: `uv run python src/manage.py makemigrations mobile`
+- [x] write a test that `MarkPhoto` persists and enforces the
       `unique_together("mark", "frame_id")` constraint (IntegrityError on dup)
-- [ ] run migration check + tests:
+- [x] run migration check + tests:
       `uv run python src/manage.py makemigrations --check --dry-run` and
-      `uv run pytest src/apps/mobile/tests.py -k markphoto_model` — must pass
+      `uv run pytest src/apps/mobile/tests.py -k markphoto` — must pass
 
 ### Task 2: Settings — throttle scope + upload-size limit
 

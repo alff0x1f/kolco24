@@ -6914,6 +6914,49 @@ def test_markpresent_bulk_create_ignore_conflicts_is_additive(django_user_model)
     assert mark.present.get(number_in_team=1).nfc_uid == "aa"
 
 
+@pytest.mark.django_db
+def test_markphoto_model_persists(django_user_model, settings, tmp_path):
+    from django.core.files.base import ContentFile
+
+    from apps.mobile.models import MarkPhoto
+
+    settings.MEDIA_ROOT = str(tmp_path)
+    race, team = _make_team_in_race(django_user_model, slug="mark-photo-race-1")
+    mark = _make_mark(team, race, id="mark-photo-1", method="photo")
+    mark.save()
+
+    photo = MarkPhoto(mark=mark, frame_id="frame-1")
+    photo.image.save("frame-1.jpg", ContentFile(b"fake-jpeg-bytes"), save=False)
+    photo.save()
+
+    stored = MarkPhoto.objects.get(mark=mark, frame_id="frame-1")
+    assert stored.image.name == "mark_photos/mark-photo-1/frame-1.jpg"
+    assert stored.created_at is not None
+
+
+@pytest.mark.django_db
+def test_markphoto_unique_together_raises_on_duplicate(
+    django_user_model, settings, tmp_path
+):
+    from django.core.files.base import ContentFile
+
+    from apps.mobile.models import MarkPhoto
+
+    settings.MEDIA_ROOT = str(tmp_path)
+    race, team = _make_team_in_race(django_user_model, slug="mark-photo-race-2")
+    mark = _make_mark(team, race, id="mark-photo-2", method="photo")
+    mark.save()
+
+    def _photo():
+        p = MarkPhoto(mark=mark, frame_id="frame-1")
+        p.image.save("frame-1.jpg", ContentFile(b"bytes"), save=False)
+        return p
+
+    _photo().save()
+    with pytest.raises(IntegrityError):
+        _photo().save()
+
+
 # --- Mark upload serializers (Task 2) --------------------------------------
 
 
