@@ -104,8 +104,9 @@ def races_version():
 # bust on all cached clients at deploy time, even when no DB row was touched.
 # History: 1 = initial; 2 = color field added to LegendCheckpointSerializer;
 # 3 = legend tags[] identity key renamed point -> checkpoint_id (TagSerializer);
-# 4 = top-level total_cost added to the legend response (progress-bar denominator).
-_LEGEND_SCHEMA_VERSION = 4
+# 4 = top-level total_cost added to the legend response (progress-bar denominator);
+# 5 = top-level scoring_count added (count of scoring КП, cost > 0).
+_LEGEND_SCHEMA_VERSION = 5
 
 
 def legend_version(race_id):
