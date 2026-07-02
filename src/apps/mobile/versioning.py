@@ -34,6 +34,14 @@ from website.models.models import Athlet, Team
 from website.models.race import Category, Race
 from website.models.tag import Tag
 
+# Bump whenever the teams response schema changes (fields added or removed on
+# TeamSerializer / the embedded CategorySerializer). Prefixed into every
+# teams_version() hash so a schema change forces a cache bust on all cached
+# clients at deploy time, even when no DB row was touched.
+# History: 1 = initial; 2 = control_time + overtime_penalty added to
+# CategorySerializer.
+_TEAMS_SCHEMA_VERSION = 2
+
 
 def teams_version(race_id):
     """Return a short, stable fingerprint of a race's teams + members + categories.
@@ -54,6 +62,10 @@ def teams_version(race_id):
     category **add/delete** moves ``COUNT(Category)``. The category aggregate is
     over ``Category.objects.filter(race_id=race_id)`` with **no ``is_active``
     filter** — the exact queryset the view serves (single-source contract).
+
+    A ``_TEAMS_SCHEMA_VERSION`` prefix is prepended to the hash input so a
+    response-shape change (fields added/removed on the team or embedded category
+    serializer) busts the cache at deploy time even when no DB row changed.
 
     None aggregates (empty race) render as the literal ``"None"`` → stable,
     non-crashing. Returns **bare** hex (no quotes).
@@ -77,7 +89,8 @@ def teams_version(race_id):
         count=Count("id"),
     )
     raw = (
-        f"{teams['max_updated']}|{members['max_updated']}"
+        f"{_TEAMS_SCHEMA_VERSION}"
+        f"|{teams['max_updated']}|{members['max_updated']}"
         f"|{members['count']}|{teams['count']}"
         f"|{categories['max_updated']}|{categories['count']}"
     )

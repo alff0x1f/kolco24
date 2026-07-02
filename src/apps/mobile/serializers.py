@@ -304,14 +304,24 @@ class CategorySerializer(serializers.ModelSerializer):
     """Mobile view of a race category (display + filter only).
 
     Exposes just the fields the app needs to resolve a team's ``category2`` id
-    into a label and build a category filter — no ``is_active`` (the list
-    intentionally includes inactive categories so a team's id still resolves),
-    no ``description`` or size fields (YAGNI).
+    into a label and build a category filter, plus the category's control time
+    (``control_time``, minutes; ``0`` = не задано) and per-minute overtime
+    penalty (``overtime_penalty``, баллы; ``0`` = без штрафа) — no ``is_active``
+    (the list intentionally includes inactive categories so a team's id still
+    resolves), no ``description`` or size fields (YAGNI).
     """
 
     class Meta:
         model = Category
-        fields = ["id", "code", "short_name", "name", "order"]
+        fields = [
+            "id",
+            "code",
+            "short_name",
+            "name",
+            "order",
+            "control_time",
+            "overtime_penalty",
+        ]
 
 
 class MemberSerializer(serializers.ModelSerializer):
