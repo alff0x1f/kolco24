@@ -247,16 +247,16 @@
 - Create: `src/templates/race/protocol.html`
 - Modify: `src/apps/race/tests.py`
 
-- [ ] `ProtocolView.get`: выбор протокола по правам (`can_edit_race` → последний любой; иначе последний
+- [x] `ProtocolView.get`: выбор протокола по правам (`can_edit_race` → последний любой; иначе последний
       `final`; нет → сообщение), строки `filter(category_id=...)`, заголовок по статусу, контекст.
-- [ ] создать `src/templates/race/protocol.html` на базе `teams_result.html` под новые имена полей,
+- [x] создать `src/templates/race/protocol.html` на базе `teams_result.html` под новые имена полей,
       без mock-блоков, с print-landscape и подсветкой расхождения чипов.
-- [ ] тест видимости: публика (аноним/не-админ) видит только `final` (при наличии только draft →
+- [x] тест видимости: публика (аноним/не-админ) видит только `final` (при наличии только draft →
       «Протокол ещё не опубликован»); админ видит draft.
-- [ ] тест: страница фильтрует строки по `category_id`; заголовок соответствует статусу.
-- [ ] тест **гарантии неизменности**: сформировали протокол → изменили `Team.teamname` и добавили
+- [x] тест: страница фильтрует строки по `category_id`; заголовок соответствует статусу.
+- [x] тест **гарантии неизменности**: сформировали протокол → изменили `Team.teamname` и добавили
       `TakenKP` → GET `/results/` возвращает прежние значения (снапшот не изменился до пересчёта).
-- [ ] `uv run pytest src/apps/race/tests.py --reuse-db` — зелёные перед Task 4.
+- [x] `uv run pytest src/apps/race/tests.py --reuse-db` — зелёные перед Task 4.
 
 ### Task 4: POST-вьюхи build/freeze + кнопки
 

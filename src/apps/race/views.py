@@ -14,7 +14,7 @@ from django.views import View
 from django.views.decorators.cache import never_cache
 
 from apps.race.forms import RaceForm
-from apps.race.models import RaceExtra
+from apps.race.models import Protocol, RaceExtra
 from apps.race.permissions import can_edit_race
 from website.forms import NewsPostForm
 from website.models import Checkpoint, NewsPost, Race, Team
@@ -1044,3 +1044,55 @@ class RaceLegendCodesView(View):
             for tag in tags
         ]
         return render(request, "race/legend_codes.html", {"race": race, "rows": rows})
+
+
+class ProtocolView(View):
+    """Read-only results-protocol page, backed by the ``ProtocolRow`` snapshot.
+
+    Visibility: :func:`can_edit_race` sees the latest protocol of any status
+    (draft or final); everyone else sees only the latest ``final`` one. The
+    page never touches live ``Team``/``TakenKP`` data — only whatever a past
+    :func:`apps.race.results.build_protocol` call snapshotted into rows.
+    """
+
+    def get(self, request, race_slug, category_id):
+        race = get_object_or_404(Race, slug=race_slug)
+        can_edit = can_edit_race(request.user, race)
+        category = Category.objects.filter(id=category_id, race=race).first()
+
+        protocol_qs = race.protocols.all()
+        if not can_edit:
+            protocol_qs = protocol_qs.filter(status=Protocol.FINAL)
+        protocol = protocol_qs.order_by("-created_at").first()
+
+        if protocol is None:
+            return render(
+                request,
+                "race/protocol.html",
+                {
+                    "race": race,
+                    "category": category,
+                    "can_edit": can_edit,
+                    "protocol": None,
+                    "rows": [],
+                },
+            )
+
+        rows = protocol.rows.filter(category_id=category_id).order_by("place")
+        title = (
+            "Предварительный протокол"
+            if protocol.status == Protocol.DRAFT
+            else "Итоговый протокол"
+        )
+        return render(
+            request,
+            "race/protocol.html",
+            {
+                "race": race,
+                "category": category,
+                "can_edit": can_edit,
+                "protocol": protocol,
+                "rows": rows,
+                "title": title,
+            },
+        )

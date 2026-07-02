@@ -11,7 +11,7 @@ from apps.race.forms import RaceForm
 from apps.race.models import Protocol
 from apps.race.permissions import can_edit_race
 from apps.race.results import build_protocol, freeze_protocol
-from apps.race.views import RaceEditView, RacePageView, RaceTeamsView
+from apps.race.views import ProtocolView, RaceEditView, RacePageView, RaceTeamsView
 from website.models import Race
 from website.models.checkpoint import Checkpoint
 from website.models.models import TakenKP, Team
@@ -2981,3 +2981,136 @@ def test_freeze_protocol_without_draft_returns_none(django_user_model):
 
     # freezing again with no draft present is a no-op.
     assert freeze_protocol(race) is None
+
+
+# ---------------------------------------------------------------------------
+# ProtocolView (Task 3)
+# ---------------------------------------------------------------------------
+# The URL for this view is wired in Task 5, so these tests call it directly
+# via RequestFactory instead of ``client``/``reverse()``.
+
+
+@pytest.mark.django_db
+def test_protocol_view_public_sees_only_final(rf, django_user_model):
+    race = _make_race()
+    category = _make_category(race)
+    owner = django_user_model.objects.create_user(username="owner", password="x")
+    _make_started_team(owner, category, teamname="A", finish_time=2000)
+
+    build_protocol(race, None)  # draft only, not frozen
+
+    request = rf.get("/")
+    request.user = AnonymousUser()
+    response = ProtocolView.as_view()(
+        request, race_slug=race.slug, category_id=category.id
+    )
+    assert response.status_code == 200
+    assert "ещё не опубликован" in response.content.decode()
+
+    freeze_protocol(race)
+    request = rf.get("/")
+    request.user = AnonymousUser()
+    response = ProtocolView.as_view()(
+        request, race_slug=race.slug, category_id=category.id
+    )
+    assert response.status_code == 200
+    assert "A" in response.content.decode()
+
+
+@pytest.mark.django_db
+def test_protocol_view_admin_sees_draft(rf, django_user_model):
+    race = _make_race()
+    category = _make_category(race)
+    admin = django_user_model.objects.create_user(username="radmin", password="x")
+    RaceAdmin.objects.create(race=race, user=admin, role=RaceAdmin.Role.ADMIN)
+    owner = django_user_model.objects.create_user(username="owner", password="x")
+    _make_started_team(owner, category, teamname="DraftTeam", finish_time=2000)
+
+    build_protocol(race, admin)
+
+    request = rf.get("/")
+    request.user = admin
+    response = ProtocolView.as_view()(
+        request, race_slug=race.slug, category_id=category.id
+    )
+    assert response.status_code == 200
+    content = response.content.decode()
+    assert "DraftTeam" in content
+    assert "черновик" in content
+
+
+@pytest.mark.django_db
+def test_protocol_view_filters_rows_by_category(rf, django_user_model):
+    race = _make_race()
+    category_a = _make_category(race, code="a", short_name="A", name="Категория A")
+    category_b = _make_category(
+        race, code="b", short_name="B", name="Категория B", order=1
+    )
+    owner = django_user_model.objects.create_user(username="owner", password="x")
+    _make_started_team(owner, category_a, teamname="TeamA", finish_time=2000)
+    _make_started_team(owner, category_b, teamname="TeamB", finish_time=2000)
+
+    build_protocol(race, None)
+    freeze_protocol(race)
+
+    request = rf.get("/")
+    request.user = AnonymousUser()
+    response = ProtocolView.as_view()(
+        request, race_slug=race.slug, category_id=category_a.id
+    )
+    content = response.content.decode()
+    assert "TeamA" in content
+    assert "TeamB" not in content
+
+
+@pytest.mark.django_db
+def test_protocol_view_title_matches_status(rf, django_user_model):
+    race = _make_race()
+    category = _make_category(race)
+    owner = django_user_model.objects.create_user(username="owner", password="x")
+    _make_started_team(owner, category, teamname="A", finish_time=2000)
+
+    admin = django_user_model.objects.create_user(username="radmin2", password="x")
+    RaceAdmin.objects.create(race=race, user=admin, role=RaceAdmin.Role.ADMIN)
+
+    build_protocol(race, admin)
+    request = rf.get("/")
+    request.user = admin
+    response = ProtocolView.as_view()(
+        request, race_slug=race.slug, category_id=category.id
+    )
+    assert "Предварительный протокол" in response.content.decode()
+
+    freeze_protocol(race)
+    request = rf.get("/")
+    request.user = AnonymousUser()
+    response = ProtocolView.as_view()(
+        request, race_slug=race.slug, category_id=category.id
+    )
+    assert "Итоговый протокол" in response.content.decode()
+
+
+@pytest.mark.django_db
+def test_protocol_view_immutability_guarantee(rf, django_user_model):
+    """A frozen snapshot is unaffected by later edits to live Team/TakenKP data."""
+    race = _make_race()
+    category = _make_category(race)
+    owner = django_user_model.objects.create_user(username="owner", password="x")
+    team = _make_started_team(owner, category, teamname="Original", finish_time=2000)
+
+    build_protocol(race, None)
+    freeze_protocol(race)
+
+    # Mutate live data after the snapshot was frozen.
+    team.teamname = "Changed"
+    team.save()
+    _make_taken_kp(team, 1, nfc="chip1", timestamp=1)
+
+    request = rf.get("/")
+    request.user = AnonymousUser()
+    response = ProtocolView.as_view()(
+        request, race_slug=race.slug, category_id=category.id
+    )
+    content = response.content.decode()
+    assert "Original" in content
+    assert "Changed" not in content

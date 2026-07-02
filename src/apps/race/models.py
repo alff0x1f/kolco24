@@ -1,3 +1,5 @@
+import datetime
+
 from django.conf import settings
 from django.db import models
 
@@ -156,3 +158,15 @@ class ProtocolRow(models.Model):
 
     def __str__(self):
         return f"ProtocolRow #{self.id}: {self.team_name} ({self.place})"
+
+    @property
+    def start_time_date(self):
+        if not self.start_time_ms:
+            return None
+        return datetime.datetime.fromtimestamp(self.start_time_ms / 1000)
+
+    @property
+    def finish_time_date(self):
+        if not self.finish_time_ms:
+            return None
+        return datetime.datetime.fromtimestamp(self.finish_time_ms / 1000)
