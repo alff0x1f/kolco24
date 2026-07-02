@@ -8,10 +8,13 @@ from django.test import RequestFactory
 from django.urls import resolve, reverse
 
 from apps.race.forms import RaceForm
+from apps.race.models import Protocol
 from apps.race.permissions import can_edit_race
+from apps.race.results import build_protocol, freeze_protocol
 from apps.race.views import RaceEditView, RacePageView, RaceTeamsView
 from website.models import Race
-from website.models.models import Team
+from website.models.checkpoint import Checkpoint
+from website.models.models import TakenKP, Team
 from website.models.race import Category, RaceAdmin, RacePriceTier, RegStatus
 
 
@@ -2751,3 +2754,230 @@ def test_protocol_frozen_at_and_created_by_allow_null(django_user_model):
     protocol.save()
     protocol.refresh_from_db()
     assert protocol.created_by is None
+
+
+# ---------------------------------------------------------------------------
+# build_protocol / freeze_protocol service (Task 2)
+# ---------------------------------------------------------------------------
+
+
+def _make_checkpoint(race, number, cost):
+    return Checkpoint.objects.create(race=race, number=number, cost=cost)
+
+
+def _make_taken_kp(team, point_number, nfc="", image_url="", timestamp=0):
+    return TakenKP.objects.create(
+        team=team,
+        point_number=point_number,
+        nfc=nfc,
+        image_url=image_url,
+        timestamp=timestamp,
+    )
+
+
+def _make_started_team(owner, category, start_time=1000, finish_time=0, **kwargs):
+    return _make_team(
+        owner,
+        category,
+        start_time=start_time,
+        finish_time=finish_time,
+        **kwargs,
+    )
+
+
+@pytest.mark.django_db
+def test_build_protocol_creates_rows_with_scores_and_places(django_user_model):
+    race = _make_race()
+    category = _make_category(race)
+    _make_checkpoint(race, 1, 10)
+    _make_checkpoint(race, 2, 20)
+
+    owner_a = django_user_model.objects.create_user(username="owner_a", password="x")
+    owner_b = django_user_model.objects.create_user(username="owner_b", password="x")
+
+    team_a = _make_started_team(
+        owner_a, category, teamname="A", finish_time=1000 + 3_600_000
+    )
+    team_b = _make_started_team(
+        owner_b, category, teamname="B", finish_time=1000 + 1_800_000
+    )
+
+    _make_taken_kp(team_a, 1, nfc="chip1", timestamp=1)
+    _make_taken_kp(team_a, 2, nfc="chip1", timestamp=2)
+    _make_taken_kp(team_b, 1, nfc="chip2", timestamp=1)
+
+    protocol = build_protocol(race, None)
+
+    rows = {row.team_id: row for row in protocol.rows.all()}
+    assert rows[team_a.id].total_score == 30
+    assert rows[team_a.id].nfc_score == 30
+    assert rows[team_a.id].chips_count == 1
+    assert rows[team_a.id].duration_ms == 3_600_000
+    assert rows[team_b.id].total_score == 10
+    assert rows[team_b.id].duration_ms == 1_800_000
+
+    # A scores higher despite taking longer -> places 1st.
+    assert rows[team_a.id].place == 1
+    assert rows[team_b.id].place == 2
+
+
+@pytest.mark.django_db
+def test_build_protocol_penalty_from_category(django_user_model):
+    race = _make_race()
+    category = _make_category(race)
+    category.control_time = 60
+    category.overtime_penalty = 2
+    category.save()
+    _make_checkpoint(race, 1, 10)
+
+    owner = django_user_model.objects.create_user(username="owner", password="x")
+    team = _make_started_team(owner, category, finish_time=1000 + 90 * 60 * 1000)
+    _make_taken_kp(team, 1, nfc="chip1", timestamp=1)
+
+    protocol = build_protocol(race, None)
+    row = protocol.rows.get(team_id=team.id)
+
+    assert row.total_score == 10
+    assert row.penalty == 60  # 30 min overtime * 2 pts/min
+    assert row.final_score == row.total_score - 60
+
+
+@pytest.mark.django_db
+def test_build_protocol_no_penalty_when_control_time_zero(django_user_model):
+    race = _make_race()
+    category = _make_category(race)  # control_time defaults to 0
+    _make_checkpoint(race, 1, 10)
+
+    owner = django_user_model.objects.create_user(username="owner", password="x")
+    team = _make_started_team(owner, category, finish_time=1000 + 90 * 60 * 1000)
+    _make_taken_kp(team, 1, nfc="chip1", timestamp=1)
+
+    protocol = build_protocol(race, None)
+    row = protocol.rows.get(team_id=team.id)
+
+    assert row.penalty == 0
+    assert row.final_score == row.total_score
+
+
+@pytest.mark.django_db
+def test_build_protocol_penalty_magnitude_matches_old_one_point_per_minute(
+    django_user_model,
+):
+    race = _make_race()
+    category = _make_category(race)
+    category.control_time = 60
+    category.overtime_penalty = 1
+    category.save()
+
+    owner = django_user_model.objects.create_user(username="owner", password="x")
+    team = _make_started_team(owner, category, finish_time=1000 + 75 * 60 * 1000)
+
+    protocol = build_protocol(race, None)
+    row = protocol.rows.get(team_id=team.id)
+
+    assert row.penalty == 15  # matches old view's 1 point per overtime minute
+
+
+@pytest.mark.django_db
+def test_build_protocol_orphan_checkpoint_number_does_not_crash(django_user_model):
+    race = _make_race()
+    category = _make_category(race)
+    _make_checkpoint(race, 1, 10)
+
+    owner = django_user_model.objects.create_user(username="owner", password="x")
+    team = _make_started_team(owner, category, finish_time=2000)
+    # point 99 has no Checkpoint row at all -> orphan
+    _make_taken_kp(team, 99, nfc="chip1", timestamp=1)
+    _make_taken_kp(team, 1, nfc="chip1", timestamp=2)
+
+    protocol = build_protocol(race, None)
+    row = protocol.rows.get(team_id=team.id)
+
+    # only the known point (cost 10) contributes to score.
+    assert row.total_score == 10
+    assert row.nfc_count == 1
+
+
+@pytest.mark.django_db
+def test_build_protocol_rebuild_reuses_draft_and_recomputes_rows(django_user_model):
+    race = _make_race()
+    category = _make_category(race)
+    _make_checkpoint(race, 1, 10)
+
+    owner = django_user_model.objects.create_user(username="owner", password="x")
+    team = _make_started_team(owner, category, finish_time=2000)
+
+    protocol_1 = build_protocol(race, None)
+    assert protocol_1.rows.count() == 1
+    assert protocol_1.rows.get().total_score == 0
+
+    _make_taken_kp(team, 1, nfc="chip1", timestamp=1)
+    protocol_2 = build_protocol(race, None)
+
+    assert protocol_2.id == protocol_1.id
+    assert protocol_2.rows.count() == 1
+    assert protocol_2.rows.get().total_score == 10
+
+
+@pytest.mark.django_db
+def test_build_protocol_after_freeze_creates_new_draft_final_unchanged(
+    django_user_model,
+):
+    race = _make_race()
+    category = _make_category(race)
+    _make_checkpoint(race, 1, 10)
+
+    owner = django_user_model.objects.create_user(username="owner", password="x")
+    team = _make_started_team(owner, category, finish_time=2000)
+    _make_taken_kp(team, 1, nfc="chip1", timestamp=1)
+
+    draft = build_protocol(race, None)
+    final = freeze_protocol(race)
+    assert final.id == draft.id
+    assert final.status == Protocol.FINAL
+    final_score_before = final.rows.get().total_score
+
+    # New data appears after freeze.
+    _make_taken_kp(team, 1, nfc="chip1", timestamp=2)
+    _make_checkpoint(race, 2, 50)
+    _make_taken_kp(team, 2, nfc="chip1", timestamp=3)
+
+    new_draft = build_protocol(race, None)
+    assert new_draft.id != final.id
+    assert new_draft.status == Protocol.DRAFT
+    assert new_draft.rows.get().total_score == 60
+
+    final.refresh_from_db()
+    assert final.rows.get().total_score == final_score_before
+
+
+@pytest.mark.django_db
+def test_build_protocol_no_started_teams_returns_zero_rows():
+    race = _make_race()
+    _make_category(race)
+
+    protocol = build_protocol(race, None)
+
+    assert protocol.rows.count() == 0
+
+
+@pytest.mark.django_db
+def test_freeze_protocol_without_any_protocol_returns_none():
+    race = _make_race()
+
+    assert freeze_protocol(race) is None
+
+
+@pytest.mark.django_db
+def test_freeze_protocol_without_draft_returns_none(django_user_model):
+    race = _make_race()
+    category = _make_category(race)
+    owner = django_user_model.objects.create_user(username="owner", password="x")
+    _make_started_team(owner, category, finish_time=2000)
+
+    build_protocol(race, None)
+    frozen = freeze_protocol(race)
+    assert frozen.status == Protocol.FINAL
+
+    # freezing again with no draft present is a no-op.
+    assert freeze_protocol(race) is None

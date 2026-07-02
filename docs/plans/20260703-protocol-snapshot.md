@@ -219,26 +219,26 @@
 - Create: `src/apps/race/results.py`
 - Modify: `src/apps/race/tests.py`
 
-- [ ] реализовать `build_protocol(race, user)`: выбор/создание draft под `select_for_update` в
+- [x] реализовать `build_protocol(race, user)`: выбор/создание draft под `select_for_update` в
       `transaction.atomic()`, порт логики результатов, штраф из `Category.control_time`/
       `overtime_penalty`, сортировка+места по категориям, `bulk_create` строк.
-- [ ] вынести хелперы подсчёта (members-склейка, NFC/фото-дедуп, `duration_str`) в приватные функции
+- [x] вынести хелперы подсчёта (members-склейка, NFC/фото-дедуп, `duration_str`) в приватные функции
       модуля для читаемости и тестируемости.
-- [ ] реализовать `freeze_protocol(race)`: draft→final с `frozen_at`, no-op (возврат `None`) без draft.
-- [ ] тест: `build_protocol` создаёт корректные строки — баллы NFC/фото, `total_score`, места по
+- [x] реализовать `freeze_protocol(race)`: draft→final с `frozen_at`, no-op (возврат `None`) без draft.
+- [x] тест: `build_protocol` создаёт корректные строки — баллы NFC/фото, `total_score`, места по
       `(-final_score, duration_ms)`, `chips_count`.
-- [ ] тест штрафа из категории: `control_time>0` и просрочка → `penalty = overtime_min *
+- [x] тест штрафа из категории: `control_time>0` и просрочка → `penalty = overtime_min *
       overtime_penalty`, `final_score = total_score - penalty`; `control_time=0` → `penalty=0`.
-- [ ] тест паритета магнитуды со старой формулой: категория с `overtime_penalty=1` даёт `penalty ==
+- [x] тест паритета магнитуды со старой формулой: категория с `overtime_penalty=1` даёт `penalty ==
       overtime_min` (1 балл/мин — как в старой вьюхе).
-- [ ] тест осиротевшего КП: `TakenKP.point_number`, которого нет в `cost`-словаре (нет `Checkpoint`
+- [x] тест осиротевшего КП: `TakenKP.point_number`, которого нет в `cost`-словаре (нет `Checkpoint`
       или `cost<0`) → build **не падает**, неизвестный номер пропущен (проверка `cost.get`, не `[]`).
-- [ ] тест жизненного цикла: повторный `build` при draft пересчитывает **тот же** протокол (rows
+- [x] тест жизненного цикла: повторный `build` при draft пересчитывает **тот же** протокол (rows
       переписаны, не накапливаются); после `freeze` следующий `build` создаёт **новый** draft, а final
       остаётся неизменным.
-- [ ] тест краевого случая: гонка без стартовавших команд → протокол с 0 строк; `freeze` без draft →
+- [x] тест краевого случая: гонка без стартовавших команд → протокол с 0 строк; `freeze` без draft →
       `None`, статус final не трогается.
-- [ ] `uv run pytest src/apps/race/tests.py --reuse-db` — зелёные перед Task 3.
+- [x] `uv run pytest src/apps/race/tests.py --reuse-db` — зелёные перед Task 3.
 
 ### Task 3: Вьюха отображения `ProtocolView` + шаблон
 
