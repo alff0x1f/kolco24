@@ -305,10 +305,10 @@
 - [x] `make lint` — чисто.
 
 ### Task 7: [Final] Документация и оформление
-- [ ] обновить `CLAUDE.md`: краткая заметка про `apps.race` `Protocol`/`ProtocolRow`, сервис
+- [x] обновить `CLAUDE.md`: краткая заметка про `apps.race` `Protocol`/`ProtocolRow`, сервис
       `results.py`, URL `results`/`results-deprecated`/`build`/`freeze`, правило видимости.
-- [ ] `make format && make lint` перед коммитом.
-- [ ] переместить план в `docs/plans/completed/`.
+- [x] `make format && make lint` перед коммитом.
+- [x] переместить план в `docs/plans/completed/`.
 
 ## Post-Completion
 *Требуют ручного действия или внешних систем — без чекбоксов, информационно.*
