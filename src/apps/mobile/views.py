@@ -14,7 +14,7 @@ from django.conf import settings
 from django.contrib.auth import authenticate
 from django.core.files.base import ContentFile
 from django.db import IntegrityError, transaction
-from django.db.models import F, Prefetch, Sum
+from django.db.models import Count, F, Prefetch, Q, Sum
 from django.http import HttpResponseNotModified
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
@@ -715,11 +715,19 @@ class LegendView(AppAPIView):
         # `Sum` ignores order_by/select_related; an empty race yields None → 0.
         # Derives purely from `Checkpoint.cost`, which `legend_version` already
         # fingerprints via `MAX(updated_at)|COUNT`, so no new ETag input is needed.
-        total_cost = qs.aggregate(total=Sum("cost"))["total"] or 0
+        # `scoring_count` = number of scoring КП (cost > 0) over the same set —
+        # the progress-bar numerator's denominator (how many КП count toward score).
+        agg = qs.aggregate(
+            total=Sum("cost"),
+            scoring=Count("id", filter=Q(cost__gt=0)),
+        )
+        total_cost = agg["total"] or 0
+        scoring_count = agg["scoring"] or 0
         resp = Response(
             {
                 "race": race_id,
                 "total_cost": total_cost,
+                "scoring_count": scoring_count,
                 "checkpoints": LegendCheckpointSerializer(qs, many=True).data,
                 "tags": TagSerializer(tag_qs, many=True).data,
             }

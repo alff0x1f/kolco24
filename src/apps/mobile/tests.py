@@ -532,6 +532,7 @@ def test_legend_valid_signature_returns_200_with_fields_and_order(client, settin
     data = response.json()
     assert data["race"] == race.id
     assert data["total_cost"] == 4  # 2 + 1 + 1 over all non-hidden КП
+    assert data["scoring_count"] == 3  # all three КП have cost > 0
     assert data["tags"] == []
     assert [c["number"] for c in data["checkpoints"]] == [1, 2, 3]
     first = data["checkpoints"][0]
@@ -844,6 +845,7 @@ def test_legend_locked_cp_serves_enc_not_cleartext_open_serves_cleartext(
     # total_cost folds in the locked КП's cost (4 + 2) as an aggregate only —
     # the per-КП locked cost still isn't exposed (no "cost" key on the locked КП).
     assert data["total_cost"] == 6
+    assert data["scoring_count"] == 2  # both the open (4) and locked (2) КП score
 
 
 @pytest.mark.django_db
@@ -886,6 +888,38 @@ def test_legend_total_cost_empty_race_is_zero(client, settings):
 
     assert response.status_code == 200
     assert response.json()["total_cost"] == 0
+    assert response.json()["scoring_count"] == 0
+
+
+@pytest.mark.django_db
+def test_legend_scoring_count_counts_cost_gt_zero_only(client, settings):
+    """scoring_count = number of non-hidden КП with cost > 0 (open + locked)."""
+    from website.models.checkpoint import Checkpoint
+    from website.models.race import Race
+
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    race = Race.objects.create(name="Scoring race", slug="scoring-race")
+    Checkpoint.objects.create(race=race, number=1, cost=3, description="open")
+    Checkpoint.objects.create(
+        race=race, number=2, cost=5, description="locked", is_legend_locked=True
+    )
+    # cost == 0 → not a scoring КП
+    Checkpoint.objects.create(race=race, number=3, cost=0, description="free")
+    # hidden КП excluded even though cost > 0
+    Checkpoint.objects.create(
+        race=race, number=4, cost=99, description="hidden", type="hidden"
+    )
+
+    path = f"/app/race/{race.id}/legend/"
+    response = client.get(path, **_signed_headers("GET", path, SECRET))
+
+    assert response.status_code == 200
+    data = response.json()
+    # КП #1 (open, cost 3) + #2 (locked, cost 5); #3 (cost 0) and #4 (hidden) excluded.
+    assert data["scoring_count"] == 2
+    assert data["total_cost"] == 8
 
 
 @pytest.mark.django_db
