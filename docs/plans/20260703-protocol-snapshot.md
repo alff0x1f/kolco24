@@ -281,16 +281,16 @@
 - Modify: `src/website/urls.py`
 - Modify: `src/apps/race/tests.py`
 
-- [ ] импортировать вьюхи `apps.race` в `website/urls.py`; переключить `category_results` на
+- [x] импортировать вьюхи `apps.race` в `website/urls.py`; переключить `category_results` на
       `ProtocolView`.
-- [ ] добавить `results-deprecated/` → `AllTeamsResultView` имя `category_results_deprecated`.
-- [ ] добавить `results/build/` (`protocol_build`) и `results/freeze/` (`protocol_freeze`).
-- [ ] тест: депрекейтнутый URL рендерит старую вьюху (`teams_result.html`), новый `category_results`
+- [x] добавить `results-deprecated/` → `AllTeamsResultView` имя `category_results_deprecated`.
+- [x] добавить `results/build/` (`protocol_build`) и `results/freeze/` (`protocol_freeze`).
+- [x] тест: депрекейтнутый URL рендерит старую вьюху (`teams_result.html`), новый `category_results`
       рендерит снапшот-шаблон; `reverse()` имён резолвится.
-- [ ] тест: старый int-URL results (`RaceIdRedirectView`) по-прежнему редиректит (редирект **path-based**
+- [x] тест: старый int-URL results (`RaceIdRedirectView`) по-прежнему редиректит (редирект **path-based**
       — строковая замена `/race/<id>/`→`/race/<slug>/`, не `reverse("category_results")`, поэтому смена
       вьюхи за именем его не затрагивает; тест как страховка).
-- [ ] `uv run pytest src/apps/race/tests.py --reuse-db` — зелёные перед Task 6.
+- [x] `uv run pytest src/apps/race/tests.py --reuse-db` — зелёные перед Task 6.
 
 ### Task 6: Verify acceptance criteria
 - [ ] проверить все требования Overview: снапшот неизменен к правкам живых данных; штраф из полей

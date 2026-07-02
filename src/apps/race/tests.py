@@ -3255,3 +3255,66 @@ def test_protocol_build_ignores_offsite_referer(rf, django_user_model):
         )
         in response.url
     )
+
+
+# ---------------------------------------------------------------------------
+# URL routing (Task 5)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.django_db
+def test_category_results_url_resolves_to_protocol_view(client):
+    race = _make_race(slug="url-routing-race")
+    category = _make_category(race)
+
+    resp = client.get(reverse("category_results", args=[race.slug, category.id]))
+
+    assert resp.status_code == 200
+    assert resp.resolver_match.func.view_class is ProtocolView
+    assert "race/protocol.html" in [t.name for t in resp.templates]
+
+
+@pytest.mark.django_db
+def test_category_results_deprecated_url_renders_old_view(client, django_user_model):
+    race = _make_race(slug="url-routing-race-2")
+    category = _make_category(race)
+    owner = django_user_model.objects.create_user(username="deprowner", password="x")
+    _make_started_team(owner, category, finish_time=2000)
+
+    resp = client.get(
+        reverse("category_results_deprecated", args=[race.slug, category.id])
+    )
+
+    assert resp.status_code == 200
+    assert "teams_result.html" in [t.name for t in resp.templates]
+
+
+@pytest.mark.django_db
+def test_protocol_build_and_freeze_url_names_resolve(client, django_user_model):
+    race = _make_race(slug="url-routing-race-3")
+    _make_category(race)
+    admin = django_user_model.objects.create_user(username="urladmin", password="x")
+    RaceAdmin.objects.create(race=race, user=admin, role=RaceAdmin.Role.ADMIN)
+    client.force_login(admin)
+
+    build_url = reverse("protocol_build", kwargs={"race_slug": race.slug})
+    freeze_url = reverse("protocol_freeze", kwargs={"race_slug": race.slug})
+
+    resp = client.post(build_url)
+    assert resp.status_code == 302
+    assert Protocol.objects.filter(race=race, status=Protocol.DRAFT).exists()
+
+    resp = client.post(freeze_url)
+    assert resp.status_code == 302
+    assert Protocol.objects.filter(race=race, status=Protocol.FINAL).exists()
+
+
+@pytest.mark.django_db
+def test_race_id_redirect_still_works_for_results_url(client):
+    race = _make_race(slug="url-routing-race-4")
+    category = _make_category(race)
+
+    resp = client.get(f"/race/{race.id}/category/{category.id}/results/")
+
+    assert resp.status_code == 301
+    assert resp["Location"] == f"/race/{race.slug}/category/{category.id}/results/"
