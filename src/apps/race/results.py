@@ -137,9 +137,14 @@ def _build_row(protocol, team, cost):
 
 
 def _assign_places(rows):
-    """Sort rows by category, then ``(-final_score, duration_ms)``; reset
-    ``place`` to 1 at each category change."""
-    rows.sort(key=lambda r: (r.category_id, -r.final_score, r.duration_ms))
+    """Sort rows by category, then ``(-final_score, duration_ms, team_id)``;
+    reset ``place`` to 1 at each category change.
+
+    ``team_id`` is a tiebreaker so the order is deterministic across rebuilds
+    even for two teams tied on both score and duration (the source queryset
+    has no guaranteed row order).
+    """
+    rows.sort(key=lambda r: (r.category_id, -r.final_score, r.duration_ms, r.team_id))
     current_category = object()
     place = 1
     for row in rows:

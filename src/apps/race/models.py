@@ -113,7 +113,7 @@ class ProtocolRow(models.Model):
     # Identification
     place = models.IntegerField(default=0)
     team_id = models.IntegerField()
-    start_number = models.CharField(max_length=20, blank=True, default="")
+    start_number = models.CharField(max_length=50, blank=True, default="")
     team_name = models.CharField(max_length=200, blank=True, default="")
     members = models.TextField(blank=True, default="")
     club = models.CharField(max_length=200, blank=True, default="")

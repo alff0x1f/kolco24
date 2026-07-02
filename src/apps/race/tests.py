@@ -2982,6 +2982,125 @@ def test_build_protocol_no_started_teams_returns_zero_rows():
 
 
 @pytest.mark.django_db
+def test_build_protocol_excludes_unpaid_teams(django_user_model):
+    race = _make_race()
+    category = _make_category(race)
+    owner = django_user_model.objects.create_user(username="owner", password="x")
+    _make_started_team(owner, category, finish_time=2000, paid_people=0)
+
+    protocol = build_protocol(race, None)
+
+    assert protocol.rows.count() == 0
+
+
+@pytest.mark.django_db
+def test_build_protocol_excludes_unstarted_teams(django_user_model):
+    race = _make_race()
+    category = _make_category(race)
+    owner = django_user_model.objects.create_user(username="owner", password="x")
+    _make_team(owner, category, start_time=0, finish_time=0)
+
+    protocol = build_protocol(race, None)
+
+    assert protocol.rows.count() == 0
+
+
+@pytest.mark.django_db
+def test_build_protocol_place_resets_per_category(django_user_model):
+    race = _make_race()
+    cat_a = _make_category(race, code="a", short_name="a", name="A")
+    cat_b = _make_category(race, code="b", short_name="b", name="B")
+    _make_checkpoint(race, 1, 10)
+    _make_checkpoint(race, 2, 20)
+
+    owner_1 = django_user_model.objects.create_user(username="o1", password="x")
+    owner_2 = django_user_model.objects.create_user(username="o2", password="x")
+    owner_3 = django_user_model.objects.create_user(username="o3", password="x")
+    owner_4 = django_user_model.objects.create_user(username="o4", password="x")
+
+    a_hi = _make_started_team(owner_1, cat_a, teamname="A-hi", finish_time=2000)
+    a_lo = _make_started_team(owner_2, cat_a, teamname="A-lo", finish_time=2000)
+    b_hi = _make_started_team(owner_3, cat_b, teamname="B-hi", finish_time=2000)
+    b_lo = _make_started_team(owner_4, cat_b, teamname="B-lo", finish_time=2000)
+
+    _make_taken_kp(a_hi, 2, nfc="c1", timestamp=1)
+    _make_taken_kp(b_hi, 2, nfc="c2", timestamp=1)
+
+    protocol = build_protocol(race, None)
+    rows = {row.team_id: row for row in protocol.rows.all()}
+
+    # Each category has its own 1st/2nd place, independent of the other.
+    assert rows[a_hi.id].place == 1
+    assert rows[a_lo.id].place == 2
+    assert rows[b_hi.id].place == 1
+    assert rows[b_lo.id].place == 2
+
+
+@pytest.mark.django_db
+def test_build_protocol_ties_broken_deterministically_by_team_id(django_user_model):
+    race = _make_race()
+    category = _make_category(race)
+
+    owner_1 = django_user_model.objects.create_user(username="t1", password="x")
+    owner_2 = django_user_model.objects.create_user(username="t2", password="x")
+    # Both teams tie on final_score (0) and duration_ms -> team_id tiebreaker.
+    team_lo = _make_started_team(owner_1, category, teamname="Lo", finish_time=2000)
+    team_hi = _make_started_team(owner_2, category, teamname="Hi", finish_time=2000)
+    assert team_lo.id < team_hi.id
+
+    protocol_1 = build_protocol(race, None)
+    rows_1 = {row.team_id: row.place for row in protocol_1.rows.all()}
+
+    protocol_2 = build_protocol(race, None)
+    rows_2 = {row.team_id: row.place for row in protocol_2.rows.all()}
+
+    assert rows_1 == rows_2
+    assert rows_1[team_lo.id] == 1
+    assert rows_1[team_hi.id] == 2
+
+
+@pytest.mark.django_db
+def test_build_protocol_start_number_accepts_full_team_field_length(
+    django_user_model,
+):
+    """Regression: ``ProtocolRow.start_number`` must accept anything
+    ``Team.start_number`` (max_length=50) can hold, or ``bulk_create`` raises
+    a Postgres ``DataError`` and the whole build rolls back."""
+    race = _make_race()
+    category = _make_category(race)
+    owner = django_user_model.objects.create_user(username="owner", password="x")
+    long_start_number = "x" * 50
+    _make_started_team(
+        owner, category, finish_time=2000, start_number=long_start_number
+    )
+
+    protocol = build_protocol(race, None)
+
+    assert protocol.rows.get().start_number == long_start_number
+
+
+@pytest.mark.django_db
+def test_team_members_lists_all_athletes_up_to_ucount(django_user_model):
+    race = _make_race()
+    category = _make_category(race)
+    owner = django_user_model.objects.create_user(username="owner", password="x")
+    team = _make_started_team(
+        owner,
+        category,
+        finish_time=2000,
+        ucount=3,
+        athlet1="Ivanov",
+        athlet2="Petrov",
+        athlet3="Sidorov",
+    )
+
+    protocol = build_protocol(race, None)
+    row = protocol.rows.get(team_id=team.id)
+
+    assert row.members == "Ivanov, Petrov, Sidorov"
+
+
+@pytest.mark.django_db
 def test_freeze_protocol_without_any_protocol_returns_none():
     race = _make_race()
 
@@ -3308,6 +3427,23 @@ def test_protocol_build_ignores_offsite_referer(rf, django_user_model):
         )
         in response.url
     )
+
+
+@pytest.mark.django_db
+def test_protocol_build_falls_back_to_race_page_without_active_category(
+    rf, django_user_model
+):
+    race = _make_race()
+    # No category at all -> _protocol_redirect_back has nowhere else to go.
+    admin = django_user_model.objects.create_user(username="radmin7", password="x")
+    RaceAdmin.objects.create(race=race, user=admin, role=RaceAdmin.Role.ADMIN)
+
+    request = _attach_messages(rf.post("/"))
+    request.user = admin
+    response = ProtocolBuildView.as_view()(request, race_slug=race.slug)
+
+    assert response.status_code == 302
+    assert response.url == reverse("race", kwargs={"race_slug": race.slug})
 
 
 # ---------------------------------------------------------------------------

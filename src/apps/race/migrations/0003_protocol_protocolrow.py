@@ -74,7 +74,7 @@ class Migration(migrations.Migration):
                 ("team_id", models.IntegerField()),
                 (
                     "start_number",
-                    models.CharField(blank=True, default="", max_length=20),
+                    models.CharField(blank=True, default="", max_length=50),
                 ),
                 ("team_name", models.CharField(blank=True, default="", max_length=200)),
                 ("members", models.TextField(blank=True, default="")),
