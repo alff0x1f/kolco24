@@ -35,8 +35,11 @@
           <div class="sub">{{ category.name }} ({{ category.short_name }})</div>
         {% endif %}
       </div>
-      {% if can_edit %}
-        <div class="head-r protocol-actions">
+      <div class="head-r protocol-actions">
+        {% if rows %}
+          <button type="button" class="btn btn-ghost" onclick="window.print()">Печать</button>
+        {% endif %}
+        {% if can_edit %}
           <form method="post" action="{% url 'protocol_build' race.slug %}">
             {% csrf_token %}
             <button type="submit" class="btn btn-ghost">Сформировать</button>
@@ -45,9 +48,21 @@
             {% csrf_token %}
             <button type="submit" class="btn btn-primary">Зафиксировать</button>
           </form>
-        </div>
-      {% endif %}
+        {% endif %}
+      </div>
     </div>
+
+    {% if protocol %}
+      <!-- Print-only header: shown on the printed sheet in place of the on-screen
+           breadcrumb/nav (hidden via @media print). -->
+      <div class="print-head">
+        <div class="print-title">{{ race.name }}{% if category %} — {{ category.name }}{% endif %}</div>
+        <div class="print-sub">
+          {{ title|default:"Протокол" }} ·
+          {% if protocol.frozen_at %}{{ protocol.frozen_at|date:"d.m.Y H:i" }}{% else %}{{ protocol.created_at|date:"d.m.Y H:i" }}{% endif %}
+        </div>
+      </div>
+    {% endif %}
 
     {% if messages %}
       <ul class="protocol-messages">
@@ -120,10 +135,3 @@
 </div>
 {% endblock %}
 
-{% block footer_js_include %}
-<style>
-  @media print {
-    @page { size: landscape; }
-  }
-</style>
-{% endblock %}

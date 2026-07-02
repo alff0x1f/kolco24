@@ -72,6 +72,50 @@
   background: #fdecea; border-radius: 4px; padding: 1px 6px; margin-bottom: 3px;
 }
 
+/* ── Print-only sheet header ─────────────────────────────────
+   Hidden on screen; shown in @media print in place of the nav/breadcrumb. */
+.protocol-page .print-head { display: none; }
+
+/* ── Print ───────────────────────────────────────────────────
+   A clean sheet for hanging results / saving as PDF (Ctrl+P → "Save as PDF").
+   Paper size is left to the print dialog so A4 and A3 both work. */
 @media print {
-  @page { size: landscape; }
+  @page { size: landscape; margin: 10mm 8mm; }
+
+  /* Drop the site chrome and on-screen-only controls. */
+  #siteNav,
+  .footer-dark,
+  .protocol-page .breadcrumb,
+  .protocol-page .head,
+  .protocol-page .protocol-actions,
+  .protocol-page .protocol-messages { display: none !important; }
+
+  /* White sheet — override theme-2's gray body background so nothing prints gray. */
+  body { background: #fff; }
+
+  /* Flatten page/card wrappers — no padding, shadow, or rounded border on paper. */
+  .protocol-page { padding: 0; }
+  .protocol-page .card {
+    margin: 0; border: 0; border-radius: 0; box-shadow: none; background: #fff;
+  }
+
+  .protocol-page .print-head { display: block; margin: 0 0 8px; }
+  .protocol-page .print-title { font-size: 16pt; font-weight: 700; }
+  .protocol-page .print-sub { font-size: 10pt; color: #333; margin-top: 2px; }
+
+  /* Compact, wrap-friendly table that repeats its header on every sheet. */
+  .protocol-page .grid-wrap { overflow: visible; }
+  .protocol-page .protocol-table { font-size: 9pt; }
+  .protocol-page .protocol-table thead { display: table-header-group; }
+  .protocol-page .protocol-table tr { break-inside: avoid; }
+  .protocol-page .protocol-table th,
+  .protocol-page .protocol-table td {
+    padding: 3px 6px; white-space: normal; word-break: break-word;
+  }
+  .protocol-page .protocol-table th { font-size: 8pt; }
+  /* Keep row striping / mismatch highlight visible on paper. */
+  .protocol-page .protocol-table,
+  .protocol-page .chip-mismatch {
+    -webkit-print-color-adjust: exact; print-color-adjust: exact;
+  }
 }
