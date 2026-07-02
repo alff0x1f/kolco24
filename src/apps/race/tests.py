@@ -4,14 +4,25 @@ import re
 
 import pytest
 from django.contrib.auth.models import AnonymousUser, User
+from django.contrib.messages.storage.fallback import FallbackStorage
 from django.test import RequestFactory
 from django.urls import resolve, reverse
 
 from apps.race.forms import RaceForm
+from apps.race.models import Protocol
 from apps.race.permissions import can_edit_race
-from apps.race.views import RaceEditView, RacePageView, RaceTeamsView
+from apps.race.results import build_protocol, freeze_protocol
+from apps.race.views import (
+    ProtocolBuildView,
+    ProtocolFreezeView,
+    ProtocolView,
+    RaceEditView,
+    RacePageView,
+    RaceTeamsView,
+)
 from website.models import Race
-from website.models.models import Team
+from website.models.checkpoint import Checkpoint
+from website.models.models import TakenKP, Team
 from website.models.race import Category, RaceAdmin, RacePriceTier, RegStatus
 
 
@@ -48,6 +59,18 @@ def _make_team(owner, category, **kwargs):
     }
     defaults.update(kwargs)
     return Team.objects.create(owner=owner, category2=category, **defaults)
+
+
+def _attach_messages(request):
+    """Attach a message storage to a bare ``RequestFactory`` request.
+
+    The build/freeze views call ``messages.success``/``messages.info``, which
+    need ``request._messages`` — normally set by ``MessageMiddleware``, which
+    ``RequestFactory`` requests never go through. Standard Django test recipe.
+    """
+    setattr(request, "session", {})
+    setattr(request, "_messages", FallbackStorage(request))
+    return request
 
 
 @pytest.mark.django_db
@@ -2692,3 +2715,795 @@ def test_legend_codes_get_race_moderator_forbidden(client, django_user_model):
 
 
 # ---------------------------------------------------------------------------
+# Protocol / ProtocolRow models (Task 1)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.django_db
+def test_protocol_created_with_default_status_draft():
+    from apps.race.models import Protocol
+
+    race = _make_race()
+    protocol = Protocol.objects.create(race=race)
+    assert protocol.status == Protocol.DRAFT
+    assert protocol.frozen_at is None
+    assert protocol.created_by is None
+
+
+@pytest.mark.django_db
+def test_protocol_related_name_on_race():
+    from apps.race.models import Protocol
+
+    race = _make_race()
+    protocol = Protocol.objects.create(race=race)
+    assert list(race.protocols.all()) == [protocol]
+
+
+@pytest.mark.django_db
+def test_protocol_row_related_name_on_protocol():
+    from apps.race.models import Protocol, ProtocolRow
+
+    race = _make_race()
+    protocol = Protocol.objects.create(race=race)
+    row = ProtocolRow.objects.create(protocol=protocol, team_id=1, category_id=1)
+    assert list(protocol.rows.all()) == [row]
+
+
+@pytest.mark.django_db
+def test_protocol_row_cascade_deleted_with_protocol():
+    from apps.race.models import Protocol, ProtocolRow
+
+    race = _make_race()
+    protocol = Protocol.objects.create(race=race)
+    row = ProtocolRow.objects.create(protocol=protocol, team_id=1, category_id=1)
+    protocol.delete()
+    assert not ProtocolRow.objects.filter(id=row.id).exists()
+
+
+@pytest.mark.django_db
+def test_protocol_frozen_at_and_created_by_allow_null(django_user_model):
+    from apps.race.models import Protocol
+
+    race = _make_race()
+    user = django_user_model.objects.create_user(username="creator", password="x")
+
+    protocol = Protocol.objects.create(race=race, created_by=user)
+    assert protocol.frozen_at is None
+
+    protocol.created_by = None
+    protocol.save()
+    protocol.refresh_from_db()
+    assert protocol.created_by is None
+
+
+# ---------------------------------------------------------------------------
+# build_protocol / freeze_protocol service (Task 2)
+# ---------------------------------------------------------------------------
+
+
+def _make_checkpoint(race, number, cost):
+    return Checkpoint.objects.create(race=race, number=number, cost=cost)
+
+
+def _make_taken_kp(team, point_number, nfc="", image_url="", timestamp=0):
+    return TakenKP.objects.create(
+        team=team,
+        point_number=point_number,
+        nfc=nfc,
+        image_url=image_url,
+        timestamp=timestamp,
+    )
+
+
+def _make_started_team(owner, category, start_time=1000, finish_time=0, **kwargs):
+    return _make_team(
+        owner,
+        category,
+        start_time=start_time,
+        finish_time=finish_time,
+        **kwargs,
+    )
+
+
+@pytest.mark.django_db
+def test_build_protocol_creates_rows_with_scores_and_places(django_user_model):
+    race = _make_race()
+    category = _make_category(race)
+    _make_checkpoint(race, 1, 10)
+    _make_checkpoint(race, 2, 20)
+
+    owner_a = django_user_model.objects.create_user(username="owner_a", password="x")
+    owner_b = django_user_model.objects.create_user(username="owner_b", password="x")
+
+    team_a = _make_started_team(
+        owner_a, category, teamname="A", finish_time=1000 + 3_600_000
+    )
+    team_b = _make_started_team(
+        owner_b, category, teamname="B", finish_time=1000 + 1_800_000
+    )
+
+    _make_taken_kp(team_a, 1, nfc="chip1", timestamp=1)
+    _make_taken_kp(team_a, 2, nfc="chip1", timestamp=2)
+    _make_taken_kp(team_b, 1, nfc="chip2", timestamp=1)
+
+    protocol = build_protocol(race, None)
+
+    rows = {row.team_id: row for row in protocol.rows.all()}
+    assert rows[team_a.id].total_score == 30
+    assert rows[team_a.id].nfc_score == 30
+    assert rows[team_a.id].chips_count == 1
+    assert rows[team_a.id].duration_ms == 3_600_000
+    assert rows[team_b.id].total_score == 10
+    assert rows[team_b.id].duration_ms == 1_800_000
+
+    # A scores higher despite taking longer -> places 1st.
+    assert rows[team_a.id].place == 1
+    assert rows[team_b.id].place == 2
+
+
+@pytest.mark.django_db
+def test_build_protocol_penalty_from_category(django_user_model):
+    race = _make_race()
+    category = _make_category(race)
+    category.control_time = 60
+    category.overtime_penalty = 2
+    category.save()
+    _make_checkpoint(race, 1, 10)
+
+    owner = django_user_model.objects.create_user(username="owner", password="x")
+    team = _make_started_team(owner, category, finish_time=1000 + 90 * 60 * 1000)
+    _make_taken_kp(team, 1, nfc="chip1", timestamp=1)
+
+    protocol = build_protocol(race, None)
+    row = protocol.rows.get(team_id=team.id)
+
+    assert row.total_score == 10
+    assert row.penalty == 60  # 30 min overtime * 2 pts/min
+    assert row.final_score == row.total_score - 60
+
+
+@pytest.mark.django_db
+def test_build_protocol_no_penalty_when_control_time_zero(django_user_model):
+    race = _make_race()
+    category = _make_category(race)  # control_time defaults to 0
+    _make_checkpoint(race, 1, 10)
+
+    owner = django_user_model.objects.create_user(username="owner", password="x")
+    team = _make_started_team(owner, category, finish_time=1000 + 90 * 60 * 1000)
+    _make_taken_kp(team, 1, nfc="chip1", timestamp=1)
+
+    protocol = build_protocol(race, None)
+    row = protocol.rows.get(team_id=team.id)
+
+    assert row.penalty == 0
+    assert row.final_score == row.total_score
+
+
+@pytest.mark.django_db
+def test_build_protocol_penalty_magnitude_matches_old_one_point_per_minute(
+    django_user_model,
+):
+    race = _make_race()
+    category = _make_category(race)
+    category.control_time = 60
+    category.overtime_penalty = 1
+    category.save()
+
+    owner = django_user_model.objects.create_user(username="owner", password="x")
+    team = _make_started_team(owner, category, finish_time=1000 + 75 * 60 * 1000)
+
+    protocol = build_protocol(race, None)
+    row = protocol.rows.get(team_id=team.id)
+
+    assert row.penalty == 15  # matches old view's 1 point per overtime minute
+
+
+@pytest.mark.django_db
+def test_build_protocol_orphan_checkpoint_number_does_not_crash(django_user_model):
+    race = _make_race()
+    category = _make_category(race)
+    _make_checkpoint(race, 1, 10)
+
+    owner = django_user_model.objects.create_user(username="owner", password="x")
+    team = _make_started_team(owner, category, finish_time=2000)
+    # point 99 has no Checkpoint row at all -> orphan
+    _make_taken_kp(team, 99, nfc="chip1", timestamp=1)
+    _make_taken_kp(team, 1, nfc="chip1", timestamp=2)
+
+    protocol = build_protocol(race, None)
+    row = protocol.rows.get(team_id=team.id)
+
+    # only the known point (cost 10) contributes to score.
+    assert row.total_score == 10
+    assert row.nfc_count == 1
+
+
+@pytest.mark.django_db
+def test_build_protocol_rebuild_reuses_draft_and_recomputes_rows(django_user_model):
+    race = _make_race()
+    category = _make_category(race)
+    _make_checkpoint(race, 1, 10)
+
+    owner = django_user_model.objects.create_user(username="owner", password="x")
+    team = _make_started_team(owner, category, finish_time=2000)
+
+    protocol_1 = build_protocol(race, None)
+    assert protocol_1.rows.count() == 1
+    assert protocol_1.rows.get().total_score == 0
+
+    _make_taken_kp(team, 1, nfc="chip1", timestamp=1)
+    protocol_2 = build_protocol(race, None)
+
+    assert protocol_2.id == protocol_1.id
+    assert protocol_2.rows.count() == 1
+    assert protocol_2.rows.get().total_score == 10
+
+
+@pytest.mark.django_db
+def test_build_protocol_after_freeze_creates_new_draft_final_unchanged(
+    django_user_model,
+):
+    race = _make_race()
+    category = _make_category(race)
+    _make_checkpoint(race, 1, 10)
+
+    owner = django_user_model.objects.create_user(username="owner", password="x")
+    team = _make_started_team(owner, category, finish_time=2000)
+    _make_taken_kp(team, 1, nfc="chip1", timestamp=1)
+
+    draft = build_protocol(race, None)
+    final = freeze_protocol(race)
+    assert final.id == draft.id
+    assert final.status == Protocol.FINAL
+    final_score_before = final.rows.get().total_score
+
+    # New data appears after freeze.
+    _make_taken_kp(team, 1, nfc="chip1", timestamp=2)
+    _make_checkpoint(race, 2, 50)
+    _make_taken_kp(team, 2, nfc="chip1", timestamp=3)
+
+    new_draft = build_protocol(race, None)
+    assert new_draft.id != final.id
+    assert new_draft.status == Protocol.DRAFT
+    assert new_draft.rows.get().total_score == 60
+
+    final.refresh_from_db()
+    assert final.rows.get().total_score == final_score_before
+
+
+@pytest.mark.django_db
+def test_build_protocol_no_started_teams_returns_zero_rows():
+    race = _make_race()
+    _make_category(race)
+
+    protocol = build_protocol(race, None)
+
+    assert protocol.rows.count() == 0
+
+
+@pytest.mark.django_db
+def test_build_protocol_excludes_unpaid_teams(django_user_model):
+    race = _make_race()
+    category = _make_category(race)
+    owner = django_user_model.objects.create_user(username="owner", password="x")
+    _make_started_team(owner, category, finish_time=2000, paid_people=0)
+
+    protocol = build_protocol(race, None)
+
+    assert protocol.rows.count() == 0
+
+
+@pytest.mark.django_db
+def test_build_protocol_excludes_unstarted_teams(django_user_model):
+    race = _make_race()
+    category = _make_category(race)
+    owner = django_user_model.objects.create_user(username="owner", password="x")
+    _make_team(owner, category, start_time=0, finish_time=0)
+
+    protocol = build_protocol(race, None)
+
+    assert protocol.rows.count() == 0
+
+
+@pytest.mark.django_db
+def test_build_protocol_place_resets_per_category(django_user_model):
+    race = _make_race()
+    cat_a = _make_category(race, code="a", short_name="a", name="A")
+    cat_b = _make_category(race, code="b", short_name="b", name="B")
+    _make_checkpoint(race, 1, 10)
+    _make_checkpoint(race, 2, 20)
+
+    owner_1 = django_user_model.objects.create_user(username="o1", password="x")
+    owner_2 = django_user_model.objects.create_user(username="o2", password="x")
+    owner_3 = django_user_model.objects.create_user(username="o3", password="x")
+    owner_4 = django_user_model.objects.create_user(username="o4", password="x")
+
+    a_hi = _make_started_team(owner_1, cat_a, teamname="A-hi", finish_time=2000)
+    a_lo = _make_started_team(owner_2, cat_a, teamname="A-lo", finish_time=2000)
+    b_hi = _make_started_team(owner_3, cat_b, teamname="B-hi", finish_time=2000)
+    b_lo = _make_started_team(owner_4, cat_b, teamname="B-lo", finish_time=2000)
+
+    _make_taken_kp(a_hi, 2, nfc="c1", timestamp=1)
+    _make_taken_kp(b_hi, 2, nfc="c2", timestamp=1)
+
+    protocol = build_protocol(race, None)
+    rows = {row.team_id: row for row in protocol.rows.all()}
+
+    # Each category has its own 1st/2nd place, independent of the other.
+    assert rows[a_hi.id].place == 1
+    assert rows[a_lo.id].place == 2
+    assert rows[b_hi.id].place == 1
+    assert rows[b_lo.id].place == 2
+
+
+@pytest.mark.django_db
+def test_build_protocol_ties_broken_deterministically_by_team_id(django_user_model):
+    race = _make_race()
+    category = _make_category(race)
+
+    owner_1 = django_user_model.objects.create_user(username="t1", password="x")
+    owner_2 = django_user_model.objects.create_user(username="t2", password="x")
+    # Both teams tie on final_score (0) and duration_ms -> team_id tiebreaker.
+    team_lo = _make_started_team(owner_1, category, teamname="Lo", finish_time=2000)
+    team_hi = _make_started_team(owner_2, category, teamname="Hi", finish_time=2000)
+    assert team_lo.id < team_hi.id
+
+    protocol_1 = build_protocol(race, None)
+    rows_1 = {row.team_id: row.place for row in protocol_1.rows.all()}
+
+    protocol_2 = build_protocol(race, None)
+    rows_2 = {row.team_id: row.place for row in protocol_2.rows.all()}
+
+    assert rows_1 == rows_2
+    assert rows_1[team_lo.id] == 1
+    assert rows_1[team_hi.id] == 2
+
+
+@pytest.mark.django_db
+def test_build_protocol_start_number_accepts_full_team_field_length(
+    django_user_model,
+):
+    """Regression: ``ProtocolRow.start_number`` must accept anything
+    ``Team.start_number`` (max_length=50) can hold, or ``bulk_create`` raises
+    a Postgres ``DataError`` and the whole build rolls back."""
+    race = _make_race()
+    category = _make_category(race)
+    owner = django_user_model.objects.create_user(username="owner", password="x")
+    long_start_number = "x" * 50
+    _make_started_team(
+        owner, category, finish_time=2000, start_number=long_start_number
+    )
+
+    protocol = build_protocol(race, None)
+
+    assert protocol.rows.get().start_number == long_start_number
+
+
+@pytest.mark.django_db
+def test_team_members_lists_all_athletes_up_to_ucount(django_user_model):
+    race = _make_race()
+    category = _make_category(race)
+    owner = django_user_model.objects.create_user(username="owner", password="x")
+    team = _make_started_team(
+        owner,
+        category,
+        finish_time=2000,
+        ucount=3,
+        athlet1="Ivanov",
+        athlet2="Petrov",
+        athlet3="Sidorov",
+    )
+
+    protocol = build_protocol(race, None)
+    row = protocol.rows.get(team_id=team.id)
+
+    assert row.members == "Ivanov, Petrov, Sidorov"
+
+
+@pytest.mark.django_db
+def test_freeze_protocol_without_any_protocol_returns_none():
+    race = _make_race()
+
+    assert freeze_protocol(race) is None
+
+
+@pytest.mark.django_db
+def test_freeze_protocol_without_draft_returns_none(django_user_model):
+    race = _make_race()
+    category = _make_category(race)
+    owner = django_user_model.objects.create_user(username="owner", password="x")
+    _make_started_team(owner, category, finish_time=2000)
+
+    build_protocol(race, None)
+    frozen = freeze_protocol(race)
+    assert frozen.status == Protocol.FINAL
+
+    # freezing again with no draft present is a no-op.
+    assert freeze_protocol(race) is None
+
+
+@pytest.mark.django_db(transaction=True)
+def test_build_protocol_concurrent_first_build_creates_only_one_draft():
+    """Two racing first builds on a race with no protocol yet must not both
+    create a draft -- the ``select_for_update`` lock on the parent ``Race``
+    row (Task 2) has to serialize the critical section even though the
+    ``Protocol`` queryset both threads see is empty. ``Protocol.objects.create``
+    is slowed down so the first thread is still holding the ``Race`` row lock
+    when the second thread reaches its own ``select_for_update`` -- without
+    this delay the two threads might simply run one after another and the
+    test would pass even with a broken (unlocked) implementation.
+    ``transaction=True`` gives each thread its own real DB transaction, which
+    real row locking requires (a savepoint in the default wrapped-test
+    transaction would not block a second thread)."""
+    import threading
+    import time
+    from unittest.mock import patch
+
+    from apps.race.models import Protocol as ProtocolModel
+
+    race = _make_race()
+    _make_category(race)
+
+    real_create = ProtocolModel.objects.create
+
+    def _slow_create(*args, **kwargs):
+        obj = real_create(*args, **kwargs)
+        time.sleep(0.3)
+        return obj
+
+    errors = []
+
+    def _build():
+        try:
+            build_protocol(race, None)
+        except Exception as exc:  # pragma: no cover - surfaced via errors list
+            errors.append(exc)
+        finally:
+            from django.db import connection
+
+            connection.close()
+
+    with patch.object(ProtocolModel.objects, "create", side_effect=_slow_create):
+        t1 = threading.Thread(target=_build)
+        t2 = threading.Thread(target=_build)
+        t1.start()
+        t2.start()
+        t1.join()
+        t2.join()
+
+    assert not errors
+    assert Protocol.objects.filter(race=race).count() == 1
+
+
+# ---------------------------------------------------------------------------
+# ProtocolView (Task 3)
+# ---------------------------------------------------------------------------
+# The URL for this view is wired in Task 5, so these tests call it directly
+# via RequestFactory instead of ``client``/``reverse()``.
+
+
+@pytest.mark.django_db
+def test_protocol_view_public_sees_only_final(rf, django_user_model):
+    race = _make_race()
+    category = _make_category(race)
+    owner = django_user_model.objects.create_user(username="owner", password="x")
+    _make_started_team(owner, category, teamname="A", finish_time=2000)
+
+    build_protocol(race, None)  # draft only, not frozen
+
+    request = rf.get("/")
+    request.user = AnonymousUser()
+    response = ProtocolView.as_view()(
+        request, race_slug=race.slug, category_id=category.id
+    )
+    assert response.status_code == 200
+    assert "ещё не опубликован" in response.content.decode()
+
+    freeze_protocol(race)
+    request = rf.get("/")
+    request.user = AnonymousUser()
+    response = ProtocolView.as_view()(
+        request, race_slug=race.slug, category_id=category.id
+    )
+    assert response.status_code == 200
+    assert "A" in response.content.decode()
+
+
+@pytest.mark.django_db
+def test_protocol_view_admin_sees_draft(rf, django_user_model):
+    race = _make_race()
+    category = _make_category(race)
+    admin = django_user_model.objects.create_user(username="radmin", password="x")
+    RaceAdmin.objects.create(race=race, user=admin, role=RaceAdmin.Role.ADMIN)
+    owner = django_user_model.objects.create_user(username="owner", password="x")
+    _make_started_team(owner, category, teamname="DraftTeam", finish_time=2000)
+
+    build_protocol(race, admin)
+
+    request = rf.get("/")
+    request.user = admin
+    response = ProtocolView.as_view()(
+        request, race_slug=race.slug, category_id=category.id
+    )
+    assert response.status_code == 200
+    content = response.content.decode()
+    assert "DraftTeam" in content
+    assert "черновик" in content
+
+
+@pytest.mark.django_db
+def test_protocol_view_filters_rows_by_category(rf, django_user_model):
+    race = _make_race()
+    category_a = _make_category(race, code="a", short_name="A", name="Категория A")
+    category_b = _make_category(
+        race, code="b", short_name="B", name="Категория B", order=1
+    )
+    owner = django_user_model.objects.create_user(username="owner", password="x")
+    _make_started_team(owner, category_a, teamname="TeamA", finish_time=2000)
+    _make_started_team(owner, category_b, teamname="TeamB", finish_time=2000)
+
+    build_protocol(race, None)
+    freeze_protocol(race)
+
+    request = rf.get("/")
+    request.user = AnonymousUser()
+    response = ProtocolView.as_view()(
+        request, race_slug=race.slug, category_id=category_a.id
+    )
+    content = response.content.decode()
+    assert "TeamA" in content
+    assert "TeamB" not in content
+
+
+@pytest.mark.django_db
+def test_protocol_view_title_matches_status(rf, django_user_model):
+    race = _make_race()
+    category = _make_category(race)
+    owner = django_user_model.objects.create_user(username="owner", password="x")
+    _make_started_team(owner, category, teamname="A", finish_time=2000)
+
+    admin = django_user_model.objects.create_user(username="radmin2", password="x")
+    RaceAdmin.objects.create(race=race, user=admin, role=RaceAdmin.Role.ADMIN)
+
+    build_protocol(race, admin)
+    request = rf.get("/")
+    request.user = admin
+    response = ProtocolView.as_view()(
+        request, race_slug=race.slug, category_id=category.id
+    )
+    assert "Предварительный протокол" in response.content.decode()
+
+    freeze_protocol(race)
+    request = rf.get("/")
+    request.user = AnonymousUser()
+    response = ProtocolView.as_view()(
+        request, race_slug=race.slug, category_id=category.id
+    )
+    assert "Итоговый протокол" in response.content.decode()
+
+
+@pytest.mark.django_db
+def test_protocol_view_immutability_guarantee(rf, django_user_model):
+    """A frozen snapshot is unaffected by later edits to live Team/TakenKP data."""
+    race = _make_race()
+    category = _make_category(race)
+    owner = django_user_model.objects.create_user(username="owner", password="x")
+    team = _make_started_team(owner, category, teamname="Original", finish_time=2000)
+
+    build_protocol(race, None)
+    freeze_protocol(race)
+
+    # Mutate live data after the snapshot was frozen.
+    team.teamname = "Changed"
+    team.save()
+    _make_taken_kp(team, 1, nfc="chip1", timestamp=1)
+
+    request = rf.get("/")
+    request.user = AnonymousUser()
+    response = ProtocolView.as_view()(
+        request, race_slug=race.slug, category_id=category.id
+    )
+    content = response.content.decode()
+    assert "Original" in content
+    assert "Changed" not in content
+
+
+# ---------------------------------------------------------------------------
+# ProtocolBuildView / ProtocolFreezeView (Task 4)
+# ---------------------------------------------------------------------------
+# The URL for these views is wired in Task 5, so these tests call them
+# directly via RequestFactory instead of ``client``/``reverse()``.
+
+
+@pytest.mark.django_db
+def test_protocol_build_forbidden_for_non_admin(rf, django_user_model):
+    race = _make_race()
+    _make_category(race)
+    other = django_user_model.objects.create_user(username="other", password="x")
+
+    request = _attach_messages(rf.post("/"))
+    request.user = other
+    response = ProtocolBuildView.as_view()(request, race_slug=race.slug)
+    assert response.status_code == 403
+    assert not Protocol.objects.filter(race=race).exists()
+
+
+@pytest.mark.django_db
+def test_protocol_freeze_forbidden_for_non_admin(rf, django_user_model):
+    race = _make_race()
+    category = _make_category(race)
+    owner = django_user_model.objects.create_user(username="owner", password="x")
+    _make_started_team(owner, category, teamname="A", finish_time=2000)
+    protocol = build_protocol(race, None)
+    other = django_user_model.objects.create_user(username="other2", password="x")
+
+    request = _attach_messages(rf.post("/"))
+    request.user = other
+    response = ProtocolFreezeView.as_view()(request, race_slug=race.slug)
+    assert response.status_code == 403
+    protocol.refresh_from_db()
+    assert protocol.status == Protocol.DRAFT
+
+
+@pytest.mark.django_db
+def test_protocol_build_and_freeze_admin_flow(rf, django_user_model):
+    race = _make_race()
+    category = _make_category(race)
+    admin = django_user_model.objects.create_user(username="radmin3", password="x")
+    RaceAdmin.objects.create(race=race, user=admin, role=RaceAdmin.Role.ADMIN)
+    owner = django_user_model.objects.create_user(username="owner3", password="x")
+    _make_started_team(owner, category, teamname="A", finish_time=2000)
+
+    request = _attach_messages(rf.post("/"))
+    request.user = admin
+    response = ProtocolBuildView.as_view()(request, race_slug=race.slug)
+    assert response.status_code == 302
+    protocol = Protocol.objects.get(race=race)
+    assert protocol.status == Protocol.DRAFT
+
+    request = _attach_messages(rf.post("/"))
+    request.user = admin
+    response = ProtocolFreezeView.as_view()(request, race_slug=race.slug)
+    assert response.status_code == 302
+    protocol.refresh_from_db()
+    assert protocol.status == Protocol.FINAL
+    assert protocol.frozen_at is not None
+
+    # A build after freeze creates a *new* draft; the final stays untouched.
+    request = _attach_messages(rf.post("/"))
+    request.user = admin
+    ProtocolBuildView.as_view()(request, race_slug=race.slug)
+    assert Protocol.objects.filter(race=race).count() == 2
+    protocol.refresh_from_db()
+    assert protocol.status == Protocol.FINAL
+
+
+@pytest.mark.django_db
+def test_protocol_freeze_without_draft_is_friendly(rf, django_user_model):
+    race = _make_race()
+    _make_category(race)
+    admin = django_user_model.objects.create_user(username="radmin4", password="x")
+    RaceAdmin.objects.create(race=race, user=admin, role=RaceAdmin.Role.ADMIN)
+
+    request = _attach_messages(rf.post("/"))
+    request.user = admin
+    response = ProtocolFreezeView.as_view()(request, race_slug=race.slug)
+    assert response.status_code == 302
+    assert not Protocol.objects.filter(race=race).exists()
+
+
+@pytest.mark.django_db
+def test_protocol_build_redirects_to_referer_when_safe(rf, django_user_model):
+    race = _make_race()
+    _make_category(race)
+    admin = django_user_model.objects.create_user(username="radmin5", password="x")
+    RaceAdmin.objects.create(race=race, user=admin, role=RaceAdmin.Role.ADMIN)
+
+    request = _attach_messages(
+        rf.post("/", HTTP_REFERER="http://testserver/race/some/results/")
+    )
+    request.user = admin
+    response = ProtocolBuildView.as_view()(request, race_slug=race.slug)
+    assert response.status_code == 302
+    assert response.url == "http://testserver/race/some/results/"
+
+
+@pytest.mark.django_db
+def test_protocol_build_ignores_offsite_referer(rf, django_user_model):
+    race = _make_race()
+    category = _make_category(race)
+    admin = django_user_model.objects.create_user(username="radmin6", password="x")
+    RaceAdmin.objects.create(race=race, user=admin, role=RaceAdmin.Role.ADMIN)
+
+    request = _attach_messages(rf.post("/", HTTP_REFERER="http://evil.example/"))
+    request.user = admin
+    response = ProtocolBuildView.as_view()(request, race_slug=race.slug)
+    assert response.status_code == 302
+    assert "evil.example" not in response.url
+    assert (
+        reverse(
+            "category_results",
+            kwargs={"race_slug": race.slug, "category_id": category.id},
+        )
+        in response.url
+    )
+
+
+@pytest.mark.django_db
+def test_protocol_build_falls_back_to_race_page_without_active_category(
+    rf, django_user_model
+):
+    race = _make_race()
+    # No category at all -> _protocol_redirect_back has nowhere else to go.
+    admin = django_user_model.objects.create_user(username="radmin7", password="x")
+    RaceAdmin.objects.create(race=race, user=admin, role=RaceAdmin.Role.ADMIN)
+
+    request = _attach_messages(rf.post("/"))
+    request.user = admin
+    response = ProtocolBuildView.as_view()(request, race_slug=race.slug)
+
+    assert response.status_code == 302
+    assert response.url == reverse("race", kwargs={"race_slug": race.slug})
+
+
+# ---------------------------------------------------------------------------
+# URL routing (Task 5)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.django_db
+def test_category_results_url_resolves_to_protocol_view(client):
+    race = _make_race(slug="url-routing-race")
+    category = _make_category(race)
+
+    resp = client.get(reverse("category_results", args=[race.slug, category.id]))
+
+    assert resp.status_code == 200
+    assert resp.resolver_match.func.view_class is ProtocolView
+    assert "race/protocol.html" in [t.name for t in resp.templates]
+
+
+@pytest.mark.django_db
+def test_category_results_deprecated_url_renders_old_view(client, django_user_model):
+    race = _make_race(slug="url-routing-race-2")
+    category = _make_category(race)
+    owner = django_user_model.objects.create_user(username="deprowner", password="x")
+    _make_started_team(owner, category, finish_time=2000)
+
+    resp = client.get(
+        reverse("category_results_deprecated", args=[race.slug, category.id])
+    )
+
+    assert resp.status_code == 200
+    assert "teams_result.html" in [t.name for t in resp.templates]
+
+
+@pytest.mark.django_db
+def test_protocol_build_and_freeze_url_names_resolve(client, django_user_model):
+    race = _make_race(slug="url-routing-race-3")
+    _make_category(race)
+    admin = django_user_model.objects.create_user(username="urladmin", password="x")
+    RaceAdmin.objects.create(race=race, user=admin, role=RaceAdmin.Role.ADMIN)
+    client.force_login(admin)
+
+    build_url = reverse("protocol_build", kwargs={"race_slug": race.slug})
+    freeze_url = reverse("protocol_freeze", kwargs={"race_slug": race.slug})
+
+    resp = client.post(build_url)
+    assert resp.status_code == 302
+    assert Protocol.objects.filter(race=race, status=Protocol.DRAFT).exists()
+
+    resp = client.post(freeze_url)
+    assert resp.status_code == 302
+    assert Protocol.objects.filter(race=race, status=Protocol.FINAL).exists()
+
+
+@pytest.mark.django_db
+def test_race_id_redirect_still_works_for_results_url(client):
+    race = _make_race(slug="url-routing-race-4")
+    category = _make_category(race)
+
+    resp = client.get(f"/race/{race.id}/category/{category.id}/results/")
+
+    assert resp.status_code == 301
+    assert resp["Location"] == f"/race/{race.slug}/category/{category.id}/results/"

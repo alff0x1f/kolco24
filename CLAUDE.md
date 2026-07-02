@@ -570,6 +570,26 @@ expiry; if a draft outlives or dies before it, the seat is held at most ~20 min 
 window); (2) **double add-submit** — `AddTeam.post` creates a fresh `Team` per POST, so submitting the *add* form twice
 can briefly reserve seats against the same user (self-resolves in ≤20 min), not fixed.
 
+**Protocol snapshot (results)** (`src/apps/race/models.py`, `src/apps/race/results.py`): the results page
+(`/results/`, URL name `category_results`) reads a **denormalized snapshot**, never the live `Team`/`TakenKP`/
+`Checkpoint` models — so a mid-race team edit or KP re-scan can't change already-published results. Two models:
+`Protocol` (`status` `draft`/`final`, constants `Protocol.DRAFT`/`Protocol.FINAL`; `frozen_at`, `created_by`,
+`Meta.ordering = ["-created_at"]`, FK `race → website.Race` CASCADE `related_name="protocols"`) and `ProtocolRow`
+(one denormalized row per team per protocol, `related_name="rows"`, indexed on `(protocol, category_id)`).
+`build_protocol(race, user)` (service, `results.py`) recomputes from live data into the current `draft` in place
+(deletes+rebuilds its rows) or creates a new `draft` if the latest protocol is already `final`; it locks
+`Race.objects.select_for_update()` (not the `Protocol` queryset, which can be empty on the first build) so
+concurrent builds can't create two drafts. `freeze_protocol(race)` flips the latest `draft` to `final` (no-op /
+returns `None` if there is none). Penalty is computed from `Category.control_time`/`overtime_penalty` (both
+default `0` = no penalty) instead of the old hardcoded category-id-based control times — **fill in those
+category fields before the first real `freeze`**, or the frozen protocol locks in zero penalties. Visibility
+(`ProtocolView`): `can_edit_race(user, race)` users see the latest protocol of any status; everyone else sees only
+the latest `final` (or a "not published yet" message). URLs (`website/urls.py`): `category_results` now serves
+the snapshot; the old live-computed `AllTeamsResultView` moved unchanged to
+`.../results-deprecated/` (name `category_results_deprecated`, no redirect from the old path); build/freeze are
+POST-only at `.../results/build/` / `.../results/freeze/` (names `protocol_build`/`protocol_freeze`), gated by
+`can_edit_race`.
+
 **Email** goes through `django-mailer` (`EMAIL_BACKEND = "mailer.backend.DbBackend"`): messages are queued in the DB and
 sent by the `kolco24_runmailer` container running `manage.py runmailer`.
 

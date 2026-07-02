@@ -3,19 +3,22 @@ import json
 import re
 from urllib.parse import quote
 
+from django.contrib import messages
 from django.db import transaction
 from django.db.models import Count, OuterRef, ProtectedError, Q, Subquery
 from django.http import Http404, HttpResponseForbidden, HttpResponseRedirect
 from django.shortcuts import get_object_or_404, render
 from django.urls import reverse
 from django.utils.decorators import method_decorator
+from django.utils.http import url_has_allowed_host_and_scheme
 from django.utils.safestring import mark_safe
 from django.views import View
 from django.views.decorators.cache import never_cache
 
 from apps.race.forms import RaceForm
-from apps.race.models import RaceExtra
+from apps.race.models import Protocol, RaceExtra
 from apps.race.permissions import can_edit_race
+from apps.race.results import build_protocol, freeze_protocol
 from website.forms import NewsPostForm
 from website.models import Checkpoint, NewsPost, Race, Team
 from website.models.checkpoint import CheckpointTag
@@ -1044,3 +1047,109 @@ class RaceLegendCodesView(View):
             for tag in tags
         ]
         return render(request, "race/legend_codes.html", {"race": race, "rows": rows})
+
+
+class ProtocolView(View):
+    """Read-only results-protocol page, backed by the ``ProtocolRow`` snapshot.
+
+    Visibility: :func:`can_edit_race` sees the latest protocol of any status
+    (draft or final); everyone else sees only the latest ``final`` one. The
+    page never touches live ``Team``/``TakenKP`` data — only whatever a past
+    :func:`apps.race.results.build_protocol` call snapshotted into rows.
+    """
+
+    def get(self, request, race_slug, category_id):
+        race = get_object_or_404(Race, slug=race_slug)
+        can_edit = can_edit_race(request.user, race)
+        category = Category.objects.filter(id=category_id, race=race).first()
+
+        protocol_qs = race.protocols.all()
+        if not can_edit:
+            protocol_qs = protocol_qs.filter(status=Protocol.FINAL)
+        protocol = protocol_qs.order_by("-created_at").first()
+
+        if protocol is None:
+            return render(
+                request,
+                "race/protocol.html",
+                {
+                    "race": race,
+                    "category": category,
+                    "can_edit": can_edit,
+                    "protocol": None,
+                    "rows": [],
+                },
+            )
+
+        rows = protocol.rows.filter(category_id=category_id).order_by("place")
+        title = (
+            "Предварительный протокол"
+            if protocol.status == Protocol.DRAFT
+            else "Итоговый протокол"
+        )
+        return render(
+            request,
+            "race/protocol.html",
+            {
+                "race": race,
+                "category": category,
+                "can_edit": can_edit,
+                "protocol": protocol,
+                "rows": rows,
+                "title": title,
+            },
+        )
+
+
+def _protocol_redirect_back(request, race):
+    """Redirect back to where a build/freeze POST came from.
+
+    Prefers ``HTTP_REFERER`` (validated against ``url_has_allowed_host_and_scheme``
+    to rule out an off-site redirect via a spoofed header); falls back to the
+    results page of the race's first active category, then to the race page
+    itself if the race has none.
+    """
+    referer = request.META.get("HTTP_REFERER")
+    if referer and url_has_allowed_host_and_scheme(
+        referer, allowed_hosts={request.get_host()}, require_https=request.is_secure()
+    ):
+        return HttpResponseRedirect(referer)
+    category = Category.active_objects.filter(race=race).order_by("order", "id").first()
+    if category is not None:
+        return HttpResponseRedirect(
+            reverse(
+                "category_results",
+                kwargs={"race_slug": race.slug, "category_id": category.id},
+            )
+        )
+    return HttpResponseRedirect(reverse("race", kwargs={"race_slug": race.slug}))
+
+
+class ProtocolBuildView(View):
+    """Recompute the race's draft protocol from live data. Admin-only POST."""
+
+    def post(self, request, race_slug):
+        race = get_object_or_404(Race, slug=race_slug)
+        if not can_edit_race(request.user, race):
+            return HttpResponseForbidden()
+        build_protocol(race, request.user)
+        messages.success(request, "Протокол сформирован (черновик).")
+        return _protocol_redirect_back(request, race)
+
+
+class ProtocolFreezeView(View):
+    """Freeze the race's latest draft protocol into an immutable final.
+
+    Admin-only POST.
+    """
+
+    def post(self, request, race_slug):
+        race = get_object_or_404(Race, slug=race_slug)
+        if not can_edit_race(request.user, race):
+            return HttpResponseForbidden()
+        protocol = freeze_protocol(race)
+        if protocol is None:
+            messages.info(request, "Нет черновика для фиксации.")
+        else:
+            messages.success(request, "Протокол зафиксирован.")
+        return _protocol_redirect_back(request, race)

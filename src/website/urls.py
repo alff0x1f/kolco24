@@ -4,6 +4,9 @@ from django.shortcuts import redirect
 from django.urls import include, path
 
 from apps.race.views import (
+    ProtocolBuildView,
+    ProtocolFreezeView,
+    ProtocolView,
     RaceEditView,
     RaceLegendCodesView,
     RaceLegendEditView,
@@ -84,8 +87,23 @@ urlpatterns = [
     ),
     path(
         "race/<slug:race_slug>/category/<int:category_id>/results/",
-        views.AllTeamsResultView.as_view(),
+        ProtocolView.as_view(),
         name="category_results",
+    ),
+    path(
+        "race/<slug:race_slug>/category/<int:category_id>/results-deprecated/",
+        views.AllTeamsResultView.as_view(),
+        name="category_results_deprecated",
+    ),
+    path(
+        "race/<slug:race_slug>/results/build/",
+        ProtocolBuildView.as_view(),
+        name="protocol_build",
+    ),
+    path(
+        "race/<slug:race_slug>/results/freeze/",
+        ProtocolFreezeView.as_view(),
+        name="protocol_freeze",
     ),
     path(
         "race/<slug:race_slug>/member_logs/",

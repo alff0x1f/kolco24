@@ -1,0 +1,77 @@
+/* Results protocol — read-only snapshot table at /race/<slug>/category/<id>/results/.
+   Scoped under .protocol-page. Reuses theme-2.css tokens/classes (.container,
+   .card, .chip) and mirrors legend_codes' header/table layout. */
+
+.protocol-page {
+  --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  padding: 0 0 72px;
+}
+
+/* ── Breadcrumb / header ─────────────────────────────────── */
+.protocol-page .breadcrumb {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 13px; color: var(--muted); padding: 16px 0 0;
+}
+.protocol-page .breadcrumb a { color: var(--muted); }
+.protocol-page .breadcrumb a:hover { color: var(--ink); }
+.protocol-page .breadcrumb .sep { color: var(--muted-2); }
+.protocol-page .breadcrumb .cur { color: var(--ink-soft); }
+
+.protocol-page .head {
+  display: flex; align-items: flex-end; justify-content: space-between;
+  gap: 18px; padding: 10px 0 20px; flex-wrap: wrap;
+}
+.protocol-page .head-l { display: flex; flex-direction: column; gap: 7px; min-width: 0; }
+.protocol-page .head-title { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.protocol-page .head h1 { font-size: 26px; font-weight: 600; letter-spacing: -0.015em; }
+.protocol-page .head .sub { font-size: 13.5px; color: var(--muted); }
+
+.protocol-page .chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 12px; font-weight: 500; padding: 4px 11px; border-radius: 999px;
+}
+.protocol-page .chip.status-draft { background: #fdf3ea; color: #b5680a; }
+.protocol-page .chip.status-final { background: #eaf1fd; color: var(--primary); }
+
+.protocol-page .head-r.protocol-actions { display: flex; gap: 10px; }
+.protocol-page .protocol-actions form { margin: 0; }
+
+.protocol-page .protocol-messages {
+  list-style: none; margin: 0 0 16px; padding: 0; display: flex; flex-direction: column; gap: 8px;
+}
+.protocol-page .protocol-messages .msg {
+  font-size: 13.5px; padding: 9px 14px; border-radius: 8px;
+  background: #eaf1fd; color: var(--primary);
+}
+.protocol-page .protocol-messages .msg.error { background: #fdecea; color: #b3261e; }
+.protocol-page .protocol-messages .msg.info { background: #f4f6f9; color: var(--ink); }
+
+/* ── Card / empty state ─────────────────────────────────────── */
+.protocol-page .card { margin-bottom: 0; }
+.protocol-page .card-body { padding: 22px; }
+.protocol-page .empty-msg { color: var(--muted); font-size: 14px; margin: 0; }
+
+/* ── Table ───────────────────────────────────────────────── */
+.protocol-page .grid-wrap { overflow-x: auto; }
+.protocol-page .protocol-table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+.protocol-page .protocol-table th,
+.protocol-page .protocol-table td {
+  text-align: left; padding: 9px 16px; border-bottom: 1px solid var(--line-soft);
+  white-space: nowrap;
+}
+.protocol-page .protocol-table th {
+  font-size: 11px; font-weight: 600; letter-spacing: 0.06em;
+  text-transform: uppercase; color: var(--muted);
+}
+.protocol-page .protocol-table th.num,
+.protocol-page .protocol-table td.num { text-align: right; font-family: var(--mono); }
+.protocol-page .protocol-table tbody tr:last-child td { border-bottom: 0; }
+
+.protocol-page .chip-mismatch {
+  display: inline-block; font-size: 11.5px; font-weight: 600; color: #b3261e;
+  background: #fdecea; border-radius: 4px; padding: 1px 6px; margin-bottom: 3px;
+}
+
+@media print {
+  @page { size: landscape; }
+}
