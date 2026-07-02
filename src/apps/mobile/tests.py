@@ -1466,7 +1466,7 @@ def test_teams_version_changes_when_team_added(django_user_model):
         username="owner1", email="o1@example.com", password="x"
     )
     before = teams_version(race.id)
-    Team.objects.create(owner=user, category2=category, teamname="Alpha")
+    Team.objects.create(owner=user, category2=category, teamname="Alpha", paid_people=2)
     after = teams_version(race.id)
     assert before != after
 
@@ -1480,7 +1480,9 @@ def test_teams_version_changes_when_team_edited(django_user_model):
     user = django_user_model.objects.create_user(
         username="owner2", email="o2@example.com", password="x"
     )
-    team = Team.objects.create(owner=user, category2=category, teamname="Beta")
+    team = Team.objects.create(
+        owner=user, category2=category, teamname="Beta", paid_people=2
+    )
     before = teams_version(race.id)
     team.teamname = "Beta renamed"
     team.save()
@@ -1497,7 +1499,9 @@ def test_teams_version_changes_when_athlet_renamed(django_user_model):
     user = django_user_model.objects.create_user(
         username="owner3", email="o3@example.com", password="x"
     )
-    team = Team.objects.create(owner=user, category2=category, teamname="Gamma")
+    team = Team.objects.create(
+        owner=user, category2=category, teamname="Gamma", paid_people=2
+    )
     athlet = Athlet.objects.create(
         owner=user, team=team, name="Runner", number_in_team=1
     )
@@ -1996,7 +2000,7 @@ def test_teams_valid_signature_returns_200_with_fields_and_members(
         username="t1", email="t1@example.com", password="x"
     )
     team = Team.objects.create(
-        owner=user, category2=category, teamname="Alpha", ucount=2
+        owner=user, category2=category, teamname="Alpha", ucount=2, paid_people=2
     )
     Athlet.objects.create(owner=user, team=team, name="Second", number_in_team=2)
     Athlet.objects.create(owner=user, team=team, name="First", number_in_team=1)
@@ -2028,8 +2032,12 @@ def test_teams_orders_by_id(client, settings, django_user_model):
     user = django_user_model.objects.create_user(
         username="t2", email="t2@example.com", password="x"
     )
-    first = Team.objects.create(owner=user, category2=category, teamname="Alpha")
-    second = Team.objects.create(owner=user, category2=category, teamname="Bravo")
+    first = Team.objects.create(
+        owner=user, category2=category, teamname="Alpha", paid_people=2
+    )
+    second = Team.objects.create(
+        owner=user, category2=category, teamname="Bravo", paid_people=2
+    )
 
     path = f"/app/race/{race.id}/teams/"
     response = client.get(path, **_signed_headers("GET", path, SECRET))
@@ -2079,7 +2087,9 @@ def test_teams_etag_changes_when_athlet_renamed(client, settings, django_user_mo
     user = django_user_model.objects.create_user(
         username="t4", email="t4@example.com", password="x"
     )
-    team = Team.objects.create(owner=user, category2=category, teamname="Alpha")
+    team = Team.objects.create(
+        owner=user, category2=category, teamname="Alpha", paid_people=2
+    )
     athlet = Athlet.objects.create(
         owner=user, team=team, name="Runner", number_in_team=1
     )
@@ -2108,7 +2118,9 @@ def test_teams_stale_if_none_match_returns_200_with_new_etag(
     user = django_user_model.objects.create_user(
         username="t5", email="t5@example.com", password="x"
     )
-    team = Team.objects.create(owner=user, category2=category, teamname="Beta")
+    team = Team.objects.create(
+        owner=user, category2=category, teamname="Beta", paid_people=2
+    )
     athlet = Athlet.objects.create(
         owner=user, team=team, name="Runner2", number_in_team=1
     )
@@ -2139,7 +2151,9 @@ def test_teams_soft_delete_changes_etag(client, settings, django_user_model):
     user = django_user_model.objects.create_user(
         username="td2", email="td2@example.com", password="x"
     )
-    team = Team.objects.create(owner=user, category2=category, teamname="Phantom")
+    team = Team.objects.create(
+        owner=user, category2=category, teamname="Phantom", paid_people=2
+    )
 
     path = f"/app/race/{race.id}/teams/"
     before = client.get(path, **_signed_headers("GET", path, SECRET))
@@ -2219,8 +2233,12 @@ def test_teams_excludes_other_race_teams(client, settings, django_user_model):
     user = django_user_model.objects.create_user(
         username="iso1", email="iso1@example.com", password="x"
     )
-    team1 = Team.objects.create(owner=user, category2=cat1, teamname="Race1 Team")
-    Team.objects.create(owner=user, category2=cat2, teamname="Race2 Team")
+    team1 = Team.objects.create(
+        owner=user, category2=cat1, teamname="Race1 Team", paid_people=2
+    )
+    Team.objects.create(
+        owner=user, category2=cat2, teamname="Race2 Team", paid_people=2
+    )
 
     path = f"/app/race/{race1.id}/teams/"
     response = client.get(path, **_signed_headers("GET", path, SECRET))
@@ -2282,6 +2300,49 @@ def test_teams_excludes_category2_none_team(client, settings, django_user_model)
 
     assert response.status_code == 200
     assert response.json()["teams"] == []
+
+
+@pytest.mark.django_db
+def test_teams_excludes_unpaid_teams(client, settings, django_user_model):
+    """Teams with paid_people == 0 (payment not completed) are withheld."""
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    from website.models.models import Team
+
+    race, category = _make_race_with_category(slug="teams-unpaid")
+    user = django_user_model.objects.create_user(
+        username="up1", email="up1@example.com", password="x"
+    )
+    paid = Team.objects.create(
+        owner=user, category2=category, teamname="Paid", paid_people=2
+    )
+    Team.objects.create(owner=user, category2=category, teamname="Unpaid")
+
+    path = f"/app/race/{race.id}/teams/"
+    response = client.get(path, **_signed_headers("GET", path, SECRET))
+
+    assert response.status_code == 200
+    ids = [t["id"] for t in response.json()["teams"]]
+    assert ids == [paid.id]
+
+
+@pytest.mark.django_db
+def test_teams_version_changes_when_team_pays(django_user_model):
+    """A team completing payment (0 -> >0) moves the fingerprint."""
+    from apps.mobile.versioning import teams_version
+    from website.models.models import Team
+
+    race, category = _make_race_with_category(slug="teams-ver-pay")
+    user = django_user_model.objects.create_user(
+        username="vp1", email="vp1@example.com", password="x"
+    )
+    team = Team.objects.create(owner=user, category2=category, teamname="Pending")
+    before = teams_version(race.id)
+    team.paid_people = 2
+    team.save()
+    after = teams_version(race.id)
+    assert before != after
 
 
 @pytest.mark.django_db
