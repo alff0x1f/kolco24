@@ -3003,6 +3003,59 @@ def test_freeze_protocol_without_draft_returns_none(django_user_model):
     assert freeze_protocol(race) is None
 
 
+@pytest.mark.django_db(transaction=True)
+def test_build_protocol_concurrent_first_build_creates_only_one_draft():
+    """Two racing first builds on a race with no protocol yet must not both
+    create a draft -- the ``select_for_update`` lock on the parent ``Race``
+    row (Task 2) has to serialize the critical section even though the
+    ``Protocol`` queryset both threads see is empty. ``Protocol.objects.create``
+    is slowed down so the first thread is still holding the ``Race`` row lock
+    when the second thread reaches its own ``select_for_update`` -- without
+    this delay the two threads might simply run one after another and the
+    test would pass even with a broken (unlocked) implementation.
+    ``transaction=True`` gives each thread its own real DB transaction, which
+    real row locking requires (a savepoint in the default wrapped-test
+    transaction would not block a second thread)."""
+    import threading
+    import time
+    from unittest.mock import patch
+
+    from apps.race.models import Protocol as ProtocolModel
+
+    race = _make_race()
+    _make_category(race)
+
+    real_create = ProtocolModel.objects.create
+
+    def _slow_create(*args, **kwargs):
+        obj = real_create(*args, **kwargs)
+        time.sleep(0.3)
+        return obj
+
+    errors = []
+
+    def _build():
+        try:
+            build_protocol(race, None)
+        except Exception as exc:  # pragma: no cover - surfaced via errors list
+            errors.append(exc)
+        finally:
+            from django.db import connection
+
+            connection.close()
+
+    with patch.object(ProtocolModel.objects, "create", side_effect=_slow_create):
+        t1 = threading.Thread(target=_build)
+        t2 = threading.Thread(target=_build)
+        t1.start()
+        t2.start()
+        t1.join()
+        t2.join()
+
+    assert not errors
+    assert Protocol.objects.filter(race=race).count() == 1
+
+
 # ---------------------------------------------------------------------------
 # ProtocolView (Task 3)
 # ---------------------------------------------------------------------------

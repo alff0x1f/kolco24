@@ -293,12 +293,16 @@
 - [x] `uv run pytest src/apps/race/tests.py --reuse-db` — зелёные перед Task 6.
 
 ### Task 6: Verify acceptance criteria
-- [ ] проверить все требования Overview: снапшот неизменен к правкам живых данных; штраф из полей
+- [x] проверить все требования Overview: снапшот неизменен к правкам живых данных; штраф из полей
       `Category`; видимость draft/final; старый URL на `/results-deprecated/`.
-- [ ] проверить краевые случаи: пустая гонка, `control_time=0`, freeze без draft, осиротевший
-      `point_number`, **два конкурентных первых build** (лок на `Race` → один draft, не два).
-- [ ] полный прогон: `uv run pytest`.
-- [ ] `make lint` — чисто.
+- [x] проверить краевые случаи: пустая гонка, `control_time=0`, freeze без draft, осиротевший
+      `point_number`, **два конкурентных первых build** (лок на `Race` → один draft, не два) — добавлен
+      реальный многопоточный тест `test_build_protocol_concurrent_first_build_creates_only_one_draft`
+      (`django_db(transaction=True)`, замедленный `Protocol.objects.create`, чтобы гарантировать
+      пересечение потоков); подтверждено вручную, что тест падает (создаются 2 draft) при временном
+      удалении `select_for_update`, и проходит с ним.
+- [x] полный прогон: `uv run pytest`.
+- [x] `make lint` — чисто.
 
 ### Task 7: [Final] Документация и оформление
 - [ ] обновить `CLAUDE.md`: краткая заметка про `apps.race` `Protocol`/`ProtocolRow`, сервис
