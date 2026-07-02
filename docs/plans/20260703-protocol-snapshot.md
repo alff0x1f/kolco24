@@ -265,15 +265,15 @@
 - Modify: `src/templates/race/protocol.html`
 - Modify: `src/apps/race/tests.py`
 
-- [ ] `ProtocolBuildView.post` и `ProtocolFreezeView.post`: гейт `can_edit_race` (403 иначе), вызов
+- [x] `ProtocolBuildView.post` и `ProtocolFreezeView.post`: гейт `can_edit_race` (403 иначе), вызов
       сервиса, `messages`, redirect назад.
-- [ ] добавить в шаблон формы-кнопки «Сформировать»/«Зафиксировать» c CSRF, видимые только при
+- [x] добавить в шаблон формы-кнопки «Сформировать»/«Зафиксировать» c CSRF, видимые только при
       `can_edit`.
-- [ ] тест: POST build/freeze не-админом → 403, протокол не создан/не изменён.
-- [ ] тест: POST build админом создаёт draft; POST freeze переводит в final; повторный build после
+- [x] тест: POST build/freeze не-админом → 403, протокол не создан/не изменён.
+- [x] тест: POST build админом создаёт draft; POST freeze переводит в final; повторный build после
       freeze создаёт новый draft.
-- [ ] тест: freeze без draft — дружелюбное сообщение, без 500.
-- [ ] `uv run pytest src/apps/race/tests.py --reuse-db` — зелёные перед Task 5.
+- [x] тест: freeze без draft — дружелюбное сообщение, без 500.
+- [x] `uv run pytest src/apps/race/tests.py --reuse-db` — зелёные перед Task 5.
 
 ### Task 5: URL-роутинг (новый /results/ + /results-deprecated/)
 

@@ -35,7 +35,27 @@
           <div class="sub">{{ category.name }} ({{ category.short_name }})</div>
         {% endif %}
       </div>
+      {% if can_edit %}
+        <div class="head-r protocol-actions">
+          <form method="post" action="/race/{{ race.slug }}/results/build/">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-ghost">Сформировать</button>
+          </form>
+          <form method="post" action="/race/{{ race.slug }}/results/freeze/">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-primary">Зафиксировать</button>
+          </form>
+        </div>
+      {% endif %}
     </div>
+
+    {% if messages %}
+      <ul class="protocol-messages">
+        {% for message in messages %}
+          <li class="msg{% if message.tags %} {{ message.tags }}{% endif %}">{{ message }}</li>
+        {% endfor %}
+      </ul>
+    {% endif %}
 
     <div class="card">
       {% if not protocol %}

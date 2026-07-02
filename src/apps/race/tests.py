@@ -4,6 +4,7 @@ import re
 
 import pytest
 from django.contrib.auth.models import AnonymousUser, User
+from django.contrib.messages.storage.fallback import FallbackStorage
 from django.test import RequestFactory
 from django.urls import resolve, reverse
 
@@ -11,7 +12,14 @@ from apps.race.forms import RaceForm
 from apps.race.models import Protocol
 from apps.race.permissions import can_edit_race
 from apps.race.results import build_protocol, freeze_protocol
-from apps.race.views import ProtocolView, RaceEditView, RacePageView, RaceTeamsView
+from apps.race.views import (
+    ProtocolBuildView,
+    ProtocolFreezeView,
+    ProtocolView,
+    RaceEditView,
+    RacePageView,
+    RaceTeamsView,
+)
 from website.models import Race
 from website.models.checkpoint import Checkpoint
 from website.models.models import TakenKP, Team
@@ -51,6 +59,18 @@ def _make_team(owner, category, **kwargs):
     }
     defaults.update(kwargs)
     return Team.objects.create(owner=owner, category2=category, **defaults)
+
+
+def _attach_messages(request):
+    """Attach a message storage to a bare ``RequestFactory`` request.
+
+    The build/freeze views call ``messages.success``/``messages.info``, which
+    need ``request._messages`` — normally set by ``MessageMiddleware``, which
+    ``RequestFactory`` requests never go through. Standard Django test recipe.
+    """
+    setattr(request, "session", {})
+    setattr(request, "_messages", FallbackStorage(request))
+    return request
 
 
 @pytest.mark.django_db
@@ -3114,3 +3134,124 @@ def test_protocol_view_immutability_guarantee(rf, django_user_model):
     content = response.content.decode()
     assert "Original" in content
     assert "Changed" not in content
+
+
+# ---------------------------------------------------------------------------
+# ProtocolBuildView / ProtocolFreezeView (Task 4)
+# ---------------------------------------------------------------------------
+# The URL for these views is wired in Task 5, so these tests call them
+# directly via RequestFactory instead of ``client``/``reverse()``.
+
+
+@pytest.mark.django_db
+def test_protocol_build_forbidden_for_non_admin(rf, django_user_model):
+    race = _make_race()
+    _make_category(race)
+    other = django_user_model.objects.create_user(username="other", password="x")
+
+    request = _attach_messages(rf.post("/"))
+    request.user = other
+    response = ProtocolBuildView.as_view()(request, race_slug=race.slug)
+    assert response.status_code == 403
+    assert not Protocol.objects.filter(race=race).exists()
+
+
+@pytest.mark.django_db
+def test_protocol_freeze_forbidden_for_non_admin(rf, django_user_model):
+    race = _make_race()
+    category = _make_category(race)
+    owner = django_user_model.objects.create_user(username="owner", password="x")
+    _make_started_team(owner, category, teamname="A", finish_time=2000)
+    protocol = build_protocol(race, None)
+    other = django_user_model.objects.create_user(username="other2", password="x")
+
+    request = _attach_messages(rf.post("/"))
+    request.user = other
+    response = ProtocolFreezeView.as_view()(request, race_slug=race.slug)
+    assert response.status_code == 403
+    protocol.refresh_from_db()
+    assert protocol.status == Protocol.DRAFT
+
+
+@pytest.mark.django_db
+def test_protocol_build_and_freeze_admin_flow(rf, django_user_model):
+    race = _make_race()
+    category = _make_category(race)
+    admin = django_user_model.objects.create_user(username="radmin3", password="x")
+    RaceAdmin.objects.create(race=race, user=admin, role=RaceAdmin.Role.ADMIN)
+    owner = django_user_model.objects.create_user(username="owner3", password="x")
+    _make_started_team(owner, category, teamname="A", finish_time=2000)
+
+    request = _attach_messages(rf.post("/"))
+    request.user = admin
+    response = ProtocolBuildView.as_view()(request, race_slug=race.slug)
+    assert response.status_code == 302
+    protocol = Protocol.objects.get(race=race)
+    assert protocol.status == Protocol.DRAFT
+
+    request = _attach_messages(rf.post("/"))
+    request.user = admin
+    response = ProtocolFreezeView.as_view()(request, race_slug=race.slug)
+    assert response.status_code == 302
+    protocol.refresh_from_db()
+    assert protocol.status == Protocol.FINAL
+    assert protocol.frozen_at is not None
+
+    # A build after freeze creates a *new* draft; the final stays untouched.
+    request = _attach_messages(rf.post("/"))
+    request.user = admin
+    ProtocolBuildView.as_view()(request, race_slug=race.slug)
+    assert Protocol.objects.filter(race=race).count() == 2
+    protocol.refresh_from_db()
+    assert protocol.status == Protocol.FINAL
+
+
+@pytest.mark.django_db
+def test_protocol_freeze_without_draft_is_friendly(rf, django_user_model):
+    race = _make_race()
+    _make_category(race)
+    admin = django_user_model.objects.create_user(username="radmin4", password="x")
+    RaceAdmin.objects.create(race=race, user=admin, role=RaceAdmin.Role.ADMIN)
+
+    request = _attach_messages(rf.post("/"))
+    request.user = admin
+    response = ProtocolFreezeView.as_view()(request, race_slug=race.slug)
+    assert response.status_code == 302
+    assert not Protocol.objects.filter(race=race).exists()
+
+
+@pytest.mark.django_db
+def test_protocol_build_redirects_to_referer_when_safe(rf, django_user_model):
+    race = _make_race()
+    _make_category(race)
+    admin = django_user_model.objects.create_user(username="radmin5", password="x")
+    RaceAdmin.objects.create(race=race, user=admin, role=RaceAdmin.Role.ADMIN)
+
+    request = _attach_messages(
+        rf.post("/", HTTP_REFERER="http://testserver/race/some/results/")
+    )
+    request.user = admin
+    response = ProtocolBuildView.as_view()(request, race_slug=race.slug)
+    assert response.status_code == 302
+    assert response.url == "http://testserver/race/some/results/"
+
+
+@pytest.mark.django_db
+def test_protocol_build_ignores_offsite_referer(rf, django_user_model):
+    race = _make_race()
+    category = _make_category(race)
+    admin = django_user_model.objects.create_user(username="radmin6", password="x")
+    RaceAdmin.objects.create(race=race, user=admin, role=RaceAdmin.Role.ADMIN)
+
+    request = _attach_messages(rf.post("/", HTTP_REFERER="http://evil.example/"))
+    request.user = admin
+    response = ProtocolBuildView.as_view()(request, race_slug=race.slug)
+    assert response.status_code == 302
+    assert "evil.example" not in response.url
+    assert (
+        reverse(
+            "category_results",
+            kwargs={"race_slug": race.slug, "category_id": category.id},
+        )
+        in response.url
+    )

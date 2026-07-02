@@ -3,12 +3,14 @@ import json
 import re
 from urllib.parse import quote
 
+from django.contrib import messages
 from django.db import transaction
 from django.db.models import Count, OuterRef, ProtectedError, Q, Subquery
 from django.http import Http404, HttpResponseForbidden, HttpResponseRedirect
 from django.shortcuts import get_object_or_404, render
 from django.urls import reverse
 from django.utils.decorators import method_decorator
+from django.utils.http import url_has_allowed_host_and_scheme
 from django.utils.safestring import mark_safe
 from django.views import View
 from django.views.decorators.cache import never_cache
@@ -16,6 +18,7 @@ from django.views.decorators.cache import never_cache
 from apps.race.forms import RaceForm
 from apps.race.models import Protocol, RaceExtra
 from apps.race.permissions import can_edit_race
+from apps.race.results import build_protocol, freeze_protocol
 from website.forms import NewsPostForm
 from website.models import Checkpoint, NewsPost, Race, Team
 from website.models.checkpoint import CheckpointTag
@@ -1096,3 +1099,57 @@ class ProtocolView(View):
                 "title": title,
             },
         )
+
+
+def _protocol_redirect_back(request, race):
+    """Redirect back to where a build/freeze POST came from.
+
+    Prefers ``HTTP_REFERER`` (validated against ``url_has_allowed_host_and_scheme``
+    to rule out an off-site redirect via a spoofed header); falls back to the
+    results page of the race's first active category, then to the race page
+    itself if the race has none.
+    """
+    referer = request.META.get("HTTP_REFERER")
+    if referer and url_has_allowed_host_and_scheme(
+        referer, allowed_hosts={request.get_host()}, require_https=request.is_secure()
+    ):
+        return HttpResponseRedirect(referer)
+    category = Category.active_objects.filter(race=race).order_by("order", "id").first()
+    if category is not None:
+        return HttpResponseRedirect(
+            reverse(
+                "category_results",
+                kwargs={"race_slug": race.slug, "category_id": category.id},
+            )
+        )
+    return HttpResponseRedirect(reverse("race", kwargs={"race_slug": race.slug}))
+
+
+class ProtocolBuildView(View):
+    """Recompute the race's draft protocol from live data. Admin-only POST."""
+
+    def post(self, request, race_slug):
+        race = get_object_or_404(Race, slug=race_slug)
+        if not can_edit_race(request.user, race):
+            return HttpResponseForbidden()
+        build_protocol(race, request.user)
+        messages.success(request, "Протокол сформирован (черновик).")
+        return _protocol_redirect_back(request, race)
+
+
+class ProtocolFreezeView(View):
+    """Freeze the race's latest draft protocol into an immutable final.
+
+    Admin-only POST.
+    """
+
+    def post(self, request, race_slug):
+        race = get_object_or_404(Race, slug=race_slug)
+        if not can_edit_race(request.user, race):
+            return HttpResponseForbidden()
+        protocol = freeze_protocol(race)
+        if protocol is None:
+            messages.info(request, "Нет черновика для фиксации.")
+        else:
+            messages.success(request, "Протокол зафиксирован.")
+        return _protocol_redirect_back(request, race)
