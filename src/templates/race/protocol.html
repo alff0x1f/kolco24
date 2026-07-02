@@ -37,11 +37,11 @@
       </div>
       {% if can_edit %}
         <div class="head-r protocol-actions">
-          <form method="post" action="/race/{{ race.slug }}/results/build/">
+          <form method="post" action="{% url 'protocol_build' race.slug %}">
             {% csrf_token %}
             <button type="submit" class="btn btn-ghost">Сформировать</button>
           </form>
-          <form method="post" action="/race/{{ race.slug }}/results/freeze/">
+          <form method="post" action="{% url 'protocol_freeze' race.slug %}">
             {% csrf_token %}
             <button type="submit" class="btn btn-primary">Зафиксировать</button>
           </form>
