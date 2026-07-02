@@ -2692,3 +2692,62 @@ def test_legend_codes_get_race_moderator_forbidden(client, django_user_model):
 
 
 # ---------------------------------------------------------------------------
+# Protocol / ProtocolRow models (Task 1)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.django_db
+def test_protocol_created_with_default_status_draft():
+    from apps.race.models import Protocol
+
+    race = _make_race()
+    protocol = Protocol.objects.create(race=race)
+    assert protocol.status == Protocol.DRAFT
+    assert protocol.frozen_at is None
+    assert protocol.created_by is None
+
+
+@pytest.mark.django_db
+def test_protocol_related_name_on_race():
+    from apps.race.models import Protocol
+
+    race = _make_race()
+    protocol = Protocol.objects.create(race=race)
+    assert list(race.protocols.all()) == [protocol]
+
+
+@pytest.mark.django_db
+def test_protocol_row_related_name_on_protocol():
+    from apps.race.models import Protocol, ProtocolRow
+
+    race = _make_race()
+    protocol = Protocol.objects.create(race=race)
+    row = ProtocolRow.objects.create(protocol=protocol, team_id=1, category_id=1)
+    assert list(protocol.rows.all()) == [row]
+
+
+@pytest.mark.django_db
+def test_protocol_row_cascade_deleted_with_protocol():
+    from apps.race.models import Protocol, ProtocolRow
+
+    race = _make_race()
+    protocol = Protocol.objects.create(race=race)
+    row = ProtocolRow.objects.create(protocol=protocol, team_id=1, category_id=1)
+    protocol.delete()
+    assert not ProtocolRow.objects.filter(id=row.id).exists()
+
+
+@pytest.mark.django_db
+def test_protocol_frozen_at_and_created_by_allow_null(django_user_model):
+    from apps.race.models import Protocol
+
+    race = _make_race()
+    user = django_user_model.objects.create_user(username="creator", password="x")
+
+    protocol = Protocol.objects.create(race=race, created_by=user)
+    assert protocol.frozen_at is None
+
+    protocol.created_by = None
+    protocol.save()
+    protocol.refresh_from_db()
+    assert protocol.created_by is None

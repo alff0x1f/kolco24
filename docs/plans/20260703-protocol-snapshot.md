@@ -200,18 +200,18 @@
 - Create: `src/apps/race/migrations/0003_protocol_protocolrow.py` (через `makemigrations`)
 - Modify: `src/apps/race/tests.py`
 
-- [ ] добавить в `models.py` модель `Protocol` (поля/константы/`Meta.ordering` из Technical Details),
+- [x] добавить в `models.py` модель `Protocol` (поля/константы/`Meta.ordering` из Technical Details),
       FK `race → "website.Race"` CASCADE `related_name="protocols"`, `created_by → AUTH_USER_MODEL`
       SET_NULL null.
-- [ ] добавить модель `ProtocolRow` со всеми денормализованными полями и индексом `(protocol,
+- [x] добавить модель `ProtocolRow` со всеми денормализованными полями и индексом `(protocol,
       category_id)`; `__str__` для читаемости в админке.
-- [ ] сгенерировать миграцию: `uv run python src/manage.py makemigrations race_app`
+- [x] сгенерировать миграцию: `uv run python src/manage.py makemigrations race_app`
       (⚠️ app label — `race_app`, НЕ `race`; иначе «No installed app with label 'race'». Проверить, что
       файл в `apps/race/migrations/` и зависит от `website`).
-- [ ] написать тесты: создание `Protocol`/`ProtocolRow`, `related_name` (`race.protocols`,
+- [x] написать тесты: создание `Protocol`/`ProtocolRow`, `related_name` (`race.protocols`,
       `protocol.rows`), дефолт `status=draft`, CASCADE-удаление строк при удалении протокола.
-- [ ] написать тест краевого случая: `frozen_at`/`created_by` допускают `null`.
-- [ ] `uv run pytest src/apps/race/tests.py --reuse-db` — зелёные перед Task 2.
+- [x] написать тест краевого случая: `frozen_at`/`created_by` допускают `null`.
+- [x] `uv run pytest src/apps/race/tests.py --reuse-db` — зелёные перед Task 2.
 
 ### Task 2: Сервис `build_protocol` / `freeze_protocol`
 
