@@ -56,15 +56,23 @@
 .protocol-page .protocol-table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
 .protocol-page .protocol-table th,
 .protocol-page .protocol-table td {
-  text-align: left; padding: 9px 16px; border-bottom: 1px solid var(--line-soft);
-  white-space: nowrap;
+  text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line-soft);
+  vertical-align: top;
 }
 .protocol-page .protocol-table th {
   font-size: 11px; font-weight: 600; letter-spacing: 0.06em;
   text-transform: uppercase; color: var(--muted);
 }
+/* Only the numeric columns stay on one line; the wide text columns
+   (name, club, city, chip/photo KP lists) wrap so the table fits the
+   container width without horizontal scroll on a large screen. */
 .protocol-page .protocol-table th.num,
-.protocol-page .protocol-table td.num { text-align: right; font-family: var(--mono); }
+.protocol-page .protocol-table td.num {
+  text-align: right; font-family: var(--mono); white-space: nowrap;
+}
+/* Times stay on one line so a clock value never breaks mid-number. */
+.protocol-page .protocol-table th.time,
+.protocol-page .protocol-table td.time { white-space: nowrap; }
 .protocol-page .protocol-table tbody tr:last-child td { border-bottom: 0; }
 
 .protocol-page .chip-mismatch {
@@ -110,7 +118,7 @@
   .protocol-page .protocol-table tr { break-inside: avoid; }
   .protocol-page .protocol-table th,
   .protocol-page .protocol-table td {
-    padding: 3px 6px; white-space: normal; word-break: break-word;
+    padding: 3px 6px; white-space: normal;
   }
   .protocol-page .protocol-table th { font-size: 8pt; }
   /* Keep row striping / mismatch highlight visible on paper. */
