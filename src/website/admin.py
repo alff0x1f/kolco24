@@ -237,6 +237,8 @@ class CategoryAdmin(admin.ModelAdmin):
         "order",
         "min_people",
         "max_people",
+        "control_time",
+        "overtime_penalty",
         "is_active",
     )
     list_filter = ("race__name", "is_active")

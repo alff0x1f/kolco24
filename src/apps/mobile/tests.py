@@ -1975,10 +1975,22 @@ def test_category_serializer_output_keys_match_spec():
     race, category = _make_race_with_category(slug="ser-cat-keys")
     category.short_name = "O"
     category.order = 3
+    category.control_time = 480
+    category.overtime_penalty = 1
     category.save()
     data = CategorySerializer(category).data
-    assert set(data.keys()) == {"id", "code", "short_name", "name", "order"}
+    assert set(data.keys()) == {
+        "id",
+        "code",
+        "short_name",
+        "name",
+        "order",
+        "control_time",
+        "overtime_penalty",
+    }
     assert data["short_name"] == "O"
+    assert data["control_time"] == 480
+    assert data["overtime_penalty"] == 1
     assert data["order"] == 3
     assert "is_active" not in data
 
@@ -2382,7 +2394,15 @@ def test_teams_excludes_soft_deleted_team(client, settings, django_user_model):
 
 # --- TeamsView embedded categories ------------------------------------------
 
-CATEGORY_FIELDS = {"id", "code", "short_name", "name", "order"}
+CATEGORY_FIELDS = {
+    "id",
+    "code",
+    "short_name",
+    "name",
+    "order",
+    "control_time",
+    "overtime_penalty",
+}
 
 
 @pytest.mark.django_db

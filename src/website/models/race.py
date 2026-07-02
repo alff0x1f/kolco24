@@ -251,6 +251,10 @@ class Category(Model):
     min_people = IntegerField("Минимум участников", default=2)
     max_people = IntegerField("Максимум участников", default=6)
     people_limit = IntegerField("Лимит участников", default=0)  # 0 = без лимита
+    control_time = IntegerField("Контрольное время (мин)", default=0)  # 0 = не задано
+    overtime_penalty = IntegerField(
+        "Штраф за минуту просрочки (баллы)", default=0
+    )  # 0 = без штрафа
     updated_at = DateTimeField(auto_now=True)
 
     class Meta:
