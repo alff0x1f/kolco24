@@ -43,7 +43,10 @@ def teams_version(race_id):
     (``TeamManager`` already excludes ``is_deleted``) so a team edit, a member
     rename, a member add/remove, or a team add/remove all move the fingerprint.
     Teams with ``category2=None`` are out of scope (a race owns teams via
-    ``category2.race``) and excluded by the filter.
+    ``category2.race``) and excluded by the filter. Only **paid** teams
+    (``paid_people > 0``) are aggregated — the app is served only paid teams (the
+    exact queryset the view serves, single-source contract), so a team paying
+    (``0 → >0``) moves the fingerprint and forces a refetch.
 
     Categories are folded in because they ride inside the teams response (no
     separate ``versions.categories``): a category **rename/reorder** moves
@@ -55,12 +58,16 @@ def teams_version(race_id):
     None aggregates (empty race) render as the literal ``"None"`` → stable,
     non-crashing. Returns **bare** hex (no quotes).
     """
-    teams = Team.objects.filter(category2__race_id=race_id).aggregate(
+    teams = Team.objects.filter(
+        category2__race_id=race_id, paid_people__gt=0
+    ).aggregate(
         max_updated=Max("updated_at"),
         count=Count("id"),
     )
     members = Athlet.objects.filter(
-        team__is_deleted=False, team__category2__race_id=race_id
+        team__is_deleted=False,
+        team__category2__race_id=race_id,
+        team__paid_people__gt=0,
     ).aggregate(
         max_updated=Max("updated_at"),
         count=Count("id"),

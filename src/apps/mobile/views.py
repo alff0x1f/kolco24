@@ -739,7 +739,9 @@ class LegendView(AppAPIView):
 class TeamsView(AppAPIView):
     """Return a race's teams + members + categories (conditional GET).
 
-    The response is ``{"race": id, "categories": [...], "teams": [...]}``. The
+    The response is ``{"race": id, "categories": [...], "teams": [...]}``. Only
+    **paid** teams (``paid_people > 0``) are served — teams that started but have
+    not completed payment are withheld from the app. The
     ``categories`` block rides inside this resource (no separate endpoint) so the
     app can resolve a team's ``category2`` id into a label and build a filter; it
     lists **all** of the race's categories ordered ``order, id`` — including
@@ -763,7 +765,7 @@ class TeamsView(AppAPIView):
 
         categories = Category.objects.filter(race_id=race_id).order_by("order", "id")
         teams = (
-            Team.objects.filter(category2__race_id=race_id)
+            Team.objects.filter(category2__race_id=race_id, paid_people__gt=0)
             .order_by("id")
             .prefetch_related(
                 Prefetch(
