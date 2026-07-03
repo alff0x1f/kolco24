@@ -559,29 +559,48 @@ class MarkUploadView(AppAPIView):
 def _auto_populate_boundary_times(race_id, team_id, deduped):
     """Populate ``Team.start_time``/``finish_time`` from verified NFC marks.
 
-    Write-once (never overwrites a non-zero field); earliest verified
-    ``Coalesce(trusted_ms, wall_ms)`` wins across the whole stored history for
-    the team, not just this batch, so upload/batch order can't change the
-    result.
+    Write-once (never overwrites a non-zero field): the *first* upload that
+    finds the field still ``0`` wins and sets it from the earliest verified
+    ``Coalesce(trusted_ms, wall_ms)`` across the whole stored history for the
+    team at that moment (not just this batch) — so within that first write,
+    batch-internal ordering can't change the result. Once the field is set,
+    it is final: a later upload with a genuinely earlier verified mark does
+    NOT retroactively revise it (first-successful-write-wins, not true
+    global-earliest-wins across all uploads ever received).
+    ``select_for_update()`` serializes concurrent uploads for the same team so
+    a write can never regress an already-set field to a *later* value. It
+    does NOT make two truly concurrent uploads (both mid-transaction, neither
+    yet committed) resolve to the global earliest across both: each computes
+    its aggregate over only what its own transaction can see, so whichever
+    commits first sets the field from its own snapshot, and the second is
+    skipped by the write-once guard even if it held a genuinely earlier mark.
+    This is accepted as first-write-wins for both the sequential and the
+    concurrent case, since it still records a real verified scan (never a
+    fabricated or clobbered-to-a-later value) and manual/API-set values
+    remain protected.
     """
     type_by_cp = dict(
         Checkpoint.objects.filter(
             race_id=race_id,
-            type__in=[CheckpointType.start, CheckpointType.finish],
+            type__in=[CheckpointType.start.value, CheckpointType.finish.value],
         ).values_list("id", "type")
     )
     if not type_by_cp:
         return
 
     batch_cp_ids = {m["checkpoint_id"] for m in deduped.values()}
-    start_ids = [cp for cp, t in type_by_cp.items() if t == CheckpointType.start]
-    finish_ids = [cp for cp, t in type_by_cp.items() if t == CheckpointType.finish]
+    start_ids = [cp for cp, t in type_by_cp.items() if t == CheckpointType.start.value]
+    finish_ids = [
+        cp for cp, t in type_by_cp.items() if t == CheckpointType.finish.value
+    ]
     start_touched = bool(batch_cp_ids & set(start_ids))
     finish_touched = bool(batch_cp_ids & set(finish_ids))
     if not start_touched and not finish_touched:
         return
 
-    team = Team.objects.get(pk=team_id)
+    team = Team.objects.select_for_update().filter(pk=team_id).first()
+    if team is None:
+        return
     update_fields = []
     for touched, cp_ids, field in (
         (start_touched, start_ids, "start_time"),
@@ -589,13 +608,22 @@ def _auto_populate_boundary_times(race_id, team_id, deduped):
     ):
         if not touched or getattr(team, field) != 0:
             continue
-        earliest = Mark.objects.filter(
-            team_id=team_id,
-            race_id=race_id,
-            verified=True,
-            method="nfc",
-            checkpoint_id__in=cp_ids,
-        ).aggregate(t=Min(Coalesce("trusted_ms", "wall_ms")))["t"]
+        # gt=0 excludes a bogus epoch-0 timestamp (unset device clock) — 0 is
+        # also Team.start_time/finish_time's unset sentinel, so an unfiltered
+        # Min() would let one such mark permanently pin the aggregate at 0
+        # and starve out every later, genuinely-timed mark.
+        earliest = (
+            Mark.objects.filter(
+                team_id=team_id,
+                race_id=race_id,
+                verified=True,
+                method="nfc",
+                checkpoint_id__in=cp_ids,
+            )
+            .annotate(boundary_ms=Coalesce("trusted_ms", "wall_ms"))
+            .filter(boundary_ms__gt=0)
+            .aggregate(t=Min("boundary_ms"))["t"]
+        )
         if earliest is not None:
             setattr(team, field, earliest)
             update_fields.append(field)

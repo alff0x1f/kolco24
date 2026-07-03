@@ -107,8 +107,12 @@ Key design decisions (settled in brainstorm):
   don't fire; codebase style is explicit-logic-in-views).
 - **Scope:** `Team.start_time` / `finish_time` only. No `TeamMemberRaceLog`, no
   `distance_time` (YAGNI).
-- **Concurrency:** no `select_for_update` — racing batches for the same team both read
-  `0` and write the *same* deterministic earliest value; harmless last-write-wins.
+- **Concurrency:** `select_for_update()` on the `Team` row inside the existing
+  `transaction.atomic()` — without it, two racing uploads for the same team can each
+  read a zero field before either commits and compute a different "earliest" from
+  their own not-yet-committed marks, so the loser's write could silently clobber the
+  winner's with a later value. Serializing on the team row makes write-once/
+  earliest-wins hold under real concurrency, not just for a single upload.
 
 ## Technical Details
 
