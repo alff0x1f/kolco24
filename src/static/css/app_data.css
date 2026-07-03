@@ -1,0 +1,137 @@
+/* App data — admin cross-check pages at /race/<slug>/app-data/[team/<id>/].
+   Scoped under .app-data. Reuses theme-2.css tokens/classes (.container,
+   .card, .btn, .btn-ghost, .input) and mirrors legend_codes' header. */
+
+.app-data {
+  --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  padding: 0 0 72px;
+}
+
+/* Overview page: the teams table is dense — let it use the full viewport
+   width instead of theme-2's 1180px container cap. */
+.app-data--wide .container { max-width: none; padding: 0 28px; }
+@media (max-width: 720px) {
+  .app-data--wide .container { padding: 0 12px; }
+}
+
+/* ── Breadcrumb / header (mirrors legend_codes) ──────────── */
+.app-data .breadcrumb {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 13px; color: var(--muted); padding: 16px 0 0;
+}
+.app-data .breadcrumb a { color: var(--muted); }
+.app-data .breadcrumb a:hover { color: var(--ink); }
+.app-data .breadcrumb .sep { color: var(--muted-2); }
+.app-data .breadcrumb .cur { color: var(--ink-soft); }
+
+.app-data .head {
+  display: flex; align-items: flex-end; justify-content: space-between;
+  gap: 18px; padding: 10px 0 20px; flex-wrap: wrap;
+}
+.app-data .head-l { display: flex; flex-direction: column; gap: 7px; min-width: 0; }
+.app-data .head-title { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.app-data .head h1 { font-size: 26px; font-weight: 600; letter-spacing: -0.015em; }
+.app-data .head .sub { font-size: 13.5px; color: var(--muted); max-width: 72ch; line-height: 1.6; }
+.app-data .head .sub.summary { display: flex; flex-wrap: wrap; gap: 6px 18px; max-width: none; }
+.app-data .head .sub.summary b { color: var(--ink-soft); font-weight: 600; }
+.app-data .head-actions { display: flex; gap: 9px; align-items: center; flex-shrink: 0; }
+
+.app-data .chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 12px; font-weight: 500; padding: 4px 11px; border-radius: 999px;
+}
+.app-data .chip.edit { background: #eaf1fd; color: var(--primary); }
+.app-data .chip.edit::before {
+  content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--primary-2);
+}
+
+/* ── Card ────────────────────────────────────────────────── */
+.app-data .card { margin-bottom: 22px; }
+.app-data .card-head {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 16px 22px; border-bottom: 1px solid var(--line-soft); flex-wrap: wrap;
+}
+.app-data .card-head h2 {
+  font-size: 13px; font-weight: 600; letter-spacing: 0.1em;
+  text-transform: uppercase; color: var(--muted); margin: 0;
+}
+.app-data .card-head-r { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.app-data .card-head .aux { font-size: 12.5px; color: var(--muted); }
+.app-data .card-body.tight { padding: 0; }
+.app-data .search { width: 240px; font-size: 13.5px; padding: 7px 12px; }
+
+.app-data .filters { font-size: 13px; color: var(--ink-soft); }
+.app-data .filters label {
+  display: inline-flex; align-items: center; gap: 6px; cursor: pointer;
+}
+
+/* ── Tables ──────────────────────────────────────────────── */
+.app-data .grid-wrap { overflow-x: auto; }
+.app-data .data { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+.app-data .data th, .app-data .data td {
+  text-align: left; padding: 9px 14px; border-bottom: 1px solid var(--line-soft);
+  vertical-align: top;
+}
+.app-data .data th {
+  font-size: 11.5px; font-weight: 600; letter-spacing: 0.07em;
+  text-transform: uppercase; color: var(--muted); white-space: nowrap;
+}
+.app-data .data td.num, .app-data .data th.num { text-align: right; }
+.app-data .data .mono { font-family: var(--mono); font-size: 12.5px; white-space: nowrap; }
+.app-data .data .aux { color: var(--muted); font-size: 12px; }
+.app-data .data tr.empty td { color: var(--muted); text-align: center; padding: 28px 14px; }
+.app-data .data td.warn, .app-data .warn { color: #b4531f; }
+
+.app-data .team-cell a { color: var(--ink); font-weight: 500; }
+.app-data .team-cell a:hover { color: var(--primary); }
+.app-data .team-num {
+  display: inline-block; min-width: 30px; font-family: var(--mono);
+  font-size: 12.5px; color: var(--muted); margin-right: 4px;
+}
+.app-data .head .team-num { font-size: 18px; min-width: 0; margin-right: 8px; }
+.app-data .team-cell .cat { display: block; font-size: 12px; color: var(--muted); padding-left: 34px; }
+
+/* ── Chips / badges ──────────────────────────────────────── */
+.app-data .tagchip {
+  display: inline-block; font-size: 11.5px; font-weight: 500;
+  background: var(--line-soft); color: var(--ink-soft);
+  padding: 1px 7px; border-radius: 999px; margin: 1px 2px 1px 0;
+  max-width: 180px; overflow: hidden; text-overflow: ellipsis;
+  vertical-align: middle; white-space: nowrap;
+}
+.app-data .tagchip.unknown { background: #fdeee7; color: #b4531f; }
+.app-data .tagchip.mono { font-family: var(--mono); }
+
+.app-data .badge {
+  display: inline-block; font-size: 11px; font-weight: 600;
+  padding: 1px 7px; border-radius: 4px; margin-left: 4px;
+  background: var(--line-soft); color: var(--muted); vertical-align: middle;
+}
+.app-data .badge.ok { background: #e5f4e8; color: #23753a; }
+.app-data .badge.bad { background: #fdeee7; color: #b4531f; }
+.app-data .badge.warn-b { background: #fdf4dd; color: #8a6d1a; }
+
+/* ── Timeline specifics ──────────────────────────────────── */
+.app-data .kind {
+  display: inline-block; font-size: 11px; font-weight: 600;
+  letter-spacing: 0.05em; text-transform: uppercase;
+  padding: 1px 7px; border-radius: 4px; margin-right: 6px;
+}
+.app-data .kind-mark { background: #eaf1fd; color: var(--primary); }
+.app-data .kind-judge { background: #f3e9fb; color: #6d3a9e; }
+.app-data .kind-track { background: #e5f4e8; color: #23753a; }
+.app-data .kind-boundary { background: #fdf4dd; color: #8a6d1a; }
+
+.app-data .photos { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
+.app-data .photos img {
+  width: 72px; height: 72px; object-fit: cover; border-radius: 6px;
+  border: 1px solid var(--line-soft); display: block;
+}
+.app-data .photos a:hover img { border-color: var(--primary); }
+
+.app-data .chips-line { display: inline-flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+
+@media (max-width: 720px) {
+  .app-data .search { width: 100%; }
+  .app-data .data th, .app-data .data td { padding: 8px 10px; }
+}

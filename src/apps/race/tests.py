@@ -9,7 +9,8 @@ from django.contrib.messages.storage.fallback import FallbackStorage
 from django.test import RequestFactory
 from django.urls import resolve, reverse
 
-from apps.mobile.models import Mark, MarkPresent, TrackPoint
+from apps.mobile.models import JudgeScan, Mark, MarkPhoto, MarkPresent, TrackPoint
+from apps.race.app_data import build_overview, build_team_timeline, format_ms
 from apps.race.forms import RaceForm
 from apps.race.models import Protocol
 from apps.race.permissions import can_edit_race
@@ -18,6 +19,8 @@ from apps.race.views import (
     ProtocolBuildView,
     ProtocolFreezeView,
     ProtocolView,
+    RaceAppDataTeamView,
+    RaceAppDataView,
     RaceEditView,
     RaceMapPositionsView,
     RaceMapTrackView,
@@ -2801,6 +2804,7 @@ def _make_mark(
     present_chips=("chip1", "chip2"),
     expected=None,
     wall_ms=1,
+    trusted_ms=None,
 ):
     """Create a mobile ``Mark`` (+ ``MarkPresent`` roster) for the protocol tests.
 
@@ -2825,6 +2829,7 @@ def _make_mark(
         complete=True,
         verified=verified,
         wall_ms=wall_ms,
+        trusted_ms=trusted_ms,
     )
     for i, uid in enumerate(present_chips, start=1):
         MarkPresent.objects.create(
@@ -4233,3 +4238,332 @@ def test_race_map_page_config_island_handles_numeric_zero_slug(
 def test_race_map_page_url_resolves():
     resolved = resolve("/race/some-slug/map/")
     assert resolved.func.view_class is RaceMapView
+
+
+# --- RaceAppDataView / RaceAppDataTeamView (app-data pages) -----------------
+
+
+def _make_app_data_race(slug):
+    """Race + category + admin-owned team with boundary checkpoints."""
+    race = _make_race(slug=slug)
+    race.is_published = True
+    race.save()
+    category = _make_category(race)
+    cp_start = Checkpoint.objects.create(race=race, number=100, cost=0, type="start")
+    cp_finish = Checkpoint.objects.create(race=race, number=200, cost=0, type="finish")
+    cp_kp = _make_checkpoint(race, 1, 10)
+    return race, category, cp_start, cp_finish, cp_kp
+
+
+@pytest.mark.django_db
+def test_app_data_anonymous_redirects_to_login(client):
+    race = _make_race(slug="app-data-anon")
+
+    resp = client.get(reverse("race_app_data", kwargs={"race_slug": race.slug}))
+
+    assert resp.status_code == 302
+    assert reverse("login") in resp.url
+
+
+@pytest.mark.django_db
+def test_app_data_regular_user_forbidden(client, django_user_model):
+    race = _make_race(slug="app-data-forbidden")
+    user = django_user_model.objects.create_user(username="plain-appdata", password="x")
+    client.force_login(user)
+
+    assert (
+        client.get(
+            reverse("race_app_data", kwargs={"race_slug": race.slug})
+        ).status_code
+        == 403
+    )
+    assert (
+        client.get(
+            reverse(
+                "race_app_data_team",
+                kwargs={"race_slug": race.slug, "team_id": 1},
+            )
+        ).status_code
+        == 403
+    )
+
+
+@pytest.mark.django_db
+def test_app_data_race_admin_200(client, django_user_model):
+    race, category, *_ = _make_app_data_race("app-data-admin")
+    owner = django_user_model.objects.create_user(
+        username="appdata-owner", password="x"
+    )
+    _make_team(owner, category, teamname="Ромашки")
+
+    admin = django_user_model.objects.create_user(
+        username="appdata-admin", password="x"
+    )
+    RaceAdmin.objects.create(race=race, user=admin, role=RaceAdmin.Role.ADMIN)
+    client.force_login(admin)
+
+    resp = client.get(reverse("race_app_data", kwargs={"race_slug": race.slug}))
+
+    assert resp.status_code == 200
+    assert "Ромашки" in resp.content.decode()
+
+
+@pytest.mark.django_db
+def test_app_data_team_404_for_team_not_in_race(client, django_user_model):
+    race, *_ = _make_app_data_race("app-data-404")
+    other_race = _make_race(slug="app-data-404-other")
+    other_category = _make_category(other_race)
+    owner = django_user_model.objects.create_user(username="appdata-404", password="x")
+    foreign_team = _make_team(owner, other_category)
+
+    superuser = django_user_model.objects.create_superuser(
+        username="appdata-404-su", password="x", email="ad404@example.com"
+    )
+    client.force_login(superuser)
+
+    resp = client.get(
+        reverse(
+            "race_app_data_team",
+            kwargs={"race_slug": race.slug, "team_id": foreign_team.id},
+        )
+    )
+
+    assert resp.status_code == 404
+
+
+@pytest.mark.django_db
+def test_app_data_overview_chips_takes_and_judge_scans(django_user_model):
+    from website.models.tag import Tag
+
+    race, category, cp_start, cp_finish, cp_kp = _make_app_data_race("app-data-rows")
+    owner = django_user_model.objects.create_user(username="appdata-rows", password="x")
+    take_ms = 1_700_000_100_000
+    team = _make_team(owner, category, teamname="A", start_time=take_ms, finish_time=0)
+
+    Tag.objects.create(number=5, nfc_uid="AA:01")
+    # Chip uid stored raw/lowercase in MarkPresent — must still resolve to №5.
+    _make_mark(team, cp_start, present_chips=("aa:01", "FF:99"), wall_ms=take_ms)
+    _make_mark(team, cp_kp, present_chips=("aa:01",), wall_ms=take_ms + 60_000)
+
+    JudgeScan.objects.create(
+        id="js-1",
+        race=race,
+        source_install_id="judge-phone",
+        event_type="start",
+        participant_number=5,
+        nfc_uid="AA:01",
+        wall_ms=take_ms - 120_000,
+    )
+    JudgeScan.objects.create(
+        id="js-2",
+        race=race,
+        source_install_id="judge-phone",
+        event_type="start",
+        participant_number=77,
+        nfc_uid="DE:AD",
+        wall_ms=take_ms - 60_000,
+    )
+
+    context = build_overview(race)
+
+    assert len(context["rows"]) == 1
+    row = context["rows"][0]
+    labels = {chip["label"] for chip in row["chips"]}
+    assert "№5" in labels
+    assert "FF:99" in labels  # not in the Tag pool — raw uid, flagged
+    assert row["take_start"] == format_ms(take_ms)
+    assert row["take_finish"] == ""
+    assert row["start_mismatch"] is False
+    assert row["judge_start"] == {
+        "scanned": 1,
+        "chips": 2,
+        "first": format_ms(take_ms - 120_000),
+        "last": format_ms(take_ms - 120_000),
+        "spread": False,
+    }
+    assert row["judge_finish"] is None
+    assert row["marks_total"] == 2
+    assert row["marks_verified"] == 2
+
+    assert len(context["unmatched_scans"]) == 1
+    assert context["unmatched_scans"][0]["participant_number"] == 77
+
+
+@pytest.mark.django_db
+def test_app_data_overview_flags_boundary_mismatch(django_user_model):
+    race, category, cp_start, *_ = _make_app_data_race("app-data-mismatch")
+    owner = django_user_model.objects.create_user(username="appdata-mm", password="x")
+    take_ms = 1_700_000_100_000
+    # Stored Team.start_time diverges from the earliest verified take.
+    team = _make_team(owner, category, start_time=take_ms + 5_000)
+    _make_mark(team, cp_start, wall_ms=take_ms)
+
+    row = build_overview(race)["rows"][0]
+
+    assert row["start_mismatch"] is True
+    # Unverified marks must not count as a boundary take.
+    Mark.objects.all().delete()
+    _make_mark(team, cp_start, verified=False, wall_ms=take_ms)
+    row = build_overview(race)["rows"][0]
+    assert row["take_start"] == ""
+    assert row["start_mismatch"] is False
+
+
+@pytest.mark.django_db
+def test_app_data_team_timeline_orders_all_event_kinds(client, django_user_model):
+    from website.models.tag import Tag
+
+    race, category, cp_start, cp_finish, cp_kp = _make_app_data_race("app-data-feed")
+    owner = django_user_model.objects.create_user(username="appdata-feed", password="x")
+    base_ms = 1_700_000_000_000
+    team = _make_team(
+        owner, category, teamname="Лента", start_time=base_ms, finish_time=0
+    )
+    Tag.objects.create(number=9, nfc_uid="AB:CD")
+
+    mark = _make_mark(team, cp_kp, present_chips=("ab:cd",), wall_ms=base_ms + 300_000)
+    # Sentinel present slot: counted but unsnapshotted member.
+    MarkPresent.objects.create(
+        mark=mark, nfc_uid=None, code=None, number=0, number_in_team=2
+    )
+    MarkPhoto.objects.create(mark=mark, frame_id="f1", image="mark_photos/m/f1.jpg")
+    # Unknown КП: checkpoint_id that is not in the race legend.
+    _make_mark(team, 999_999, present_chips=("ab:cd",), wall_ms=base_ms + 400_000)
+
+    JudgeScan.objects.create(
+        id="js-feed-1",
+        race=race,
+        source_install_id="judge-phone",
+        event_type="start",
+        participant_number=9,
+        nfc_uid="ab:cd ",  # raw — normalized on read before chip matching
+        wall_ms=base_ms - 60_000,
+    )
+    _make_track_point(
+        team, race, "tp-feed-1", gps_time_ms=base_ms + 100_000, segment_id="seg-a"
+    )
+    _make_track_point(
+        team, race, "tp-feed-2", gps_time_ms=base_ms + 200_000, segment_id="seg-a"
+    )
+
+    context = build_team_timeline(race, team)
+
+    kinds = [event["kind"] for event in context["events"]]
+    assert kinds == ["judge", "boundary", "track", "mark", "mark"]
+    assert [event["ms"] for event in context["events"]] == sorted(
+        event["ms"] for event in context["events"]
+    )
+
+    mark_event = context["events"][3]
+    assert mark_event["cp_number"] == cp_kp.number
+    present_labels = [p["label"] for p in mark_event["present"]]
+    assert present_labels == ["№9", "без снимка"]
+    assert mark_event["photos"] == ["/media/mark_photos/m/f1.jpg"]
+
+    unknown_event = context["events"][4]
+    assert unknown_event["cp_unknown"] is True
+    assert unknown_event["checkpoint_id"] == 999_999
+
+    track_event = context["events"][2]
+    assert track_event["points"] == 2
+    assert track_event["segment_id"] == "seg-a"
+
+    assert [chip["label"] for chip in context["chips"]] == ["№9"]
+    assert context["marks_count"] == 2
+    assert context["photos_count"] == 1
+
+    # The rendered page must not blow up on the full fixture set.
+    superuser = django_user_model.objects.create_superuser(
+        username="appdata-feed-su", password="x", email="adfeed@example.com"
+    )
+    client.force_login(superuser)
+    resp = client.get(
+        reverse(
+            "race_app_data_team",
+            kwargs={"race_slug": race.slug, "team_id": team.id},
+        )
+    )
+    assert resp.status_code == 200
+    body = resp.content.decode()
+    assert "без снимка" in body
+    assert "/media/mark_photos/m/f1.jpg" in body
+
+
+@pytest.mark.django_db
+def test_app_data_team_timeline_flags_clock_skew(client, django_user_model):
+    """A wall-vs-trusted divergence over the threshold gets a «часы …» badge."""
+    race, category, cp_start, cp_finish, cp_kp = _make_app_data_race("app-data-skew")
+    owner = django_user_model.objects.create_user(username="appdata-skew", password="x")
+    base_ms = 1_700_000_000_000
+    team = _make_team(owner, category, teamname="Часы")
+
+    # Phone clock 5 min ahead of trusted time — badge expected.
+    _make_mark(
+        team,
+        cp_kp,
+        present_chips=("sk:01",),
+        wall_ms=base_ms + 300_000,
+        trusted_ms=base_ms,
+    )
+    # 10 s divergence — under the threshold, no badge.
+    _make_mark(
+        team,
+        cp_kp,
+        present_chips=("sk:01",),
+        wall_ms=base_ms + 1_010_000,
+        trusted_ms=base_ms + 1_000_000,
+    )
+    # No trusted_ms at all — nothing to compare, no badge.
+    _make_mark(team, cp_kp, present_chips=("sk:01",), wall_ms=base_ms + 2_000_000)
+    # Judge scan with the phone clock 2 min behind.
+    JudgeScan.objects.create(
+        id="js-skew-1",
+        race=race,
+        source_install_id="judge-phone",
+        event_type="start",
+        participant_number=1,
+        nfc_uid="SK:01",
+        wall_ms=base_ms + 3_000_000 - 120_000,
+        trusted_ms=base_ms + 3_000_000,
+    )
+
+    context = build_team_timeline(race, team)
+
+    skews = {
+        (event["kind"], event["ms"]): event["clock_skew"]
+        for event in context["events"]
+        if event["kind"] in ("mark", "judge")
+    }
+    skewed_mark = skews[("mark", base_ms)]
+    assert skewed_mark["label"] == "часы спешат на 5м 00с"
+    assert skewed_mark["wall"] == format_ms(base_ms + 300_000)
+    assert skewed_mark["trusted"] == format_ms(base_ms)
+    assert skews[("mark", base_ms + 1_000_000)] is None
+    assert skews[("mark", base_ms + 2_000_000)] is None
+
+    judge_skew = skews[("judge", base_ms + 3_000_000)]
+    assert judge_skew["label"] == "часы отстают на 2м 00с"
+
+    # The rendered page shows the badge.
+    superuser = django_user_model.objects.create_superuser(
+        username="appdata-skew-su", password="x", email="adskew@example.com"
+    )
+    client.force_login(superuser)
+    resp = client.get(
+        reverse(
+            "race_app_data_team",
+            kwargs={"race_slug": race.slug, "team_id": team.id},
+        )
+    )
+    assert resp.status_code == 200
+    body = resp.content.decode()
+    assert "часы спешат на 5м 00с" in body
+    assert "часы отстают на 2м 00с" in body
+
+
+def test_app_data_urls_resolve():
+    assert resolve("/race/some-slug/app-data/").func.view_class is RaceAppDataView
+    assert (
+        resolve("/race/some-slug/app-data/team/7/").func.view_class
+        is RaceAppDataTeamView
+    )

@@ -127,6 +127,8 @@
             <a class="btn btn-primary" href="{% url 'edit_race' race.slug %}">Редактировать гонку</a>
             <a class="btn btn-outline" href="{% url 'edit_legend' race.slug %}">Легенда (КП)</a>
             <a class="btn btn-outline" href="{% url 'legend_codes' race.slug %}">Коды легенды</a>
+            <a class="btn btn-outline" href="{% url 'race_map' race.slug %}">Карта гонки</a>
+            <a class="btn btn-outline" href="{% url 'race_app_data' race.slug %}">Данные приложения</a>
             {% if user.is_superuser %}
             <a class="btn btn-outline" href="{% url 'add_race' %}">+ Новая гонка</a>
             {% endif %}

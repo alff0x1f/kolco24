@@ -1,0 +1,171 @@
+{% extends "website/base-2.html" %}
+{% load static %}
+
+{% block title %}Данные приложения — {{ race.name }} — Кольцо 24{% endblock %}
+
+{% block extra_head %}
+<link href="{% static 'css/app_data.css' %}" rel="stylesheet">
+{% endblock %}
+
+{% block content %}
+<div class="app-data app-data--wide">
+  <div class="container">
+
+    <!-- Breadcrumb -->
+    <nav class="breadcrumb">
+      <a href="/">Кольцо&nbsp;24</a>
+      <span class="sep">/</span>
+      <a href="{% url 'race' race.slug %}">{{ race.name }}</a>
+      <span class="sep">/</span>
+      <span class="cur">Данные приложения</span>
+    </nav>
+
+    <!-- Header -->
+    <div class="head">
+      <div class="head-l">
+        <div class="head-title">
+          <h1>Данные приложения</h1>
+          <span class="chip edit">{{ race.name }}</span>
+        </div>
+        <div class="sub">
+          Сверка данных, загруженных мобильным приложением: времена старта/финиша,
+          взятия граничных КП, чипы команд (по составу взятий), судейские отметки
+          и активность загрузок. Клик по команде — вся её лента событий.
+        </div>
+      </div>
+      <div class="head-actions">
+        <a class="btn btn-ghost" href="{% url 'race_map' race.slug %}">Карта гонки</a>
+      </div>
+    </div>
+
+    <!-- Teams table -->
+    <div class="card">
+      <div class="card-head">
+        <h2>Команды</h2>
+        <div class="card-head-r">
+          <input class="input search" type="search" id="teamSearch"
+                 placeholder="Поиск по номеру или названию">
+          <span class="aux">{{ rows|length }} команд.</span>
+        </div>
+      </div>
+      <div class="card-body tight">
+        <div class="grid-wrap">
+          <table class="data" id="teamsTable">
+            <thead>
+              <tr>
+                <th>Команда</th>
+                <th>Старт</th>
+                <th>Финиш</th>
+                <th>Взятие старт-КП</th>
+                <th>Взятие финиш-КП</th>
+                <th>Чипы</th>
+                <th>Судья: старт</th>
+                <th>Судья: финиш</th>
+                <th class="num">Взятия</th>
+                <th class="num">Фото</th>
+                <th>Трек</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for row in rows %}
+              <tr data-search="{{ row.team.start_number|lower }} {{ row.team.teamname|lower }}">
+                <td class="team-cell">
+                  <a href="{% url 'race_app_data_team' race.slug row.team.id %}">
+                    <span class="team-num">{{ row.team.start_number|default:"—" }}</span>
+                    {{ row.team.teamname|default:"Без названия" }}
+                  </a>
+                  <span class="cat">{{ row.team.category2.short_name }}</span>
+                </td>
+                <td class="mono">{{ row.start_time|default:"—" }}</td>
+                <td class="mono">{{ row.finish_time|default:"—" }}</td>
+                <td class="mono{% if row.start_mismatch %} warn{% endif %}"
+                    {% if row.start_mismatch %}title="Не совпадает с Team.start_time"{% endif %}>
+                  {{ row.take_start|default:"—" }}</td>
+                <td class="mono{% if row.finish_mismatch %} warn{% endif %}"
+                    {% if row.finish_mismatch %}title="Не совпадает с Team.finish_time"{% endif %}>
+                  {{ row.take_finish|default:"—" }}</td>
+                <td class="chips">
+                  {% for chip in row.chips %}
+                  <span class="tagchip{% if not chip.known %} unknown{% endif %}"
+                        title="{{ chip.uid }}">{{ chip.label }}</span>
+                  {% empty %}—{% endfor %}
+                </td>
+                <td class="mono">
+                  {% if row.judge_start %}
+                    {{ row.judge_start.first }}
+                    {% if row.judge_start.spread %}– {{ row.judge_start.last }}{% endif %}
+                    <span class="aux">{{ row.judge_start.scanned }}/{{ row.judge_start.chips }}</span>
+                  {% else %}—{% endif %}
+                </td>
+                <td class="mono">
+                  {% if row.judge_finish %}
+                    {{ row.judge_finish.first }}
+                    {% if row.judge_finish.spread %}– {{ row.judge_finish.last }}{% endif %}
+                    <span class="aux">{{ row.judge_finish.scanned }}/{{ row.judge_finish.chips }}</span>
+                  {% else %}—{% endif %}
+                </td>
+                <td class="num">{{ row.marks_verified }}/{{ row.marks_total }}</td>
+                <td class="num">{{ row.photos|default:"—" }}</td>
+                <td class="mono">
+                  {% if row.track_points %}{{ row.track_points }} тчк
+                    <span class="aux">до {{ row.track_last }}</span>
+                  {% else %}—{% endif %}
+                </td>
+              </tr>
+              {% empty %}
+              <tr class="empty"><td colspan="11">У гонки нет команд.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Unmatched judge scans -->
+    <div class="card">
+      <div class="card-head">
+        <h2>Неопознанные судейские сканы</h2>
+        <span class="aux">{{ unmatched_scans|length }} скан.</span>
+      </div>
+      <div class="card-body tight">
+        <div class="grid-wrap">
+          <table class="data">
+            <thead>
+              <tr>
+                <th>Время</th>
+                <th>Тип</th>
+                <th class="num">№ участника</th>
+                <th>Чип</th>
+                <th>Получено сервером</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for scan in unmatched_scans %}
+              <tr>
+                <td class="mono">{{ scan.time|default:"—" }}</td>
+                <td>{{ scan.event_type }}</td>
+                <td class="num">{{ scan.participant_number }}</td>
+                <td>
+                  {% if scan.chip %}
+                  <span class="tagchip{% if not scan.chip.known %} unknown{% endif %}"
+                        title="{{ scan.chip.uid }}">{{ scan.chip.label }}</span>
+                  {% else %}—{% endif %}
+                </td>
+                <td class="mono aux">{{ scan.received }}</td>
+              </tr>
+              {% empty %}
+              <tr class="empty"><td colspan="5">Все сканы привязаны к командам.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+{% endblock %}
+
+{% block footer_js_include %}
+<script src="{% static 'js/app_data.js' %}"></script>
+{% endblock %}
