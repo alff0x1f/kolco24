@@ -245,13 +245,13 @@ immutable, still out of `versioning.py`).
 - Create: `src/static/js/race_map.js`
 - Create: `src/static/css/race_map.css`
 
-- [ ] `race_map.css`: `.race-map` scoped layout — map fills viewport minus header, sidebar column, marker styles (numbered circle, `.is-stale` grey, `.is-selected` highlight), sidebar rows/search/counter
-- [ ] `race_map.js`: config island parse, Leaflet init (OSM + OpenTopoMap in layer control, with the required attribution strings © OpenStreetMap contributors / © OpenTopoMap (CC-BY-SA) in the tile layer options), positions fetch + marker render, one-time `fitBounds`, empty-race hint
-- [ ] polling: `setInterval` 20 s with in-flight guard; update marker positions in place; stale (>10 min by `received_at`) → grey
-- [ ] sidebar: counter «трек шлют N из M», substring search, «не шлют трек» group; row ↔ marker click both toggle track selection
-- [ ] track toggle: fetch `race_map_track`, draw segment polylines (cycling ~10-color palette), remove on second click; remember the team's current `(install_id, segment_id)` from positions at fetch time
-- [ ] live append: on poll tick, same session key → append point to that polyline; changed key → start a new polyline from the new point (never connect across sessions)
-- [ ] no unit tests (no JS test infra in project — the explicit exception noted in Development Approach); the manual smoke checklist in Task 7 is the mandatory verification; keep JS free of inline template vars (config island only)
+- [x] `race_map.css`: `.race-map` scoped layout — map fills viewport minus header, sidebar column, marker styles (numbered circle, `.is-stale` grey, `.is-selected` highlight), sidebar rows/search/counter
+- [x] `race_map.js`: config island parse, Leaflet init (OSM + OpenTopoMap in layer control, with the required attribution strings © OpenStreetMap contributors / © OpenTopoMap (CC-BY-SA) in the tile layer options), positions fetch + marker render, one-time `fitBounds`, empty-race hint
+- [x] polling: `setInterval` 20 s with in-flight guard; update marker positions in place; stale (>10 min by `received_at`) → grey
+- [x] sidebar: counter «трек шлют N из M», substring search, «не шлют трек» group; row ↔ marker click both toggle track selection
+- [x] track toggle: fetch `race_map_track`, draw segment polylines (cycling ~10-color palette), remove on second click; remember the team's current `(install_id, segment_id)` from positions at fetch time
+- [x] live append: on poll tick, same session key → append point to that polyline; changed key → start a new polyline from the new point (never connect across sessions)
+- [x] no unit tests (no JS test infra in project — the explicit exception noted in Development Approach); the manual smoke checklist in Task 7 is the mandatory verification; keep JS free of inline template vars (config island only)
 
 ### Task 7: Verify acceptance criteria
 

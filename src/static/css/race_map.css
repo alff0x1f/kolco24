@@ -1,0 +1,109 @@
+/* Race map — /race/<slug>/map/. Scoped under .race-map (theme-2.css owns
+   the bare .page class, never redefine it here). Full-viewport map with a
+   narrow sidebar (team list, search, freshness counter). */
+
+.race-map { padding: 0; }
+
+.race-map .breadcrumb {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 13px; color: var(--muted);
+  padding: 12px 20px 0;
+}
+.race-map .breadcrumb a { color: var(--muted); }
+.race-map .breadcrumb a:hover { color: var(--ink); }
+.race-map .breadcrumb .sep { color: var(--muted-2); }
+.race-map .breadcrumb .cur { color: var(--ink-soft); }
+
+.race-map-body {
+  display: flex;
+  height: calc(100vh - 57px - 34px);
+  min-height: 480px;
+  margin-top: 10px;
+  border-top: 1px solid var(--line);
+}
+
+/* ── Sidebar ──────────────────────────────────────────────── */
+.race-map-sidebar {
+  width: 280px; flex-shrink: 0;
+  display: flex; flex-direction: column;
+  background: var(--paper-2);
+  border-right: 1px solid var(--line);
+  overflow: hidden;
+}
+.rm-sidebar-head {
+  padding: 14px 16px 12px;
+  border-bottom: 1px solid var(--line-soft);
+  display: flex; flex-direction: column; gap: 8px;
+}
+.rm-sidebar-head h1 { font-size: 17px; font-weight: 600; letter-spacing: -0.01em; }
+.rm-counter { font-size: 12.5px; color: var(--muted); }
+.rm-search {
+  width: 100%; padding: 7px 10px; font-size: 13.5px;
+  border: 1px solid var(--line); border-radius: var(--radius-sm);
+  background: var(--paper); color: var(--ink-soft);
+}
+.rm-search:focus { outline: none; border-color: var(--primary-2); background: var(--paper-2); }
+
+.rm-team-list { flex: 1; overflow-y: auto; }
+.rm-group-label {
+  padding: 10px 16px 4px;
+  font-size: 11px; font-weight: 600; letter-spacing: 0.08em;
+  text-transform: uppercase; color: var(--muted-2);
+}
+
+.rm-row {
+  display: flex; align-items: center; gap: 9px;
+  padding: 7px 16px; cursor: pointer;
+  border-left: 3px solid transparent;
+}
+.rm-row:hover { background: var(--paper); }
+.rm-row.is-selected { background: var(--paper); border-left-color: var(--rm-color, var(--primary-2)); }
+.rm-row.is-stale { opacity: 0.55; }
+.rm-row.is-empty { opacity: 0.55; }
+
+.rm-row-num {
+  flex-shrink: 0; width: 26px; height: 26px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 11px; font-weight: 600; color: #fff;
+  background: var(--muted-2);
+}
+.rm-row.is-selected .rm-row-num,
+.rm-row:not(.is-empty) .rm-row-num { background: var(--primary-2); }
+.rm-row.is-selected .rm-row-num { background: var(--rm-color, var(--primary-2)); }
+.rm-row.is-empty .rm-row-num { background: var(--muted-2); }
+
+.rm-row-name {
+  flex: 1; min-width: 0; font-size: 13.5px; color: var(--ink-soft);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.rm-row-flag { font-size: 11px; color: var(--muted); flex-shrink: 0; }
+
+.rm-empty { padding: 14px 16px; font-size: 13px; color: var(--muted); }
+
+/* ── Map canvas ───────────────────────────────────────────── */
+.race-map-canvas { position: relative; flex: 1; min-width: 0; }
+.rm-map { position: absolute; inset: 0; background: var(--paper); }
+
+.rm-hint {
+  position: absolute; top: 16px; left: 50%; transform: translateX(-50%);
+  z-index: 1000; background: var(--paper-2); border: 1px solid var(--line);
+  border-radius: var(--radius-sm); box-shadow: var(--shadow);
+  padding: 8px 16px; font-size: 13px; color: var(--muted);
+}
+
+/* Leaflet marker (divIcon) — numbered circle */
+.rm-marker {
+  display: flex; align-items: center; justify-content: center;
+  width: 26px; height: 26px; border-radius: 50%;
+  background: var(--rm-color, var(--primary-2));
+  color: #fff; font-size: 11px; font-weight: 700;
+  border: 2px solid #fff; box-shadow: var(--shadow-sm);
+}
+.rm-marker.is-stale { background: var(--muted-2); }
+.rm-marker.is-selected { box-shadow: 0 0 0 3px var(--rm-color, var(--primary-2)); }
+
+@media (max-width: 720px) {
+  .race-map-body { flex-direction: column; height: auto; }
+  .race-map-sidebar { width: 100%; height: 260px; border-right: none; border-bottom: 1px solid var(--line); }
+  .race-map-canvas { height: 60vh; }
+}
