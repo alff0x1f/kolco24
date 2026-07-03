@@ -280,7 +280,7 @@ stores.
 - Modify: `CLAUDE.md`
 - Modify: this plan (move to completed)
 
-- [ ] Add a **"Judge scans upload"** invariant paragraph to the `apps.mobile`
+- [x] Add a **"Judge scans upload"** invariant paragraph to the `apps.mobile`
       section of `CLAUDE.md`, mirroring the **"Track upload"** invariant:
       `POST /app/race/<id>/judge_scans/` (name `judge_scans`), build-HMAC-only
       (NOT the per-person write layer), `mobile-write` throttle; race-scoped with
@@ -292,7 +292,7 @@ stores.
       (**note the deliberate divergence from `Mark.cp_nfc_uid`, stored raw**);
       `verified`/scoring/per-participant dedup are out of scope (future read-side
       task).
-- [ ] `mkdir -p docs/plans/completed` and move this plan there.
+- [x] `mkdir -p docs/plans/completed` and move this plan there.
 
 ## Post-Completion
 

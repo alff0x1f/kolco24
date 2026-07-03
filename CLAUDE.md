@@ -405,6 +405,27 @@ Django 4.2 project. Source lives entirely under `src/`, with `manage.py` at `src
       `Mark`/`TrackPoint`/`MarkPresent` convention (only the stats models `AppInstall`/`AppAuthFailure` are registered).
       A frame arriving before its parent `Mark` 404s — contract-safe, since the client only drains a mark's frames
       after that mark's own upload is acknowledged, and treats a photo `404` as transient (self-heals on the next sync).
+    - **Judge scans upload** (`POST /app/race/<id>/judge_scans/`, name `judge_scans` — a **sixth POST**, also
+      **build-HMAC-only** like `/track/`/`/marks/`: gated by `AppAPIView`'s default `[SignedAppPermission]`, NOT the
+      per-person write layer; throttle scope `mobile-write`, 60/min). Ingests a batch of judge start/finish bracelet
+      scans — a judge station scans **all teams of the race at once**, so the endpoint is **race-scoped with no
+      `team_id`** (the one structural omission vs. `/track/`: no team-in-race check). `JudgeScan` (`models.py`) is
+      immutable/write-only like `TrackPoint`: **PK = the client UUID `id`** (the idempotency key), FK
+      `race → website.Race` CASCADE `related_name="judge_scans"`, **no `updated_at`, deliberately out of
+      `versioning.py`** (an immutable row never touches the fingerprint/`sync` machinery), not admin-registered.
+      Idempotency is `JudgeScan.objects.bulk_create(objs, ignore_conflicts=True)` — a re-sent `id` is silently
+      skipped, no enrichment. **`source_install_id` is read from the signed body**, not the `X-Install-Id` header
+      (same pattern as `/marks/`'s `source_install_id`, not `/track/`'s header-sourced `install_id`). **All-or-nothing
+      400** (`serializer.is_valid(raise_exception=True)`): one malformed scan row 400s the whole batch, matching
+      `/track/`/`/marks/` — not the contract prose's partial-accept wording. `nfc_uid` is **normalized on store**
+      (`.strip().upper()`) in the view before building objs (`bulk_create` bypasses `save()` overrides) so it matches
+      the normalized member `Tag` pool format for post-facto participant resolution — a **deliberate divergence from
+      `Mark.cp_nfc_uid`/`MarkPresent.nfc_uid`, which are stored raw**. `event_type` is `ChoiceField(["start","finish"])`.
+      Flow (`views.py:JudgeScanUploadView`): resolve published `Race` (404) → validate body via
+      `JudgeScanUploadSerializer` (400) → no team check → read `source_install_id` from validated data → normalize
+      each scan's `nfc_uid` → `bulk_create(ignore_conflicts=True)` → 200 `{"accepted": [all submitted ids]}`. Empty
+      `scans` → ack `[]` (an empty `bulk_create` is a no-op). Read-side scoring, per-`participant_number` peak dedup,
+      and admin reattribution/rendering of judge scans are **out of scope** (a future task).
 
 New feature apps that don't fit in `website` live under `src/apps/<name>/`. Each needs a unique `AppConfig` label (e.g.
 `label = "race_app"`).
