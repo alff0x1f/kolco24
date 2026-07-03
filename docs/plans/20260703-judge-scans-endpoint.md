@@ -171,7 +171,7 @@ stores.
 **Files:**
 - Modify: `src/apps/mobile/serializers.py`
 
-- [ ] Add `JudgeScanSerializer` (one scan) mirroring `TrackPointSerializer`
+- [x] Add `JudgeScanSerializer` (one scan) mirroring `TrackPointSerializer`
       style: `id` `CharField(max_length=64, min_length=1)`; `event_type`
       `ChoiceField(choices=["start","finish"])`; `participant_number`
       `IntegerField(min_value=0, max_value=2147483647)`; `nfc_uid`
@@ -181,16 +181,16 @@ stores.
       min_value=0, max_value=9223372036854775807)`; `boot_count`
       `IntegerField(required=False, allow_null=True, min_value=0,
       max_value=2147483647)`.
-- [ ] Add `JudgeScanUploadSerializer` (body): `source_install_id`
+- [x] Add `JudgeScanUploadSerializer` (body): `source_install_id`
       `CharField(max_length=64)`; `scans` `JudgeScanSerializer(many=True,
       allow_empty=True, max_length=500)`.
-- [ ] Docstrings noting the two divergences from the track pair (no `team_id`;
+- [x] Docstrings noting the two divergences from the track pair (no `team_id`;
       `source_install_id` is the provenance key from the signed body) and the
       `event_type` choice constraint.
-- [ ] Write serializer tests (valid batch; omitted vs explicit-null nullables;
+- [x] Write serializer tests (valid batch; omitted vs explicit-null nullables;
       missing required field; out-of-range magnitudes; empty `id`; over-500;
       **bad `event_type` choice**; empty `scans` valid) — see Task 5.
-- [ ] Run tests — must pass before next task.
+- [x] Run tests — must pass before next task.
 
 ### Task 3: Add view and URL route
 

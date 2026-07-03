@@ -7407,6 +7407,188 @@ def test_mark_serializer_oversized_present_strings_invalid():
     assert not serializer.is_valid(), "oversized code should be invalid"
 
 
+# --- Judge scan upload serializers (judge-scans-endpoint plan, Task 2) -----
+
+
+def _valid_judge_scan(**overrides):
+    scan = {
+        "id": "0f9c2222-2222-2222-2222-222222222222",
+        "event_type": "start",
+        "participant_number": 101,
+        "nfc_uid": "04F1E2D3C4B5A6",
+        "wall_ms": 1718900000000,
+        "trusted_ms": 1718900000123,
+        "elapsed_at": 9876543,
+        "boot_count": 7,
+    }
+    scan.update(overrides)
+    return scan
+
+
+def _judge_scan_upload_body(**overrides):
+    body = {
+        "source_install_id": "b3c4-uuid",
+        "scans": [_valid_judge_scan()],
+    }
+    body.update(overrides)
+    return body
+
+
+def test_judge_scan_upload_serializer_valid_batch():
+    from apps.mobile.serializers import JudgeScanUploadSerializer
+
+    serializer = JudgeScanUploadSerializer(data=_judge_scan_upload_body())
+    assert serializer.is_valid(), serializer.errors
+    data = serializer.validated_data
+    assert data["source_install_id"] == "b3c4-uuid"
+    assert len(data["scans"]) == 1
+    scan = data["scans"][0]
+    assert scan["id"] == "0f9c2222-2222-2222-2222-222222222222"
+    assert scan["event_type"] == "start"
+    assert scan["participant_number"] == 101
+    assert scan["nfc_uid"] == "04F1E2D3C4B5A6"
+
+
+def test_judge_scan_serializer_omitted_nullables_resolve_absent():
+    from apps.mobile.serializers import JudgeScanUploadSerializer
+
+    scan = _valid_judge_scan()
+    for field in ("trusted_ms", "elapsed_at", "boot_count"):
+        scan.pop(field)
+    serializer = JudgeScanUploadSerializer(data=_judge_scan_upload_body(scans=[scan]))
+    assert serializer.is_valid(), serializer.errors
+    parsed = serializer.validated_data["scans"][0]
+    assert "trusted_ms" not in parsed
+    assert "elapsed_at" not in parsed
+    assert "boot_count" not in parsed
+
+
+def test_judge_scan_serializer_explicit_null_nullables():
+    from apps.mobile.serializers import JudgeScanUploadSerializer
+
+    scan = _valid_judge_scan(trusted_ms=None, elapsed_at=None, boot_count=None)
+    serializer = JudgeScanUploadSerializer(data=_judge_scan_upload_body(scans=[scan]))
+    assert serializer.is_valid(), serializer.errors
+    parsed = serializer.validated_data["scans"][0]
+    assert parsed["trusted_ms"] is None
+    assert parsed["elapsed_at"] is None
+    assert parsed["boot_count"] is None
+
+
+def test_judge_scan_serializer_missing_required_field_invalid():
+    from apps.mobile.serializers import JudgeScanUploadSerializer
+
+    for field in ("id", "event_type", "participant_number", "nfc_uid", "wall_ms"):
+        scan = _valid_judge_scan()
+        scan.pop(field)
+        serializer = JudgeScanUploadSerializer(
+            data=_judge_scan_upload_body(scans=[scan])
+        )
+        assert not serializer.is_valid(), f"missing {field} should be invalid"
+        assert "scans" in serializer.errors
+
+
+def test_judge_scan_serializer_oversized_32bit_ints_invalid():
+    from apps.mobile.serializers import JudgeScanUploadSerializer
+
+    too_big = 2147483648  # 2^31, one past the 32-bit signed max
+    for field in ("participant_number", "boot_count"):
+        scan = _valid_judge_scan(**{field: too_big})
+        serializer = JudgeScanUploadSerializer(
+            data=_judge_scan_upload_body(scans=[scan])
+        )
+        assert not serializer.is_valid(), f"oversized {field} should be invalid"
+
+
+def test_judge_scan_serializer_bigint_fields_accept_over_32bit():
+    from apps.mobile.serializers import JudgeScanUploadSerializer
+
+    big = 2147483648  # past 32-bit max, well within BigInt
+    scan = _valid_judge_scan(wall_ms=big, trusted_ms=big, elapsed_at=big)
+    serializer = JudgeScanUploadSerializer(data=_judge_scan_upload_body(scans=[scan]))
+    assert serializer.is_valid(), serializer.errors
+    parsed = serializer.validated_data["scans"][0]
+    assert parsed["wall_ms"] == big
+    assert parsed["trusted_ms"] == big
+    assert parsed["elapsed_at"] == big
+
+
+def test_judge_scan_serializer_oversized_bigint_invalid():
+    from apps.mobile.serializers import JudgeScanUploadSerializer
+
+    too_big = 9223372036854775808  # 2^63, one past the BigInt signed max
+    for field in ("wall_ms", "trusted_ms", "elapsed_at"):
+        scan = _valid_judge_scan(**{field: too_big})
+        serializer = JudgeScanUploadSerializer(
+            data=_judge_scan_upload_body(scans=[scan])
+        )
+        assert not serializer.is_valid(), f"oversized {field} should be invalid"
+
+
+def test_judge_scan_serializer_empty_id_invalid():
+    from apps.mobile.serializers import JudgeScanUploadSerializer
+
+    scan = _valid_judge_scan(id="")
+    serializer = JudgeScanUploadSerializer(data=_judge_scan_upload_body(scans=[scan]))
+    assert not serializer.is_valid()
+
+
+def test_judge_scan_serializer_blank_nfc_uid_invalid():
+    from apps.mobile.serializers import JudgeScanUploadSerializer
+
+    scan = _valid_judge_scan(nfc_uid="")
+    serializer = JudgeScanUploadSerializer(data=_judge_scan_upload_body(scans=[scan]))
+    assert not serializer.is_valid()
+
+
+def test_judge_scan_serializer_bad_event_type_invalid():
+    from apps.mobile.serializers import JudgeScanUploadSerializer
+
+    scan = _valid_judge_scan(event_type="lap")
+    serializer = JudgeScanUploadSerializer(data=_judge_scan_upload_body(scans=[scan]))
+    assert not serializer.is_valid()
+    assert "scans" in serializer.errors
+
+
+def test_judge_scan_upload_serializer_over_500_scans_invalid():
+    from apps.mobile.serializers import JudgeScanUploadSerializer
+
+    scans = [_valid_judge_scan(id=f"scan-{i}") for i in range(501)]
+    serializer = JudgeScanUploadSerializer(data=_judge_scan_upload_body(scans=scans))
+    assert not serializer.is_valid()
+    assert "scans" in serializer.errors
+
+
+def test_judge_scan_upload_serializer_empty_scans_valid():
+    from apps.mobile.serializers import JudgeScanUploadSerializer
+
+    serializer = JudgeScanUploadSerializer(data=_judge_scan_upload_body(scans=[]))
+    assert serializer.is_valid(), serializer.errors
+    assert serializer.validated_data["scans"] == []
+
+
+def test_judge_scan_upload_serializer_missing_source_install_id_invalid():
+    from apps.mobile.serializers import JudgeScanUploadSerializer
+
+    body = _judge_scan_upload_body()
+    body.pop("source_install_id")
+    serializer = JudgeScanUploadSerializer(data=body)
+    assert not serializer.is_valid()
+    assert "source_install_id" in serializer.errors
+
+
+def test_judge_scan_upload_serializer_oversized_source_install_id_invalid():
+    """source_install_id is body-sourced here (unlike track/marks' header-sourced
+    install_id), so it needs its own oversized-input test."""
+    from apps.mobile.serializers import JudgeScanUploadSerializer
+
+    serializer = JudgeScanUploadSerializer(
+        data=_judge_scan_upload_body(source_install_id="A" * 65)
+    )
+    assert not serializer.is_valid()
+    assert "source_install_id" in serializer.errors
+
+
 # --- Mark upload endpoint (Task 3) -----------------------------------------
 
 
