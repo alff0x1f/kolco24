@@ -240,26 +240,26 @@ stores.
 **Files:**
 - Modify: `src/apps/mobile/tests.py`
 
-- [ ] Add a `JudgeScan` section mirroring `test_trackpoint_*` /
+- [x] Add a `JudgeScan` section mirroring `test_trackpoint_*` /
       `test_track_upload_*`, reusing `_signed_post` and the autouse
       `_clear_throttle_cache` fixture. **Model**: round-trip all fields;
       round-trip non-null optionals; `bulk_create(ignore_conflicts=True)`
       idempotency; duplicate-PK create raises.
-- [ ] **Serializer** tests: valid batch; omitted nullables resolve absent;
+- [x] **Serializer** tests: valid batch; omitted nullables resolve absent;
       explicit-null nullables; missing required field invalid; out-of-range
       magnitudes invalid; empty `id` invalid; over-500 invalid; **bad
       `event_type` invalid**; empty `scans` valid.
-- [ ] **View** tests: wrong signature → 403; happy-path persists + acks all ids;
+- [x] **View** tests: wrong signature → 403; happy-path persists + acks all ids;
       idempotent no-duplicate-rows; **`nfc_uid` normalization** (lowercase input
       stored uppercase); **`source_install_id` read from body**; unpublished race
       → 404; nonexistent race → 404; malformed scan → 400; empty `scans` acks
       `[]`; nullable round-trip through the view.
-- [ ] Add an oversized-`source_install_id` serializer test (>64 chars → 400 via
+- [x] Add an oversized-`source_install_id` serializer test (>64 chars → 400 via
       `max_length=64`) — cheap and worth it since it is body-sourced here (the
       track/marks suites omit it because their install_id is header-sourced).
-- [ ] **Explicitly no team-not-in-race test** (endpoint has no `team_id`) — add a
+- [x] **Explicitly no team-not-in-race test** (endpoint has no `team_id`) — add a
       one-line comment noting this deliberate divergence from the track suite.
-- [ ] Run `uv run pytest src/apps/mobile/tests.py` — all pass before next task.
+- [x] Run `uv run pytest src/apps/mobile/tests.py` — all pass before next task.
 
 ### Task 6: Verify acceptance criteria
 
