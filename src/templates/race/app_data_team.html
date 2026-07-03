@@ -102,6 +102,11 @@
                   </span>
                   {% if ev.method == "photo" %}<span class="badge">фото</span>{% endif %}
                   {% if not ev.complete %}<span class="badge warn-b">не полный</span>{% endif %}
+                  {% if ev.clock_skew %}
+                  <span class="badge warn-b"
+                        title="по часам телефона {{ ev.clock_skew.wall }}, доверенное время {{ ev.clock_skew.trusted }}">
+                    {{ ev.clock_skew.label }}</span>
+                  {% endif %}
                 </td>
                 <td>
                   <span class="aux">Состав ({{ ev.present|length }}/{{ ev.expected_count }}):</span>
@@ -132,6 +137,11 @@
                   <span class="tagchip{% if not ev.chip.known %} unknown{% endif %}"
                         title="{{ ev.chip.uid }}">{{ ev.chip.label }}</span>
                   <span class="aux">№ участника {{ ev.participant_number }}</span>
+                  {% if ev.clock_skew %}
+                  <span class="badge warn-b"
+                        title="по часам телефона {{ ev.clock_skew.wall }}, доверенное время {{ ev.clock_skew.trusted }}">
+                    {{ ev.clock_skew.label }}</span>
+                  {% endif %}
                 </td>
 
                 {% elif ev.kind == "track" %}

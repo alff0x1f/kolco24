@@ -75,6 +75,31 @@ def _event_ms(obj):
     return obj.wall_ms
 
 
+# |trusted_ms − wall_ms| above this gets a «часы …» badge in the timeline.
+CLOCK_SKEW_BADGE_MS = 60_000
+
+
+def _clock_skew(obj):
+    """Phone-clock divergence badge data for a ``Mark``/``JudgeScan``.
+
+    ``_event_ms`` silently prefers ``trusted_ms``, hiding a skewed phone
+    wall-clock — the key diagnostic in a disputed take time. When both sources
+    are present and disagree by more than ``CLOCK_SKEW_BADGE_MS``, return
+    ``{"label", "wall", "trusted"}`` for the badge; otherwise ``None``.
+    """
+    if not obj.trusted_ms or obj.trusted_ms <= 0 or not obj.wall_ms:
+        return None
+    skew = obj.wall_ms - obj.trusted_ms
+    if abs(skew) < CLOCK_SKEW_BADGE_MS:
+        return None
+    direction = "спешат" if skew > 0 else "отстают"
+    return {
+        "label": f"часы {direction} на {_format_duration(abs(skew))}",
+        "wall": format_ms(obj.wall_ms),
+        "trusted": format_ms(obj.trusted_ms),
+    }
+
+
 def _tag_pool():
     """Global member-chip pool: normalized uid → bracelet number."""
     return {
@@ -326,6 +351,7 @@ def build_team_timeline(race, team):
                 "lon": mark.loc_lon,
                 "photos": [p.image.url for p in photos[mark.id] if p.image],
                 "install_id": mark.source_install_id,
+                "clock_skew": _clock_skew(mark),
             }
         )
 
@@ -343,6 +369,7 @@ def build_team_timeline(race, team):
                 "event_type": scan.event_type,
                 "participant_number": scan.participant_number,
                 "chip": _chip_label(uid, tag_numbers),
+                "clock_skew": _clock_skew(scan),
             }
         )
 

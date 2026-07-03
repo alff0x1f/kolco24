@@ -2804,6 +2804,7 @@ def _make_mark(
     present_chips=("chip1", "chip2"),
     expected=None,
     wall_ms=1,
+    trusted_ms=None,
 ):
     """Create a mobile ``Mark`` (+ ``MarkPresent`` roster) for the protocol tests.
 
@@ -2828,6 +2829,7 @@ def _make_mark(
         complete=True,
         verified=verified,
         wall_ms=wall_ms,
+        trusted_ms=trusted_ms,
     )
     for i, uid in enumerate(present_chips, start=1):
         MarkPresent.objects.create(
@@ -4485,6 +4487,78 @@ def test_app_data_team_timeline_orders_all_event_kinds(client, django_user_model
     body = resp.content.decode()
     assert "без снимка" in body
     assert "/media/mark_photos/m/f1.jpg" in body
+
+
+@pytest.mark.django_db
+def test_app_data_team_timeline_flags_clock_skew(client, django_user_model):
+    """A wall-vs-trusted divergence over the threshold gets a «часы …» badge."""
+    race, category, cp_start, cp_finish, cp_kp = _make_app_data_race("app-data-skew")
+    owner = django_user_model.objects.create_user(username="appdata-skew", password="x")
+    base_ms = 1_700_000_000_000
+    team = _make_team(owner, category, teamname="Часы")
+
+    # Phone clock 5 min ahead of trusted time — badge expected.
+    _make_mark(
+        team,
+        cp_kp,
+        present_chips=("sk:01",),
+        wall_ms=base_ms + 300_000,
+        trusted_ms=base_ms,
+    )
+    # 10 s divergence — under the threshold, no badge.
+    _make_mark(
+        team,
+        cp_kp,
+        present_chips=("sk:01",),
+        wall_ms=base_ms + 1_010_000,
+        trusted_ms=base_ms + 1_000_000,
+    )
+    # No trusted_ms at all — nothing to compare, no badge.
+    _make_mark(team, cp_kp, present_chips=("sk:01",), wall_ms=base_ms + 2_000_000)
+    # Judge scan with the phone clock 2 min behind.
+    JudgeScan.objects.create(
+        id="js-skew-1",
+        race=race,
+        source_install_id="judge-phone",
+        event_type="start",
+        participant_number=1,
+        nfc_uid="SK:01",
+        wall_ms=base_ms + 3_000_000 - 120_000,
+        trusted_ms=base_ms + 3_000_000,
+    )
+
+    context = build_team_timeline(race, team)
+
+    skews = {
+        (event["kind"], event["ms"]): event["clock_skew"]
+        for event in context["events"]
+        if event["kind"] in ("mark", "judge")
+    }
+    skewed_mark = skews[("mark", base_ms)]
+    assert skewed_mark["label"] == "часы спешат на 5м 00с"
+    assert skewed_mark["wall"] == format_ms(base_ms + 300_000)
+    assert skewed_mark["trusted"] == format_ms(base_ms)
+    assert skews[("mark", base_ms + 1_000_000)] is None
+    assert skews[("mark", base_ms + 2_000_000)] is None
+
+    judge_skew = skews[("judge", base_ms + 3_000_000)]
+    assert judge_skew["label"] == "часы отстают на 2м 00с"
+
+    # The rendered page shows the badge.
+    superuser = django_user_model.objects.create_superuser(
+        username="appdata-skew-su", password="x", email="adskew@example.com"
+    )
+    client.force_login(superuser)
+    resp = client.get(
+        reverse(
+            "race_app_data_team",
+            kwargs={"race_slug": race.slug, "team_id": team.id},
+        )
+    )
+    assert resp.status_code == 200
+    body = resp.content.decode()
+    assert "часы спешат на 5м 00с" in body
+    assert "часы отстают на 2м 00с" in body
 
 
 def test_app_data_urls_resolve():
