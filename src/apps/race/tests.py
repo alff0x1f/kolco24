@@ -4199,9 +4199,35 @@ def test_race_map_page_config_island_has_both_urls(client, django_user_model):
     assert config["positionsUrl"] == reverse(
         "race_map_positions", kwargs={"race_slug": race.slug}
     )
-    assert config["trackUrlTemplate"] == reverse(
-        "race_map_track", kwargs={"race_slug": race.slug, "team_id": 0}
-    ).replace("/0/", "/{team_id}/")
+    assert config["trackUrlTemplate"] == re.sub(
+        r"/0/$",
+        "/{team_id}/",
+        reverse("race_map_track", kwargs={"race_slug": race.slug, "team_id": 0}),
+    )
+
+
+def test_race_map_page_config_island_handles_numeric_zero_slug(
+    client, django_user_model
+):
+    """A race slug of exactly "0" must not corrupt trackUrlTemplate.
+
+    The template is built by rendering the track URL with a team_id=0
+    placeholder and substituting it back out; a naive str.replace("/0/", ...)
+    would also match the "/0/" from the slug segment itself.
+    """
+    race = _make_race(slug="0")
+    superuser = django_user_model.objects.create_superuser(
+        username="map-page-config-zero-su",
+        password="x",
+        email="map-page-config-zero-su@example.com",
+    )
+    client.force_login(superuser)
+
+    resp = client.get(reverse("race_map", kwargs={"race_slug": race.slug}))
+
+    assert resp.status_code == 200
+    config = _script_json(resp.content.decode(), "raceMapConfig")
+    assert config["trackUrlTemplate"] == "/race/0/map/track/{team_id}/"
 
 
 def test_race_map_page_url_resolves():

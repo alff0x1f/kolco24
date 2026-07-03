@@ -125,7 +125,7 @@ Django 4.2 project. Source lives entirely under `src/`, with `manage.py` at `src
   coordinates). Each segment carries its own `install_id`/`segment_id` so the frontend maps live-poll appends to the
   correct per-session polyline by key instead of assuming array position. The frontend polls positions every 20 s and
   fetches a team's track only on click (multi-select, per-team polyline color cycling, live point-append on poll
-  while a track is selected — skipped when the polled point repeats the last-appended `(session, gps_time_ms)`,
+  while a track is selected — skipped when the polled point repeats the last-appended `(session, lat, lon)`,
   `>10 min` stale markers greyed). Leaflet 1.9.4 is vendored (no CDN) at `src/static/vendor/leaflet/` — off-limits for edits,
   served by WhiteNoise like any other static asset — with OSM as the default base tile layer and OpenTopoMap as a
   switchable second layer. `TrackPoint` (`apps.mobile`) gained

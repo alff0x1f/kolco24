@@ -134,6 +134,14 @@
     });
   }
 
+  function updateEmptyHint() {
+    var hasAny = Object.keys(teams).some(function (teamId) {
+      var row = teams[teamId];
+      return row.lat != null && row.lon != null;
+    });
+    emptyHintEl.hidden = hasAny;
+  }
+
   function fitBoundsOnce() {
     if (boundsFitted) return;
     var latlngs = [];
@@ -143,11 +151,8 @@
     });
     if (latlngs.length) {
       map.fitBounds(latlngs, { padding: [40, 40], maxZoom: 14 });
-      emptyHintEl.hidden = true;
-    } else {
-      emptyHintEl.hidden = false;
+      boundsFitted = true;
     }
-    boundsFitted = true;
   }
 
   /* ── Sidebar ──────────────────────────────────────────────── */
@@ -327,6 +332,7 @@
         });
         renderMarkers();
         renderSidebar();
+        updateEmptyHint();
         fitBoundsOnce();
         Object.keys(selected).forEach(function (teamId) {
           appendLivePoint(teamId, teams[teamId]);

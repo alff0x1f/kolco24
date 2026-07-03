@@ -1191,7 +1191,7 @@ class RaceMapView(View):
         track_url_placeholder = reverse(
             "race_map_track", kwargs={"race_slug": race.slug, "team_id": 0}
         )
-        track_url_template = track_url_placeholder.replace("/0/", "/{team_id}/")
+        track_url_template = re.sub(r"/0/$", "/{team_id}/", track_url_placeholder)
 
         context = {
             "race": race,
