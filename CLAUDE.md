@@ -358,7 +358,13 @@ Django 4.2 project. Source lives entirely under `src/`, with `manage.py` at `src
       (`category2__race_id`, else 404) → build `bids_by_cp` + compute `verified` → de-dup batch + flatten `location` to
       `loc_*` (`location is None` → all `loc_*=None`) + build `MarkPresent` objs → `transaction.atomic()` (parent upsert
       before child insert) → 200 `{"accepted": [all submitted ids]}`. Empty `marks` → early ack `[]` (tag-bid query
-      skipped).
+      skipped). **Boundary-time side effect**: still inside that same `transaction.atomic()`, after the `Mark`/
+      `MarkPresent` upserts, a verified (`verified=True`, `method="nfc"`) mark for a `start`/`finish`-typed КП
+      auto-populates `Team.start_time`/`finish_time` — write-once (only when the field is still `0`, never
+      overwrites manual or api-set values), earliest-wins (`Min(Coalesce("trusted_ms","wall_ms"))` over all stored
+      verified NFC marks for that team+boundary), saved with `update_fields=[...,"updated_at"]`. A `method="photo"`
+      take never sets it. Races with no `start`/`finish` КП, or КП not provisioned with `CheckpointTag`s, simply
+      never auto-populate (no error).
     - **Photo upload** (`POST /app/race/<id>/mark/<mark_id>/photo/<frame_id>`, name `mark_photo` — a **fifth POST**, also
       **build-HMAC-only** like `/track/`/`/marks/`: gated by `AppAPIView`'s default `[SignedAppPermission]`, NOT the
       per-person write layer; throttle scope `mobile-photo`, `120/min`). Stores one raw JPEG frame for a

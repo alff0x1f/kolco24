@@ -200,11 +200,11 @@ Key design decisions (settled in brainstorm):
 
 ### Task 4: Finalize
 
-- [ ] Update `CLAUDE.md` **Marks upload** invariant to note the boundary-time
+- [x] Update `CLAUDE.md` **Marks upload** invariant to note the boundary-time
       side effect (verified `method="nfc"` start/finish marks populate
       `Team.start_time`/`finish_time` once, earliest-wins, `trusted_ms`→`wall_ms`;
       photo marks never set it).
-- [ ] Move this plan to `docs/plans/completed/`.
+- [x] Move this plan to `docs/plans/completed/`.
 
 ## Post-Completion
 
