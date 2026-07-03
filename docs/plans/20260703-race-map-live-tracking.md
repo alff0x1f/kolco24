@@ -193,9 +193,9 @@ immutable, still out of `versioning.py`).
 - Create: `src/static/vendor/leaflet/leaflet.css`
 - Create: `src/static/vendor/leaflet/images/*` (marker/layers icons from the dist)
 
-- [ ] download Leaflet 1.9.4 dist (js + css + images) into `src/static/vendor/leaflet/`
-- [ ] verify `leaflet.css` icon paths resolve relative to the vendored `images/` dir (they are relative in the dist — no edits to vendored files)
-- [ ] no tests (static assets only); `git add` and confirm `collectstatic` would pick them up via `STATICFILES_DIRS` (no config change needed)
+- [x] download Leaflet 1.9.4 dist (js + css + images) into `src/static/vendor/leaflet/`
+- [x] verify `leaflet.css` icon paths resolve relative to the vendored `images/` dir (they are relative in the dist — no edits to vendored files)
+- [x] no tests (static assets only); `git add` and confirm `collectstatic` would pick them up via `STATICFILES_DIRS` (no config change needed)
 
 ### Task 3: Positions endpoint (`race_map_positions`)
 
