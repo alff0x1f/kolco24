@@ -233,11 +233,11 @@ immutable, still out of `versioning.py`).
 - Create: `src/templates/race/map.html`
 - Modify: `src/apps/race/tests.py`
 
-- [ ] add `RaceMapView(View)` rendering `race/map.html` with `race` + the JSON config island data (`positionsUrl` via `reverse`; `trackUrlTemplate` via `reverse(..., kwargs={"team_id": 0}).replace("/0/", "/{team_id}/")` — `reverse` can't leave a placeholder)
-- [ ] wire `race/<slug:race_slug>/map/` → name `race_map`
-- [ ] create `map.html`: extends `website/base-2.html`, breadcrumb like `legend_form.html`, full-viewport map container + sidebar skeleton, `#raceMapConfig` JSON island; CSS (Leaflet + `race_map.css`) in `{% block extra_head %}`, JS (Leaflet + `race_map.js`) in `{% block footer_js_include %}` (same blocks as `legend_form.html`)
-- [ ] write tests: page access trio (anon redirect / user 403 / admin 200), response contains the config island with both URLs
-- [ ] run `uv run pytest src/apps/race/tests.py` — must pass before task 6
+- [x] add `RaceMapView(View)` rendering `race/map.html` with `race` + the JSON config island data (`positionsUrl` via `reverse`; `trackUrlTemplate` via `reverse(..., kwargs={"team_id": 0}).replace("/0/", "/{team_id}/")` — `reverse` can't leave a placeholder)
+- [x] wire `race/<slug:race_slug>/map/` → name `race_map`
+- [x] create `map.html`: extends `website/base-2.html`, breadcrumb like `legend_form.html`, full-viewport map container + sidebar skeleton, `#raceMapConfig` JSON island; CSS (Leaflet + `race_map.css`) in `{% block extra_head %}`, JS (Leaflet + `race_map.js`) in `{% block footer_js_include %}` (same blocks as `legend_form.html`)
+- [x] write tests: page access trio (anon redirect / user 403 / admin 200), response contains the config island with both URLs
+- [x] run `uv run pytest src/apps/race/tests.py` — must pass before task 6
 
 ### Task 6: Frontend JS + CSS
 

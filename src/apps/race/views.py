@@ -1161,6 +1161,50 @@ class ProtocolFreezeView(View):
         return _protocol_redirect_back(request, race)
 
 
+class RaceMapView(View):
+    """Organizer-only «Карта гонки» page: markers + on-demand tracks.
+
+    Gated on :func:`can_edit_race` like :class:`RaceLegendEditView`. The
+    heavy lifting (positions polling, track fetch/draw) lives entirely in
+    ``race_map.js``, driven by the ``#raceMapConfig`` JSON island — this view
+    only resolves the two endpoint URLs. ``trackUrlTemplate`` is built via
+    ``reverse()`` with a placeholder ``team_id`` and a string substitution
+    (``reverse()`` itself can't leave a template placeholder in the path).
+    """
+
+    def _load_and_authorize(self, request, race_slug):
+        if not request.user.is_authenticated:
+            return None, HttpResponseRedirect(
+                reverse("login") + "?next=" + quote(request.path, safe="/:@")
+            )
+        race = get_object_or_404(Race, slug=race_slug)
+        if not can_edit_race(request.user, race):
+            return race, HttpResponseForbidden()
+        return race, None
+
+    def get(self, request, race_slug):
+        race, response = self._load_and_authorize(request, race_slug)
+        if response is not None:
+            return response
+
+        positions_url = reverse("race_map_positions", kwargs={"race_slug": race.slug})
+        track_url_placeholder = reverse(
+            "race_map_track", kwargs={"race_slug": race.slug, "team_id": 0}
+        )
+        track_url_template = track_url_placeholder.replace("/0/", "/{team_id}/")
+
+        context = {
+            "race": race,
+            "map_config": _safe_json(
+                {
+                    "positionsUrl": positions_url,
+                    "trackUrlTemplate": track_url_template,
+                }
+            ),
+        }
+        return render(request, "race/map.html", context)
+
+
 class RaceMapPositionsView(View):
     """Last known GPS position per team, for the organizer race-map page.
 

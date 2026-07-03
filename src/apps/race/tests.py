@@ -21,6 +21,7 @@ from apps.race.views import (
     RaceEditView,
     RaceMapPositionsView,
     RaceMapTrackView,
+    RaceMapView,
     RacePageView,
     RaceTeamsView,
 )
@@ -4080,3 +4081,77 @@ def test_race_map_track_points_ordered_by_gps_time_within_segment(
 def test_race_map_track_url_resolves():
     resolved = resolve("/race/some-slug/map/track/7/")
     assert resolved.func.view_class is RaceMapTrackView
+
+
+# --- RaceMapView (Task 5) ----------------------------------------------------
+
+
+@pytest.mark.django_db
+def test_race_map_page_anonymous_redirects_to_login(client):
+    race = _make_race(slug="map-page-anon")
+
+    resp = client.get(reverse("race_map", kwargs={"race_slug": race.slug}))
+
+    assert resp.status_code == 302
+    assert reverse("login") in resp.url
+
+
+@pytest.mark.django_db
+def test_race_map_page_regular_user_forbidden(client, django_user_model):
+    race = _make_race(slug="map-page-forbidden")
+    user = django_user_model.objects.create_user(
+        username="map-page-plain", password="x"
+    )
+    client.force_login(user)
+
+    resp = client.get(reverse("race_map", kwargs={"race_slug": race.slug}))
+
+    assert resp.status_code == 403
+
+
+@pytest.mark.django_db
+def test_race_map_page_superuser_and_race_admin_200(client, django_user_model):
+    race = _make_race(slug="map-page-admins")
+
+    superuser = django_user_model.objects.create_superuser(
+        username="map-page-su", password="x", email="map-page-su@example.com"
+    )
+    client.force_login(superuser)
+    resp = client.get(reverse("race_map", kwargs={"race_slug": race.slug}))
+    assert resp.status_code == 200
+    client.logout()
+
+    admin = django_user_model.objects.create_user(
+        username="map-page-admin", password="x"
+    )
+    RaceAdmin.objects.create(race=race, user=admin, role=RaceAdmin.Role.ADMIN)
+    client.force_login(admin)
+    resp = client.get(reverse("race_map", kwargs={"race_slug": race.slug}))
+    assert resp.status_code == 200
+
+
+@pytest.mark.django_db
+def test_race_map_page_config_island_has_both_urls(client, django_user_model):
+    race = _make_race(slug="map-page-config")
+    superuser = django_user_model.objects.create_superuser(
+        username="map-page-config-su",
+        password="x",
+        email="map-page-config-su@example.com",
+    )
+    client.force_login(superuser)
+
+    resp = client.get(reverse("race_map", kwargs={"race_slug": race.slug}))
+
+    assert resp.status_code == 200
+    config = _script_json(resp.content.decode(), "raceMapConfig")
+    assert config["positionsUrl"] == reverse(
+        "race_map_positions", kwargs={"race_slug": race.slug}
+    )
+    assert config["trackUrlTemplate"] == reverse(
+        "race_map_track", kwargs={"race_slug": race.slug, "team_id": 0}
+    ).replace("/0/", "/{team_id}/")
+
+
+def test_race_map_page_url_resolves():
+    resolved = resolve("/race/some-slug/map/")
+    assert resolved.func.view_class is RaceMapView
