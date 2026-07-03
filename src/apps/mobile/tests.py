@@ -8028,7 +8028,7 @@ def _marks_path(race_id):
     return f"/app/race/{race_id}/marks/"
 
 
-def _make_cp_with_tag(race, number=1):
+def _make_cp_with_tag(race, number=1, cp_type="kp"):
     """Create a КП + a CheckpointTag whose signals populate code/bid.
 
     Returns ``(checkpoint, cp_code_hex)`` where ``cp_code_hex`` is the wire
@@ -8037,7 +8037,9 @@ def _make_cp_with_tag(race, number=1):
     """
     from website.models.checkpoint import Checkpoint, CheckpointTag
 
-    cp = Checkpoint.objects.create(race=race, number=number, cost=3, description="tree")
+    cp = Checkpoint.objects.create(
+        race=race, number=number, cost=3, description="tree", type=cp_type
+    )
     tag = CheckpointTag.objects.create(checkpoint=cp, nfc_uid=f"04AABBCC{number:02X}")
     tag.refresh_from_db()
     return cp, bytes(tag.code).hex()
@@ -8582,6 +8584,539 @@ def test_mark_upload_throttle_returns_429_after_limit(
         SimpleRateThrottle.THROTTLE_RATES = original_rates
 
     assert 429 in statuses[2:]
+
+
+# --- Boundary-time auto-population from verified marks ---------------------
+
+
+@pytest.mark.django_db
+def test_mark_upload_sets_start_time_from_trusted_ms(
+    client, settings, django_user_model
+):
+    import json
+
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    race, team = _make_team_in_race(django_user_model, slug="boundary-start-trusted")
+    cp, cp_code = _make_cp_with_tag(race, cp_type="start")
+    path = _marks_path(race.id)
+    mark = _valid_mark(
+        id="mk-start-1",
+        checkpoint_id=cp.id,
+        cp_code=cp_code,
+        trusted_ms=1000,
+        wall_ms=2000,
+    )
+    body = json.dumps(
+        {"team_id": team.id, "source_install_id": "ph", "marks": [mark]}
+    ).encode()
+
+    response = _signed_post(client, path, SECRET, body)
+    assert response.status_code == 200
+
+    team.refresh_from_db()
+    assert team.start_time == 1000
+    assert team.finish_time == 0
+
+
+@pytest.mark.django_db
+def test_mark_upload_sets_start_time_falls_back_to_wall_ms(
+    client, settings, django_user_model
+):
+    import json
+
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    race, team = _make_team_in_race(django_user_model, slug="boundary-start-wall")
+    cp, cp_code = _make_cp_with_tag(race, cp_type="start")
+    path = _marks_path(race.id)
+    mark = _valid_mark(
+        id="mk-start-2",
+        checkpoint_id=cp.id,
+        cp_code=cp_code,
+        trusted_ms=None,
+        wall_ms=3000,
+    )
+    body = json.dumps(
+        {"team_id": team.id, "source_install_id": "ph", "marks": [mark]}
+    ).encode()
+
+    response = _signed_post(client, path, SECRET, body)
+    assert response.status_code == 200
+
+    team.refresh_from_db()
+    assert team.start_time == 3000
+
+
+@pytest.mark.django_db
+def test_mark_upload_unverified_start_mark_does_not_set_start_time(
+    client, settings, django_user_model
+):
+    """A bad cp_code (fails verification) must never populate start_time."""
+    import json
+
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    race, team = _make_team_in_race(django_user_model, slug="boundary-start-unverified")
+    cp, _cp_code = _make_cp_with_tag(race, cp_type="start")
+    path = _marks_path(race.id)
+    mark = _valid_mark(
+        id="mk-start-3",
+        checkpoint_id=cp.id,
+        cp_code="00" * 16,  # wrong code — does not match the tag's bid
+        trusted_ms=1000,
+        wall_ms=2000,
+    )
+    body = json.dumps(
+        {"team_id": team.id, "source_install_id": "ph", "marks": [mark]}
+    ).encode()
+
+    response = _signed_post(client, path, SECRET, body)
+    assert response.status_code == 200
+
+    team.refresh_from_db()
+    assert team.start_time == 0
+
+
+@pytest.mark.django_db
+def test_mark_upload_untagged_checkpoint_does_not_set_start_time(
+    client, settings, django_user_model
+):
+    """A start КП with no CheckpointTag at all can never verify."""
+    import json
+
+    from website.models.checkpoint import Checkpoint
+
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    race, team = _make_team_in_race(django_user_model, slug="boundary-start-untagged")
+    cp = Checkpoint.objects.create(
+        race=race, number=1, cost=3, description="start", type="start"
+    )
+    path = _marks_path(race.id)
+    mark = _valid_mark(
+        id="mk-start-4",
+        checkpoint_id=cp.id,
+        cp_code="00" * 16,
+        trusted_ms=1000,
+        wall_ms=2000,
+    )
+    body = json.dumps(
+        {"team_id": team.id, "source_install_id": "ph", "marks": [mark]}
+    ).encode()
+
+    response = _signed_post(client, path, SECRET, body)
+    assert response.status_code == 200
+
+    team.refresh_from_db()
+    assert team.start_time == 0
+
+
+@pytest.mark.django_db
+def test_mark_upload_photo_mark_never_sets_start_time(
+    client, settings, django_user_model
+):
+    """A method='photo' take must never populate a boundary time, even when it
+    carries the real matching cp_code and is thus verified=True on the Mark row
+    — the boundary-time gate is verified=True AND method='nfc', not verified
+    alone."""
+    import json
+
+    from apps.mobile.models import Mark
+
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    race, team = _make_team_in_race(django_user_model, slug="boundary-start-photo")
+    cp, cp_code = _make_cp_with_tag(race, cp_type="start")
+    path = _marks_path(race.id)
+    mark = _valid_mark(
+        id="mk-start-5",
+        checkpoint_id=cp.id,
+        method="photo",
+        cp_code=cp_code,
+        trusted_ms=1000,
+        wall_ms=2000,
+    )
+    body = json.dumps(
+        {"team_id": team.id, "source_install_id": "ph", "marks": [mark]}
+    ).encode()
+
+    response = _signed_post(client, path, SECRET, body)
+    assert response.status_code == 200
+
+    assert Mark.objects.get(pk="mk-start-5").verified is True
+    team.refresh_from_db()
+    assert team.start_time == 0
+
+
+@pytest.mark.django_db
+def test_mark_upload_does_not_overwrite_existing_start_time(
+    client, settings, django_user_model
+):
+    from website.models.models import Team
+
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    race, team = _make_team_in_race(django_user_model, slug="boundary-start-preserve")
+    Team.objects.filter(pk=team.pk).update(start_time=42)
+    cp, cp_code = _make_cp_with_tag(race, cp_type="start")
+    path = _marks_path(race.id)
+    mark = _valid_mark(
+        id="mk-start-6",
+        checkpoint_id=cp.id,
+        cp_code=cp_code,
+        trusted_ms=1000,
+        wall_ms=2000,
+    )
+    import json
+
+    body = json.dumps(
+        {"team_id": team.id, "source_install_id": "ph", "marks": [mark]}
+    ).encode()
+
+    response = _signed_post(client, path, SECRET, body)
+    assert response.status_code == 200
+
+    team.refresh_from_db()
+    assert team.start_time == 42
+
+
+@pytest.mark.django_db
+def test_mark_upload_earliest_verified_start_mark_wins(
+    client, settings, django_user_model
+):
+    """Within the first upload that sets the field, the batch minimum wins;
+    write-once then blocks any later upload from revising it, even with an
+    earlier timestamp (see the second assertion below)."""
+    import json
+
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    race, team = _make_team_in_race(django_user_model, slug="boundary-start-earliest")
+    cp, cp_code = _make_cp_with_tag(race, cp_type="start")
+    path = _marks_path(race.id)
+
+    mark_a = _valid_mark(
+        id="mk-start-7a", checkpoint_id=cp.id, cp_code=cp_code, trusted_ms=5000
+    )
+    mark_b = _valid_mark(
+        id="mk-start-7b", checkpoint_id=cp.id, cp_code=cp_code, trusted_ms=1000
+    )
+    body = json.dumps(
+        {"team_id": team.id, "source_install_id": "ph", "marks": [mark_a, mark_b]}
+    ).encode()
+    response = _signed_post(client, path, SECRET, body)
+    assert response.status_code == 200
+    team.refresh_from_db()
+    assert team.start_time == 1000
+
+    # A later upload with an even-earlier timestamp must not matter — the
+    # field is already non-zero, so write-once keeps it at 1000.
+    mark_c = _valid_mark(
+        id="mk-start-7c", checkpoint_id=cp.id, cp_code=cp_code, trusted_ms=100
+    )
+    body2 = json.dumps(
+        {"team_id": team.id, "source_install_id": "ph", "marks": [mark_c]}
+    ).encode()
+    response2 = _signed_post(client, path, SECRET, body2)
+    assert response2.status_code == 200
+    team.refresh_from_db()
+    assert team.start_time == 1000
+
+
+@pytest.mark.django_db
+def test_mark_upload_epoch_zero_mark_does_not_poison_boundary_time(
+    client, settings, django_user_model
+):
+    """A verified mark with trusted_ms=wall_ms=0 (unset device clock) must be
+    excluded from the earliest-wins aggregate — 0 is also the unset sentinel
+    for Team.start_time, so an unfiltered Min() would pin the field at 0
+    forever and starve out every later, genuinely-timed mark."""
+    import json
+
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    race, team = _make_team_in_race(django_user_model, slug="boundary-start-epoch0")
+    cp, cp_code = _make_cp_with_tag(race, cp_type="start")
+    path = _marks_path(race.id)
+
+    zero_mark = _valid_mark(
+        id="mk-start-zero",
+        checkpoint_id=cp.id,
+        cp_code=cp_code,
+        trusted_ms=0,
+        wall_ms=0,
+    )
+    body1 = json.dumps(
+        {"team_id": team.id, "source_install_id": "ph", "marks": [zero_mark]}
+    ).encode()
+    response1 = _signed_post(client, path, SECRET, body1)
+    assert response1.status_code == 200
+    team.refresh_from_db()
+    assert team.start_time == 0
+
+    real_mark = _valid_mark(
+        id="mk-start-real",
+        checkpoint_id=cp.id,
+        cp_code=cp_code,
+        trusted_ms=5000,
+    )
+    body2 = json.dumps(
+        {"team_id": team.id, "source_install_id": "ph", "marks": [real_mark]}
+    ).encode()
+    response2 = _signed_post(client, path, SECRET, body2)
+    assert response2.status_code == 200
+    team.refresh_from_db()
+    assert team.start_time == 5000
+
+
+@pytest.mark.django_db
+def test_mark_upload_no_boundary_marks_leaves_times_untouched(
+    client, settings, django_user_model
+):
+    """A batch touching only a plain КП leaves start/finish untouched."""
+    import json
+
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    race, team = _make_team_in_race(django_user_model, slug="boundary-no-touch")
+    _start_cp, _start_code = _make_cp_with_tag(race, number=1, cp_type="start")
+    kp, kp_code = _make_cp_with_tag(race, number=2, cp_type="kp")
+    path = _marks_path(race.id)
+    mark = _valid_mark(id="mk-plain-1", checkpoint_id=kp.id, cp_code=kp_code)
+    body = json.dumps(
+        {"team_id": team.id, "source_install_id": "ph", "marks": [mark]}
+    ).encode()
+
+    original_updated_at = team.updated_at
+    response = _signed_post(client, path, SECRET, body)
+    assert response.status_code == 200
+
+    team.refresh_from_db()
+    assert team.start_time == 0
+    assert team.finish_time == 0
+    assert team.updated_at == original_updated_at
+
+
+@pytest.mark.django_db
+def test_mark_upload_race_without_boundary_checkpoints_is_noop(
+    client, settings, django_user_model
+):
+    """A race with no start/finish КП never auto-populates (no error either)."""
+    import json
+
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    race, team = _make_team_in_race(django_user_model, slug="boundary-no-boundary-cp")
+    kp, kp_code = _make_cp_with_tag(race, cp_type="kp")
+    path = _marks_path(race.id)
+    mark = _valid_mark(id="mk-plain-2", checkpoint_id=kp.id, cp_code=kp_code)
+    body = json.dumps(
+        {"team_id": team.id, "source_install_id": "ph", "marks": [mark]}
+    ).encode()
+
+    original_updated_at = team.updated_at
+    response = _signed_post(client, path, SECRET, body)
+    assert response.status_code == 200
+
+    team.refresh_from_db()
+    assert team.start_time == 0
+    assert team.finish_time == 0
+    assert team.updated_at == original_updated_at
+
+
+@pytest.mark.django_db
+def test_mark_upload_sets_both_boundary_times_in_one_batch(
+    client, settings, django_user_model
+):
+    """A single batch touching both a start and a finish КП sets both fields."""
+    import json
+
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    race, team = _make_team_in_race(django_user_model, slug="boundary-both-in-batch")
+    start_cp, start_code = _make_cp_with_tag(race, number=1, cp_type="start")
+    finish_cp, finish_code = _make_cp_with_tag(race, number=2, cp_type="finish")
+    path = _marks_path(race.id)
+    start_mark = _valid_mark(
+        id="mk-both-start",
+        checkpoint_id=start_cp.id,
+        cp_code=start_code,
+        trusted_ms=1000,
+    )
+    finish_mark = _valid_mark(
+        id="mk-both-finish",
+        checkpoint_id=finish_cp.id,
+        cp_code=finish_code,
+        trusted_ms=9000,
+    )
+    body = json.dumps(
+        {
+            "team_id": team.id,
+            "source_install_id": "ph",
+            "marks": [start_mark, finish_mark],
+        }
+    ).encode()
+
+    response = _signed_post(client, path, SECRET, body)
+    assert response.status_code == 200
+
+    team.refresh_from_db()
+    assert team.start_time == 1000
+    assert team.finish_time == 9000
+
+
+@pytest.mark.django_db
+def test_mark_upload_enrichment_merge_sets_boundary_time_after_correction(
+    client, settings, django_user_model
+):
+    """A repeat id that upserts from unverified to verified must still trigger
+    the boundary-time population on the second upload (aggregation reads all
+    stored history, so the corrected row must be visible to it)."""
+    import json
+
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    race, team = _make_team_in_race(django_user_model, slug="boundary-enrichment")
+    cp, cp_code = _make_cp_with_tag(race, cp_type="start")
+    path = _marks_path(race.id)
+
+    bad_mark = _valid_mark(
+        id="mk-enrich-1",
+        checkpoint_id=cp.id,
+        cp_code="00" * 16,  # wrong code — unverified
+        trusted_ms=1000,
+    )
+    body1 = json.dumps(
+        {"team_id": team.id, "source_install_id": "ph", "marks": [bad_mark]}
+    ).encode()
+    response1 = _signed_post(client, path, SECRET, body1)
+    assert response1.status_code == 200
+    team.refresh_from_db()
+    assert team.start_time == 0
+
+    corrected_mark = _valid_mark(
+        id="mk-enrich-1",  # same id — enrichment upsert
+        checkpoint_id=cp.id,
+        cp_code=cp_code,  # now verifies
+        trusted_ms=1000,
+    )
+    body2 = json.dumps(
+        {"team_id": team.id, "source_install_id": "ph", "marks": [corrected_mark]}
+    ).encode()
+    response2 = _signed_post(client, path, SECRET, body2)
+    assert response2.status_code == 200
+
+    team.refresh_from_db()
+    assert team.start_time == 1000
+
+
+@pytest.mark.django_db
+def test_mark_upload_sets_finish_time_independently_of_start_time(
+    client, settings, django_user_model
+):
+    import json
+
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    race, team = _make_team_in_race(django_user_model, slug="boundary-finish")
+    cp, cp_code = _make_cp_with_tag(race, cp_type="finish")
+    path = _marks_path(race.id)
+    mark = _valid_mark(
+        id="mk-finish-1", checkpoint_id=cp.id, cp_code=cp_code, trusted_ms=9000
+    )
+    body = json.dumps(
+        {"team_id": team.id, "source_install_id": "ph", "marks": [mark]}
+    ).encode()
+
+    response = _signed_post(client, path, SECRET, body)
+    assert response.status_code == 200
+
+    team.refresh_from_db()
+    assert team.finish_time == 9000
+    assert team.start_time == 0
+
+
+@pytest.mark.django_db
+def test_mark_upload_boundary_write_advances_team_updated_at(
+    client, settings, django_user_model
+):
+    import json
+
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    race, team = _make_team_in_race(django_user_model, slug="boundary-updated-at")
+    original_updated_at = team.updated_at
+    cp, cp_code = _make_cp_with_tag(race, cp_type="start")
+    path = _marks_path(race.id)
+    mark = _valid_mark(
+        id="mk-start-8", checkpoint_id=cp.id, cp_code=cp_code, trusted_ms=1000
+    )
+    body = json.dumps(
+        {"team_id": team.id, "source_install_id": "ph", "marks": [mark]}
+    ).encode()
+
+    response = _signed_post(client, path, SECRET, body)
+    assert response.status_code == 200
+
+    team.refresh_from_db()
+    assert team.start_time == 1000
+    assert team.updated_at > original_updated_at
+
+
+@pytest.mark.django_db
+def test_mark_upload_boundary_time_is_scoped_to_the_uploading_team(
+    client, settings, django_user_model
+):
+    """A verified start mark for a different team in the same race must not
+    populate this team's start_time."""
+    import json
+
+    from website.models.models import Team
+    from website.models.race import Category
+
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    race, team_a = _make_team_in_race(django_user_model, slug="boundary-scope")
+    category = Category.objects.get(race=race)
+    user_b = django_user_model.objects.create_user(
+        username="owner-boundary-scope-b",
+        email="boundary-scope-b@example.com",
+        password="x",
+    )
+    team_b = Team.objects.create(owner=user_b, category2=category, teamname="Beta")
+
+    cp, cp_code = _make_cp_with_tag(race, cp_type="start")
+    path = _marks_path(race.id)
+    mark = _valid_mark(
+        id="mk-start-9", checkpoint_id=cp.id, cp_code=cp_code, trusted_ms=1000
+    )
+    body = json.dumps(
+        {"team_id": team_b.id, "source_install_id": "ph", "marks": [mark]}
+    ).encode()
+
+    response = _signed_post(client, path, SECRET, body)
+    assert response.status_code == 200
+
+    team_a.refresh_from_db()
+    team_b.refresh_from_db()
+    assert team_a.start_time == 0
+    assert team_b.start_time == 1000
 
 
 # --- Mark photo upload endpoint (Task 3) ------------------------------------

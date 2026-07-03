@@ -358,7 +358,32 @@ Django 4.2 project. Source lives entirely under `src/`, with `manage.py` at `src
       (`category2__race_id`, else 404) → build `bids_by_cp` + compute `verified` → de-dup batch + flatten `location` to
       `loc_*` (`location is None` → all `loc_*=None`) + build `MarkPresent` objs → `transaction.atomic()` (parent upsert
       before child insert) → 200 `{"accepted": [all submitted ids]}`. Empty `marks` → early ack `[]` (tag-bid query
-      skipped).
+      skipped). **Boundary-time side effect**: still inside that same `transaction.atomic()`, after the `Mark`/
+      `MarkPresent` upserts, a verified (`verified=True`, `method="nfc"`) mark for a `start`/`finish`-typed КП
+      auto-populates `Team.start_time`/`finish_time` — write-once (only when the field is still `0`; **first-write-
+      wins**, not global-earliest-wins: the first upload that finds the field `0` sets it and every later upload is a
+      no-op for that field, even one carrying a genuinely earlier verified mark — see the second assertion of
+      `test_mark_upload_earliest_verified_start_mark_wins` in `apps/mobile/tests.py`; manual/api-set values are never
+      overwritten either), and within that first write, earliest-wins (`Min(Coalesce("trusted_ms","wall_ms"))`,
+      **excluding non-positive results** — an epoch-`0` mark would otherwise permanently pin the aggregate at `0`,
+      which is also the unset sentinel, and starve out every later genuinely-timed mark — over all stored verified
+      NFC marks for that team+boundary at that moment, not just the current batch), saved with
+      `update_fields=[...,"updated_at"]`. A `method="photo"` take never sets it. Races with no `start`/`finish` КП, or
+      КП not provisioned with `CheckpointTag`s, simply never auto-populate (no error). Fetches the `Team` row with
+      `select_for_update()` so a write can never regress an already-set field to a *later* value; it does **not**
+      make two truly-concurrent uploads for the same team resolve to the global earliest across both (each computes
+      its aggregate only over what its own not-yet-committed transaction can see, so whichever commits first wins and
+      the loser is skipped by the write-once guard even if it held a genuinely earlier mark) — accepted as
+      first-write-wins for both the sequential and the concurrent case, since the stored value is always a real
+      verified scan, never fabricated or clobbered to something later. **Accepted risk — same trust boundary as the
+      rest of `/marks/`, now feeding a scored field**: `team_id` is still spoofable (build-HMAC-only, no per-person
+      auth), and `Team.start_time`/`finish_time` are read by `apps/race/results.py` when building the protocol
+      snapshot — so a client that legitimately learns a shared start/finish station's code can post a fabricated
+      verified NFC mark for another team's `team_id` and, being first, permanently set that team's boundary time
+      (write-once). No additional gating is added here; an organizer who suspects a bogus auto-populated value must
+      currently clear it by hand (edit the field in `/admin/` — a subsequent `/marks/` upload that still references
+      the same boundary КП will recompute and re-set it from the still-present historical `Mark` rows, so a durable
+      fix also requires removing/editing those `Mark` rows, which have no admin UI today).
     - **Photo upload** (`POST /app/race/<id>/mark/<mark_id>/photo/<frame_id>`, name `mark_photo` — a **fifth POST**, also
       **build-HMAC-only** like `/track/`/`/marks/`: gated by `AppAPIView`'s default `[SignedAppPermission]`, NOT the
       per-person write layer; throttle scope `mobile-photo`, `120/min`). Stores one raw JPEG frame for a
