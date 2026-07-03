@@ -113,15 +113,20 @@ Django 4.2 project. Source lives entirely under `src/`, with `manage.py` at `src
   `team_id=0` placeholder string-replaced since `reverse()` can't leave a template placeholder); `race_map_positions`
   (`race/<slug>/map/positions/`, JSON list, one row per **every** team of the race — a team with no `TrackPoint` rows
   gets `lat`/`lon`/`gps_time_ms`/`received_at`/`install_id`/`segment_id` all `null` so the JS sidebar can group it
-  under «не шлют трек»); `race_map_track` (`race/<slug>/map/track/<int:team_id>/`, JSON `{"segments": [[[lat, lon],
-  …], …]}`, 404 if the team isn't in the race). Positions uses `DISTINCT ON (team_id)` ordered by
-  `-gps_time_ms, -created_at, -id` — the extra tie-breakers make the picked row deterministic when two phones of one
-  team upload different points with the same `gps_time_ms` (otherwise marker flicker across polls). Track grouping
-  keys a "session" by the pair `(install_id, segment_id)` (not `segment_id` alone — two phones of one team must not
-  merge into one line), thins each session to one point per `THIN_INTERVAL_MS = 30_000` ms of `gps_time_ms` while
-  always keeping the session's last point. The frontend polls positions every 20 s and fetches a team's track only on
-  click (multi-select, per-team polyline color cycling, live point-append on poll while a track is selected, `>10 min`
-  stale markers greyed). Leaflet 1.9.4 is vendored (no CDN) at `src/static/vendor/leaflet/` — off-limits for edits,
+  under «не шлют трек»); `race_map_track` (`race/<slug>/map/track/<int:team_id>/`, JSON `{"segments": [{"install_id",
+  "segment_id", "points": [[lat, lon], …]}, …]}`, 404 if the team isn't in the race). Positions uses
+  `DISTINCT ON (team_id)` ordered by `-gps_time_ms, -created_at, -id` — the extra tie-breakers make the picked row
+  deterministic when two phones of one team upload different points with the same `gps_time_ms` (otherwise marker
+  flicker across polls). Track grouping keys a "session" by the pair `(install_id, segment_id)` (not `segment_id`
+  alone — two phones of one team must not merge into one line), orders each session's points by
+  `(gps_time_ms, created_at, id)` (same tie-breaker discipline as positions), thins each session to one point per
+  `THIN_INTERVAL_MS = 30_000` ms of `gps_time_ms` while always keeping the session's true last point (compared by
+  full `(lat, lon, gps_time_ms)` identity, not timestamp alone — two fixes can share a `gps_time_ms` with different
+  coordinates). Each segment carries its own `install_id`/`segment_id` so the frontend maps live-poll appends to the
+  correct per-session polyline by key instead of assuming array position. The frontend polls positions every 20 s and
+  fetches a team's track only on click (multi-select, per-team polyline color cycling, live point-append on poll
+  while a track is selected — skipped when the polled point repeats the last-appended `(session, gps_time_ms)`,
+  `>10 min` stale markers greyed). Leaflet 1.9.4 is vendored (no CDN) at `src/static/vendor/leaflet/` — off-limits for edits,
   served by WhiteNoise like any other static asset — with OSM as the default base tile layer and OpenTopoMap as a
   switchable second layer. `TrackPoint` (`apps.mobile`) gained
   `Meta.indexes = [models.Index(fields=["race", "team", "-gps_time_ms"], name="mobile_tp_race_team_ts")]` (migration

@@ -1294,16 +1294,14 @@ class RaceMapTrackView(View):
 
     def _thin_session(self, points):
         kept = []
-        last_kept_ms = None
-        for lat, lon, gps_time_ms in points:
-            if (
-                last_kept_ms is None
-                or gps_time_ms - last_kept_ms >= self.THIN_INTERVAL_MS
-            ):
-                kept.append((lat, lon, gps_time_ms))
-                last_kept_ms = gps_time_ms
+        last_kept = None
+        for point in points:
+            gps_time_ms = point[2]
+            if last_kept is None or gps_time_ms - last_kept[2] >= self.THIN_INTERVAL_MS:
+                kept.append(point)
+                last_kept = point
         last_point = points[-1]
-        if not kept or kept[-1][2] != last_point[2]:
+        if not kept or kept[-1] != last_point:
             kept.append(last_point)
         return [[lat, lon] for lat, lon, _ in kept]
 
@@ -1316,7 +1314,7 @@ class RaceMapTrackView(View):
 
         points = (
             TrackPoint.objects.filter(race_id=race.id, team_id=team.id)
-            .order_by("gps_time_ms")
+            .order_by("gps_time_ms", "created_at", "id")
             .values_list("install_id", "segment_id", "lat", "lon", "gps_time_ms")
         )
 
@@ -1329,5 +1327,12 @@ class RaceMapTrackView(View):
                 session_order.append(key)
             sessions[key].append((lat, lon, gps_time_ms))
 
-        segments = [self._thin_session(sessions[key]) for key in session_order]
+        segments = [
+            {
+                "install_id": key[0],
+                "segment_id": key[1],
+                "points": self._thin_session(sessions[key]),
+            }
+            for key in session_order
+        ]
         return JsonResponse({"segments": segments})

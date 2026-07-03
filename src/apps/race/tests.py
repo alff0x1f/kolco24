@@ -3947,7 +3947,7 @@ def test_race_map_track_thins_points_within_30s(client, django_user_model):
     data = resp.json()
     assert len(data["segments"]) == 1
     segment = data["segments"][0]
-    assert segment == [[0.0, 0.0], [3.0, 3.0], [4.0, 4.0]]
+    assert segment["points"] == [[0.0, 0.0], [3.0, 3.0], [4.0, 4.0]]
 
 
 @pytest.mark.django_db
@@ -3992,8 +3992,10 @@ def test_race_map_track_two_segment_ids_ordered_by_time(client, django_user_mode
     assert resp.status_code == 200
     segments = resp.json()["segments"]
     assert len(segments) == 2
-    assert segments[0] == [[10.0, 10.0]]
-    assert segments[1] == [[20.0, 20.0]]
+    assert segments[0]["segment_id"] == "seg-1"
+    assert segments[0]["points"] == [[10.0, 10.0]]
+    assert segments[1]["segment_id"] == "seg-2"
+    assert segments[1]["points"] == [[20.0, 20.0]]
 
 
 @pytest.mark.django_db
@@ -4042,8 +4044,11 @@ def test_race_map_track_same_segment_id_two_installs_is_two_segments(
     assert resp.status_code == 200
     segments = resp.json()["segments"]
     assert len(segments) == 2
-    assert [1.0, 1.0] in segments[0] or [1.0, 1.0] in segments[1]
-    assert [2.0, 2.0] in segments[0] or [2.0, 2.0] in segments[1]
+    install_ids = {segment["install_id"] for segment in segments}
+    assert install_ids == {"phone-1", "phone-2"}
+    all_points = segments[0]["points"] + segments[1]["points"]
+    assert [1.0, 1.0] in all_points
+    assert [2.0, 2.0] in all_points
 
 
 @pytest.mark.django_db
@@ -4075,7 +4080,54 @@ def test_race_map_track_points_ordered_by_gps_time_within_segment(
 
     assert resp.status_code == 200
     segment = resp.json()["segments"][0]
-    assert segment == [[1.0, 1.0], [2.0, 2.0]]
+    assert segment["points"] == [[1.0, 1.0], [2.0, 2.0]]
+
+
+@pytest.mark.django_db
+def test_race_map_track_keeps_true_last_point_on_tied_gps_time(
+    client, django_user_model
+):
+    from django.utils import timezone as django_timezone
+
+    race = _make_race(slug="map-track-tie")
+    category = _make_category(race)
+    owner = django_user_model.objects.create_user(
+        username="map-track-tie-owner", password="x"
+    )
+    team = _make_team(owner, category, teamname="Tie", start_number="1")
+
+    base = 1_700_000_000_000
+    _make_track_point(team, race, "tp-tie-0", gps_time_ms=base, lat=0.0, lon=0.0)
+    _make_track_point(
+        team, race, "tp-tie-30a", gps_time_ms=base + 30_000, lat=1.0, lon=1.0
+    )
+    _make_track_point(
+        team, race, "tp-tie-30b", gps_time_ms=base + 30_000, lat=2.0, lon=2.0
+    )
+    # Force tp-tie-30a to sort before tp-tie-30b on the created_at tie-breaker,
+    # so the two tied-gps_time_ms points have a deterministic, distinct order
+    # and tp-tie-30b (with different coordinates) is the true last point.
+    TrackPoint.objects.filter(id="tp-tie-30a").update(
+        created_at=django_timezone.now() - datetime.timedelta(seconds=1)
+    )
+
+    admin = django_user_model.objects.create_superuser(
+        username="map-track-tie-su",
+        password="x",
+        email="map-track-tie-su@example.com",
+    )
+    client.force_login(admin)
+    resp = client.get(
+        reverse("race_map_track", kwargs={"race_slug": race.slug, "team_id": team.id})
+    )
+
+    assert resp.status_code == 200
+    segment = resp.json()["segments"][0]
+    # The thinning pick (tp-tie-30a) and the true final point (tp-tie-30b,
+    # different coordinates despite the tied gps_time_ms) must both survive —
+    # comparing only the timestamp would wrongly treat them as the same point
+    # and drop the segment's real last fix.
+    assert segment["points"] == [[0.0, 0.0], [1.0, 1.0], [2.0, 2.0]]
 
 
 def test_race_map_track_url_resolves():
