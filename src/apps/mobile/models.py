@@ -287,3 +287,47 @@ class MarkPhoto(models.Model):
 
     def __str__(self):
         return f"MarkPhoto(mark={self.mark_id} frame={self.frame_id})"
+
+
+class JudgeScan(models.Model):
+    """One judge-station bracelet scan (start/finish) uploaded by the app.
+
+    The primary key is the **client-generated UUID** (``id``): the idempotency
+    key *is* the PK, so a re-sent scan hits a PK conflict and is silently
+    skipped by ``bulk_create(..., ignore_conflicts=True)`` — same pattern as
+    :class:`TrackPoint`.
+
+    Rows are **write-only / immutable**: there is no ``updated_at`` and the
+    model is deliberately **not** in ``versioning.py`` — it never touches the
+    fingerprint/``sync`` ETag machinery. Not admin-registered.
+
+    No ``team`` FK: a judge station scans **all** teams of the race at once, so
+    the row is race-scoped only; ``participant_number`` + ``nfc_uid`` identify
+    the scanned bracelet for later (out-of-scope) read-side resolution.
+
+    ``nfc_uid`` is normalized (``.strip().upper()``) by the **view**, not a
+    ``save()`` override — ``bulk_create`` bypasses ``save()`` overrides anyway.
+    This is a deliberate divergence from ``Mark.cp_nfc_uid`` /
+    ``MarkPresent.nfc_uid``, which are stored raw: judge scans are resolved
+    against the normalized member ``Tag`` pool by uid, so normalizing at ingest
+    makes that read-side match direct.
+    """
+
+    id = models.CharField(max_length=64, primary_key=True)
+    race = models.ForeignKey(
+        "website.Race",
+        on_delete=models.CASCADE,
+        related_name="judge_scans",
+    )
+    source_install_id = models.CharField(max_length=64)
+    event_type = models.CharField(max_length=16)
+    participant_number = models.IntegerField()
+    nfc_uid = models.CharField(max_length=255)
+    wall_ms = models.BigIntegerField()
+    trusted_ms = models.BigIntegerField(null=True)
+    elapsed_at = models.BigIntegerField(null=True)
+    boot_count = models.IntegerField(null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"JudgeScan({self.id} race={self.race_id} {self.event_type})"

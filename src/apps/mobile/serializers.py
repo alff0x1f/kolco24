@@ -201,6 +201,51 @@ class MarkUploadSerializer(serializers.Serializer):
     marks = MarkSerializer(many=True, allow_empty=True, max_length=500)
 
 
+class JudgeScanSerializer(serializers.Serializer):
+    """Validate one bracelet scan in a ``POST /app/race/<race_id>/judge_scans/`` batch.
+
+    No ``team_id`` here (unlike ``TrackPointSerializer``/``MarkSerializer``): a
+    judge station scans all teams of the race at once, so the row is
+    race-scoped only. ``event_type`` is a ``ChoiceField`` — only the two
+    contract values ``start``/``finish`` are accepted, any other is a 400.
+    ``wall_ms`` is required BigInt; ``trusted_ms``/``elapsed_at`` are nullable
+    BigInt (``2^63 − 1`` cap); ``boot_count`` backs a 32-bit column, so it
+    carries the ``2^31 − 1`` cap instead.
+    """
+
+    id = serializers.CharField(max_length=64, min_length=1)
+    event_type = serializers.ChoiceField(choices=["start", "finish"])
+    participant_number = serializers.IntegerField(min_value=0, max_value=2147483647)
+    nfc_uid = serializers.CharField(
+        max_length=255, allow_blank=False, trim_whitespace=True
+    )
+    wall_ms = serializers.IntegerField(min_value=0, max_value=9223372036854775807)
+    trusted_ms = serializers.IntegerField(
+        required=False, allow_null=True, min_value=0, max_value=9223372036854775807
+    )
+    elapsed_at = serializers.IntegerField(
+        required=False, allow_null=True, min_value=0, max_value=9223372036854775807
+    )
+    boot_count = serializers.IntegerField(
+        required=False, allow_null=True, min_value=0, max_value=2147483647
+    )
+
+
+class JudgeScanUploadSerializer(serializers.Serializer):
+    """Validate the ``POST /app/race/<race_id>/judge_scans/`` body.
+
+    No ``team_id`` (race-scoped only — no per-team membership check).
+    ``source_install_id`` is the provenance grouping key, read from the
+    **signed body** (not the ``X-Install-Id`` header), like
+    ``MarkUploadSerializer``. ``scans`` is a batch of up to 500 rows
+    (all-or-nothing — an oversized batch is a 400); an empty list is valid and
+    acks ``[]``.
+    """
+
+    source_install_id = serializers.CharField(max_length=64)
+    scans = JudgeScanSerializer(many=True, allow_empty=True, max_length=500)
+
+
 class RaceListSerializer(serializers.ModelSerializer):
     """Public list view of a published race (no images)."""
 

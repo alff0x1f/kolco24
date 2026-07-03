@@ -7407,6 +7407,620 @@ def test_mark_serializer_oversized_present_strings_invalid():
     assert not serializer.is_valid(), "oversized code should be invalid"
 
 
+# --- JudgeScan model (judge-scans-endpoint plan, Task 1) -------------------
+
+
+@pytest.mark.django_db
+def test_judge_scan_round_trips_all_fields(django_user_model):
+    from apps.mobile.models import JudgeScan
+
+    race, _team = _make_team_in_race(django_user_model, slug="judge-race-1")
+    pk = "0f9c2222-2222-2222-2222-222222222222"
+    JudgeScan.objects.create(
+        id=pk,
+        race=race,
+        source_install_id="b3c4-uuid",
+        event_type="start",
+        participant_number=101,
+        nfc_uid="04F1E2D3C4B5A6",
+        wall_ms=1718900000000,
+        trusted_ms=1718900000123,
+        elapsed_at=9876543,
+        boot_count=7,
+    )
+
+    scan = JudgeScan.objects.get(pk=pk)
+    assert scan.pk == pk
+    assert scan.race_id == race.id
+    assert scan.source_install_id == "b3c4-uuid"
+    assert scan.event_type == "start"
+    assert scan.participant_number == 101
+    assert scan.nfc_uid == "04F1E2D3C4B5A6"
+    assert scan.wall_ms == 1718900000000
+    assert scan.trusted_ms == 1718900000123
+    assert scan.elapsed_at == 9876543
+    assert scan.boot_count == 7
+    assert scan.created_at is not None
+    assert str(scan) == f"JudgeScan({pk} race={race.id} start)"
+
+
+@pytest.mark.django_db
+def test_judge_scan_round_trips_non_null_optionals(django_user_model):
+    from apps.mobile.models import JudgeScan
+
+    race, _team = _make_team_in_race(django_user_model, slug="judge-race-2")
+    JudgeScan.objects.create(
+        id="pk-with-optionals",
+        race=race,
+        source_install_id="b3c4-uuid",
+        event_type="finish",
+        participant_number=1,
+        nfc_uid="04AABBCC",
+        wall_ms=1,
+        trusted_ms=None,
+        elapsed_at=None,
+        boot_count=None,
+    )
+    scan = JudgeScan.objects.get(pk="pk-with-optionals")
+    assert scan.trusted_ms is None
+    assert scan.elapsed_at is None
+    assert scan.boot_count is None
+
+
+@pytest.mark.django_db
+def test_judge_scan_bulk_create_ignore_conflicts_is_idempotent(django_user_model):
+    from apps.mobile.models import JudgeScan
+
+    race, _team = _make_team_in_race(django_user_model, slug="judge-race-3")
+    pk = "dup-scan-id"
+
+    def _scan(participant_number):
+        return JudgeScan(
+            id=pk,
+            race=race,
+            source_install_id="b3c4-uuid",
+            event_type="start",
+            participant_number=participant_number,
+            nfc_uid="04AABBCC",
+            wall_ms=1,
+        )
+
+    JudgeScan.objects.bulk_create([_scan(1)], ignore_conflicts=True)
+    assert JudgeScan.objects.count() == 1
+
+    # second bulk_create with the same id silently no-ops; original row untouched
+    JudgeScan.objects.bulk_create([_scan(99)], ignore_conflicts=True)
+    assert JudgeScan.objects.count() == 1
+    assert JudgeScan.objects.get(pk=pk).participant_number == 1
+
+
+@pytest.mark.django_db
+def test_judge_scan_create_duplicate_pk_raises(django_user_model):
+    from apps.mobile.models import JudgeScan
+
+    race, _team = _make_team_in_race(django_user_model, slug="judge-race-4")
+    JudgeScan.objects.create(
+        id="same-pk",
+        race=race,
+        source_install_id="b3c4-uuid",
+        event_type="start",
+        participant_number=1,
+        nfc_uid="04AABBCC",
+        wall_ms=1,
+    )
+    with pytest.raises(IntegrityError):
+        JudgeScan.objects.create(
+            id="same-pk",
+            race=race,
+            source_install_id="b3c4-uuid",
+            event_type="finish",
+            participant_number=2,
+            nfc_uid="04AABBCD",
+            wall_ms=2,
+        )
+
+
+# --- Judge scan upload serializers (judge-scans-endpoint plan, Task 2) -----
+
+
+def _valid_judge_scan(**overrides):
+    scan = {
+        "id": "0f9c2222-2222-2222-2222-222222222222",
+        "event_type": "start",
+        "participant_number": 101,
+        "nfc_uid": "04F1E2D3C4B5A6",
+        "wall_ms": 1718900000000,
+        "trusted_ms": 1718900000123,
+        "elapsed_at": 9876543,
+        "boot_count": 7,
+    }
+    scan.update(overrides)
+    return scan
+
+
+def _judge_scan_upload_body(**overrides):
+    body = {
+        "source_install_id": "b3c4-uuid",
+        "scans": [_valid_judge_scan()],
+    }
+    body.update(overrides)
+    return body
+
+
+def test_judge_scan_upload_serializer_valid_batch():
+    from apps.mobile.serializers import JudgeScanUploadSerializer
+
+    serializer = JudgeScanUploadSerializer(data=_judge_scan_upload_body())
+    assert serializer.is_valid(), serializer.errors
+    data = serializer.validated_data
+    assert data["source_install_id"] == "b3c4-uuid"
+    assert len(data["scans"]) == 1
+    scan = data["scans"][0]
+    assert scan["id"] == "0f9c2222-2222-2222-2222-222222222222"
+    assert scan["event_type"] == "start"
+    assert scan["participant_number"] == 101
+    assert scan["nfc_uid"] == "04F1E2D3C4B5A6"
+
+
+def test_judge_scan_serializer_omitted_nullables_resolve_absent():
+    from apps.mobile.serializers import JudgeScanUploadSerializer
+
+    scan = _valid_judge_scan()
+    for field in ("trusted_ms", "elapsed_at", "boot_count"):
+        scan.pop(field)
+    serializer = JudgeScanUploadSerializer(data=_judge_scan_upload_body(scans=[scan]))
+    assert serializer.is_valid(), serializer.errors
+    parsed = serializer.validated_data["scans"][0]
+    assert "trusted_ms" not in parsed
+    assert "elapsed_at" not in parsed
+    assert "boot_count" not in parsed
+
+
+def test_judge_scan_serializer_explicit_null_nullables():
+    from apps.mobile.serializers import JudgeScanUploadSerializer
+
+    scan = _valid_judge_scan(trusted_ms=None, elapsed_at=None, boot_count=None)
+    serializer = JudgeScanUploadSerializer(data=_judge_scan_upload_body(scans=[scan]))
+    assert serializer.is_valid(), serializer.errors
+    parsed = serializer.validated_data["scans"][0]
+    assert parsed["trusted_ms"] is None
+    assert parsed["elapsed_at"] is None
+    assert parsed["boot_count"] is None
+
+
+def test_judge_scan_serializer_missing_required_field_invalid():
+    from apps.mobile.serializers import JudgeScanUploadSerializer
+
+    for field in ("id", "event_type", "participant_number", "nfc_uid", "wall_ms"):
+        scan = _valid_judge_scan()
+        scan.pop(field)
+        serializer = JudgeScanUploadSerializer(
+            data=_judge_scan_upload_body(scans=[scan])
+        )
+        assert not serializer.is_valid(), f"missing {field} should be invalid"
+        assert "scans" in serializer.errors
+
+
+def test_judge_scan_serializer_oversized_32bit_ints_invalid():
+    from apps.mobile.serializers import JudgeScanUploadSerializer
+
+    too_big = 2147483648  # 2^31, one past the 32-bit signed max
+    for field in ("participant_number", "boot_count"):
+        scan = _valid_judge_scan(**{field: too_big})
+        serializer = JudgeScanUploadSerializer(
+            data=_judge_scan_upload_body(scans=[scan])
+        )
+        assert not serializer.is_valid(), f"oversized {field} should be invalid"
+
+
+def test_judge_scan_serializer_bigint_fields_accept_over_32bit():
+    from apps.mobile.serializers import JudgeScanUploadSerializer
+
+    big = 2147483648  # past 32-bit max, well within BigInt
+    scan = _valid_judge_scan(wall_ms=big, trusted_ms=big, elapsed_at=big)
+    serializer = JudgeScanUploadSerializer(data=_judge_scan_upload_body(scans=[scan]))
+    assert serializer.is_valid(), serializer.errors
+    parsed = serializer.validated_data["scans"][0]
+    assert parsed["wall_ms"] == big
+    assert parsed["trusted_ms"] == big
+    assert parsed["elapsed_at"] == big
+
+
+def test_judge_scan_serializer_oversized_bigint_invalid():
+    from apps.mobile.serializers import JudgeScanUploadSerializer
+
+    too_big = 9223372036854775808  # 2^63, one past the BigInt signed max
+    for field in ("wall_ms", "trusted_ms", "elapsed_at"):
+        scan = _valid_judge_scan(**{field: too_big})
+        serializer = JudgeScanUploadSerializer(
+            data=_judge_scan_upload_body(scans=[scan])
+        )
+        assert not serializer.is_valid(), f"oversized {field} should be invalid"
+
+
+def test_judge_scan_serializer_empty_id_invalid():
+    from apps.mobile.serializers import JudgeScanUploadSerializer
+
+    scan = _valid_judge_scan(id="")
+    serializer = JudgeScanUploadSerializer(data=_judge_scan_upload_body(scans=[scan]))
+    assert not serializer.is_valid()
+
+
+def test_judge_scan_serializer_blank_nfc_uid_invalid():
+    from apps.mobile.serializers import JudgeScanUploadSerializer
+
+    scan = _valid_judge_scan(nfc_uid="")
+    serializer = JudgeScanUploadSerializer(data=_judge_scan_upload_body(scans=[scan]))
+    assert not serializer.is_valid()
+
+
+def test_judge_scan_serializer_bad_event_type_invalid():
+    from apps.mobile.serializers import JudgeScanUploadSerializer
+
+    scan = _valid_judge_scan(event_type="lap")
+    serializer = JudgeScanUploadSerializer(data=_judge_scan_upload_body(scans=[scan]))
+    assert not serializer.is_valid()
+    assert "scans" in serializer.errors
+
+
+def test_judge_scan_upload_serializer_over_500_scans_invalid():
+    from apps.mobile.serializers import JudgeScanUploadSerializer
+
+    scans = [_valid_judge_scan(id=f"scan-{i}") for i in range(501)]
+    serializer = JudgeScanUploadSerializer(data=_judge_scan_upload_body(scans=scans))
+    assert not serializer.is_valid()
+    assert "scans" in serializer.errors
+
+
+def test_judge_scan_upload_serializer_empty_scans_valid():
+    from apps.mobile.serializers import JudgeScanUploadSerializer
+
+    serializer = JudgeScanUploadSerializer(data=_judge_scan_upload_body(scans=[]))
+    assert serializer.is_valid(), serializer.errors
+    assert serializer.validated_data["scans"] == []
+
+
+def test_judge_scan_upload_serializer_missing_source_install_id_invalid():
+    from apps.mobile.serializers import JudgeScanUploadSerializer
+
+    body = _judge_scan_upload_body()
+    body.pop("source_install_id")
+    serializer = JudgeScanUploadSerializer(data=body)
+    assert not serializer.is_valid()
+    assert "source_install_id" in serializer.errors
+
+
+def test_judge_scan_upload_serializer_oversized_source_install_id_invalid():
+    """source_install_id is body-sourced here (unlike track/marks' header-sourced
+    install_id), so it needs its own oversized-input test."""
+    from apps.mobile.serializers import JudgeScanUploadSerializer
+
+    serializer = JudgeScanUploadSerializer(
+        data=_judge_scan_upload_body(source_install_id="A" * 65)
+    )
+    assert not serializer.is_valid()
+    assert "source_install_id" in serializer.errors
+
+
+# --- Judge scan upload endpoint (judge-scans-endpoint plan, Task 3) --------
+#
+# No team_id on this endpoint (a judge station scans all teams of the race at
+# once) — so, deliberately, there is no team-not-in-race test here, unlike the
+# track/marks suites.
+
+
+def _judge_scans_path(race_id):
+    return f"/app/race/{race_id}/judge_scans/"
+
+
+def _make_judge_race(django_user_model, slug):
+    """A published race + ADMIN RaceAdmin user + their active token.
+
+    Judge-scan upload is gated by the per-person write layer
+    (``SignedAppPermission + IsMobileUser + CanEditRaceLegend``), so a request
+    must carry a bearer token owned by a race admin. Returns ``(race, user, raw)``.
+    """
+    from website.models.race import Race, RaceAdmin
+
+    race = Race.objects.create(name=f"Judge race {slug}", slug=slug, is_published=True)
+    user = django_user_model.objects.create_user(
+        username=f"judge-{slug}", email=f"judge-{slug}@example.com", password="x"
+    )
+    RaceAdmin.objects.create(race=race, user=user, role=RaceAdmin.Role.ADMIN)
+    raw = _make_active_token(user)
+    return race, user, raw
+
+
+@pytest.mark.django_db
+def test_judge_scan_upload_wrong_signature_returns_403(
+    client, settings, django_user_model
+):
+    import json
+
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    race, _user, raw = _make_judge_race(django_user_model, "judge-403")
+    path = _judge_scans_path(race.id)
+    body = json.dumps(_judge_scan_upload_body()).encode()
+    # build the signature with the WRONG secret → build gate rejects first
+    # (before the bearer layer), so a neutral "Forbidden" regardless of token
+    response = _signed_post_auth(client, path, "wrong-secret", body, raw)
+    assert response.status_code == 403
+    assert response.json() == {"detail": "Forbidden"}
+
+
+@pytest.mark.django_db
+def test_judge_scan_upload_missing_bearer_returns_401(
+    client, settings, django_user_model
+):
+    import json
+
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    race, _user, _raw = _make_judge_race(django_user_model, "judge-nobearer")
+    path = _judge_scans_path(race.id)
+    body = json.dumps(_judge_scan_upload_body()).encode()
+    # valid build sig but no Authorization header → actionable 401
+    response = _signed_post_auth(client, path, SECRET, body, None)
+    assert response.status_code == 401
+
+
+@pytest.mark.django_db
+def test_judge_scan_upload_non_admin_user_returns_403(
+    client, settings, django_user_model
+):
+    import json
+
+    from apps.mobile.models import JudgeScan
+    from website.models.race import Race
+
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    race = Race.objects.create(
+        name="Judge plain", slug="judge-plain", is_published=True
+    )
+    # a valid user + token, but no RaceAdmin row → CanEditRaceLegend denies
+    user = django_user_model.objects.create_user(
+        username="judge-plain-crew", email="judge-plain@example.com", password="x"
+    )
+    raw = _make_active_token(user)
+
+    path = _judge_scans_path(race.id)
+    body = json.dumps(_judge_scan_upload_body()).encode()
+    response = _signed_post_auth(client, path, SECRET, body, raw)
+    assert response.status_code == 403
+    # actionable (not the neutral build-layer "Forbidden")
+    assert response.json() != {"detail": "Forbidden"}
+    assert JudgeScan.objects.count() == 0
+
+
+@pytest.mark.django_db
+def test_judge_scan_upload_happy_path_persists_and_acks(
+    client, settings, django_user_model
+):
+    import json
+
+    from apps.mobile.models import JudgeScan
+
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    race, _user, raw = _make_judge_race(django_user_model, "judge-happy")
+    path = _judge_scans_path(race.id)
+    s1 = _valid_judge_scan(id="scan-a")
+    s2 = _valid_judge_scan(id="scan-b", participant_number=202)
+    body = json.dumps(_judge_scan_upload_body(scans=[s1, s2])).encode()
+
+    response = _signed_post_auth(client, path, SECRET, body, raw)
+    assert response.status_code == 200
+    assert response.json() == {"accepted": ["scan-a", "scan-b"]}
+
+    assert JudgeScan.objects.count() == 2
+    row = JudgeScan.objects.get(pk="scan-a")
+    assert row.race_id == race.id
+    assert row.source_install_id == "b3c4-uuid"
+    assert row.event_type == "start"
+    assert row.participant_number == 101
+    assert row.wall_ms == 1718900000000
+
+
+@pytest.mark.django_db
+def test_judge_scan_upload_idempotent_no_duplicate_rows(
+    client, settings, django_user_model
+):
+    import json
+
+    from apps.mobile.models import JudgeScan
+
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    race, _user, raw = _make_judge_race(django_user_model, "judge-idem")
+    path = _judge_scans_path(race.id)
+    body = json.dumps(
+        _judge_scan_upload_body(scans=[_valid_judge_scan(id="scan-x")])
+    ).encode()
+
+    r1 = _signed_post_auth(client, path, SECRET, body, raw)
+    r2 = _signed_post_auth(client, path, SECRET, body, raw)
+    assert r1.status_code == 200
+    assert r2.status_code == 200
+    assert r1.json() == r2.json() == {"accepted": ["scan-x"]}
+    assert JudgeScan.objects.count() == 1
+
+
+@pytest.mark.django_db
+def test_judge_scan_upload_nfc_uid_normalization(client, settings, django_user_model):
+    import json
+
+    from apps.mobile.models import JudgeScan
+
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    race, _user, raw = _make_judge_race(django_user_model, "judge-nfc-norm")
+    path = _judge_scans_path(race.id)
+    scan = _valid_judge_scan(id="scan-lower", nfc_uid="  04f1e2d3c4b5a6  ")
+    body = json.dumps(_judge_scan_upload_body(scans=[scan])).encode()
+
+    response = _signed_post_auth(client, path, SECRET, body, raw)
+    assert response.status_code == 200
+    row = JudgeScan.objects.get(pk="scan-lower")
+    assert row.nfc_uid == "04F1E2D3C4B5A6"
+
+
+@pytest.mark.django_db
+def test_judge_scan_upload_source_install_id_from_body(
+    client, settings, django_user_model
+):
+    import json
+
+    from apps.mobile.models import JudgeScan
+
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    race, _user, raw = _make_judge_race(django_user_model, "judge-install")
+    path = _judge_scans_path(race.id)
+    body = json.dumps(
+        _judge_scan_upload_body(
+            source_install_id="phone-judge-1",
+            scans=[_valid_judge_scan(id="scan-install")],
+        )
+    ).encode()
+    # X-Install-Id header (if any) must NOT be used — only the signed body.
+    headers = _signed_headers("POST", path, SECRET, body=body)
+    headers["HTTP_AUTHORIZATION"] = f"Bearer {raw}"
+    headers["HTTP_X_INSTALL_ID"] = "header-should-be-ignored"
+    response = client.post(path, data=body, content_type="application/json", **headers)
+    assert response.status_code == 200
+    row = JudgeScan.objects.get(pk="scan-install")
+    assert row.source_install_id == "phone-judge-1"
+
+
+@pytest.mark.django_db
+def test_judge_scan_upload_unpublished_race_returns_404(
+    client, settings, django_user_model
+):
+    import json
+
+    from website.models.race import Race, RaceAdmin
+
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    race = Race.objects.create(name="Hidden", slug="judge-hidden", is_published=False)
+    user = django_user_model.objects.create_user(
+        username="judge-hidden-crew", email="judge-hidden@example.com", password="x"
+    )
+    RaceAdmin.objects.create(race=race, user=user, role=RaceAdmin.Role.ADMIN)
+    raw = _make_active_token(user)
+    path = _judge_scans_path(race.id)
+    body = json.dumps(_judge_scan_upload_body()).encode()
+    response = _signed_post_auth(client, path, SECRET, body, raw)
+    assert response.status_code == 404
+
+
+@pytest.mark.django_db
+def test_judge_scan_upload_nonexistent_race_returns_404(
+    client, settings, django_user_model
+):
+    import json
+
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    # a valid user + token is needed to clear IsMobileUser; CanEditRaceLegend
+    # then 404s on the missing race before the view body runs
+    user = django_user_model.objects.create_user(
+        username="judge-norace", email="judge-norace@example.com", password="x"
+    )
+    raw = _make_active_token(user)
+    path = _judge_scans_path(999999)
+    body = json.dumps(_judge_scan_upload_body()).encode()
+    response = _signed_post_auth(client, path, SECRET, body, raw)
+    assert response.status_code == 404
+
+
+@pytest.mark.django_db
+def test_judge_scan_upload_malformed_scan_returns_400(
+    client, settings, django_user_model
+):
+    import json
+
+    from apps.mobile.models import JudgeScan
+
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    race, _user, raw = _make_judge_race(django_user_model, "judge-bad")
+    path = _judge_scans_path(race.id)
+
+    bad_scans = [
+        _valid_judge_scan(event_type="lap"),  # bad choice
+        _valid_judge_scan(nfc_uid=""),  # blank
+    ]
+    for bad in bad_scans:
+        body = json.dumps(_judge_scan_upload_body(scans=[bad])).encode()
+        response = _signed_post_auth(client, path, SECRET, body, raw)
+        assert response.status_code == 400
+
+    # a missing required field
+    missing = _valid_judge_scan()
+    missing.pop("wall_ms")
+    body = json.dumps(_judge_scan_upload_body(scans=[missing])).encode()
+    assert _signed_post_auth(client, path, SECRET, body, raw).status_code == 400
+
+    # nothing got written on a rejected batch
+    assert JudgeScan.objects.count() == 0
+
+
+@pytest.mark.django_db
+def test_judge_scan_upload_empty_scans_acks_empty(client, settings, django_user_model):
+    import json
+
+    from apps.mobile.models import JudgeScan
+
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    race, _user, raw = _make_judge_race(django_user_model, "judge-empty")
+    path = _judge_scans_path(race.id)
+    body = json.dumps(_judge_scan_upload_body(scans=[])).encode()
+    response = _signed_post_auth(client, path, SECRET, body, raw)
+    assert response.status_code == 200
+    assert response.json() == {"accepted": []}
+    assert JudgeScan.objects.count() == 0
+
+
+@pytest.mark.django_db
+def test_judge_scan_upload_nullable_round_trip(client, settings, django_user_model):
+    import json
+
+    from apps.mobile.models import JudgeScan
+
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    race, _user, raw = _make_judge_race(django_user_model, "judge-null")
+    path = _judge_scans_path(race.id)
+
+    scan = _valid_judge_scan(id="scan-null")
+    for field in ("trusted_ms", "elapsed_at", "boot_count"):
+        scan.pop(field)
+    body = json.dumps(_judge_scan_upload_body(scans=[scan])).encode()
+    response = _signed_post_auth(client, path, SECRET, body, raw)
+    assert response.status_code == 200
+
+    row = JudgeScan.objects.get(pk="scan-null")
+    assert row.trusted_ms is None
+    assert row.elapsed_at is None
+    assert row.boot_count is None
+
+
 # --- Mark upload endpoint (Task 3) -----------------------------------------
 
 

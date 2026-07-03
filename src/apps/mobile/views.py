@@ -32,6 +32,7 @@ from .models import (
     MARK_UPDATE_FIELDS,
     AppAuthFailure,
     AppInstall,
+    JudgeScan,
     Mark,
     MarkPhoto,
     MarkPresent,
@@ -42,6 +43,7 @@ from .models import (
 from .permissions import CanEditRaceLegend, IsMobileUser, SignedAppPermission
 from .serializers import (
     CategorySerializer,
+    JudgeScanUploadSerializer,
     LegendCheckpointSerializer,
     LoginSerializer,
     MarkUploadSerializer,
@@ -646,6 +648,70 @@ class MarkPhotoUploadView(AppAPIView):
                 raise
             return Response(status=status.HTTP_200_OK)  # concurrent duplicate
         return Response(status=status.HTTP_201_CREATED)
+
+
+class JudgeScanUploadView(AppAPIView):
+    """``POST /app/race/<race_id>/judge_scans/`` — ingest a batch of judge scans.
+
+    A near-clone of :class:`TrackUploadView`: same ``AppAPIView`` base, same
+    ``mobile-write`` throttle, same immutable client-UUID-PK idempotency via
+    ``bulk_create(ignore_conflicts=True)``.
+
+    **Per-person write layer** (unlike ``/track/``/``/marks/``, which are
+    build-HMAC-only): a judge station is an admin credential, so the same stack
+    as :class:`TagCreateView` gates this endpoint —
+
+    1. :class:`SignedAppPermission` — per-build HMAC (over the request **body**);
+    2. :class:`IsMobileUser` — resolves the bearer to ``request.mobile_user``;
+    3. :class:`CanEditRaceLegend` — per-race ``can_edit_race`` authorization
+       (superuser or ``RaceAdmin(role=ADMIN)``), reading ``view.kwargs["race_id"]``.
+
+    Two divergences from ``/track/``:
+
+    - **No ``team_id``** — a judge station scans all teams of the race at
+      once, so there is no per-team membership check.
+    - ``source_install_id`` is read from the **signed body** (like
+      ``MarkUploadView``), not the ``X-Install-Id`` header.
+
+    Validation is all-or-nothing: a malformed/out-of-range scan (or an
+    over-500 batch) 400s the whole request, never a partial accept.
+    ``nfc_uid`` is normalized (``.strip().upper()``) here in the view before
+    building the model objects, since ``bulk_create`` bypasses ``save()``
+    overrides. Rows are immutable/write-only — ``JudgeScan`` has no
+    ``updated_at`` and stays out of ``versioning.py``/ETag/``sync``.
+    """
+
+    permission_classes = [SignedAppPermission, IsMobileUser, CanEditRaceLegend]
+    throttle_classes = [ClientIPScopedRateThrottle]
+    throttle_scope = "mobile-write"
+
+    def post(self, request, race_id):
+        get_object_or_404(Race, pk=race_id, is_published=True)
+
+        serializer = JudgeScanUploadSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)  # 400 on malformed/out-of-range
+        source_install_id = serializer.validated_data["source_install_id"]
+        scans = serializer.validated_data["scans"]
+
+        objs = [
+            JudgeScan(
+                id=s["id"],
+                race_id=race_id,
+                source_install_id=source_install_id,
+                event_type=s["event_type"],
+                participant_number=s["participant_number"],
+                nfc_uid=s["nfc_uid"].strip().upper(),
+                wall_ms=s["wall_ms"],
+                trusted_ms=s.get("trusted_ms"),
+                elapsed_at=s.get("elapsed_at"),
+                boot_count=s.get("boot_count"),
+            )
+            for s in scans
+        ]
+        JudgeScan.objects.bulk_create(objs, ignore_conflicts=True)
+        return Response(
+            {"accepted": [s["id"] for s in scans]}, status=status.HTTP_200_OK
+        )
 
 
 class RaceListView(AppAPIView):
