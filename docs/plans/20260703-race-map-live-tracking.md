@@ -40,9 +40,9 @@ phones are still uploading. The page gives live monitoring plus per-team track r
   scope). No SSE/WebSocket/Channels.
 - Track thinning on the server: keep a point only if ≥ 30 s (30 000 ms of `gps_time_ms`) passed
   since the previously kept one; always keep each segment's last point. Split polylines by
-  `segment_id`.
+  recording session — the pair `(install_id, segment_id)`.
 - Positions response includes **all** teams of the race; teams with no points get `lat`/`lon:
-  null` (sidebar shows them as «не шлют трек»).
+  null` (sidebar shows them as «не шлют трек»), likewise `install_id`/`segment_id`.
 - No accuracy-based outlier filtering (deliberate — raw picture first, threshold later if needed).
 
 ## Development Approach
@@ -50,9 +50,12 @@ phones are still uploading. The page gives live monitoring plus per-team track r
 - **testing approach**: Regular (code first, then tests in the same task)
 - complete each task fully before moving to the next
 - make small, focused changes
-- **CRITICAL: every task MUST include new/updated tests** for code changes in that task
+- **CRITICAL: every code-bearing backend task MUST include new/updated tests**
   - tests are not optional - they are a required part of the checklist
   - tests cover both success and error scenarios
+  - the two asset-only tasks are the explicit exceptions: Task 2 (vendored static files) has no
+    testable code; Task 6 (JS/CSS — no JS test infra in the project) carries a mandatory manual
+    smoke checklist instead, executed in Task 7
 - **CRITICAL: all tests must pass before starting next task** - no exceptions
 - **CRITICAL: update this plan file when scope changes during implementation**
 - run tests after each change
@@ -92,7 +95,7 @@ polling `positions` every 20 s, per-team track fetch on click.
 ```python
 last_points = (
     TrackPoint.objects.filter(race_id=race.id)
-    .order_by("team_id", "-gps_time_ms")
+    .order_by("team_id", "-gps_time_ms", "-created_at", "-id")
     .distinct("team_id")
 )
 teams = Team.objects.filter(category2__race_id=race.id)  # default manager excludes deleted
@@ -104,8 +107,14 @@ the last point where present:
 
 ```json
 [{"team_id": 1, "name": "…", "number": "12", "lat": 55.1, "lon": 61.2,
-  "gps_time_ms": 1750000000000, "received_at": "2026-07-03T10:00:00+00:00"}, …]
+  "gps_time_ms": 1750000000000, "received_at": "2026-07-03T10:00:00+00:00",
+  "install_id": "…", "segment_id": "…"}, …]
 ```
+
+The extra `-created_at`/`-id` in `order_by` are deterministic tie-breakers: two phones of one team
+can upload different points with the same `gps_time_ms`, and bare `DISTINCT ON` would pick either
+row per request (marker flicker). `install_id`/`segment_id` are included so the JS live-append can
+detect that a new recording session started (see Frontend below).
 
 `received_at` = the last point's `created_at` (server receive time) — the UI uses it to grey out
 stale markers (phone stopped uploading); emit it as `.isoformat()` (plain `JsonResponse` won't
@@ -118,11 +127,14 @@ serialize a raw `datetime`). Teams without points: `lat`/`lon`/`gps_time_ms`/`re
 points = (
     TrackPoint.objects.filter(race_id=race.id, team_id=team.id)
     .order_by("gps_time_ms")
-    .values_list("segment_id", "lat", "lon", "gps_time_ms")
+    .values_list("install_id", "segment_id", "lat", "lon", "gps_time_ms")
 )
 ```
 
-Group into segments by `segment_id` (segments ordered by their first point's `gps_time_ms`);
+Group into segments by the pair `(install_id, segment_id)` — the model doc
+(`src/apps/mobile/models.py:99`) defines the pair, not `segment_id` alone, as the session key
+(two phones of one team must not merge into one line). Segments ordered by their first point's
+`gps_time_ms`;
 within a segment keep a point iff `gps_time_ms - last_kept >= 30_000`; always append the segment's
 final point (dedupe if it was already kept). Response: `{"segments": [[[lat, lon], …], …]}` —
 ~1 500 points / ~80 KB for a 24 h track instead of 5 760 / ~300 KB. Team not in this race → 404
@@ -146,8 +158,11 @@ immutable, still out of `versioning.py`).
   marker with `received_at` older than 10 min → greyed CSS class; sidebar: counter «трек шлют
   N из M», substring search, group «не шлют трек» for `lat: null` teams; click on row or marker →
   toggle track (fetch once, draw segment polylines in a color from a ~10-color cycling palette,
-  highlight marker; second click removes); on each poll tick, append the fresh position to the
-  last polyline of selected teams (no track re-fetch).
+  highlight marker; second click removes); on each poll tick, for each selected team compare the
+  position's `(install_id, segment_id)` with the one remembered at track fetch — same session →
+  append the point to that session's polyline; changed (phone reconnect / new recording) → start a
+  fresh polyline from the new point instead of drawing a bogus straight line across the map (no
+  track re-fetch either way).
 - `race_map.css` scoped under `.race-map` (never define a bare `.page` — `theme-2.css` owns it).
 - Vendored Leaflet 1.9.4 (`leaflet.js`, `leaflet.css`, `images/`) in `src/static/vendor/leaflet/`
   — vendored assets are off-limits for edits, served by WhiteNoise like everything else.
@@ -190,10 +205,10 @@ immutable, still out of `versioning.py`).
 - Modify: `src/apps/race/tests.py`
 
 - [ ] add `RaceMapPositionsView(View)` with the `_load_and_authorize` pattern (anon → login redirect with `?next=`, non-admin → 403, race by slug → 404)
-- [ ] implement the `DISTINCT ON (team_id)` last-point query + all-teams merge; `JsonResponse` list per **Technical Details** (null point fields for teams without points; `safe=False` or wrap in `{"teams": […]}` — pick one and mirror in JS)
+- [ ] implement the `DISTINCT ON (team_id)` last-point query (with the `-created_at`, `-id` tie-breakers) + all-teams merge; `JsonResponse` list per **Technical Details** incl. `install_id`/`segment_id` (null point fields for teams without points; `safe=False` or wrap in `{"teams": […]}` — pick one and mirror in JS)
 - [ ] wire `race/<slug:race_slug>/map/positions/` → name `race_map_positions` in `src/website/urls.py`
 - [ ] write tests: anon redirect, plain user 403, superuser and `RaceAdmin(role=ADMIN)` 200
-- [ ] write tests: team with 3 points returns the max-`gps_time_ms` one; team without points has `lat is None`; a point from another race's team never appears
+- [ ] write tests: team with 3 points returns the max-`gps_time_ms` one; team without points has `lat is None`; a point from another race's team never appears; two points with equal `gps_time_ms` → the tie-breaker picks the same row on repeated requests (deterministic)
 - [ ] run `uv run pytest src/apps/race/tests.py` — must pass before task 4
 
 ### Task 4: Track endpoint (`race_map_track`)
@@ -204,9 +219,9 @@ immutable, still out of `versioning.py`).
 - Modify: `src/apps/race/tests.py`
 
 - [ ] add `RaceMapTrackView(View)`: same authorize, resolve team via `Team.objects.filter(category2__race_id=race.id, pk=team_id)` → 404 if absent
-- [ ] implement segment grouping (ordered by first point's `gps_time_ms`) + 30 s thinning with always-keep-last-of-segment; return `{"segments": [[[lat, lon], …], …]}`
+- [ ] implement segment grouping by `(install_id, segment_id)` (segments ordered by first point's `gps_time_ms`) + 30 s thinning with always-keep-last-of-segment; return `{"segments": [[[lat, lon], …], …]}`
 - [ ] wire `race/<slug:race_slug>/map/track/<int:team_id>/` → name `race_map_track`
-- [ ] write tests: points 10 s apart collapse (kept count matches expectation), segment's last point always present, two `segment_id`s → two segments ordered by time, points ordered by `gps_time_ms` within a segment
+- [ ] write tests: points 10 s apart collapse (kept count matches expectation), segment's last point always present, two `segment_id`s → two segments ordered by time, same `segment_id` from two `install_id`s → two segments (session key is the pair), points ordered by `gps_time_ms` within a segment
 - [ ] write tests: team from another race → 404; anon/non-admin gating (redirect/403)
 - [ ] run `uv run pytest src/apps/race/tests.py` — must pass before task 5
 
@@ -231,11 +246,12 @@ immutable, still out of `versioning.py`).
 - Create: `src/static/css/race_map.css`
 
 - [ ] `race_map.css`: `.race-map` scoped layout — map fills viewport minus header, sidebar column, marker styles (numbered circle, `.is-stale` grey, `.is-selected` highlight), sidebar rows/search/counter
-- [ ] `race_map.js`: config island parse, Leaflet init (OSM + OpenTopoMap in layer control), positions fetch + marker render, one-time `fitBounds`, empty-race hint
+- [ ] `race_map.js`: config island parse, Leaflet init (OSM + OpenTopoMap in layer control, with the required attribution strings © OpenStreetMap contributors / © OpenTopoMap (CC-BY-SA) in the tile layer options), positions fetch + marker render, one-time `fitBounds`, empty-race hint
 - [ ] polling: `setInterval` 20 s with in-flight guard; update marker positions in place; stale (>10 min by `received_at`) → grey
 - [ ] sidebar: counter «трек шлют N из M», substring search, «не шлют трек» group; row ↔ marker click both toggle track selection
-- [ ] track toggle: fetch `race_map_track`, draw segment polylines (cycling ~10-color palette), remove on second click; on poll tick append fresh position to the selected team's last polyline
-- [ ] no unit tests (no JS test infra in project) — manual verification is Task 7 / Post-Completion; keep JS free of inline template vars (config island only)
+- [ ] track toggle: fetch `race_map_track`, draw segment polylines (cycling ~10-color palette), remove on second click; remember the team's current `(install_id, segment_id)` from positions at fetch time
+- [ ] live append: on poll tick, same session key → append point to that polyline; changed key → start a new polyline from the new point (never connect across sessions)
+- [ ] no unit tests (no JS test infra in project — the explicit exception noted in Development Approach); the manual smoke checklist in Task 7 is the mandatory verification; keep JS free of inline template vars (config island only)
 
 ### Task 7: Verify acceptance criteria
 
@@ -254,8 +270,8 @@ immutable, still out of `versioning.py`).
 
 **Manual verification:**
 - watch a real race (or the app's emulator feed) for one polling hour: marker movement, stale
-  greying, track append correctness after phone reconnects (new `segment_id` → new polyline
-  appears only after re-toggle or page reload — acceptable)
+  greying, track append correctness after phone reconnects (session key change must start a new
+  polyline — no straight line across the map)
 - eyeball positions/track endpoint latency on prod data volume (~500k rows) — the composite index
   should keep both under ~100 ms; if not, revisit with `EXPLAIN`
 
