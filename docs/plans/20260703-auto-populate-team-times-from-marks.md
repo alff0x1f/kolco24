@@ -82,18 +82,23 @@ rows are visible to the aggregation):
 3. Load the `Team` (the view currently only does `.exists()`); switch to fetching it so
    we can read/write the boundary fields.
 4. For each boundary that is touched **and** whose team field is currently `0`:
-   compute the **earliest** timestamp across **all stored verified marks** for that
+   compute the **earliest** timestamp across **all stored verified NFC marks** for that
    team + boundary КП set:
-   `Mark.objects.filter(team_id, race_id, verified=True, checkpoint_id__in=<ids>)
-   .aggregate(t=Min(Coalesce("trusted_ms", "wall_ms")))["t"]`.
+   `Mark.objects.filter(team_id, race_id, verified=True, method="nfc",
+   checkpoint_id__in=<ids>).aggregate(t=Min(Coalesce("trusted_ms", "wall_ms")))["t"]`.
    If `t` is not `None`, set the field.
 5. If any field changed, `team.save(update_fields=[changed...] + ["updated_at"])`.
 
 Key design decisions (settled in brainstorm):
 
 - **Time source:** prefer `trusted_ms`, fall back to `wall_ms` (via `Coalesce`).
-- **Gate:** `verified=True` only — proof of physical NFC scan. Consequence: start/finish
-  КП must be provisioned with `CheckpointTag`s (same requirement as locked-КП scanning).
+- **Gate:** `verified=True` **and** `method="nfc"` — proof of physical NFC scan. Only
+  NFC takes populate the boundary time; a `method="photo"` take must never set it. (A
+  photo mark already has a blank `cp_code` → `_is_verified` returns `False` → `verified`
+  is `False`, so the `verified=True` filter alone would exclude it; the explicit
+  `method="nfc"` makes the intent robust rather than relying on that implicit coupling.)
+  Consequence: start/finish КП must be provisioned with `CheckpointTag`s (same
+  requirement as locked-КП scanning).
 - **Selection:** earliest verified mark wins; computed over batch + history after the
   upsert → deterministic regardless of upload/batch order.
 - **Write-once:** only write when the field is `0`; never overwrite (protects manual
@@ -151,8 +156,8 @@ Key design decisions (settled in brainstorm):
 - [ ] Keep the early `Team.objects.filter(...).exists()` check (it drives the empty-marks
       404 / early-return path). Add a `Team` fetch in the boundary block, then for each
       touched boundary with the team field `== 0`, aggregate
-      `Min(Coalesce("trusted_ms","wall_ms"))` over verified marks for that boundary's
-      cp ids and set the field; save once with
+      `Min(Coalesce("trusted_ms","wall_ms"))` over `verified=True, method="nfc"` marks
+      for that boundary's cp ids and set the field; save once with
       `update_fields=[changed...] + ["updated_at"]` only if something changed.
 - [ ] Verify the empty-`marks` early return and the `200 {"accepted": ...}` contract are
       unchanged.
@@ -169,6 +174,8 @@ Key design decisions (settled in brainstorm):
       variant with `trusted_ms=None` falls back to `wall_ms`.
 - [ ] Test: an **unverified** start mark (bad/blank `cp_code`, or КП with no tag) does
       **not** set `start_time` (stays `0`).
+- [ ] Test: a `method="photo"` mark for a start КП does **not** set `start_time` (stays
+      `0`) — only NFC takes populate the time.
 - [ ] Test: an existing **non-zero** `start_time` is preserved (no overwrite) when a
       new verified start mark arrives.
 - [ ] Test: **earliest** wins — multiple verified start marks (across the batch and/or a
@@ -194,8 +201,9 @@ Key design decisions (settled in brainstorm):
 ### Task 4: Finalize
 
 - [ ] Update `CLAUDE.md` **Marks upload** invariant to note the boundary-time
-      side effect (verified start/finish marks populate `Team.start_time`/`finish_time`
-      once, earliest-wins, `trusted_ms`→`wall_ms`).
+      side effect (verified `method="nfc"` start/finish marks populate
+      `Team.start_time`/`finish_time` once, earliest-wins, `trusted_ms`→`wall_ms`;
+      photo marks never set it).
 - [ ] Move this plan to `docs/plans/completed/`.
 
 ## Post-Completion
