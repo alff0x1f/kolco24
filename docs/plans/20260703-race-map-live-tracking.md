@@ -181,10 +181,10 @@ immutable, still out of `versioning.py`).
 - Create: `src/apps/mobile/migrations/00XX_trackpoint_race_team_time_idx.py` (via `makemigrations`)
 - Modify: `src/apps/mobile/tests.py`
 
-- [ ] add `Meta.indexes = [models.Index(fields=["race", "team", "-gps_time_ms"], name="mobile_tp_race_team_ts")]` to `TrackPoint` (keep the docstring's "not in versioning" invariants intact; Django caps index names at 30 chars)
-- [ ] `uv run python src/manage.py makemigrations mobile` — verify the migration only adds the index
-- [ ] write test: index name present in `TrackPoint._meta.indexes` (guards accidental removal)
-- [ ] run `uv run pytest src/apps/mobile/tests.py` — must pass before task 2
+- [x] add `Meta.indexes = [models.Index(fields=["race", "team", "-gps_time_ms"], name="mobile_tp_race_team_ts")]` to `TrackPoint` (keep the docstring's "not in versioning" invariants intact; Django caps index names at 30 chars)
+- [x] `uv run python src/manage.py makemigrations mobile` — verify the migration only adds the index
+- [x] write test: index name present in `TrackPoint._meta.indexes` (guards accidental removal)
+- [x] run `uv run pytest src/apps/mobile/tests.py` — must pass before task 2
 
 ### Task 2: Vendor Leaflet
 
