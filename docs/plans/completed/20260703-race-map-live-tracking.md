@@ -262,9 +262,9 @@ immutable, still out of `versioning.py`).
 
 ### Task 8: [Final] Update documentation
 
-- [ ] update `CLAUDE.md` (`apps.race` section): document `RaceMapView`/`RaceMapPositionsView`/`RaceMapTrackView`, URL names, the thinning rule, the vendored Leaflet, and the new `TrackPoint` index (note it's still out of `versioning.py`)
-- [ ] update `src/apps/mobile/README.md` if it references the organizer map as "future task" — point to the new page
-- [ ] move this plan to `docs/plans/completed/`
+- [x] update `CLAUDE.md` (`apps.race` section): document `RaceMapView`/`RaceMapPositionsView`/`RaceMapTrackView`, URL names, the thinning rule, the vendored Leaflet, and the new `TrackPoint` index (note it's still out of `versioning.py`)
+- [x] update `src/apps/mobile/README.md` if it references the organizer map as "future task" — point to the new page
+- [x] move this plan to `docs/plans/completed/`
 
 ## Post-Completion
 

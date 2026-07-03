@@ -104,6 +104,29 @@ Django 4.2 project. Source lives entirely under `src/`, with `manage.py` at `src
   <id>` — same `CheckpointTag` queryset ordered by `checkpoint__number` then `id`, same `—` placeholder for tags without
   a `code` yet, same `nfc_uid / КП number / code(hex)` columns. The JS "Скопировать CSV" button builds RFC-4180 CSV
   from the rendered table and writes it to the clipboard. Gated on `can_edit_race`.
+  `RaceMapView`/`RaceMapPositionsView`/`RaceMapTrackView` (`src/apps/race/views.py`) back the organizer-only «Карта
+  гонки» page — the read side of `apps.mobile`'s `/app/race/<id>/track/` upload (`TrackPoint` rows were write-only
+  until this). All three share the same `_load_and_authorize` gate as `RaceLegendEditView` (anon → `login` redirect
+  with `?next=`, non-admin → 403). URL names: `race_map` (`race/<slug>/map/`, template `src/templates/race/map.html`,
+  extends `website/base-2.html`, assets `src/static/css/race_map.css` + `src/static/js/race_map.js` — resolves only
+  the two JSON endpoint URLs into a `#raceMapConfig` island, `trackUrlTemplate` built via `reverse()` with a
+  `team_id=0` placeholder string-replaced since `reverse()` can't leave a template placeholder); `race_map_positions`
+  (`race/<slug>/map/positions/`, JSON list, one row per **every** team of the race — a team with no `TrackPoint` rows
+  gets `lat`/`lon`/`gps_time_ms`/`received_at`/`install_id`/`segment_id` all `null` so the JS sidebar can group it
+  under «не шлют трек»); `race_map_track` (`race/<slug>/map/track/<int:team_id>/`, JSON `{"segments": [[[lat, lon],
+  …], …]}`, 404 if the team isn't in the race). Positions uses `DISTINCT ON (team_id)` ordered by
+  `-gps_time_ms, -created_at, -id` — the extra tie-breakers make the picked row deterministic when two phones of one
+  team upload different points with the same `gps_time_ms` (otherwise marker flicker across polls). Track grouping
+  keys a "session" by the pair `(install_id, segment_id)` (not `segment_id` alone — two phones of one team must not
+  merge into one line), thins each session to one point per `THIN_INTERVAL_MS = 30_000` ms of `gps_time_ms` while
+  always keeping the session's last point. The frontend polls positions every 20 s and fetches a team's track only on
+  click (multi-select, per-team polyline color cycling, live point-append on poll while a track is selected, `>10 min`
+  stale markers greyed). Leaflet 1.9.4 is vendored (no CDN) at `src/static/vendor/leaflet/` — off-limits for edits,
+  served by WhiteNoise like any other static asset — with OSM as the default base tile layer and OpenTopoMap as a
+  switchable second layer. `TrackPoint` (`apps.mobile`) gained
+  `Meta.indexes = [models.Index(fields=["race", "team", "-gps_time_ms"], name="mobile_tp_race_team_ts")]` (migration
+  in `apps.mobile`) to serve both the positions `DISTINCT ON` query and the per-team track scan; the model is still
+  immutable and still intentionally absent from `apps.mobile`'s `versioning.py` — the index doesn't change that.
 - `apps.mobile` — **signed mobile-app endpoints** for iOS/Android (`label = "mobile"`, mounted at `/app/*`
   via `config/urls.py`). The **read** path is self-contained: touches neither `/api/` nor `donate`/`website` — but the
   **track-upload and marks-upload writes** (`TrackPoint`/`Mark`+`MarkPresent`, see the **Track upload** and **Marks
