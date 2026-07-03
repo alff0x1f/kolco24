@@ -192,11 +192,11 @@ Key design decisions (settled in brainstorm):
 
 ### Task 3: Verify acceptance criteria
 
-- [ ] Verify each brainstorm decision is honored (time source, verified gate,
+- [x] Verify each brainstorm decision is honored (time source, verified gate,
       earliest, write-once, team-only scope, inline placement).
-- [ ] Run full suite: `uv run pytest src/apps/mobile/tests.py` (and a broader
+- [x] Run full suite: `uv run pytest src/apps/mobile/tests.py` (and a broader
       `uv run pytest --reuse-db` if quick).
-- [ ] Run `make format && make lint`.
+- [x] Run `make format && make lint`.
 
 ### Task 4: Finalize
 
