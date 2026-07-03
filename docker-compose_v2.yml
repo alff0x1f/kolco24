@@ -59,6 +59,9 @@ services:
     volumes:
       - ${DATA_LOCATION}/static:/app/staticfiles:ro
       - ${DATA_LOCATION}/media:/app/media:ro
+      # Кеш тайлов карты (deploy/nginx.conf, /tiles/): на хосте, чтобы
+      # прогретые тайлы переживали пересоздание контейнера и работали офлайн.
+      - ${DATA_LOCATION}/tile_cache:/var/cache/nginx/tiles
       - ./deploy/nginx.conf:/etc/nginx/templates/default.conf.template:ro
     depends_on:
       kolco24_migrate:

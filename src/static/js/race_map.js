@@ -42,13 +42,24 @@
   /* ── Leaflet init ─────────────────────────────────────────── */
   var map = L.map(mapEl).setView(DEFAULT_CENTER, DEFAULT_ZOOM);
 
-  var osmLayer = L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+  // Tile URLs come from the config island: in production they point at the
+  // nginx pull-through cache (/tiles/…, deploy/nginx.conf) so the map works
+  // offline at a race site; local runserver overrides them with the direct
+  // upstream URLs via MAP_TILE_URL_* env vars. Fallbacks keep a stale cached
+  // page working. The gray errorTileUrl pixel renders an unwarmed tile in
+  // offline mode as a clean gray cell instead of a broken image.
+  var GRAY_TILE = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGN49+4dAAWYAsspex20AAAAAElFTkSuQmCC";
+  var tileUrls = config.tileUrls || {};
+
+  var osmLayer = L.tileLayer(tileUrls.osm || "https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
     maxZoom: 19,
+    errorTileUrl: GRAY_TILE,
     attribution: "&copy; OpenStreetMap contributors"
   }).addTo(map);
 
-  var topoLayer = L.tileLayer("https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png", {
+  var topoLayer = L.tileLayer(tileUrls.topo || "https://tile.opentopomap.org/{z}/{x}/{y}.png", {
     maxZoom: 17,
+    errorTileUrl: GRAY_TILE,
     attribution: "&copy; OpenTopoMap (CC-BY-SA)"
   });
 

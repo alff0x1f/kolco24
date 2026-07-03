@@ -4,6 +4,7 @@ import json
 import re
 
 import pytest
+from django.conf import settings
 from django.contrib.auth.models import AnonymousUser, User
 from django.contrib.messages.storage.fallback import FallbackStorage
 from django.test import RequestFactory
@@ -4449,6 +4450,26 @@ def test_race_map_page_config_island_has_marks_url(client, django_user_model):
     assert config["marksUrl"] == reverse(
         "race_map_marks", kwargs={"race_slug": race.slug}
     )
+
+
+@pytest.mark.django_db
+def test_race_map_page_config_island_has_tile_urls(client, django_user_model):
+    race = _make_race(slug="map-page-tiles-config")
+    superuser = django_user_model.objects.create_superuser(
+        username="map-page-tiles-su",
+        password="x",
+        email="map-page-tiles-su@example.com",
+    )
+    client.force_login(superuser)
+
+    resp = client.get(reverse("race_map", kwargs={"race_slug": race.slug}))
+
+    assert resp.status_code == 200
+    config = _script_json(resp.content.decode(), "raceMapConfig")
+    assert config["tileUrls"] == {
+        "osm": settings.MAP_TILE_URL_OSM,
+        "topo": settings.MAP_TILE_URL_TOPO,
+    }
 
 
 # --- RaceAppDataView / RaceAppDataTeamView (app-data pages) -----------------

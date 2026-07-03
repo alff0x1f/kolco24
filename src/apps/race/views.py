@@ -3,6 +3,7 @@ import json
 import re
 from urllib.parse import quote
 
+from django.conf import settings
 from django.contrib import messages
 from django.db import transaction
 from django.db.models import Count, OuterRef, ProtectedError, Q, Subquery
@@ -1202,6 +1203,10 @@ class RaceMapView(View):
                     "positionsUrl": positions_url,
                     "trackUrlTemplate": track_url_template,
                     "marksUrl": marks_url,
+                    "tileUrls": {
+                        "osm": settings.MAP_TILE_URL_OSM,
+                        "topo": settings.MAP_TILE_URL_TOPO,
+                    },
                 }
             ),
         }

@@ -77,6 +77,14 @@ MOBILE_TOKEN_TTL = timedelta(days=30)
 # lease (lease_expires_at: null); a local-race server would set "local".
 MOBILE_DATA_SOURCE = os.getenv("MOBILE_DATA_SOURCE", "cloud")
 
+# Map tile URL templates for the race-map page (Leaflet {z}/{x}/{y}
+# placeholders). Defaults go through the nginx pull-through cache
+# (deploy/nginx.conf, /tiles/) so tiles keep working offline at a race site;
+# local runserver has no nginx — override in src/.env with the direct
+# upstream URLs (see deploy/kolco24.env.example).
+MAP_TILE_URL_OSM = os.getenv("MAP_TILE_URL_OSM", "/tiles/osm/{z}/{x}/{y}.png")
+MAP_TILE_URL_TOPO = os.getenv("MAP_TILE_URL_TOPO", "/tiles/topo/{z}/{x}/{y}.png")
+
 EMAIL_BACKEND = "mailer.backend.DbBackend"
 
 EMAIL_HOST = "smtp.yandex.ru"
