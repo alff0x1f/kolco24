@@ -14,7 +14,8 @@ from django.conf import settings
 from django.contrib.auth import authenticate
 from django.core.files.base import ContentFile
 from django.db import IntegrityError, transaction
-from django.db.models import Count, F, Prefetch, Q, Sum
+from django.db.models import Count, F, Min, Prefetch, Q, Sum
+from django.db.models.functions import Coalesce
 from django.http import HttpResponseNotModified
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
@@ -550,7 +551,57 @@ class MarkUploadView(AppAPIView):
             # rest (the late roster members of an enrichment re-send).
             MarkPresent.objects.bulk_create(present_objs, ignore_conflicts=True)
 
+            _auto_populate_boundary_times(race_id, team_id, deduped)
+
         return Response({"accepted": accepted}, status=status.HTTP_200_OK)
+
+
+def _auto_populate_boundary_times(race_id, team_id, deduped):
+    """Populate ``Team.start_time``/``finish_time`` from verified NFC marks.
+
+    Write-once (never overwrites a non-zero field); earliest verified
+    ``Coalesce(trusted_ms, wall_ms)`` wins across the whole stored history for
+    the team, not just this batch, so upload/batch order can't change the
+    result.
+    """
+    type_by_cp = dict(
+        Checkpoint.objects.filter(
+            race_id=race_id,
+            type__in=[CheckpointType.start, CheckpointType.finish],
+        ).values_list("id", "type")
+    )
+    if not type_by_cp:
+        return
+
+    batch_cp_ids = {m["checkpoint_id"] for m in deduped.values()}
+    start_ids = [cp for cp, t in type_by_cp.items() if t == CheckpointType.start]
+    finish_ids = [cp for cp, t in type_by_cp.items() if t == CheckpointType.finish]
+    start_touched = bool(batch_cp_ids & set(start_ids))
+    finish_touched = bool(batch_cp_ids & set(finish_ids))
+    if not start_touched and not finish_touched:
+        return
+
+    team = Team.objects.get(pk=team_id)
+    update_fields = []
+    for touched, cp_ids, field in (
+        (start_touched, start_ids, "start_time"),
+        (finish_touched, finish_ids, "finish_time"),
+    ):
+        if not touched or getattr(team, field) != 0:
+            continue
+        earliest = Mark.objects.filter(
+            team_id=team_id,
+            race_id=race_id,
+            verified=True,
+            method="nfc",
+            checkpoint_id__in=cp_ids,
+        ).aggregate(t=Min(Coalesce("trusted_ms", "wall_ms")))["t"]
+        if earliest is not None:
+            setattr(team, field, earliest)
+            update_fields.append(field)
+
+    if update_fields:
+        team.save(update_fields=update_fields + ["updated_at"])
 
 
 PHOTO_MAX_BYTES = 10 * 1024 * 1024  # 10 MB app-level cap (nginx gates at 50m)

@@ -142,24 +142,24 @@ Key design decisions (settled in brainstorm):
 **Files:**
 - Modify: `src/apps/mobile/views.py`
 
-- [ ] Add imports: `Min` (extend the existing `django.db.models` import) and `Coalesce`
+- [x] Add imports: `Min` (extend the existing `django.db.models` import) and `Coalesce`
       (`django.db.models.functions`). `Checkpoint` and `CheckpointType` are already
       imported — do not re-import.
-- [ ] In `MarkUploadView.post`, after the `Mark`/`MarkPresent` `bulk_create` and inside
+- [x] In `MarkUploadView.post`, after the `Mark`/`MarkPresent` `bulk_create` and inside
       the same `transaction.atomic()`, add a helper block: build
       `type_by_cp = dict(Checkpoint.objects.filter(race_id=race_id,
       type__in=[CheckpointType.start, CheckpointType.finish]).values_list("id","type"))`;
       return/skip if empty.
-- [ ] Compute `batch_cp_ids = {m["checkpoint_id"] for m in deduped.values()}`;
+- [x] Compute `batch_cp_ids = {m["checkpoint_id"] for m in deduped.values()}`;
       derive `start_ids` / `finish_ids` from `type_by_cp`; compute
       `start_touched` / `finish_touched` against `batch_cp_ids`.
-- [ ] Keep the early `Team.objects.filter(...).exists()` check (it drives the empty-marks
+- [x] Keep the early `Team.objects.filter(...).exists()` check (it drives the empty-marks
       404 / early-return path). Add a `Team` fetch in the boundary block, then for each
       touched boundary with the team field `== 0`, aggregate
       `Min(Coalesce("trusted_ms","wall_ms"))` over `verified=True, method="nfc"` marks
       for that boundary's cp ids and set the field; save once with
       `update_fields=[changed...] + ["updated_at"]` only if something changed.
-- [ ] Verify the empty-`marks` early return and the `200 {"accepted": ...}` contract are
+- [x] Verify the empty-`marks` early return and the `200 {"accepted": ...}` contract are
       unchanged.
 
 ### Task 2: Tests for boundary-time auto-population
