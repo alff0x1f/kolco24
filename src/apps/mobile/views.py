@@ -654,9 +654,17 @@ class JudgeScanUploadView(AppAPIView):
     """``POST /app/race/<race_id>/judge_scans/`` — ingest a batch of judge scans.
 
     A near-clone of :class:`TrackUploadView`: same ``AppAPIView`` base, same
-    **build-HMAC-only** trust boundary (no per-person bearer), same
     ``mobile-write`` throttle, same immutable client-UUID-PK idempotency via
     ``bulk_create(ignore_conflicts=True)``.
+
+    **Per-person write layer** (unlike ``/track/``/``/marks/``, which are
+    build-HMAC-only): a judge station is an admin credential, so the same stack
+    as :class:`TagCreateView` gates this endpoint —
+
+    1. :class:`SignedAppPermission` — per-build HMAC (over the request **body**);
+    2. :class:`IsMobileUser` — resolves the bearer to ``request.mobile_user``;
+    3. :class:`CanEditRaceLegend` — per-race ``can_edit_race`` authorization
+       (superuser or ``RaceAdmin(role=ADMIN)``), reading ``view.kwargs["race_id"]``.
 
     Two divergences from ``/track/``:
 
@@ -673,6 +681,7 @@ class JudgeScanUploadView(AppAPIView):
     ``updated_at`` and stays out of ``versioning.py``/ETag/``sync``.
     """
 
+    permission_classes = [SignedAppPermission, IsMobileUser, CanEditRaceLegend]
     throttle_classes = [ClientIPScopedRateThrottle]
     throttle_scope = "mobile-write"
 

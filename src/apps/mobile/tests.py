@@ -7713,6 +7713,24 @@ def _judge_scans_path(race_id):
     return f"/app/race/{race_id}/judge_scans/"
 
 
+def _make_judge_race(django_user_model, slug):
+    """A published race + ADMIN RaceAdmin user + their active token.
+
+    Judge-scan upload is gated by the per-person write layer
+    (``SignedAppPermission + IsMobileUser + CanEditRaceLegend``), so a request
+    must carry a bearer token owned by a race admin. Returns ``(race, user, raw)``.
+    """
+    from website.models.race import Race, RaceAdmin
+
+    race = Race.objects.create(name=f"Judge race {slug}", slug=slug, is_published=True)
+    user = django_user_model.objects.create_user(
+        username=f"judge-{slug}", email=f"judge-{slug}@example.com", password="x"
+    )
+    RaceAdmin.objects.create(race=race, user=user, role=RaceAdmin.Role.ADMIN)
+    raw = _make_active_token(user)
+    return race, user, raw
+
+
 @pytest.mark.django_db
 def test_judge_scan_upload_wrong_signature_returns_403(
     client, settings, django_user_model
@@ -7722,13 +7740,61 @@ def test_judge_scan_upload_wrong_signature_returns_403(
     settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
     settings.MOBILE_APP_TS_WINDOW = 300
 
-    race, _team = _make_team_in_race(django_user_model, slug="judge-403")
+    race, _user, raw = _make_judge_race(django_user_model, "judge-403")
     path = _judge_scans_path(race.id)
     body = json.dumps(_judge_scan_upload_body()).encode()
-    # build the signature with the WRONG secret → build gate must reject
-    response = _signed_post(client, path, "wrong-secret", body)
+    # build the signature with the WRONG secret → build gate rejects first
+    # (before the bearer layer), so a neutral "Forbidden" regardless of token
+    response = _signed_post_auth(client, path, "wrong-secret", body, raw)
     assert response.status_code == 403
     assert response.json() == {"detail": "Forbidden"}
+
+
+@pytest.mark.django_db
+def test_judge_scan_upload_missing_bearer_returns_401(
+    client, settings, django_user_model
+):
+    import json
+
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    race, _user, _raw = _make_judge_race(django_user_model, "judge-nobearer")
+    path = _judge_scans_path(race.id)
+    body = json.dumps(_judge_scan_upload_body()).encode()
+    # valid build sig but no Authorization header → actionable 401
+    response = _signed_post_auth(client, path, SECRET, body, None)
+    assert response.status_code == 401
+
+
+@pytest.mark.django_db
+def test_judge_scan_upload_non_admin_user_returns_403(
+    client, settings, django_user_model
+):
+    import json
+
+    from apps.mobile.models import JudgeScan
+    from website.models.race import Race
+
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    race = Race.objects.create(
+        name="Judge plain", slug="judge-plain", is_published=True
+    )
+    # a valid user + token, but no RaceAdmin row → CanEditRaceLegend denies
+    user = django_user_model.objects.create_user(
+        username="judge-plain-crew", email="judge-plain@example.com", password="x"
+    )
+    raw = _make_active_token(user)
+
+    path = _judge_scans_path(race.id)
+    body = json.dumps(_judge_scan_upload_body()).encode()
+    response = _signed_post_auth(client, path, SECRET, body, raw)
+    assert response.status_code == 403
+    # actionable (not the neutral build-layer "Forbidden")
+    assert response.json() != {"detail": "Forbidden"}
+    assert JudgeScan.objects.count() == 0
 
 
 @pytest.mark.django_db
@@ -7742,13 +7808,13 @@ def test_judge_scan_upload_happy_path_persists_and_acks(
     settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
     settings.MOBILE_APP_TS_WINDOW = 300
 
-    race, _team = _make_team_in_race(django_user_model, slug="judge-happy")
+    race, _user, raw = _make_judge_race(django_user_model, "judge-happy")
     path = _judge_scans_path(race.id)
     s1 = _valid_judge_scan(id="scan-a")
     s2 = _valid_judge_scan(id="scan-b", participant_number=202)
     body = json.dumps(_judge_scan_upload_body(scans=[s1, s2])).encode()
 
-    response = _signed_post(client, path, SECRET, body)
+    response = _signed_post_auth(client, path, SECRET, body, raw)
     assert response.status_code == 200
     assert response.json() == {"accepted": ["scan-a", "scan-b"]}
 
@@ -7772,14 +7838,14 @@ def test_judge_scan_upload_idempotent_no_duplicate_rows(
     settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
     settings.MOBILE_APP_TS_WINDOW = 300
 
-    race, _team = _make_team_in_race(django_user_model, slug="judge-idem")
+    race, _user, raw = _make_judge_race(django_user_model, "judge-idem")
     path = _judge_scans_path(race.id)
     body = json.dumps(
         _judge_scan_upload_body(scans=[_valid_judge_scan(id="scan-x")])
     ).encode()
 
-    r1 = _signed_post(client, path, SECRET, body)
-    r2 = _signed_post(client, path, SECRET, body)
+    r1 = _signed_post_auth(client, path, SECRET, body, raw)
+    r2 = _signed_post_auth(client, path, SECRET, body, raw)
     assert r1.status_code == 200
     assert r2.status_code == 200
     assert r1.json() == r2.json() == {"accepted": ["scan-x"]}
@@ -7795,12 +7861,12 @@ def test_judge_scan_upload_nfc_uid_normalization(client, settings, django_user_m
     settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
     settings.MOBILE_APP_TS_WINDOW = 300
 
-    race, _team = _make_team_in_race(django_user_model, slug="judge-nfc-norm")
+    race, _user, raw = _make_judge_race(django_user_model, "judge-nfc-norm")
     path = _judge_scans_path(race.id)
     scan = _valid_judge_scan(id="scan-lower", nfc_uid="  04f1e2d3c4b5a6  ")
     body = json.dumps(_judge_scan_upload_body(scans=[scan])).encode()
 
-    response = _signed_post(client, path, SECRET, body)
+    response = _signed_post_auth(client, path, SECRET, body, raw)
     assert response.status_code == 200
     row = JudgeScan.objects.get(pk="scan-lower")
     assert row.nfc_uid == "04F1E2D3C4B5A6"
@@ -7817,7 +7883,7 @@ def test_judge_scan_upload_source_install_id_from_body(
     settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
     settings.MOBILE_APP_TS_WINDOW = 300
 
-    race, _team = _make_team_in_race(django_user_model, slug="judge-install")
+    race, _user, raw = _make_judge_race(django_user_model, "judge-install")
     path = _judge_scans_path(race.id)
     body = json.dumps(
         _judge_scan_upload_body(
@@ -7827,6 +7893,7 @@ def test_judge_scan_upload_source_install_id_from_body(
     ).encode()
     # X-Install-Id header (if any) must NOT be used — only the signed body.
     headers = _signed_headers("POST", path, SECRET, body=body)
+    headers["HTTP_AUTHORIZATION"] = f"Bearer {raw}"
     headers["HTTP_X_INSTALL_ID"] = "header-should-be-ignored"
     response = client.post(path, data=body, content_type="application/json", **headers)
     assert response.status_code == 200
@@ -7840,15 +7907,20 @@ def test_judge_scan_upload_unpublished_race_returns_404(
 ):
     import json
 
-    from website.models.race import Race
+    from website.models.race import Race, RaceAdmin
 
     settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
     settings.MOBILE_APP_TS_WINDOW = 300
 
     race = Race.objects.create(name="Hidden", slug="judge-hidden", is_published=False)
+    user = django_user_model.objects.create_user(
+        username="judge-hidden-crew", email="judge-hidden@example.com", password="x"
+    )
+    RaceAdmin.objects.create(race=race, user=user, role=RaceAdmin.Role.ADMIN)
+    raw = _make_active_token(user)
     path = _judge_scans_path(race.id)
     body = json.dumps(_judge_scan_upload_body()).encode()
-    response = _signed_post(client, path, SECRET, body)
+    response = _signed_post_auth(client, path, SECRET, body, raw)
     assert response.status_code == 404
 
 
@@ -7861,9 +7933,15 @@ def test_judge_scan_upload_nonexistent_race_returns_404(
     settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
     settings.MOBILE_APP_TS_WINDOW = 300
 
+    # a valid user + token is needed to clear IsMobileUser; CanEditRaceLegend
+    # then 404s on the missing race before the view body runs
+    user = django_user_model.objects.create_user(
+        username="judge-norace", email="judge-norace@example.com", password="x"
+    )
+    raw = _make_active_token(user)
     path = _judge_scans_path(999999)
     body = json.dumps(_judge_scan_upload_body()).encode()
-    response = _signed_post(client, path, SECRET, body)
+    response = _signed_post_auth(client, path, SECRET, body, raw)
     assert response.status_code == 404
 
 
@@ -7878,7 +7956,7 @@ def test_judge_scan_upload_malformed_scan_returns_400(
     settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
     settings.MOBILE_APP_TS_WINDOW = 300
 
-    race, _team = _make_team_in_race(django_user_model, slug="judge-bad")
+    race, _user, raw = _make_judge_race(django_user_model, "judge-bad")
     path = _judge_scans_path(race.id)
 
     bad_scans = [
@@ -7887,14 +7965,14 @@ def test_judge_scan_upload_malformed_scan_returns_400(
     ]
     for bad in bad_scans:
         body = json.dumps(_judge_scan_upload_body(scans=[bad])).encode()
-        response = _signed_post(client, path, SECRET, body)
+        response = _signed_post_auth(client, path, SECRET, body, raw)
         assert response.status_code == 400
 
     # a missing required field
     missing = _valid_judge_scan()
     missing.pop("wall_ms")
     body = json.dumps(_judge_scan_upload_body(scans=[missing])).encode()
-    assert _signed_post(client, path, SECRET, body).status_code == 400
+    assert _signed_post_auth(client, path, SECRET, body, raw).status_code == 400
 
     # nothing got written on a rejected batch
     assert JudgeScan.objects.count() == 0
@@ -7909,10 +7987,10 @@ def test_judge_scan_upload_empty_scans_acks_empty(client, settings, django_user_
     settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
     settings.MOBILE_APP_TS_WINDOW = 300
 
-    race, _team = _make_team_in_race(django_user_model, slug="judge-empty")
+    race, _user, raw = _make_judge_race(django_user_model, "judge-empty")
     path = _judge_scans_path(race.id)
     body = json.dumps(_judge_scan_upload_body(scans=[])).encode()
-    response = _signed_post(client, path, SECRET, body)
+    response = _signed_post_auth(client, path, SECRET, body, raw)
     assert response.status_code == 200
     assert response.json() == {"accepted": []}
     assert JudgeScan.objects.count() == 0
@@ -7927,14 +8005,14 @@ def test_judge_scan_upload_nullable_round_trip(client, settings, django_user_mod
     settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
     settings.MOBILE_APP_TS_WINDOW = 300
 
-    race, _team = _make_team_in_race(django_user_model, slug="judge-null")
+    race, _user, raw = _make_judge_race(django_user_model, "judge-null")
     path = _judge_scans_path(race.id)
 
     scan = _valid_judge_scan(id="scan-null")
     for field in ("trusted_ms", "elapsed_at", "boot_count"):
         scan.pop(field)
     body = json.dumps(_judge_scan_upload_body(scans=[scan])).encode()
-    response = _signed_post(client, path, SECRET, body)
+    response = _signed_post_auth(client, path, SECRET, body, raw)
     assert response.status_code == 200
 
     row = JudgeScan.objects.get(pk="scan-null")

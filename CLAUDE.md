@@ -405,9 +405,14 @@ Django 4.2 project. Source lives entirely under `src/`, with `manage.py` at `src
       `Mark`/`TrackPoint`/`MarkPresent` convention (only the stats models `AppInstall`/`AppAuthFailure` are registered).
       A frame arriving before its parent `Mark` 404s — contract-safe, since the client only drains a mark's frames
       after that mark's own upload is acknowledged, and treats a photo `404` as transient (self-heals on the next sync).
-    - **Judge scans upload** (`POST /app/race/<id>/judge_scans/`, name `judge_scans` — a **sixth POST**, also
-      **build-HMAC-only** like `/track/`/`/marks/`: gated by `AppAPIView`'s default `[SignedAppPermission]`, NOT the
-      per-person write layer; throttle scope `mobile-write`, 60/min). Ingests a batch of judge start/finish bracelet
+    - **Judge scans upload** (`POST /app/race/<id>/judge_scans/`, name `judge_scans` — a **sixth POST**; unlike
+      `/track/`/`/marks/` it is on the **per-person write layer**, gated by the same stack as tag-create
+      `[SignedAppPermission, IsMobileUser, CanEditRaceLegend]` — a judge station is an admin credential, so the caller
+      must present a `MobileToken` bearer owned by a race admin (superuser or `RaceAdmin(role=ADMIN)`); a missing/invalid
+      token → `401`, a non-admin → actionable `403`, a bad build sig → neutral `403 {"detail":"Forbidden"}`.
+      `CanEditRaceLegend` reads `view.kwargs["race_id"]` (loads `Race`, missing → 404, **without** the `is_published`
+      filter — an unpublished race the admin owns clears the permission, then the view's `get_object_or_404(...,
+      is_published=True)` 404s). Throttle scope `mobile-write`, 60/min). Ingests a batch of judge start/finish bracelet
       scans — a judge station scans **all teams of the race at once**, so the endpoint is **race-scoped with no
       `team_id`** (the one structural omission vs. `/track/`: no team-in-race check). `JudgeScan` (`models.py`) is
       immutable/write-only like `TrackPoint`: **PK = the client UUID `id`** (the idempotency key), FK
