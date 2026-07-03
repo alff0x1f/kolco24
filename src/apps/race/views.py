@@ -21,6 +21,7 @@ from django.views import View
 from django.views.decorators.cache import never_cache
 
 from apps.mobile.models import TrackPoint
+from apps.race.app_data import build_overview, build_team_timeline
 from apps.race.forms import RaceForm
 from apps.race.models import Protocol, RaceExtra
 from apps.race.permissions import can_edit_race
@@ -1336,3 +1337,61 @@ class RaceMapTrackView(View):
             for key in session_order
         ]
         return JsonResponse({"segments": segments})
+
+
+class RaceAppDataView(View):
+    """Organizer-only «Данные приложения» overview: one row per team.
+
+    A visual cross-check of everything the mobile app uploaded for a race —
+    stored boundary times vs the verified boundary takes they were derived
+    from, the team's chips (via ``MarkPresent``), judge start/finish scans
+    attributed by chip uid, and upload activity counters. Gated on
+    :func:`can_edit_race` like :class:`RaceMapView`; all aggregation lives in
+    :mod:`apps.race.app_data`.
+    """
+
+    def _load_and_authorize(self, request, race_slug):
+        if not request.user.is_authenticated:
+            return None, HttpResponseRedirect(
+                reverse("login") + "?next=" + quote(request.path, safe="/:@")
+            )
+        race = get_object_or_404(Race, slug=race_slug)
+        if not can_edit_race(request.user, race):
+            return race, HttpResponseForbidden()
+        return race, None
+
+    def get(self, request, race_slug):
+        race, response = self._load_and_authorize(request, race_slug)
+        if response is not None:
+            return response
+        context = build_overview(race)
+        context["race"] = race
+        return render(request, "race/app_data.html", context)
+
+
+class RaceAppDataTeamView(View):
+    """One team's chronological feed of app events (marks, scans, track).
+
+    Same gate as :class:`RaceAppDataView`; 404 when the team is not in the
+    race (mirrors :class:`RaceMapTrackView`).
+    """
+
+    def _load_and_authorize(self, request, race_slug):
+        if not request.user.is_authenticated:
+            return None, HttpResponseRedirect(
+                reverse("login") + "?next=" + quote(request.path, safe="/:@")
+            )
+        race = get_object_or_404(Race, slug=race_slug)
+        if not can_edit_race(request.user, race):
+            return race, HttpResponseForbidden()
+        return race, None
+
+    def get(self, request, race_slug, team_id):
+        race, response = self._load_and_authorize(request, race_slug)
+        if response is not None:
+            return response
+        team = get_object_or_404(Team, pk=team_id, category2__race_id=race.id)
+        context = build_team_timeline(race, team)
+        context["race"] = race
+        context["team"] = team
+        return render(request, "race/app_data_team.html", context)

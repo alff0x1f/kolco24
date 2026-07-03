@@ -1,0 +1,167 @@
+{% extends "website/base-2.html" %}
+{% load static %}
+
+{% block title %}{{ team.teamname|default:team.start_number }} — данные приложения — Кольцо 24{% endblock %}
+
+{% block extra_head %}
+<link href="{% static 'css/app_data.css' %}" rel="stylesheet">
+{% endblock %}
+
+{% block content %}
+<div class="app-data">
+  <div class="container">
+
+    <!-- Breadcrumb -->
+    <nav class="breadcrumb">
+      <a href="/">Кольцо&nbsp;24</a>
+      <span class="sep">/</span>
+      <a href="{% url 'race' race.slug %}">{{ race.name }}</a>
+      <span class="sep">/</span>
+      <a href="{% url 'race_app_data' race.slug %}">Данные приложения</a>
+      <span class="sep">/</span>
+      <span class="cur">{{ team.teamname|default:team.start_number }}</span>
+    </nav>
+
+    <!-- Header -->
+    <div class="head">
+      <div class="head-l">
+        <div class="head-title">
+          <h1>
+            <span class="team-num">{{ team.start_number|default:"—" }}</span>
+            {{ team.teamname|default:"Без названия" }}
+          </h1>
+          <span class="chip edit">{{ team.category2.short_name }}</span>
+        </div>
+        <div class="sub summary">
+          <span>Старт: <b class="mono">{{ start_time|default:"—" }}</b></span>
+          <span>Финиш: <b class="mono">{{ finish_time|default:"—" }}</b></span>
+          <span>Взятий: <b>{{ marks_count }}</b></span>
+          <span>Фото: <b>{{ photos_count }}</b></span>
+          {% if chips %}
+          <span class="chips-line">Чипы:
+            {% for chip in chips %}
+            <span class="tagchip{% if not chip.known %} unknown{% endif %}"
+                  title="{{ chip.uid }}">{{ chip.label }}</span>
+            {% endfor %}
+          </span>
+          {% endif %}
+          {% if installs %}
+          <span class="chips-line">Устройства:
+            {% for install in installs %}
+            <span class="tagchip mono" title="install_id">{{ install|truncatechars:12 }}</span>
+            {% endfor %}
+          </span>
+          {% endif %}
+        </div>
+      </div>
+      <div class="head-actions">
+        <a class="btn btn-ghost" href="{% url 'race_map' race.slug %}">Показать на карте</a>
+      </div>
+    </div>
+
+    <!-- Timeline -->
+    <div class="card">
+      <div class="card-head">
+        <h2>Лента событий</h2>
+        <div class="card-head-r filters" id="eventFilters">
+          <label><input type="checkbox" data-kind="mark" checked> Взятия</label>
+          <label><input type="checkbox" data-kind="judge" checked> Судья</label>
+          <label><input type="checkbox" data-kind="track" checked> Трек</label>
+          <label><input type="checkbox" data-kind="boundary" checked> Старт/финиш</label>
+        </div>
+      </div>
+      <div class="card-body tight">
+        <div class="grid-wrap">
+          <table class="data timeline">
+            <thead>
+              <tr>
+                <th>Время</th>
+                <th>Событие</th>
+                <th>Детали</th>
+                <th>Получено</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for ev in events %}
+              <tr class="ev ev-{{ ev.kind }}">
+                <td class="mono">{{ ev.time|default:"—" }}</td>
+
+                {% if ev.kind == "mark" %}
+                <td>
+                  <span class="kind kind-mark">КП</span>
+                  {% if ev.cp_unknown %}
+                    <span class="warn" title="КП не найден в легенде гонки">id {{ ev.checkpoint_id }}?</span>
+                  {% else %}
+                    <b>{{ ev.cp_number }}</b>
+                    {% if ev.cp_type == "start" or ev.cp_type == "finish" %}
+                    <span class="aux">{{ ev.cp_type }}</span>
+                    {% endif %}
+                  {% endif %}
+                  <span class="badge {% if ev.verified %}ok{% else %}bad{% endif %}">
+                    {% if ev.verified %}verified{% else %}не верифиц.{% endif %}
+                  </span>
+                  {% if ev.method == "photo" %}<span class="badge">фото</span>{% endif %}
+                  {% if not ev.complete %}<span class="badge warn-b">не полный</span>{% endif %}
+                </td>
+                <td>
+                  <span class="aux">Состав ({{ ev.present|length }}/{{ ev.expected_count }}):</span>
+                  {% for p in ev.present %}
+                  <span class="tagchip{% if not p.known %} unknown{% endif %}"
+                        title="{{ p.uid }}">{{ p.label }}</span>
+                  {% empty %}<span class="aux">—</span>{% endfor %}
+                  {% if ev.lat %}
+                  <span class="aux mono">({{ ev.lat|floatformat:5 }}, {{ ev.lon|floatformat:5 }})</span>
+                  {% endif %}
+                  {% if ev.photos %}
+                  <span class="photos">
+                    {% for url in ev.photos %}
+                    <a href="{{ url }}" target="_blank" rel="noopener">
+                      <img src="{{ url }}" loading="lazy" alt="фото КП">
+                    </a>
+                    {% endfor %}
+                  </span>
+                  {% endif %}
+                </td>
+
+                {% elif ev.kind == "judge" %}
+                <td>
+                  <span class="kind kind-judge">Судья</span>
+                  {{ ev.event_type }}
+                </td>
+                <td>
+                  <span class="tagchip{% if not ev.chip.known %} unknown{% endif %}"
+                        title="{{ ev.chip.uid }}">{{ ev.chip.label }}</span>
+                  <span class="aux">№ участника {{ ev.participant_number }}</span>
+                </td>
+
+                {% elif ev.kind == "track" %}
+                <td><span class="kind kind-track">Трек</span> сегмент</td>
+                <td>
+                  <span class="aux">{{ ev.points }} тчк, {{ ev.duration }}, до {{ ev.last }}</span>
+                  <span class="tagchip mono" title="{{ ev.install_id }} / {{ ev.segment_id }}">
+                    {{ ev.install_id|truncatechars:12 }}</span>
+                </td>
+
+                {% else %}
+                <td><span class="kind kind-boundary">{{ ev.label }}</span></td>
+                <td><span class="aux">Team.{{ ev.field }} (автозаполнено или задано вручную)</span></td>
+                {% endif %}
+
+                <td class="mono aux">{{ ev.received|default:"" }}</td>
+              </tr>
+              {% empty %}
+              <tr class="empty"><td colspan="4">Приложение ещё ничего не прислало для этой команды.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+{% endblock %}
+
+{% block footer_js_include %}
+<script src="{% static 'js/app_data.js' %}"></script>
+{% endblock %}
