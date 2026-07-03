@@ -20,6 +20,7 @@ from apps.race.views import (
     ProtocolView,
     RaceEditView,
     RaceMapPositionsView,
+    RaceMapTrackView,
     RacePageView,
     RaceTeamsView,
 )
@@ -3842,3 +3843,240 @@ def test_race_map_positions_tie_breaker_is_deterministic(client, django_user_mod
 def test_race_map_positions_url_resolves():
     resolved = resolve("/race/some-slug/map/positions/")
     assert resolved.func.view_class is RaceMapPositionsView
+
+
+# --- RaceMapTrackView (Task 4) ----------------------------------------------
+
+
+@pytest.mark.django_db
+def test_race_map_track_anonymous_redirects_to_login(client, django_user_model):
+    race = _make_race(slug="map-track-anon")
+    category = _make_category(race)
+    owner = django_user_model.objects.create_user(
+        username="map-track-anon-owner", password="x"
+    )
+    team = _make_team(owner, category, teamname="Anon", start_number="1")
+
+    resp = client.get(
+        reverse("race_map_track", kwargs={"race_slug": race.slug, "team_id": team.id})
+    )
+
+    assert resp.status_code == 302
+    assert reverse("login") in resp.url
+
+
+@pytest.mark.django_db
+def test_race_map_track_regular_user_forbidden(client, django_user_model):
+    race = _make_race(slug="map-track-forbidden")
+    category = _make_category(race)
+    owner = django_user_model.objects.create_user(
+        username="map-track-forbidden-owner", password="x"
+    )
+    team = _make_team(owner, category, teamname="Forbidden", start_number="1")
+    user = django_user_model.objects.create_user(
+        username="map-track-plain", password="x"
+    )
+    client.force_login(user)
+
+    resp = client.get(
+        reverse("race_map_track", kwargs={"race_slug": race.slug, "team_id": team.id})
+    )
+
+    assert resp.status_code == 403
+
+
+@pytest.mark.django_db
+def test_race_map_track_other_race_team_404(client, django_user_model):
+    race = _make_race(slug="map-track-thisrace")
+    other_race = _make_race(slug="map-track-otherrace")
+    other_category = _make_category(other_race, code="other")
+    owner = django_user_model.objects.create_user(
+        username="map-track-cross-owner", password="x"
+    )
+    other_team = _make_team(owner, other_category, teamname="Away", start_number="2")
+
+    admin = django_user_model.objects.create_superuser(
+        username="map-track-cross-su",
+        password="x",
+        email="map-track-cross-su@example.com",
+    )
+    client.force_login(admin)
+    resp = client.get(
+        reverse(
+            "race_map_track",
+            kwargs={"race_slug": race.slug, "team_id": other_team.id},
+        )
+    )
+
+    assert resp.status_code == 404
+
+
+@pytest.mark.django_db
+def test_race_map_track_thins_points_within_30s(client, django_user_model):
+    race = _make_race(slug="map-track-thin")
+    category = _make_category(race)
+    owner = django_user_model.objects.create_user(
+        username="map-track-thin-owner", password="x"
+    )
+    team = _make_team(owner, category, teamname="Thin", start_number="1")
+
+    base = 1_700_000_000_000
+    # 10s apart: 0, 10s, 20s, 30s, 40s -> kept: 0, 30s, 40s (last always kept)
+    for i in range(5):
+        _make_track_point(
+            team,
+            race,
+            f"tp-thin-{i}",
+            gps_time_ms=base + i * 10_000,
+            lat=float(i),
+            lon=float(i),
+        )
+
+    admin = django_user_model.objects.create_superuser(
+        username="map-track-thin-su",
+        password="x",
+        email="map-track-thin-su@example.com",
+    )
+    client.force_login(admin)
+    resp = client.get(
+        reverse("race_map_track", kwargs={"race_slug": race.slug, "team_id": team.id})
+    )
+
+    assert resp.status_code == 200
+    data = resp.json()
+    assert len(data["segments"]) == 1
+    segment = data["segments"][0]
+    assert segment == [[0.0, 0.0], [3.0, 3.0], [4.0, 4.0]]
+
+
+@pytest.mark.django_db
+def test_race_map_track_two_segment_ids_ordered_by_time(client, django_user_model):
+    race = _make_race(slug="map-track-twoseg")
+    category = _make_category(race)
+    owner = django_user_model.objects.create_user(
+        username="map-track-twoseg-owner", password="x"
+    )
+    team = _make_team(owner, category, teamname="TwoSeg", start_number="1")
+
+    base = 1_700_000_000_000
+    _make_track_point(
+        team,
+        race,
+        "tp-seg2-a",
+        segment_id="seg-2",
+        gps_time_ms=base + 100_000,
+        lat=20.0,
+        lon=20.0,
+    )
+    _make_track_point(
+        team,
+        race,
+        "tp-seg1-a",
+        segment_id="seg-1",
+        gps_time_ms=base,
+        lat=10.0,
+        lon=10.0,
+    )
+
+    admin = django_user_model.objects.create_superuser(
+        username="map-track-twoseg-su",
+        password="x",
+        email="map-track-twoseg-su@example.com",
+    )
+    client.force_login(admin)
+    resp = client.get(
+        reverse("race_map_track", kwargs={"race_slug": race.slug, "team_id": team.id})
+    )
+
+    assert resp.status_code == 200
+    segments = resp.json()["segments"]
+    assert len(segments) == 2
+    assert segments[0] == [[10.0, 10.0]]
+    assert segments[1] == [[20.0, 20.0]]
+
+
+@pytest.mark.django_db
+def test_race_map_track_same_segment_id_two_installs_is_two_segments(
+    client, django_user_model
+):
+    race = _make_race(slug="map-track-twophone")
+    category = _make_category(race)
+    owner = django_user_model.objects.create_user(
+        username="map-track-twophone-owner", password="x"
+    )
+    team = _make_team(owner, category, teamname="TwoPhone", start_number="1")
+
+    base = 1_700_000_000_000
+    _make_track_point(
+        team,
+        race,
+        "tp-phone1",
+        install_id="phone-1",
+        segment_id="seg-shared",
+        gps_time_ms=base,
+        lat=1.0,
+        lon=1.0,
+    )
+    _make_track_point(
+        team,
+        race,
+        "tp-phone2",
+        install_id="phone-2",
+        segment_id="seg-shared",
+        gps_time_ms=base + 1_000,
+        lat=2.0,
+        lon=2.0,
+    )
+
+    admin = django_user_model.objects.create_superuser(
+        username="map-track-twophone-su",
+        password="x",
+        email="map-track-twophone-su@example.com",
+    )
+    client.force_login(admin)
+    resp = client.get(
+        reverse("race_map_track", kwargs={"race_slug": race.slug, "team_id": team.id})
+    )
+
+    assert resp.status_code == 200
+    segments = resp.json()["segments"]
+    assert len(segments) == 2
+    assert [1.0, 1.0] in segments[0] or [1.0, 1.0] in segments[1]
+    assert [2.0, 2.0] in segments[0] or [2.0, 2.0] in segments[1]
+
+
+@pytest.mark.django_db
+def test_race_map_track_points_ordered_by_gps_time_within_segment(
+    client, django_user_model
+):
+    race = _make_race(slug="map-track-order")
+    category = _make_category(race)
+    owner = django_user_model.objects.create_user(
+        username="map-track-order-owner", password="x"
+    )
+    team = _make_team(owner, category, teamname="Order", start_number="1")
+
+    base = 1_700_000_000_000
+    _make_track_point(
+        team, race, "tp-order-2", gps_time_ms=base + 60_000, lat=2.0, lon=2.0
+    )
+    _make_track_point(team, race, "tp-order-1", gps_time_ms=base, lat=1.0, lon=1.0)
+
+    admin = django_user_model.objects.create_superuser(
+        username="map-track-order-su",
+        password="x",
+        email="map-track-order-su@example.com",
+    )
+    client.force_login(admin)
+    resp = client.get(
+        reverse("race_map_track", kwargs={"race_slug": race.slug, "team_id": team.id})
+    )
+
+    assert resp.status_code == 200
+    segment = resp.json()["segments"][0]
+    assert segment == [[1.0, 1.0], [2.0, 2.0]]
+
+
+def test_race_map_track_url_resolves():
+    resolved = resolve("/race/some-slug/map/track/7/")
+    assert resolved.func.view_class is RaceMapTrackView

@@ -218,12 +218,12 @@ immutable, still out of `versioning.py`).
 - Modify: `src/website/urls.py`
 - Modify: `src/apps/race/tests.py`
 
-- [ ] add `RaceMapTrackView(View)`: same authorize, resolve team via `Team.objects.filter(category2__race_id=race.id, pk=team_id)` → 404 if absent
-- [ ] implement segment grouping by `(install_id, segment_id)` (segments ordered by first point's `gps_time_ms`) + 30 s thinning with always-keep-last-of-segment; return `{"segments": [[[lat, lon], …], …]}`
-- [ ] wire `race/<slug:race_slug>/map/track/<int:team_id>/` → name `race_map_track`
-- [ ] write tests: points 10 s apart collapse (kept count matches expectation), segment's last point always present, two `segment_id`s → two segments ordered by time, same `segment_id` from two `install_id`s → two segments (session key is the pair), points ordered by `gps_time_ms` within a segment
-- [ ] write tests: team from another race → 404; anon/non-admin gating (redirect/403)
-- [ ] run `uv run pytest src/apps/race/tests.py` — must pass before task 5
+- [x] add `RaceMapTrackView(View)`: same authorize, resolve team via `Team.objects.filter(category2__race_id=race.id, pk=team_id)` → 404 if absent
+- [x] implement segment grouping by `(install_id, segment_id)` (segments ordered by first point's `gps_time_ms`) + 30 s thinning with always-keep-last-of-segment; return `{"segments": [[[lat, lon], …], …]}`
+- [x] wire `race/<slug:race_slug>/map/track/<int:team_id>/` → name `race_map_track`
+- [x] write tests: points 10 s apart collapse (kept count matches expectation), segment's last point always present, two `segment_id`s → two segments ordered by time, same `segment_id` from two `install_id`s → two segments (session key is the pair), points ordered by `gps_time_ms` within a segment
+- [x] write tests: team from another race → 404; anon/non-admin gating (redirect/403)
+- [x] run `uv run pytest src/apps/race/tests.py` — must pass before task 5
 
 ### Task 5: Map page view + template
 

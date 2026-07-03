@@ -1224,3 +1224,66 @@ class RaceMapPositionsView(View):
                 }
             )
         return JsonResponse(rows, safe=False)
+
+
+class RaceMapTrackView(View):
+    """One team's thinned GPS track, split into per-session polylines.
+
+    A "session" is the pair ``(install_id, segment_id)`` — per the
+    ``TrackPoint`` model doc, two phones of one team recording at once must
+    not merge into one line. Within a session a point is kept only if
+    ``THIN_INTERVAL_MS`` has passed since the previously kept point; a
+    session's last point is always kept so the line reaches its true end.
+    """
+
+    THIN_INTERVAL_MS = 30_000
+
+    def _load_and_authorize(self, request, race_slug):
+        if not request.user.is_authenticated:
+            return None, HttpResponseRedirect(
+                reverse("login") + "?next=" + quote(request.path, safe="/:@")
+            )
+        race = get_object_or_404(Race, slug=race_slug)
+        if not can_edit_race(request.user, race):
+            return race, HttpResponseForbidden()
+        return race, None
+
+    def _thin_session(self, points):
+        kept = []
+        last_kept_ms = None
+        for lat, lon, gps_time_ms in points:
+            if (
+                last_kept_ms is None
+                or gps_time_ms - last_kept_ms >= self.THIN_INTERVAL_MS
+            ):
+                kept.append((lat, lon, gps_time_ms))
+                last_kept_ms = gps_time_ms
+        last_point = points[-1]
+        if not kept or kept[-1][2] != last_point[2]:
+            kept.append(last_point)
+        return [[lat, lon] for lat, lon, _ in kept]
+
+    def get(self, request, race_slug, team_id):
+        race, response = self._load_and_authorize(request, race_slug)
+        if response is not None:
+            return response
+
+        team = get_object_or_404(Team, pk=team_id, category2__race_id=race.id)
+
+        points = (
+            TrackPoint.objects.filter(race_id=race.id, team_id=team.id)
+            .order_by("gps_time_ms")
+            .values_list("install_id", "segment_id", "lat", "lon", "gps_time_ms")
+        )
+
+        sessions = {}
+        session_order = []
+        for install_id, segment_id, lat, lon, gps_time_ms in points:
+            key = (install_id, segment_id)
+            if key not in sessions:
+                sessions[key] = []
+                session_order.append(key)
+            sessions[key].append((lat, lon, gps_time_ms))
+
+        segments = [self._thin_session(sessions[key]) for key in session_order]
+        return JsonResponse({"segments": segments})
