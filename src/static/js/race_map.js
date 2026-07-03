@@ -358,14 +358,13 @@
     var cp = row.cp_number != null
       ? "КП " + escapeHtml(row.cp_number)
       : "КП? (id " + escapeHtml(row.checkpoint_id) + ")";
-    var parts = [
-      cp,
-      "№" + escapeHtml(row.team_number) + " " + escapeHtml(row.team_name),
-      formatMarkTime(row.time_ms)
-    ];
+    var parts = [cp, formatMarkTime(row.time_ms)];
     if (row.accuracy != null) parts.push("±" + Math.round(row.accuracy) + " м");
     parts.push(escapeHtml(row.method) + (row.verified ? " ✓" : " ✗"));
-    return parts.join(" · ");
+    var team = row.team_number
+      ? "№" + escapeHtml(row.team_number) + " " + escapeHtml(row.team_name)
+      : escapeHtml(row.team_name);
+    return parts.join(" · ") + "<br>" + "<b>" + team + "</b>";
   }
 
   function markStyle(row) {
