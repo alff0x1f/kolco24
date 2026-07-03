@@ -223,16 +223,16 @@ stores.
 **Files:**
 - Create: `src/apps/mobile/migrations/0011_judgescan.py`
 
-- [ ] `uv run python src/manage.py makemigrations mobile` (produces
+- [x] `uv run python src/manage.py makemigrations mobile` (produces
       `0011_judgescan`, depending on `0010_alter_markphoto_image` and the
       relevant `website` migration for the `Race` FK).
-- [ ] Inspect the generated migration: single `CreateModel`, PK is the
+- [x] Inspect the generated migration: single `CreateModel`, PK is the
       `CharField` `id`, no extra indexes beyond the FK.
-- [ ] `uv run python src/manage.py migrate` against the local DB to confirm it
+- [x] `uv run python src/manage.py migrate` against the local DB to confirm it
       applies cleanly.
-- [ ] `uv run python src/manage.py makemigrations --check --dry-run` reports no
+- [x] `uv run python src/manage.py makemigrations --check --dry-run` reports no
       pending changes.
-- [ ] Run tests (`--reuse-db` will pick up the new migration) — must pass before
+- [x] Run tests (`--reuse-db` will pick up the new migration) — must pass before
       next task.
 
 ### Task 5: Add the `JudgeScan` test block
