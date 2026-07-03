@@ -167,28 +167,28 @@ Key design decisions (settled in brainstorm):
 **Files:**
 - Modify: `src/apps/mobile/tests.py`
 
-- [ ] Extend/add a helper to create a `start`/`finish`-typed КП with a `CheckpointTag`
+- [x] Extend/add a helper to create a `start`/`finish`-typed КП with a `CheckpointTag`
       (like `_make_cp_with_tag` but passing `type=CheckpointType.start`/`finish`), so
       uploaded marks can be `verified=True`.
-- [ ] Test: a verified `start` mark sets `Team.start_time` from `trusted_ms`; and a
+- [x] Test: a verified `start` mark sets `Team.start_time` from `trusted_ms`; and a
       variant with `trusted_ms=None` falls back to `wall_ms`.
-- [ ] Test: an **unverified** start mark (bad/blank `cp_code`, or КП with no tag) does
+- [x] Test: an **unverified** start mark (bad/blank `cp_code`, or КП with no tag) does
       **not** set `start_time` (stays `0`).
-- [ ] Test: a `method="photo"` mark for a start КП does **not** set `start_time` (stays
+- [x] Test: a `method="photo"` mark for a start КП does **not** set `start_time` (stays
       `0`) — only NFC takes populate the time.
-- [ ] Test: an existing **non-zero** `start_time` is preserved (no overwrite) when a
+- [x] Test: an existing **non-zero** `start_time` is preserved (no overwrite) when a
       new verified start mark arrives.
-- [ ] Test: **earliest** wins — multiple verified start marks (across the batch and/or a
+- [x] Test: **earliest** wins — multiple verified start marks (across the batch and/or a
       second upload) leave `start_time` at the minimum `Coalesce(trusted_ms, wall_ms)`.
-- [ ] Test: a batch with no start/finish marks leaves `start_time` / `finish_time`
+- [x] Test: a batch with no start/finish marks leaves `start_time` / `finish_time`
       untouched; and a race with no start/finish КП is a no-op.
-- [ ] Test: `finish_time` is set independently of `start_time` (verified finish mark
+- [x] Test: `finish_time` is set independently of `start_time` (verified finish mark
       sets finish only).
-- [ ] Test: `Team.updated_at` advances when a boundary time is written (guards the
+- [x] Test: `Team.updated_at` advances when a boundary time is written (guards the
       `update_fields=[..., "updated_at"]` discipline).
-- [ ] Test: team-scoping — a verified start mark for a *different* team in the same race
+- [x] Test: team-scoping — a verified start mark for a *different* team in the same race
       does not populate this team's `start_time`.
-- [ ] Run `uv run pytest src/apps/mobile/tests.py` — must pass.
+- [x] Run `uv run pytest src/apps/mobile/tests.py` — must pass.
 
 ### Task 3: Verify acceptance criteria
 
