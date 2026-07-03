@@ -30,6 +30,15 @@
         <h1>Карта гонки</h1>
         <div class="rm-counter" id="rmCounter">трек шлют — из —</div>
         <input class="rm-search" id="rmSearch" type="search" placeholder="Поиск команды…">
+        <label class="rm-marks-toggle">
+          <input type="checkbox" id="rmMarksToggle"> Взятия КП
+        </label>
+        <div class="rm-marks-filters" id="rmMarksFilters" hidden>
+          <label><input type="checkbox" id="rmMarksVerified" checked> verified</label>
+          <label><input type="checkbox" id="rmMarksUnverified" checked> не-verified</label>
+          <label><input type="checkbox" id="rmMarksNfc" checked> nfc</label>
+          <label><input type="checkbox" id="rmMarksPhoto" checked> photo</label>
+        </div>
       </div>
       <div class="rm-team-list" id="rmTeamList">
         <!-- rows injected by race_map.js -->

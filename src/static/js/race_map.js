@@ -223,6 +223,7 @@
     }
     renderMarkers();
     renderSidebar();
+    restyleMarks();
   }
 
   function selectTeam(teamId) {
@@ -315,6 +316,140 @@
       track.polylines.push(line);
     }
     line.addLatLng([row.lat, row.lon]);
+  }
+
+  /* ── Marks layer («Взятия КП») ────────────────────────────── */
+  // All located checkpoint takes, fetched once on first toggle. Colored by
+  // checkpoint (its own palette cursor — team colors are assigned lazily on
+  // selection, so sharing one cursor would make mark colors depend on click
+  // history). Verified takes are filled dots, unverified — hollow dashed.
+  // When any team is selected, other teams' marks dim so the selected team's
+  // takes read on top of its track.
+  var marksToggleEl = document.getElementById("rmMarksToggle");
+  var marksFiltersEl = document.getElementById("rmMarksFilters");
+  var marksFilterEls = {
+    verified: document.getElementById("rmMarksVerified"),
+    unverified: document.getElementById("rmMarksUnverified"),
+    nfc: document.getElementById("rmMarksNfc"),
+    photo: document.getElementById("rmMarksPhoto")
+  };
+  var marksLayer = L.layerGroup();
+  var markEntries = []; // [{row, marker}]
+  var marksFetched = false;
+  var cpColors = {}; // checkpoint_id -> color
+  var cpNextColorIdx = 0;
+
+  function colorForCp(checkpointId) {
+    if (!cpColors[checkpointId]) {
+      cpColors[checkpointId] = COLOR_PALETTE[cpNextColorIdx % COLOR_PALETTE.length];
+      cpNextColorIdx += 1;
+    }
+    return cpColors[checkpointId];
+  }
+
+  function formatMarkTime(timeMs) {
+    if (timeMs == null) return "—";
+    var d = new Date(timeMs);
+    if (isNaN(d.getTime())) return "—";
+    return ("0" + d.getHours()).slice(-2) + ":" + ("0" + d.getMinutes()).slice(-2);
+  }
+
+  function markTooltip(row) {
+    var cp = row.cp_number != null
+      ? "КП " + escapeHtml(row.cp_number)
+      : "КП? (id " + escapeHtml(row.checkpoint_id) + ")";
+    var parts = [cp, formatMarkTime(row.time_ms)];
+    if (row.accuracy != null) parts.push("±" + Math.round(row.accuracy) + " м");
+    parts.push(escapeHtml(row.method) + (row.verified ? " ✓" : " ✗"));
+    var team = row.team_number
+      ? "№" + escapeHtml(row.team_number) + " " + escapeHtml(row.team_name)
+      : escapeHtml(row.team_name);
+    return parts.join(" · ") + "<br>" + "<b>" + team + "</b>";
+  }
+
+  function markStyle(row) {
+    var anySelected = Object.keys(selected).length > 0;
+    var isOwn = !!selected[row.team_id];
+    var dim = anySelected && !isOwn;
+    return {
+      color: colorForCp(row.checkpoint_id),
+      radius: isOwn ? 8 : 6,
+      weight: 2,
+      dashArray: row.verified ? null : "3,3",
+      opacity: dim ? 0.15 : 0.9,
+      fillOpacity: row.verified ? (dim ? 0.1 : 0.75) : 0
+    };
+  }
+
+  function markPassesFilters(row) {
+    if (!(row.verified ? marksFilterEls.verified.checked : marksFilterEls.unverified.checked)) {
+      return false;
+    }
+    if (row.method === "nfc") return marksFilterEls.nfc.checked;
+    if (row.method === "photo") return marksFilterEls.photo.checked;
+    return true;
+  }
+
+  function applyMarksFilters() {
+    markEntries.forEach(function (entry) {
+      if (markPassesFilters(entry.row)) {
+        marksLayer.addLayer(entry.marker);
+      } else {
+        marksLayer.removeLayer(entry.marker);
+      }
+    });
+  }
+
+  function restyleMarks() {
+    // CircleMarker.setStyle applies `radius` too.
+    markEntries.forEach(function (entry) {
+      entry.marker.setStyle(markStyle(entry.row));
+    });
+  }
+
+  function fetchMarks() {
+    fetch(config.marksUrl, { credentials: "same-origin" })
+      .then(function (resp) {
+        if (!resp.ok) throw new Error("marks fetch failed");
+        return resp.json();
+      })
+      .then(function (rows) {
+        markEntries = rows
+          .filter(function (row) {
+            return row.lat != null && row.lon != null;
+          })
+          .map(function (row) {
+            var marker = L.circleMarker([row.lat, row.lon], markStyle(row));
+            marker.bindTooltip(markTooltip(row));
+            return { row: row, marker: marker };
+          });
+        applyMarksFilters();
+      })
+      .catch(function () {
+        // allow a retry on the next toggle
+        marksFetched = false;
+      });
+  }
+
+  if (marksToggleEl && config.marksUrl) {
+    marksToggleEl.addEventListener("change", function () {
+      if (marksToggleEl.checked) {
+        marksFiltersEl.hidden = false;
+        marksLayer.addTo(map);
+        if (!marksFetched) {
+          marksFetched = true;
+          fetchMarks();
+        }
+      } else {
+        marksFiltersEl.hidden = true;
+        map.removeLayer(marksLayer);
+      }
+    });
+    Object.keys(marksFilterEls).forEach(function (key) {
+      marksFilterEls[key].addEventListener("change", applyMarksFilters);
+    });
+  } else if (marksToggleEl) {
+    marksToggleEl.closest(".rm-marks-toggle").hidden = true;
   }
 
   /* ── Polling ──────────────────────────────────────────────── */
