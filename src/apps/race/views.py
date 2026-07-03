@@ -20,7 +20,7 @@ from django.utils.safestring import mark_safe
 from django.views import View
 from django.views.decorators.cache import never_cache
 
-from apps.mobile.models import TrackPoint
+from apps.mobile.models import Mark, TrackPoint
 from apps.race.app_data import build_overview, build_team_timeline
 from apps.race.forms import RaceForm
 from apps.race.models import Protocol, RaceExtra
@@ -1193,6 +1193,7 @@ class RaceMapView(View):
             "race_map_track", kwargs={"race_slug": race.slug, "team_id": 0}
         )
         track_url_template = re.sub(r"/0/$", "/{team_id}/", track_url_placeholder)
+        marks_url = reverse("race_map_marks", kwargs={"race_slug": race.slug})
 
         context = {
             "race": race,
@@ -1200,6 +1201,7 @@ class RaceMapView(View):
                 {
                     "positionsUrl": positions_url,
                     "trackUrlTemplate": track_url_template,
+                    "marksUrl": marks_url,
                 }
             ),
         }
@@ -1337,6 +1339,82 @@ class RaceMapTrackView(View):
             for key in session_order
         ]
         return JsonResponse({"segments": segments})
+
+
+class RaceMapMarksView(View):
+    """All located checkpoint takes of a race, for the «Взятия КП» map layer.
+
+    Gated on :func:`can_edit_race` like the other map views. ``Checkpoint``
+    has no coordinates in the DB, so the cluster of take points per КП is the
+    only ground truth of where a КП actually stands — takes without a GPS fix
+    are filtered out server-side. ``Mark.checkpoint_id`` is a plain int (not
+    an FK): an unknown id yields ``cp_number: null`` (rendered as «КП?» —
+    exactly the rows worth analyzing). Fetched once per page load, no
+    pagination/thinning (thousands of rows at most).
+    """
+
+    def _load_and_authorize(self, request, race_slug):
+        if not request.user.is_authenticated:
+            return None, HttpResponseRedirect(
+                reverse("login") + "?next=" + quote(request.path, safe="/:@")
+            )
+        race = get_object_or_404(Race, slug=race_slug)
+        if not can_edit_race(request.user, race):
+            return race, HttpResponseForbidden()
+        return race, None
+
+    def get(self, request, race_slug):
+        race, response = self._load_and_authorize(request, race_slug)
+        if response is not None:
+            return response
+
+        cp_numbers = dict(
+            Checkpoint.objects.filter(race=race).values_list("id", "number")
+        )
+
+        marks = (
+            Mark.objects.filter(
+                race_id=race.id, loc_lat__isnull=False, loc_lon__isnull=False
+            )
+            .order_by("created_at", "id")
+            .values(
+                "id",
+                "team_id",
+                "team__teamname",
+                "team__start_number",
+                "checkpoint_id",
+                "loc_lat",
+                "loc_lon",
+                "loc_accuracy",
+                "verified",
+                "method",
+                "trusted_ms",
+                "wall_ms",
+            )
+        )
+
+        rows = [
+            {
+                "mark_id": mark["id"],
+                "team_id": mark["team_id"],
+                "team_name": mark["team__teamname"],
+                "team_number": mark["team__start_number"],
+                "checkpoint_id": mark["checkpoint_id"],
+                "cp_number": cp_numbers.get(mark["checkpoint_id"]),
+                "lat": mark["loc_lat"],
+                "lon": mark["loc_lon"],
+                "accuracy": mark["loc_accuracy"],
+                "verified": mark["verified"],
+                "method": mark["method"],
+                "time_ms": (
+                    mark["trusted_ms"]
+                    if mark["trusted_ms"] is not None
+                    else mark["wall_ms"]
+                ),
+            }
+            for mark in marks
+        ]
+        return JsonResponse(rows, safe=False)
 
 
 class RaceAppDataView(View):

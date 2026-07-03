@@ -22,6 +22,7 @@ from apps.race.views import (
     RaceAppDataTeamView,
     RaceAppDataView,
     RaceEditView,
+    RaceMapMarksView,
     RaceMapPositionsView,
     RaceMapTrackView,
     RaceMapView,
@@ -4238,6 +4239,216 @@ def test_race_map_page_config_island_handles_numeric_zero_slug(
 def test_race_map_page_url_resolves():
     resolved = resolve("/race/some-slug/map/")
     assert resolved.func.view_class is RaceMapView
+
+
+# --- RaceMapMarksView (map layer «Взятия КП») --------------------------------
+
+
+def _make_located_mark(team, checkpoint, lat=55.0, lon=37.0, **kwargs):
+    """A ``Mark`` with a GPS fix, for the marks map-layer tests."""
+    mark = _make_mark(team, checkpoint, **kwargs)
+    mark.loc_lat = lat
+    mark.loc_lon = lon
+    mark.loc_accuracy = 8.5
+    mark.save()
+    return mark
+
+
+@pytest.mark.django_db
+def test_race_map_marks_anonymous_redirects_to_login(client):
+    race = _make_race(slug="map-marks-anon")
+
+    resp = client.get(reverse("race_map_marks", kwargs={"race_slug": race.slug}))
+
+    assert resp.status_code == 302
+    assert reverse("login") in resp.url
+
+
+@pytest.mark.django_db
+def test_race_map_marks_regular_user_forbidden(client, django_user_model):
+    race = _make_race(slug="map-marks-forbidden")
+    user = django_user_model.objects.create_user(username="marks-plain", password="x")
+    client.force_login(user)
+
+    resp = client.get(reverse("race_map_marks", kwargs={"race_slug": race.slug}))
+
+    assert resp.status_code == 403
+
+
+@pytest.mark.django_db
+def test_race_map_marks_superuser_and_race_admin_200(client, django_user_model):
+    race = _make_race(slug="map-marks-admins")
+
+    superuser = django_user_model.objects.create_superuser(
+        username="marks-su", password="x", email="marks-su@example.com"
+    )
+    client.force_login(superuser)
+    resp = client.get(reverse("race_map_marks", kwargs={"race_slug": race.slug}))
+    assert resp.status_code == 200
+    client.logout()
+
+    admin = django_user_model.objects.create_user(username="marks-admin", password="x")
+    RaceAdmin.objects.create(race=race, user=admin, role=RaceAdmin.Role.ADMIN)
+    client.force_login(admin)
+    resp = client.get(reverse("race_map_marks", kwargs={"race_slug": race.slug}))
+    assert resp.status_code == 200
+
+
+@pytest.mark.django_db
+def test_race_map_marks_row_shape(client, django_user_model):
+    race = _make_race(slug="map-marks-shape")
+    category = _make_category(race)
+    owner = django_user_model.objects.create_user(username="marks-owner", password="x")
+    team = _make_team(owner, category, teamname="Alpha", start_number="7")
+    cp = _make_checkpoint(race, 5, 10)
+    mark = _make_located_mark(
+        team, cp, lat=55.5, lon=37.5, wall_ms=1_700_000_000_000, verified=True
+    )
+
+    admin = django_user_model.objects.create_superuser(
+        username="marks-shape-su", password="x", email="marks-shape-su@example.com"
+    )
+    client.force_login(admin)
+    resp = client.get(reverse("race_map_marks", kwargs={"race_slug": race.slug}))
+
+    assert resp.status_code == 200
+    rows = resp.json()
+    assert len(rows) == 1
+    row = rows[0]
+    assert row == {
+        "mark_id": mark.id,
+        "team_id": team.id,
+        "team_name": "Alpha",
+        "team_number": "7",
+        "checkpoint_id": cp.id,
+        "cp_number": 5,
+        "lat": 55.5,
+        "lon": 37.5,
+        "accuracy": 8.5,
+        "verified": True,
+        "method": "nfc",
+        "time_ms": 1_700_000_000_000,
+    }
+
+
+@pytest.mark.django_db
+def test_race_map_marks_excludes_marks_without_coordinates(client, django_user_model):
+    race = _make_race(slug="map-marks-noloc")
+    category = _make_category(race)
+    owner = django_user_model.objects.create_user(
+        username="marks-noloc-owner", password="x"
+    )
+    team = _make_team(owner, category)
+    cp = _make_checkpoint(race, 1, 10)
+    _make_mark(team, cp)  # no loc_* fields
+    located = _make_located_mark(team, cp)
+
+    admin = django_user_model.objects.create_superuser(
+        username="marks-noloc-su", password="x", email="marks-noloc-su@example.com"
+    )
+    client.force_login(admin)
+    resp = client.get(reverse("race_map_marks", kwargs={"race_slug": race.slug}))
+
+    rows = resp.json()
+    assert [row["mark_id"] for row in rows] == [located.id]
+
+
+@pytest.mark.django_db
+def test_race_map_marks_unknown_checkpoint_has_null_cp_number(
+    client, django_user_model
+):
+    race = _make_race(slug="map-marks-orphan")
+    category = _make_category(race)
+    owner = django_user_model.objects.create_user(
+        username="marks-orphan-owner", password="x"
+    )
+    team = _make_team(owner, category)
+    _make_located_mark(team, 999_999, verified=False)
+
+    admin = django_user_model.objects.create_superuser(
+        username="marks-orphan-su", password="x", email="marks-orphan-su@example.com"
+    )
+    client.force_login(admin)
+    resp = client.get(reverse("race_map_marks", kwargs={"race_slug": race.slug}))
+
+    rows = resp.json()
+    assert len(rows) == 1
+    assert rows[0]["checkpoint_id"] == 999_999
+    assert rows[0]["cp_number"] is None
+    assert rows[0]["verified"] is False
+
+
+@pytest.mark.django_db
+def test_race_map_marks_excludes_other_race_marks(client, django_user_model):
+    race = _make_race(slug="map-marks-thisrace")
+    other_race = _make_race(slug="map-marks-otherrace")
+    category = _make_category(race)
+    other_category = _make_category(other_race, code="other")
+    owner = django_user_model.objects.create_user(
+        username="marks-cross-owner", password="x"
+    )
+    team = _make_team(owner, category, teamname="Home")
+    other_team = _make_team(owner, other_category, teamname="Away")
+    home_mark = _make_located_mark(team, _make_checkpoint(race, 1, 10))
+    _make_located_mark(other_team, _make_checkpoint(other_race, 1, 10))
+
+    admin = django_user_model.objects.create_superuser(
+        username="marks-cross-su", password="x", email="marks-cross-su@example.com"
+    )
+    client.force_login(admin)
+    resp = client.get(reverse("race_map_marks", kwargs={"race_slug": race.slug}))
+
+    rows = resp.json()
+    assert [row["mark_id"] for row in rows] == [home_mark.id]
+
+
+@pytest.mark.django_db
+def test_race_map_marks_time_ms_prefers_trusted_ms(client, django_user_model):
+    race = _make_race(slug="map-marks-time")
+    category = _make_category(race)
+    owner = django_user_model.objects.create_user(
+        username="marks-time-owner", password="x"
+    )
+    team = _make_team(owner, category)
+    cp = _make_checkpoint(race, 1, 10)
+    with_trusted = _make_located_mark(
+        team, cp, wall_ms=100, trusted_ms=1_700_000_000_000
+    )
+    wall_only = _make_located_mark(team, cp, wall_ms=200, trusted_ms=None)
+
+    admin = django_user_model.objects.create_superuser(
+        username="marks-time-su", password="x", email="marks-time-su@example.com"
+    )
+    client.force_login(admin)
+    resp = client.get(reverse("race_map_marks", kwargs={"race_slug": race.slug}))
+
+    by_id = {row["mark_id"]: row for row in resp.json()}
+    assert by_id[with_trusted.id]["time_ms"] == 1_700_000_000_000
+    assert by_id[wall_only.id]["time_ms"] == 200
+
+
+def test_race_map_marks_url_resolves():
+    resolved = resolve("/race/some-slug/map/marks/")
+    assert resolved.func.view_class is RaceMapMarksView
+
+
+@pytest.mark.django_db
+def test_race_map_page_config_island_has_marks_url(client, django_user_model):
+    race = _make_race(slug="map-page-marks-config")
+    superuser = django_user_model.objects.create_superuser(
+        username="map-page-marks-su",
+        password="x",
+        email="map-page-marks-su@example.com",
+    )
+    client.force_login(superuser)
+
+    resp = client.get(reverse("race_map", kwargs={"race_slug": race.slug}))
+
+    assert resp.status_code == 200
+    config = _script_json(resp.content.decode(), "raceMapConfig")
+    assert config["marksUrl"] == reverse(
+        "race_map_marks", kwargs={"race_slug": race.slug}
+    )
 
 
 # --- RaceAppDataView / RaceAppDataTeamView (app-data pages) -----------------
