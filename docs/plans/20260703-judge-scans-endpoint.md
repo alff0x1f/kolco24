@@ -263,16 +263,16 @@ stores.
 
 ### Task 6: Verify acceptance criteria
 
-- [ ] Endpoint round-trips a full contract body (all fields incl. nullables) and
+- [x] Endpoint round-trips a full contract body (all fields incl. nullables) and
       acks every id.
-- [ ] Idempotent re-send produces no duplicate rows and still acks.
-- [ ] `nfc_uid` stored normalized; `source_install_id` sourced from the signed
+- [x] Idempotent re-send produces no duplicate rows and still acks.
+- [x] `nfc_uid` stored normalized; `source_install_id` sourced from the signed
       body; `event_type` restricted to `start`/`finish`.
-- [ ] Build-HMAC-only: valid signature succeeds, bad signature 403; no bearer
+- [x] Build-HMAC-only: valid signature succeeds, bad signature 403; no bearer
       required.
-- [ ] `JudgeScan` is absent from `versioning.py` (grep confirms) and not
+- [x] `JudgeScan` is absent from `versioning.py` (grep confirms) and not
       admin-registered (grep `admin.py`).
-- [ ] `make lint` clean; `uv run pytest src/apps/mobile/tests.py` fully green.
+- [x] `make lint` clean; `uv run pytest src/apps/mobile/tests.py` fully green.
 
 ### Task 7: [Final] Update documentation
 
