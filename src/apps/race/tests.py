@@ -1,4 +1,5 @@
 import datetime
+import itertools
 import json
 import re
 
@@ -8,6 +9,7 @@ from django.contrib.messages.storage.fallback import FallbackStorage
 from django.test import RequestFactory
 from django.urls import resolve, reverse
 
+from apps.mobile.models import Mark, MarkPresent
 from apps.race.forms import RaceForm
 from apps.race.models import Protocol
 from apps.race.permissions import can_edit_race
@@ -22,7 +24,7 @@ from apps.race.views import (
 )
 from website.models import Race
 from website.models.checkpoint import Checkpoint
-from website.models.models import TakenKP, Team
+from website.models.models import Team
 from website.models.race import Category, RaceAdmin, RacePriceTier, RegStatus
 
 
@@ -2785,14 +2787,47 @@ def _make_checkpoint(race, number, cost):
     return Checkpoint.objects.create(race=race, number=number, cost=cost)
 
 
-def _make_taken_kp(team, point_number, nfc="", image_url="", timestamp=0):
-    return TakenKP.objects.create(
+_mark_id_seq = itertools.count(1)
+
+
+def _make_mark(
+    team,
+    checkpoint,
+    method="nfc",
+    verified=True,
+    present_chips=("chip1", "chip2"),
+    expected=None,
+    wall_ms=1,
+):
+    """Create a mobile ``Mark`` (+ ``MarkPresent`` roster) for the protocol tests.
+
+    ``checkpoint`` may be a ``Checkpoint`` (its ``id`` is used as
+    ``Mark.checkpoint_id``) or a raw int (an orphan/unknown КП). ``present_chips``
+    is the tuple of participant ``nfc_uid``s scanned at the take; its distinct
+    count is compared against ``team.ucount`` (the roster) to decide completeness.
+    The default roster covers the default ``ucount=2`` team. ``expected_count`` is
+    stored but no longer used for scoring (server recomputes against the roster).
+    """
+    cp_id = getattr(checkpoint, "id", checkpoint)
+    mark = Mark.objects.create(
+        id=f"mark-{next(_mark_id_seq)}",
         team=team,
-        point_number=point_number,
-        nfc=nfc,
-        image_url=image_url,
-        timestamp=timestamp,
+        race=team.category2.race,
+        source_install_id="test",
+        checkpoint_id=cp_id,
+        method=method,
+        cp_code="",
+        cp_nfc_uid="",
+        expected_count=len(present_chips) if expected is None else expected,
+        complete=True,
+        verified=verified,
+        wall_ms=wall_ms,
     )
+    for i, uid in enumerate(present_chips, start=1):
+        MarkPresent.objects.create(
+            mark=mark, nfc_uid=uid, code="", number=i, number_in_team=i
+        )
+    return mark
 
 
 def _make_started_team(owner, category, start_time=1000, finish_time=0, **kwargs):
@@ -2809,8 +2844,8 @@ def _make_started_team(owner, category, start_time=1000, finish_time=0, **kwargs
 def test_build_protocol_creates_rows_with_scores_and_places(django_user_model):
     race = _make_race()
     category = _make_category(race)
-    _make_checkpoint(race, 1, 10)
-    _make_checkpoint(race, 2, 20)
+    cp1 = _make_checkpoint(race, 1, 10)
+    cp2 = _make_checkpoint(race, 2, 20)
 
     owner_a = django_user_model.objects.create_user(username="owner_a", password="x")
     owner_b = django_user_model.objects.create_user(username="owner_b", password="x")
@@ -2822,16 +2857,16 @@ def test_build_protocol_creates_rows_with_scores_and_places(django_user_model):
         owner_b, category, teamname="B", finish_time=1000 + 1_800_000
     )
 
-    _make_taken_kp(team_a, 1, nfc="chip1", timestamp=1)
-    _make_taken_kp(team_a, 2, nfc="chip1", timestamp=2)
-    _make_taken_kp(team_b, 1, nfc="chip2", timestamp=1)
+    _make_mark(team_a, cp1, present_chips=("a1", "a2"), wall_ms=1)
+    _make_mark(team_a, cp2, present_chips=("a1", "a2"), wall_ms=2)
+    _make_mark(team_b, cp1, present_chips=("b1", "b2"), wall_ms=1)
 
     protocol = build_protocol(race, None)
 
     rows = {row.team_id: row for row in protocol.rows.all()}
     assert rows[team_a.id].total_score == 30
     assert rows[team_a.id].nfc_score == 30
-    assert rows[team_a.id].chips_count == 1
+    assert rows[team_a.id].chips_count == 2
     assert rows[team_a.id].duration_ms == 3_600_000
     assert rows[team_b.id].total_score == 10
     assert rows[team_b.id].duration_ms == 1_800_000
@@ -2848,11 +2883,11 @@ def test_build_protocol_penalty_from_category(django_user_model):
     category.control_time = 60
     category.overtime_penalty = 2
     category.save()
-    _make_checkpoint(race, 1, 10)
+    cp1 = _make_checkpoint(race, 1, 10)
 
     owner = django_user_model.objects.create_user(username="owner", password="x")
     team = _make_started_team(owner, category, finish_time=1000 + 90 * 60 * 1000)
-    _make_taken_kp(team, 1, nfc="chip1", timestamp=1)
+    _make_mark(team, cp1)
 
     protocol = build_protocol(race, None)
     row = protocol.rows.get(team_id=team.id)
@@ -2866,11 +2901,11 @@ def test_build_protocol_penalty_from_category(django_user_model):
 def test_build_protocol_no_penalty_when_control_time_zero(django_user_model):
     race = _make_race()
     category = _make_category(race)  # control_time defaults to 0
-    _make_checkpoint(race, 1, 10)
+    cp1 = _make_checkpoint(race, 1, 10)
 
     owner = django_user_model.objects.create_user(username="owner", password="x")
     team = _make_started_team(owner, category, finish_time=1000 + 90 * 60 * 1000)
-    _make_taken_kp(team, 1, nfc="chip1", timestamp=1)
+    _make_mark(team, cp1)
 
     protocol = build_protocol(race, None)
     row = protocol.rows.get(team_id=team.id)
@@ -2902,13 +2937,13 @@ def test_build_protocol_penalty_magnitude_matches_old_one_point_per_minute(
 def test_build_protocol_orphan_checkpoint_number_does_not_crash(django_user_model):
     race = _make_race()
     category = _make_category(race)
-    _make_checkpoint(race, 1, 10)
+    cp1 = _make_checkpoint(race, 1, 10)
 
     owner = django_user_model.objects.create_user(username="owner", password="x")
     team = _make_started_team(owner, category, finish_time=2000)
-    # point 99 has no Checkpoint row at all -> orphan
-    _make_taken_kp(team, 99, nfc="chip1", timestamp=1)
-    _make_taken_kp(team, 1, nfc="chip1", timestamp=2)
+    # checkpoint_id 999999 has no Checkpoint row at all -> orphan
+    _make_mark(team, 999999, wall_ms=1)
+    _make_mark(team, cp1, wall_ms=2)
 
     protocol = build_protocol(race, None)
     row = protocol.rows.get(team_id=team.id)
@@ -2919,10 +2954,134 @@ def test_build_protocol_orphan_checkpoint_number_does_not_crash(django_user_mode
 
 
 @pytest.mark.django_db
+def test_build_protocol_incomplete_nfc_mark_not_counted(django_user_model):
+    """An NFC take with fewer present chips than the roster (``team.ucount``,
+    not all participants scanned) does not count as a taken КП."""
+    race = _make_race()
+    category = _make_category(race)
+    cp1 = _make_checkpoint(race, 1, 10)
+
+    owner = django_user_model.objects.create_user(username="owner", password="x")
+    # ucount 2, only 1 chip scanned -> incomplete against the roster.
+    team = _make_started_team(owner, category, finish_time=2000, ucount=2)
+    _make_mark(team, cp1, present_chips=("chip1",))
+
+    protocol = build_protocol(race, None)
+    row = protocol.rows.get(team_id=team.id)
+
+    assert row.nfc_count == 0
+    assert row.total_score == 0
+    # the lone scanned bracelet still shows up in the chip count.
+    assert row.chips_count == 1
+
+
+@pytest.mark.django_db
+def test_build_protocol_complete_nfc_mark_counts(django_user_model):
+    """All roster participants scanned (present >= ucount) -> the КП counts."""
+    race = _make_race()
+    category = _make_category(race)
+    cp1 = _make_checkpoint(race, 1, 10)
+
+    owner = django_user_model.objects.create_user(username="owner", password="x")
+    team = _make_started_team(owner, category, finish_time=2000, ucount=2)
+    _make_mark(team, cp1, present_chips=("chip1", "chip2"))
+
+    protocol = build_protocol(race, None)
+    row = protocol.rows.get(team_id=team.id)
+
+    assert row.nfc_count == 1
+    assert row.total_score == 10
+    assert row.chips_count == 2
+
+
+@pytest.mark.django_db
+def test_build_protocol_unverified_nfc_mark_not_counted(django_user_model):
+    """A ``verified=False`` NFC mark (no physical КП scan proof) is ignored."""
+    race = _make_race()
+    category = _make_category(race)
+    cp1 = _make_checkpoint(race, 1, 10)
+
+    owner = django_user_model.objects.create_user(username="owner", password="x")
+    team = _make_started_team(owner, category, finish_time=2000)
+    _make_mark(team, cp1, verified=False)
+
+    protocol = build_protocol(race, None)
+    row = protocol.rows.get(team_id=team.id)
+
+    assert row.nfc_count == 0
+    assert row.total_score == 0
+
+
+@pytest.mark.django_db
+def test_build_protocol_photo_mark_counts_without_participant_check(django_user_model):
+    """A photo take counts on a known КП with no verified/participant check."""
+    race = _make_race()
+    category = _make_category(race)
+    cp1 = _make_checkpoint(race, 1, 10)
+
+    owner = django_user_model.objects.create_user(username="owner", password="x")
+    team = _make_started_team(owner, category, finish_time=2000)
+    # verified False, no present roster, but photo counts anyway.
+    _make_mark(team, cp1, method="photo", verified=False, present_chips=())
+
+    protocol = build_protocol(race, None)
+    row = protocol.rows.get(team_id=team.id)
+
+    assert row.photo_count == 1
+    assert row.photo_score == 10
+    assert row.total_score == 10
+
+
+@pytest.mark.django_db
+def test_build_protocol_nfc_wins_over_photo_same_checkpoint(django_user_model):
+    """When the same КП has both an NFC and a photo take, NFC wins (scored once)."""
+    race = _make_race()
+    category = _make_category(race)
+    cp1 = _make_checkpoint(race, 1, 10)
+
+    owner = django_user_model.objects.create_user(username="owner", password="x")
+    team = _make_started_team(owner, category, finish_time=2000)
+    _make_mark(team, cp1, method="nfc")
+    _make_mark(team, cp1, method="photo", verified=False, present_chips=())
+
+    protocol = build_protocol(race, None)
+    row = protocol.rows.get(team_id=team.id)
+
+    assert row.nfc_count == 1
+    assert row.photo_count == 0
+    assert row.total_score == 10
+
+
+@pytest.mark.django_db
+def test_build_protocol_chips_count_distinct_across_marks(django_user_model):
+    """chips_count is distinct bracelets across all the team's marks; the
+    ``nfc_uid=null`` sentinel row does not count."""
+    race = _make_race()
+    category = _make_category(race)
+    cp1 = _make_checkpoint(race, 1, 10)
+    cp2 = _make_checkpoint(race, 2, 20)
+
+    owner = django_user_model.objects.create_user(username="owner", password="x")
+    team = _make_started_team(owner, category, finish_time=2000)
+    _make_mark(team, cp1, present_chips=("a", "b"), wall_ms=1)
+    _make_mark(team, cp2, present_chips=("b", "c"), wall_ms=2)
+    # a "no snapshot" sentinel row must not inflate the count.
+    sentinel = _make_mark(team, cp1, present_chips=(), wall_ms=3)
+    MarkPresent.objects.create(
+        mark=sentinel, nfc_uid=None, code=None, number=0, number_in_team=0
+    )
+
+    protocol = build_protocol(race, None)
+    row = protocol.rows.get(team_id=team.id)
+
+    assert row.chips_count == 3  # a, b, c
+
+
+@pytest.mark.django_db
 def test_build_protocol_rebuild_reuses_draft_and_recomputes_rows(django_user_model):
     race = _make_race()
     category = _make_category(race)
-    _make_checkpoint(race, 1, 10)
+    cp1 = _make_checkpoint(race, 1, 10)
 
     owner = django_user_model.objects.create_user(username="owner", password="x")
     team = _make_started_team(owner, category, finish_time=2000)
@@ -2931,7 +3090,7 @@ def test_build_protocol_rebuild_reuses_draft_and_recomputes_rows(django_user_mod
     assert protocol_1.rows.count() == 1
     assert protocol_1.rows.get().total_score == 0
 
-    _make_taken_kp(team, 1, nfc="chip1", timestamp=1)
+    _make_mark(team, cp1)
     protocol_2 = build_protocol(race, None)
 
     assert protocol_2.id == protocol_1.id
@@ -2945,11 +3104,11 @@ def test_build_protocol_after_freeze_creates_new_draft_final_unchanged(
 ):
     race = _make_race()
     category = _make_category(race)
-    _make_checkpoint(race, 1, 10)
+    cp1 = _make_checkpoint(race, 1, 10)
 
     owner = django_user_model.objects.create_user(username="owner", password="x")
     team = _make_started_team(owner, category, finish_time=2000)
-    _make_taken_kp(team, 1, nfc="chip1", timestamp=1)
+    _make_mark(team, cp1, wall_ms=1)
 
     draft = build_protocol(race, None)
     final = freeze_protocol(race)
@@ -2958,9 +3117,9 @@ def test_build_protocol_after_freeze_creates_new_draft_final_unchanged(
     final_score_before = final.rows.get().total_score
 
     # New data appears after freeze.
-    _make_taken_kp(team, 1, nfc="chip1", timestamp=2)
-    _make_checkpoint(race, 2, 50)
-    _make_taken_kp(team, 2, nfc="chip1", timestamp=3)
+    _make_mark(team, cp1, wall_ms=2)
+    cp2 = _make_checkpoint(race, 2, 50)
+    _make_mark(team, cp2, wall_ms=3)
 
     new_draft = build_protocol(race, None)
     assert new_draft.id != final.id
@@ -3011,7 +3170,7 @@ def test_build_protocol_place_resets_per_category(django_user_model):
     cat_a = _make_category(race, code="a", short_name="a", name="A")
     cat_b = _make_category(race, code="b", short_name="b", name="B")
     _make_checkpoint(race, 1, 10)
-    _make_checkpoint(race, 2, 20)
+    cp2 = _make_checkpoint(race, 2, 20)
 
     owner_1 = django_user_model.objects.create_user(username="o1", password="x")
     owner_2 = django_user_model.objects.create_user(username="o2", password="x")
@@ -3023,8 +3182,8 @@ def test_build_protocol_place_resets_per_category(django_user_model):
     b_hi = _make_started_team(owner_3, cat_b, teamname="B-hi", finish_time=2000)
     b_lo = _make_started_team(owner_4, cat_b, teamname="B-lo", finish_time=2000)
 
-    _make_taken_kp(a_hi, 2, nfc="c1", timestamp=1)
-    _make_taken_kp(b_hi, 2, nfc="c2", timestamp=1)
+    _make_mark(a_hi, cp2)
+    _make_mark(b_hi, cp2)
 
     protocol = build_protocol(race, None)
     rows = {row.team_id: row for row in protocol.rows.all()}
@@ -3284,9 +3443,10 @@ def test_protocol_view_title_matches_status(rf, django_user_model):
 
 @pytest.mark.django_db
 def test_protocol_view_immutability_guarantee(rf, django_user_model):
-    """A frozen snapshot is unaffected by later edits to live Team/TakenKP data."""
+    """A frozen snapshot is unaffected by later edits to live Team/Mark data."""
     race = _make_race()
     category = _make_category(race)
+    cp1 = _make_checkpoint(race, 1, 10)
     owner = django_user_model.objects.create_user(username="owner", password="x")
     team = _make_started_team(owner, category, teamname="Original", finish_time=2000)
 
@@ -3296,7 +3456,7 @@ def test_protocol_view_immutability_guarantee(rf, django_user_model):
     # Mutate live data after the snapshot was frozen.
     team.teamname = "Changed"
     team.save()
-    _make_taken_kp(team, 1, nfc="chip1", timestamp=1)
+    _make_mark(team, cp1)
 
     request = rf.get("/")
     request.user = AnonymousUser()

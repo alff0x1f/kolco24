@@ -7,12 +7,15 @@ live ``Team``/``TakenKP`` data changes underneath it.
 """
 
 from django.db import transaction
+from django.db.models import Count, Q
+from django.db.models.functions import Coalesce
 from django.utils import timezone
 
+from apps.mobile.models import Mark, MarkPresent
 from apps.race.models import Protocol, ProtocolRow
 from website.models import Race
 from website.models.checkpoint import Checkpoint
-from website.models.models import TakenKP, Team
+from website.models.models import Team
 
 
 def _team_members(team):
@@ -39,56 +42,94 @@ def _duration_str(duration_ms):
     return f"{hours}:{minutes % 60:02d}:{seconds % 60:02d}"
 
 
-def _score_checkpoints(team, cost):
+def _score_checkpoints(team, cp_info):
     """Return NFC/photo checkpoint numbers + scores for ``team``.
 
-    Mirrors the old view's dedup rules: NFC take is dedup'd by point number
-    (first-seen, ordered by timestamp) and wins over photo for the same
-    point; photo take is dedup'd via ``DISTINCT ON (point_number)``. Unknown
-    point numbers (no ``Checkpoint`` row, or filtered out by ``cost__gte=0``)
-    are skipped via ``cost.get`` rather than raising ``KeyError``.
+    Reads the mobile ``Mark`` table (the Android app's checkpoint takes), not
+    the legacy ``TakenKP``. ``cp_info`` maps ``checkpoint id -> (number, cost)``
+    for the race's non-negative-cost КП — ``Mark.checkpoint_id`` is the
+    checkpoint **id**, but the protocol displays/costs by **number**.
+
+    Scoring rules (see the brainstorm + ``kolco24_app_v2`` UPLOAD.md):
+
+    * A **КП counts as taken** only if the КП *and* all participants were
+      scanned. For NFC that is ``method="nfc"`` **and** ``verified=True``
+      (``cp_code`` proved a physical scan) **and** the number of distinct real
+      (non-sentinel) present chips ``>= team.ucount`` — completeness is
+      recomputed server-side against the **roster** (the team's own size), not
+      trusting the client's ``expected_count``/``complete`` (per UPLOAD.md).
+      The present count is a single ``Count`` annotation, so no per-mark query.
+    * A **photo** take (``method="photo"``) counts on a known КП with no
+      participant/verified check (photo is a fallback; members aren't scanned).
+    * Takes are dedup'd by **``checkpoint_id``** (each physical КП scores once);
+      NFC wins over photo for the same КП. Unknown ``checkpoint_id`` (not in
+      ``cp_info``) is skipped.
+    * ``chips_count`` = distinct non-sentinel ``nfc_uid`` across all the team's
+      ``MarkPresent`` rows (how many bracelets participated).
     """
-    nfc_takes = (
-        TakenKP.objects.filter(team=team.id).exclude(nfc="").order_by("timestamp")
+    real_present = Count(
+        "present__nfc_uid",
+        filter=Q(present__nfc_uid__isnull=False) & ~Q(present__nfc_uid=""),
+        distinct=True,
+    )
+    nfc_marks = (
+        Mark.objects.filter(team=team.id, method="nfc", verified=True)
+        .annotate(present_real=real_present)
+        .order_by(Coalesce("trusted_ms", "wall_ms"))
     )
 
     nfc_points = []
     nfc_score = 0
-    seen_points = set()
-    unique_chips = set()
-    for take in nfc_takes:
-        unique_chips.update(take.nfc.split(","))
-        point_cost = cost.get(take.point_number)
-        if point_cost and take.point_number not in seen_points:
-            nfc_score += point_cost
-            nfc_points.append(take.point_number)
-            seen_points.add(take.point_number)
+    seen_cps = set()
+    for mark in nfc_marks:
+        info = cp_info.get(mark.checkpoint_id)
+        if (
+            info
+            and mark.checkpoint_id not in seen_cps
+            and mark.present_real >= team.ucount
+        ):
+            number, cost = info
+            nfc_score += cost
+            nfc_points.append(number)
+            seen_cps.add(mark.checkpoint_id)
 
-    photo_takes = (
-        TakenKP.objects.filter(team=team.id)
-        .exclude(image_url="")
-        .distinct("point_number")
-        .order_by("point_number")
+    photo_marks = Mark.objects.filter(team=team.id, method="photo").order_by(
+        "checkpoint_id"
     )
     photo_points = []
     photo_score = 0
-    for take in photo_takes:
-        point_cost = cost.get(take.point_number)
-        if point_cost and take.point_number not in seen_points:
-            photo_score += point_cost
-            photo_points.append(take.point_number)
+    seen_photo = set()
+    for mark in photo_marks:
+        info = cp_info.get(mark.checkpoint_id)
+        if (
+            info
+            and mark.checkpoint_id not in seen_cps
+            and mark.checkpoint_id not in seen_photo
+        ):
+            number, cost = info
+            photo_score += cost
+            photo_points.append(number)
+            seen_photo.add(mark.checkpoint_id)
+
+    chips_count = (
+        MarkPresent.objects.filter(mark__team=team.id, nfc_uid__isnull=False)
+        .exclude(nfc_uid="")
+        .values("nfc_uid")
+        .distinct()
+        .count()
+    )
 
     return {
         "nfc_points": nfc_points,
         "nfc_score": nfc_score,
         "photo_points": photo_points,
         "photo_score": photo_score,
-        "chips_count": len(unique_chips),
+        "chips_count": chips_count,
     }
 
 
-def _build_row(protocol, team, cost):
-    scoring = _score_checkpoints(team, cost)
+def _build_row(protocol, team, cp_info):
+    scoring = _score_checkpoints(team, cp_info)
     total_score = scoring["nfc_score"] + scoring["photo_score"]
 
     duration_ms = 0
@@ -183,12 +224,12 @@ def build_protocol(race, user):
             .exclude(start_time=0)
             .select_related("category2")
         )
-        cost = {
-            cp.number: cp.cost
+        cp_info = {
+            cp.id: (cp.number, cp.cost)
             for cp in Checkpoint.objects.filter(race_id=race.id, cost__gte=0)
         }
 
-        rows = [_build_row(protocol, team, cost) for team in teams]
+        rows = [_build_row(protocol, team, cp_info) for team in teams]
         _assign_places(rows)
 
         ProtocolRow.objects.bulk_create(rows)
