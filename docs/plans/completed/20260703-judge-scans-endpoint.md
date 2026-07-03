@@ -310,3 +310,34 @@ stores.
 **Out of scope (future tasks, per the contract):**
 - Read-side scoring, per-`participant_number` peak dedup, and admin
   reattribution/rendering of judge scans.
+
+## Amendment (2026-07-03): gate behind `CanEditRaceLegend`
+
+**Supersedes the "build-HMAC-only" trust boundary above.** After the initial
+implementation the endpoint was moved onto the **per-person write layer** — a
+judge station is an admin credential, not an anonymous participant phone, so it
+must present a `MobileToken` bearer owned by a race admin.
+
+- **Change** (`src/apps/mobile/views.py`): `JudgeScanUploadView` now sets
+  `permission_classes = [SignedAppPermission, IsMobileUser, CanEditRaceLegend]`
+  (the same stack as the tag-create endpoint `POST /app/race/<id>/tags/`),
+  instead of inheriting `AppAPIView`'s default `[SignedAppPermission]`.
+- **Resulting behavior**:
+  - bad build signature → neutral `403 {"detail":"Forbidden"}` (`SignedAppPermission`, first in the stack);
+  - missing / invalid / expired / revoked token → actionable `401` (`IsMobileUser`);
+  - valid token but the user is not a race admin (superuser or `RaceAdmin(role=ADMIN)`) → actionable `403` (`CanEditRaceLegend`);
+  - admin token → request proceeds. `CanEditRaceLegend` loads `Race` by
+    `view.kwargs["race_id"]` (missing → 404) **without** the `is_published`
+    filter, so an unpublished race the admin owns clears the permission and then
+    the view body's `get_object_or_404(..., is_published=True)` 404s.
+- **This diverges from `/track/` and `/marks/`**, which stay build-HMAC-only
+  (those run on participants' phones with no login). Judge scans join
+  tag-create as the mobile write endpoints requiring an admin bearer.
+- **Tests** (`src/apps/mobile/tests.py`): view tests switched from `_signed_post`
+  to `_signed_post_auth` with an admin token (new `_make_judge_race` helper);
+  added `missing_bearer → 401` and `non_admin_user → 403` cases.
+- **Docs**: the CLAUDE.md "Judge scans upload" invariant was rewritten to
+  describe the per-person write layer.
+- **Client impact**: the Android `JudgeScanRepository` must now send an
+  `Authorization: Bearer <MobileToken>` header (obtained via `POST /app/login/`)
+  on judge-scan uploads — a build-HMAC-only request now 401s.
