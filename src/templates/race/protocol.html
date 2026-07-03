@@ -1,5 +1,6 @@
 {% extends "website/base-2.html" %}
 {% load static %}
+{% load custom_filters %}
 
 {% block title %}{{ title|default:"Протокол" }} — {{ race.name }} — Кольцо 24{% endblock %}
 
@@ -35,8 +36,11 @@
           <div class="sub">{{ category.name }} ({{ category.short_name }})</div>
         {% endif %}
       </div>
-      {% if can_edit %}
-        <div class="head-r protocol-actions">
+      <div class="head-r protocol-actions">
+        {% if rows %}
+          <button type="button" class="btn btn-ghost" onclick="window.print()">Печать</button>
+        {% endif %}
+        {% if can_edit %}
           <form method="post" action="{% url 'protocol_build' race.slug %}">
             {% csrf_token %}
             <button type="submit" class="btn btn-ghost">Сформировать</button>
@@ -45,9 +49,21 @@
             {% csrf_token %}
             <button type="submit" class="btn btn-primary">Зафиксировать</button>
           </form>
-        </div>
-      {% endif %}
+        {% endif %}
+      </div>
     </div>
+
+    {% if protocol %}
+      <!-- Print-only header: shown on the printed sheet in place of the on-screen
+           breadcrumb/nav (hidden via @media print). -->
+      <div class="print-head">
+        <div class="print-title">{{ race.name }}{% if category %} — {{ category.short_name|default:category.name }}{% endif %}</div>
+        <div class="print-sub">
+          {{ title|default:"Протокол" }} ·
+          {% if protocol.frozen_at %}{{ protocol.frozen_at|date:"d.m.Y H:i" }}{% else %}{{ protocol.updated_at|date:"d.m.Y H:i" }}{% endif %}
+        </div>
+      </div>
+    {% endif %}
 
     {% if messages %}
       <ul class="protocol-messages">
@@ -73,14 +89,13 @@
               <tr>
                 <th class="num">#</th>
                 <th>Название</th>
-                <th>Клуб</th>
-                <th>Город</th>
+                <th>Клуб / Город</th>
                 <th class="num">Человек</th>
                 <th>Чип</th>
                 <th>Фото</th>
                 <th class="num">Балл</th>
-                <th>Старт/Финиш</th>
-                <th>Время</th>
+                <th class="time">Старт/Финиш</th>
+                <th class="time">Время</th>
                 <th class="num">Штраф</th>
                 <th class="num">Итог</th>
               </tr>
@@ -91,10 +106,9 @@
                   <td class="num">{{ row.place|default:"-" }}</td>
                   <td>
                     {{ row.start_number }} {{ row.team_name }}
-                    ({{ row.members }})
+                    ({{ row.members|abbrev_names }})
                   </td>
-                  <td>{{ row.club }}</td>
-                  <td>{{ row.city }}</td>
+                  <td>{{ row.club }}{% if row.club and row.city %}, {% endif %}{{ row.city }}</td>
                   <td class="num">{{ row.member_count }}</td>
                   <td>
                     {% if row.member_count != row.chips_count and row.chips_count != 0 %}
@@ -104,8 +118,8 @@
                   </td>
                   <td>{{ row.photo_checkpoints }}</td>
                   <td class="num">{{ row.total_score }}</td>
-                  <td>{{ row.start_time_date|date:"H:i:s" }} {{ row.finish_time_date|date:"H:i:s" }}</td>
-                  <td>{{ row.duration_str }}</td>
+                  <td class="time">{{ row.start_time_date|date:"H:i:s" }}<br>{{ row.finish_time_date|date:"H:i:s" }}</td>
+                  <td class="time">{{ row.duration_str }}</td>
                   <td class="num">{% if row.penalty %}{{ row.penalty }}{% else %}-{% endif %}</td>
                   <td class="num">{{ row.final_score }}</td>
                 </tr>
@@ -120,10 +134,3 @@
 </div>
 {% endblock %}
 
-{% block footer_js_include %}
-<style>
-  @media print {
-    @page { size: landscape; }
-  }
-</style>
-{% endblock %}

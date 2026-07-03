@@ -62,6 +62,27 @@ def dict_key(d, key):
     return d.get(key, None)
 
 
+@register.filter(name="abbrev_names")
+def abbrev_names(value):
+    """Abbreviate a comma-separated member list to "Фамилия Инициалы".
+
+    "Фамилия Имя" → "Фамилия И"; "Фамилия Имя Отчество" → "Фамилия ИО".
+    A single-word entry is kept as-is. Used on the results protocol so long
+    full names stay compact in the table (screen and print).
+    """
+    if not value:
+        return value
+    result = []
+    for name in value.split(","):
+        parts = name.split()
+        if not parts:
+            continue
+        surname = parts[0]
+        initials = "".join(p[0].upper() for p in parts[1:] if p)
+        result.append(f"{surname} {initials}" if initials else surname)
+    return ", ".join(result)
+
+
 @register.filter(name="ru_plural")
 def ru_plural(value, forms):
     """Pick the Russian noun form that agrees with ``value``.

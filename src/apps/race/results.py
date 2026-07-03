@@ -169,7 +169,8 @@ def build_protocol(race, user):
         Race.objects.select_for_update().get(id=race.id)
 
         latest = Protocol.objects.filter(race=race).order_by("-created_at").first()
-        if latest and latest.status == Protocol.DRAFT:
+        reused_draft = latest is not None and latest.status == Protocol.DRAFT
+        if reused_draft:
             protocol = latest
             protocol.rows.all().delete()
         else:
@@ -191,6 +192,12 @@ def build_protocol(race, user):
         _assign_places(rows)
 
         ProtocolRow.objects.bulk_create(rows)
+
+        # Reusing a draft doesn't touch the Protocol row itself, so bump its
+        # auto_now ``updated_at`` to reflect this rebuild (a fresh draft was
+        # just inserted, so its ``updated_at`` is already current).
+        if reused_draft:
+            protocol.save(update_fields=["updated_at"])
 
     return protocol
 
