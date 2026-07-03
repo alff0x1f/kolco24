@@ -6,7 +6,12 @@ from urllib.parse import quote
 from django.contrib import messages
 from django.db import transaction
 from django.db.models import Count, OuterRef, ProtectedError, Q, Subquery
-from django.http import Http404, HttpResponseForbidden, HttpResponseRedirect
+from django.http import (
+    Http404,
+    HttpResponseForbidden,
+    HttpResponseRedirect,
+    JsonResponse,
+)
 from django.shortcuts import get_object_or_404, render
 from django.urls import reverse
 from django.utils.decorators import method_decorator
@@ -15,6 +20,7 @@ from django.utils.safestring import mark_safe
 from django.views import View
 from django.views.decorators.cache import never_cache
 
+from apps.mobile.models import TrackPoint
 from apps.race.forms import RaceForm
 from apps.race.models import Protocol, RaceExtra
 from apps.race.permissions import can_edit_race
@@ -1153,3 +1159,180 @@ class ProtocolFreezeView(View):
         else:
             messages.success(request, "Протокол зафиксирован.")
         return _protocol_redirect_back(request, race)
+
+
+class RaceMapView(View):
+    """Organizer-only «Карта гонки» page: markers + on-demand tracks.
+
+    Gated on :func:`can_edit_race` like :class:`RaceLegendEditView`. The
+    heavy lifting (positions polling, track fetch/draw) lives entirely in
+    ``race_map.js``, driven by the ``#raceMapConfig`` JSON island — this view
+    only resolves the two endpoint URLs. ``trackUrlTemplate`` is built via
+    ``reverse()`` with a placeholder ``team_id`` and a string substitution
+    (``reverse()`` itself can't leave a template placeholder in the path).
+    """
+
+    def _load_and_authorize(self, request, race_slug):
+        if not request.user.is_authenticated:
+            return None, HttpResponseRedirect(
+                reverse("login") + "?next=" + quote(request.path, safe="/:@")
+            )
+        race = get_object_or_404(Race, slug=race_slug)
+        if not can_edit_race(request.user, race):
+            return race, HttpResponseForbidden()
+        return race, None
+
+    def get(self, request, race_slug):
+        race, response = self._load_and_authorize(request, race_slug)
+        if response is not None:
+            return response
+
+        positions_url = reverse("race_map_positions", kwargs={"race_slug": race.slug})
+        track_url_placeholder = reverse(
+            "race_map_track", kwargs={"race_slug": race.slug, "team_id": 0}
+        )
+        track_url_template = re.sub(r"/0/$", "/{team_id}/", track_url_placeholder)
+
+        context = {
+            "race": race,
+            "map_config": _safe_json(
+                {
+                    "positionsUrl": positions_url,
+                    "trackUrlTemplate": track_url_template,
+                }
+            ),
+        }
+        return render(request, "race/map.html", context)
+
+
+class RaceMapPositionsView(View):
+    """Last known GPS position per team, for the organizer race-map page.
+
+    Gated on :func:`can_edit_race` like :class:`RaceLegendEditView`. Returns
+    **all** teams of the race; a team with no ``TrackPoint`` rows gets
+    ``lat``/``lon``/``gps_time_ms``/``received_at``/``install_id``/
+    ``segment_id`` all ``null`` (the JS sidebar groups those as «не шлют
+    трек»).
+    """
+
+    def _load_and_authorize(self, request, race_slug):
+        if not request.user.is_authenticated:
+            return None, HttpResponseRedirect(
+                reverse("login") + "?next=" + quote(request.path, safe="/:@")
+            )
+        race = get_object_or_404(Race, slug=race_slug)
+        if not can_edit_race(request.user, race):
+            return race, HttpResponseForbidden()
+        return race, None
+
+    def get(self, request, race_slug):
+        race, response = self._load_and_authorize(request, race_slug)
+        if response is not None:
+            return response
+
+        # ``-created_at``/``-id`` are deterministic tie-breakers: two phones
+        # of one team can upload different points with the same
+        # ``gps_time_ms``, and a bare DISTINCT ON would pick either row per
+        # request (marker flicker).
+        last_points = {
+            point["team_id"]: point
+            for point in TrackPoint.objects.filter(race_id=race.id)
+            .order_by("team_id", "-gps_time_ms", "-created_at", "-id")
+            .distinct("team_id")
+            .values(
+                "team_id",
+                "lat",
+                "lon",
+                "gps_time_ms",
+                "created_at",
+                "install_id",
+                "segment_id",
+            )
+        }
+
+        teams = Team.objects.filter(category2__race_id=race.id)
+        rows = []
+        for team in teams:
+            point = last_points.get(team.id)
+            rows.append(
+                {
+                    "team_id": team.id,
+                    "name": team.teamname,
+                    "number": team.start_number,
+                    "lat": point["lat"] if point else None,
+                    "lon": point["lon"] if point else None,
+                    "gps_time_ms": point["gps_time_ms"] if point else None,
+                    "received_at": (point["created_at"].isoformat() if point else None),
+                    "install_id": point["install_id"] if point else None,
+                    "segment_id": point["segment_id"] if point else None,
+                }
+            )
+        return JsonResponse(rows, safe=False)
+
+
+class RaceMapTrackView(View):
+    """One team's thinned GPS track, split into per-session polylines.
+
+    A "session" is the pair ``(install_id, segment_id)`` — per the
+    ``TrackPoint`` model doc, two phones of one team recording at once must
+    not merge into one line. Within a session a point is kept only if
+    ``THIN_INTERVAL_MS`` has passed since the previously kept point; a
+    session's last point is always kept so the line reaches its true end.
+    """
+
+    THIN_INTERVAL_MS = 30_000
+
+    def _load_and_authorize(self, request, race_slug):
+        if not request.user.is_authenticated:
+            return None, HttpResponseRedirect(
+                reverse("login") + "?next=" + quote(request.path, safe="/:@")
+            )
+        race = get_object_or_404(Race, slug=race_slug)
+        if not can_edit_race(request.user, race):
+            return race, HttpResponseForbidden()
+        return race, None
+
+    def _thin_session(self, points):
+        kept = []
+        last_kept = None
+        for point in points:
+            gps_time_ms = point[2]
+            if last_kept is None or gps_time_ms - last_kept[2] >= self.THIN_INTERVAL_MS:
+                kept.append(point)
+                last_kept = point
+        last_point = points[-1]
+        if not kept or kept[-1] != last_point:
+            kept.append(last_point)
+        return [[lat, lon] for lat, lon, _ in kept]
+
+    def get(self, request, race_slug, team_id):
+        race, response = self._load_and_authorize(request, race_slug)
+        if response is not None:
+            return response
+
+        team = get_object_or_404(Team, pk=team_id, category2__race_id=race.id)
+
+        points = (
+            TrackPoint.objects.filter(race_id=race.id, team_id=team.id)
+            .order_by("gps_time_ms", "created_at", "id")
+            .values_list("install_id", "segment_id", "lat", "lon", "gps_time_ms")
+        )
+
+        sessions = {}
+        session_order = []
+        for install_id, segment_id, lat, lon, gps_time_ms in points:
+            key = (install_id, segment_id)
+            if key not in sessions:
+                sessions[key] = []
+                session_order.append(key)
+            sessions[key].append((lat, lon, gps_time_ms))
+
+        segments = [
+            {
+                "install_id": key[0],
+                "segment_id": key[1],
+                "points": self._thin_session(sessions[key]),
+            }
+            for key in session_order
+        ]
+        return JsonResponse({"segments": segments})

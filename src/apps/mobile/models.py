@@ -125,6 +125,14 @@ class TrackPoint(models.Model):
     boot_count = models.IntegerField(null=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
+    class Meta:
+        indexes = [
+            models.Index(
+                fields=["race", "team", "-gps_time_ms"],
+                name="mobile_tp_race_team_ts",
+            )
+        ]
+
     def __str__(self):
         return f"TrackPoint({self.id} team={self.team_id} race={self.race_id})"
 

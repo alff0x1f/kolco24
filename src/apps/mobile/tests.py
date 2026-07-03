@@ -6336,6 +6336,18 @@ def test_trackpoint_create_duplicate_pk_raises(django_user_model):
         )
 
 
+def test_trackpoint_has_race_team_gps_time_index():
+    from apps.mobile.models import TrackPoint
+
+    index_names = {index.name for index in TrackPoint._meta.indexes}
+    assert "mobile_tp_race_team_ts" in index_names
+
+    index = next(
+        i for i in TrackPoint._meta.indexes if i.name == "mobile_tp_race_team_ts"
+    )
+    assert index.fields == ["race", "team", "-gps_time_ms"]
+
+
 # --- Track upload serializers (Task 2) -------------------------------------
 
 
