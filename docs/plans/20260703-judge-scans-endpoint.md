@@ -150,7 +150,7 @@ stores.
 **Files:**
 - Modify: `src/apps/mobile/models.py`
 
-- [ ] Add `JudgeScan` model after `MarkPhoto`: `id` `CharField(max_length=64,
+- [x] Add `JudgeScan` model after `MarkPhoto`: `id` `CharField(max_length=64,
       primary_key=True)`; `race` `FK("website.Race", on_delete=CASCADE,
       related_name="judge_scans")`; `source_install_id` `CharField(max_length=64)`;
       `event_type` `CharField(max_length=16)`; `participant_number`
@@ -158,13 +158,13 @@ stores.
       `BigIntegerField()`; `trusted_ms` `BigIntegerField(null=True)`; `elapsed_at`
       `BigIntegerField(null=True)`; `boot_count` `IntegerField(null=True)`;
       `created_at` `DateTimeField(auto_now_add=True)`.
-- [ ] Docstring modeled on `TrackPoint`: immutable/write-only, client-UUID PK =
+- [x] Docstring modeled on `TrackPoint`: immutable/write-only, client-UUID PK =
       idempotency key, **no `updated_at` / out of `versioning.py`**, **no `team`
       FK because the judge station is race-wide**, `nfc_uid` normalized by the
       view (not a `save()` override, since `bulk_create` bypasses it).
-- [ ] Add `__str__` returning
+- [x] Add `__str__` returning
       `f"JudgeScan({self.id} race={self.race_id} {self.event_type})"`.
-- [ ] Generate the migration (Task 4 verifies it applies).
+- [x] Generate the migration (Task 4 verifies it applies).
 
 ### Task 2: Add serializers
 
