@@ -204,12 +204,12 @@ immutable, still out of `versioning.py`).
 - Modify: `src/website/urls.py`
 - Modify: `src/apps/race/tests.py`
 
-- [ ] add `RaceMapPositionsView(View)` with the `_load_and_authorize` pattern (anon → login redirect with `?next=`, non-admin → 403, race by slug → 404)
-- [ ] implement the `DISTINCT ON (team_id)` last-point query (with the `-created_at`, `-id` tie-breakers) + all-teams merge; `JsonResponse` list per **Technical Details** incl. `install_id`/`segment_id` (null point fields for teams without points; `safe=False` or wrap in `{"teams": […]}` — pick one and mirror in JS)
-- [ ] wire `race/<slug:race_slug>/map/positions/` → name `race_map_positions` in `src/website/urls.py`
-- [ ] write tests: anon redirect, plain user 403, superuser and `RaceAdmin(role=ADMIN)` 200
-- [ ] write tests: team with 3 points returns the max-`gps_time_ms` one; team without points has `lat is None`; a point from another race's team never appears; two points with equal `gps_time_ms` → the tie-breaker picks the same row on repeated requests (deterministic)
-- [ ] run `uv run pytest src/apps/race/tests.py` — must pass before task 4
+- [x] add `RaceMapPositionsView(View)` with the `_load_and_authorize` pattern (anon → login redirect with `?next=`, non-admin → 403, race by slug → 404)
+- [x] implement the `DISTINCT ON (team_id)` last-point query (with the `-created_at`, `-id` tie-breakers) + all-teams merge; `JsonResponse` list per **Technical Details** incl. `install_id`/`segment_id` (null point fields for teams without points; `safe=False` or wrap in `{"teams": […]}` — pick one and mirror in JS)
+- [x] wire `race/<slug:race_slug>/map/positions/` → name `race_map_positions` in `src/website/urls.py`
+- [x] write tests: anon redirect, plain user 403, superuser and `RaceAdmin(role=ADMIN)` 200
+- [x] write tests: team with 3 points returns the max-`gps_time_ms` one; team without points has `lat is None`; a point from another race's team never appears; two points with equal `gps_time_ms` → the tie-breaker picks the same row on repeated requests (deterministic)
+- [x] run `uv run pytest src/apps/race/tests.py` — must pass before task 4
 
 ### Task 4: Track endpoint (`race_map_track`)
 

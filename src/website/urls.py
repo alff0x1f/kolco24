@@ -10,6 +10,7 @@ from apps.race.views import (
     RaceEditView,
     RaceLegendCodesView,
     RaceLegendEditView,
+    RaceMapPositionsView,
     RacePageView,
     RaceTeamsView,
 )
@@ -71,6 +72,11 @@ urlpatterns = [
         "race/<slug:race_slug>/legend/codes/",
         RaceLegendCodesView.as_view(),
         name="legend_codes",
+    ),
+    path(
+        "race/<slug:race_slug>/map/positions/",
+        RaceMapPositionsView.as_view(),
+        name="race_map_positions",
     ),
     path("race/<slug:race_slug>/", RacePageView.as_view(), name="race"),
     path("race/<slug:race_slug>/teams/", RaceTeamsView.as_view(), name="all_teams"),

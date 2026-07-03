@@ -6,7 +6,12 @@ from urllib.parse import quote
 from django.contrib import messages
 from django.db import transaction
 from django.db.models import Count, OuterRef, ProtectedError, Q, Subquery
-from django.http import Http404, HttpResponseForbidden, HttpResponseRedirect
+from django.http import (
+    Http404,
+    HttpResponseForbidden,
+    HttpResponseRedirect,
+    JsonResponse,
+)
 from django.shortcuts import get_object_or_404, render
 from django.urls import reverse
 from django.utils.decorators import method_decorator
@@ -15,6 +20,7 @@ from django.utils.safestring import mark_safe
 from django.views import View
 from django.views.decorators.cache import never_cache
 
+from apps.mobile.models import TrackPoint
 from apps.race.forms import RaceForm
 from apps.race.models import Protocol, RaceExtra
 from apps.race.permissions import can_edit_race
@@ -1153,3 +1159,68 @@ class ProtocolFreezeView(View):
         else:
             messages.success(request, "Протокол зафиксирован.")
         return _protocol_redirect_back(request, race)
+
+
+class RaceMapPositionsView(View):
+    """Last known GPS position per team, for the organizer race-map page.
+
+    Gated on :func:`can_edit_race` like :class:`RaceLegendEditView`. Returns
+    **all** teams of the race; a team with no ``TrackPoint`` rows gets
+    ``lat``/``lon``/``gps_time_ms``/``received_at``/``install_id``/
+    ``segment_id`` all ``null`` (the JS sidebar groups those as «не шлют
+    трек»).
+    """
+
+    def _load_and_authorize(self, request, race_slug):
+        if not request.user.is_authenticated:
+            return None, HttpResponseRedirect(
+                reverse("login") + "?next=" + quote(request.path, safe="/:@")
+            )
+        race = get_object_or_404(Race, slug=race_slug)
+        if not can_edit_race(request.user, race):
+            return race, HttpResponseForbidden()
+        return race, None
+
+    def get(self, request, race_slug):
+        race, response = self._load_and_authorize(request, race_slug)
+        if response is not None:
+            return response
+
+        # ``-created_at``/``-id`` are deterministic tie-breakers: two phones
+        # of one team can upload different points with the same
+        # ``gps_time_ms``, and a bare DISTINCT ON would pick either row per
+        # request (marker flicker).
+        last_points = {
+            point["team_id"]: point
+            for point in TrackPoint.objects.filter(race_id=race.id)
+            .order_by("team_id", "-gps_time_ms", "-created_at", "-id")
+            .distinct("team_id")
+            .values(
+                "team_id",
+                "lat",
+                "lon",
+                "gps_time_ms",
+                "created_at",
+                "install_id",
+                "segment_id",
+            )
+        }
+
+        teams = Team.objects.filter(category2__race_id=race.id)
+        rows = []
+        for team in teams:
+            point = last_points.get(team.id)
+            rows.append(
+                {
+                    "team_id": team.id,
+                    "name": team.teamname,
+                    "number": team.start_number,
+                    "lat": point["lat"] if point else None,
+                    "lon": point["lon"] if point else None,
+                    "gps_time_ms": point["gps_time_ms"] if point else None,
+                    "received_at": (point["created_at"].isoformat() if point else None),
+                    "install_id": point["install_id"] if point else None,
+                    "segment_id": point["segment_id"] if point else None,
+                }
+            )
+        return JsonResponse(rows, safe=False)

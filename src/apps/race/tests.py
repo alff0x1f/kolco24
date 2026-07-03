@@ -9,7 +9,7 @@ from django.contrib.messages.storage.fallback import FallbackStorage
 from django.test import RequestFactory
 from django.urls import resolve, reverse
 
-from apps.mobile.models import Mark, MarkPresent
+from apps.mobile.models import Mark, MarkPresent, TrackPoint
 from apps.race.forms import RaceForm
 from apps.race.models import Protocol
 from apps.race.permissions import can_edit_race
@@ -19,6 +19,7 @@ from apps.race.views import (
     ProtocolFreezeView,
     ProtocolView,
     RaceEditView,
+    RaceMapPositionsView,
     RacePageView,
     RaceTeamsView,
 )
@@ -3667,3 +3668,177 @@ def test_race_id_redirect_still_works_for_results_url(client):
 
     assert resp.status_code == 301
     assert resp["Location"] == f"/race/{race.slug}/category/{category.id}/results/"
+
+
+# --- RaceMapPositionsView (Task 3) -----------------------------------------
+
+
+def _make_track_point(team, race, point_id, **kwargs):
+    defaults = {
+        "install_id": "install-1",
+        "segment_id": "seg-1",
+        "lat": 55.0,
+        "lon": 37.0,
+        "accuracy": 5.0,
+        "gps_time_ms": 1_700_000_000_000,
+        "elapsed_at": 1000,
+    }
+    defaults.update(kwargs)
+    return TrackPoint.objects.create(id=point_id, team=team, race=race, **defaults)
+
+
+@pytest.mark.django_db
+def test_race_map_positions_anonymous_redirects_to_login(client):
+    race = _make_race(slug="map-pos-anon")
+
+    resp = client.get(reverse("race_map_positions", kwargs={"race_slug": race.slug}))
+
+    assert resp.status_code == 302
+    assert reverse("login") in resp.url
+
+
+@pytest.mark.django_db
+def test_race_map_positions_regular_user_forbidden(client, django_user_model):
+    race = _make_race(slug="map-pos-forbidden")
+    user = django_user_model.objects.create_user(username="plain-map", password="x")
+    client.force_login(user)
+
+    resp = client.get(reverse("race_map_positions", kwargs={"race_slug": race.slug}))
+
+    assert resp.status_code == 403
+
+
+@pytest.mark.django_db
+def test_race_map_positions_superuser_and_race_admin_200(client, django_user_model):
+    race = _make_race(slug="map-pos-admins")
+
+    superuser = django_user_model.objects.create_superuser(
+        username="map-su", password="x", email="map-su@example.com"
+    )
+    client.force_login(superuser)
+    resp = client.get(reverse("race_map_positions", kwargs={"race_slug": race.slug}))
+    assert resp.status_code == 200
+    client.logout()
+
+    admin = django_user_model.objects.create_user(username="map-admin", password="x")
+    RaceAdmin.objects.create(race=race, user=admin, role=RaceAdmin.Role.ADMIN)
+    client.force_login(admin)
+    resp = client.get(reverse("race_map_positions", kwargs={"race_slug": race.slug}))
+    assert resp.status_code == 200
+
+
+@pytest.mark.django_db
+def test_race_map_positions_returns_latest_point_per_team(client, django_user_model):
+    race = _make_race(slug="map-pos-latest")
+    category = _make_category(race)
+    owner = django_user_model.objects.create_user(username="map-owner", password="x")
+    team = _make_team(owner, category, teamname="Alpha", start_number="7")
+
+    _make_track_point(team, race, "tp-1", gps_time_ms=1_700_000_000_000, lat=10.0)
+    _make_track_point(team, race, "tp-2", gps_time_ms=1_700_000_030_000, lat=20.0)
+    _make_track_point(team, race, "tp-3", gps_time_ms=1_700_000_010_000, lat=15.0)
+
+    admin = django_user_model.objects.create_superuser(
+        username="map-latest-su", password="x", email="map-latest-su@example.com"
+    )
+    client.force_login(admin)
+    resp = client.get(reverse("race_map_positions", kwargs={"race_slug": race.slug}))
+
+    assert resp.status_code == 200
+    rows = resp.json()
+    assert len(rows) == 1
+    row = rows[0]
+    assert row["team_id"] == team.id
+    assert row["name"] == "Alpha"
+    assert row["number"] == "7"
+    assert row["lat"] == 20.0
+    assert row["gps_time_ms"] == 1_700_000_030_000
+    assert row["received_at"] is not None
+    assert row["install_id"] == "install-1"
+    assert row["segment_id"] == "seg-1"
+
+
+@pytest.mark.django_db
+def test_race_map_positions_team_without_points_has_null_fields(
+    client, django_user_model
+):
+    race = _make_race(slug="map-pos-nodata")
+    category = _make_category(race)
+    owner = django_user_model.objects.create_user(
+        username="map-nodata-owner", password="x"
+    )
+    _make_team(owner, category, teamname="NoTrack", start_number="9")
+
+    admin = django_user_model.objects.create_superuser(
+        username="map-nodata-su", password="x", email="map-nodata-su@example.com"
+    )
+    client.force_login(admin)
+    resp = client.get(reverse("race_map_positions", kwargs={"race_slug": race.slug}))
+
+    assert resp.status_code == 200
+    rows = resp.json()
+    assert len(rows) == 1
+    row = rows[0]
+    assert row["lat"] is None
+    assert row["lon"] is None
+    assert row["gps_time_ms"] is None
+    assert row["received_at"] is None
+    assert row["install_id"] is None
+    assert row["segment_id"] is None
+
+
+@pytest.mark.django_db
+def test_race_map_positions_excludes_other_race_points(client, django_user_model):
+    race = _make_race(slug="map-pos-thisrace")
+    other_race = _make_race(slug="map-pos-otherrace")
+    category = _make_category(race)
+    other_category = _make_category(other_race, code="other")
+    owner = django_user_model.objects.create_user(
+        username="map-cross-owner", password="x"
+    )
+    team = _make_team(owner, category, teamname="Home", start_number="1")
+    other_team = _make_team(owner, other_category, teamname="Away", start_number="2")
+
+    _make_track_point(team, race, "tp-home", lat=1.0, lon=2.0)
+    _make_track_point(other_team, other_race, "tp-away", lat=3.0, lon=4.0)
+
+    admin = django_user_model.objects.create_superuser(
+        username="map-cross-su", password="x", email="map-cross-su@example.com"
+    )
+    client.force_login(admin)
+    resp = client.get(reverse("race_map_positions", kwargs={"race_slug": race.slug}))
+
+    assert resp.status_code == 200
+    rows = resp.json()
+    team_ids = [row["team_id"] for row in rows]
+    assert team.id in team_ids
+    assert other_team.id not in team_ids
+
+
+@pytest.mark.django_db
+def test_race_map_positions_tie_breaker_is_deterministic(client, django_user_model):
+    race = _make_race(slug="map-pos-tie")
+    category = _make_category(race)
+    owner = django_user_model.objects.create_user(
+        username="map-tie-owner", password="x"
+    )
+    team = _make_team(owner, category, teamname="Tie", start_number="3")
+
+    _make_track_point(team, race, "tp-tie-1", gps_time_ms=1_700_000_000_000, lat=1.0)
+    _make_track_point(team, race, "tp-tie-2", gps_time_ms=1_700_000_000_000, lat=2.0)
+
+    admin = django_user_model.objects.create_superuser(
+        username="map-tie-su", password="x", email="map-tie-su@example.com"
+    )
+    client.force_login(admin)
+    url = reverse("race_map_positions", kwargs={"race_slug": race.slug})
+
+    first = client.get(url).json()[0]["lat"]
+    second = client.get(url).json()[0]["lat"]
+
+    assert first == second
+
+
+def test_race_map_positions_url_resolves():
+    resolved = resolve("/race/some-slug/map/positions/")
+    assert resolved.func.view_class is RaceMapPositionsView
