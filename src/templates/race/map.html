@@ -4,6 +4,10 @@
 {% block title %}Карта — {{ race.name }} — Кольцо 24{% endblock %}
 
 {% block extra_head %}
+{# Site-wide Referrer-Policy is same-origin (Django default), which strips the
+   Referer from cross-origin tile requests — OSM's tile usage policy rejects
+   referer-less requests. Send the bare origin to tile servers on this page. #}
+<meta name="referrer" content="strict-origin-when-cross-origin">
 <link href="{% static 'vendor/leaflet/leaflet.css' %}" rel="stylesheet">
 <link href="{% static 'css/race_map.css' %}" rel="stylesheet">
 {% endblock %}
