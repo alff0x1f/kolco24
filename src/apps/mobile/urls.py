@@ -1,6 +1,7 @@
 from django.urls import path
 
 from .views import (
+    JudgeScanUploadView,
     LegendView,
     LoginView,
     LogoutView,
@@ -42,6 +43,11 @@ urlpatterns = [
         "race/<int:race_id>/marks/",
         MarkUploadView.as_view(),
         name="marks",
+    ),
+    path(
+        "race/<int:race_id>/judge_scans/",
+        JudgeScanUploadView.as_view(),
+        name="judge_scans",
     ),
     # No trailing slash: the contract path (UPLOAD.md) ends at <frame_id>, and
     # the signed canonical string is the request's full_path, so the route must

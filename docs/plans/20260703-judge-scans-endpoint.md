@@ -198,25 +198,25 @@ stores.
 - Modify: `src/apps/mobile/views.py`
 - Modify: `src/apps/mobile/urls.py`
 
-- [ ] In `views.py`, import `JudgeScan` from `.models` and the two serializers.
-- [ ] Add `JudgeScanUploadView(AppAPIView)` modeled on `TrackUploadView`:
+- [x] In `views.py`, import `JudgeScan` from `.models` and the two serializers.
+- [x] Add `JudgeScanUploadView(AppAPIView)` modeled on `TrackUploadView`:
       `throttle_classes=[ClientIPScopedRateThrottle]`,
       `throttle_scope="mobile-write"`; docstring covering build-HMAC-only trust
       boundary, race-scoped (no team check), `source_install_id` from body,
       immutable `ignore_conflicts` idempotency, out of `versioning.py`.
-- [ ] `post(self, request, race_id)`: `get_object_or_404(Race, pk=race_id,
+- [x] `post(self, request, race_id)`: `get_object_or_404(Race, pk=race_id,
       is_published=True)` → validate with `JudgeScanUploadSerializer` (400) →
       **no team check** → read `source_install_id` from validated data → build
       `JudgeScan` objs, normalizing `nfc_uid` via `.strip().upper()` →
       `JudgeScan.objects.bulk_create(objs, ignore_conflicts=True)` →
       `Response({"accepted": [s["id"] for s in scans]}, status=200)`. Empty batch
       acks `[]` (no special-casing needed — an empty `bulk_create` is a no-op).
-- [ ] In `urls.py`, import `JudgeScanUploadView` and add
+- [x] In `urls.py`, import `JudgeScanUploadView` and add
       `path("race/<int:race_id>/judge_scans/", JudgeScanUploadView.as_view(),
       name="judge_scans")`.
-- [ ] Write view tests (happy-path persists + acks; nfc_uid normalization;
+- [x] Write view tests (happy-path persists + acks; nfc_uid normalization;
       source_install_id read from body) — see Task 5.
-- [ ] Run tests — must pass before next task.
+- [x] Run tests — must pass before next task.
 
 ### Task 4: Generate and apply the migration
 
