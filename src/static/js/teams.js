@@ -4,9 +4,9 @@
  *   #teams-data       — [{num, name, city, parts, cnt, catId, mine, edit?}]
  *   #categories-data  — [{id, label, count, colorIdx}]  (in display order)
  *
- * Counts shown in chips / breakdown are derived from the actual team rows so
- * they always agree with what the filter renders; categories-data supplies the
- * display order, labels and colours (via colorIdx).
+ * Counts shown in chips are derived from the actual team rows so they always
+ * agree with what the filter renders; categories-data supplies display order,
+ * labels and colours (via colorIdx).
  *
  * Category ids need explicit String() coercion: data-initial is a string while
  * JSON catId is an int, so "7" === 7 would be false.
@@ -22,7 +22,7 @@
   var TEAMS = JSON.parse(teamsEl.textContent);
   var CATS = JSON.parse(catsEl.textContent);
 
-  // colorIdx -> colour, single source for chip dots and breakdown bars.
+  // colorIdx -> colour, single source for chip dots and table badges.
   var CAT_COLORS = [
     "#2a5288", "#d99a2b", "#2a8fb0", "#c2589a",
     "#4582EC", "#02B875", "#7c4ddb", "#d4633f",
@@ -41,14 +41,8 @@
     counts[k] = (counts[k] || 0) + 1;
   });
   var total = TEAMS.length;
-  var hasMine = TEAMS.some(function (t) {
-    return t.mine === true;
-  });
-  var maxCount = 0;
-  CATS.forEach(function (c) {
-    var n = counts[String(c.id)] || 0;
-    if (n > maxCount) maxCount = n;
-  });
+  var isAuthenticated = pageEl.getAttribute("data-authenticated") === "true";
+  var hasActions = pageEl.getAttribute("data-has-actions") === "true";
 
   var initial = pageEl.getAttribute("data-initial") || "all";
   var activeCat = initial; // 'all' | 'mine' | '<catId>'
@@ -60,7 +54,6 @@
   var emptyEl = document.getElementById("emptyState");
   var footEl = document.getElementById("footCount");
   var chipsEl = document.getElementById("catChips");
-  var brkEl = document.getElementById("brk");
   var tableEl = document.querySelector(".teams-table");
   var searchEl = document.getElementById("searchInput");
 
@@ -115,7 +108,7 @@
   function buildChips() {
     chipsEl.innerHTML = "";
     chipsEl.appendChild(chip("Все", "all", total, null));
-    if (hasMine) {
+    if (isAuthenticated) {
       var mineCount = TEAMS.filter(function (t) {
         return t.mine === true;
       }).length;
@@ -125,41 +118,6 @@
       var n = counts[String(c.id)] || 0;
       if (!n) return;
       chipsEl.appendChild(chip(c.label, String(c.id), n, CAT_COLORS[c.colorIdx]));
-    });
-  }
-
-  function buildBrk() {
-    brkEl.innerHTML = "";
-    CATS.forEach(function (c) {
-      var n = counts[String(c.id)] || 0;
-      if (!n) return;
-      var val = String(c.id);
-      var btn = document.createElement("button");
-      btn.type = "button";
-      btn.className = "brk-row" + (val === activeCat ? " is-active" : "");
-      btn.dataset.cat = val;
-      var pct = maxCount ? Math.round((n / maxCount) * 100) : 0;
-      // Full category name shown dim next to the short label; skip it when the
-      // label already is the full name (no short_name) to avoid duplication.
-      var full = c.name && c.name !== c.label ? c.name : "";
-      btn.innerHTML =
-        '<div class="brk-top"><span class="nm">' +
-        esc(c.label) +
-        "</span>" +
-        (full
-          ? '<span class="brk-full" title="' + esc(full) + '">' + esc(full) + "</span>"
-          : "") +
-        '<span class="vl">' +
-        n +
-        "</span>" +
-        "</div>" +
-        '<div class="brk-bar"><i style="width:' +
-        pct +
-        '%"></i></div>';
-      btn.addEventListener("click", function () {
-        setCat(activeCat === val ? "all" : val);
-      });
-      brkEl.appendChild(btn);
     });
   }
 
@@ -173,16 +131,7 @@
     document.querySelectorAll(".chip").forEach(function (ch) {
       ch.classList.toggle("is-active", ch.dataset.cat === activeCat);
     });
-    document.querySelectorAll(".brk-row").forEach(function (r) {
-      r.classList.toggle("is-active", r.dataset.cat === activeCat);
-    });
   }
-
-  var EDIT_SVG =
-    '<svg width="13" height="13" viewBox="0 0 20 20" fill="none" ' +
-    'stroke="currentColor" stroke-width="1.7" stroke-linecap="round" ' +
-    'stroke-linejoin="round"><path d="M4 13.5V16h2.5L15 7.5 12.5 5 4 13.5z"/>' +
-    '<path d="m11.5 6 2.5 2.5"/></svg>';
 
   var CNT_SVG =
     '<svg width="15" height="15" viewBox="0 0 20 20" fill="none" ' +
@@ -216,21 +165,27 @@
     var ci = meta ? meta.colorIdx : 0;
     var catLabel = meta ? meta.label : "";
     var nameCell = '<div class="t-name">' + hl(t.name);
-    if (t.edit) {
-      nameCell +=
-        ' <a class="edit" href="' +
-        esc(t.edit) +
-        '" title="Редактировать">' +
-        EDIT_SVG +
-        "</a>";
-    }
+    if (t.mine) nameCell += ' <span class="mine-marker">Ваша</span>';
     nameCell += "</div>";
     if (t.parts) {
       nameCell +=
         '<div class="t-parts" title="' + esc(t.parts) + '">' + hl(t.parts) + "</div>";
     }
+    var actionCell = "";
+    if (hasActions) {
+      actionCell = '<td class="col-action">';
+      if (t.edit) {
+        actionCell +=
+          '<a class="team-action" href="' +
+          esc(t.edit) +
+          '">' +
+          esc(t.action || "Редактировать") +
+          "</a>";
+      }
+      actionCell += "</td>";
+    }
     return (
-      "<tr>" +
+      '<tr class="' + (t.mine ? "is-mine" : "") + '">' +
       '<td class="col-num"><span class="bib">' +
       esc(t.num) +
       "</span></td>" +
@@ -249,6 +204,7 @@
       CNT_SVG +
       esc(t.cnt) +
       "</span></td>" +
+      actionCell +
       "</tr>"
     );
   }
@@ -298,16 +254,6 @@
     });
   }
 
-  var resetEl = document.getElementById("resetCat");
-  if (resetEl) {
-    resetEl.addEventListener("click", function (e) {
-      e.preventDefault();
-      query = "";
-      if (searchEl) searchEl.value = "";
-      setCat("all");
-    });
-  }
-
   function updateSortIndicators(activeBtn) {
     document.querySelectorAll(".th-sort").forEach(function (b) {
       var th = b.closest("th");
@@ -344,6 +290,5 @@
   });
 
   buildChips();
-  buildBrk();
   render();
 })();

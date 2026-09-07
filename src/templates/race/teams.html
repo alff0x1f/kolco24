@@ -8,166 +8,65 @@
 {% endblock %}
 {% block content %}
 
-<div class="cover-banner">
-  <div class="cover-image">
-    {% if race.header_image %}<img class="cover-bg-img" src="{{ race.header_image }}" alt="">{% endif %}
-    <div class="cover-status">
-      {% if reg_open %}
-        <span class="pill success">Регистрация открыта</span>
-      {% elif reg_upcoming %}
-        <span class="pill muted">Регистрация скоро</span>
-      {% else %}
-        <span class="pill">Регистрация окончена</span>
-      {% endif %}
-    </div>
-  </div>
-</div>
+{% include "race/_race_header.html" with active_tab="teams" %}
 
-<div class="teams-page" data-initial="{{ initial_filter }}">
+<div class="teams-page" data-initial="{{ initial_filter }}"
+  data-authenticated="{{ is_authenticated|yesno:'true,false' }}"
+  data-has-actions="{{ has_team_actions|yesno:'true,false' }}">
   <div class="container">
 
-    <section class="cover-meta-card">
-      <div class="cover-meta">
-        <div class="cover-title">
-          <nav class="crumbs cover-crumbs" aria-label="Хлебные крошки">
-            <a href="{% url 'race' race.slug %}">{{ race.name }}</a>
-            <span class="sep" aria-hidden="true">›</span>
-            <h1 aria-current="page">Команды</h1>
-          </nav>
-          <div class="sub">
-            {% if race.place %}<span>📍 {{ race.place }}</span><span class="dot"></span>{% endif %}
-            <span>{{ race.date }}</span>
-            <span class="dot"></span>
-            <span>{{ category_count }} {{ category_count|ru_plural:"категория,категории,категорий" }}</span>
-          </div>
-        </div>
-        {% if reg_open and not race_full and user.is_authenticated %}
-        <div class="cover-actions">
-          <a class="btn btn-primary" href="{% url 'add_team' race.slug %}">Добавить команду</a>
-        </div>
-        {% endif %}
-      </div>
-    </section>
-
-    <div class="grid">
-
-      <main>
-        <section class="card teams-card">
-          <div class="teams-head">
-            <h2>Команды <span class="total">{{ race_team_count }}</span></h2>
+    <main>
+      <section class="card teams-card">
+        <div class="teams-head">
+          <h2>Команды <span class="total">{{ race_team_count }}</span></h2>
+          <div class="teams-head-actions">
             <div class="search">
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true">
                 <circle cx="7" cy="7" r="5"/><path d="m11 11 3 3"/>
               </svg>
               <input type="search" id="searchInput" aria-label="Поиск: команда, город или участник" placeholder="Команда, город или участник…" autocomplete="off">
             </div>
-          </div>
-          <div class="cat-chips" id="catChips"></div>
-          <div class="teams-table-wrap">
-            <table class="teams-table">
-              <thead>
-                <tr>
-                  <th class="col-num" scope="col" aria-sort="ascending">
-                    <button type="button" class="th-sort sorted" data-sort="num">№ <span class="arr" aria-hidden="true">▼</span></button>
-                  </th>
-                  <th scope="col" aria-sort="none">
-                    <button type="button" class="th-sort" data-sort="name">Команда <span class="arr" aria-hidden="true">▼</span></button>
-                  </th>
-                  <th class="col-cat" scope="col" aria-sort="none">
-                    <button type="button" class="th-sort" data-sort="cat">Категория <span class="arr" aria-hidden="true">▼</span></button>
-                  </th>
-                  <th class="col-city" scope="col" aria-sort="none">
-                    <button type="button" class="th-sort" data-sort="city">Город <span class="arr" aria-hidden="true">▼</span></button>
-                  </th>
-                  <th class="col-cnt" scope="col" aria-sort="none">
-                    <button type="button" class="th-sort" data-sort="cnt">Чел. <span class="arr" aria-hidden="true">▼</span></button>
-                  </th>
-                </tr>
-              </thead>
-              <tbody id="teamRows"></tbody>
-            </table>
-            <div class="empty" id="emptyState" hidden>
-              <strong>Ничего не найдено</strong>
-              Измените запрос или выберите другую категорию.
-            </div>
-          </div>
-          <div class="teams-foot">
-            <span id="footCount"></span>
-            <span>Данные на&nbsp;{{ race.date }}</span>
-          </div>
-        </section>
-      </main>
-
-      <aside class="sidebar">
-
-        {% if can_edit_race %}
-        <div class="card card-admin">
-          <div class="side-head">
-            <h3>Управление</h3>
-          </div>
-          <div class="card-pad admin-actions">
-            <a class="btn btn-primary" href="{% url 'add_team' race.slug %}">+ Команда</a>
+            {% if can_edit_race %}
+            <a class="btn btn-outline teams-add" href="{% url 'add_team' race.slug %}">+ Команда</a>
+            {% endif %}
           </div>
         </div>
-        {% endif %}
-
-        <div class="card card-summary">
-          <div class="side-head">
-            <h3>Сводка</h3>
-          </div>
-          <div class="card-pad info-card-pad">
-            <ul class="info-list">
-              <li>
-                <svg class="icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6">
-                  <path d="M5 3v14"/><path d="M5 4h9l-2 3 2 3H5"/>
-                </svg>
-                <span class="label">Команд</span>
-                <span class="value">{{ race_team_count }}</span>
-              </li>
-              <li>
-                <svg class="icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6">
-                  <circle cx="10" cy="7" r="3"/><path d="M4 17c0-3 2.7-5 6-5s6 2 6 5"/>
-                </svg>
-                <span class="label">Участников</span>
-                <span class="value">{{ race_people_count|floatformat:0 }}</span>
-              </li>
-              <li>
-                <svg class="icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6">
-                  <circle cx="10" cy="7" r="3"/><path d="M4 17c0-3 2.7-5 6-5s6 2 6 5"/>
-                </svg>
-                <span class="label">Категорий</span>
-                <span class="value">{{ category_count }}</span>
-              </li>
-              {% if race_remaining is not None %}
-              <li>
-                <svg class="icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6">
-                  <circle cx="10" cy="7" r="3"/><path d="M4 17c0-3 2.7-5 6-5s6 2 6 5"/>
-                </svg>
-                <span class="label">Осталось мест</span>
-                <span class="value">{% if race_remaining > 0 %}{{ race_remaining|floatformat:0 }}{% else %}нет{% endif %}</span>
-              </li>
-              {% endif %}
-              <li>
-                <svg class="icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6">
-                  <circle cx="10" cy="10" r="7"/><path d="M10 6v4l2.5 2"/>
-                </svg>
-                <span class="label">Дата</span>
-                <span class="value">{{ race.date }}</span>
-              </li>
-            </ul>
+        <div class="cat-chips" id="catChips"></div>
+        <div class="teams-table-wrap">
+          <table class="teams-table">
+            <thead>
+              <tr>
+                <th class="col-num" scope="col" aria-sort="ascending">
+                  <button type="button" class="th-sort sorted" data-sort="num">№ <span class="arr" aria-hidden="true">▼</span></button>
+                </th>
+                <th scope="col" aria-sort="none">
+                  <button type="button" class="th-sort" data-sort="name">Команда <span class="arr" aria-hidden="true">▼</span></button>
+                </th>
+                <th class="col-cat" scope="col" aria-sort="none">
+                  <button type="button" class="th-sort" data-sort="cat">Категория <span class="arr" aria-hidden="true">▼</span></button>
+                </th>
+                <th class="col-city" scope="col" aria-sort="none">
+                  <button type="button" class="th-sort" data-sort="city">Город <span class="arr" aria-hidden="true">▼</span></button>
+                </th>
+                <th class="col-cnt" scope="col" aria-sort="none">
+                  <button type="button" class="th-sort" data-sort="cnt">Чел. <span class="arr" aria-hidden="true">▼</span></button>
+                </th>
+                {% if has_team_actions %}<th class="col-action" scope="col">Действия</th>{% endif %}
+              </tr>
+            </thead>
+            <tbody id="teamRows"></tbody>
+          </table>
+          <div class="empty" id="emptyState" hidden>
+            <strong>Ничего не найдено</strong>
+            Измените запрос или выберите другую категорию.
           </div>
         </div>
-
-        <div class="card card-breakdown">
-          <div class="side-head">
-            <h3>По категориям</h3>
-            <a href="#" id="resetCat">Сбросить</a>
-          </div>
-          <div class="brk" id="brk"></div>
+        <div class="teams-foot">
+          <span id="footCount"></span>
+          <span>Данные на&nbsp;{{ race.date }}</span>
         </div>
-
-      </aside>
-    </div>
+      </section>
+    </main>
   </div>
 </div>
 

@@ -76,6 +76,41 @@ def _categories_with_team_count(race):
     )
 
 
+def _team_display_name(team):
+    return team.teamname or (
+        f"Без названия {team.id} " f"({team.owner.last_name} {team.owner.first_name})"
+    )
+
+
+def _owned_teams(race, user):
+    """Compact team data for the signed-in user's race-page callout."""
+    if user is None or not user.is_authenticated:
+        return []
+
+    can_change = race.is_teams_editable or user.is_superuser
+    teams = (
+        Team.objects.filter(category2__race=race, owner=user)
+        .select_related("category2", "owner")
+        .order_by("category2__order", "start_number", "id")
+    )
+    return [
+        {
+            "id": team.id,
+            "name": _team_display_name(team),
+            "number": team.start_number,
+            "category": team.category2.short_name or team.category2.name,
+            "city": team.city,
+            "participants": team.ucount,
+            "url": reverse("edit_team", args=[team.id]),
+            "action_label": (
+                "Редактировать команду" if can_change else "Посмотреть команду"
+            ),
+            "can_change": can_change,
+        }
+        for team in teams
+    ]
+
+
 class RacePageView(View):
     @staticmethod
     def build_context(race, user=None):
@@ -111,6 +146,7 @@ class RacePageView(View):
             "race_people_count": race.people_count(),
             "race_remaining": race_remaining,
             "race_full": race_full,
+            "owned_teams": _owned_teams(race, user),
         }
         context["can_edit_race"] = bool(user is not None and can_edit_race(user, race))
         if user is not None and is_race_admin(user, race):
@@ -173,11 +209,9 @@ class RaceTeamsView(View):
         )
 
         teams_data = []
+        has_team_actions = False
         for team in teams:
-            name = team.teamname or (
-                f"Без названия {team.id} "
-                f"({team.owner.last_name} {team.owner.first_name})"
-            )
+            name = _team_display_name(team)
             parts = ", ".join(
                 p
                 for p in (
@@ -205,7 +239,13 @@ class RaceTeamsView(View):
                 "mine": mine,
             }
             if is_superuser or mine:
+                has_team_actions = True
                 row["edit"] = f"/team/{team.id}"
+                row["action"] = (
+                    "Редактировать"
+                    if race.is_teams_editable or is_superuser
+                    else "Посмотреть"
+                )
             teams_data.append(row)
 
         race_remaining = race.remaining_people()
@@ -223,6 +263,8 @@ class RaceTeamsView(View):
             "race_full": race_full,
             "category_count": len(categories),
             "race_date": race.date,
+            "is_authenticated": is_authenticated,
+            "has_team_actions": has_team_actions,
             "can_edit_race": bool(user is not None and can_edit_race(user, race)),
         }
 
