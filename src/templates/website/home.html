@@ -49,27 +49,27 @@
 
   <main class="community-content">
     <section id="publications" class="community-section container" aria-labelledby="latest-title">
-      <div class="community-section__head">
-        <div>
-          <p class="community-eyebrow community-eyebrow--dark">Новое в журнале</p>
-          <h2 id="latest-title">Свежие материалы</h2>
+      <div class="publication-column">
+        <div class="publication-feed">
+          <div class="publication-feed__head">
+            <h2 id="latest-title">Свежие материалы</h2>
+            <span>Всего: {{ page_obj.paginator.count }}</span>
+          </div>
+
+          {% if publications %}
+          {% for publication in publications %}
+          {% include "website/_publication_post.html" %}
+          {% endfor %}
+          {% else %}
+          <div class="publication-feed__empty">
+            <h3>Материалы готовятся</h3>
+            <p>Скоро здесь появятся новости сообщества и практические статьи.</p>
+          </div>
+          {% endif %}
         </div>
-      </div>
 
-      {% if publications %}
-      <div class="publication-grid">
-        {% for publication in publications %}
-        {% include "website/_publication_card.html" %}
-        {% endfor %}
+        {% include "website/_publication_pagination.html" with pagination_fragment="#publications" %}
       </div>
-      {% else %}
-      <div class="community-empty">
-        <span aria-hidden="true">24</span>
-        <div><h3>Материалы готовятся</h3><p>Скоро здесь появятся новости сообщества и практические статьи.</p></div>
-      </div>
-      {% endif %}
-
-      {% include "website/_publication_pagination.html" with pagination_fragment="#publications" %}
     </section>
 
     <section class="races-preview" aria-labelledby="races-title">

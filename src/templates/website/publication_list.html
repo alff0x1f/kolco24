@@ -18,20 +18,26 @@
   {% include "website/_section_tabs.html" with active_tab=section_tab %}
 
   <div class="container community-catalog__body">
-    {% if publications %}
-    <div class="publication-grid">
-      {% for publication in publications %}
-      {% include "website/_publication_card.html" %}
-      {% endfor %}
-    </div>
-    {% else %}
-    <div class="community-empty community-empty--catalog">
-      <span aria-hidden="true">24</span>
-      <div><h2>Пока ничего нет</h2><p>В этой категории ещё не опубликовано материалов.</p></div>
-    </div>
-    {% endif %}
+    <div class="publication-column">
+      <div class="publication-feed">
+        <div class="publication-feed__head">
+          <h2>{{ catalog_title }}</h2>
+          <span>Всего: {{ page_obj.paginator.count }}</span>
+        </div>
+        {% if publications %}
+        {% for publication in publications %}
+        {% include "website/_publication_post.html" %}
+        {% endfor %}
+        {% else %}
+        <div class="publication-feed__empty">
+          <h3>Пока ничего нет</h3>
+          <p>В этой категории ещё не опубликовано материалов.</p>
+        </div>
+        {% endif %}
+      </div>
 
-    {% include "website/_publication_pagination.html" %}
+      {% include "website/_publication_pagination.html" %}
+    </div>
   </div>
 </main>
 {% endblock %}

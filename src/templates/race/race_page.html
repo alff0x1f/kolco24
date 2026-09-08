@@ -37,7 +37,7 @@
                 <label for="id_summary">Короткий анонс (необязательно)</label>
                 <textarea class="input{% if post_form.summary.errors %} has-error{% endif %}"
                   id="id_summary" name="summary"
-                  rows="2" placeholder="Для карточки публикации">{{ post_form.summary.value|default:'' }}</textarea>
+                  rows="2" placeholder="Для ленты публикаций">{{ post_form.summary.value|default:'' }}</textarea>
                 {% if post_form.summary.errors %}
                 <span class="hint err">{{ post_form.summary.errors|join:", " }}</span>
                 {% endif %}
@@ -64,17 +64,18 @@
         </div>
         {% endif %}
 
-        <section class="card tabs-card">
-          <div class="tabs-head">
-            <h2>Новости <span class="badge">{{ news_count }}</span></h2>
+        <section class="publication-feed" aria-labelledby="race-news-title">
+          <div class="publication-feed__head">
+            <h2 id="race-news-title">Новости соревнования</h2>
+            <span>Всего: {{ news_count }}</span>
           </div>
-          <div class="tab-body race-publications-grid">
-            {% for news in news_list %}
-            {% include "website/_publication_card.html" with publication=news %}
-            {% empty %}
-            <p class="post-empty">Новостей пока нет.</p>
-            {% endfor %}
+          {% for news in news_list %}
+          {% include "website/_publication_post.html" with publication=news hide_race=True %}
+          {% empty %}
+          <div class="publication-feed__empty">
+            <p>Новостей пока нет.</p>
           </div>
+          {% endfor %}
         </section>
       </main>
 

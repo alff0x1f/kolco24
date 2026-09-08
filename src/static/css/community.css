@@ -262,10 +262,121 @@
   color: var(--primary-dk);
 }
 
-.publication-grid {
+/* Compact publication rows, following the race-detail prototype. */
+.publication-column {
+  min-width: 0;
+}
+
+.publication-feed {
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--paper-2);
+}
+
+.publication-feed__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  padding: 16px 21px;
+  border-bottom: 1px solid var(--line);
+}
+
+.publication-feed__head h2 {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+}
+
+.publication-feed__head > span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.publication-post {
+  padding: 21px;
+  overflow-wrap: anywhere;
+}
+
+.publication-post + .publication-post {
+  border-top: 1px solid var(--line-soft);
+}
+
+.publication-post--image {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 16px;
+  grid-template-columns: minmax(0, 1fr) 205px;
+  align-items: start;
+  gap: 20px;
+}
+
+.publication-post__body { min-width: 0; }
+
+.publication-post h3 {
+  margin: 0 0 8px;
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.publication-post h3 a { color: var(--ink); }
+.publication-post h3 a:hover { color: var(--primary-dk); }
+
+.publication-post__meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  margin-bottom: 7px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.publication-post__meta a { color: var(--muted); }
+.publication-post__meta a:hover { color: var(--primary-dk); }
+
+.publication-post__image {
+  display: block;
+  height: 142px;
+  max-width: 100%;
+  overflow: hidden;
+  border-radius: 11px;
+}
+
+.publication-post__image img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  object-position: left top;
+}
+
+.publication-post__summary {
+  margin: 0 0 12px;
+  color: var(--ink-soft);
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+.publication-post .publication-read {
+  display: inline-block;
+  color: var(--primary);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.publication-post .publication-read:hover { color: var(--primary-dk); }
+
+.publication-feed__empty { padding: 21px; }
+.publication-feed__empty h3 { margin: 0 0 8px; font-size: 20px; }
+.publication-feed__empty p { margin: 0; color: var(--muted); }
+
+.publication-post a:focus-visible {
+  outline: 2px solid var(--primary-2);
+  outline-offset: 4px;
 }
 
 .publication-card {
@@ -819,19 +930,9 @@
 .race-archive__list strong { overflow: hidden; font-size: 14px; font-weight: 500; text-overflow: ellipsis; white-space: nowrap; }
 .race-archive__list b { color: var(--primary-2); font-weight: 500; }
 
-/* Publication cards reused on the race page. */
-.race-publications-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 16px;
-}
-
-.race-publications-grid .post-empty { grid-column: 1 / -1; }
-
 @media (max-width: 920px) {
   .race-spotlight__inner { grid-template-columns: 72px minmax(0, 1fr); }
   .race-spotlight__actions { grid-column: 2; }
-  .publication-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .race-list-grid,
   .race-catalog__grid { grid-template-columns: 1fr; }
 }
@@ -846,8 +947,11 @@
   .race-spotlight h2 { font-size: 21px; }
   .race-spotlight__actions { grid-column: 1 / -1; }
   .community-section__head h2 { font-size: 25px; }
-  .publication-grid { grid-template-columns: 1fr; }
-  .race-publications-grid { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 620px) {
+  .publication-post--image { display: block; }
+  .publication-post__image { height: 150px; margin-top: 15px; }
 }
 
 @media (max-width: 600px) {
