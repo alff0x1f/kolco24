@@ -4,10 +4,6 @@
       href="{% url 'index' %}"{% if active_tab == 'home' %} aria-current="page"{% endif %}>
       Главная
     </a>
-    <a class="section-tab{% if active_tab == 'posts' %} is-active{% endif %}"
-      href="{% url 'publication_list' %}"{% if active_tab == 'posts' %} aria-current="page"{% endif %}>
-      Все публикации
-    </a>
     <a class="section-tab{% if active_tab == 'news' %} is-active{% endif %}"
       href="{% url 'news_list' %}"{% if active_tab == 'news' %} aria-current="page"{% endif %}>
       Новости

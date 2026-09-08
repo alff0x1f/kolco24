@@ -74,16 +74,11 @@
   text-shadow: 0 1px 8px rgba(0, 0, 0, .22);
 }
 
-.community-hero__links,
 .race-spotlight__actions {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
   gap: 10px;
-}
-
-.community-hero__links {
-  margin-top: 19px;
 }
 
 .community-button {
@@ -102,14 +97,12 @@
   transition: background .12s, border-color .12s, color .12s;
 }
 
-.community-button--light,
 .community-button--accent {
   border-color: var(--primary-2);
   color: #fff;
   background: var(--primary-2);
 }
 
-.community-button--light:hover,
 .community-button--accent:hover {
   border-color: var(--primary-dk);
   color: #fff;
@@ -126,17 +119,6 @@
   border-color: rgba(255, 255, 255, .62);
   color: #fff;
   background: rgba(255, 255, 255, .12);
-}
-
-.community-text-link {
-  padding: 8px 5px;
-  color: rgba(255, 255, 255, .86);
-  font-size: 14px;
-  font-weight: 500;
-}
-
-.community-text-link:hover {
-  color: #fff;
 }
 
 /* Featured race uses the same treatment as the regular race header. */
@@ -869,9 +851,6 @@
 }
 
 @media (max-width: 600px) {
-  .community-hero__links { align-items: stretch; flex-direction: column; }
-  .community-hero__links .community-button { width: 100%; }
-  .community-text-link { align-self: flex-start; }
   .race-spotlight .container { padding: 0 12px; }
   .race-spotlight__actions .community-button { flex: 1; }
   .community-section { padding-bottom: 32px; }

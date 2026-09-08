@@ -2,7 +2,7 @@ import re
 from datetime import timedelta
 
 import pytest
-from django.urls import reverse
+from django.urls import Resolver404, resolve, reverse
 from django.utils import timezone
 
 from website.models import NewsPost, PublicationKind, Race
@@ -178,7 +178,6 @@ def test_unreleased_publication_returns_404(client, kwargs):
 @pytest.mark.parametrize(
     ("url_name", "expected_path", "expected_title", "expected_tab"),
     [
-        ("publication_list", "/posts/", "Публикации", "posts"),
         ("news_list", "/news/", "Новости", "news"),
         ("article_list", "/articles/", "Статьи", "articles"),
     ],
@@ -201,23 +200,16 @@ def test_publication_catalogs_filter_by_route(client):
     article = create_publication("Статья", kind=PublicationKind.ARTICLE)
     news = create_publication("Новость", kind=PublicationKind.NEWS)
 
-    posts_response = client.get(reverse("publication_list"))
     news_response = client.get(reverse("news_list"))
     articles_response = client.get(reverse("article_list"))
 
-    assert set(posts_response.context["publications"]) == {article, news}
     assert list(news_response.context["publications"]) == [news]
     assert list(articles_response.context["publications"]) == [article]
 
 
-@pytest.mark.django_db
-def test_publication_catalog_ignores_legacy_kind_query(client):
-    article = create_publication("Статья", kind=PublicationKind.ARTICLE)
-    news = create_publication("Новость", kind=PublicationKind.NEWS)
-
-    response = client.get(reverse("publication_list"), {"kind": "article"})
-
-    assert set(response.context["publications"]) == {article, news}
+def test_posts_route_does_not_exist():
+    with pytest.raises(Resolver404):
+        resolve("/posts/")
 
 
 @pytest.mark.django_db
@@ -225,7 +217,6 @@ def test_publication_catalog_ignores_legacy_kind_query(client):
     ("url_name", "active_url_name"),
     [
         ("index", "index"),
-        ("publication_list", "publication_list"),
         ("news_list", "news_list"),
         ("article_list", "article_list"),
         ("race_list", "race_list"),
@@ -255,7 +246,6 @@ def test_community_section_tabs_link_to_each_standalone_route(client):
 
     assert hrefs == [
         reverse("index"),
-        reverse("publication_list"),
         reverse("news_list"),
         reverse("article_list"),
         reverse("race_list"),
@@ -266,7 +256,6 @@ def test_community_section_tabs_link_to_each_standalone_route(client):
 @pytest.mark.parametrize(
     ("url_name", "kind"),
     [
-        ("publication_list", PublicationKind.NEWS),
         ("news_list", PublicationKind.NEWS),
         ("article_list", PublicationKind.ARTICLE),
     ],
@@ -286,8 +275,17 @@ def test_publication_catalog_pagination_does_not_render_kind_query(
 
 
 @pytest.mark.django_db
-def test_publication_detail_keeps_breadcrumbs_without_section_tabs(client):
-    publication = create_publication("Материал без общей панели")
+@pytest.mark.parametrize(
+    ("kind", "catalog_url_name"),
+    [
+        (PublicationKind.NEWS, "news_list"),
+        (PublicationKind.ARTICLE, "article_list"),
+    ],
+)
+def test_publication_detail_keeps_category_breadcrumbs_without_section_tabs(
+    client, kind, catalog_url_name
+):
+    publication = create_publication("Материал без общей панели", kind=kind)
 
     response = client.get(publication.get_absolute_url())
     html = response.content.decode()
@@ -296,7 +294,7 @@ def test_publication_detail_keeps_breadcrumbs_without_section_tabs(client):
     assert 'aria-label="Разделы сайта"' not in html
     assert 'class="section-tabs"' not in html
     assert f'href="{reverse("index")}"' in breadcrumbs
-    assert f'href="{reverse("publication_list")}"' in breadcrumbs
+    assert f'href="{reverse(catalog_url_name)}"' in breadcrumbs
 
 
 @pytest.mark.django_db
@@ -310,7 +308,6 @@ def test_dark_navbar_does_not_duplicate_publication_and_race_links(client):
     assert header_match, "Dark site navbar was not rendered"
     navbar = header_match.group(0)
     assert 'class="nav-links"' not in navbar
-    assert f'href="{reverse("publication_list")}"' not in navbar
     assert f'href="{reverse("race_list")}"' not in navbar
 
 

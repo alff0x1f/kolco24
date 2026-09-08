@@ -49,11 +49,9 @@ class PublicationListView(View):
     template_name = "website/publication_list.html"
     paginate_by = 9
     publication_kind = None
-    section_tab = "posts"
-    catalog_title = "Публикации"
-    catalog_description = (
-        "Новости сообщества и знания, которые пригодятся до, во время и после старта."
-    )
+    section_tab = None
+    catalog_title = None
+    catalog_description = None
 
     def get(self, request):
         publications = visible_publications()

@@ -31,7 +31,6 @@ from .views.team import EditTeamView, TeamMemberMoveView
 
 urlpatterns = [
     path("", HomeView.as_view(), name="index"),
-    path("posts/", PublicationListView.as_view(), name="publication_list"),
     path(
         "news/",
         PublicationListView.as_view(
