@@ -23,7 +23,7 @@ class HomeView(View):
         featured_race = (
             Race.objects.filter(
                 is_published=True,
-                reg_status=RegStatus.OPEN,
+                reg_status__in=(RegStatus.OPEN, RegStatus.UPCOMING),
                 date_end__gte=today,
             )
             .order_by("date", "date_end", "pk")

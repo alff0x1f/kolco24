@@ -48,9 +48,11 @@ def test_home_is_a_real_page_and_shows_only_visible_publications(client):
 
 
 @pytest.mark.django_db
-def test_home_features_nearest_open_published_race_that_has_not_ended(client):
+def test_home_features_nearest_open_or_upcoming_published_race_that_has_not_ended(
+    client,
+):
     today = timezone.localdate()
-    nearest = Race.objects.create(
+    Race.objects.create(
         name="Ближайшая открытая",
         slug="nearest-open",
         date=today + timedelta(days=4),
@@ -81,13 +83,13 @@ def test_home_features_nearest_open_published_race_that_has_not_ended(client):
 
     response = client.get(reverse("index"))
 
-    assert response.context["featured_race"] == nearest
-    assert "Ближайшая открытая" in response.content.decode()
+    assert response.context["featured_race"].slug == "not-open-yet"
+    assert "Регистрация скоро откроется" in response.content.decode()
     assert "Старый забытый статус" not in response.content.decode()
 
 
 @pytest.mark.django_db
-def test_home_has_no_spotlight_without_open_registration(client):
+def test_home_upcoming_registration_spotlight_has_no_registration_link(client):
     today = timezone.localdate()
     Race.objects.create(
         name="Будущая гонка",
@@ -95,6 +97,26 @@ def test_home_has_no_spotlight_without_open_registration(client):
         date=today + timedelta(days=10),
         date_end=today + timedelta(days=10),
         reg_status=RegStatus.UPCOMING,
+    )
+
+    response = client.get(reverse("index"))
+
+    html = response.content.decode()
+    assert response.context["featured_race"].slug == "future-upcoming"
+    assert "race-spotlight" in html
+    assert "Регистрация скоро откроется" in html
+    assert "Зарегистрироваться" not in html
+
+
+@pytest.mark.django_db
+def test_home_has_no_spotlight_without_open_or_upcoming_registration(client):
+    today = timezone.localdate()
+    Race.objects.create(
+        name="Гонка без мест",
+        slug="future-sold-out",
+        date=today + timedelta(days=10),
+        date_end=today + timedelta(days=10),
+        reg_status=RegStatus.SOLD_OUT,
     )
 
     response = client.get(reverse("index"))
