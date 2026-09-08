@@ -31,17 +31,7 @@
     </div>
     {% endif %}
 
-    {% if page_obj.paginator.num_pages > 1 %}
-    <nav class="community-pagination" aria-label="Страницы публикаций">
-      {% if page_obj.has_previous %}
-      <a href="?page={{ page_obj.previous_page_number }}">← Назад</a>
-      {% else %}<span></span>{% endif %}
-      <span>{{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span>
-      {% if page_obj.has_next %}
-      <a href="?page={{ page_obj.next_page_number }}">Дальше →</a>
-      {% else %}<span></span>{% endif %}
-    </nav>
-    {% endif %}
+    {% include "website/_publication_pagination.html" %}
   </div>
 </main>
 {% endblock %}

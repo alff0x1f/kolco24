@@ -48,6 +48,42 @@ def test_home_is_a_real_page_and_shows_only_visible_publications(client):
 
 
 @pytest.mark.django_db
+def test_home_paginates_news_and_articles_together(client):
+    publication_date = timezone.now() - timedelta(days=1)
+    publications = [
+        create_publication(
+            f"Материал {index}",
+            kind=(PublicationKind.NEWS if index % 2 else PublicationKind.ARTICLE),
+            publication_date=publication_date,
+        )
+        for index in range(10)
+    ]
+
+    first_page = client.get(reverse("index"))
+    second_page = client.get(reverse("index"), {"page": 2})
+
+    assert list(first_page.context["publications"]) == list(reversed(publications[1:]))
+    assert list(second_page.context["publications"]) == [publications[0]]
+    assert 'href="?page=2#publications"' in first_page.content.decode()
+    assert 'href="?page=1#publications"' in second_page.content.decode()
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(
+    ("page", "expected_page"),
+    [("invalid", 1), ("999", 2)],
+)
+def test_home_pagination_handles_invalid_page_numbers(client, page, expected_page):
+    for index in range(10):
+        create_publication(f"Материал {index}")
+
+    response = client.get(reverse("index"), {"page": page})
+
+    assert response.status_code == 200
+    assert response.context["page_obj"].number == expected_page
+
+
+@pytest.mark.django_db
 def test_home_features_nearest_open_or_upcoming_published_race_that_has_not_ended(
     client,
 ):
@@ -175,41 +211,31 @@ def test_unreleased_publication_returns_404(client, kwargs):
 
 
 @pytest.mark.django_db
-@pytest.mark.parametrize(
-    ("url_name", "expected_path", "expected_title", "expected_tab"),
-    [
-        ("news_list", "/news/", "Новости", "news"),
-        ("article_list", "/articles/", "Статьи", "articles"),
-    ],
-)
-def test_publication_catalog_routes(
-    client, url_name, expected_path, expected_title, expected_tab
-):
-    assert reverse(url_name) == expected_path
+def test_article_catalog_route(client):
+    assert reverse("article_list") == "/articles/"
 
-    response = client.get(reverse(url_name))
+    response = client.get(reverse("article_list"))
 
     assert response.status_code == 200
-    assert response.context["catalog_title"] == expected_title
+    assert response.context["catalog_title"] == "Статьи"
     assert response.context["catalog_description"]
-    assert response.context["section_tab"] == expected_tab
+    assert response.context["section_tab"] == "articles"
 
 
 @pytest.mark.django_db
-def test_publication_catalogs_filter_by_route(client):
+def test_article_catalog_filters_out_news(client):
     article = create_publication("Статья", kind=PublicationKind.ARTICLE)
-    news = create_publication("Новость", kind=PublicationKind.NEWS)
+    create_publication("Новость", kind=PublicationKind.NEWS)
 
-    news_response = client.get(reverse("news_list"))
     articles_response = client.get(reverse("article_list"))
 
-    assert list(news_response.context["publications"]) == [news]
     assert list(articles_response.context["publications"]) == [article]
 
 
-def test_posts_route_does_not_exist():
+@pytest.mark.parametrize("path", ["/posts/", "/news/"])
+def test_removed_publication_catalog_routes_do_not_exist(path):
     with pytest.raises(Resolver404):
-        resolve("/posts/")
+        resolve(path)
 
 
 @pytest.mark.django_db
@@ -217,7 +243,6 @@ def test_posts_route_does_not_exist():
     ("url_name", "active_url_name"),
     [
         ("index", "index"),
-        ("news_list", "news_list"),
         ("article_list", "article_list"),
         ("race_list", "race_list"),
     ],
@@ -246,27 +271,17 @@ def test_community_section_tabs_link_to_each_standalone_route(client):
 
     assert hrefs == [
         reverse("index"),
-        reverse("news_list"),
         reverse("article_list"),
         reverse("race_list"),
     ]
 
 
 @pytest.mark.django_db
-@pytest.mark.parametrize(
-    ("url_name", "kind"),
-    [
-        ("news_list", PublicationKind.NEWS),
-        ("article_list", PublicationKind.ARTICLE),
-    ],
-)
-def test_publication_catalog_pagination_does_not_render_kind_query(
-    client, url_name, kind
-):
+def test_article_catalog_pagination_does_not_render_kind_query(client):
     for index in range(10):
-        create_publication(f"Материал {url_name} {index}", kind=kind)
+        create_publication(f"Статья {index}", kind=PublicationKind.ARTICLE)
 
-    response = client.get(reverse(url_name))
+    response = client.get(reverse("article_list"))
     html = response.content.decode()
 
     assert response.status_code == 200
@@ -278,7 +293,7 @@ def test_publication_catalog_pagination_does_not_render_kind_query(
 @pytest.mark.parametrize(
     ("kind", "catalog_url_name"),
     [
-        (PublicationKind.NEWS, "news_list"),
+        (PublicationKind.NEWS, None),
         (PublicationKind.ARTICLE, "article_list"),
     ],
 )
@@ -293,8 +308,13 @@ def test_publication_detail_keeps_category_breadcrumbs_without_section_tabs(
 
     assert 'aria-label="Разделы сайта"' not in html
     assert 'class="section-tabs"' not in html
-    assert f'href="{reverse("index")}"' in breadcrumbs
-    assert f'href="{reverse(catalog_url_name)}"' in breadcrumbs
+    expected_url = (
+        reverse(catalog_url_name)
+        if catalog_url_name
+        else f'{reverse("index")}#publications'
+    )
+    assert f'href="{expected_url}"' in breadcrumbs
+    assert f'href="{expected_url}"' in html
 
 
 @pytest.mark.django_db

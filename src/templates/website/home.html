@@ -48,7 +48,7 @@
   {% endif %}
 
   <main class="community-content">
-    <section class="community-section container" aria-labelledby="latest-title">
+    <section id="publications" class="community-section container" aria-labelledby="latest-title">
       <div class="community-section__head">
         <div>
           <p class="community-eyebrow community-eyebrow--dark">Новое в журнале</p>
@@ -68,6 +68,8 @@
         <div><h3>Материалы готовятся</h3><p>Скоро здесь появятся новости сообщества и практические статьи.</p></div>
       </div>
       {% endif %}
+
+      {% include "website/_publication_pagination.html" with pagination_fragment="#publications" %}
     </section>
 
     <section class="races-preview" aria-labelledby="races-title">

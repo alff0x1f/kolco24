@@ -3,20 +3,25 @@ from django.shortcuts import get_object_or_404, render
 from django.utils import timezone
 from django.views import View
 
-from website.models import NewsPost, Race
+from website.models import NewsPost, PublicationKind, Race
 from website.models.race import RegStatus
 
 
 def visible_publications():
     """Public publication feed, including scheduled items only after release."""
-    return NewsPost.objects.filter(
-        is_published=True,
-        publication_date__lte=timezone.now(),
-    ).select_related("race")
+    return (
+        NewsPost.objects.filter(
+            is_published=True,
+            publication_date__lte=timezone.now(),
+        )
+        .select_related("race")
+        .order_by("-publication_date", "-pk")
+    )
 
 
 class HomeView(View):
     template_name = "website/home.html"
+    publication_paginate_by = 9
 
     def get(self, request):
         today = timezone.localdate()
@@ -37,27 +42,24 @@ class HomeView(View):
         if featured_race is not None:
             upcoming_races = upcoming_races.exclude(pk=featured_race.pk)
 
+        page_obj = Paginator(
+            visible_publications(), self.publication_paginate_by
+        ).get_page(request.GET.get("page"))
         context = {
             "featured_race": featured_race,
-            "publications": visible_publications()[:9],
+            "page_obj": page_obj,
+            "publications": page_obj.object_list,
             "upcoming_races": upcoming_races[:3],
         }
         return render(request, self.template_name, context)
 
 
-class PublicationListView(View):
+class ArticleListView(View):
     template_name = "website/publication_list.html"
     paginate_by = 9
-    publication_kind = None
-    section_tab = None
-    catalog_title = None
-    catalog_description = None
 
     def get(self, request):
-        publications = visible_publications()
-        if self.publication_kind is not None:
-            publications = publications.filter(kind=self.publication_kind)
-
+        publications = visible_publications().filter(kind=PublicationKind.ARTICLE)
         page_obj = Paginator(publications, self.paginate_by).get_page(
             request.GET.get("page")
         )
@@ -67,10 +69,12 @@ class PublicationListView(View):
             {
                 "page_obj": page_obj,
                 "publications": page_obj.object_list,
-                "publication_kind": self.publication_kind,
-                "section_tab": self.section_tab,
-                "catalog_title": self.catalog_title,
-                "catalog_description": self.catalog_description,
+                "section_tab": "articles",
+                "catalog_title": "Статьи",
+                "catalog_description": (
+                    "Практические статьи о подготовке, навигации "
+                    "и туристских соревнованиях."
+                ),
             },
         )
 

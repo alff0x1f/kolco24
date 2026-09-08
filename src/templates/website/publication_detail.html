@@ -11,7 +11,7 @@
 <main class="community-page publication-detail">
   <div class="container publication-detail__wrap">
     <nav class="community-crumbs" aria-label="Хлебные крошки">
-      <a href="{% url 'index' %}">Главная</a><span>/</span>{% if publication.kind == "news" %}<a href="{% url 'news_list' %}">Новости</a>{% else %}<a href="{% url 'article_list' %}">Статьи</a>{% endif %}
+      <a href="{% url 'index' %}{% if publication.kind == 'news' %}#publications{% endif %}">Главная</a>{% if publication.kind == "article" %}<span>/</span><a href="{% url 'article_list' %}">Статьи</a>{% endif %}
     </nav>
     <article>
       <header class="publication-detail__head">
@@ -33,7 +33,7 @@
       <div class="publication-detail__body">{{ publication.content_html|safe }}</div>
     </article>
     <footer class="publication-detail__footer">
-      {% if publication.kind == "news" %}<a href="{% url 'news_list' %}">← Ко всем новостям</a>{% else %}<a href="{% url 'article_list' %}">← Ко всем статьям</a>{% endif %}
+      {% if publication.kind == "news" %}<a href="{% url 'index' %}#publications">← Ко всем публикациям</a>{% else %}<a href="{% url 'article_list' %}">← Ко всем статьям</a>{% endif %}
     </footer>
   </div>
 </main>
