@@ -39,86 +39,222 @@
   color: var(--muted);
 }
 
-/* ── Race page wrapper ───────────────────────────────── */
-/* top-padding is 0 because the cover banner sits flush at the top */
-.race-page { padding: 0 0 56px; }
-
-/* ── Cover banner ────────────────────────────────────── */
-.cover-banner {
+/* ── Shared race header and section navigation ───────── */
+.race-hero {
   position: relative;
-  width: 100%;
-  background: #1d242d;
-}
-.cover-image {
-  position: relative;
-  width: 100%;
-  aspect-ratio: 1920 / 480;
-  min-height: 200px;
-  max-height: 460px;
-  /* fallback gradient when no header_image */
-  background: linear-gradient(145deg, #4a5e74 0%, #5d7388 35%, #8c9aa6 65%, #b6b6a6 100%);
-  background-size: cover;
-  background-position: center;
+  min-height: 176px;
   overflow: hidden;
+  color: #fff;
+  background: linear-gradient(135deg, #1d3a63 0%, #485f78 55%, #7d8791 100%);
 }
-.cover-bg-img {
-  position: absolute; inset: 0;
-  width: 100%; height: 100%;
-  object-fit: cover; object-position: center;
-  z-index: 0;
+.race-hero-bg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
 }
-.cover-image::before {
-  content: ''; position: absolute; inset: 0; z-index: 1;
-  background: linear-gradient(180deg, rgba(0, 0, 0, 0) 35%, rgba(0, 0, 0, .38) 100%);
+.race-hero-shade {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, rgba(15, 22, 31, .82) 0%, rgba(15, 22, 31, .58) 48%, rgba(15, 22, 31, .28) 100%);
 }
-.cover-status {
-  position: absolute; top: 18px; z-index: 2;
-  right: max(20px, calc((100% - 1180px) / 2 + 20px));
-}
-.cover-status .pill {
-  background: rgba(255, 255, 255, .95);
-  backdrop-filter: blur(8px);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, .08), 0 8px 24px rgba(0, 0, 0, .12);
-}
-
-.cover-meta-card {
-  background: var(--paper-2);
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  overflow: hidden;
-  box-shadow: var(--shadow-sm);
-  margin-bottom: 16px;
-  margin-top: -16px;
+.race-hero-inner {
   position: relative;
-  z-index: 2;
-}
-.cover-meta {
+  z-index: 1;
+  min-height: 176px;
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
-  gap: 18px;
-  align-items: center;
-  padding: 18px 24px 20px;
+  align-items: end;
+  gap: 24px;
+  padding-top: 22px;
+  padding-bottom: 24px;
 }
-.cover-title h1 {
-  font-size: 24px;
+.race-hero-copy { min-width: 0; }
+.race-hero .pill {
+  margin-bottom: 11px;
+  background: rgba(255, 255, 255, .94);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, .14);
+}
+.race-hero h1 {
+  max-width: 760px;
+  color: #fff;
+  font-size: 30px;
   font-weight: 600;
-  letter-spacing: -0.01em;
-  margin-bottom: 4px;
-  color: var(--ink);
+  line-height: 1.12;
+  letter-spacing: -.015em;
+  text-shadow: 0 1px 12px rgba(0, 0, 0, .3);
 }
-.cover-title .sub {
-  font-size: 14px;
-  color: var(--muted);
-  display: flex; gap: 14px; flex-wrap: wrap;
+.race-hero-meta {
+  display: flex;
   align-items: center;
+  flex-wrap: wrap;
+  gap: 9px;
+  margin-top: 9px;
+  color: rgba(255, 255, 255, .88);
+  font-size: 13.5px;
+  text-shadow: 0 1px 8px rgba(0, 0, 0, .28);
 }
-.cover-title .sub .dot {
-  width: 3px; height: 3px;
-  background: var(--muted-2);
+.meta-sep {
+  width: 3px;
+  height: 3px;
+  flex: 0 0 auto;
   border-radius: 50%;
-  flex-shrink: 0;
+  background: currentColor;
+  opacity: .55;
 }
-.cover-actions { display: flex; gap: 8px; align-items: center; }
+.race-hero-actions { align-self: end; }
+.race-hero-actions .btn {
+  box-shadow: 0 8px 24px rgba(0, 0, 0, .18);
+}
+.race-tabs {
+  position: sticky;
+  top: 57px;
+  z-index: 20;
+  background: rgba(255, 255, 255, .96);
+  border-bottom: 1px solid var(--line);
+  box-shadow: 0 1px 2px rgba(22, 26, 31, .03);
+  backdrop-filter: blur(10px);
+}
+.race-tabs-inner {
+  display: flex;
+  align-items: stretch;
+  gap: 28px;
+}
+.race-tab {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 49px;
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 500;
+}
+.race-tab:hover { color: var(--ink); }
+.race-tab::after {
+  content: '';
+  position: absolute;
+  right: 0;
+  bottom: -1px;
+  left: 0;
+  height: 3px;
+  border-radius: 3px 3px 0 0;
+  background: transparent;
+}
+.race-tab.is-active { color: var(--primary-dk); }
+.race-tab.is-active::after { background: var(--primary-2); }
+.race-tab span {
+  min-width: 22px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--paper);
+  color: var(--muted);
+  font-size: 11px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+.race-tab.is-active span { background: #e7eef7; color: var(--primary); }
+
+.race-page { padding: 20px 0 56px; }
+
+/* ── Overview layout ─────────────────────────────────── */
+.overview-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  grid-template-areas:
+    "news summary"
+    "news secondary";
+  gap: 0 16px;
+  align-items: start;
+}
+.overview-news { grid-area: news; min-width: 0; }
+.overview-summary { grid-area: summary; }
+.overview-secondary { grid-area: secondary; }
+
+/* ── Signed-in user's teams ──────────────────────────── */
+.owned-teams-card { margin-bottom: 16px; overflow: hidden; }
+.owned-teams-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 17px 22px 14px;
+  border-bottom: 1px solid var(--line-soft);
+}
+.owned-teams-head h2,
+.owned-teams-empty h2 {
+  margin-top: 3px;
+  font-size: 19px;
+  font-weight: 600;
+}
+.owned-teams-count {
+  display: inline-grid;
+  place-items: center;
+  min-width: 28px;
+  height: 28px;
+  padding: 0 8px;
+  border-radius: 999px;
+  background: #e7eef7;
+  color: var(--primary);
+  font-size: 12px;
+  font-weight: 600;
+}
+.owned-team-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 16px;
+  padding: 15px 22px;
+  border-top: 1px solid var(--line-soft);
+}
+.owned-team-row:first-child { border-top: 0; }
+.owned-team-number {
+  min-width: 54px;
+  padding: 6px 9px;
+  border-radius: 8px;
+  background: #eef1f5;
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 600;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+.owned-team-copy { min-width: 0; }
+.owned-team-copy h3 {
+  overflow-wrap: anywhere;
+  font-size: 16px;
+  font-weight: 600;
+}
+.owned-team-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 12.5px;
+}
+.owned-team-locked {
+  display: inline-block;
+  margin-top: 5px;
+  color: var(--warn);
+  font-size: 12px;
+  font-weight: 500;
+}
+.owned-teams-empty {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 20px 22px;
+}
+.owned-teams-empty p {
+  margin: 5px 0 0;
+  color: var(--muted);
+  font-size: 13.5px;
+}
 
 /* ── Outline button (not in theme-2.css) ─────────────── */
 .btn-outline {
@@ -346,40 +482,61 @@
 }
 .cat-remaining.ok { color: var(--primary-2); }
 .cat-remaining.none { color: #c0392b; }
-/* Race-level «осталось N мест / мест нет» badge in the cover sub line. */
-.cover-title .sub .remaining { font-weight: 600; }
-.cover-title .sub .remaining.ok { color: var(--primary-2); }
-.cover-title .sub .remaining.none { color: #c0392b; }
 
 /* ── Responsive ──────────────────────────────────────── */
 @media (max-width: 920px) {
-  .cover-image { aspect-ratio: 16 / 9; }
-  .cover-meta {
+  .overview-grid {
     grid-template-columns: 1fr;
-    padding: 14px 18px 16px;
-    row-gap: 14px;
+    grid-template-areas:
+      "summary"
+      "news"
+      "secondary";
   }
-  .cover-actions { justify-content: flex-start; }
 }
 @media (max-width: 720px) {
-  .cover-image { aspect-ratio: 16 / 10; }
+  .race-hero,
+  .race-hero-inner { min-height: 152px; }
+  .race-hero-inner {
+    grid-template-columns: 1fr;
+    gap: 13px;
+    padding-top: 18px;
+    padding-bottom: 18px;
+  }
+  .race-hero h1 { font-size: 25px; }
+  .race-hero .pill { margin-bottom: 8px; }
+  .race-hero-actions { justify-self: start; }
+  .owned-team-row { grid-template-columns: auto minmax(0, 1fr); }
+  .owned-team-row .btn { grid-column: 2; justify-self: start; }
 }
 @media (max-width: 600px) {
-  .race-page { padding: 0 0 36px; }
-  .cover-meta-card {
-    border-radius: 0;
-    border-left: none;
-    border-right: none;
-    margin-top: -10px;
+  .race-page { padding: 12px 0 36px; }
+  .race-hero,
+  .race-hero-inner { min-height: 144px; }
+  .race-hero-shade {
+    background: linear-gradient(90deg, rgba(15, 22, 31, .84), rgba(15, 22, 31, .5));
   }
-  .cover-image { aspect-ratio: 3 / 2; min-height: 180px; }
-  .cover-status { top: 10px; right: 10px; }
-  .cover-status .pill { font-size: 12px; padding: 4px 10px; }
-  .cover-meta { grid-template-columns: 1fr; padding: 12px 16px 16px; gap: 10px; }
-  .cover-title h1 { font-size: 20px; }
-  .cover-title .sub { font-size: 13px; gap: 10px; }
-  .cover-actions { width: 100%; flex-wrap: wrap; }
-  .cover-actions .btn { flex: 1; justify-content: center; min-width: 0; }
+  .race-hero h1 { font-size: 22px; }
+  .race-hero-meta { gap: 7px; margin-top: 7px; font-size: 12.5px; }
+  .race-hero .pill { padding: 4px 10px; font-size: 12px; }
+  .race-hero-actions,
+  .race-hero-actions .btn { width: 100%; }
+  .race-tabs-inner { gap: 24px; }
+  .race-tab { min-height: 46px; }
+  .owned-teams-head { padding: 15px 16px 12px; }
+  .owned-team-row {
+    grid-template-columns: 1fr;
+    gap: 9px;
+    padding: 15px 16px 17px;
+  }
+  .owned-team-number { justify-self: start; }
+  .owned-team-row .btn { grid-column: 1; width: 100%; }
+  .owned-teams-empty {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 15px;
+    padding: 18px 16px;
+  }
+  .owned-teams-empty .btn { width: 100%; }
   .tab-body { padding: 16px 16px 18px; }
   .post-title { font-size: 17px; }
   .post-body { font-size: 14.5px; }
