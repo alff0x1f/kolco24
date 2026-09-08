@@ -108,55 +108,6 @@
 .race-hero-actions .btn {
   box-shadow: 0 8px 24px rgba(0, 0, 0, .18);
 }
-.race-tabs {
-  position: sticky;
-  top: 57px;
-  z-index: 20;
-  background: rgba(255, 255, 255, .96);
-  border-bottom: 1px solid var(--line);
-  box-shadow: 0 1px 2px rgba(22, 26, 31, .03);
-  backdrop-filter: blur(10px);
-}
-.race-tabs-inner {
-  display: flex;
-  align-items: stretch;
-  gap: 28px;
-}
-.race-tab {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  min-height: 49px;
-  color: var(--muted);
-  font-size: 14px;
-  font-weight: 500;
-}
-.race-tab:hover { color: var(--ink); }
-.race-tab::after {
-  content: '';
-  position: absolute;
-  right: 0;
-  bottom: -1px;
-  left: 0;
-  height: 3px;
-  border-radius: 3px 3px 0 0;
-  background: transparent;
-}
-.race-tab.is-active { color: var(--primary-dk); }
-.race-tab.is-active::after { background: var(--primary-2); }
-.race-tab span {
-  min-width: 22px;
-  padding: 1px 7px;
-  border-radius: 999px;
-  background: var(--paper);
-  color: var(--muted);
-  font-size: 11px;
-  text-align: center;
-  font-variant-numeric: tabular-nums;
-}
-.race-tab.is-active span { background: #e7eef7; color: var(--primary); }
-
 .race-page { padding: 20px 0 56px; }
 
 /* ── Overview layout ─────────────────────────────────── */
@@ -520,8 +471,6 @@
   .race-hero .pill { padding: 4px 10px; font-size: 12px; }
   .race-hero-actions,
   .race-hero-actions .btn { width: 100%; }
-  .race-tabs-inner { gap: 24px; }
-  .race-tab { min-height: 46px; }
   .owned-teams-head { padding: 15px 16px 12px; }
   .owned-team-row {
     grid-template-columns: 1fr;

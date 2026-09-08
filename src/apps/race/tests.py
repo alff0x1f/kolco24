@@ -482,8 +482,8 @@ def test_teams_page_renders_key_markup(client):
     assert 'data-initial="all"' in html
     # Compact shared race header + persistent section tabs.
     assert 'class="race-hero"' in html
-    assert 'class="race-tabs"' in html
-    assert 'class="race-tab is-active"' in html
+    assert 'class="section-tabs"' in html
+    assert 'class="section-tab is-active"' in html
     assert reverse("race", args=[race.slug]) in html
     assert reverse("all_teams", args=[race.slug]) in html
     # search box + chips container the JS hydrates
@@ -508,6 +508,46 @@ def test_teams_page_renders_key_markup(client):
     _script_json(html, "categories-data")
     # teams.js wired up
     assert "js/teams.js" in html
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(
+    ("url_name", "active_url_name"),
+    [("race", "race"), ("all_teams", "all_teams")],
+)
+def test_race_tabs_keep_labels_active_state_and_team_count(
+    client, url_name, active_url_name
+):
+    owner = User.objects.create_user(
+        username=f"tabs-{url_name}",
+        password="p",
+        email=f"tabs-{url_name}@example.com",
+    )
+    race = _make_race(slug=f"tabs-{url_name}")
+    category = _make_category(race)
+    _make_team(owner, category, teamname="Оплаченная", paid_people=2)
+    _make_team(owner, category, teamname="Неоплаченная", paid_people=0)
+
+    response = client.get(reverse(url_name, args=[race.slug]))
+    html = response.content.decode()
+    nav_match = re.search(
+        r'<nav\b[^>]*aria-label="Разделы гонки"[^>]*>.*?</nav>',
+        html,
+        re.DOTALL,
+    )
+
+    assert response.status_code == 200
+    assert nav_match, "Race section tabs were not rendered"
+    nav = nav_match.group(0)
+    current_links = re.findall(r'<a\b[^>]*aria-current="page"[^>]*>', nav)
+    compact_nav = " ".join(nav.split())
+
+    assert "Обзор" in nav
+    assert "Команды <span>1</span>" in compact_nav
+    assert len(current_links) == 1
+    assert 'class="section-tab is-active"' in current_links[0]
+    expected_href = reverse(active_url_name, args=[race.slug])
+    assert f'href="{expected_href}"' in current_links[0]
 
 
 @pytest.mark.django_db

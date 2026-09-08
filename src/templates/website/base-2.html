@@ -35,10 +35,6 @@
             <span></span><span></span><span></span>
         </button>
         <div class="nav-menu">
-            <ul class="nav-links">
-                <li><a href="{% url 'publication_list' %}">Публикации</a></li>
-                <li><a href="{% url 'race_list' %}">Соревнования</a></li>
-            </ul>
             <div class="nav-actions">
                 {% if request.session.impersonator_id %}
                 <span class="nav-impersonator">Режим пользователя</span>

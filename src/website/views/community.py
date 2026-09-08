@@ -3,7 +3,7 @@ from django.shortcuts import get_object_or_404, render
 from django.utils import timezone
 from django.views import View
 
-from website.models import NewsPost, PublicationKind, Race
+from website.models import NewsPost, Race
 from website.models.race import RegStatus
 
 
@@ -48,16 +48,17 @@ class HomeView(View):
 class PublicationListView(View):
     template_name = "website/publication_list.html"
     paginate_by = 9
+    publication_kind = None
+    section_tab = "posts"
+    catalog_title = "Публикации"
+    catalog_description = (
+        "Новости сообщества и знания, которые пригодятся до, во время и после старта."
+    )
 
     def get(self, request):
-        selected_kind = request.GET.get("kind", "")
-        valid_kinds = {value for value, _label in PublicationKind.choices}
-
         publications = visible_publications()
-        if selected_kind in valid_kinds:
-            publications = publications.filter(kind=selected_kind)
-        else:
-            selected_kind = ""
+        if self.publication_kind is not None:
+            publications = publications.filter(kind=self.publication_kind)
 
         page_obj = Paginator(publications, self.paginate_by).get_page(
             request.GET.get("page")
@@ -68,7 +69,10 @@ class PublicationListView(View):
             {
                 "page_obj": page_obj,
                 "publications": page_obj.object_list,
-                "selected_kind": selected_kind,
+                "publication_kind": self.publication_kind,
+                "section_tab": self.section_tab,
+                "catalog_title": self.catalog_title,
+                "catalog_description": self.catalog_description,
             },
         )
 

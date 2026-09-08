@@ -33,6 +33,31 @@ urlpatterns = [
     path("", HomeView.as_view(), name="index"),
     path("posts/", PublicationListView.as_view(), name="publication_list"),
     path(
+        "news/",
+        PublicationListView.as_view(
+            publication_kind="news",
+            section_tab="news",
+            catalog_title="Новости",
+            catalog_description=(
+                "Новости сообщества, соревнований и жизни «Кольца 24»."
+            ),
+        ),
+        name="news_list",
+    ),
+    path(
+        "articles/",
+        PublicationListView.as_view(
+            publication_kind="article",
+            section_tab="articles",
+            catalog_title="Статьи",
+            catalog_description=(
+                "Практические статьи о подготовке, навигации "
+                "и туристских соревнованиях."
+            ),
+        ),
+        name="article_list",
+    ),
+    path(
         "post/<int:pk>/",
         PublicationDetailView.as_view(),
         name="publication_detail",

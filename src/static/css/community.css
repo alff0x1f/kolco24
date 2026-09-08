@@ -644,29 +644,6 @@
 
 .community-catalog__body { padding-top: 20px; }
 
-.publication-filters {
-  display: flex;
-  gap: 8px;
-  margin-bottom: 18px;
-}
-
-.publication-filters a {
-  padding: 7px 13px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  color: var(--muted);
-  background: var(--paper-2);
-  font-size: 13px;
-  font-weight: 500;
-}
-
-.publication-filters a:hover,
-.publication-filters a.is-active {
-  border-color: var(--primary-2);
-  color: #fff;
-  background: var(--primary-2);
-}
-
 .community-pagination {
   display: grid;
   grid-template-columns: 1fr auto 1fr;
@@ -904,8 +881,6 @@
   .races-preview { padding: 27px 0 38px; }
   .races-preview__offseason { align-items: flex-start; flex-direction: column; padding: 19px 17px; }
   .race-list-card { grid-template-columns: 50px minmax(0, 1fr) 22px; gap: 11px; padding: 15px 13px; border-radius: 0; border-right: 0; border-left: 0; }
-  .publication-filters { overflow-x: auto; padding-bottom: 3px; }
-  .publication-filters a { flex: 0 0 auto; }
   .publication-detail { padding: 14px 0 38px; }
   .publication-detail article { border-right: 0; border-left: 0; border-radius: 0; }
   .publication-detail__head { padding: 28px 20px 24px; }

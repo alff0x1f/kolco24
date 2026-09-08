@@ -1,8 +1,8 @@
 {% extends "website/base-2.html" %}
 {% load static %}
 
-{% block title %}Публикации — Кольцо 24{% endblock %}
-{% block head_descr %}Новости сообщества и практические статьи о подготовке, навигации и туристских соревнованиях.{% endblock %}
+{% block title %}{{ catalog_title }} — Кольцо 24{% endblock %}
+{% block head_descr %}{{ catalog_description }}{% endblock %}
 {% block extra_head %}<link href="{% static 'css/community.css' %}" rel="stylesheet">{% endblock %}
 
 {% block content %}
@@ -10,18 +10,14 @@
   <header class="community-catalog__head">
     <div class="container">
       <p class="community-eyebrow">Журнал «Кольцо 24»</p>
-      <h1>Публикации</h1>
-      <p>Новости сообщества и знания, которые пригодятся до, во время и после старта.</p>
+      <h1>{{ catalog_title }}</h1>
+      <p>{{ catalog_description }}</p>
     </div>
   </header>
 
-  <div class="container community-catalog__body">
-    <nav class="publication-filters" aria-label="Фильтр публикаций">
-      <a{% if not selected_kind %} class="is-active" aria-current="page"{% endif %} href="{% url 'publication_list' %}">Все</a>
-      <a{% if selected_kind == 'news' %} class="is-active" aria-current="page"{% endif %} href="{% url 'publication_list' %}?kind=news">Новости</a>
-      <a{% if selected_kind == 'article' %} class="is-active" aria-current="page"{% endif %} href="{% url 'publication_list' %}?kind=article">Статьи</a>
-    </nav>
+  {% include "website/_section_tabs.html" with active_tab=section_tab %}
 
+  <div class="container community-catalog__body">
     {% if publications %}
     <div class="publication-grid">
       {% for publication in publications %}
@@ -38,11 +34,11 @@
     {% if page_obj.paginator.num_pages > 1 %}
     <nav class="community-pagination" aria-label="Страницы публикаций">
       {% if page_obj.has_previous %}
-      <a href="?{% if selected_kind %}kind={{ selected_kind }}&amp;{% endif %}page={{ page_obj.previous_page_number }}">← Назад</a>
+      <a href="?page={{ page_obj.previous_page_number }}">← Назад</a>
       {% else %}<span></span>{% endif %}
       <span>{{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span>
       {% if page_obj.has_next %}
-      <a href="?{% if selected_kind %}kind={{ selected_kind }}&amp;{% endif %}page={{ page_obj.next_page_number }}">Дальше →</a>
+      <a href="?page={{ page_obj.next_page_number }}">Дальше →</a>
       {% else %}<span></span>{% endif %}
     </nav>
     {% endif %}

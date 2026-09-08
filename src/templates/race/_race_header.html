@@ -36,13 +36,13 @@
   </div>
 </header>
 
-<nav class="race-tabs" aria-label="Разделы гонки">
-  <div class="container race-tabs-inner">
-    <a class="race-tab{% if active_tab == 'overview' %} is-active{% endif %}"
+<nav class="section-tabs" aria-label="Разделы гонки">
+  <div class="container section-tabs-inner">
+    <a class="section-tab{% if active_tab == 'overview' %} is-active{% endif %}"
       href="{% url 'race' race.slug %}"{% if active_tab == 'overview' %} aria-current="page"{% endif %}>
       Обзор
     </a>
-    <a class="race-tab{% if active_tab == 'teams' %} is-active{% endif %}"
+    <a class="section-tab{% if active_tab == 'teams' %} is-active{% endif %}"
       href="{% url 'all_teams' race.slug %}"{% if active_tab == 'teams' %} aria-current="page"{% endif %}>
       Команды <span>{{ race_team_count }}</span>
     </a>
