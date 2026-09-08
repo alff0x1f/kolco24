@@ -1,0 +1,51 @@
+{% extends "website/base-2.html" %}
+{% load static %}
+
+{% block title %}Публикации — Кольцо 24{% endblock %}
+{% block head_descr %}Новости сообщества и практические статьи о подготовке, навигации и туристских соревнованиях.{% endblock %}
+{% block extra_head %}<link href="{% static 'css/community.css' %}" rel="stylesheet">{% endblock %}
+
+{% block content %}
+<main class="community-page community-catalog">
+  <header class="community-catalog__head">
+    <div class="container">
+      <p class="community-eyebrow">Журнал «Кольцо 24»</p>
+      <h1>Публикации</h1>
+      <p>Новости сообщества и знания, которые пригодятся до, во время и после старта.</p>
+    </div>
+  </header>
+
+  <div class="container community-catalog__body">
+    <nav class="publication-filters" aria-label="Фильтр публикаций">
+      <a{% if not selected_kind %} class="is-active" aria-current="page"{% endif %} href="{% url 'publication_list' %}">Все</a>
+      <a{% if selected_kind == 'news' %} class="is-active" aria-current="page"{% endif %} href="{% url 'publication_list' %}?kind=news">Новости</a>
+      <a{% if selected_kind == 'article' %} class="is-active" aria-current="page"{% endif %} href="{% url 'publication_list' %}?kind=article">Статьи</a>
+    </nav>
+
+    {% if publications %}
+    <div class="publication-grid">
+      {% for publication in publications %}
+      {% include "website/_publication_card.html" %}
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="community-empty community-empty--catalog">
+      <span aria-hidden="true">24</span>
+      <div><h2>Пока ничего нет</h2><p>В этой категории ещё не опубликовано материалов.</p></div>
+    </div>
+    {% endif %}
+
+    {% if page_obj.paginator.num_pages > 1 %}
+    <nav class="community-pagination" aria-label="Страницы публикаций">
+      {% if page_obj.has_previous %}
+      <a href="?{% if selected_kind %}kind={{ selected_kind }}&amp;{% endif %}page={{ page_obj.previous_page_number }}">← Назад</a>
+      {% else %}<span></span>{% endif %}
+      <span>{{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span>
+      {% if page_obj.has_next %}
+      <a href="?{% if selected_kind %}kind={{ selected_kind }}&amp;{% endif %}page={{ page_obj.next_page_number }}">Дальше →</a>
+      {% else %}<span></span>{% endif %}
+    </nav>
+    {% endif %}
+  </div>
+</main>
+{% endblock %}

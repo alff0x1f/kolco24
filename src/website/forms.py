@@ -322,10 +322,17 @@ class PageForm(forms.ModelForm):
 class NewsPostForm(forms.ModelForm):
     class Meta:
         model = NewsPost
-        fields = ["title", "content", "image"]
+        fields = ["title", "summary", "content", "image"]
         widgets = {
             "title": forms.TextInput(
                 attrs={"class": "form-control", "placeholder": "Заголовок"}
+            ),
+            "summary": forms.Textarea(
+                attrs={
+                    "class": "form-control",
+                    "rows": 2,
+                    "placeholder": "Короткий анонс (необязательно)",
+                }
             ),
             "content": forms.Textarea(
                 attrs={"class": "form-control", "rows": 6, "placeholder": "Markdown"}

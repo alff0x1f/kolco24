@@ -1,0 +1,99 @@
+{% extends "website/base-2.html" %}
+{% load static %}
+
+{% block title %}Кольцо 24 — маршруты, опыт и люди{% endblock %}
+{% block head_descr %}Истории сообщества, практические материалы о рогейне и туристских соревнованиях, будущие старты и архив «Кольца 24».{% endblock %}
+{% block extra_head %}<link href="{% static 'css/community.css' %}" rel="stylesheet">{% endblock %}
+
+{% block content %}
+<div class="community-page">
+  <section class="community-hero">
+    <div class="container community-hero__grid">
+      <div class="community-hero__copy">
+        <p class="community-eyebrow">Журнал туристского сообщества</p>
+        <h1>Маршруты, опыт и люди</h1>
+        <p class="community-hero__lead">Разбираемся в навигации и снаряжении, готовимся к длинным дистанциям и рассказываем истории тех, кто выходит на старт.</p>
+        <div class="community-hero__links">
+          <a class="community-button community-button--light" href="{% url 'publication_list' %}">Читать публикации</a>
+          <a class="community-text-link" href="{% url 'race_list' %}">Все соревнования <span aria-hidden="true">→</span></a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  {% if featured_race %}
+  <section class="race-spotlight" aria-labelledby="featured-race-title">
+    <div class="container">
+      <div class="race-spotlight__inner{% if featured_race.header_image %} race-spotlight__inner--image{% endif %}">
+        {% if featured_race.header_image %}
+        <img class="race-spotlight__image" src="{{ featured_race.header_image }}" alt="">
+        <span class="race-spotlight__shade" aria-hidden="true"></span>
+        {% endif %}
+        <div class="race-spotlight__date">
+          <strong>{{ featured_race.date|date:"d" }}</strong>
+          <span>{{ featured_race.date|date:"E" }}</span>
+        </div>
+        <div class="race-spotlight__copy">
+          <p class="race-spotlight__eyebrow"><span></span> Регистрация открыта</p>
+          <h2 id="featured-race-title">{{ featured_race.name }}</h2>
+          <p>{% if featured_race.date_end != featured_race.date %}{{ featured_race.date|date:"j E" }}–{{ featured_race.date_end|date:"j E Y" }}{% else %}{{ featured_race.date|date:"j E Y" }}{% endif %}{% if featured_race.place %} · {{ featured_race.place }}{% endif %}</p>
+        </div>
+        <div class="race-spotlight__actions">
+          <a class="community-button community-button--accent" href="{% url 'add_team' featured_race.slug %}">Зарегистрироваться</a>
+          <a class="community-button community-button--outline-light" href="{% url 'race' featured_race.slug %}">О гонке</a>
+        </div>
+      </div>
+    </div>
+  </section>
+  {% endif %}
+
+  <main class="community-content">
+    <section class="community-section container" aria-labelledby="latest-title">
+      <div class="community-section__head">
+        <div>
+          <p class="community-eyebrow community-eyebrow--dark">Новое в журнале</p>
+          <h2 id="latest-title">Свежие материалы</h2>
+        </div>
+        <a class="community-all-link" href="{% url 'publication_list' %}">Все публикации <span aria-hidden="true">→</span></a>
+      </div>
+
+      {% if publications %}
+      <div class="publication-grid">
+        {% for publication in publications %}
+        {% include "website/_publication_card.html" %}
+        {% endfor %}
+      </div>
+      {% else %}
+      <div class="community-empty">
+        <span aria-hidden="true">24</span>
+        <div><h3>Материалы готовятся</h3><p>Скоро здесь появятся новости сообщества и практические статьи.</p></div>
+      </div>
+      {% endif %}
+    </section>
+
+    <section class="races-preview" aria-labelledby="races-title">
+      <div class="container">
+        <div class="community-section__head">
+          <div>
+            <p class="community-eyebrow community-eyebrow--dark">Календарь</p>
+            <h2 id="races-title">Соревнования</h2>
+          </div>
+          <a class="community-all-link" href="{% url 'race_list' %}">Календарь и архив <span aria-hidden="true">→</span></a>
+        </div>
+        {% if upcoming_races %}
+        <div class="race-list-grid">
+          {% for race in upcoming_races %}
+          {% include "website/_race_card.html" %}
+          {% endfor %}
+        </div>
+        {% else %}
+        <div class="races-preview__offseason">
+          <p>Новые старты пока не объявлены. В архиве остаются маршруты, команды и результаты прошлых лет.</p>
+          <a href="{% url 'race_list' %}#archive">Открыть архив <span aria-hidden="true">→</span></a>
+        </div>
+        {% endif %}
+      </div>
+    </section>
+  </main>
+</div>
+{% endblock %}

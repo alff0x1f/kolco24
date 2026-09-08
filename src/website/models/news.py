@@ -1,5 +1,9 @@
 import nh3
 from django.db import models
+from django.urls import reverse
+from django.utils import timezone
+from django.utils.html import strip_tags
+from django.utils.text import Truncator
 from markdown import markdown
 
 # Tags produced by Python-Markdown (with extra) that are safe to render
@@ -90,16 +94,38 @@ def _render_markdown(text):
     return nh3.clean(raw_html, tags=_MD_ALLOWED_TAGS, attributes=_MD_ALLOWED_ATTRIBUTES)
 
 
-class NewsPost(models.Model):
-    """Model for a news post"""
+class PublicationKind(models.TextChoices):
+    NEWS = "news", "Новость"
+    ARTICLE = "article", "Статья"
 
-    title = models.CharField("Заголовок новости", max_length=255)
-    publication_date = models.DateTimeField("Дата публикации", auto_now_add=True)
+
+class NewsPost(models.Model):
+    """A news item or evergreen article shown in the site publication feed."""
+
+    title = models.CharField("Заголовок", max_length=255)
+    summary = models.TextField(
+        "Анонс",
+        blank=True,
+        help_text=(
+            "Короткий текст для карточки. Если пусто, используется начало статьи."
+        ),
+    )
+    kind = models.CharField(
+        "Тип",
+        max_length=16,
+        choices=PublicationKind.choices,
+        default=PublicationKind.NEWS,
+        db_index=True,
+    )
+    is_published = models.BooleanField("Опубликована", default=True, db_index=True)
+    publication_date = models.DateTimeField(
+        "Дата публикации", default=timezone.now, db_index=True
+    )
 
     # Main content of the news post
-    content = models.TextField("Текст новости", help_text="Use Markdown format")
+    content = models.TextField("Текст", help_text="Use Markdown format")
     content_html = models.TextField(
-        "Текст новости (HTML)", editable=False, help_text="Rendered HTML content"
+        "Текст (HTML)", editable=False, help_text="Rendered HTML content"
     )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -115,15 +141,24 @@ class NewsPost(models.Model):
     )
 
     def __str__(self):
-        """Return a string representation of the news post"""
         return self.title
+
+    def get_absolute_url(self):
+        return reverse("publication_detail", kwargs={"pk": self.pk})
+
+    @property
+    def card_summary(self):
+        """Return an editor-written teaser or a compact plain-text fallback."""
+        if self.summary.strip():
+            return self.summary.strip()
+        return Truncator(strip_tags(self.content_html)).chars(220)
 
     class Meta:
         """Meta options for the model"""
 
         ordering = ["-publication_date"]
-        verbose_name = "Новость"
-        verbose_name_plural = "Новости"
+        verbose_name = "Публикация"
+        verbose_name_plural = "Публикации"
 
     def save(self, *args, **kwargs):
         """Render the markdown content to HTML"""
