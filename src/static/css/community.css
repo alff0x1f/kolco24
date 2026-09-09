@@ -16,13 +16,13 @@
   position: relative;
   overflow: hidden;
   color: #fff;
-  background: linear-gradient(135deg, #1d3a63 0%, #485f78 55%, #7d8791 100%);
+  background: #1d3a63 url('../images/backgrounds/header2024.jpg') center / cover no-repeat;
 }
 
 .community-hero::after {
   position: absolute;
   inset: 0;
-  background: linear-gradient(90deg, rgba(15, 22, 31, .38), rgba(15, 22, 31, .08));
+  background: linear-gradient(90deg, rgba(15, 22, 31, .82) 0%, rgba(15, 22, 31, .58) 48%, rgba(15, 22, 31, .28) 100%);
   content: "";
 }
 

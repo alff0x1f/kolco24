@@ -45,7 +45,7 @@
   min-height: 176px;
   overflow: hidden;
   color: #fff;
-  background: linear-gradient(135deg, #1d3a63 0%, #485f78 55%, #7d8791 100%);
+  background: #1d3a63 url('../images/backgrounds/header2024.jpg') center / cover no-repeat;
 }
 .race-hero-bg {
   position: absolute;
