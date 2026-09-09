@@ -7,15 +7,11 @@
 
 {% block content %}
 <main class="community-page community-catalog">
-  <header class="community-catalog__head">
-    <div class="container">
-      <p class="community-eyebrow">Журнал «Кольцо 24»</p>
-      <h1>{{ catalog_title }}</h1>
-      <p>{{ catalog_description }}</p>
-    </div>
-  </header>
+  {% include "website/_community_hero.html" with eyebrow="Журнал «Кольцо 24»" title=catalog_title description=catalog_description only %}
 
   {% include "website/_section_tabs.html" with active_tab=section_tab %}
+
+  {% include "website/_race_spotlight.html" with featured_race=featured_race only %}
 
   <div class="container community-catalog__body">
     <div class="publication-column">

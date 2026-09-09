@@ -84,8 +84,10 @@ def test_home_pagination_handles_invalid_page_numbers(client, page, expected_pag
 
 
 @pytest.mark.django_db
-def test_home_features_nearest_open_or_upcoming_published_race_that_has_not_ended(
+@pytest.mark.parametrize("route", ["index", "article_list", "race_list"])
+def test_sections_feature_nearest_open_or_upcoming_published_race_that_has_not_ended(
     client,
+    route,
 ):
     today = timezone.localdate()
     Race.objects.create(
@@ -117,15 +119,30 @@ def test_home_features_nearest_open_or_upcoming_published_race_that_has_not_ende
         reg_status=RegStatus.OPEN,
     )
 
-    response = client.get(reverse("index"))
+    Race.objects.create(
+        name="Скрытая ближайшая гонка",
+        slug="hidden-nearest",
+        date=today,
+        date_end=today,
+        is_published=False,
+    )
+
+    response = client.get(reverse(route))
 
     assert response.context["featured_race"].slug == "not-open-yet"
     assert "Регистрация скоро откроется" in response.content.decode()
-    assert "Старый забытый статус" not in response.content.decode()
+    html = response.content.decode()
+    spotlight = re.search(r'<section class="race-spotlight".*?</section>', html, re.S)
+    assert spotlight
+    assert "Старый забытый статус" not in spotlight.group()
+    assert "Скрытая ближайшая гонка" not in html
 
 
 @pytest.mark.django_db
-def test_home_upcoming_registration_spotlight_has_no_registration_link(client):
+@pytest.mark.parametrize("route", ["index", "article_list", "race_list"])
+def test_sections_upcoming_registration_spotlight_has_no_registration_link(
+    client, route
+):
     today = timezone.localdate()
     Race.objects.create(
         name="Будущая гонка",
@@ -135,7 +152,7 @@ def test_home_upcoming_registration_spotlight_has_no_registration_link(client):
         reg_status=RegStatus.UPCOMING,
     )
 
-    response = client.get(reverse("index"))
+    response = client.get(reverse(route))
 
     html = response.content.decode()
     assert response.context["featured_race"].slug == "future-upcoming"
@@ -145,7 +162,10 @@ def test_home_upcoming_registration_spotlight_has_no_registration_link(client):
 
 
 @pytest.mark.django_db
-def test_home_has_no_spotlight_without_open_or_upcoming_registration(client):
+@pytest.mark.parametrize("route", ["index", "article_list", "race_list"])
+def test_sections_have_no_spotlight_without_open_or_upcoming_registration(
+    client, route
+):
     today = timezone.localdate()
     Race.objects.create(
         name="Гонка без мест",
@@ -155,7 +175,7 @@ def test_home_has_no_spotlight_without_open_or_upcoming_registration(client):
         reg_status=RegStatus.SOLD_OUT,
     )
 
-    response = client.get(reverse("index"))
+    response = client.get(reverse(route))
 
     assert response.context["featured_race"] is None
     assert "race-spotlight" not in response.content.decode()
@@ -337,12 +357,14 @@ def test_race_list_splits_current_future_and_archive(client):
     current = Race.objects.create(
         name="Текущая",
         slug="current-race",
+        reg_status=RegStatus.SOLD_OUT,
         date=today - timedelta(days=1),
         date_end=today,
     )
     future = Race.objects.create(
         name="Будущая",
         slug="future-race",
+        reg_status=RegStatus.SOLD_OUT,
         date=today + timedelta(days=2),
         date_end=today + timedelta(days=2),
     )
@@ -365,6 +387,67 @@ def test_race_list_splits_current_future_and_archive(client):
     assert list(response.context["current_races"]) == [current]
     assert list(response.context["future_races"]) == [future]
     assert list(response.context["past_races"]) == [past]
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("route", ["index", "article_list", "race_list"])
+def test_sections_open_spotlight_links_to_registration(client, route):
+    today = timezone.localdate()
+    race = Race.objects.create(
+        name="Открытая гонка",
+        slug="open-spotlight",
+        date=today + timedelta(days=1),
+        date_end=today + timedelta(days=1),
+        reg_status=RegStatus.OPEN,
+    )
+
+    html = client.get(reverse(route)).content.decode()
+
+    assert f'href="{reverse("add_team", args=[race.slug])}"' in html
+    assert f'href="{reverse("race", args=[race.slug])}"' in html
+    assert html.count('id="featured-race-title"') == 1
+    assert html.index('class="section-tabs"') < html.index('class="race-spotlight"')
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("starts_in", [-1, 1])
+@pytest.mark.parametrize("has_other_future", [False, True])
+def test_race_catalog_shows_featured_race_once_and_keeps_other_starts(
+    client, starts_in, has_other_future
+):
+    today = timezone.localdate()
+    featured = Race.objects.create(
+        name="Главный старт",
+        slug="featured-once",
+        date=today + timedelta(days=starts_in),
+        date_end=today + timedelta(days=1),
+    )
+    other = None
+    if has_other_future:
+        other = Race.objects.create(
+            name="Следующий старт",
+            slug="other-start",
+            date=today + timedelta(days=10),
+            date_end=today + timedelta(days=10),
+        )
+
+    response = client.get(reverse("race_list"))
+    html = response.content.decode()
+
+    assert response.context["featured_race"] == featured
+    assert html.count(featured.name) == 1
+    assert list(response.context["current_races"]) == []
+    assert list(response.context["future_races"]) == ([other] if other else [])
+    assert 'id="current-races-title"' not in html
+    assert 'id="archive-title"' in html
+    if has_other_future:
+        assert html.count(f'<h3><a href="{reverse("race", args=[other.slug])}">') == 1
+        assert ("Другие будущие старты" in html) == (starts_in > 0)
+    elif starts_in > 0:
+        assert 'id="future-races-title"' not in html
+        assert "Новые соревнования пока не объявлены" not in html
+    else:
+        assert "Новые соревнования пока не объявлены" in html
 
 
 @pytest.mark.django_db

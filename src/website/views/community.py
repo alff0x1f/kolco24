@@ -19,21 +19,25 @@ def visible_publications():
     )
 
 
+def get_featured_race(today):
+    return (
+        Race.objects.filter(
+            is_published=True,
+            reg_status__in=(RegStatus.OPEN, RegStatus.UPCOMING),
+            date_end__gte=today,
+        )
+        .order_by("date", "date_end", "pk")
+        .first()
+    )
+
+
 class HomeView(View):
     template_name = "website/home.html"
     publication_paginate_by = 9
 
     def get(self, request):
         today = timezone.localdate()
-        featured_race = (
-            Race.objects.filter(
-                is_published=True,
-                reg_status__in=(RegStatus.OPEN, RegStatus.UPCOMING),
-                date_end__gte=today,
-            )
-            .order_by("date", "date_end", "pk")
-            .first()
-        )
+        featured_race = get_featured_race(today)
 
         upcoming_races = Race.objects.filter(
             is_published=True,
@@ -70,6 +74,7 @@ class ArticleListView(View):
                 "page_obj": page_obj,
                 "publications": page_obj.object_list,
                 "section_tab": "articles",
+                "featured_race": get_featured_race(timezone.localdate()),
                 "catalog_title": "Статьи",
                 "catalog_description": (
                     "Практические статьи о подготовке, навигации "
@@ -96,8 +101,15 @@ class RaceListView(View):
 
     def get(self, request):
         today = timezone.localdate()
+        featured_race = get_featured_race(today)
         races = Race.objects.filter(is_published=True)
+        if featured_race is not None:
+            races = races.exclude(pk=featured_race.pk)
         context = {
+            "featured_race": featured_race,
+            "featured_race_is_future": (
+                featured_race is not None and featured_race.date > today
+            ),
             "current_races": races.filter(
                 date__lte=today,
                 date_end__gte=today,

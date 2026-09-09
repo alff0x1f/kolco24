@@ -7,45 +7,11 @@
 
 {% block content %}
 <div class="community-page">
-  <section class="community-hero">
-    <div class="container community-hero__grid">
-      <div class="community-hero__copy">
-        <p class="community-eyebrow">Журнал туристского сообщества</p>
-        <h1>Маршруты, опыт и люди</h1>
-        <p class="community-hero__lead">Разбираемся в навигации и снаряжении, готовимся к длинным дистанциям и рассказываем истории тех, кто выходит на старт.</p>
-      </div>
-    </div>
-  </section>
+  {% include "website/_community_hero.html" with eyebrow="Журнал туристского сообщества" title="Маршруты, опыт и люди" description="Разбираемся в навигации и снаряжении, готовимся к длинным дистанциям и рассказываем истории тех, кто выходит на старт." only %}
 
   {% include "website/_section_tabs.html" with active_tab="home" %}
 
-  {% if featured_race %}
-  <section class="race-spotlight" aria-labelledby="featured-race-title">
-    <div class="container">
-      <div class="race-spotlight__inner{% if featured_race.header_image %} race-spotlight__inner--image{% endif %}">
-        {% if featured_race.header_image %}
-        <img class="race-spotlight__image" src="{{ featured_race.header_image }}" alt="">
-        <span class="race-spotlight__shade" aria-hidden="true"></span>
-        {% endif %}
-        <div class="race-spotlight__date">
-          <strong>{{ featured_race.date|date:"d" }}</strong>
-          <span>{{ featured_race.date|date:"E" }}</span>
-        </div>
-        <div class="race-spotlight__copy">
-          <p class="race-spotlight__eyebrow"><span></span> {% if featured_race.reg_status == "open" %}Регистрация открыта{% else %}Регистрация скоро откроется{% endif %}</p>
-          <h2 id="featured-race-title">{{ featured_race.name }}</h2>
-          <p>{% if featured_race.date_end != featured_race.date %}{{ featured_race.date|date:"j E" }}–{{ featured_race.date_end|date:"j E Y" }}{% else %}{{ featured_race.date|date:"j E Y" }}{% endif %}{% if featured_race.place %} · {{ featured_race.place }}{% endif %}</p>
-        </div>
-        <div class="race-spotlight__actions">
-          {% if featured_race.reg_status == "open" %}
-          <a class="community-button community-button--accent" href="{% url 'add_team' featured_race.slug %}">Зарегистрироваться</a>
-          {% endif %}
-          <a class="community-button community-button--outline-light" href="{% url 'race' featured_race.slug %}">О гонке</a>
-        </div>
-      </div>
-    </div>
-  </section>
-  {% endif %}
+  {% include "website/_race_spotlight.html" with featured_race=featured_race only %}
 
   <main class="community-content">
     <section id="publications" class="community-section container" aria-labelledby="latest-title">
@@ -89,7 +55,7 @@
         </div>
         {% else %}
         <div class="races-preview__offseason">
-          <p>Новые старты пока не объявлены. В архиве остаются маршруты, команды и результаты прошлых лет.</p>
+          <p>{% if featured_race %}Другие старты пока не объявлены.{% else %}Новые старты пока не объявлены.{% endif %} В архиве остаются маршруты, команды и результаты прошлых лет.</p>
           <a href="{% url 'race_list' %}#archive">Открыть архив <span aria-hidden="true">→</span></a>
         </div>
         {% endif %}

@@ -7,15 +7,11 @@
 
 {% block content %}
 <main class="community-page community-catalog race-catalog">
-  <header class="community-catalog__head community-catalog__head--races">
-    <div class="container">
-      <p class="community-eyebrow">Календарь и история</p>
-      <h1>Соревнования</h1>
-      <p>Ближайшие старты, страницы команд, результаты и маршруты прошлых лет.</p>
-    </div>
-  </header>
+  {% include "website/_community_hero.html" with eyebrow="Календарь и история" title="Соревнования" description="Ближайшие старты, страницы команд, результаты и маршруты прошлых лет." only %}
 
   {% include "website/_section_tabs.html" with active_tab="races" %}
+
+  {% include "website/_race_spotlight.html" with featured_race=featured_race only %}
 
   <div class="container community-catalog__body">
     {% if current_races %}
@@ -27,8 +23,9 @@
     </section>
     {% endif %}
 
+    {% if future_races or not featured_race_is_future %}
     <section class="race-catalog__section" aria-labelledby="future-races-title">
-      <div class="community-section__head"><h2 id="future-races-title">Будущие старты</h2></div>
+      <div class="community-section__head"><h2 id="future-races-title">{% if featured_race_is_future %}Другие будущие старты{% else %}Будущие старты{% endif %}</h2></div>
       {% if future_races %}
       <div class="race-catalog__grid">
         {% for race in future_races %}{% include "website/_race_card.html" %}{% endfor %}
@@ -37,6 +34,7 @@
       <div class="race-catalog__empty"><p>Новые соревнования пока не объявлены.</p></div>
       {% endif %}
     </section>
+    {% endif %}
 
     <section class="race-catalog__section race-archive" id="archive" aria-labelledby="archive-title">
       <div class="community-section__head">

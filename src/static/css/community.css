@@ -11,7 +11,7 @@
   color: var(--ink);
 }
 
-/* Home header follows the race hero scale and palette. */
+/* Shared hero for home, articles, and the race catalog. */
 .community-hero {
   position: relative;
   overflow: hidden;
@@ -702,37 +702,10 @@
   font-weight: 500;
 }
 
-/* Catalogs use the regular page header instead of a separate color system. */
+/* Catalog layout below the shared hero and section tabs. */
 .community-catalog {
   min-height: 60vh;
   padding-bottom: 56px;
-}
-
-.community-catalog__head {
-  padding: 24px 0 20px;
-  border-bottom: 1px solid var(--line);
-  background: var(--paper-2);
-}
-
-.community-catalog__head .community-eyebrow {
-  margin-bottom: 6px;
-  color: var(--muted);
-}
-
-.community-catalog__head h1 {
-  margin: 0;
-  color: var(--ink);
-  font-size: 28px;
-  font-weight: 600;
-  letter-spacing: -.01em;
-}
-
-.community-catalog__head p:last-child {
-  max-width: 650px;
-  margin: 7px 0 0;
-  color: var(--muted);
-  font-size: 14px;
-  line-height: 1.5;
 }
 
 .community-catalog__body { padding-top: 20px; }
