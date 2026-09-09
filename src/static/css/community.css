@@ -359,7 +359,14 @@
   color: var(--ink-soft);
   font-size: 15px;
   line-height: 1.5;
+  overflow-wrap: anywhere;
 }
+
+.publication-post__summary p { margin: 0 0 10px; }
+.publication-post__summary > :first-child { margin-top: 0; }
+.publication-post__summary > :last-child { margin-bottom: 0; }
+.publication-post__summary a { text-decoration: underline; }
+.publication-post__summary pre { white-space: pre-wrap; }
 
 .publication-post .publication-read {
   display: inline-block;

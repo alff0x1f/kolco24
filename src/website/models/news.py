@@ -1,8 +1,12 @@
+import re
+from html import unescape
+
 import nh3
 from django.db import models
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.html import strip_tags
+from django.utils.safestring import mark_safe
 from django.utils.text import Truncator
 from markdown import markdown
 
@@ -88,6 +92,38 @@ _MD_ALLOWED_ATTRIBUTES = {
     "h6": {"id"},
 }
 
+_FEED_ALLOWED_TAGS = {
+    "a",
+    "p",
+    "br",
+    "strong",
+    "em",
+    "b",
+    "i",
+    "s",
+    "del",
+    "ul",
+    "ol",
+    "li",
+    "blockquote",
+    "pre",
+    "code",
+}
+
+
+def _clean_feed_html(html):
+    return nh3.clean(html, tags=_FEED_ALLOWED_TAGS, attributes={"a": {"href", "title"}})
+
+
+def _normalized_text(html):
+    html = re.sub(
+        r"<br\b[^>]*>|</(?:p|div|li|h[1-6]|blockquote|pre)>",
+        " ",
+        html,
+        flags=re.IGNORECASE,
+    )
+    return " ".join(unescape(strip_tags(html)).split())
+
 
 def _render_markdown(text):
     raw_html = markdown(str(text), extensions=["extra"])
@@ -146,12 +182,42 @@ class NewsPost(models.Model):
     def get_absolute_url(self):
         return reverse("publication_detail", kwargs={"pk": self.pk})
 
-    @property
-    def card_summary(self):
-        """Return an editor-written teaser or a compact plain-text fallback."""
+    def _summary(self, limit):
         if self.summary.strip():
             return self.summary.strip()
-        return Truncator(strip_tags(self.content_html)).chars(220)
+        return Truncator(unescape(strip_tags(self.content_html))).chars(limit)
+
+    @property
+    def card_summary(self):
+        """Keep a compact description for metadata and publication cards."""
+        return self._summary(220)
+
+    @property
+    def feed_summary(self):
+        """Give news more room in the feed while keeping article teasers short."""
+        return self._summary(600 if self.kind == PublicationKind.NEWS else 220)
+
+    @property
+    def feed_summary_html(self):
+        """Render safe feed formatting and close tags when shortening the text."""
+        html = _clean_feed_html(
+            _render_markdown(self.summary.strip())
+            if self.summary.strip()
+            else self.content_html
+        )
+        if not self.summary.strip():
+            limit = 600 if self.kind == PublicationKind.NEWS else 220
+            text = unescape(strip_tags(html))
+            if Truncator(text).chars(limit) != text:
+                html = Truncator(html).chars(limit, html=True)
+        return mark_safe(_clean_feed_html(html))
+
+    @property
+    def has_more_content(self):
+        """Whether the full publication contains text not shown in its preview."""
+        content = _normalized_text(self.content_html)
+        summary = _normalized_text(self.feed_summary_html)
+        return bool(content) and summary != content
 
     class Meta:
         """Meta options for the model"""

@@ -2,6 +2,7 @@ import re
 from datetime import timedelta
 
 import pytest
+from django.template.loader import render_to_string
 from django.urls import Resolver404, resolve, reverse
 from django.utils import timezone
 
@@ -27,6 +28,185 @@ def extract_labelled_nav(response, aria_label):
     )
     assert match, f"Navigation {aria_label!r} was not rendered"
     return match.group(0)
+
+
+@pytest.mark.parametrize(
+    ("content_html", "summary", "read_more"),
+    [
+        ("<p>Короткая новость целиком.</p>", "", False),
+        (f"<p>{'я' * 220}</p>", "", False),
+        (f"<p>{'я' * 221}</p>", "", False),
+        (f"<p>{'я' * 601}</p>", "", True),
+        ("<p>Полный текст новости.</p>", "Отдельный анонс", True),
+        (
+            "<p>Полный <strong>текст</strong> новости.</p>",
+            "Полный текст новости.",
+            False,
+        ),
+        (
+            "<p>Первая строка.</p>\n<p>Вторая строка.</p>",
+            "Первая строка. Вторая строка.",
+            False,
+        ),
+        ("<p>Карта &amp; компас</p>", "Карта & компас", False),
+        ("<p>Карта &amp; компас</p>", "", False),
+    ],
+)
+def test_publication_preview_offers_reading_only_when_text_is_missing(
+    content_html, summary, read_more
+):
+    publication = NewsPost(
+        pk=24, title="Новость", content_html=content_html, summary=summary
+    )
+
+    html = render_to_string(
+        "website/_publication_post.html", {"publication": publication}
+    )
+
+    assert ('class="publication-read"' in html) is read_more
+    assert f'<h3><a href="{publication.get_absolute_url()}">Новость</a></h3>' in html
+    assert "&amp;amp;" not in html
+
+
+@pytest.mark.parametrize(
+    ("kind", "limit"), [(PublicationKind.NEWS, 600), (PublicationKind.ARTICLE, 220)]
+)
+@pytest.mark.parametrize("offset", [-1, 0, 1])
+def test_feed_preview_limits_preserve_compact_metadata(kind, limit, offset):
+    content = "я" * (limit + offset)
+    publication = NewsPost(
+        pk=1, title="Публикация", kind=kind, content_html=f"<p>{content}</p>"
+    )
+
+    html = render_to_string(
+        "website/_publication_post.html", {"publication": publication}
+    )
+
+    assert len(publication.feed_summary) == min(len(content), limit)
+    assert len(publication.card_summary) == min(len(content), 220)
+    assert (publication.feed_summary == content) is (offset <= 0)
+    assert ('class="publication-read"' in html) is (offset > 0)
+    assert (
+        '<div class="publication-post__summary">'
+        f"<p>{publication.feed_summary}</p></div>" in html
+    )
+
+
+@pytest.mark.parametrize("kind", [PublicationKind.NEWS, PublicationKind.ARTICLE])
+def test_feed_preview_preserves_editor_summary(kind):
+    summary = "Авторский анонс. " * 50
+    publication = NewsPost(
+        pk=1,
+        title="Публикация",
+        kind=kind,
+        summary=summary,
+        content_html="<p>Полный текст.</p>",
+    )
+
+    html = render_to_string(
+        "website/_publication_post.html", {"publication": publication}
+    )
+
+    assert publication.feed_summary == summary.strip()
+    assert publication.card_summary == summary.strip()
+    assert summary.strip() in html
+    assert 'class="publication-read"' in html
+
+
+@pytest.mark.parametrize("use_editor_summary", [False, True])
+def test_feed_preview_preserves_links_and_line_breaks(use_editor_summary):
+    content_html = (
+        '<p><a href="https://example.com/map">Карта</a><br>'
+        "Старт в <strong>10:00</strong>.</p><p>Ждём на поляне.</p>"
+    )
+    publication = NewsPost(
+        pk=1,
+        title="Старт",
+        content_html=content_html,
+        summary=content_html if use_editor_summary else "",
+    )
+
+    html = render_to_string(
+        "website/_publication_post.html", {"publication": publication}
+    )
+
+    assert 'href="https://example.com/map"' in html
+    assert "</a><br>Старт в <strong>10:00</strong>.</p>" in html
+    assert "<p>Ждём на поляне.</p>" in html
+    assert "&lt;br" not in html
+    assert 'class="publication-read"' not in html
+
+
+def test_feed_preview_renders_markdown_in_editor_summary():
+    publication = NewsPost(
+        pk=1,
+        title="Старт",
+        content_html="<p>Подробности старта.</p>",
+        summary="[Карта](https://example.com/map)  \nСтарт в **10:00**.",
+    )
+
+    html = render_to_string(
+        "website/_publication_post.html", {"publication": publication}
+    )
+
+    assert 'href="https://example.com/map"' in html
+    assert "<br>" in html
+    assert "<strong>10:00</strong>" in html
+
+
+@pytest.mark.parametrize(
+    ("kind", "limit"), [(PublicationKind.NEWS, 600), (PublicationKind.ARTICLE, 220)]
+)
+def test_feed_preview_does_not_truncate_short_text_with_entities(kind, limit):
+    publication = NewsPost(
+        pk=1,
+        title="Новость",
+        kind=kind,
+        content_html=f"<p>{'я' * (limit - 1)}&amp;</p>",
+    )
+
+    assert publication.feed_summary_html.endswith("&amp;</p>")
+    assert not publication.has_more_content
+
+
+@pytest.mark.parametrize(
+    ("kind", "limit"), [(PublicationKind.NEWS, 600), (PublicationKind.ARTICLE, 220)]
+)
+def test_feed_preview_closes_link_when_truncating(kind, limit):
+    publication = NewsPost(
+        pk=1,
+        title="Новость",
+        kind=kind,
+        content_html=f'<p><a href="/races/">{"я" * (limit + 100)}</a></p>',
+    )
+
+    html = publication.feed_summary_html
+
+    assert 'href="/races/"' in html
+    assert html.endswith("…</a></p>")
+    assert publication.has_more_content
+
+
+@pytest.mark.parametrize("use_editor_summary", [False, True])
+def test_feed_preview_removes_unsafe_html(use_editor_summary):
+    unsafe_html = (
+        '<p onclick="alert(1)">Текст<br>'
+        '<a href="javascript:alert(1)">Ссылка</a>'
+        "<script>alert(1)</script></p>"
+    )
+    publication = NewsPost(
+        pk=1,
+        title="Новость",
+        content_html=unsafe_html,
+        summary=unsafe_html if use_editor_summary else "",
+    )
+
+    html = publication.feed_summary_html
+
+    assert "<br>" in html
+    assert "<script" not in html
+    assert "onclick" not in html
+    assert "javascript:" not in html
 
 
 @pytest.mark.django_db
