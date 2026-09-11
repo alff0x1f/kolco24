@@ -70,6 +70,11 @@ class Race(Model):
     def __str__(self):
         return self.name
 
+    @property
+    def is_current(self):
+        today = timezone.localdate()
+        return self.date <= today <= self.date_end
+
     def clean(self):
         super().clean()
         errors = {}

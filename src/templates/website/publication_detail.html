@@ -1,0 +1,44 @@
+{% extends "website/base-2.html" %}
+{% load static %}
+
+{% block title %}{{ publication.title }} — Кольцо 24{% endblock %}
+{% block head_descr %}{{ publication.card_summary }}{% endblock %}
+{% block og_title %}{{ publication.title }}{% endblock %}
+{% block og_description %}{{ publication.card_summary }}{% endblock %}
+{% block og_url %}https://kolco24.ru{{ publication.get_absolute_url }}{% endblock %}
+{% block extra_head %}<link href="{% static 'css/community.css' %}" rel="stylesheet">{% endblock %}
+
+{% block content %}
+<main class="community-page publication-detail">
+  <div class="container publication-detail__wrap">
+    <nav class="community-crumbs" aria-label="Хлебные крошки">
+      <a href="{% url 'index' %}{% if publication.kind == 'news' %}#publications{% endif %}">Главная</a>{% if publication.kind == "article" %}<span>/</span><a href="{% url 'article_list' %}">Статьи</a>{% endif %}
+    </nav>
+    <article>
+      {% if is_preview %}
+      <p role="status">Предпросмотр — публикация пока недоступна посетителям.</p>
+      {% endif %}
+      <header class="publication-detail__head">
+        <div class="publication-detail__meta">
+          <span class="publication-kind">{{ publication.get_kind_display }}</span>
+          <time datetime="{{ publication.publication_date|date:'c' }}">{{ publication.publication_date|date:"j E Y" }}</time>
+        </div>
+        <h1>{{ publication.title }}</h1>
+        {% if publication.summary %}<p class="publication-detail__lead">{{ publication.summary }}</p>{% endif %}
+        {% if publication.race %}
+        <a class="publication-detail__race" href="{% url 'race' publication.race.slug %}">Материал о соревновании: {{ publication.race.name }} →</a>
+        {% endif %}
+      </header>
+
+      {% if publication.image %}
+      <figure class="publication-detail__cover"><img src="{{ publication.image.url }}" alt="{{ publication.title }}"></figure>
+      {% endif %}
+
+      <div class="publication-detail__body">{{ publication.content_html|safe }}</div>
+    </article>
+    <footer class="publication-detail__footer">
+      {% if publication.kind == "news" %}<a href="{% url 'index' %}#publications">← Ко всем публикациям</a>{% else %}<a href="{% url 'article_list' %}">← Ко всем статьям</a>{% endif %}
+    </footer>
+  </div>
+</main>
+{% endblock %}

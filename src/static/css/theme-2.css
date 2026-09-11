@@ -23,6 +23,8 @@
   --shadow:     0 1px 2px rgba(22,26,31,.04), 0 8px 24px rgba(22,26,31,.05);
   --radius:     14px;
   --radius-sm:  10px;
+  --site-nav-height: 57px;
+  --section-tabs-height: 50px;
 }
 
 *, *::before, *::after { box-sizing: border-box; }
@@ -51,14 +53,14 @@ button { font-family: inherit; }
 
 /* ── Main container (pushes footer down) ────────────── */
 .main-container {
-  min-height: calc(100vh - 57px - 280px);
+  min-height: calc(100vh - var(--site-nav-height) - 280px);
 }
 
 /* ── Nav ─────────────────────────────────────────────── */
 .nav { background: var(--dark); color: #fff; position: sticky; top: 0; z-index: 50; }
 .nav-inner {
   display: flex; align-items: center; justify-content: space-between;
-  padding: 12px 0; gap: 14px;
+  padding: 12px 20px; gap: 14px;
 }
 .brand { display: flex; align-items: center; gap: 11px; color: #fff; font-weight: 500; font-size: 16px; }
 .brand:hover { color: #fff; }
@@ -93,6 +95,62 @@ button { font-family: inherit; }
   font-weight: 500; font-size: 14px;
 }
 .nav-actions .login:hover { background: rgba(255,255,255,.07); border-color: rgba(255,255,255,.4); color: #fff; }
+
+/* ── Shared section navigation ───────────────────────── */
+.section-tabs {
+  position: sticky;
+  top: var(--site-nav-height);
+  z-index: 20;
+  overflow-x: auto;
+  white-space: nowrap;
+  background: rgba(255, 255, 255, .96);
+  border-bottom: 1px solid var(--line);
+  box-shadow: 0 1px 2px rgba(22, 26, 31, .03);
+  backdrop-filter: blur(10px);
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.section-tabs::-webkit-scrollbar { display: none; }
+.section-tabs-inner {
+  display: flex;
+  align-items: stretch;
+  gap: 28px;
+}
+.section-tab {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+  gap: 7px;
+  min-height: 49px;
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 500;
+}
+.section-tab:hover { color: var(--ink); }
+.section-tab::after {
+  content: '';
+  position: absolute;
+  right: 0;
+  bottom: -1px;
+  left: 0;
+  height: 3px;
+  border-radius: 3px 3px 0 0;
+  background: transparent;
+}
+.section-tab.is-active { color: var(--primary-dk); }
+.section-tab.is-active::after { background: var(--primary-2); }
+.section-tab span {
+  min-width: 22px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--paper);
+  color: var(--muted);
+  font-size: 11px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+.section-tab.is-active span { background: #e7eef7; color: var(--primary); }
 
 /* ── Nav user dropdown ───────────────────────────────── */
 .nav-user { position: relative; }
@@ -564,6 +622,7 @@ button { font-family: inherit; }
   .footer-dark .footer-grid { grid-template-columns: 1fr 1fr; }
 }
 @media (max-width: 720px) {
+  :root { --site-nav-height: 62px; }
   .nav-burger { display: inline-flex; }
   .nav-menu {
     position: absolute; left: 0; right: 0; top: 100%;
@@ -589,7 +648,11 @@ button { font-family: inherit; }
   .nav > .container { position: relative; }
 }
 @media (max-width: 600px) {
+  :root { --section-tabs-height: 47px; }
   .container { padding: 0 12px; }
+  .nav-inner { padding: 12px; }
+  .section-tabs-inner { gap: 24px; }
+  .section-tab { min-height: 46px; }
   .page { padding: 14px 0 36px; }
   .page-head h1 { font-size: 22px; }
   .login-page { padding: 24px 0 36px; }

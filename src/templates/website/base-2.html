@@ -18,7 +18,7 @@
     <meta property="og:type" content="website">
     <meta property="og:description" content="{% block og_description %}Cоревнования по пешеходному туризму в дисциплине рогейн{% endblock %}">
     <meta property="og:image" content="https://kolco24.ru/static/images/backgrounds/header2024.jpg">
-    <meta property="og:url" content="https://kolco24.ru">
+    <meta property="og:url" content="{% block og_url %}https://kolco24.ru{% endblock %}">
     <meta property="og:site_name" content="Кольцо 24">
     {% block extra_head %}{% endblock %}
 </head>
@@ -35,8 +35,6 @@
             <span></span><span></span><span></span>
         </button>
         <div class="nav-menu">
-            <ul class="nav-links">
-            </ul>
             <div class="nav-actions">
                 {% if request.session.impersonator_id %}
                 <span class="nav-impersonator">Режим пользователя</span>
@@ -88,6 +86,8 @@
                     <h6>Навигация</h6>
                     <ul>
                         <li><a href="/">Главная</a></li>
+                        <li><a href="{% url 'article_list' %}">Статьи</a></li>
+                        <li><a href="{% url 'race_list' %}">Соревнования</a></li>
                         <li><a href="{% url 'login' %}">Вход</a></li>
                         <li><a href="https://vk.com/kolco24" target="_blank" rel="noopener noreferrer">Группа в ВК</a></li>
                         <li><a href="https://vk.com/kolco24y2020" target="_blank" rel="noopener noreferrer">Кольцо-24 2020</a></li>

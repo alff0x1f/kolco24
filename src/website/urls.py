@@ -1,6 +1,5 @@
 from django.conf import settings
 from django.conf.urls.static import static
-from django.shortcuts import redirect
 from django.urls import include, path
 
 from apps.race.views import (
@@ -21,12 +20,24 @@ from apps.race.views import (
 )
 
 from . import views
-from .views import RaceIdRedirectView
+from .views import (
+    ArticleListView,
+    HomeView,
+    PublicationDetailView,
+    RaceIdRedirectView,
+    RaceListView,
+)
 from .views.team import EditTeamView, TeamMemberMoveView
 
 urlpatterns = [
-    # "/" redirects to the current race.
-    path("", lambda request: redirect("race", race_slug="kolco12-2026"), name="index"),
+    path("", HomeView.as_view(), name="index"),
+    path("articles/", ArticleListView.as_view(), name="article_list"),
+    path(
+        "post/<int:pk>/",
+        PublicationDetailView.as_view(),
+        name="publication_detail",
+    ),
+    path("races/", RaceListView.as_view(), name="race_list"),
     # auth now lives in apps.accounts (mounted at /accounts/ in config/urls.py)
     path("team/<int:team_id>/", EditTeamView.as_view(), name="edit_team"),
     path(

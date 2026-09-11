@@ -216,8 +216,10 @@ def test_mine_and_edit_flags():
 
     assert teams["Mine"]["mine"] is True
     assert teams["Mine"]["edit"] == f"/team/{mine_team.id}"
+    assert teams["Mine"]["action"] == "Посмотреть"
     assert teams["Theirs"]["mine"] is False
     assert "edit" not in teams["Theirs"]
+    assert context["has_team_actions"] is True
 
 
 @pytest.mark.django_db
@@ -370,7 +372,7 @@ def test_all_teams_returns_200_with_data_initial_all(client):
 
 
 @pytest.mark.django_db
-def test_all_teams_renders_admin_panel_for_superuser(client, django_user_model):
+def test_all_teams_renders_add_action_for_superuser(client, django_user_model):
     race = _make_race(slug="ru2a")
     superuser = django_user_model.objects.create_superuser(
         username="su2", password="p", email="su2@example.com"
@@ -381,10 +383,10 @@ def test_all_teams_renders_admin_panel_for_superuser(client, django_user_model):
 
     assert resp.status_code == 200
     html = resp.content.decode()
-    assert "card-admin" in html
+    assert "teams-add" in html
     # «Редактировать гонку» lives on the race page now, not on teams.
     assert reverse("edit_race", args=[race.slug]) not in html
-    # The teams admin panel keeps «+ Команда».
+    # The teams toolbar keeps «+ Команда».
     assert reverse("add_team", args=[race.slug]) in html
 
 
@@ -444,6 +446,55 @@ def test_invalid_race_slug_returns_404(client):
 
 
 @pytest.mark.django_db
+@pytest.mark.parametrize("published", [False, True])
+@pytest.mark.parametrize(
+    "role",
+    ["anonymous", "visitor", "staff", "other_admin", "admin", "moderator", "superuser"],
+)
+def test_race_overview_visibility(client, published, role):
+    race = Race.objects.create(
+        name="Неанонсированный старт", slug="draft-overview", is_published=published
+    )
+    from website.models import NewsPost
+
+    post = NewsPost.objects.create(
+        title="Секретная новость", content="Описание", race=race
+    )
+    if role != "anonymous":
+        user = User.objects.create_user(
+            username=role, is_staff=role == "staff", is_superuser=role == "superuser"
+        )
+        if role in {"admin", "moderator", "other_admin"}:
+            assigned_race = (
+                _make_race(slug="other-draft-race") if role == "other_admin" else race
+            )
+            RaceAdmin.objects.create(
+                race=assigned_race,
+                user=user,
+                role=(
+                    RaceAdmin.Role.MODERATOR
+                    if role == "moderator"
+                    else RaceAdmin.Role.ADMIN
+                ),
+            )
+        client.force_login(user)
+
+    response = client.get(reverse("race", args=[race.slug]))
+    allowed = published or role in {"admin", "moderator", "superuser"}
+    assert response.status_code == (200 if allowed else 404)
+    if allowed:
+        assert response.context["race"] == race
+        # The feed uses public visibility rules even in a private race preview.
+        assert (post in response.context["news_list"]) is published
+        if not published:
+            assert client.get(post.get_absolute_url()).status_code == 200
+    else:
+        html = response.content.decode()
+        assert race.name not in html
+        assert post.title not in html
+
+
+@pytest.mark.django_db
 def test_invalid_category_returns_404(client):
     race = _make_race(slug="ru6")
     _make_category(race)
@@ -478,11 +529,12 @@ def test_teams_page_renders_key_markup(client):
     # page wrapper + initial filter
     assert 'class="teams-page"' in html
     assert 'data-initial="all"' in html
-    # cover meta card + breadcrumb trail (race › Команды), leaf is the <h1>
-    assert 'class="cover-meta-card"' in html
-    assert "cover-crumbs" in html
+    # Compact shared race header + persistent section tabs.
+    assert 'class="race-hero"' in html
+    assert 'class="section-tabs"' in html
+    assert 'class="section-tab is-active"' in html
     assert reverse("race", args=[race.slug]) in html
-    assert '<h1 aria-current="page">Команды</h1>' in html
+    assert reverse("all_teams", args=[race.slug]) in html
     # search box + chips container the JS hydrates
     assert 'id="searchInput"' in html
     assert 'id="catChips"' in html
@@ -497,14 +549,54 @@ def test_teams_page_renders_key_markup(client):
     assert 'id="teamRows"' in html
     assert 'id="emptyState"' in html
     assert 'id="footCount"' in html
-    # sidebar summary + breakdown
-    assert 'id="brk"' in html
-    assert 'id="resetCat"' in html
+    # The table uses the full page width; duplicate sidebar breakdown is gone.
+    assert 'id="brk"' not in html
+    assert 'id="resetCat"' not in html
     # both JSON blocks present and parseable
     _script_json(html, "teams-data")
     _script_json(html, "categories-data")
     # teams.js wired up
     assert "js/teams.js" in html
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(
+    ("url_name", "active_url_name"),
+    [("race", "race"), ("all_teams", "all_teams")],
+)
+def test_race_tabs_keep_labels_active_state_and_team_count(
+    client, url_name, active_url_name
+):
+    owner = User.objects.create_user(
+        username=f"tabs-{url_name}",
+        password="p",
+        email=f"tabs-{url_name}@example.com",
+    )
+    race = _make_race(slug=f"tabs-{url_name}")
+    category = _make_category(race)
+    _make_team(owner, category, teamname="Оплаченная", paid_people=2)
+    _make_team(owner, category, teamname="Неоплаченная", paid_people=0)
+
+    response = client.get(reverse(url_name, args=[race.slug]))
+    html = response.content.decode()
+    nav_match = re.search(
+        r'<nav\b[^>]*aria-label="Разделы гонки"[^>]*>.*?</nav>',
+        html,
+        re.DOTALL,
+    )
+
+    assert response.status_code == 200
+    assert nav_match, "Race section tabs were not rendered"
+    nav = nav_match.group(0)
+    current_links = re.findall(r'<a\b[^>]*aria-current="page"[^>]*>', nav)
+    compact_nav = " ".join(nav.split())
+
+    assert "Обзор" in nav
+    assert "Команды <span>1</span>" in compact_nav
+    assert len(current_links) == 1
+    assert 'class="section-tab is-active"' in current_links[0]
+    expected_href = reverse(active_url_name, args=[race.slug])
+    assert f'href="{expected_href}"' in current_links[0]
 
 
 @pytest.mark.django_db
@@ -568,6 +660,75 @@ def test_race_page_authenticated_sees_plain_add_button(client):
     html = resp.content.decode()
     assert "Добавить команду" in html
     assert "Зарегистрировать команду" not in html
+
+
+@pytest.mark.django_db
+def test_race_page_shows_owned_team_with_explicit_edit_action(client):
+    owner = User.objects.create_user(
+        username="team-owner", password="p", email="owner@example.com"
+    )
+    race = _make_race(slug="owned-team")
+    race.is_teams_editable = True
+    race.save(update_fields=["is_teams_editable"])
+    category = _make_category(race)
+    team = _make_team(
+        owner,
+        category,
+        teamname="Лесные коты",
+        start_number="18",
+        city="Уфа",
+    )
+    client.force_login(owner)
+
+    resp = client.get(reverse("race", args=[race.slug]))
+
+    assert resp.status_code == 200
+    assert len(resp.context["owned_teams"]) == 1
+    html = resp.content.decode()
+    assert "Ваша команда" in html
+    assert "Лесные коты" in html
+    assert "№ 18" in html
+    assert "Редактировать команду" in html
+    assert reverse("edit_team", args=[team.id]) in html
+
+
+@pytest.mark.django_db
+def test_race_page_lists_multiple_owned_teams(client):
+    owner = User.objects.create_user(
+        username="multi-owner", password="p", email="multi@example.com"
+    )
+    race = _make_race(slug="owned-teams")
+    category = _make_category(race)
+    first = _make_team(owner, category, teamname="Первая", start_number="1")
+    second = _make_team(owner, category, teamname="Вторая", start_number="2")
+    client.force_login(owner)
+
+    resp = client.get(reverse("race", args=[race.slug]))
+
+    assert resp.status_code == 200
+    html = resp.content.decode()
+    assert "Ваши команды" in html
+    assert reverse("edit_team", args=[first.id]) in html
+    assert reverse("edit_team", args=[second.id]) in html
+
+
+@pytest.mark.django_db
+def test_race_page_keeps_owned_team_link_when_editing_is_closed(client):
+    owner = User.objects.create_user(
+        username="locked-owner", password="p", email="locked@example.com"
+    )
+    race = _make_race(slug="locked-team")
+    category = _make_category(race)
+    team = _make_team(owner, category, teamname="После финиша")
+    client.force_login(owner)
+
+    resp = client.get(reverse("race", args=[race.slug]))
+
+    assert resp.status_code == 200
+    html = resp.content.decode()
+    assert "Редактирование закрыто" in html
+    assert "Посмотреть команду" in html
+    assert reverse("edit_team", args=[team.id]) in html
 
 
 @pytest.mark.django_db

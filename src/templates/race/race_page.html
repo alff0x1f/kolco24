@@ -1,59 +1,24 @@
 {% extends "website/base-2.html" %}
 {% load static %}
+{% load tz %}
 {% load custom_filters %}
 {% block title %}{{ race.name }} · {{ race.date }}{% endblock %}
 {% block extra_head %}
 <link href="{% static 'css/race.css' %}" rel="stylesheet">
+<link href="{% static 'css/community.css' %}" rel="stylesheet">
 {% endblock %}
 {% block content %}
 
-<div class="cover-banner">
-  <div class="cover-image">
-    {% if race.header_image %}<img class="cover-bg-img" src="{{ race.header_image }}" alt="">{% endif %}
-    <div class="cover-status">
-      {% if reg_open %}
-        <span class="pill success">Регистрация открыта</span>
-      {% elif reg_upcoming %}
-        <span class="pill muted">Регистрация скоро</span>
-      {% else %}
-        <span class="pill">Регистрация окончена</span>
-      {% endif %}
-    </div>
-  </div>
-</div>
+{% include "race/_race_header.html" with active_tab="overview" %}
 
 <div class="race-page">
   <div class="container">
 
-    <section class="cover-meta-card">
-      <div class="cover-meta">
-        <div class="cover-title">
-          <h1>{{ race.name }}</h1>
-          <div class="sub">
-            {% if race.place %}<span>📍 {{ race.place }}</span><span class="dot"></span>{% endif %}
-            <span>{{ race.date }}</span>
-            {% if race_remaining is not None %}
-            <span class="dot"></span>
-            {% if race_remaining > 0 %}
-            <span class="remaining ok">осталось {{ race_remaining|floatformat:0 }} {{ race_remaining|ru_plural:"место,места,мест" }}</span>
-            {% else %}
-            <span class="remaining none">мест нет</span>
-            {% endif %}
-            {% endif %}
-          </div>
-        </div>
-        <div class="cover-actions">
-          {% if reg_open and not race_full %}
-            <a class="btn btn-primary" href="{% url 'add_team' race.slug %}">{% if user.is_authenticated %}Добавить команду{% else %}Зарегистрировать команду{% endif %}</a>
-          {% endif %}
-          <a class="btn btn-ghost" href="{% url 'all_teams' race.slug %}">Все команды</a>
-        </div>
-      </div>
-    </section>
+    {% include "race/_owned_teams.html" %}
 
-    <div class="grid">
+    <div class="overview-grid">
 
-      <main>
+      <main class="overview-news">
         {% if post_form %}
         <div class="card post-add-card">
           <div class="card-pad">
@@ -67,6 +32,15 @@
                   placeholder="Заголовок новости">
                 {% if post_form.title.errors %}
                 <span class="hint err">{{ post_form.title.errors|join:", " }}</span>
+                {% endif %}
+              </div>
+              <div class="field-row">
+                <label for="id_summary">Короткий анонс (необязательно)</label>
+                <textarea class="input{% if post_form.summary.errors %} has-error{% endif %}"
+                  id="id_summary" name="summary"
+                  rows="2" placeholder="Для ленты публикаций">{{ post_form.summary.value|default:'' }}</textarea>
+                {% if post_form.summary.errors %}
+                <span class="hint err">{{ post_form.summary.errors|join:", " }}</span>
                 {% endif %}
               </div>
               <div class="field-row">
@@ -85,80 +59,54 @@
                 <span class="hint err">{{ post_form.image.errors|join:", " }}</span>
                 {% endif %}
               </div>
-              <button class="btn btn-primary" type="submit">Опубликовать</button>
+              <div class="field-row">
+                {{ post_form.kind.label_tag }}
+                {{ post_form.kind }}
+                {{ post_form.kind.errors }}
+              </div>
+              <div class="field-row">
+                {{ post_form.publication_date.label_tag }}
+                {{ post_form.publication_date }}
+                {{ post_form.publication_date.errors }}
+                {% get_current_timezone as publication_timezone %}
+                <span class="hint">Часовой пояс: {{ publication_timezone }}. Будущая дата отложит публикацию.</span>
+              </div>
+              <div class="field-row">
+                <label for="{{ post_form.is_published.id_for_label }}">
+                  {{ post_form.is_published }} Разрешить публикацию
+                </label>
+                {{ post_form.is_published.errors }}
+                <span class="hint">Снимите отметку, чтобы сохранить черновик.</span>
+              </div>
+              <button class="btn btn-primary" type="submit">Сохранить и посмотреть</button>
             </form>
           </div>
         </div>
         {% endif %}
 
-        <section class="card tabs-card">
-          <div class="tabs-head">
-            <h2>Новости <span class="badge">{{ news_count }}</span></h2>
+        <section class="publication-feed" aria-labelledby="race-news-title">
+          <div class="publication-feed__head">
+            <h2 id="race-news-title">Новости соревнования</h2>
+            <span>Всего: {{ news_count }}</span>
           </div>
-          <div class="tab-body">
-            {% for news in news_list %}
-            <article class="post">
-              <div class="post-meta">
-                <time datetime="{{ news.publication_date|date:'Y-m-d' }}">{{ news.publication_date|date:"j E Y" }}</time>
-              </div>
-              {% if news.image %}
-              <div class="post-image">
-                <img src="{{ news.image.url }}" alt="{{ news.title }}">
-              </div>
-              {% endif %}
-              <h3 class="post-title">{{ news.title }}</h3>
-              <div class="post-body">{{ news.content_html|safe }}</div>
-            </article>
-            {% empty %}
-            <p class="post-empty">Новостей пока нет.</p>
-            {% endfor %}
+          {% for news in news_list %}
+          {% include "website/_publication_post.html" with publication=news hide_race=True %}
+          {% empty %}
+          <div class="publication-feed__empty">
+            <p>Новостей пока нет.</p>
           </div>
+          {% endfor %}
         </section>
       </main>
 
-      <aside class="sidebar">
-
-        {% if can_edit_race %}
-        <div class="card card-admin">
-          <div class="side-head">
-            <h3>Управление</h3>
-          </div>
-          <div class="card-pad admin-actions">
-            <a class="btn btn-primary" href="{% url 'edit_race' race.slug %}">Редактировать гонку</a>
-            <a class="btn btn-outline" href="{% url 'edit_legend' race.slug %}">Легенда (КП)</a>
-            <a class="btn btn-outline" href="{% url 'legend_codes' race.slug %}">Коды легенды</a>
-            <a class="btn btn-outline" href="{% url 'race_map' race.slug %}">Карта гонки</a>
-            <a class="btn btn-outline" href="{% url 'race_app_data' race.slug %}">Данные приложения</a>
-            {% if user.is_superuser %}
-            <a class="btn btn-outline" href="{% url 'add_race' %}">+ Новая гонка</a>
-            {% endif %}
-          </div>
-        </div>
-        {% endif %}
+      <aside class="overview-summary">
 
         <div class="card">
           <div class="side-head">
-            <h3>{{ race.name }}</h3>
+            <h3>О гонке</h3>
           </div>
           <div class="card-pad info-card-pad">
             <ul class="info-list">
-              {% if race.place %}
-              <li>
-                <svg class="icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6">
-                  <path d="M10 2C7.2 2 5 4.2 5 7c0 4 5 11 5 11s5-7 5-11c0-2.8-2.2-5-5-5Z"/>
-                  <circle cx="10" cy="7" r="2"/>
-                </svg>
-                <span class="label">Место</span>
-                <span class="value">{{ race.place }}</span>
-              </li>
-              {% endif %}
-              <li>
-                <svg class="icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6">
-                  <circle cx="10" cy="10" r="7"/><path d="M10 6v4l2.5 2"/>
-                </svg>
-                <span class="label">Дата</span>
-                <span class="value">{{ race.date }}</span>
-              </li>
               <li>
                 <svg class="icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6">
                   <circle cx="10" cy="7" r="3"/><path d="M4 17c0-3 2.7-5 6-5s6 2 6 5"/>
@@ -183,10 +131,39 @@
                 <span class="value">{{ race.cost }}&nbsp;₽/уч</span>
               </li>
               {% endif %}
+              {% if race_remaining is not None %}
+              <li>
+                <svg class="icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6">
+                  <circle cx="10" cy="7" r="3"/><path d="M4 17c0-3 2.7-5 6-5s6 2 6 5"/>
+                </svg>
+                <span class="label">Осталось мест</span>
+                <span class="value">{% if race_remaining > 0 %}{{ race_remaining|floatformat:0 }}{% else %}нет{% endif %}</span>
+              </li>
+              {% endif %}
             </ul>
           </div>
         </div>
 
+        {% if can_edit_race %}
+        <div class="card card-admin">
+          <div class="side-head">
+            <h3>Управление</h3>
+          </div>
+          <div class="card-pad admin-actions">
+            <a class="btn btn-primary" href="{% url 'edit_race' race.slug %}">Редактировать гонку</a>
+            <a class="btn btn-outline" href="{% url 'edit_legend' race.slug %}">Легенда (КП)</a>
+            <a class="btn btn-outline" href="{% url 'legend_codes' race.slug %}">Коды легенды</a>
+            <a class="btn btn-outline" href="{% url 'race_map' race.slug %}">Карта гонки</a>
+            <a class="btn btn-outline" href="{% url 'race_app_data' race.slug %}">Данные приложения</a>
+            {% if user.is_superuser %}
+            <a class="btn btn-outline" href="{% url 'add_race' %}">+ Новая гонка</a>
+            {% endif %}
+          </div>
+        </div>
+        {% endif %}
+      </aside>
+
+      <aside class="overview-secondary">
         {% if links %}
         <div class="card">
           <div class="side-head">

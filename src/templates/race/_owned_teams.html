@@ -1,0 +1,43 @@
+{% load custom_filters %}
+{% if user.is_authenticated %}
+  {% if owned_teams %}
+  <section class="card owned-teams-card" aria-labelledby="ownedTeamsTitle">
+    <div class="owned-teams-head">
+      <div>
+        <span class="kicker">Личный кабинет</span>
+        <h2 id="ownedTeamsTitle">{% if owned_teams|length == 1 %}Ваша команда{% else %}Ваши команды{% endif %}</h2>
+      </div>
+      <span class="owned-teams-count">{{ owned_teams|length }}</span>
+    </div>
+    <div class="owned-teams-list">
+      {% for team in owned_teams %}
+      <article class="owned-team-row">
+        <div class="owned-team-number">{% if team.number %}№ {{ team.number }}{% else %}Без номера{% endif %}</div>
+        <div class="owned-team-copy">
+          <h3>{{ team.name }}</h3>
+          <div class="owned-team-meta">
+            <span>{{ team.category }}</span>
+            {% if team.city %}<span class="meta-sep" aria-hidden="true"></span><span>{{ team.city }}</span>{% endif %}
+            <span class="meta-sep" aria-hidden="true"></span>
+            <span>{{ team.participants }} {{ team.participants|ru_plural:"участник,участника,участников" }}</span>
+          </div>
+          {% if not team.can_change %}<span class="owned-team-locked">Редактирование закрыто</span>{% endif %}
+        </div>
+        <a class="btn {% if team.can_change %}btn-primary{% else %}btn-ghost{% endif %}" href="{{ team.url }}">
+          {{ team.action_label }}
+        </a>
+      </article>
+      {% endfor %}
+    </div>
+  </section>
+  {% elif reg_open and not race_full %}
+  <section class="card owned-teams-card owned-teams-empty">
+    <div>
+      <span class="kicker">Ваша команда</span>
+      <h2>Вы ещё не зарегистрировали команду</h2>
+      <p>Добавьте состав и выберите категорию для этой гонки.</p>
+    </div>
+    <a class="btn btn-primary" href="{% url 'add_team' race.slug %}">Добавить команду</a>
+  </section>
+  {% endif %}
+{% endif %}

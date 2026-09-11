@@ -1,0 +1,26 @@
+<article class="race-list-card">
+  <div class="race-list-card__date" aria-hidden="true">
+    <strong>{{ race.date|date:"d" }}</strong>
+    <span>{{ race.date|date:"M" }}</span>
+    <small>{{ race.date|date:"Y" }}</small>
+  </div>
+  <div class="race-list-card__body">
+    <div class="race-list-card__status">
+      {% if race.is_current %}
+      <span class="race-status race-status--current">Идёт сейчас</span>
+      {% elif race.reg_status == "open" %}
+      <span class="race-status race-status--open">Регистрация открыта</span>
+      {% elif race.reg_status == "sold_out" %}
+      <span class="race-status race-status--muted">Мест нет</span>
+      {% else %}
+      <span class="race-status">Скоро</span>
+      {% endif %}
+    </div>
+    <h3><a href="{% url 'race' race.slug %}">{{ race.name }}</a></h3>
+    <p>
+      {% if race.date_end != race.date %}{{ race.date|date:"j E" }}–{{ race.date_end|date:"j E Y" }}{% else %}{{ race.date|date:"j E Y" }}{% endif %}
+      {% if race.place %}<span aria-hidden="true"> · </span>{{ race.place }}{% endif %}
+    </p>
+  </div>
+  <a class="race-list-card__arrow" href="{% url 'race' race.slug %}" aria-label="Открыть соревнование «{{ race.name }}»">→</a>
+</article>

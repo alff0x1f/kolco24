@@ -1,0 +1,66 @@
+{% extends "website/base-2.html" %}
+{% load static %}
+
+{% block title %}Кольцо 24 — соревновательный поход выходного дня{% endblock %}
+{% block head_descr %}Соревновательный поход выходного дня с элементами рогейна и ориентирования на местности.{% endblock %}
+{% block extra_head %}<link href="{% static 'css/community.css' %}" rel="stylesheet">{% endblock %}
+
+{% block content %}
+<div class="community-page">
+  {% include "website/_community_hero.html" with title="Кольцо 24" description="Соревновательный поход выходного дня с элементами рогейна и ориентирования на местности." only %}
+
+  {% include "website/_section_tabs.html" with active_tab="home" %}
+
+  {% include "website/_race_spotlight.html" with featured_race=featured_race only %}
+
+  <main class="community-content">
+    <section id="publications" class="community-section container" aria-labelledby="latest-title">
+      <div class="publication-column">
+        <div class="publication-feed">
+          <div class="publication-feed__head">
+            <h2 id="latest-title">Новости</h2>
+            <span>Всего: {{ page_obj.paginator.count }}</span>
+          </div>
+
+          {% if publications %}
+          {% for publication in publications %}
+          {% include "website/_publication_post.html" %}
+          {% endfor %}
+          {% else %}
+          <div class="publication-feed__empty">
+            <h3>Материалы готовятся</h3>
+            <p>Скоро здесь появятся новости сообщества и практические статьи.</p>
+          </div>
+          {% endif %}
+        </div>
+
+        {% include "website/_publication_pagination.html" with pagination_fragment="#publications" %}
+      </div>
+    </section>
+
+    <section class="races-preview" aria-labelledby="races-title">
+      <div class="container">
+        <div class="community-section__head">
+          <div>
+            <p class="community-eyebrow community-eyebrow--dark">Календарь</p>
+            <h2 id="races-title">Соревнования</h2>
+          </div>
+          <a class="community-all-link" href="{% url 'race_list' %}">Календарь и архив <span aria-hidden="true">→</span></a>
+        </div>
+        {% if upcoming_races %}
+        <div class="race-list-grid">
+          {% for race in upcoming_races %}
+          {% include "website/_race_card.html" %}
+          {% endfor %}
+        </div>
+        {% else %}
+        <div class="races-preview__offseason">
+          <p>{% if featured_race %}Другие старты пока не объявлены.{% else %}Новые старты пока не объявлены.{% endif %} В архиве остаются маршруты, команды и результаты прошлых лет.</p>
+          <a href="{% url 'race_list' %}#archive">Открыть архив <span aria-hidden="true">→</span></a>
+        </div>
+        {% endif %}
+      </div>
+    </section>
+  </main>
+</div>
+{% endblock %}

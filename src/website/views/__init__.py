@@ -1,3 +1,4 @@
+from .community import ArticleListView, HomeView, PublicationDetailView, RaceListView
 from .views_ import (
     AddNewsPostView,
     AddTeam,

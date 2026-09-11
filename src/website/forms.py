@@ -322,10 +322,30 @@ class PageForm(forms.ModelForm):
 class NewsPostForm(forms.ModelForm):
     class Meta:
         model = NewsPost
-        fields = ["title", "content", "image"]
+        fields = [
+            "title",
+            "summary",
+            "content",
+            "image",
+            "kind",
+            "is_published",
+            "publication_date",
+        ]
         widgets = {
+            "kind": forms.Select(attrs={"class": "input"}),
+            "publication_date": forms.DateTimeInput(
+                format="%Y-%m-%dT%H:%M",
+                attrs={"class": "input", "type": "datetime-local"},
+            ),
             "title": forms.TextInput(
                 attrs={"class": "form-control", "placeholder": "Заголовок"}
+            ),
+            "summary": forms.Textarea(
+                attrs={
+                    "class": "form-control",
+                    "rows": 2,
+                    "placeholder": "Короткий анонс (необязательно)",
+                }
             ),
             "content": forms.Textarea(
                 attrs={"class": "form-control", "rows": 6, "placeholder": "Markdown"}

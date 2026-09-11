@@ -1,0 +1,22 @@
+<article class="publication-post{% if publication.image %} publication-post--image{% endif %}">
+  <div class="publication-post__body">
+    {% if publication.race and not hide_race %}
+    <div class="publication-post__meta">
+      <a href="{% url 'race' publication.race.slug %}">{{ publication.race.name }}</a>
+    </div>
+    {% endif %}
+    <h3><a href="{{ publication.get_absolute_url }}">{{ publication.title }}</a></h3>
+    <div class="publication-post__summary">{{ publication.feed_summary_html }}</div>
+  </div>
+  {% if publication.image %}
+  <a class="publication-post__image" href="{{ publication.get_absolute_url }}" aria-label="Читать: {{ publication.title }}">
+    <img src="{{ publication.image.url }}" alt="" loading="lazy" decoding="async">
+  </a>
+  {% endif %}
+  <footer class="publication-post__footer">
+    {% if publication.has_more_content %}
+    <a class="publication-read" href="{{ publication.get_absolute_url }}" aria-label="Читать полностью: {{ publication.title }}">Читать полностью <span aria-hidden="true">→</span></a>
+    {% endif %}
+    <time datetime="{{ publication.publication_date|date:'c' }}">{{ publication.publication_date|date:"j E Y" }}</time>
+  </footer>
+</article>

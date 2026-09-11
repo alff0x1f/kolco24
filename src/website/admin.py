@@ -1,6 +1,4 @@
 from django.contrib import admin
-from django.utils.html import format_html
-from markdown import markdown
 
 from .models import (
     Checkpoint,
@@ -246,14 +244,38 @@ class CategoryAdmin(admin.ModelAdmin):
 
 
 class NewsPostAdmin(admin.ModelAdmin):
-    list_display = ("title", "publication_date", "race", "created_at", "updated_at")
-    search_fields = ("title", "content")
-    list_filter = ("race", "publication_date")
+    list_display = (
+        "id",
+        "title",
+        "kind",
+        "is_published",
+        "publication_date",
+        "race",
+    )
+    search_fields = ("title", "summary", "content")
+    list_filter = ("kind", "is_published", "race", "publication_date")
+    list_editable = ("is_published",)
+    date_hierarchy = "publication_date"
     readonly_fields = ("created_at", "updated_at", "content_html")
 
     # Fieldsets for better organization in the admin form
     fieldsets = (
-        (None, {"fields": ("title", "content", "content_html", "image", "race")}),
+        (
+            None,
+            {
+                "fields": (
+                    "title",
+                    "summary",
+                    "kind",
+                    "content",
+                    "content_html",
+                    "image",
+                    "race",
+                    "is_published",
+                    "publication_date",
+                )
+            },
+        ),
         (
             "Timestamps",
             {
@@ -261,18 +283,6 @@ class NewsPostAdmin(admin.ModelAdmin):
             },
         ),
     )
-
-    # Customize the form to exclude content_html and show markdown preview
-    def save_model(self, request, obj, form, change):
-        # Render the markdown content to HTML before saving
-        obj.content_html = markdown(obj.content)
-        super().save_model(request, obj, form, change)
-
-    # Optionally, show the HTML content in the list view as a preview
-    def content_preview(self, obj):
-        return format_html(obj.content_html)
-
-    content_preview.short_description = "HTML Preview"
 
 
 @admin.register(Tag)

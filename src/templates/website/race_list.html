@@ -1,0 +1,64 @@
+{% extends "website/base-2.html" %}
+{% load static %}
+
+{% block title %}Соревнования — Кольцо 24{% endblock %}
+{% block head_descr %}Календарь будущих стартов и архив соревнований «Кольцо 24».{% endblock %}
+{% block extra_head %}<link href="{% static 'css/community.css' %}" rel="stylesheet">{% endblock %}
+
+{% block content %}
+<main class="community-page community-catalog race-catalog">
+  {% include "website/_community_hero.html" with title="Соревнования" description="Ближайшие старты, страницы команд, результаты и маршруты прошлых лет." only %}
+
+  {% include "website/_section_tabs.html" with active_tab="races" %}
+
+  {% include "website/_race_spotlight.html" with featured_race=featured_race only %}
+
+  <div class="container community-catalog__body">
+    {% if current_races %}
+    <section class="race-catalog__section" aria-labelledby="current-races-title">
+      <div class="community-section__head"><h2 id="current-races-title">Сейчас проходит</h2></div>
+      <div class="race-catalog__grid">
+        {% for race in current_races %}{% include "website/_race_card.html" %}{% endfor %}
+      </div>
+    </section>
+    {% endif %}
+
+    {% if future_races or not featured_race_is_future %}
+    <section class="race-catalog__section" aria-labelledby="future-races-title">
+      <div class="community-section__head"><h2 id="future-races-title">{% if featured_race_is_future %}Другие будущие старты{% else %}Будущие старты{% endif %}</h2></div>
+      {% if future_races %}
+      <div class="race-catalog__grid">
+        {% for race in future_races %}{% include "website/_race_card.html" %}{% endfor %}
+      </div>
+      {% else %}
+      <div class="race-catalog__empty"><p>Новые соревнования пока не объявлены.</p></div>
+      {% endif %}
+    </section>
+    {% endif %}
+
+    <section class="race-catalog__section race-archive" id="archive" aria-labelledby="archive-title">
+      <div class="community-section__head">
+        <div><p class="community-eyebrow community-eyebrow--dark">Результаты и маршруты</p><h2 id="archive-title">Архив</h2></div>
+      </div>
+      {% regroup past_races by date.year as archive_years %}
+      {% for year in archive_years %}
+      <div class="race-archive__year">
+        <h3>{{ year.grouper }}</h3>
+        <div class="race-archive__list">
+          {% for race in year.list %}
+          <a href="{% url 'race' race.slug %}">
+            <span>{{ race.date|date:"d.m" }}</span>
+            <strong>{{ race.name }}</strong>
+            {% if race.place %}<small>{{ race.place }}</small>{% endif %}
+            <b aria-hidden="true">→</b>
+          </a>
+          {% endfor %}
+        </div>
+      </div>
+      {% empty %}
+      <div class="race-catalog__empty"><p>В архиве пока нет опубликованных соревнований.</p></div>
+      {% endfor %}
+    </section>
+  </div>
+</main>
+{% endblock %}

@@ -1,5 +1,13 @@
+import re
+from html import unescape
+
 import nh3
 from django.db import models
+from django.urls import reverse
+from django.utils import timezone
+from django.utils.html import strip_tags
+from django.utils.safestring import mark_safe
+from django.utils.text import Truncator
 from markdown import markdown
 
 # Tags produced by Python-Markdown (with extra) that are safe to render
@@ -84,22 +92,92 @@ _MD_ALLOWED_ATTRIBUTES = {
     "h6": {"id"},
 }
 
+_FEED_ALLOWED_TAGS = {
+    "a",
+    "p",
+    "br",
+    "strong",
+    "em",
+    "b",
+    "i",
+    "s",
+    "del",
+    "ul",
+    "ol",
+    "li",
+    "blockquote",
+    "pre",
+    "code",
+}
+
+
+def _clean_feed_html(html):
+    return nh3.clean(html, tags=_FEED_ALLOWED_TAGS, attributes={"a": {"href", "title"}})
+
+
+def _normalized_text(html):
+    html = re.sub(
+        r"<br\b[^>]*>|</(?:p|div|li|h[1-6]|blockquote|pre)>",
+        " ",
+        html,
+        flags=re.IGNORECASE,
+    )
+    return " ".join(unescape(strip_tags(html)).split())
+
 
 def _render_markdown(text):
     raw_html = markdown(str(text), extensions=["extra"])
     return nh3.clean(raw_html, tags=_MD_ALLOWED_TAGS, attributes=_MD_ALLOWED_ATTRIBUTES)
 
 
-class NewsPost(models.Model):
-    """Model for a news post"""
+class PublicationKind(models.TextChoices):
+    NEWS = "news", "Новость"
+    ARTICLE = "article", "Статья"
 
-    title = models.CharField("Заголовок новости", max_length=255)
-    publication_date = models.DateTimeField("Дата публикации", auto_now_add=True)
+
+class NewsPostQuerySet(models.QuerySet):
+    def visible(self):
+        """Released posts belonging to public races, in stable feed order."""
+        return (
+            self.filter(
+                models.Q(race__isnull=True) | models.Q(race__is_published=True),
+                is_published=True,
+                publication_date__lte=timezone.now(),
+            )
+            .select_related("race")
+            .order_by("-publication_date", "-pk")
+        )
+
+
+class NewsPost(models.Model):
+    """A news item or evergreen article shown in the site publication feed."""
+
+    objects = NewsPostQuerySet.as_manager()
+
+    title = models.CharField("Заголовок", max_length=255)
+    summary = models.TextField(
+        "Анонс",
+        blank=True,
+        help_text=(
+            "Короткий текст для карточки. Если пусто, используется начало статьи."
+        ),
+    )
+    kind = models.CharField(
+        "Тип",
+        max_length=16,
+        choices=PublicationKind.choices,
+        default=PublicationKind.NEWS,
+        db_index=True,
+    )
+    is_published = models.BooleanField("Опубликована", default=True, db_index=True)
+    publication_date = models.DateTimeField(
+        "Дата публикации", default=timezone.now, db_index=True
+    )
 
     # Main content of the news post
-    content = models.TextField("Текст новости", help_text="Use Markdown format")
+    content = models.TextField("Текст", help_text="Use Markdown format")
     content_html = models.TextField(
-        "Текст новости (HTML)", editable=False, help_text="Rendered HTML content"
+        "Текст (HTML)", editable=False, help_text="Rendered HTML content"
     )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -115,15 +193,62 @@ class NewsPost(models.Model):
     )
 
     def __str__(self):
-        """Return a string representation of the news post"""
         return self.title
+
+    def get_absolute_url(self):
+        return reverse("publication_detail", kwargs={"pk": self.pk})
+
+    def _summary(self, limit):
+        if self.summary.strip():
+            return self.summary.strip()
+        return Truncator(unescape(strip_tags(self.content_html))).chars(limit)
+
+    @property
+    def card_summary(self):
+        """Keep a compact description for metadata and publication cards."""
+        return self._summary(220)
+
+    @property
+    def feed_summary(self):
+        """Give news more room in the feed while keeping article teasers short."""
+        return self._summary(600 if self.kind == PublicationKind.NEWS else 220)
+
+    @property
+    def feed_summary_html(self):
+        """Reuse the preview until its source fields change on this instance."""
+        source = (self.summary, self.content_html, self.kind)
+        if getattr(self, "_feed_summary_source", None) != source:
+            self._feed_summary_html = self._render_feed_summary_html()
+            self._feed_summary_source = source
+        return self._feed_summary_html
+
+    def _render_feed_summary_html(self):
+        """Render safe feed formatting and close tags when shortening the text."""
+        html = _clean_feed_html(
+            _render_markdown(self.summary.strip())
+            if self.summary.strip()
+            else self.content_html
+        )
+        if not self.summary.strip():
+            limit = 600 if self.kind == PublicationKind.NEWS else 220
+            text = unescape(strip_tags(html))
+            if Truncator(text).chars(limit) != text:
+                html = Truncator(html).chars(limit, html=True)
+        return mark_safe(_clean_feed_html(html))
+
+    @property
+    def has_more_content(self):
+        """Whether the full publication contains text not shown in its preview."""
+        content = _normalized_text(self.content_html)
+        summary = _normalized_text(self.feed_summary_html)
+        return bool(content) and summary != content
 
     class Meta:
         """Meta options for the model"""
 
         ordering = ["-publication_date"]
-        verbose_name = "Новость"
-        verbose_name_plural = "Новости"
+        verbose_name = "Публикация"
+        verbose_name_plural = "Публикации"
 
     def save(self, *args, **kwargs):
         """Render the markdown content to HTML"""

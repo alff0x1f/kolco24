@@ -12,7 +12,7 @@ from .models import (
     TeamMemberRaceLog,
     TeamStartLog,
 )
-from .news import MenuItem, NewsPost, Page
+from .news import MenuItem, NewsPost, Page, PublicationKind
 from .payment import SbpPaymentRecipient
 from .race import Race, RaceAdmin, RaceLink, RacePriceTier
 from .tag import Tag
