@@ -1,3 +1,4 @@
+{% load custom_filters %}
 <header class="race-hero">
   {% if race.header_image %}
   <img class="race-hero-bg" src="{{ race.header_image }}" alt="">
@@ -19,7 +20,7 @@
         {% if race_remaining is not None %}
         <span class="meta-sep" aria-hidden="true"></span>
         {% if race_remaining > 0 %}
-        <span>осталось {{ race_remaining|floatformat:0 }} мест</span>
+        <span>осталось {{ race_remaining|floatformat:0 }} {{ race_remaining|ru_plural:"место,места,мест" }}</span>
         {% else %}
         <span>мест нет</span>
         {% endif %}
