@@ -435,7 +435,12 @@ def test_publication_detail_uses_id_url(client):
 
     assert response.status_code == 200
     assert response.context["publication"] == publication
-    assert "Навигация на дистанции" in response.content.decode()
+    html = response.content.decode()
+    assert "Навигация на дистанции" in html
+    assert (
+        f'<meta property="og:url" content="https://kolco24.ru{publication.get_absolute_url()}">'
+        in html
+    )
 
 
 @pytest.mark.django_db

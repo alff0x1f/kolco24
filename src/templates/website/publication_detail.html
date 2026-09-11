@@ -5,6 +5,7 @@
 {% block head_descr %}{{ publication.card_summary }}{% endblock %}
 {% block og_title %}{{ publication.title }}{% endblock %}
 {% block og_description %}{{ publication.card_summary }}{% endblock %}
+{% block og_url %}https://kolco24.ru{{ publication.get_absolute_url }}{% endblock %}
 {% block extra_head %}<link href="{% static 'css/community.css' %}" rel="stylesheet">{% endblock %}
 
 {% block content %}
