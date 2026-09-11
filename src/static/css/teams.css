@@ -7,7 +7,7 @@
 
 /* ── Wrapper ─────────────────────────────────────────── */
 .teams-page {
-  --teams-sticky-top: 107px; /* Site navigation (57px) + race tabs (50px). */
+  --teams-sticky-top: calc(var(--site-nav-height) + var(--section-tabs-height));
   padding: 20px 0 56px;
 }
 
