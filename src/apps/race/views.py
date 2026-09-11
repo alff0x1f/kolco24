@@ -25,7 +25,7 @@ from apps.mobile.models import Mark, TrackPoint
 from apps.race.app_data import build_overview, build_team_timeline
 from apps.race.forms import RaceForm
 from apps.race.models import Protocol, RaceExtra
-from apps.race.permissions import can_edit_race
+from apps.race.permissions import can_edit_race, is_team_editing_open
 from apps.race.results import build_protocol, freeze_protocol
 from website.forms import NewsPostForm
 from website.models import Checkpoint, NewsPost, Race, Team
@@ -87,7 +87,7 @@ def _owned_teams(race, user):
     if user is None or not user.is_authenticated:
         return []
 
-    can_change = race.is_teams_editable or user.is_superuser
+    can_change = is_team_editing_open(user, race)
     teams = (
         Team.objects.filter(category2__race=race, owner=user)
         .select_related("category2", "owner")
@@ -214,6 +214,7 @@ class RaceTeamsView(View):
 
         teams_data = []
         has_team_actions = False
+        can_change = is_team_editing_open(user, race)
         for team in teams:
             name = _team_display_name(team)
             parts = ", ".join(
@@ -245,11 +246,7 @@ class RaceTeamsView(View):
             if is_superuser or mine:
                 has_team_actions = True
                 row["edit"] = f"/team/{team.id}"
-                row["action"] = (
-                    "Редактировать"
-                    if race.is_teams_editable or is_superuser
-                    else "Посмотреть"
-                )
+                row["action"] = "Редактировать" if can_change else "Посмотреть"
             teams_data.append(row)
 
         race_remaining = race.remaining_people()

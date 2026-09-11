@@ -403,82 +403,7 @@
   outline-offset: 4px;
 }
 
-.publication-card {
-  display: flex;
-  min-width: 0;
-  flex-direction: column;
-  overflow: hidden;
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  background: var(--paper-2);
-  box-shadow: var(--shadow-sm);
-  transition: border-color .12s, box-shadow .12s;
-}
-
-.publication-card:hover {
-  border-color: #cdd3da;
-  box-shadow: var(--shadow);
-}
-
-.publication-card__visual {
-  position: relative;
-  display: block;
-  overflow: hidden;
-  aspect-ratio: 16 / 9;
-  border-bottom: 1px solid var(--line-soft);
-  color: #fff;
-  background: linear-gradient(135deg, #294d79, #718397);
-}
-
-.publication-card--news .publication-card__visual {
-  background: linear-gradient(135deg, #354657, #7b8793);
-}
-
-.publication-card__visual img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.publication-card__rings {
-  position: absolute;
-  top: 50%;
-  right: -10px;
-  width: 150px;
-  height: 150px;
-  border: 1px solid rgba(255, 255, 255, .16);
-  border-radius: 50%;
-  transform: translateY(-50%);
-}
-
-.publication-card__rings::before,
-.publication-card__rings::after {
-  position: absolute;
-  border: 1px solid rgba(255, 255, 255, .14);
-  border-radius: 50%;
-  content: "";
-}
-
-.publication-card__rings::before { inset: 27px; }
-.publication-card__rings::after { inset: 53px; }
-
-.publication-card__mark {
-  position: absolute;
-  bottom: 15px;
-  left: 18px;
-  color: rgba(255, 255, 255, .9);
-  font-size: 28px;
-  font-weight: 500;
-}
-
-.publication-card__body {
-  display: flex;
-  flex: 1;
-  flex-direction: column;
-  padding: 19px 20px 17px;
-}
-
-.publication-card__meta {
+.publication-detail__meta {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
@@ -497,62 +422,6 @@
   font-size: 10px;
   font-weight: 600;
   letter-spacing: .06em;
-}
-
-.publication-card--news .publication-kind {
-  color: var(--muted);
-  background: var(--paper);
-}
-
-.publication-card h2 {
-  margin: 13px 0 8px;
-  font-size: 19px;
-  font-weight: 500;
-  letter-spacing: -.005em;
-  line-height: 1.25;
-}
-
-.publication-card h2 a {
-  color: var(--ink);
-}
-
-.publication-card h2 a:hover {
-  color: var(--primary-dk);
-}
-
-.publication-card__body > p {
-  display: -webkit-box;
-  overflow: hidden;
-  margin: 0 0 17px;
-  color: var(--muted);
-  font-size: 14px;
-  line-height: 1.55;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 4;
-}
-
-.publication-card__footer {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  margin-top: auto;
-  padding-top: 13px;
-  border-top: 1px solid var(--line-soft);
-  font-size: 11.5px;
-}
-
-.publication-race,
-.publication-community {
-  min-width: 0;
-  overflow: hidden;
-  color: var(--muted);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.publication-race:hover {
-  color: var(--primary-dk);
 }
 
 .publication-read {
@@ -959,8 +828,6 @@
   .race-spotlight__actions .community-button { flex: 1; }
   .community-section { padding-bottom: 32px; }
   .community-section__head { align-items: flex-start; flex-direction: column; gap: 7px; }
-  .publication-card { border-radius: 0; border-right: 0; border-left: 0; }
-  .publication-card__body { padding: 18px 16px 16px; }
   .races-preview { padding: 27px 0 38px; }
   .races-preview__offseason { align-items: flex-start; flex-direction: column; padding: 19px 17px; }
   .race-list-card { grid-template-columns: 50px minmax(0, 1fr) 22px; gap: 11px; padding: 15px 13px; border-radius: 0; border-right: 0; border-left: 0; }

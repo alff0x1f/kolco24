@@ -18,7 +18,7 @@
       <p role="status">Предпросмотр — публикация пока недоступна посетителям.</p>
       {% endif %}
       <header class="publication-detail__head">
-        <div class="publication-card__meta">
+        <div class="publication-detail__meta">
           <span class="publication-kind">{{ publication.get_kind_display }}</span>
           <time datetime="{{ publication.publication_date|date:'c' }}">{{ publication.publication_date|date:"j E Y" }}</time>
         </div>
