@@ -19,6 +19,22 @@
   var catsEl = document.getElementById("categories-data");
   if (!pageEl || !teamsEl || !catsEl) return;
 
+  // Keep column headings below the search panel when its contents wrap.
+  var headEl = pageEl.querySelector(".teams-head");
+  if (headEl) {
+    function updateHeadHeight() {
+      pageEl.style.setProperty(
+        "--teams-head-height", headEl.getBoundingClientRect().height + "px"
+      );
+    }
+    updateHeadHeight();
+    if (typeof ResizeObserver !== "undefined") {
+      new ResizeObserver(updateHeadHeight).observe(headEl);
+    } else {
+      window.addEventListener("resize", updateHeadHeight);
+    }
+  }
+
   var TEAMS = JSON.parse(teamsEl.textContent);
   var CATS = JSON.parse(catsEl.textContent);
 

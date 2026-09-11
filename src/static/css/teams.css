@@ -6,11 +6,15 @@
    Scoped under .teams-page where practical. */
 
 /* ── Wrapper ─────────────────────────────────────────── */
-.teams-page { padding: 20px 0 56px; }
+.teams-page {
+  --teams-sticky-top: 107px; /* Site navigation (57px) + race tabs (50px). */
+  padding: 20px 0 56px;
+}
 
 /* ── Teams card head + search ────────────────────────── */
 .teams-page .teams-card { position: relative; }
 .teams-page .teams-head {
+  position: sticky; top: var(--teams-sticky-top); z-index: 2;
   display: flex; align-items: center; justify-content: space-between;
   gap: 16px;
   padding: 18px 22px 16px;
@@ -89,7 +93,9 @@
   padding: 0;
   border-bottom: 1px solid var(--line);
   background: #fafbfc;
-  position: sticky; top: 106px; z-index: 1;
+  position: sticky;
+  top: calc(var(--teams-sticky-top) + var(--teams-head-height, 74px));
+  z-index: 1;
 }
 .teams-page .teams-table thead th .th-sort {
   display: block; width: 100%;
