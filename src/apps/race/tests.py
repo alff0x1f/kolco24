@@ -446,6 +446,52 @@ def test_invalid_race_slug_returns_404(client):
 
 
 @pytest.mark.django_db
+@pytest.mark.parametrize("published", [False, True])
+@pytest.mark.parametrize(
+    "role",
+    ["anonymous", "visitor", "staff", "other_admin", "admin", "moderator", "superuser"],
+)
+def test_race_overview_visibility(client, published, role):
+    race = Race.objects.create(
+        name="Неанонсированный старт", slug="draft-overview", is_published=published
+    )
+    from website.models import NewsPost
+
+    post = NewsPost.objects.create(
+        title="Секретная новость", content="Описание", race=race
+    )
+    if role != "anonymous":
+        user = User.objects.create_user(
+            username=role, is_staff=role == "staff", is_superuser=role == "superuser"
+        )
+        if role in {"admin", "moderator", "other_admin"}:
+            assigned_race = (
+                _make_race(slug="other-draft-race") if role == "other_admin" else race
+            )
+            RaceAdmin.objects.create(
+                race=assigned_race,
+                user=user,
+                role=(
+                    RaceAdmin.Role.MODERATOR
+                    if role == "moderator"
+                    else RaceAdmin.Role.ADMIN
+                ),
+            )
+        client.force_login(user)
+
+    response = client.get(reverse("race", args=[race.slug]))
+    allowed = published or role in {"admin", "moderator", "superuser"}
+    assert response.status_code == (200 if allowed else 404)
+    if allowed:
+        assert response.context["race"] == race
+        assert post in response.context["news_list"]
+    else:
+        html = response.content.decode()
+        assert race.name not in html
+        assert post.title not in html
+
+
+@pytest.mark.django_db
 def test_invalid_category_returns_404(client):
     race = _make_race(slug="ru6")
     _make_category(race)

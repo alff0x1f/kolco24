@@ -163,6 +163,10 @@ class RacePageView(View):
             race = Race.objects.get(slug=race_slug)
         except Race.DoesNotExist:
             raise Http404
+        if not race.is_published and not (
+            request.user.is_superuser or is_race_admin(request.user, race)
+        ):
+            raise Http404
         context = self.build_context(race, request.user)
         return render(request, "race/race_page.html", context)
 

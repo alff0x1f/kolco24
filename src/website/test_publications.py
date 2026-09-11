@@ -411,6 +411,61 @@ def test_unreleased_publication_returns_404(client, kwargs):
 
 
 @pytest.mark.django_db
+@pytest.mark.parametrize("kind", [PublicationKind.NEWS, PublicationKind.ARTICLE])
+def test_unpublished_race_posts_stay_private_until_race_is_published(client, kind):
+    race = Race.objects.create(
+        name="Неанонсированная гонка", slug="unannounced-race", is_published=False
+    )
+    hidden = create_publication("Секретный анонс", race=race, kind=kind)
+    standalone = create_publication("Материал без гонки", kind=kind)
+    public_race = Race.objects.create(name="Открытая гонка", slug="announced-race")
+    visible = create_publication("Открытый анонс", race=public_race, kind=kind)
+    create_publication("Черновик", race=race, kind=kind, is_published=False)
+    create_publication(
+        "Запланировано",
+        race=race,
+        kind=kind,
+        publication_date=timezone.now() + timedelta(days=1),
+    )
+    routes = ["index", "article_list"] if kind == PublicationKind.ARTICLE else ["index"]
+
+    for published in [False, True, False]:
+        race.is_published = published
+        race.save(update_fields=["is_published"])
+        expected = {standalone, visible, hidden} if published else {standalone, visible}
+        for route in routes:
+            response = client.get(reverse(route))
+            assert response.status_code == 200
+            assert set(response.context["publications"]) == expected
+            assert response.context["page_obj"].paginator.count == len(expected)
+            if not published:
+                html = response.content.decode()
+                assert hidden.title not in html
+                assert race.name not in html
+                assert race.slug not in html
+
+        response = client.get(hidden.get_absolute_url())
+        assert response.status_code == (200 if published else 404)
+        if not published:
+            assert hidden.title not in response.content.decode()
+
+
+@pytest.mark.django_db
+def test_authenticated_visitor_cannot_read_unpublished_race_post(
+    client, django_user_model
+):
+    race = Race.objects.create(
+        name="Черновик гонки", slug="draft-race", is_published=False
+    )
+    publication = create_publication("Новость черновика", race=race)
+    user = django_user_model.objects.create_user(username="visitor")
+    client.force_login(user)
+
+    assert client.get(publication.get_absolute_url()).status_code == 404
+    assert list(client.get(reverse("index")).context["publications"]) == []
+
+
+@pytest.mark.django_db
 def test_article_catalog_route(client):
     assert reverse("article_list") == "/articles/"
 

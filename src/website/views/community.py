@@ -1,4 +1,5 @@
 from django.core.paginator import Paginator
+from django.db.models import Q
 from django.shortcuts import get_object_or_404, render
 from django.utils import timezone
 from django.views import View
@@ -8,9 +9,10 @@ from website.models.race import RegStatus
 
 
 def visible_publications():
-    """Public publication feed, including scheduled items only after release."""
+    """Released publications, excluding posts attached to unpublished races."""
     return (
         NewsPost.objects.filter(
+            Q(race__isnull=True) | Q(race__is_published=True),
             is_published=True,
             publication_date__lte=timezone.now(),
         )
