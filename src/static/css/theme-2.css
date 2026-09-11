@@ -60,7 +60,7 @@ button { font-family: inherit; }
 .nav { background: var(--dark); color: #fff; position: sticky; top: 0; z-index: 50; }
 .nav-inner {
   display: flex; align-items: center; justify-content: space-between;
-  padding: 12px 0; gap: 14px;
+  padding: 12px 20px; gap: 14px;
 }
 .brand { display: flex; align-items: center; gap: 11px; color: #fff; font-weight: 500; font-size: 16px; }
 .brand:hover { color: #fff; }
@@ -650,6 +650,7 @@ button { font-family: inherit; }
 @media (max-width: 600px) {
   :root { --section-tabs-height: 47px; }
   .container { padding: 0 12px; }
+  .nav-inner { padding: 12px; }
   .section-tabs-inner { gap: 24px; }
   .section-tab { min-height: 46px; }
   .page { padding: 14px 0 36px; }
