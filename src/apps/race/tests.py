@@ -484,7 +484,10 @@ def test_race_overview_visibility(client, published, role):
     assert response.status_code == (200 if allowed else 404)
     if allowed:
         assert response.context["race"] == race
-        assert post in response.context["news_list"]
+        # The feed uses public visibility rules even in a private race preview.
+        assert (post in response.context["news_list"]) is published
+        if not published:
+            assert client.get(post.get_absolute_url()).status_code == 200
     else:
         html = response.content.decode()
         assert race.name not in html

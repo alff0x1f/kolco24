@@ -65,9 +65,7 @@ class AddNewsPostView(View):
             post = form.save(commit=False)
             post.race = race
             post.save()
-            return HttpResponseRedirect(
-                reverse("race", kwargs={"race_slug": race_slug})
-            )
+            return HttpResponseRedirect(post.get_absolute_url())
         from apps.race.views import RacePageView
 
         context = RacePageView.build_context(race, request.user)

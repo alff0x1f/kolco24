@@ -1,12 +1,16 @@
 import re
 from datetime import timedelta
+from unittest.mock import patch
 
 import pytest
+from django.contrib.auth.models import Permission
 from django.template.loader import render_to_string
 from django.urls import Resolver404, resolve, reverse
 from django.utils import timezone
 
-from website.models import NewsPost, PublicationKind, Race
+from website.forms import NewsPostForm
+from website.models import NewsPost, PublicationKind, Race, RaceAdmin
+from website.models.news import _clean_feed_html, _render_markdown
 from website.models.race import RegStatus
 
 
@@ -28,6 +32,46 @@ def extract_labelled_nav(response, aria_label):
     )
     assert match, f"Navigation {aria_label!r} was not rendered"
     return match.group(0)
+
+
+@pytest.mark.parametrize("summary", ["", "**Авторский анонс**"])
+def test_publication_template_renders_preview_once(summary):
+    publication = NewsPost(
+        pk=24, title="Новость", summary=summary, content_html="<p>Полный текст.</p>"
+    )
+    with (
+        patch("website.models.news._render_markdown", wraps=_render_markdown) as render,
+        patch("website.models.news._clean_feed_html", wraps=_clean_feed_html) as clean,
+    ):
+        render_to_string("website/_publication_post.html", {"publication": publication})
+
+    assert render.call_count == bool(summary)
+    assert clean.call_count == 2  # Before truncation and after it, once per preview.
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("summary", "Новый анонс"),
+        ("content_html", "<p>Обновлённый текст.</p>"),
+        ("kind", PublicationKind.ARTICLE),
+    ],
+)
+def test_feed_preview_cache_tracks_source_changes(field, value):
+    publication = NewsPost(content_html=f"<p>{'я' * 500}</p>")
+    original = publication.feed_summary_html
+
+    setattr(publication, field, value)
+
+    assert publication.feed_summary_html != original
+    assert (
+        publication.feed_summary_html
+        == NewsPost(
+            summary=publication.summary,
+            content_html=publication.content_html,
+            kind=publication.kind,
+        ).feed_summary_html
+    )
 
 
 @pytest.mark.parametrize(
@@ -698,3 +742,176 @@ def test_race_page_hides_unreleased_posts_and_links_visible_post(client):
     assert list(response.context["news_list"]) == [visible]
     assert visible.get_absolute_url() in content
     assert "Неопубликованная новость" not in content
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("hidden_by", ["draft", "future", "race"])
+@pytest.mark.parametrize(
+    ("role", "allowed"),
+    [
+        ("anonymous", False),
+        ("visitor", False),
+        ("staff", False),
+        ("other_race", False),
+        ("admin", True),
+        ("moderator", True),
+        ("editor", True),
+        ("superuser", True),
+    ],
+)
+def test_publication_preview_requires_editor_rights(
+    client, django_user_model, hidden_by, role, allowed
+):
+    race = Race.objects.create(
+        name="Гонка", slug="preview-race", is_published=hidden_by != "race"
+    )
+    publication = create_publication(
+        "Скрытая статья",
+        race=race,
+        kind=PublicationKind.ARTICLE,
+        is_published=hidden_by != "draft",
+        publication_date=timezone.now()
+        + timedelta(days=1 if hidden_by == "future" else -1),
+    )
+    if role != "anonymous":
+        user = django_user_model.objects.create_user(
+            username=role, is_staff=role == "staff", is_superuser=role == "superuser"
+        )
+        if role in ("admin", "moderator", "other_race"):
+            managed_race = race
+            if role == "other_race":
+                managed_race = Race.objects.create(name="Другая", slug="other-race")
+            RaceAdmin.objects.create(
+                user=user,
+                race=managed_race,
+                role=(
+                    RaceAdmin.Role.MODERATOR
+                    if role == "moderator"
+                    else RaceAdmin.Role.ADMIN
+                ),
+            )
+        if role == "editor":
+            user.user_permissions.add(
+                Permission.objects.get(
+                    content_type__app_label="website", codename="change_newspost"
+                )
+            )
+        client.force_login(user)
+
+    response = client.get(publication.get_absolute_url())
+
+    assert response.status_code == (200 if allowed else 404)
+    if allowed:
+        assert response.context["is_preview"] is True
+        assert "Предпросмотр" in response.content.decode()
+        assert response["Cache-Control"] == "private, no-store"
+        assert response["X-Robots-Tag"] == "noindex, nofollow"
+    for route in ("index", "article_list"):
+        assert list(client.get(reverse(route)).context["publications"]) == []
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("role", ["editor", "superuser"])
+def test_global_editor_can_preview_standalone_draft(client, django_user_model, role):
+    publication = create_publication("Черновик без гонки", is_published=False)
+    user = django_user_model.objects.create_user(
+        username=role, is_superuser=role == "superuser"
+    )
+    if role == "editor":
+        user.user_permissions.add(
+            Permission.objects.get(
+                content_type__app_label="website", codename="change_newspost"
+            )
+        )
+    client.force_login(user)
+    assert client.get(publication.get_absolute_url()).status_code == 200
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("published", [False, True])
+def test_race_form_saves_drafts_and_scheduled_articles(
+    client, django_user_model, published
+):
+    race = Race.objects.create(name="Гонка", slug="form-race")
+    user = django_user_model.objects.create_user(username="race-editor")
+    RaceAdmin.objects.create(race=race, user=user)
+    client.force_login(user)
+    date = timezone.localtime(timezone.now() + timedelta(days=2)).replace(
+        second=0, microsecond=0
+    )
+    page = client.get(reverse("race", kwargs={"race_slug": race.slug}))
+    for field in ("kind", "is_published", "publication_date"):
+        assert f'name="{field}"' in page.content.decode()
+    data = {
+        "title": "Запланированная статья",
+        "content": "**Подробности**",
+        "kind": PublicationKind.ARTICLE,
+        "publication_date": date.strftime("%Y-%m-%dT%H:%M"),
+    }
+    if published:
+        data["is_published"] = "on"
+
+    response = client.post(f"/race/{race.slug}/post/add/", data)
+
+    publication = NewsPost.objects.get(race=race)
+    assert publication.kind == PublicationKind.ARTICLE
+    assert publication.is_published is published
+    assert publication.publication_date == date
+    assert response.status_code == 302
+    assert response["Location"] == publication.get_absolute_url()
+    assert client.get(response["Location"]).context["is_preview"] is True
+    assert not NewsPost.objects.visible().exists()
+    client.logout()
+    assert client.get(publication.get_absolute_url()).status_code == 404
+
+
+def test_publication_form_preserves_invalid_scheduling_input():
+    form = NewsPostForm(
+        data={
+            "title": "Черновик",
+            "content": "Текст",
+            "kind": "article",
+            "publication_date": "не дата",
+        }
+    )
+    assert not form.is_valid()
+    assert "publication_date" in form.errors
+    assert form["publication_date"].value() == "не дата"
+    assert form["kind"].value() == "article"
+    assert form["is_published"].value() is False
+
+
+@pytest.mark.django_db
+def test_race_feed_uses_shared_visibility_and_stable_order(
+    client, django_assert_num_queries
+):
+    race = Race.objects.create(name="Гонка", slug="ordered-feed")
+    date = timezone.now() - timedelta(days=1)
+    posts = [
+        create_publication(
+            f"Статья {i}",
+            race=race,
+            kind=PublicationKind.ARTICLE,
+            publication_date=date,
+        )
+        for i in range(3)
+    ]
+    create_publication("Черновик", race=race, is_published=False)
+    create_publication(
+        "Будущая", race=race, publication_date=timezone.now() + timedelta(days=1)
+    )
+    expected = list(reversed(posts))
+    for route in ("index", "article_list"):
+        assert list(client.get(reverse(route)).context["publications"]) == expected
+    response = client.get(reverse("race", kwargs={"race_slug": race.slug}))
+    assert response.context["news_list"] == expected
+    assert response.context["news_count"] == 3
+    with django_assert_num_queries(0):
+        assert all(
+            post.race.name == race.name for post in response.context["news_list"]
+        )
+    race.is_published = False
+    race.save(update_fields=["is_published"])
+    from apps.race.views import RacePageView
+
+    assert RacePageView.build_context(race)["news_list"] == []

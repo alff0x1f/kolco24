@@ -191,7 +191,13 @@ def test_news_post_form_valid():
     from website.forms import NewsPostForm
 
     form = NewsPostForm(
-        data={"title": "Test Post", "content": "Some **markdown** text"}
+        data={
+            "title": "Test Post",
+            "content": "Some **markdown** text",
+            "kind": "news",
+            "is_published": True,
+            "publication_date": "2026-09-11T10:00",
+        }
     )
     assert form.is_valid(), form.errors
 
@@ -216,7 +222,13 @@ def test_add_post_by_race_admin(client):
     client.force_login(user)
     response = client.post(
         f"/race/{race.slug}/post/add/",
-        {"title": "New Post", "content": "Hello world"},
+        {
+            "title": "New Post",
+            "content": "Hello world",
+            "kind": "news",
+            "is_published": True,
+            "publication_date": "2026-09-11T10:00",
+        },
     )
     assert response.status_code == 302
     assert NewsPost.objects.filter(race=race, title="New Post").exists()

@@ -14,6 +14,9 @@
       <a href="{% url 'index' %}{% if publication.kind == 'news' %}#publications{% endif %}">Главная</a>{% if publication.kind == "article" %}<span>/</span><a href="{% url 'article_list' %}">Статьи</a>{% endif %}
     </nav>
     <article>
+      {% if is_preview %}
+      <p role="status">Предпросмотр — публикация пока недоступна посетителям.</p>
+      {% endif %}
       <header class="publication-detail__head">
         <div class="publication-card__meta">
           <span class="publication-kind">{{ publication.get_kind_display }}</span>

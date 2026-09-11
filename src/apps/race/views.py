@@ -15,7 +15,6 @@ from django.http import (
 )
 from django.shortcuts import get_object_or_404, render
 from django.urls import reverse
-from django.utils import timezone
 from django.utils.decorators import method_decorator
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.utils.safestring import mark_safe
@@ -132,11 +131,7 @@ class RacePageView(View):
                     if not cat.people_limit
                     else max(0, cat.people_limit - cat.people)
                 )
-        news_qs = NewsPost.objects.filter(
-            race=race,
-            is_published=True,
-            publication_date__lte=timezone.now(),
-        ).order_by("-publication_date")
+        news_qs = NewsPost.objects.visible().filter(race=race)
         news_count = news_qs.count()
         news_list = list(news_qs[:10])
         context = {

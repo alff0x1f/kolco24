@@ -1,5 +1,6 @@
 {% extends "website/base-2.html" %}
 {% load static %}
+{% load tz %}
 {% load custom_filters %}
 {% block title %}{{ race.name }} · {{ race.date }}{% endblock %}
 {% block extra_head %}
@@ -58,7 +59,26 @@
                 <span class="hint err">{{ post_form.image.errors|join:", " }}</span>
                 {% endif %}
               </div>
-              <button class="btn btn-primary" type="submit">Опубликовать</button>
+              <div class="field-row">
+                {{ post_form.kind.label_tag }}
+                {{ post_form.kind }}
+                {{ post_form.kind.errors }}
+              </div>
+              <div class="field-row">
+                {{ post_form.publication_date.label_tag }}
+                {{ post_form.publication_date }}
+                {{ post_form.publication_date.errors }}
+                {% get_current_timezone as publication_timezone %}
+                <span class="hint">Часовой пояс: {{ publication_timezone }}. Будущая дата отложит публикацию.</span>
+              </div>
+              <div class="field-row">
+                <label for="{{ post_form.is_published.id_for_label }}">
+                  {{ post_form.is_published }} Разрешить публикацию
+                </label>
+                {{ post_form.is_published.errors }}
+                <span class="hint">Снимите отметку, чтобы сохранить черновик.</span>
+              </div>
+              <button class="btn btn-primary" type="submit">Сохранить и посмотреть</button>
             </form>
           </div>
         </div>

@@ -1,24 +1,16 @@
 from django.core.paginator import Paginator
-from django.db.models import Q
+from django.http import Http404
 from django.shortcuts import get_object_or_404, render
 from django.utils import timezone
 from django.views import View
 
-from website.models import NewsPost, PublicationKind, Race
+from website.models import NewsPost, PublicationKind, Race, RaceAdmin
 from website.models.race import RegStatus
 
 
 def visible_publications():
     """Released publications, excluding posts attached to unpublished races."""
-    return (
-        NewsPost.objects.filter(
-            Q(race__isnull=True) | Q(race__is_published=True),
-            is_published=True,
-            publication_date__lte=timezone.now(),
-        )
-        .select_related("race")
-        .order_by("-publication_date", "-pk")
-    )
+    return NewsPost.objects.visible()
 
 
 def get_featured_race(today):
@@ -90,12 +82,36 @@ class PublicationDetailView(View):
     template_name = "website/publication_detail.html"
 
     def get(self, request, pk):
-        publication = get_object_or_404(visible_publications(), pk=pk)
-        return render(
+        publication = visible_publications().filter(pk=pk).first()
+        is_preview = publication is None
+        if is_preview:
+            publication = get_object_or_404(
+                NewsPost.objects.select_related("race"), pk=pk
+            )
+            user = request.user
+            if not (
+                user.is_authenticated
+                and user.is_active
+                and (
+                    user.has_perm("website.change_newspost")
+                    or (
+                        publication.race_id
+                        and RaceAdmin.objects.filter(
+                            race_id=publication.race_id, user=user
+                        ).exists()
+                    )
+                )
+            ):
+                raise Http404
+        response = render(
             request,
             self.template_name,
-            {"publication": publication},
+            {"publication": publication, "is_preview": is_preview},
         )
+        if is_preview:
+            response["Cache-Control"] = "private, no-store"
+            response["X-Robots-Tag"] = "noindex, nofollow"
+        return response
 
 
 class RaceListView(View):

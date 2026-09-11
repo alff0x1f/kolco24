@@ -135,8 +135,24 @@ class PublicationKind(models.TextChoices):
     ARTICLE = "article", "Статья"
 
 
+class NewsPostQuerySet(models.QuerySet):
+    def visible(self):
+        """Released posts belonging to public races, in stable feed order."""
+        return (
+            self.filter(
+                models.Q(race__isnull=True) | models.Q(race__is_published=True),
+                is_published=True,
+                publication_date__lte=timezone.now(),
+            )
+            .select_related("race")
+            .order_by("-publication_date", "-pk")
+        )
+
+
 class NewsPost(models.Model):
     """A news item or evergreen article shown in the site publication feed."""
+
+    objects = NewsPostQuerySet.as_manager()
 
     title = models.CharField("Заголовок", max_length=255)
     summary = models.TextField(
@@ -199,6 +215,14 @@ class NewsPost(models.Model):
 
     @property
     def feed_summary_html(self):
+        """Reuse the preview until its source fields change on this instance."""
+        source = (self.summary, self.content_html, self.kind)
+        if getattr(self, "_feed_summary_source", None) != source:
+            self._feed_summary_html = self._render_feed_summary_html()
+            self._feed_summary_source = source
+        return self._feed_summary_html
+
+    def _render_feed_summary_html(self):
         """Render safe feed formatting and close tags when shortening the text."""
         html = _clean_feed_html(
             _render_markdown(self.summary.strip())
