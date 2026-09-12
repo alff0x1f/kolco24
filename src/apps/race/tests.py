@@ -801,6 +801,100 @@ def test_race_page_superuser_sees_edit_and_new_buttons(client):
     assert "+ Новая гонка" in html
 
 
+@pytest.mark.django_db
+@pytest.mark.parametrize(
+    "role",
+    ["anonymous", "visitor", "staff", "other_admin", "admin", "moderator", "superuser"],
+)
+def test_race_administrators_visibility(client, role):
+    race = _make_race(slug="administrators-visibility")
+    assigned = User.objects.create_user(username="private-roster-member")
+    RaceAdmin.objects.create(race=race, user=assigned)
+    if role != "anonymous":
+        viewer = User.objects.create_user(
+            username=role, is_staff=role == "staff", is_superuser=role == "superuser"
+        )
+        if role in {"admin", "moderator", "other_admin"}:
+            RaceAdmin.objects.create(
+                race=_make_race(slug="other-roster") if role == "other_admin" else race,
+                user=viewer,
+                role=(
+                    RaceAdmin.Role.MODERATOR
+                    if role == "moderator"
+                    else RaceAdmin.Role.ADMIN
+                ),
+            )
+        client.force_login(viewer)
+
+    response = client.get(reverse("race", args=[race.slug]))
+
+    assert response.status_code == 200
+    allowed = role in {"admin", "superuser"}
+    html = response.content.decode()
+    assert ('id="race-administrators-title"' in html) is allowed
+    assert ("private-roster-member" in html) is allowed
+    assert ("race_administrators" in response.context) is allowed
+
+
+@pytest.mark.django_db
+def test_race_administrators_names_roles_and_order(client):
+    race = _make_race(slug="administrators-order")
+    viewer = User.objects.create_user(username="site-superuser", is_superuser=True)
+    client.force_login(viewer)
+    for username, first_name, last_name, role in [
+        ("z-admin", "Zoe", "Brown", RaceAdmin.Role.ADMIN),
+        ("b-moderator", "Bella", "Smith", RaceAdmin.Role.MODERATOR),
+        ("a-admin", "alice", "Jones", RaceAdmin.Role.ADMIN),
+        ("aaron", "", "", RaceAdmin.Role.MODERATOR),
+    ]:
+        member = User.objects.create_user(
+            username=username, first_name=first_name, last_name=last_name
+        )
+        RaceAdmin.objects.create(race=race, user=member, role=role)
+    outsider = User.objects.create_user(username="other-race-member")
+    RaceAdmin.objects.create(race=_make_race(slug="other-members"), user=outsider)
+
+    response = client.get(reverse("race", args=[race.slug]))
+
+    assert response.status_code == 200
+    html = response.content.decode()
+    card = html.split('aria-labelledby="race-administrators-title"', 1)[1].split(
+        "</section>", 1
+    )[0]
+    names = ["alice Jones", "Zoe Brown", "aaron", "Bella Smith"]
+    for assignment in race.race_admins.select_related("user"):
+        name = assignment.user.get_full_name() or assignment.user.get_username()
+        assert (
+            f'{name} <small class="race-administrators-id">'
+            f"ID: {assignment.user_id}</small>"
+        ) in card
+    assert [
+        member["name"] for member in response.context["race_administrators"]
+    ] == names
+    assert [card.index(name) for name in names] == sorted(
+        card.index(name) for name in names
+    )
+    assert (
+        card.count('<span class="race-administrators-role">Администратор</span>') == 2
+    )
+    assert card.count('<span class="race-administrators-role">Модератор</span>') == 2
+    assert "other-race-member" not in card
+    assert "site-superuser" not in card
+
+
+@pytest.mark.django_db
+def test_race_administrators_empty_state(client):
+    race = _make_race(slug="administrators-empty")
+    viewer = User.objects.create_user(username="empty-viewer", is_superuser=True)
+    client.force_login(viewer)
+
+    response = client.get(reverse("race", args=[race.slug]))
+
+    assert response.status_code == 200
+    assert response.context["race_administrators"] == []
+    assert "Администраторы и модераторы не назначены" in response.content.decode()
+
+
 # --- can_edit_race access-control matrix ---
 
 

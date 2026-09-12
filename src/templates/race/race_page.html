@@ -1,6 +1,7 @@
 {% extends "website/base-2.html" %}
 {% load static %}
 {% load tz %}
+{% load l10n %}
 {% load custom_filters %}
 {% block title %}{{ race.name }} · {{ race.date }}{% endblock %}
 {% block extra_head %}
@@ -160,6 +161,25 @@
             {% endif %}
           </div>
         </div>
+        <section class="card card-admin" aria-labelledby="race-administrators-title">
+          <div class="side-head">
+            <h3 id="race-administrators-title">Администраторы и модераторы</h3>
+          </div>
+          <div class="card-pad">
+            {% if race_administrators %}
+            <ul class="race-administrators">
+              {% for member in race_administrators %}
+              <li>
+                <span>{{ member.name }} <small class="race-administrators-id">ID: {{ member.user_id|unlocalize }}</small></span>
+                <span class="race-administrators-role">{{ member.role_label }}</span>
+              </li>
+              {% endfor %}
+            </ul>
+            {% else %}
+            <p class="race-administrators-empty">Администраторы и модераторы не назначены</p>
+            {% endif %}
+          </div>
+        </section>
         {% endif %}
       </aside>
 

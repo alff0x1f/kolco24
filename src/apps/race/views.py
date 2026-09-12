@@ -149,6 +149,20 @@ class RacePageView(View):
             "owned_teams": _owned_teams(race, user),
         }
         context["can_edit_race"] = bool(user is not None and can_edit_race(user, race))
+        if context["can_edit_race"]:
+            context["race_administrators"] = sorted(
+                [
+                    {
+                        "user_id": assignment.user_id,
+                        "name": assignment.user.get_full_name()
+                        or assignment.user.get_username(),
+                        "role": assignment.role,
+                        "role_label": assignment.get_role_display(),
+                    }
+                    for assignment in race.race_admins.select_related("user")
+                ],
+                key=lambda member: (member["role"], member["name"].casefold()),
+            )
         if user is not None and is_race_admin(user, race):
             context["post_form"] = NewsPostForm()
         return context
