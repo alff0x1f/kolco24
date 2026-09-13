@@ -26,6 +26,8 @@ from apps.race.app_data import build_overview, build_team_timeline
 from apps.race.forms import RaceForm
 from apps.race.models import Protocol, RaceExtra
 from apps.race.permissions import can_edit_race, is_team_editing_open
+from apps.race.promo import ERROR_MESSAGES as PROMO_ERRORS
+from apps.race.promo import PromoError, resolve_promo
 from apps.race.results import build_protocol, freeze_protocol
 from website.forms import NewsPostForm
 from website.models import Checkpoint, NewsPost, Race, Team
@@ -1535,3 +1537,57 @@ class RaceAppDataTeamView(View):
         context["race"] = race
         context["team"] = team
         return render(request, "race/app_data_team.html", context)
+
+
+class PromoCheckView(View):
+    """Validate a promo code for the team form and answer in JSON.
+
+    **GET, not POST**: the check writes nothing, and no JS in this project posts
+    — there is no CSRF-token helper to reuse — so a GET both avoids that and
+    follows the JSON-GET precedent of the race-map endpoints. The response
+    carries the discount *rule* (``type``/``value``), not a total: the JS
+    recomputes the sum as the team size changes.
+    """
+
+    def get(self, request, race_slug):
+        if not request.user.is_authenticated:
+            # JSON, not a redirect to the HTML login page — the caller is AJAX.
+            return JsonResponse({"ok": False, "error": "Войдите в аккаунт"}, status=403)
+        race = get_object_or_404(Race, slug=race_slug, is_published=True)
+        code = (request.GET.get("code") or "").strip()
+        if not code:
+            return JsonResponse({"ok": False, "error": PROMO_ERRORS["not_found"]})
+        try:
+            promo = resolve_promo(race, code, self._resolve_team(request, race))
+        except PromoError as exc:
+            return JsonResponse({"ok": False, "error": str(exc)})
+        return JsonResponse(
+            {
+                "ok": True,
+                "code": promo.code,
+                "type": promo.discount_type,
+                "value": promo.value,
+            }
+        )
+
+    @staticmethod
+    def _resolve_team(request, race):
+        """The team being edited, or ``None`` (the add flow).
+
+        A ``team_id`` outside this race, or one the user neither owns nor
+        administers, is ignored rather than rejected — the code is then checked
+        as it would be for a brand-new team.
+        """
+        raw = request.GET.get("team_id")
+        if not raw:
+            return None
+        try:
+            team_id = int(raw)
+        except (TypeError, ValueError):
+            return None
+        team = Team.objects.filter(id=team_id, category2__race=race).first()
+        if team is None:
+            return None
+        if team.owner_id != request.user.id and not can_edit_race(request.user, race):
+            return None
+        return team

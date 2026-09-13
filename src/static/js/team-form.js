@@ -6,17 +6,24 @@
    live totals that mirror the server formula.
 
    This file is the CLIENT mirror of the charge formula in
-   src/apps/race/pricing.py (compute_team_charge). Any change to the add-on
-   math here must be reflected there, and vice versa:
+   src/apps/race/pricing.py (compute_team_charge). Any change to the add-on or
+   promo math here must be reflected there, and vice versa:
 
-       due = max(0, (ucount − paidPeople) × currentPrice
+       fee      = max(0, (ucount − paidPeople) × currentPrice)
+       discount = promo ? (percent ? floor(fee × value / 100)
+                                   : min(value, fee)) : 0
+       due      = max(0, fee − discount
                   + Σ active extras: max(0, count − countPaid) × price)
+
+   A promo discounts the participation fee only — add-ons stay at full price.
 
    Config island (rendered by the template):
      <script type="application/json" id="teamFormConfig">
        { "currentPrice": 3000, "paidPeople": 0, "isEdit": false,
          "extras": [{ "code": "map", "name": "Доп. карты", "price": 200,
-                      "freePerTeam": 2, "count": 0, "countPaid": 0 }] }
+                      "freePerTeam": 2, "count": 0, "countPaid": 0 }],
+         "promo": { "code": "SALE40", "type": "percent", "value": 40 },
+         "promoCheckUrl": "/race/<slug>/promo/check/", "teamId": 42 }
      </script>
 
    DOM contract the template MUST provide (everything else is optional and
@@ -30,9 +37,10 @@
                                    each with a hidden input name="extra_<code>"
      #consent                    — consent checkbox (add mode only)
      #submitBtn / #payBtn        — submit buttons (gated on consent in add mode)
+     #promoInput / #promoBtn / #promoMsg / #promoCode (hidden, name="promo_code")
    Sidebar (optional): #sumHeading, #sumCountLbl, #sumCost, #sumPeople,
-     #sumExtras (container for per-extra lines), #sumPaidLine/#sumPaidN/
-     #sumPaidAmt, #sumTotal, #regClosedWarn.
+     #sumExtras (container for per-extra lines), #sumPromoLine/#sumPromoCode/
+     #sumPromoAmt, #sumPaidLine/#sumPaidN/#sumPaidAmt, #sumTotal, #regClosedWarn.
    Submit buttons may carry data-label-due / data-label-zero to swap their text
    when an amount is / isn't due (used by edit: "Сохранить и доплатить").
    ────────────────────────────────────────────────────────────────────────── */
@@ -51,6 +59,9 @@
     raceRemaining: null,
     currentCategoryId: null,
     bypassLimits: false,
+    promo: null,
+    promoCheckUrl: "",
+    teamId: null,
   };
   var cfgEl = document.getElementById("teamFormConfig");
   if (cfgEl) {
@@ -70,6 +81,10 @@
   var RACE_REMAINING = cfg.raceRemaining == null ? null : Number(cfg.raceRemaining);
   var CURRENT_CAT_ID = cfg.currentCategoryId == null ? null : String(cfg.currentCategoryId);
   var BYPASS_LIMITS = !!cfg.bypassLimits;
+  var PROMO_CHECK_URL = cfg.promoCheckUrl || "";
+  var TEAM_ID = cfg.teamId == null ? null : String(cfg.teamId);
+  // Applied promo: { code, type: "percent"|"fixed", value } or null.
+  var promo = cfg.promo || null;
 
   // ── DOM hooks ─────────────────────────────────────────
   var category = document.getElementById("category");
@@ -83,6 +98,10 @@
   var submitBtn = document.getElementById("submitBtn");
   var payBtn = document.getElementById("payBtn");
   var regClosedWarn = document.getElementById("regClosedWarn");
+  var promoInput = document.getElementById("promoInput");
+  var promoBtn = document.getElementById("promoBtn");
+  var promoMsg = document.getElementById("promoMsg");
+  var promoCode = document.getElementById("promoCode");
 
   // sidebar
   var sumHeading = document.getElementById("sumHeading");
@@ -90,6 +109,9 @@
   var sumCost = document.getElementById("sumCost");
   var sumPeople = document.getElementById("sumPeople");
   var sumExtras = document.getElementById("sumExtras");
+  var sumPromoLine = document.getElementById("sumPromoLine");
+  var sumPromoCode = document.getElementById("sumPromoCode");
+  var sumPromoAmt = document.getElementById("sumPromoAmt");
   var sumPaidLine = document.getElementById("sumPaidLine");
   var sumPaidN = document.getElementById("sumPaidN");
   var sumPaidAmt = document.getElementById("sumPaidAmt");
@@ -369,7 +391,19 @@
     var peopleGross = ucount * COST;
     // race-fee term (may be negative when overpaid); max(0,...) applied after
     // all extras are summed, mirroring compute_team_charge in pricing.py
-    var due = peopleGross - PAID_PEOPLE * COST;
+    var fee = Math.max(0, peopleGross - PAID_PEOPLE * COST);
+    var discount = promoDiscount(fee);
+    var due = peopleGross - PAID_PEOPLE * COST - discount;
+
+    if (sumPromoLine) {
+      if (promo && discount > 0) {
+        sumPromoLine.style.display = "";
+        if (sumPromoCode) sumPromoCode.textContent = promo.code;
+        if (sumPromoAmt) sumPromoAmt.textContent = "−" + fmt(discount) + " ₽";
+      } else {
+        sumPromoLine.style.display = "none";
+      }
+    }
 
     extras.forEach(function (item) {
       var max = extraMax(item);
@@ -422,6 +456,75 @@
     updateButtons(due);
   }
 
+  // ── Promo code ────────────────────────────────────────
+  // Server mirror: RacePromo.discount_for (src/apps/race/models.py) — a percent
+  // is floored, and the discount never exceeds the fee.
+  function promoDiscount(fee) {
+    if (!promo || fee <= 0) return 0;
+    var value = Number(promo.value) || 0;
+    var raw =
+      promo.type === "percent"
+        ? Math.floor((fee * value) / 100)
+        : Math.min(value, fee);
+    return Math.max(0, Math.min(raw, fee));
+  }
+
+  function showPromoMsg(text, isError) {
+    if (!promoMsg) return;
+    promoMsg.textContent = text || "";
+    promoMsg.style.display = text ? "" : "none";
+    promoMsg.classList.toggle("err", !!isError);
+    promoMsg.classList.toggle("ok", !!text && !isError);
+  }
+
+  function setPromo(next) {
+    promo = next;
+    if (promoCode) promoCode.value = next ? next.code : "";
+    if (promoInput) {
+      promoInput.value = next ? next.code : "";
+      promoInput.readOnly = !!next;
+      promoInput.classList.toggle("has-error", false);
+    }
+    if (promoBtn) promoBtn.textContent = next ? "Убрать" : "Применить";
+    render();
+  }
+
+  function applyPromo() {
+    var code = (promoInput ? promoInput.value : "").trim();
+    if (!code || !PROMO_CHECK_URL) {
+      showPromoMsg("Введите промокод", true);
+      return;
+    }
+    var url = PROMO_CHECK_URL + "?code=" + encodeURIComponent(code);
+    if (TEAM_ID) url += "&team_id=" + encodeURIComponent(TEAM_ID);
+    if (promoBtn) promoBtn.disabled = true;
+    fetch(url, { credentials: "same-origin" })
+      .then(function (resp) {
+        return resp.json().catch(function () {
+          return { ok: false, error: "Не удалось проверить промокод" };
+        });
+      })
+      .then(function (data) {
+        if (data && data.ok) {
+          setPromo({ code: data.code, type: data.type, value: data.value });
+          showPromoMsg("Промокод применён", false);
+        } else {
+          setPromo(null);
+          if (promoInput) {
+            promoInput.value = code;
+            promoInput.classList.add("has-error");
+          }
+          showPromoMsg((data && data.error) || "Промокод не найден", true);
+        }
+      })
+      .catch(function () {
+        showPromoMsg("Не удалось проверить промокод", true);
+      })
+      .then(function () {
+        if (promoBtn) promoBtn.disabled = false;
+      });
+  }
+
   function updateButtons(due) {
     // consent gates submit in add mode; in edit mode the gate is skipped.
     var enabled = IS_EDIT || (consent ? consent.checked : true);
@@ -447,7 +550,24 @@
     });
   }
   if (consent) consent.addEventListener("change", render);
-
+  if (promoBtn) {
+    promoBtn.addEventListener("click", function () {
+      if (promo) {
+        setPromo(null);
+        showPromoMsg("", false);
+      } else {
+        applyPromo();
+      }
+    });
+  }
+  if (promoInput) {
+    promoInput.addEventListener("keydown", function (e) {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        if (!promo) applyPromo();
+      }
+    });
+  }
   // ── Init ──────────────────────────────────────────────
   if (seg && category) {
     syncCategoryOptions();
@@ -455,4 +575,7 @@
   } else {
     setCount(isNaN(ucount) ? counts()[0] || 2 : ucount);
   }
+  // A promo resolved server-side survives a re-render with errors; applied
+  // after the size control is built so the total is recomputed with it.
+  if (promo) setPromo(promo);
 })();

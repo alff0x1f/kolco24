@@ -5674,3 +5674,145 @@ def test_create_team_payment_zero_without_discount_creates_nothing(rf):
 
     assert result is None
     assert not Payment.objects.filter(team=team).exists()
+
+
+# --- Promo codes: promo_check endpoint ---
+
+
+def _promo_check(client, race, code, team_id=None):
+    params = {"code": code}
+    if team_id is not None:
+        params["team_id"] = team_id
+    return client.get(reverse("promo_check", args=[race.slug]), params)
+
+
+@pytest.mark.django_db
+def test_promo_check_valid_code(client, django_user_model):
+    user = django_user_model.objects.create_user(
+        username="pc1", password="p", email="pc1@e.com"
+    )
+    race = _make_race(slug="pc-ok")
+    promo = _promo(race, code="SALE40", value=40)
+    client.force_login(user)
+
+    resp = _promo_check(client, race, " sale40 ")
+
+    assert resp.status_code == 200
+    assert resp.json() == {
+        "ok": True,
+        "code": promo.code,
+        "type": RacePromo.PERCENT,
+        "value": 40,
+    }
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(
+    "setup,code,error",
+    [
+        ("none", "NOPE", "Промокод не найден"),
+        ("inactive", "SALE40", "Промокод больше не действует"),
+        ("used", "SALE40", "Ваша команда уже использовала этот промокод"),
+        ("limit", "SALE40", "Лимит промокода исчерпан"),
+    ],
+)
+def test_promo_check_reports_each_error(client, setup, code, error):
+    owner, race, team = _priced_team(f"pcerr-{setup}", slug=f"pc-err-{setup}")
+    if setup == "inactive":
+        _promo(race, code="SALE40", is_active=False)
+    elif setup == "used":
+        promo = _promo(race, code="SALE40")
+        _promo_payment(team, promo, status=Payment.STATUS_DONE)
+    elif setup == "limit":
+        promo = _promo(race, code="SALE40", max_uses=1)
+        other = _make_team(owner, team.category2, start_number="2")
+        _promo_payment(other, promo, status=Payment.STATUS_DONE)
+    client.force_login(owner)
+
+    resp = _promo_check(client, race, code, team_id=team.id)
+
+    assert resp.status_code == 200
+    assert resp.json() == {"ok": False, "error": error}
+
+
+@pytest.mark.django_db
+def test_promo_check_blank_code(client, django_user_model):
+    user = django_user_model.objects.create_user(
+        username="pc2", password="p", email="pc2@e.com"
+    )
+    race = _make_race(slug="pc-blank")
+    client.force_login(user)
+
+    resp = client.get(reverse("promo_check", args=[race.slug]))
+
+    assert resp.json() == {"ok": False, "error": "Промокод не найден"}
+
+
+@pytest.mark.django_db
+def test_promo_check_ignores_foreign_team_id(client, django_user_model):
+    owner, race, team = _priced_team("pc3", slug="pc-foreign")
+    promo = _promo(race, code="SALE40")
+    # Someone else's team already used the code — that must not leak into the
+    # answer given to this user, who is simply told the code is fine.
+    _promo_payment(team, promo, status=Payment.STATUS_DONE)
+    stranger = django_user_model.objects.create_user(
+        username="pc3x", password="p", email="pc3x@e.com"
+    )
+    client.force_login(stranger)
+
+    resp = _promo_check(client, race, "SALE40", team_id=team.id)
+
+    assert resp.json()["ok"] is True
+
+
+@pytest.mark.django_db
+def test_promo_check_ignores_team_of_another_race(client):
+    owner, race, team = _priced_team("pc4", slug="pc-other-race")
+    other_race = _make_race(slug="pc-other-race-2")
+    _promo(other_race, code="SALE40")
+    client.force_login(owner)
+
+    resp = _promo_check(client, other_race, "SALE40", team_id=team.id)
+
+    assert resp.json()["ok"] is True
+
+
+@pytest.mark.django_db
+def test_promo_check_anonymous_gets_json_403(client):
+    race = _make_race(slug="pc-anon")
+    _promo(race, code="SALE40")
+
+    resp = _promo_check(client, race, "SALE40")
+
+    assert resp.status_code == 403
+    assert resp.json()["ok"] is False
+
+
+@pytest.mark.django_db
+def test_promo_check_unpublished_race_404(client, django_user_model):
+    user = django_user_model.objects.create_user(
+        username="pc5", password="p", email="pc5@e.com"
+    )
+    race = _make_race(slug="pc-unpub")
+    race.is_published = False
+    race.save(update_fields=["is_published"])
+    _promo(race, code="SALE40")
+    client.force_login(user)
+
+    assert _promo_check(client, race, "SALE40").status_code == 404
+
+
+@pytest.mark.django_db
+def test_promo_check_writes_nothing(client, django_user_model):
+    user = django_user_model.objects.create_user(
+        username="pc6", password="p", email="pc6@e.com"
+    )
+    race = _make_race(slug="pc-readonly")
+    _promo(race, code="SALE40", max_uses=1)
+    client.force_login(user)
+
+    _promo_check(client, race, "SALE40")
+    _promo_check(client, race, "SALE40")
+
+    assert Payment.objects.count() == 0
+    assert RacePromo.objects.get(race=race, code="SALE40").max_uses == 1

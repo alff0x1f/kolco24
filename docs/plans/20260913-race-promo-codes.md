@@ -398,15 +398,15 @@ total = max(0, fee - discount + Σ extras)
 - Modify: `src/website/views/team.py`
 - Modify: `src/website/tests.py`
 
-- [ ] `AddTeam.post`: звать `create_team_payment(request, team, race, promo=form.promo)`
+- [x] `AddTeam.post`: звать `create_team_payment(request, team, race, promo=form.promo)`
       (фильтрация `promo_code` уже сделана в задаче 7)
-- [ ] `EditTeamView.post`: то же самое
-- [ ] обе вьюхи ловят `PromoUnavailable` и перерисовывают форму с ошибкой формы
+- [x] `EditTeamView.post`: то же самое
+- [x] обе вьюхи ловят `PromoUnavailable` и перерисовывают форму с ошибкой формы
       («Промокод больше недоступен»), не уводя пользователя на оплату
-- [ ] тесты `AddTeam`: регистрация с промокодом создаёт платёж со скидкой; без промокода поведение
+- [x] тесты `AddTeam`: регистрация с промокодом создаёт платёж со скидкой; без промокода поведение
       прежнее; `PromoUnavailable` возвращает форму с ошибкой (200, платёж не создан)
-- [ ] тесты `EditTeamView`: доплата после оплаты со скидкой идёт по полной цене (`already_used`)
-- [ ] прогнать тесты — должны пройти до перехода к задаче 9
+- [x] тесты `EditTeamView`: доплата после оплаты со скидкой идёт по полной цене (`already_used`)
+- [x] прогнать тесты — должны пройти до перехода к задаче 9
 
 ### Task 9: JSON-эндпоинт `promo_check`
 
@@ -415,20 +415,20 @@ total = max(0, fee - discount + Σ extras)
 - Modify: `src/website/urls.py`
 - Modify: `src/apps/race/tests.py`
 
-- [ ] вьюха `PromoCheckView` (**GET**, без CSRF-возни): гонка по `race_slug` (404, только
+- [x] вьюха `PromoCheckView` (**GET**, без CSRF-возни): гонка по `race_slug` (404, только
       опубликованная), параметры `code` и необязательный `team_id`
-- [ ] аутентификация ручной веткой, как в соседних вьюхах `apps/race` (`_load_and_authorize`,
+- [x] аутентификация ручной веткой, как в соседних вьюхах `apps/race` (`_load_and_authorize`,
       `src/apps/race/views.py:747`), но вместо редиректа — `403 {"ok": false, "error": ...}`,
       чтобы AJAX не получал HTML-страницу логина
-- [ ] `team_id` резолвится строго в команду этой гонки, владельцем которой является
+- [x] `team_id` резолвится строго в команду этой гонки, владельцем которой является
       `request.user` (либо пользователь проходит `can_edit_race`) — как `EditTeamView.get_team`;
       чужая команда или команда другой гонки → как будто `team_id` не передан
-- [ ] ответ `{ok: true, code, type, value}` либо `{ok: false, error}`; пустой `code` → `{ok: false}`
-- [ ] маршрут `race/<slug:race_slug>/promo/check/`, имя `promo_check` в `src/website/urls.py`
-- [ ] тесты: валидный код, каждая ошибка резолва, чужой `team_id`, `team_id` другой гонки,
+- [x] ответ `{ok: true, code, type, value}` либо `{ok: false, error}`; пустой `code` → `{ok: false}`
+- [x] маршрут `race/<slug:race_slug>/promo/check/`, имя `promo_check` в `src/website/urls.py`
+- [x] тесты: валидный код, каждая ошибка резолва, чужой `team_id`, `team_id` другой гонки,
       аноним (403 JSON), пустой `code`, несуществующая/неопубликованная гонка
-- [ ] тест: эндпоинт не создаёт и не меняет ни одной строки в БД
-- [ ] прогнать тесты — должны пройти до перехода к задаче 10
+- [x] тест: эндпоинт не создаёт и не меняет ни одной строки в БД
+- [x] прогнать тесты — должны пройти до перехода к задаче 10
 
 ### Task 10: Ввод промокода на форме команды (конфиг + шаблоны + JS)
 
@@ -440,21 +440,21 @@ total = max(0, fee - discount + Σ extras)
 - Modify: `src/static/css/team-form.css`
 - Modify: `src/website/tests.py`
 
-- [ ] в конфиг-остров `teamFormConfig` добавить `promo: {code, type, value} | null` и
+- [x] в конфиг-остров `teamFormConfig` добавить `promo: {code, type, value} | null` и
       `promoCheckUrl`; при перерисовке формы с ошибкой применённый код сохраняется
-- [ ] в оба шаблона добавить блок ввода под доп-услугами: поле, кнопка «Применить», место под
+- [x] в оба шаблона добавить блок ввода под доп-услугами: поле, кнопка «Применить», место под
       ошибку, скрытый `promo_code`; стили в `team-form.css`
-- [ ] в `team-form.js`: GET-запрос к `promoCheckUrl` (`?code=…&team_id=…`, без CSRF-заголовка),
+- [x] в `team-form.js`: GET-запрос к `promoCheckUrl` (`?code=…&team_id=…`, без CSRF-заголовка),
       состояние промо, кнопка «Убрать», строка «Промокод XXX: −N ₽» в разбивке итога,
       обработка сетевой ошибки/403
-- [ ] формула-зеркало в `render()`: `fee = max(0, ucount×COST − PAID_PEOPLE×COST)`,
+- [x] формула-зеркало в `render()`: `fee = max(0, ucount×COST − PAID_PEOPLE×COST)`,
       `discount = type === "percent" ? Math.floor(fee * value / 100) : Math.min(value, fee)`,
       итог `max(0, fee − discount + Σ extras)`; смена размера/категории пересчитывает скидку,
       код не сбрасывается
-- [ ] обновить перекрёстные комментарии о зеркале в `team-form.js` и `apps/race/pricing.py`
-- [ ] расширить `test_config_island_mirrors_compute_team_charge` кейсом со скидкой (процент и фикс)
-- [ ] тесты: конфиг-остров содержит `promo` после ошибки валидации формы
-- [ ] прогнать тесты — должны пройти до перехода к задаче 11
+- [x] обновить перекрёстные комментарии о зеркале в `team-form.js` и `apps/race/pricing.py`
+- [x] расширить `test_config_island_mirrors_compute_team_charge` кейсом со скидкой (процент и фикс)
+- [x] тесты: конфиг-остров содержит `promo` после ошибки валидации формы
+- [x] прогнать тесты — должны пройти до перехода к задаче 11
 
 ### Task 11: Реконсайл промокодов в `RaceEditView`
 

@@ -23,6 +23,7 @@ from django.views.decorators.csrf import csrf_exempt
 
 from apps.race.permissions import can_edit_race
 from apps.race.pricing import create_team_payment, upsert_team_extras
+from apps.race.promo import PromoUnavailable
 from website.forms import NewsPostForm, PageForm, TeamForm
 from website.models import (
     Checkpoint,
@@ -372,6 +373,15 @@ def build_team_form_context(race, team, is_edit=False, bypass_limits=False, form
             }
         )
 
+    # A resolved promo survives a re-render with errors; an unresolved one is
+    # null and the field error explains why (see TeamForm.clean_promo_code).
+    promo = getattr(form, "promo", None) if form is not None else None
+    promo_config = (
+        {"code": promo.code, "type": promo.discount_type, "value": promo.value}
+        if promo is not None
+        else None
+    )
+
     config = {
         "currentPrice": current_price,
         "paidPeople": team.paid_people,
@@ -380,6 +390,9 @@ def build_team_form_context(race, team, is_edit=False, bypass_limits=False, form
         "raceRemaining": race_remaining,
         "currentCategoryId": current_category_id,
         "bypassLimits": bypass_limits,
+        "promo": promo_config,
+        "promoCheckUrl": reverse("promo_check", args=[race.slug]),
+        "teamId": team.pk,
     }
     return {
         "current_price": current_price,
@@ -463,10 +476,18 @@ class AddTeam(View):
                 return HttpResponseRedirect(reverse("my_teams", args=[race.slug]))
 
             # payment (race fee + add-on deltas, one VTB/SBP order)
-            response = create_team_payment(request, team, race)
-            if response is None:
-                return HttpResponseRedirect(reverse("my_teams", args=[race.slug]))
-            return response
+            try:
+                response = create_team_payment(request, team, race, promo=form.promo)
+            except PromoUnavailable as exc:
+                # The code's last slot went to someone else between validation
+                # and checkout. Drop the just-created team (it has no payment
+                # and nothing was credited) so the retry does not duplicate it.
+                team.delete()
+                form.add_error(None, str(exc))
+            else:
+                if response is None:
+                    return HttpResponseRedirect(reverse("my_teams", args=[race.slug]))
+                return response
 
         return render(
             request,

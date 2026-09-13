@@ -2685,3 +2685,387 @@ def test_team_form_bad_race_id_ignores_promo_code():
     assert not form.is_valid()  # category2_id missing
     assert form.promo is None
     assert "promo_code" not in form.errors
+
+
+# --- Promo codes: add/edit team views ---
+
+
+@pytest.mark.django_db
+@patch("apps.race.pricing.VTBClient._ensure_token", return_value=None)
+@patch("apps.race.pricing.VTBClient.create_order", side_effect=_echo_order_payload)
+def test_add_team_with_promo_charges_discounted_amount(
+    create_order_mock, _token_mock, client
+):
+    from apps.race.models import RacePromo
+
+    user = User.objects.create_user(
+        username="vpromo1", password="pass", email="vpromo1@example.com"
+    )
+    race = Race.objects.create(
+        name="Promo Add",
+        slug="promo-add-1",
+        cost=1000,
+        reg_status=RegStatus.OPEN,
+        is_teams_editable=True,
+    )
+    category = Category.objects.create(
+        code="t", name="Team", short_name="T", race=race, min_people=2, max_people=6
+    )
+    promo = RacePromo.objects.create(race=race, code="SALE40", value=40)
+    client.force_login(user)
+
+    response = client.post(
+        reverse("add_team", args=[race.slug]),
+        {
+            "ucount": "2",
+            "category2_id": str(category.id),
+            "promo_code": "sale40",
+        },
+    )
+
+    assert response.status_code == 302
+    payment = Payment.objects.get(team__category2=category)
+    # fee 2 × 1000 = 2000, −40% = 1200
+    assert payment.payment_amount == 1200
+    assert payment.discount_amount == 800
+    assert payment.promo == promo
+    assert create_order_mock.call_args.kwargs["amount_value"] == 1200
+
+
+@pytest.mark.django_db
+@patch("apps.race.pricing.VTBClient._ensure_token", return_value=None)
+@patch("apps.race.pricing.VTBClient.create_order", side_effect=_echo_order_payload)
+def test_add_team_without_promo_unchanged(create_order_mock, _token_mock, client):
+    user = User.objects.create_user(
+        username="vpromo2", password="pass", email="vpromo2@example.com"
+    )
+    race = Race.objects.create(
+        name="Promo Add 2",
+        slug="promo-add-2",
+        cost=1000,
+        reg_status=RegStatus.OPEN,
+        is_teams_editable=True,
+    )
+    category = Category.objects.create(
+        code="t", name="Team", short_name="T", race=race, min_people=2, max_people=6
+    )
+    RacePromo = __import__("apps.race.models", fromlist=["RacePromo"]).RacePromo
+    RacePromo.objects.create(race=race, code="SALE40", value=40)
+    client.force_login(user)
+
+    response = client.post(
+        reverse("add_team", args=[race.slug]),
+        {"ucount": "2", "category2_id": str(category.id)},
+    )
+
+    assert response.status_code == 302
+    payment = Payment.objects.get(team__category2=category)
+    assert payment.payment_amount == 2000
+    assert payment.discount_amount == 0
+    assert payment.promo is None
+
+
+@pytest.mark.django_db
+def test_add_team_rejects_unknown_promo_without_creating_team(client):
+    user = User.objects.create_user(
+        username="vpromo3", password="pass", email="vpromo3@example.com"
+    )
+    race = Race.objects.create(
+        name="Promo Add 3",
+        slug="promo-add-3",
+        cost=1000,
+        reg_status=RegStatus.OPEN,
+        is_teams_editable=True,
+    )
+    category = Category.objects.create(
+        code="t", name="Team", short_name="T", race=race, min_people=2, max_people=6
+    )
+    client.force_login(user)
+
+    response = client.post(
+        reverse("add_team", args=[race.slug]),
+        {"ucount": "2", "category2_id": str(category.id), "promo_code": "NOPE"},
+    )
+
+    assert response.status_code == 200
+    assert response.context["team_form"].errors["promo_code"] == ["Промокод не найден"]
+    assert not Team.objects.filter(category2=category).exists()
+
+
+@pytest.mark.django_db
+def test_add_team_promo_taken_between_validation_and_checkout(client):
+    """The last quota slot goes away while the request is in flight."""
+    from apps.race.models import RacePromo
+    from apps.race.promo import PromoUnavailable
+
+    user = User.objects.create_user(
+        username="vpromo4", password="pass", email="vpromo4@example.com"
+    )
+    race = Race.objects.create(
+        name="Promo Add 4",
+        slug="promo-add-4",
+        cost=1000,
+        reg_status=RegStatus.OPEN,
+        is_teams_editable=True,
+    )
+    category = Category.objects.create(
+        code="t", name="Team", short_name="T", race=race, min_people=2, max_people=6
+    )
+    RacePromo.objects.create(race=race, code="SALE40", value=40, max_uses=1)
+    client.force_login(user)
+
+    # The quota survives form validation and is gone at checkout — the unit-level
+    # race is covered in apps/race/tests.py; here only the view's handling is.
+    with patch(
+        "website.views.views_.create_team_payment",
+        side_effect=PromoUnavailable("Лимит промокода исчерпан"),
+    ):
+        response = client.post(
+            reverse("add_team", args=[race.slug]),
+            {"ucount": "2", "category2_id": str(category.id), "promo_code": "SALE40"},
+        )
+
+    assert response.status_code == 200
+    assert "Лимит промокода исчерпан" in response.context["team_form"].errors["__all__"]
+    # The half-registered team is rolled back, so a retry does not duplicate it.
+    assert not Team.objects.filter(category2=category).exists()
+    assert not Payment.objects.filter(team__category2=category).exists()
+
+
+@pytest.mark.django_db
+def test_edit_team_cannot_reuse_promo_after_paying_with_it(client):
+    from apps.race.models import RacePromo
+
+    user, race, category, team = _create_team_for_edit(
+        suffix="promo-reuse", ucount=4, paid_people=4
+    )
+    promo = RacePromo.objects.create(race=race, code="SALE40", value=40)
+    Payment.objects.create(
+        team=team, promo=promo, payment_amount=100, status=Payment.STATUS_DONE
+    )
+    client.force_login(user)
+
+    response = client.post(
+        reverse("edit_team", args=[team.id]),
+        {"ucount": "5", "category2_id": str(category.id), "promo_code": "SALE40"},
+    )
+
+    assert response.status_code == 200
+    assert response.context["team_form"].errors["promo_code"] == [
+        "Ваша команда уже использовала этот промокод"
+    ]
+    # No new payment was created for the top-up.
+    assert Payment.objects.filter(team=team).count() == 1
+
+
+@pytest.mark.django_db
+@patch("apps.race.pricing.VTBClient._ensure_token", return_value=None)
+@patch("apps.race.pricing.VTBClient.create_order", side_effect=_echo_order_payload)
+def test_edit_team_top_up_with_promo_discounts_the_delta(
+    create_order_mock, _token_mock, client
+):
+    from apps.race.models import RacePromo
+
+    user, race, category, team = _create_team_for_edit(
+        suffix="promo-topup", cost=1000, ucount=4, paid_people=4
+    )
+    RacePromo.objects.create(race=race, code="SALE50", value=50)
+    client.force_login(user)
+
+    response = client.post(
+        reverse("edit_team", args=[team.id]),
+        {"ucount": "6", "category2_id": str(category.id), "promo_code": "SALE50"},
+    )
+
+    assert response.status_code == 302
+    payment = Payment.objects.filter(team=team).order_by("-id").first()
+    # delta (6 − 4) × 1000 = 2000, −50% = 1000
+    assert payment.payment_amount == 1000
+    assert payment.discount_amount == 1000
+
+
+@pytest.mark.django_db
+def test_edit_team_promo_taken_between_validation_and_checkout(client):
+    from apps.race.models import RacePromo
+    from apps.race.promo import PromoUnavailable
+
+    user, race, category, team = _create_team_for_edit(
+        suffix="promo-gone", cost=1000, ucount=4, paid_people=4
+    )
+    RacePromo.objects.create(race=race, code="SALE40", value=40, max_uses=1)
+    client.force_login(user)
+
+    with patch(
+        "website.views.team.create_team_payment",
+        side_effect=PromoUnavailable("Лимит промокода исчерпан"),
+    ):
+        response = client.post(
+            reverse("edit_team", args=[team.id]),
+            {"ucount": "5", "category2_id": str(category.id), "promo_code": "SALE40"},
+        )
+
+    assert response.status_code == 200
+    assert "Лимит промокода исчерпан" in response.context["team_form"].errors["__all__"]
+    assert not Payment.objects.filter(team=team).exists()
+
+
+# --- Promo codes: config island + form rendering ---
+
+
+@pytest.mark.django_db
+def test_config_island_carries_promo_hooks(client):
+    import json
+
+    user, race, category, team = _create_team_for_edit(suffix="island-promo")
+    client.force_login(user)
+
+    response = client.get(reverse("edit_team", args=[team.id]))
+    config = json.loads(str(response.context["team_form_config_json"]))
+
+    assert config["promo"] is None
+    assert config["teamId"] == team.id
+    assert config["promoCheckUrl"] == reverse("promo_check", args=[race.slug])
+
+
+@pytest.mark.django_db
+def test_config_island_keeps_applied_promo_after_form_error(client):
+    import json
+
+    from apps.race.models import RacePromo
+
+    user, race, category, team = _create_team_for_edit(
+        suffix="island-keep", ucount=4, paid_people=4
+    )
+    RacePromo.objects.create(race=race, code="SALE40", value=40)
+    client.force_login(user)
+
+    # ucount 9 is out of range → the form re-renders with errors.
+    response = client.post(
+        reverse("edit_team", args=[team.id]),
+        {"ucount": "9", "category2_id": str(category.id), "promo_code": "SALE40"},
+    )
+    config = json.loads(str(response.context["team_form_config_json"]))
+
+    assert response.status_code == 200
+    assert config["promo"] == {"code": "SALE40", "type": "percent", "value": 40}
+
+
+@pytest.mark.django_db
+def test_add_team_page_renders_promo_field(client):
+    user = User.objects.create_user(
+        username="promoui", password="pass", email="promoui@example.com"
+    )
+    race = Race.objects.create(
+        name="Promo UI",
+        slug="promo-ui-1",
+        cost=1000,
+        reg_status=RegStatus.OPEN,
+        is_teams_editable=True,
+    )
+    Category.objects.create(
+        code="t", name="Team", short_name="T", race=race, min_people=2, max_people=6
+    )
+    client.force_login(user)
+
+    body = client.get(reverse("add_team", args=[race.slug])).content.decode()
+
+    assert 'id="promoInput"' in body
+    assert 'name="promo_code"' in body
+    assert 'id="sumPromoLine"' in body
+
+
+@pytest.mark.django_db
+def test_add_team_page_shows_promo_error_text(client):
+    user = User.objects.create_user(
+        username="promoui2", password="pass", email="promoui2@example.com"
+    )
+    race = Race.objects.create(
+        name="Promo UI 2",
+        slug="promo-ui-2",
+        cost=1000,
+        reg_status=RegStatus.OPEN,
+        is_teams_editable=True,
+    )
+    category = Category.objects.create(
+        code="t", name="Team", short_name="T", race=race, min_people=2, max_people=6
+    )
+    client.force_login(user)
+
+    response = client.post(
+        reverse("add_team", args=[race.slug]),
+        {"ucount": "2", "category2_id": str(category.id), "promo_code": "NOPE"},
+    )
+
+    assert "Промокод не найден" in response.content.decode()
+
+
+@pytest.mark.django_db
+def test_config_island_promo_mirrors_compute_team_charge(client):
+    """The JS formula (fee − floor(fee×value/100) + extras) must match the server."""
+    import json
+
+    from apps.race.models import RacePromo
+    from apps.race.pricing import compute_team_charge
+
+    user, race, category, team = _create_team_for_edit(
+        suffix="mirror-promo", tier_price=1500, ucount=4, paid_people=2
+    )
+    extra = RaceExtra.objects.create(
+        race=race, code="transfer", name="Трансфер", price=500, free_per_team=0
+    )
+    TeamExtra.objects.create(team=team, race_extra=extra, count=3, count_paid=1)
+    promo = RacePromo.objects.create(race=race, code="SALE33", value=33)
+    client.force_login(user)
+
+    response = client.post(
+        reverse("edit_team", args=[team.id]),
+        {
+            "ucount": "9",  # invalid → re-render, so the island keeps the promo
+            "category2_id": str(category.id),
+            "extra_transfer": "3",
+            "promo_code": "SALE33",
+        },
+    )
+    config = json.loads(str(response.context["team_form_config_json"]))
+
+    # Client-side arithmetic, exactly as team-form.js does it.
+    fee = max(
+        0, 4 * config["currentPrice"] - config["paidPeople"] * config["currentPrice"]
+    )
+    value = config["promo"]["value"]
+    js_discount = fee * value // 100
+    js_total = max(0, fee - js_discount + (3 - 1) * config["extras"][0]["price"])
+
+    total, _, discount = compute_team_charge(team, race, promo=promo)
+    assert (js_discount, js_total) == (discount, total)
+
+
+@pytest.mark.django_db
+def test_config_island_promo_mirrors_fixed_discount(client):
+    import json
+
+    from apps.race.models import RacePromo
+    from apps.race.pricing import compute_team_charge
+
+    user, race, category, team = _create_team_for_edit(
+        suffix="mirror-fixed", tier_price=1500, ucount=4, paid_people=2
+    )
+    promo = RacePromo.objects.create(
+        race=race, code="M1000", discount_type=RacePromo.FIXED, value=1000
+    )
+    client.force_login(user)
+
+    response = client.post(
+        reverse("edit_team", args=[team.id]),
+        {"ucount": "9", "category2_id": str(category.id), "promo_code": "M1000"},
+    )
+    config = json.loads(str(response.context["team_form_config_json"]))
+
+    fee = max(
+        0, 4 * config["currentPrice"] - config["paidPeople"] * config["currentPrice"]
+    )
+    js_discount = min(config["promo"]["value"], fee)
+    js_total = max(0, fee - js_discount)
+
+    total, _, discount = compute_team_charge(team, race, promo=promo)
+    assert (js_discount, js_total) == (discount, total)
