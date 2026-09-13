@@ -3069,3 +3069,103 @@ def test_config_island_promo_mirrors_fixed_discount(client):
 
     total, _, discount = compute_team_charge(team, race, promo=promo)
     assert (js_discount, js_total) == (discount, total)
+
+
+@pytest.mark.django_db
+@patch("apps.race.pricing.VTBClient._ensure_token", return_value=None)
+@patch("apps.race.pricing.VTBClient.create_order", side_effect=_echo_order_payload)
+def test_promo_end_to_end_register_settle_reuse_and_limit(
+    create_order_mock, _token_mock, client
+):
+    """Register with a code → confirm payment → reuse blocked → limit reached."""
+    from apps.race.models import RacePromo
+    from apps.race.settlement import settle_payment
+
+    race = Race.objects.create(
+        name="E2E",
+        slug="promo-e2e",
+        cost=1000,
+        reg_status=RegStatus.OPEN,
+        is_teams_editable=True,
+    )
+    category = Category.objects.create(
+        code="t", name="Team", short_name="T", race=race, min_people=2, max_people=6
+    )
+    promo = RacePromo.objects.create(race=race, code="SALE50", value=50, max_uses=1)
+
+    first = User.objects.create_user(
+        username="e2e-1", password="pass", email="e2e-1@example.com"
+    )
+    client.force_login(first)
+    assert (
+        client.post(
+            reverse("add_team", args=[race.slug]),
+            {"ucount": "2", "category2_id": str(category.id), "promo_code": "SALE50"},
+        ).status_code
+        == 302
+    )
+
+    payment = Payment.objects.get(team__category2=category)
+    assert (payment.payment_amount, payment.discount_amount) == (1000, 1000)
+
+    # The bank confirms: seats are credited, the quota is spent.
+    assert settle_payment(payment) is True
+    team = payment.team
+    team.refresh_from_db()
+    assert team.paid_people == 2
+
+    # The same team cannot reuse the code when topping up.
+    response = client.post(
+        reverse("edit_team", args=[team.id]),
+        {"ucount": "4", "category2_id": str(category.id), "promo_code": "SALE50"},
+    )
+    assert response.context["team_form"].errors["promo_code"] == [
+        "Ваша команда уже использовала этот промокод"
+    ]
+
+    # ...but the top-up goes through at full price without the code.
+    assert (
+        client.post(
+            reverse("edit_team", args=[team.id]),
+            {"ucount": "4", "category2_id": str(category.id)},
+        ).status_code
+        == 302
+    )
+    top_up = Payment.objects.filter(team=team).order_by("-id").first()
+    assert (top_up.payment_amount, top_up.discount_amount) == (2000, 0)
+
+    # The single slot is gone, so another team is refused.
+    second = User.objects.create_user(
+        username="e2e-2", password="pass", email="e2e-2@example.com"
+    )
+    client.force_login(second)
+    response = client.post(
+        reverse("add_team", args=[race.slug]),
+        {"ucount": "2", "category2_id": str(category.id), "promo_code": "SALE50"},
+    )
+    assert response.context["team_form"].errors["promo_code"] == [
+        "Лимит промокода исчерпан"
+    ]
+    assert Team.objects.filter(owner=second).count() == 0
+    assert promo.payments.count() == 1
+
+
+@pytest.mark.django_db
+def test_promo_quota_frees_after_reservation_ttl(client):
+    """An abandoned checkout releases the code after RESERVATION_TTL."""
+    from apps.race.models import RacePromo
+    from apps.race.promo import occupied_team_ids
+
+    user, race, category, team = _create_team_for_edit(suffix="e2e-ttl")
+    promo = RacePromo.objects.create(race=race, code="SALE40", value=40, max_uses=1)
+    draft = Payment.objects.create(
+        team=team, promo=promo, payment_amount=100, status=Payment.STATUS_DRAFT
+    )
+
+    assert occupied_team_ids(promo) == {team.id}
+
+    Payment.objects.filter(pk=draft.pk).update(
+        created_at=timezone.now() - RESERVATION_TTL - timedelta(minutes=1)
+    )
+
+    assert occupied_team_ids(promo) == set()

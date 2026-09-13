@@ -8,7 +8,9 @@ This module is the single source of truth for the team charge formula:
                  + Σ active extras: max(0, count − count_paid) × price)
 
 A promo code (``apps/race/promo.py``) discounts the **participation fee only** —
-add-ons are always charged at full price.
+add-ons are always charged at full price. The code's quota (how many teams may
+still use it) is derived from ``Payment`` rows there, and re-checked here under a
+row lock before the payment is created.
 
 The client mirror of this formula lives in ``src/static/js/team-form.js``
 (live total + per-extra steppers + the promo line). Keep the two in sync — any
