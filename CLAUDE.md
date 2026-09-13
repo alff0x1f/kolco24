@@ -4,26 +4,22 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Local environment
 
-**Container runtime**: use `docker`. Start the DB:
+**Container runtime**: use `docker`. A local PostgreSQL must be reachable at whatever `DB_HOST`/`DB_PORT` the `.env`
+names. The repo's `docker-compose_v2.yml` is the **deploy** stack (it needs `KOLCO24_IMAGE` and `DATA_LOCATION`, which
+the local env files don't define), so don't expect `docker compose up -d kolco24_db` to work here — use the Postgres the
+developer already runs locally, or an ad-hoc container matching the `.env`.
 
-```bash
-docker compose up -d kolco24_db
-```
+**`.env` file**: `src/config/settings.py` calls `load_dotenv()`, which searches **upwards from `src/config/`** — so
+`src/.env` wins if it exists, otherwise the repo-root `.env` is used. The working local setup is the **root `.env`**;
+do not create `src/.env`, it silently shadows the root one (different DB credentials → a confusing "works for me"
+split). A template with every variable lives in `deploy/kolco24.env.example`.
 
-**`.env` file**: `src/config/settings.py` loads `src/.env` via `python-dotenv`. Copy from `deploy/kolco24.env.example`
-and fill in secrets before running the server or tests:
-
-```bash
-cp deploy/kolco24.env.example src/.env
-```
-
-Without `.env`, most env vars will be `None` (DB password, VTB keys, etc.) and tests/server will fail.
+Without a `.env`, most env vars will be `None` (DB password, VTB keys, etc.) and tests/server will fail.
 
 ## Commands
 
 ```bash
-# Development
-docker compose up -d kolco24_db   # start local DB
+# Development (local Postgres must already be running — see above)
 uv run python src/manage.py migrate
 uv run python src/manage.py runserver 0:8080
 
