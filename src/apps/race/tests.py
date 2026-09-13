@@ -5816,3 +5816,186 @@ def test_promo_check_writes_nothing(client, django_user_model):
 
     assert Payment.objects.count() == 0
     assert RacePromo.objects.get(race=race, code="SALE40").max_uses == 1
+
+
+# --- Promo codes: race edit page ---
+
+
+def _promo_row(**overrides):
+    row = {
+        "id": None,
+        "code": "SALE40",
+        "discount_type": RacePromo.PERCENT,
+        "value": 40,
+        "max_uses": 0,
+        "comment": "",
+        "is_active": True,
+    }
+    row.update(overrides)
+    return row
+
+
+def _promo_admin(slug):
+    user = User.objects.create_user(
+        username=f"pa-{slug}", password="p", email=f"pa-{slug}@e.com"
+    )
+    race = _make_race(slug=slug)
+    RaceAdmin.objects.create(race=race, user=user, role=RaceAdmin.Role.ADMIN)
+    return user, race
+
+
+@pytest.mark.django_db
+def test_race_edit_creates_promo():
+    user, race = _promo_admin("promo-edit-add")
+    data = _post_data(
+        slug=race.slug,
+        promos_json=json.dumps([_promo_row(code="sale40", comment="партнёры")]),
+    )
+
+    resp = _edit_post(f"/race/{race.slug}/edit/", user, data, race_slug=race.slug)
+
+    assert resp.status_code == 302
+    promo = RacePromo.objects.get(race=race)
+    assert promo.code == "SALE40"
+    assert promo.discount_type == RacePromo.PERCENT
+    assert promo.value == 40
+    assert promo.comment == "партнёры"
+    assert promo.order == 0
+
+
+@pytest.mark.django_db
+def test_race_edit_updates_promo_but_keeps_code():
+    user, race = _promo_admin("promo-edit-upd")
+    promo = RacePromo.objects.create(race=race, code="SALE40", value=40)
+    data = _post_data(
+        slug=race.slug,
+        promos_json=json.dumps(
+            [
+                _promo_row(
+                    id=promo.id,
+                    code="RENAMED",  # ignored: code is read-only once saved
+                    discount_type=RacePromo.FIXED,
+                    value=1000,
+                    max_uses=5,
+                )
+            ]
+        ),
+    )
+
+    resp = _edit_post(f"/race/{race.slug}/edit/", user, data, race_slug=race.slug)
+
+    assert resp.status_code == 302
+    promo.refresh_from_db()
+    assert promo.code == "SALE40"
+    assert promo.discount_type == RacePromo.FIXED
+    assert promo.value == 1000
+    assert promo.max_uses == 5
+
+
+@pytest.mark.django_db
+def test_race_edit_deletes_unused_promo():
+    user, race = _promo_admin("promo-edit-del")
+    promo = RacePromo.objects.create(race=race, code="SALE40", value=40)
+    data = _post_data(slug=race.slug, promos_json="[]")
+
+    resp = _edit_post(f"/race/{race.slug}/edit/", user, data, race_slug=race.slug)
+
+    assert resp.status_code == 302
+    assert not RacePromo.objects.filter(id=promo.id).exists()
+
+
+@pytest.mark.django_db
+def test_race_edit_deactivates_used_promo_instead_of_deleting():
+    user, race = _promo_admin("promo-edit-soft")
+    promo = RacePromo.objects.create(race=race, code="SALE40", value=40)
+    Payment.objects.create(promo=promo, payment_amount=100, status=Payment.STATUS_DONE)
+    data = _post_data(slug=race.slug, promos_json="[]")
+
+    resp = _edit_post(f"/race/{race.slug}/edit/", user, data, race_slug=race.slug)
+
+    assert resp.status_code == 302
+    promo.refresh_from_db()
+    assert promo.is_active is False
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(
+    "row,field",
+    [
+        (_promo_row(code="a"), "code"),
+        (_promo_row(code="скидка"), "code"),
+        (_promo_row(discount_type="half"), "discount_type"),
+        (_promo_row(value=0), "value"),
+        (_promo_row(value=101), "value"),
+        (_promo_row(discount_type=RacePromo.FIXED, value=0), "value"),
+        (_promo_row(max_uses=-1), "max_uses"),
+        (_promo_row(comment="x" * 256), "comment"),
+    ],
+)
+def test_race_edit_promo_row_validation(row, field):
+    user, race = _promo_admin(f"promo-val-{field}-{abs(hash(str(row))) % 10000}")
+    data = _post_data(slug=race.slug, promos_json=json.dumps([row]))
+
+    resp = _edit_post(f"/race/{race.slug}/edit/", user, data, race_slug=race.slug)
+
+    assert resp.status_code == 200
+    html = resp.content.decode()
+    assert "Ошибки в промокодах (строки: 1)" in html
+    assert field in _script_json(html, "promo-errors")["0"]
+    assert not RacePromo.objects.filter(race=race).exists()
+
+
+@pytest.mark.django_db
+def test_race_edit_rejects_duplicate_promo_codes():
+    user, race = _promo_admin("promo-dup")
+    data = _post_data(
+        slug=race.slug,
+        promos_json=json.dumps([_promo_row(), _promo_row(value=50)]),
+    )
+
+    resp = _edit_post(f"/race/{race.slug}/edit/", user, data, race_slug=race.slug)
+
+    assert resp.status_code == 200
+    assert "code" in _script_json(resp.content.decode(), "promo-errors")["1"]
+    assert not RacePromo.objects.filter(race=race).exists()
+
+
+@pytest.mark.django_db
+def test_race_edit_page_carries_promo_island_with_usage(client):
+    owner, race, team = _priced_team("promo-island", slug="promo-island")
+    RaceAdmin.objects.create(race=race, user=owner, role=RaceAdmin.Role.ADMIN)
+    promo = _promo(race, code="SALE40", value=40, max_uses=3)
+    _promo_payment(team, promo, status=Payment.STATUS_DONE)
+    client.force_login(owner)
+
+    resp = client.get(reverse("edit_race", args=[race.slug]))
+    promos = json.loads(resp.context["promos_data"])
+
+    assert resp.status_code == 200
+    assert promos == [
+        {
+            "id": promo.id,
+            "code": "SALE40",
+            "discount_type": RacePromo.PERCENT,
+            "value": 40,
+            "max_uses": 3,
+            "comment": "",
+            "is_active": True,
+            "used": 1,
+            "has_payments": True,
+        }
+    ]
+
+
+@pytest.mark.django_db
+def test_race_edit_page_renders_promo_block(client, django_user_model):
+    user, race = _promo_admin("promo-block")
+    _promo(race, code="SALE40", value=40)
+    client.force_login(user)
+
+    html = client.get(reverse("edit_race", args=[race.slug])).content.decode()
+
+    assert 'id="promos"' in html
+    assert 'name="promos_json"' in html
+    assert 'id="addPromo"' in html
+    assert _script_json(html, "promos-data")[0]["code"] == "SALE40"

@@ -13,6 +13,7 @@
   <input type="hidden" name="categories_json" id="categoriesJson">
   <input type="hidden" name="price_tiers_json" id="priceTiersJson">
   <input type="hidden" name="extras_json" id="extrasJson">
+  <input type="hidden" name="promos_json" id="promosJson">
   <div class="container">
 
     <!-- Breadcrumb -->
@@ -274,6 +275,39 @@
           </div>
         </section>
 
+        <!-- ── Промокоды ── -->
+        <section class="card">
+          <div class="card-head">
+            <h2>Промокоды</h2>
+            <span class="aux"><span id="promoCount">0</span> кодов</span>
+          </div>
+          <div class="card-body">
+            <div class="promos" id="promos">
+              <div class="promos-headrow">
+                <span></span>
+                <span>Код</span>
+                <span>Тип</span>
+                <span>Скидка</span>
+                <span>Лимит</span>
+                <span>Исп.</span>
+                <span>Комментарий</span>
+                <span>Активен</span>
+                <span></span>
+              </div>
+              <!-- rows injected by race_form.js from #promos-data -->
+            </div>
+            <div class="promos-foot">
+              <button class="add-promo" type="button" id="addPromo">
+                <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M8 3.5v9M3.5 8h9"/></svg>
+                Добавить промокод
+              </button>
+            </div>
+            <div class="field" style="margin: 14px 0 0;">
+              <span class="field-hint">Код — латиница, цифры, «-» и «_» (2–32 символа), задаётся при создании и потом не меняется. Скидка действует только на взнос за участие, доп-услуги — по полной цене. «Лимит» — сколько команд могут применить код, 0 — без ограничений. Код, который уже применяли, нельзя удалить — он деактивируется.</span>
+            </div>
+          </div>
+        </section>
+
       </div>
 
       <!-- ─────────── SIDEBAR ─────────── -->
@@ -360,9 +394,11 @@
 <script id="categories-data" type="application/json">{{ categories_data }}</script>
 <script id="price-tiers-data" type="application/json">{{ price_tiers_data }}</script>
 <script id="extras-data" type="application/json">{{ extras_data }}</script>
+<script id="promos-data" type="application/json">{{ promos_data }}</script>
 <script id="category-errors" type="application/json">{{ category_errors }}</script>
 <script id="price-tier-errors" type="application/json">{{ price_tier_errors }}</script>
 <script id="extra-errors" type="application/json">{{ extra_errors }}</script>
+<script id="promo-errors" type="application/json">{{ promo_errors }}</script>
 {% endblock %}
 
 {% block footer_js_include %}
