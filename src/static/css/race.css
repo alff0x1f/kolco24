@@ -237,6 +237,29 @@
 }
 .admin-actions .btn { width: 100%; justify-content: center; }
 
+.race-administrators {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.race-administrators li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 4px 12px;
+  overflow-wrap: anywhere;
+}
+.race-administrators li + li { margin-top: 12px; }
+.race-administrators-id {
+  color: var(--muted);
+  font-size: 12px;
+  white-space: nowrap;
+}
+.race-administrators-role,
+.race-administrators-empty { color: var(--muted); font-size: 13px; }
+.race-administrators-empty { margin: 0; }
+
 /* ── Tabs card ───────────────────────────────────────── */
 .tabs-card { padding-bottom: 6px; }
 .tabs-head {

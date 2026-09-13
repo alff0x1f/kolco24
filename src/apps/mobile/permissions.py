@@ -185,8 +185,8 @@ class CanEditRaceLegend(BasePermission):
     raises ``Http404`` → HTTP **404**, not a 403, so a probe can't distinguish
     "no such race" from "not allowed" any differently than the web editor does),
     and delegates to :func:`apps.race.permissions.can_edit_race` — the **same**
-    superuser-or-``RaceAdmin(role=ADMIN)`` check the web ``RaceLegendEditView``
-    uses. A user without rights gets an **actionable 403** (the default DRF
+    ``RaceAdmin(role=ADMIN)`` check the web ``RaceLegendEditView`` uses, including
+    for superusers. A user without rights gets an **actionable 403** (the default DRF
     ``PermissionDenied`` message), unlike the neutral build-layer 403.
 
     **Ordering:** stack this **after** :class:`IsMobileUser`, which sets

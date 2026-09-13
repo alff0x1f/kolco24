@@ -7,6 +7,7 @@ import pytest
 from django.conf import settings
 from django.contrib.auth.models import AnonymousUser, User
 from django.contrib.messages.storage.fallback import FallbackStorage
+from django.template.loader import render_to_string
 from django.test import RequestFactory
 from django.urls import resolve, reverse
 
@@ -125,6 +126,8 @@ def test_build_context_can_edit_race_flag():
     superuser = User.objects.create_superuser(
         username="su", password="p", email="su@example.com"
     )
+    assert RaceTeamsView.build_context(race, superuser)["can_edit_race"] is False
+    RaceAdmin.objects.create(race=race, user=superuser, role=RaceAdmin.Role.ADMIN)
     assert RaceTeamsView.build_context(race, superuser)["can_edit_race"] is True
 
 
@@ -372,11 +375,12 @@ def test_all_teams_returns_200_with_data_initial_all(client):
 
 
 @pytest.mark.django_db
-def test_all_teams_renders_add_action_for_superuser(client, django_user_model):
+def test_all_teams_renders_add_action_for_assigned_superuser(client, django_user_model):
     race = _make_race(slug="ru2a")
     superuser = django_user_model.objects.create_superuser(
         username="su2", password="p", email="su2@example.com"
     )
+    RaceAdmin.objects.create(race=race, user=superuser, role=RaceAdmin.Role.ADMIN)
     client.force_login(superuser)
 
     resp = client.get(reverse("all_teams", args=[race.slug]))
@@ -783,11 +787,12 @@ def test_race_page_regular_user_no_edit_button(client):
 
 
 @pytest.mark.django_db
-def test_race_page_superuser_sees_edit_and_new_buttons(client):
+def test_race_page_assigned_superuser_sees_edit_and_new_buttons(client):
     admin = User.objects.create_superuser(
         username="su-buttons", password="p", email="su-buttons@example.com"
     )
     race = _make_race(slug="su-btn")
+    RaceAdmin.objects.create(race=race, user=admin, role=RaceAdmin.Role.ADMIN)
     client.force_login(admin)
 
     resp = client.get(reverse("race", args=[race.slug]))
@@ -801,19 +806,113 @@ def test_race_page_superuser_sees_edit_and_new_buttons(client):
     assert "+ Новая гонка" in html
 
 
+@pytest.mark.django_db
+@pytest.mark.parametrize(
+    "role",
+    ["anonymous", "visitor", "staff", "other_admin", "admin", "moderator", "superuser"],
+)
+def test_race_administrators_visibility(client, role):
+    race = _make_race(slug="administrators-visibility")
+    assigned = User.objects.create_user(username="private-roster-member")
+    RaceAdmin.objects.create(race=race, user=assigned)
+    if role != "anonymous":
+        viewer = User.objects.create_user(
+            username=role, is_staff=role == "staff", is_superuser=role == "superuser"
+        )
+        if role in {"admin", "moderator", "other_admin"}:
+            RaceAdmin.objects.create(
+                race=_make_race(slug="other-roster") if role == "other_admin" else race,
+                user=viewer,
+                role=(
+                    RaceAdmin.Role.MODERATOR
+                    if role == "moderator"
+                    else RaceAdmin.Role.ADMIN
+                ),
+            )
+        client.force_login(viewer)
+
+    response = client.get(reverse("race", args=[race.slug]))
+
+    assert response.status_code == 200
+    allowed = role == "admin"
+    html = response.content.decode()
+    assert ('id="race-administrators-title"' in html) is allowed
+    assert ("private-roster-member" in html) is allowed
+    assert ("race_administrators" in response.context) is allowed
+
+
+@pytest.mark.django_db
+def test_race_administrators_names_roles_and_order(client):
+    race = _make_race(slug="administrators-order")
+    for username, first_name, last_name, role in [
+        ("z-admin", "Zoe", "Brown", RaceAdmin.Role.ADMIN),
+        ("b-moderator", "Bella", "Smith", RaceAdmin.Role.MODERATOR),
+        ("a-admin", "alice", "Jones", RaceAdmin.Role.ADMIN),
+        ("aaron", "", "", RaceAdmin.Role.MODERATOR),
+    ]:
+        member = User.objects.create_user(
+            username=username, first_name=first_name, last_name=last_name
+        )
+        RaceAdmin.objects.create(race=race, user=member, role=role)
+    client.force_login(User.objects.get(username="a-admin"))
+    outsider = User.objects.create_user(username="other-race-member")
+    RaceAdmin.objects.create(race=_make_race(slug="other-members"), user=outsider)
+
+    response = client.get(reverse("race", args=[race.slug]))
+
+    assert response.status_code == 200
+    html = response.content.decode()
+    card = html.split('aria-labelledby="race-administrators-title"', 1)[1].split(
+        "</section>", 1
+    )[0]
+    names = ["alice Jones", "Zoe Brown", "aaron", "Bella Smith"]
+    for assignment in race.race_admins.select_related("user"):
+        name = assignment.user.get_full_name() or assignment.user.get_username()
+        assert (
+            f'{name} <small class="race-administrators-id">'
+            f"ID: {assignment.user_id}</small>"
+        ) in card
+    assert [
+        member["name"] for member in response.context["race_administrators"]
+    ] == names
+    assert [card.index(name) for name in names] == sorted(
+        card.index(name) for name in names
+    )
+    assert (
+        card.count('<span class="race-administrators-role">Администратор</span>') == 2
+    )
+    assert card.count('<span class="race-administrators-role">Модератор</span>') == 2
+    assert "other-race-member" not in card
+    assert "site-superuser" not in card
+
+
+@pytest.mark.django_db
+def test_race_administrators_template_empty_state():
+    race = _make_race(slug="administrators-empty")
+    # Defensive template fallback: authorized viewers normally have an assignment.
+    context = RacePageView.build_context(race)
+    context.update(can_edit_race=True, race_administrators=[], user=AnonymousUser())
+    html = render_to_string("race/race_page.html", context)
+    assert "Администраторы и модераторы не назначены" in html
+
+
 # --- can_edit_race access-control matrix ---
 
 
 @pytest.mark.django_db
-def test_can_edit_race_superuser_true_for_any_race():
+def test_can_edit_race_superuser_requires_assignment_for_each_race():
     admin = User.objects.create_superuser(
         username="su", password="p", email="su@example.com"
     )
     race = _make_race(slug="ce1")
     other = _make_race(slug="ce1b")
 
+    assert can_edit_race(admin, race) is False
+    assert can_edit_race(admin, other) is False
+    RaceAdmin.objects.create(race=race, user=admin, role=RaceAdmin.Role.ADMIN)
+    RaceAdmin.objects.create(race=other, user=admin, role=RaceAdmin.Role.MODERATOR)
     assert can_edit_race(admin, race) is True
-    assert can_edit_race(admin, other) is True
+    assert can_edit_race(admin, other) is False
 
 
 @pytest.mark.django_db
@@ -2460,6 +2559,7 @@ def test_legend_edit_get_superuser_returns_200_with_existing(client):
     race = _make_race()
     Checkpoint.objects.create(race=race, number=3, cost=40, description="Мост")
     superuser = User.objects.create_superuser("admin", "a@b.c", "pw")
+    RaceAdmin.objects.create(race=race, user=superuser, role=RaceAdmin.Role.ADMIN)
     client.force_login(superuser)
 
     resp = client.get(reverse("edit_legend", kwargs={"race_slug": race.slug}))
@@ -2478,6 +2578,7 @@ def test_legend_edit_post_creates_and_updates(client):
         race=race, number=1, cost=10, description="old"
     )
     superuser = User.objects.create_superuser("admin", "a@b.c", "pw")
+    RaceAdmin.objects.create(race=race, user=superuser, role=RaceAdmin.Role.ADMIN)
     client.force_login(superuser)
 
     resp = client.post(
@@ -2524,6 +2625,7 @@ def test_legend_lock_toggle_manages_checkpoint_secret(client):
     race = _make_race()
     cp = Checkpoint.objects.create(race=race, number=1, cost=30, description="секрет")
     superuser = User.objects.create_superuser("admin", "a@b.c", "pw")
+    RaceAdmin.objects.create(race=race, user=superuser, role=RaceAdmin.Role.ADMIN)
     client.force_login(superuser)
     url = reverse("edit_legend", kwargs={"race_slug": race.slug})
 
@@ -2570,6 +2672,7 @@ def test_legend_delete_untagged_checkpoint(client):
     keep = Checkpoint.objects.create(race=race, number=1, cost=10, description="a")
     drop = Checkpoint.objects.create(race=race, number=2, cost=20, description="b")
     superuser = User.objects.create_superuser("admin", "a@b.c", "pw")
+    RaceAdmin.objects.create(race=race, user=superuser, role=RaceAdmin.Role.ADMIN)
     client.force_login(superuser)
 
     resp = client.post(
@@ -2601,6 +2704,7 @@ def test_legend_delete_tagged_checkpoint_refused(client):
     tagged = Checkpoint.objects.create(race=race, number=2, cost=20, description="b")
     CheckpointTag.objects.create(checkpoint=tagged, nfc_uid="aa:bb:cc")
     superuser = User.objects.create_superuser("admin", "a@b.c", "pw")
+    RaceAdmin.objects.create(race=race, user=superuser, role=RaceAdmin.Role.ADMIN)
     client.force_login(superuser)
 
     # Submit an empty legend → would delete the tagged КП, which must be refused.
@@ -2619,6 +2723,7 @@ def test_legend_post_invalid_type_reports_row_error(client):
 
     race = _make_race()
     superuser = User.objects.create_superuser("admin", "a@b.c", "pw")
+    RaceAdmin.objects.create(race=race, user=superuser, role=RaceAdmin.Role.ADMIN)
     client.force_login(superuser)
 
     resp = client.post(
@@ -2648,6 +2753,7 @@ def test_legend_post_saves_valid_color(client):
 
     race = _make_race()
     superuser = User.objects.create_superuser("admin", "a@b.c", "pw")
+    RaceAdmin.objects.create(race=race, user=superuser, role=RaceAdmin.Role.ADMIN)
     client.force_login(superuser)
 
     resp = client.post(
@@ -2677,6 +2783,7 @@ def test_legend_post_unknown_color_reports_row_error(client):
 
     race = _make_race()
     superuser = User.objects.create_superuser("admin", "a@b.c", "pw")
+    RaceAdmin.objects.create(race=race, user=superuser, role=RaceAdmin.Role.ADMIN)
     client.force_login(superuser)
 
     resp = client.post(
@@ -2707,6 +2814,7 @@ def test_legend_post_missing_color_defaults_empty(client):
 
     race = _make_race()
     superuser = User.objects.create_superuser("admin", "a@b.c", "pw")
+    RaceAdmin.objects.create(race=race, user=superuser, role=RaceAdmin.Role.ADMIN)
     client.force_login(superuser)
 
     resp = client.post(
@@ -2738,6 +2846,7 @@ def test_legend_color_round_trip_on_existing(client):
         race=race, number=1, cost=10, description="a", color="blue"
     )
     superuser = User.objects.create_superuser("admin", "a@b.c", "pw")
+    RaceAdmin.objects.create(race=race, user=superuser, role=RaceAdmin.Role.ADMIN)
     client.force_login(superuser)
 
     # The existing КП's color is surfaced in the rendered checkpoints-data island.
@@ -2776,6 +2885,7 @@ def test_legend_color_cleared_to_empty_on_existing(client):
         race=race, number=1, cost=10, description="a", color="blue"
     )
     superuser = User.objects.create_superuser("admin2", "admin2@b.c", "pw")
+    RaceAdmin.objects.create(race=race, user=superuser, role=RaceAdmin.Role.ADMIN)
     client.force_login(superuser)
 
     resp = client.post(
@@ -2803,6 +2913,7 @@ def test_legend_color_cleared_to_empty_on_existing(client):
 def test_legend_config_island_includes_colors(client):
     race = _make_race()
     superuser = User.objects.create_superuser("admin", "a@b.c", "pw")
+    RaceAdmin.objects.create(race=race, user=superuser, role=RaceAdmin.Role.ADMIN)
     client.force_login(superuser)
 
     resp = client.get(reverse("edit_legend", kwargs={"race_slug": race.slug}))
@@ -2852,6 +2963,7 @@ def test_legend_codes_lists_tags_with_hex_and_placeholder(client):
     # signals) to exercise the "—" placeholder the command also shows.
     CheckpointTag.objects.filter(id=without_code.id).update(code=None)
     superuser = User.objects.create_superuser("admin", "a@b.c", "pw")
+    RaceAdmin.objects.create(race=race, user=superuser, role=RaceAdmin.Role.ADMIN)
     client.force_login(superuser)
 
     resp = client.get(reverse("legend_codes", kwargs={"race_slug": race.slug}))
@@ -3879,7 +3991,9 @@ def test_race_map_positions_regular_user_forbidden(client, django_user_model):
 
 
 @pytest.mark.django_db
-def test_race_map_positions_superuser_and_race_admin_200(client, django_user_model):
+def test_race_map_positions_denies_unassigned_superuser_allows_admin(
+    client, django_user_model
+):
     race = _make_race(slug="map-pos-admins")
 
     superuser = django_user_model.objects.create_superuser(
@@ -3887,7 +4001,7 @@ def test_race_map_positions_superuser_and_race_admin_200(client, django_user_mod
     )
     client.force_login(superuser)
     resp = client.get(reverse("race_map_positions", kwargs={"race_slug": race.slug}))
-    assert resp.status_code == 200
+    assert resp.status_code == 403
     client.logout()
 
     admin = django_user_model.objects.create_user(username="map-admin", password="x")
@@ -3911,6 +4025,7 @@ def test_race_map_positions_returns_latest_point_per_team(client, django_user_mo
     admin = django_user_model.objects.create_superuser(
         username="map-latest-su", password="x", email="map-latest-su@example.com"
     )
+    RaceAdmin.objects.create(race=race, user=admin, role=RaceAdmin.Role.ADMIN)
     client.force_login(admin)
     resp = client.get(reverse("race_map_positions", kwargs={"race_slug": race.slug}))
 
@@ -3942,6 +4057,7 @@ def test_race_map_positions_team_without_points_has_null_fields(
     admin = django_user_model.objects.create_superuser(
         username="map-nodata-su", password="x", email="map-nodata-su@example.com"
     )
+    RaceAdmin.objects.create(race=race, user=admin, role=RaceAdmin.Role.ADMIN)
     client.force_login(admin)
     resp = client.get(reverse("race_map_positions", kwargs={"race_slug": race.slug}))
 
@@ -3975,6 +4091,7 @@ def test_race_map_positions_excludes_other_race_points(client, django_user_model
     admin = django_user_model.objects.create_superuser(
         username="map-cross-su", password="x", email="map-cross-su@example.com"
     )
+    RaceAdmin.objects.create(race=race, user=admin, role=RaceAdmin.Role.ADMIN)
     client.force_login(admin)
     resp = client.get(reverse("race_map_positions", kwargs={"race_slug": race.slug}))
 
@@ -4000,6 +4117,7 @@ def test_race_map_positions_tie_breaker_is_deterministic(client, django_user_mod
     admin = django_user_model.objects.create_superuser(
         username="map-tie-su", password="x", email="map-tie-su@example.com"
     )
+    RaceAdmin.objects.create(race=race, user=admin, role=RaceAdmin.Role.ADMIN)
     client.force_login(admin)
     url = reverse("race_map_positions", kwargs={"race_slug": race.slug})
 
@@ -4069,6 +4187,7 @@ def test_race_map_track_other_race_team_404(client, django_user_model):
         password="x",
         email="map-track-cross-su@example.com",
     )
+    RaceAdmin.objects.create(race=race, user=admin, role=RaceAdmin.Role.ADMIN)
     client.force_login(admin)
     resp = client.get(
         reverse(
@@ -4106,6 +4225,7 @@ def test_race_map_track_thins_points_within_30s(client, django_user_model):
         password="x",
         email="map-track-thin-su@example.com",
     )
+    RaceAdmin.objects.create(race=race, user=admin, role=RaceAdmin.Role.ADMIN)
     client.force_login(admin)
     resp = client.get(
         reverse("race_map_track", kwargs={"race_slug": race.slug, "team_id": team.id})
@@ -4152,6 +4272,7 @@ def test_race_map_track_two_segment_ids_ordered_by_time(client, django_user_mode
         password="x",
         email="map-track-twoseg-su@example.com",
     )
+    RaceAdmin.objects.create(race=race, user=admin, role=RaceAdmin.Role.ADMIN)
     client.force_login(admin)
     resp = client.get(
         reverse("race_map_track", kwargs={"race_slug": race.slug, "team_id": team.id})
@@ -4204,6 +4325,7 @@ def test_race_map_track_same_segment_id_two_installs_is_two_segments(
         password="x",
         email="map-track-twophone-su@example.com",
     )
+    RaceAdmin.objects.create(race=race, user=admin, role=RaceAdmin.Role.ADMIN)
     client.force_login(admin)
     resp = client.get(
         reverse("race_map_track", kwargs={"race_slug": race.slug, "team_id": team.id})
@@ -4241,6 +4363,7 @@ def test_race_map_track_points_ordered_by_gps_time_within_segment(
         password="x",
         email="map-track-order-su@example.com",
     )
+    RaceAdmin.objects.create(race=race, user=admin, role=RaceAdmin.Role.ADMIN)
     client.force_login(admin)
     resp = client.get(
         reverse("race_map_track", kwargs={"race_slug": race.slug, "team_id": team.id})
@@ -4284,6 +4407,7 @@ def test_race_map_track_keeps_true_last_point_on_tied_gps_time(
         password="x",
         email="map-track-tie-su@example.com",
     )
+    RaceAdmin.objects.create(race=race, user=admin, role=RaceAdmin.Role.ADMIN)
     client.force_login(admin)
     resp = client.get(
         reverse("race_map_track", kwargs={"race_slug": race.slug, "team_id": team.id})
@@ -4330,7 +4454,9 @@ def test_race_map_page_regular_user_forbidden(client, django_user_model):
 
 
 @pytest.mark.django_db
-def test_race_map_page_superuser_and_race_admin_200(client, django_user_model):
+def test_race_map_page_denies_unassigned_superuser_allows_admin(
+    client, django_user_model
+):
     race = _make_race(slug="map-page-admins")
 
     superuser = django_user_model.objects.create_superuser(
@@ -4338,7 +4464,7 @@ def test_race_map_page_superuser_and_race_admin_200(client, django_user_model):
     )
     client.force_login(superuser)
     resp = client.get(reverse("race_map", kwargs={"race_slug": race.slug}))
-    assert resp.status_code == 200
+    assert resp.status_code == 403
     client.logout()
 
     admin = django_user_model.objects.create_user(
@@ -4358,6 +4484,7 @@ def test_race_map_page_config_island_has_both_urls(client, django_user_model):
         password="x",
         email="map-page-config-su@example.com",
     )
+    RaceAdmin.objects.create(race=race, user=superuser, role=RaceAdmin.Role.ADMIN)
     client.force_login(superuser)
 
     resp = client.get(reverse("race_map", kwargs={"race_slug": race.slug}))
@@ -4389,6 +4516,7 @@ def test_race_map_page_config_island_handles_numeric_zero_slug(
         password="x",
         email="map-page-config-zero-su@example.com",
     )
+    RaceAdmin.objects.create(race=race, user=superuser, role=RaceAdmin.Role.ADMIN)
     client.force_login(superuser)
 
     resp = client.get(reverse("race_map", kwargs={"race_slug": race.slug}))
@@ -4438,7 +4566,9 @@ def test_race_map_marks_regular_user_forbidden(client, django_user_model):
 
 
 @pytest.mark.django_db
-def test_race_map_marks_superuser_and_race_admin_200(client, django_user_model):
+def test_race_map_marks_denies_unassigned_superuser_allows_admin(
+    client, django_user_model
+):
     race = _make_race(slug="map-marks-admins")
 
     superuser = django_user_model.objects.create_superuser(
@@ -4446,7 +4576,7 @@ def test_race_map_marks_superuser_and_race_admin_200(client, django_user_model):
     )
     client.force_login(superuser)
     resp = client.get(reverse("race_map_marks", kwargs={"race_slug": race.slug}))
-    assert resp.status_code == 200
+    assert resp.status_code == 403
     client.logout()
 
     admin = django_user_model.objects.create_user(username="marks-admin", password="x")
@@ -4470,6 +4600,7 @@ def test_race_map_marks_row_shape(client, django_user_model):
     admin = django_user_model.objects.create_superuser(
         username="marks-shape-su", password="x", email="marks-shape-su@example.com"
     )
+    RaceAdmin.objects.create(race=race, user=admin, role=RaceAdmin.Role.ADMIN)
     client.force_login(admin)
     resp = client.get(reverse("race_map_marks", kwargs={"race_slug": race.slug}))
 
@@ -4508,6 +4639,7 @@ def test_race_map_marks_excludes_marks_without_coordinates(client, django_user_m
     admin = django_user_model.objects.create_superuser(
         username="marks-noloc-su", password="x", email="marks-noloc-su@example.com"
     )
+    RaceAdmin.objects.create(race=race, user=admin, role=RaceAdmin.Role.ADMIN)
     client.force_login(admin)
     resp = client.get(reverse("race_map_marks", kwargs={"race_slug": race.slug}))
 
@@ -4530,6 +4662,7 @@ def test_race_map_marks_unknown_checkpoint_has_null_cp_number(
     admin = django_user_model.objects.create_superuser(
         username="marks-orphan-su", password="x", email="marks-orphan-su@example.com"
     )
+    RaceAdmin.objects.create(race=race, user=admin, role=RaceAdmin.Role.ADMIN)
     client.force_login(admin)
     resp = client.get(reverse("race_map_marks", kwargs={"race_slug": race.slug}))
 
@@ -4557,6 +4690,7 @@ def test_race_map_marks_excludes_other_race_marks(client, django_user_model):
     admin = django_user_model.objects.create_superuser(
         username="marks-cross-su", password="x", email="marks-cross-su@example.com"
     )
+    RaceAdmin.objects.create(race=race, user=admin, role=RaceAdmin.Role.ADMIN)
     client.force_login(admin)
     resp = client.get(reverse("race_map_marks", kwargs={"race_slug": race.slug}))
 
@@ -4581,6 +4715,7 @@ def test_race_map_marks_time_ms_prefers_trusted_ms(client, django_user_model):
     admin = django_user_model.objects.create_superuser(
         username="marks-time-su", password="x", email="marks-time-su@example.com"
     )
+    RaceAdmin.objects.create(race=race, user=admin, role=RaceAdmin.Role.ADMIN)
     client.force_login(admin)
     resp = client.get(reverse("race_map_marks", kwargs={"race_slug": race.slug}))
 
@@ -4602,6 +4737,7 @@ def test_race_map_page_config_island_has_marks_url(client, django_user_model):
         password="x",
         email="map-page-marks-su@example.com",
     )
+    RaceAdmin.objects.create(race=race, user=superuser, role=RaceAdmin.Role.ADMIN)
     client.force_login(superuser)
 
     resp = client.get(reverse("race_map", kwargs={"race_slug": race.slug}))
@@ -4621,6 +4757,7 @@ def test_race_map_page_config_island_has_tile_urls(client, django_user_model):
         password="x",
         email="map-page-tiles-su@example.com",
     )
+    RaceAdmin.objects.create(race=race, user=superuser, role=RaceAdmin.Role.ADMIN)
     client.force_login(superuser)
 
     resp = client.get(reverse("race_map", kwargs={"race_slug": race.slug}))
@@ -4712,6 +4849,7 @@ def test_app_data_team_404_for_team_not_in_race(client, django_user_model):
     superuser = django_user_model.objects.create_superuser(
         username="appdata-404-su", password="x", email="ad404@example.com"
     )
+    RaceAdmin.objects.create(race=race, user=superuser, role=RaceAdmin.Role.ADMIN)
     client.force_login(superuser)
 
     resp = client.get(
@@ -4869,6 +5007,7 @@ def test_app_data_team_timeline_orders_all_event_kinds(client, django_user_model
     superuser = django_user_model.objects.create_superuser(
         username="appdata-feed-su", password="x", email="adfeed@example.com"
     )
+    RaceAdmin.objects.create(race=race, user=superuser, role=RaceAdmin.Role.ADMIN)
     client.force_login(superuser)
     resp = client.get(
         reverse(
@@ -4941,6 +5080,7 @@ def test_app_data_team_timeline_flags_clock_skew(client, django_user_model):
     superuser = django_user_model.objects.create_superuser(
         username="appdata-skew-su", password="x", email="adskew@example.com"
     )
+    RaceAdmin.objects.create(race=race, user=superuser, role=RaceAdmin.Role.ADMIN)
     client.force_login(superuser)
     resp = client.get(
         reverse(
