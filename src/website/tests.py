@@ -2036,15 +2036,20 @@ def test_build_team_form_context_race_remaining_unlimited(django_user_model):
 
 
 @pytest.mark.django_db
-def test_edit_team_invalid_post_superuser_has_bypass_limits_in_config(
-    client, django_user_model
+@pytest.mark.parametrize("assigned_admin", [False, True])
+def test_edit_team_invalid_post_superuser_bypass_limits_requires_race_admin(
+    client, django_user_model, assigned_admin
 ):
     import json
+
+    from website.models.race import RaceAdmin
 
     superuser = django_user_model.objects.create_superuser(
         username="su_bypass_test", password="x"
     )
     race = _pl_race(people_limit=2)
+    if assigned_admin:
+        RaceAdmin.objects.create(race=race, user=superuser, role=RaceAdmin.Role.ADMIN)
     cat = _pl_category(race)
     filler_user = _pl_user(django_user_model, n=77)
     _pl_team(cat, filler_user, paid_people=2, name="filler77")
@@ -2057,7 +2062,7 @@ def test_edit_team_invalid_post_superuser_has_bypass_limits_in_config(
     )
     assert response.status_code == 200
     config = json.loads(str(response.context["team_form_config_json"]))
-    assert config["bypassLimits"] is True
+    assert config["bypassLimits"] is assigned_admin
 
 
 @pytest.mark.parametrize(
