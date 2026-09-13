@@ -5485,18 +5485,21 @@ def _race_admin_request(user):
 
 
 @pytest.mark.django_db
-def test_can_edit_race_legend_superuser_passes(django_user_model):
+@pytest.mark.parametrize("role", [None, "admin", "moderator"])
+def test_can_edit_race_legend_superuser_requires_race_admin(django_user_model, role):
     from apps.mobile.permissions import CanEditRaceLegend
-    from website.models.race import Race
+    from website.models.race import Race, RaceAdmin
 
     su = django_user_model.objects.create_superuser(
         username="su", email="su@example.com", password="x"
     )
     race = Race.objects.create(name="Legend race", slug="legend-race-su")
+    if role is not None:
+        RaceAdmin.objects.create(race=race, user=su, role=role)
 
     request = _race_admin_request(su)
     view = _StubView(race_id=race.id)
-    assert CanEditRaceLegend().has_permission(request, view) is True
+    assert CanEditRaceLegend().has_permission(request, view) is (role == "admin")
 
 
 @pytest.mark.django_db
