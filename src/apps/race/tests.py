@@ -2132,7 +2132,7 @@ def _priced_team(username, *, cost=1000, ucount=3, paid_people=1, slug=None):
 def test_compute_team_charge_fee_only():
     _, race, team = _priced_team("ch1", cost=1000, ucount=3, paid_people=1)
 
-    total, lines = compute_team_charge(team, race)
+    total, lines, _ = compute_team_charge(team, race)
 
     # (3 − 1) × 1000, no extras.
     assert total == 2000
@@ -2147,7 +2147,7 @@ def test_compute_team_charge_single_extra():
     )
     TeamExtra.objects.create(team=team, race_extra=transfer, count=2, count_paid=0)
 
-    total, lines = compute_team_charge(team, race)
+    total, lines, _ = compute_team_charge(team, race)
 
     # fee 2000 + 2 × 500 = 3000.
     assert total == 3000
@@ -2166,7 +2166,7 @@ def test_compute_team_charge_multiple_extras_summed():
     TeamExtra.objects.create(team=team, race_extra=transfer, count=1)
     TeamExtra.objects.create(team=team, race_extra=maps, count=2)
 
-    total, lines = compute_team_charge(team, race)
+    total, lines, _ = compute_team_charge(team, race)
 
     # fee (4−2)×1000 + transfer 1×500 + maps 2×200 = 2000 + 500 + 400.
     assert total == 2900
@@ -2182,7 +2182,7 @@ def test_compute_team_charge_no_delta_when_fully_paid():
     )
     TeamExtra.objects.create(team=team, race_extra=transfer, count=2, count_paid=2)
 
-    total, lines = compute_team_charge(team, race)
+    total, lines, _ = compute_team_charge(team, race)
 
     # Fully paid people and extra → nothing to charge.
     assert total == 0
@@ -2198,7 +2198,7 @@ def test_compute_team_charge_partial_extra_delta():
     # Wants 3, already paid for 1 → charge the 2-unit delta only.
     TeamExtra.objects.create(team=team, race_extra=transfer, count=3, count_paid=1)
 
-    total, lines = compute_team_charge(team, race)
+    total, lines, _ = compute_team_charge(team, race)
 
     assert total == 1000  # 2 × 500
     assert lines == [ExtraCharge(race_extra=transfer, count=2, unit_price=500)]
@@ -2209,7 +2209,7 @@ def test_compute_team_charge_floors_at_zero():
     # Over-paid people (refund-like) must not produce a negative total.
     _, race, team = _priced_team("ch6", cost=1000, ucount=1, paid_people=3)
 
-    total, lines = compute_team_charge(team, race)
+    total, lines, _ = compute_team_charge(team, race)
 
     assert total == 0
     assert lines == []
@@ -2223,7 +2223,7 @@ def test_compute_team_charge_ignores_inactive_extra():
     )
     TeamExtra.objects.create(team=team, race_extra=transfer, count=2, count_paid=0)
 
-    total, lines = compute_team_charge(team, race)
+    total, lines, _ = compute_team_charge(team, race)
 
     assert total == 0
     assert lines == []
@@ -5100,3 +5100,577 @@ def test_app_data_urls_resolve():
         resolve("/race/some-slug/app-data/team/7/").func.view_class
         is RaceAppDataTeamView
     )
+
+
+# --- Promo codes: model ---
+
+from apps.race.models import RacePromo  # noqa: E402
+
+
+def _promo(race, code="SALE", discount_type=RacePromo.PERCENT, value=40, **kwargs):
+    return RacePromo.objects.create(
+        race=race, code=code, discount_type=discount_type, value=value, **kwargs
+    )
+
+
+@pytest.mark.django_db
+def test_promo_discount_for_percent():
+    race = _make_race(slug="promo-pct")
+    promo = _promo(race, value=40)
+
+    assert promo.discount_for(1000) == 400
+
+
+@pytest.mark.django_db
+def test_promo_discount_for_percent_rounds_down():
+    race = _make_race(slug="promo-round")
+    promo = _promo(race, value=33)
+
+    # 1000 × 33 / 100 = 330.0 exactly; 999 × 33 / 100 = 329.67 → 329.
+    assert promo.discount_for(999) == 329
+
+
+@pytest.mark.django_db
+def test_promo_discount_for_fixed():
+    race = _make_race(slug="promo-fixed")
+    promo = _promo(race, discount_type=RacePromo.FIXED, value=1000)
+
+    assert promo.discount_for(2500) == 1000
+
+
+@pytest.mark.django_db
+def test_promo_discount_for_fixed_clamped_to_fee():
+    race = _make_race(slug="promo-clamp")
+    promo = _promo(race, discount_type=RacePromo.FIXED, value=5000)
+
+    # A discount never exceeds the fee (the total must not go negative).
+    assert promo.discount_for(1500) == 1500
+
+
+@pytest.mark.django_db
+def test_promo_discount_for_zero_fee():
+    race = _make_race(slug="promo-zero")
+    percent = _promo(race, code="P", value=50)
+    fixed = _promo(race, code="F", discount_type=RacePromo.FIXED, value=500)
+
+    assert percent.discount_for(0) == 0
+    assert fixed.discount_for(0) == 0
+    assert percent.discount_for(-100) == 0
+
+
+@pytest.mark.django_db
+def test_promo_discount_for_float_fee_returns_int():
+    # Team.paid_people is a FloatField, so the fee can arrive as a float.
+    race = _make_race(slug="promo-float")
+    promo = _promo(race, value=40)
+
+    result = promo.discount_for(1000.0)
+
+    assert result == 400
+    assert isinstance(result, int)
+
+
+@pytest.mark.django_db
+def test_promo_code_normalized_on_save():
+    race = _make_race(slug="promo-norm")
+    promo = RacePromo.objects.create(race=race, code="  sale40 ", value=40)
+
+    promo.refresh_from_db()
+    assert promo.code == "SALE40"
+
+
+@pytest.mark.django_db
+def test_promo_code_unique_within_race_only():
+    from django.db import IntegrityError
+
+    race = _make_race(slug="promo-uniq")
+    other = _make_race(slug="promo-uniq-2")
+    _promo(race, code="SALE")
+    # Same code on another race is fine.
+    _promo(other, code="SALE")
+
+    with pytest.raises(IntegrityError):
+        _promo(race, code="sale")
+
+
+# --- Promo codes: resolve + quota ---
+
+from django.utils import timezone  # noqa: E402
+
+from apps.race.promo import PromoError, occupied_team_ids, resolve_promo  # noqa: E402
+from website.models.race import RESERVATION_TTL  # noqa: E402
+
+
+def _promo_payment(team, promo, status=Payment.STATUS_DONE, age=None):
+    payment = Payment.objects.create(
+        team=team, promo=promo, payment_amount=100, status=status
+    )
+    if age is not None:
+        Payment.objects.filter(pk=payment.pk).update(created_at=timezone.now() - age)
+        payment.refresh_from_db()
+    return payment
+
+
+@pytest.mark.django_db
+def test_resolve_promo_success_and_case_insensitive():
+    _, race, team = _priced_team("pm1", slug="pm-ok")
+    promo = _promo(race, code="SALE40")
+
+    assert resolve_promo(race, " sale40 ", team) == promo
+
+
+@pytest.mark.django_db
+def test_resolve_promo_not_found():
+    _, race, team = _priced_team("pm2", slug="pm-404")
+    _promo(race, code="SALE40")
+
+    for code in ("NOPE", "", None):
+        with pytest.raises(PromoError) as exc:
+            resolve_promo(race, code, team)
+        assert exc.value.key == "not_found"
+
+
+@pytest.mark.django_db
+def test_resolve_promo_other_race_code_not_found():
+    _, race, team = _priced_team("pm3", slug="pm-other")
+    other = _make_race(slug="pm-other-2")
+    _promo(other, code="SALE40")
+
+    with pytest.raises(PromoError) as exc:
+        resolve_promo(race, "SALE40", team)
+    assert exc.value.key == "not_found"
+
+
+@pytest.mark.django_db
+def test_resolve_promo_inactive():
+    _, race, team = _priced_team("pm4", slug="pm-off")
+    _promo(race, code="SALE40", is_active=False)
+
+    with pytest.raises(PromoError) as exc:
+        resolve_promo(race, "SALE40", team)
+    assert exc.value.key == "inactive"
+
+
+@pytest.mark.django_db
+def test_resolve_promo_already_used_by_this_team():
+    _, race, team = _priced_team("pm5", slug="pm-used")
+    promo = _promo(race, code="SALE40")
+    _promo_payment(team, promo, status=Payment.STATUS_DONE)
+
+    with pytest.raises(PromoError) as exc:
+        resolve_promo(race, "SALE40", team)
+    assert exc.value.key == "already_used"
+
+
+@pytest.mark.django_db
+def test_resolve_promo_limit_reached():
+    owner, race, team = _priced_team("pm6", slug="pm-limit")
+    promo = _promo(race, code="SALE40", max_uses=1)
+    other_team = _make_team(owner, team.category2, start_number="2")
+    _promo_payment(other_team, promo, status=Payment.STATUS_DONE)
+
+    with pytest.raises(PromoError) as exc:
+        resolve_promo(race, "SALE40", team)
+    assert exc.value.key == "limit_reached"
+
+
+@pytest.mark.django_db
+def test_resolve_promo_unlimited_when_max_uses_zero():
+    owner, race, team = _priced_team("pm7", slug="pm-unlim")
+    promo = _promo(race, code="SALE40", max_uses=0)
+    for i in range(3):
+        other = _make_team(owner, team.category2, start_number=str(i + 2))
+        _promo_payment(other, promo, status=Payment.STATUS_DONE)
+
+    assert resolve_promo(race, "SALE40", team) == promo
+
+
+@pytest.mark.django_db
+def test_resolve_promo_own_live_draft_passes_and_holds_one_slot():
+    _, race, team = _priced_team("pm8", slug="pm-draft")
+    promo = _promo(race, code="SALE40", max_uses=1)
+    # The team went to the bank: a live draft holds its own slot.
+    _promo_payment(team, promo, status=Payment.STATUS_DRAFT)
+
+    # A re-submit by the same team still resolves...
+    assert resolve_promo(race, "SALE40", team) == promo
+    # ...and a second draft does not multiply the quota.
+    _promo_payment(team, promo, status=Payment.STATUS_DRAFT)
+    assert occupied_team_ids(promo) == {team.id}
+
+
+@pytest.mark.django_db
+def test_resolve_promo_live_draft_of_other_team_blocks_last_slot():
+    owner, race, team = _priced_team("pm9", slug="pm-draft-other")
+    promo = _promo(race, code="SALE40", max_uses=1)
+    other = _make_team(owner, team.category2, start_number="2")
+    _promo_payment(other, promo, status=Payment.STATUS_DRAFT)
+
+    with pytest.raises(PromoError) as exc:
+        resolve_promo(race, "SALE40", team)
+    assert exc.value.key == "limit_reached"
+
+
+@pytest.mark.django_db
+def test_expired_draft_frees_the_quota():
+    owner, race, team = _priced_team("pm10", slug="pm-expired")
+    promo = _promo(race, code="SALE40", max_uses=1)
+    other = _make_team(owner, team.category2, start_number="2")
+    _promo_payment(
+        other,
+        promo,
+        status=Payment.STATUS_DRAFT,
+        age=RESERVATION_TTL + datetime.timedelta(minutes=1),
+    )
+
+    assert occupied_team_ids(promo) == set()
+    assert resolve_promo(race, "SALE40", team) == promo
+
+
+@pytest.mark.django_db
+def test_cancelled_payment_frees_the_quota_immediately():
+    owner, race, team = _priced_team("pm11", slug="pm-cancel")
+    promo = _promo(race, code="SALE40", max_uses=1)
+    other = _make_team(owner, team.category2, start_number="2")
+    _promo_payment(other, promo, status=Payment.STATUS_CANCEL)
+
+    assert occupied_team_ids(promo) == set()
+    assert resolve_promo(race, "SALE40", team) == promo
+
+
+@pytest.mark.django_db
+def test_draft_with_info_is_not_counted():
+    owner, race, team = _priced_team("pm12", slug="pm-dwi")
+    promo = _promo(race, code="SALE40", max_uses=1)
+    other = _make_team(owner, team.category2, start_number="2")
+    _promo_payment(other, promo, status=Payment.STATUS_DRAFT_WITH_INFO)
+
+    assert occupied_team_ids(promo) == set()
+
+
+@pytest.mark.django_db
+def test_occupied_team_ids_ignores_teamless_payments():
+    _, race, team = _priced_team("pm13", slug="pm-noteam")
+    promo = _promo(race, code="SALE40", max_uses=1)
+    Payment.objects.create(
+        team=None, promo=promo, payment_amount=100, status=Payment.STATUS_DONE
+    )
+
+    assert occupied_team_ids(promo) == set()
+    # An unsaved team (the add flow) must not look "already occupying".
+    assert resolve_promo(race, "SALE40", Team()) == promo
+
+
+@pytest.mark.django_db
+def test_resolve_promo_unsaved_team_hits_the_global_limit():
+    owner, race, team = _priced_team("pm14", slug="pm-unsaved")
+    promo = _promo(race, code="SALE40", max_uses=1)
+    other = _make_team(owner, team.category2, start_number="2")
+    _promo_payment(other, promo, status=Payment.STATUS_DONE)
+
+    with pytest.raises(PromoError) as exc:
+        resolve_promo(race, "SALE40", Team())
+    assert exc.value.key == "limit_reached"
+
+
+# --- Promo codes: charge formula ---
+
+
+@pytest.mark.django_db
+def test_compute_team_charge_percent_promo():
+    _, race, team = _priced_team("cp1", cost=1000, ucount=3, paid_people=1)
+    promo = _promo(race, code="SALE40", value=40)
+
+    total, lines, discount = compute_team_charge(team, race, promo=promo)
+
+    # fee (3 − 1) × 1000 = 2000, −40% = 1200.
+    assert discount == 800
+    assert total == 1200
+    assert lines == []
+
+
+@pytest.mark.django_db
+def test_compute_team_charge_fixed_promo():
+    _, race, team = _priced_team("cp2", cost=1000, ucount=3, paid_people=1)
+    promo = _promo(race, code="M1000", discount_type=RacePromo.FIXED, value=1000)
+
+    total, lines, discount = compute_team_charge(team, race, promo=promo)
+
+    assert discount == 1000
+    assert total == 1000
+
+
+@pytest.mark.django_db
+def test_compute_team_charge_promo_larger_than_fee_floors_at_zero():
+    _, race, team = _priced_team("cp3", cost=1000, ucount=3, paid_people=1)
+    promo = _promo(race, code="FREE", discount_type=RacePromo.FIXED, value=9000)
+
+    total, lines, discount = compute_team_charge(team, race, promo=promo)
+
+    assert discount == 2000
+    assert total == 0
+
+
+@pytest.mark.django_db
+def test_compute_team_charge_promo_does_not_discount_extras():
+    _, race, team = _priced_team("cp4", cost=1000, ucount=3, paid_people=1)
+    transfer = RaceExtra.objects.create(
+        race=race, code="transfer", name="Трансфер", price=500
+    )
+    TeamExtra.objects.create(team=team, race_extra=transfer, count=2, count_paid=0)
+    promo = _promo(race, code="SALE50", value=50)
+
+    total, lines, discount = compute_team_charge(team, race, promo=promo)
+
+    # fee 2000 − 1000 = 1000, plus 2 × 500 at full price.
+    assert discount == 1000
+    assert total == 2000
+    assert lines == [ExtraCharge(race_extra=transfer, count=2, unit_price=500)]
+
+
+@pytest.mark.django_db
+def test_compute_team_charge_promo_applies_to_unpaid_part_only():
+    # A top-up: the discount is taken off what is actually being paid now.
+    _, race, team = _priced_team("cp5", cost=1000, ucount=4, paid_people=2)
+    promo = _promo(race, code="SALE50", value=50)
+
+    total, lines, discount = compute_team_charge(team, race, promo=promo)
+
+    assert discount == 1000
+    assert total == 1000
+
+
+@pytest.mark.django_db
+def test_compute_team_charge_promo_on_fully_paid_team_is_noop():
+    _, race, team = _priced_team("cp6", cost=1000, ucount=2, paid_people=2)
+    promo = _promo(race, code="SALE50", value=50)
+
+    total, lines, discount = compute_team_charge(team, race, promo=promo)
+
+    assert discount == 0
+    assert total == 0
+
+
+@pytest.mark.django_db
+def test_compute_team_charge_without_promo_unchanged():
+    _, race, team = _priced_team("cp7", cost=1000, ucount=3, paid_people=1)
+    _promo(race, code="SALE40", value=40)
+
+    total, lines, discount = compute_team_charge(team, race)
+
+    assert (total, discount) == (2000, 0)
+
+
+@pytest.mark.django_db
+def test_compute_team_charge_fractional_paid_people_stays_int():
+    # Team.paid_people is a FloatField (member transfers can make it fractional).
+    _, race, team = _priced_team("cp8", cost=1000, ucount=4, paid_people=1.5)
+    promo = _promo(race, code="SALE33", value=33)
+
+    total, lines, discount = compute_team_charge(team, race, promo=promo)
+
+    # fee = int(2.5 × 1000) = 2500; 2500 × 33 // 100 = 825.
+    assert isinstance(total, int)
+    assert isinstance(discount, int)
+    assert discount == 825
+    assert total == 1675
+
+
+# --- Promo codes: settlement service ---
+
+from apps.race.settlement import settle_payment  # noqa: E402
+
+
+@pytest.mark.django_db
+def test_settle_payment_credits_people_and_extras():
+    _, race, team = _priced_team("st1", cost=1000, ucount=4, paid_people=1)
+    transfer = RaceExtra.objects.create(
+        race=race, code="transfer", name="Трансфер", price=500
+    )
+    TeamExtra.objects.create(team=team, race_extra=transfer, count=2, count_paid=0)
+    payment = Payment.objects.create(
+        team=team,
+        payment_amount=4000,
+        paid_for=3,
+        status=Payment.STATUS_DRAFT,
+    )
+    PaymentExtra.objects.create(
+        payment=payment, race_extra=transfer, count=2, unit_price=500
+    )
+
+    assert settle_payment(payment) is True
+
+    team.refresh_from_db()
+    payment.refresh_from_db()
+    assert team.paid_people == 4
+    assert team.paid_sum == 4000
+    assert payment.status == Payment.STATUS_DONE
+    assert payment.order == payment.pk
+    assert team.extras.get(race_extra=transfer).count_paid == 2
+
+
+@pytest.mark.django_db
+def test_settle_payment_is_idempotent():
+    _, race, team = _priced_team("st2", cost=1000, ucount=4, paid_people=1)
+    payment = Payment.objects.create(
+        team=team, payment_amount=3000, paid_for=3, status=Payment.STATUS_DRAFT
+    )
+
+    assert settle_payment(payment) is True
+    assert settle_payment(payment) is False
+
+    team.refresh_from_db()
+    assert team.paid_people == 4
+
+
+@pytest.mark.django_db
+def test_settle_payment_flips_race_to_sold_out():
+    _, race, team = _priced_team("st3", cost=1000, ucount=4, paid_people=1)
+    race.people_limit = 4
+    race.reg_status = RegStatus.OPEN
+    race.save(update_fields=["people_limit", "reg_status"])
+    payment = Payment.objects.create(
+        team=team, payment_amount=3000, paid_for=3, status=Payment.STATUS_DRAFT
+    )
+
+    settle_payment(payment)
+
+    race.refresh_from_db()
+    assert race.reg_status == RegStatus.SOLD_OUT
+
+
+# --- Promo codes: payment creation ---
+
+from apps.race.promo import PromoUnavailable  # noqa: E402
+
+
+def _patch_vtb():
+    """Patch the VTB integration so payment creation does not hit the network."""
+    from unittest.mock import patch
+
+    return (
+        patch("apps.race.pricing.VTBClient"),
+        patch("apps.race.pricing.VTBPayment"),
+        patch("apps.race.pricing.VTBPreparedPayment"),
+    )
+
+
+@pytest.mark.django_db
+def test_create_team_payment_snapshots_promo(rf):
+    owner, race, team = _priced_team("cpp1", cost=1000, ucount=3, paid_people=1)
+    promo = _promo(race, code="SALE40", value=40)
+    request = rf.post("/")
+    request.user = owner
+
+    from website.models import VTBPayment
+
+    client_p, payment_p, prepared_p = _patch_vtb()
+    with client_p as mock_client, payment_p as mock_payment, prepared_p as mock_prep:
+        mock_payment.new_order_id.return_value = "ORDER_TEST"
+        mock_payment.from_vtb_payload.return_value = VTBPayment.objects.create(
+            order_id="ORDER_TEST", amount_value="1200.00", status="NEW"
+        )
+        mock_prep.objects.filter.return_value.first.return_value = None
+        create_team_payment(request, team, race, promo=promo)
+        order_kwargs = mock_client.return_value.create_order.call_args.kwargs
+
+    payment = Payment.objects.get(team=team)
+    assert payment.promo == promo
+    assert payment.discount_amount == 800
+    assert payment.payment_amount == 1200
+    assert payment.payment_with_discount == 1200
+    assert payment.paid_for == 2
+    # The bank is asked for the discounted amount.
+    assert order_kwargs["amount_value"] == 1200
+
+
+@pytest.mark.django_db
+def test_create_team_payment_raises_when_quota_gone(rf):
+    owner, race, team = _priced_team("cpp2", cost=1000, ucount=3, paid_people=1)
+    promo = _promo(race, code="SALE40", value=40, max_uses=1)
+    request = rf.post("/")
+    request.user = owner
+    # Another team takes the last slot after the form validated.
+    other = _make_team(owner, team.category2, start_number="2")
+    _promo_payment(other, promo, status=Payment.STATUS_DONE)
+
+    client_p, payment_p, prepared_p = _patch_vtb()
+    with client_p, payment_p, prepared_p:
+        with pytest.raises(PromoUnavailable):
+            create_team_payment(request, team, race, promo=promo)
+
+    assert not Payment.objects.filter(team=team).exists()
+
+
+@pytest.mark.django_db
+def test_create_team_payment_raises_when_promo_deactivated(rf):
+    owner, race, team = _priced_team("cpp3", cost=1000, ucount=3, paid_people=1)
+    promo = _promo(race, code="SALE40", value=40)
+    request = rf.post("/")
+    request.user = owner
+    RacePromo.objects.filter(pk=promo.pk).update(is_active=False)
+
+    client_p, payment_p, prepared_p = _patch_vtb()
+    with client_p, payment_p, prepared_p:
+        with pytest.raises(PromoUnavailable):
+            create_team_payment(request, team, race, promo=promo)
+
+    assert not Payment.objects.filter(team=team).exists()
+
+
+@pytest.mark.django_db
+def test_create_team_payment_full_discount_settles_without_vtb(rf):
+    owner, race, team = _priced_team("cpp4", cost=1000, ucount=3, paid_people=1)
+    promo = _promo(race, code="FREE", value=100)
+    request = rf.post("/")
+    request.user = owner
+
+    client_p, payment_p, prepared_p = _patch_vtb()
+    with client_p as mock_client, payment_p, prepared_p:
+        result = create_team_payment(request, team, race, promo=promo)
+
+    assert result is None
+    mock_client.assert_not_called()
+    payment = Payment.objects.get(team=team)
+    assert payment.status == Payment.STATUS_DONE
+    assert payment.payment_amount == 0
+    assert payment.discount_amount == 2000
+    assert payment.promo == promo
+    team.refresh_from_db()
+    assert team.paid_people == 3
+    # The code's quota is occupied by this team now.
+    assert occupied_team_ids(promo) == {team.id}
+
+
+@pytest.mark.django_db
+def test_create_team_payment_full_discount_credits_extras(rf):
+    owner, race, team = _priced_team("cpp5", cost=1000, ucount=3, paid_people=1)
+    free_extra = RaceExtra.objects.create(
+        race=race, code="breakfast", name="Завтрак", price=0
+    )
+    TeamExtra.objects.create(team=team, race_extra=free_extra, count=2, count_paid=0)
+    promo = _promo(race, code="FREE", value=100)
+    request = rf.post("/")
+    request.user = owner
+
+    client_p, payment_p, prepared_p = _patch_vtb()
+    with client_p, payment_p, prepared_p:
+        result = create_team_payment(request, team, race, promo=promo)
+
+    assert result is None
+    assert team.extras.get(race_extra=free_extra).count_paid == 2
+
+
+@pytest.mark.django_db
+def test_create_team_payment_zero_without_discount_creates_nothing(rf):
+    owner, race, team = _priced_team("cpp6", cost=1000, ucount=2, paid_people=2)
+    promo = _promo(race, code="SALE40", value=40)
+    request = rf.post("/")
+    request.user = owner
+
+    client_p, payment_p, prepared_p = _patch_vtb()
+    with client_p, payment_p, prepared_p:
+        result = create_team_payment(request, team, race, promo=promo)
+
+    assert result is None
+    assert not Payment.objects.filter(team=team).exists()

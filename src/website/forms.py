@@ -49,6 +49,9 @@ class TeamForm(forms.Form):
     )
     dist = forms.CharField(required=False)
     paymentid = forms.CharField(widget=forms.HiddenInput(), required=False)
+    # Promo code applied on the client via the promo_check endpoint; resolved
+    # again here — the browser only fills the field in.
+    promo_code = forms.CharField(required=False, widget=forms.HiddenInput())
 
     def __init__(
         self,
@@ -72,6 +75,10 @@ class TeamForm(forms.Form):
             resolved_race_id = int(race_id)
         except (TypeError, ValueError):
             resolved_race_id = None
+
+        self._race_id = resolved_race_id
+        # Set by clean_promo_code; the views pass it to create_team_payment.
+        self.promo = None
 
         self.extras = []
         # count_paid per RaceExtra id, used by clean() to block reductions.
@@ -143,6 +150,30 @@ class TeamForm(forms.Form):
                     }
                 ),
             )
+
+    def clean_promo_code(self):
+        """Resolve the promo code, or raise a field error explaining why not.
+
+        Blank means «no code» — never an error. The race is resolved defensively
+        (same branch as the add-ons): with a bad ``race_id`` there is nothing to
+        resolve against, so the code is simply dropped.
+        """
+        code = (self.cleaned_data.get("promo_code") or "").strip()
+        self.promo = None
+        if not code or self._race_id is None:
+            return ""
+
+        from apps.race.promo import PromoError, resolve_promo
+        from website.models import Race
+
+        race = Race.objects.filter(id=self._race_id).first()
+        if race is None:
+            return ""
+        try:
+            self.promo = resolve_promo(race, code, self.team)
+        except PromoError as exc:
+            raise forms.ValidationError(str(exc))
+        return self.promo.code
 
     def clean(self):
         cleaned_data = super().clean()

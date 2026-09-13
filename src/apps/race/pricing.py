@@ -2,12 +2,17 @@
 
 This module is the single source of truth for the team charge formula:
 
-    total = max(0, (ucount − paid_people) × race.current_price
+    fee      = max(0, int((ucount − paid_people) × race.current_price))
+    discount = promo.discount_for(fee)          # 0 without a promo code
+    total    = max(0, fee − discount
                  + Σ active extras: max(0, count − count_paid) × price)
 
+A promo code (``apps/race/promo.py``) discounts the **participation fee only** —
+add-ons are always charged at full price.
+
 The client mirror of this formula lives in ``src/static/js/team-form.js``
-(live total + per-extra steppers). Keep the two in sync — any change to the
-charge math here must be reflected there, and vice versa.
+(live total + per-extra steppers + the promo line). Keep the two in sync — any
+change to the charge math here must be reflected there, and vice versa.
 """
 
 from collections import namedtuple
@@ -23,17 +28,23 @@ from website.models import Payment, VTBPayment, VTBPreparedPayment
 ExtraCharge = namedtuple("ExtraCharge", ["race_extra", "count", "unit_price"])
 
 
-def compute_team_charge(team, race):
-    """Return ``(total, lines)`` for charging ``team`` on ``race``.
+def compute_team_charge(team, race, promo=None):
+    """Return ``(total, lines, discount)`` for charging ``team`` on ``race``.
 
-    ``total`` is the floored, non-negative integer amount to charge:
-    the unpaid race-fee term plus, for each active ``RaceExtra``, the unpaid
-    add-on delta at the extra's current price. ``lines`` is a list of
-    ``ExtraCharge`` (one per extra with a nonzero delta) used to snapshot
-    ``PaymentExtra`` rows.
+    ``total`` is the floored, non-negative integer amount to charge: the unpaid
+    race-fee term, less the promo discount, plus — for each active ``RaceExtra``
+    — the unpaid add-on delta at the extra's current price. ``lines`` is a list
+    of ``ExtraCharge`` (one per extra with a nonzero delta) used to snapshot
+    ``PaymentExtra`` rows. ``discount`` is the applied promo discount in ₽
+    (0 without a code), snapshotted onto ``Payment.discount_amount``.
+
+    The fee is rounded to an int **before** the discount: ``Team.paid_people`` is
+    a ``FloatField``, and the JS mirror floors a percent the same way.
     """
     cost_now = race.current_price
-    total = (int(team.ucount) - team.paid_people) * cost_now
+    fee = max(0, int((int(team.ucount) - team.paid_people) * cost_now))
+    discount = promo.discount_for(fee) if promo else 0
+    total = fee - discount
 
     lines = []
     extras_by_id = {e.race_extra_id: e for e in team.extras.all()}
@@ -50,7 +61,7 @@ def compute_team_charge(team, race):
                 )
             )
 
-    return max(0, int(total)), lines
+    return max(0, int(total)), lines, discount
 
 
 def upsert_team_extras(team, cleaned_data, race):
@@ -69,25 +80,46 @@ def upsert_team_extras(team, cleaned_data, race):
             te.save(update_fields=["count"])
 
 
-def create_team_payment(request, team, race):
+def create_team_payment(request, team, race, promo=None):
     """Create the ``Payment`` (+ ``PaymentExtra`` snapshots) and mint the VTB order.
 
     Returns the redirect ``HttpResponse`` to the VTB pay URL, or ``None`` when
-    the computed cost is 0 (caller redirects to its own success URL). Reads the
-    team's ``TeamExtra`` rows — the caller must ``upsert_team_extras`` first.
+    there is nothing to charge (caller redirects to its own success URL). Reads
+    the team's ``TeamExtra`` rows — the caller must ``upsert_team_extras`` first.
 
     ``payment_method`` is forced to ``"sbp2"``: once extras are present,
     ``payment_amount`` intentionally diverges from ``paid_for × cost_per_person``,
     so the partial Yandex ``update_team`` back-calc must never run on these.
-    """
-    from apps.race.models import PaymentExtra
 
-    cost, lines = compute_team_charge(team, race)
-    if cost == 0:
+    With a ``promo``, the code's quota is re-checked under a row lock — the last
+    free slot must not be handed to two teams checking out at once — and
+    ``PromoUnavailable`` is raised if it went away since the form validated.
+    A promo that covers the whole fee charges nothing but still has to credit
+    the seats, so the payment is created as a draft and settled right here.
+    """
+    from apps.race.models import PaymentExtra, RacePromo
+    from apps.race.promo import PromoError, PromoUnavailable, check_available
+    from apps.race.settlement import settle_payment
+
+    cost, lines, discount = compute_team_charge(team, race, promo=promo)
+    paid_for = int(team.ucount) - team.paid_people
+    # Zero charge because a promo ate the fee → still credit what was bought.
+    # Zero charge without a discount means there is simply nothing left to pay,
+    # which creates no payment at all (unchanged behaviour).
+    settles_for_free = cost == 0 and discount > 0 and (paid_for > 0 or lines)
+    if cost == 0 and not settles_for_free:
         return None
 
     cost_now = race.current_price
     with transaction.atomic():
+        if promo is not None:
+            locked = RacePromo.objects.select_for_update().get(pk=promo.pk)
+            if not locked.is_active:
+                raise PromoUnavailable(str(PromoError("inactive")))
+            try:
+                check_available(locked, team)
+            except PromoError as exc:
+                raise PromoUnavailable(str(exc)) from exc
         payment = Payment.objects.create(
             owner=request.user,
             team=team,
@@ -95,8 +127,10 @@ def create_team_payment(request, team, race):
             payment_amount=cost,
             payment_with_discount=cost,
             cost_per_person=cost_now,
-            paid_for=int(team.ucount) - team.paid_people,
-            status="draft",
+            paid_for=paid_for,
+            promo=promo,
+            discount_amount=discount,
+            status=Payment.STATUS_DRAFT,
         )
         for line in lines:
             PaymentExtra.objects.create(
@@ -105,6 +139,12 @@ def create_team_payment(request, team, race):
                 count=line.count,
                 unit_price=line.unit_price,
             )
+
+    if settles_for_free:
+        # settle_payment flips the draft to done — creating it as done would
+        # trip its own idempotency guard and credit nothing.
+        settle_payment(payment)
+        return None
 
     vtb_client = VTBClient()
     vtb_client._ensure_token()

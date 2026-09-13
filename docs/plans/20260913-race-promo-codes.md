@@ -260,15 +260,15 @@ total = max(0, fee - discount + Σ extras)
 - Create: `src/apps/race/migrations/0005_racepromo.py` (последняя сейчас — `0004_protocol_updated_at.py`)
 - Modify: `src/apps/race/tests.py`
 
-- [ ] добавить модель `RacePromo` рядом с `RaceExtra` (поля, `unique_together`, `ordering`, `__str__`)
-- [ ] нормализация `code` в `save()` (`.strip().upper()`), константы типов `PERCENT`/`FIXED` с `choices`
-- [ ] метод `discount_for(fee)`: `int(fee)` на входе, зажим результата в `0 … fee`, округление вниз
+- [x] добавить модель `RacePromo` рядом с `RaceExtra` (поля, `unique_together`, `ordering`, `__str__`)
+- [x] нормализация `code` в `save()` (`.strip().upper()`), константы типов `PERCENT`/`FIXED` с `choices`
+- [x] метод `discount_for(fee)`: `int(fee)` на входе, зажим результата в `0 … fee`, округление вниз
       для процента
-- [ ] сгенерировать миграцию: `uv run python src/manage.py makemigrations race_app`
-- [ ] написать тесты `discount_for`: процент, фикс, фикс больше взноса, нулевой `fee`, округление
+- [x] сгенерировать миграцию: `uv run python src/manage.py makemigrations race_app`
+- [x] написать тесты `discount_for`: процент, фикс, фикс больше взноса, нулевой `fee`, округление
       вниз, float на входе (`paid_people` — `FloatField`) даёт `int` на выходе
-- [ ] написать тест нормализации кода в `save()` и `unique_together` внутри гонки
-- [ ] прогнать тесты — должны пройти до перехода к задаче 2
+- [x] написать тест нормализации кода в `save()` и `unique_together` внутри гонки
+- [x] прогнать тесты — должны пройти до перехода к задаче 2
 
 ### Task 2: Поля `promo` и `discount_amount` на `Payment`
 
@@ -278,14 +278,14 @@ total = max(0, fee - discount + Σ extras)
   `0092_newspost_publication_fields.py`)
 - Modify: `src/website/tests.py`
 
-- [ ] добавить `promo` (FK `race_app.RacePromo`, `null`, `blank`, `PROTECT`, `related_name="payments"`)
+- [x] добавить `promo` (FK `race_app.RacePromo`, `null`, `blank`, `PROTECT`, `related_name="payments"`)
       и `discount_amount` (`IntegerField(0)`) в `Payment`
-- [ ] комментарий у полей: `payment_amount` — уже со скидкой; legacy `payment_with_discount` не трогаем
-- [ ] сгенерировать миграцию, проверить, что в `dependencies` попала новая миграция `race_app`
-- [ ] прогнать `uv run python src/manage.py migrate` на локальной БД — применяется без ошибок
-- [ ] написать тест: `Payment` создаётся без промо (дефолты `None`/`0`) и с промо
-- [ ] написать тест: удаление `RacePromo` с платежом падает `ProtectedError`
-- [ ] прогнать тесты — должны пройти до перехода к задаче 3
+- [x] комментарий у полей: `payment_amount` — уже со скидкой; legacy `payment_with_discount` не трогаем
+- [x] сгенерировать миграцию, проверить, что в `dependencies` попала новая миграция `race_app`
+- [x] прогнать `uv run python src/manage.py migrate` на локальной БД — применяется без ошибок
+- [x] написать тест: `Payment` создаётся без промо (дефолты `None`/`0`) и с промо
+- [x] написать тест: удаление `RacePromo` с платежом падает `ProtectedError`
+- [x] прогнать тесты — должны пройти до перехода к задаче 3
 
 ### Task 3: Сервис `apps/race/promo.py` — резолв и квота
 
@@ -293,20 +293,20 @@ total = max(0, fee - discount + Σ extras)
 - Create: `src/apps/race/promo.py`
 - Modify: `src/apps/race/tests.py`
 
-- [ ] `PromoError` (с `.key`), `PromoUnavailable`, словарь русских текстов по ключам
-- [ ] `occupied_team_ids(promo)` — `DONE` + живые `DRAFT` моложе `RESERVATION_TTL`, `set` team_id,
+- [x] `PromoError` (с `.key`), `PromoUnavailable`, словарь русских текстов по ключам
+- [x] `occupied_team_ids(promo)` — `DONE` + живые `DRAFT` моложе `RESERVATION_TTL`, `set` team_id,
       обязательный `.exclude(team__isnull=True)` (иначе `None` попадёт в множество)
-- [ ] `resolve_promo(race, code, team)` в порядке `not_found → inactive → already_used → limit_reached`;
+- [x] `resolve_promo(race, code, team)` в порядке `not_found → inactive → already_used → limit_reached`;
       при `team is None or team.pk is None` (add-флоу, несохранённый `Team()`) проверка
       `already_used` пропускается, лимит проверяется как для новой команды
-- [ ] docstring модуля: почему derived-счётчик, как бронь совпадает с `Race.reserved_people`,
+- [x] docstring модуля: почему derived-счётчик, как бронь совпадает с `Race.reserved_people`,
       почему `STATUS_DRAFT_WITH_INFO` намеренно не входит в квоту
-- [ ] тесты на все 4 ключа ошибок и на успешный резолв
-- [ ] тест: резолв для несохранённой команды (`Team()`) не падает, не считается занятым и упирается
+- [x] тесты на все 4 ключа ошибок и на успешный резолв
+- [x] тест: резолв для несохранённой команды (`Team()`) не падает, не считается занятым и упирается
       в лимит наравне с остальными
-- [ ] тесты: свой живой draft проходит и не съедает вторую квоту; draft старше 20 мин освобождает
+- [x] тесты: свой живой draft проходит и не съедает вторую квоту; draft старше 20 мин освобождает
       квоту; `cancel` освобождает сразу; `max_uses=0` — без лимита
-- [ ] прогнать тесты — должны пройти до перехода к задаче 4
+- [x] прогнать тесты — должны пройти до перехода к задаче 4
 
 ### Task 4: Скидка в `compute_team_charge` и правка вызовов
 
@@ -315,17 +315,17 @@ total = max(0, fee - discount + Σ extras)
 - Modify: `src/apps/race/tests.py`
 - Modify: `src/website/tests.py`
 
-- [ ] `compute_team_charge(team, race, promo=None)` возвращает `(total, lines, discount)`;
+- [x] `compute_team_charge(team, race, promo=None)` возвращает `(total, lines, discount)`;
       `fee = max(0, int(...))` вынесен отдельным слагаемым, скидка применяется только к нему
-- [ ] обновить docstring модуля (формула со скидкой + перекрёстная ссылка на `team-form.js`)
-- [ ] поправить внутренний вызов в `create_team_payment` под новую распаковку
-- [ ] поправить существующие тесты `src/apps/race/tests.py`, распаковывающие два значения
-- [ ] поправить распаковку в `test_config_island_mirrors_compute_team_charge`
+- [x] обновить docstring модуля (формула со скидкой + перекрёстная ссылка на `team-form.js`)
+- [x] поправить внутренний вызов в `create_team_payment` под новую распаковку
+- [x] поправить существующие тесты `src/apps/race/tests.py`, распаковывающие два значения
+- [x] поправить распаковку в `test_config_island_mirrors_compute_team_charge`
       (`src/website/tests.py:2385`) — иначе полный прогон красный уже на гейте этой задачи
-- [ ] новые тесты: процент, фикс больше взноса (итог не отрицательный), доп-услуги не дешевеют,
+- [x] новые тесты: процент, фикс больше взноса (итог не отрицательный), доп-услуги не дешевеют,
       доплата считается от неоплаченной части, `promo=None` даёт прежний результат,
       дробный `paid_people` не порождает float в `total`/`discount`
-- [ ] прогнать тесты — должны пройти до перехода к задаче 5
+- [x] прогнать тесты — должны пройти до перехода к задаче 5
 
 ### Task 5: Вынос зачисления в `apps/race/settlement.py`
 
@@ -334,15 +334,15 @@ total = max(0, fee - discount + Σ extras)
 - Modify: `src/website/management/commands/check_vtb_payments.py`
 - Modify: `src/apps/race/tests.py`
 
-- [ ] перенести `_settle_race_payment` → `settle_payment(payment) -> bool` и `_credit_extras` →
+- [x] перенести `_settle_race_payment` → `settle_payment(payment) -> bool` и `_credit_extras` →
       `credit_extras(team, payment)` без изменения логики (гард `status == STATUS_DONE`,
       `transaction.atomic()`, авто `SOLD_OUT`, атомарный инкремент `TeamExtra`)
-- [ ] в команде оставить тонкие обёртки-вызовы `settle_payment` (публичный API команды не меняется)
-- [ ] docstring: идемпотентность живёт в статусе платежа, функция зовётся из двух мест
-- [ ] тесты: `settle_payment` зачисляет места и доп-услуги, повторный вызов ничего не дублирует,
+- [x] в команде оставить тонкие обёртки-вызовы `settle_payment` (публичный API команды не меняется)
+- [x] docstring: идемпотентность живёт в статусе платежа, функция зовётся из двух мест
+- [x] тесты: `settle_payment` зачисляет места и доп-услуги, повторный вызов ничего не дублирует,
       флип `OPEN → SOLD_OUT` при достижении лимита
-- [ ] убедиться, что существующие тесты команды `check_vtb_payments` зелёные
-- [ ] прогнать тесты — должны пройти до перехода к задаче 6
+- [x] убедиться, что существующие тесты команды `check_vtb_payments` зелёные
+- [x] прогнать тесты — должны пройти до перехода к задаче 6
 
 ### Task 6: Промокод в `create_team_payment` и нулевой платёж
 
@@ -350,23 +350,23 @@ total = max(0, fee - discount + Σ extras)
 - Modify: `src/apps/race/pricing.py`
 - Modify: `src/apps/race/tests.py`
 
-- [ ] `create_team_payment(request, team, race, promo=None)`: внутри `transaction.atomic()`
+- [x] `create_team_payment(request, team, race, promo=None)`: внутри `transaction.atomic()`
       `RacePromo.objects.select_for_update().get(pk=promo.pk)` + перепроверка доступности,
       при отказе — `PromoUnavailable`
-- [ ] писать `promo` и `discount_amount` в `Payment`, в ВТБ уходит сумма со скидкой
-- [ ] ветка `total == 0`: если есть что зачислять (`paid_for > 0` или дельта доп-услуг) — создать
+- [x] писать `promo` и `discount_amount` в `Payment`, в ВТБ уходит сумма со скидкой
+- [x] ветка `total == 0`: если есть что зачислять (`paid_for > 0` или дельта доп-услуг) — создать
       `Payment(status=draft, payment_amount=0, promo, discount_amount)` + `PaymentExtra` и вызвать
       `settle_payment` (он сам переведёт в `done`; создавать сразу `done` нельзя — гард
       идемпотентности не зачислит ничего). Возврат в этой ветке — `None`, как и раньше;
       в ВТБ ничего не уходит
-- [ ] тесты: снапшоты `promo`/`discount_amount`, сумма заказа ВТБ со скидкой, `PromoUnavailable`
+- [x] тесты: снапшоты `promo`/`discount_amount`, сумма заказа ВТБ со скидкой, `PromoUnavailable`
       когда квоту забрали между резолвом и платежом (мокать ВТБ как в `src/website/tests.py:788`,
       `patch("apps.race.pricing.VTBClient")`)
-- [ ] тесты нулевого платежа: возвращается `None`, `Payment` в БД со `status=done` и
+- [x] тесты нулевого платежа: возвращается `None`, `Payment` в БД со `status=done` и
       `payment_amount=0`, `paid_people` и `count_paid` зачислены, квота промокода занята,
       обращений к ВТБ не было; «платить нечего и зачислять нечего» по-прежнему даёт `None`
       и не создаёт платёж
-- [ ] прогнать тесты — должны пройти до перехода к задаче 7
+- [x] прогнать тесты — должны пройти до перехода к задаче 7
 
 ### Task 7: Поле `promo_code` в `TeamForm`
 
@@ -375,21 +375,21 @@ total = max(0, fee - discount + Σ extras)
 - Modify: `src/website/views/views_.py`
 - Modify: `src/website/tests.py`
 
-- [ ] добавить `promo_code = forms.CharField(required=False, widget=forms.HiddenInput)`
-- [ ] в `__init__` инициализировать `self.promo = None`; резолвить только когда гонка разрешилась
+- [x] добавить `promo_code = forms.CharField(required=False, widget=forms.HiddenInput)`
+- [x] в `__init__` инициализировать `self.promo = None`; резолвить только когда гонка разрешилась
       (та же защитная ветка, что для `extras`)
-- [ ] `clean_promo_code`: пусто → `None`; иначе `resolve_promo`, `PromoError` → `ValidationError`
+- [x] `clean_promo_code`: пусто → `None`; иначе `resolve_promo`, `PromoError` → `ValidationError`
       с текстом по ключу
-- [ ] **в этой же задаче** исключить `promo_code` из `team_fields` в `AddTeam.post`
+- [x] **в этой же задаче** исключить `promo_code` из `team_fields` в `AddTeam.post`
       (`src/website/views/views_.py:448`) — `TeamForm` не `ModelForm`, а `cleaned_data` расплющивается
       в `Team.objects.create(**team_fields)`, так что без этой правки каждый тест регистрации падает
       с `TypeError: Team() got unexpected keyword argument 'promo_code'`.
       `EditTeamView.post` присваивает поля явно и не затронут
-- [ ] тесты: пустой код → `form.promo is None`; несуществующий/выключенный/исчерпанный код → ошибка
+- [x] тесты: пустой код → `form.promo is None`; несуществующий/выключенный/исчерпанный код → ошибка
       поля с нужным текстом; валидный код → `form.promo` заполнен
-- [ ] тест: при битом `race_id` форма не падает и промо не резолвится
-- [ ] тест: существующие сценарии `AddTeam` (регистрация без промокода) остаются зелёными
-- [ ] прогнать тесты — должны пройти до перехода к задаче 8
+- [x] тест: при битом `race_id` форма не падает и промо не резолвится
+- [x] тест: существующие сценарии `AddTeam` (регистрация без промокода) остаются зелёными
+- [x] прогнать тесты — должны пройти до перехода к задаче 8
 
 ### Task 8: Передача промокода из вьюх команды
 

@@ -409,10 +409,20 @@ class Payment(models.Model):
         blank=True,
         related_name="race_payment",
     )
+    promo = models.ForeignKey(
+        "race_app.RacePromo",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="payments",
+    )
     order = models.IntegerField(default=0)
     balance = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     payment_method = models.CharField(max_length=50)
+    # Already net of ``discount_amount`` — this is the money actually charged.
     payment_amount = models.FloatField(default=0)
+    # Snapshot of the promo discount applied at charge time, ₽.
+    discount_amount = models.IntegerField(default=0)
     additional_charge = models.FloatField(default=0)
     payment_with_discount = models.FloatField(default=0)
     cost_per_person = models.FloatField(default=0)

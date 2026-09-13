@@ -444,9 +444,12 @@ class AddTeam(View):
         bypass = can_edit_race(request.user, race)
         form = TeamForm(race.id, data, bypass_limits=bypass)
         if form.is_valid():
-            # save team (extra_<code> fields are add-ons, not Team columns)
+            # save team (extra_<code> fields are add-ons, promo_code is the
+            # promo input — neither is a Team column)
             team_fields = {
-                k: v for k, v in form.cleaned_data.items() if not k.startswith("extra_")
+                k: v
+                for k, v in form.cleaned_data.items()
+                if not k.startswith("extra_") and k != "promo_code"
             }
             team: Team = Team.objects.create(
                 year=race.date.year,

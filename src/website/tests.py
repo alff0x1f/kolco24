@@ -2382,8 +2382,9 @@ def test_config_island_mirrors_compute_team_charge(client):
     assert e["countPaid"] == 1
 
     # server formula: (4−2)×1500 + (3−1)×500 = 3000 + 1000 = 4000
-    total, lines = compute_team_charge(team, race)
+    total, lines, discount = compute_team_charge(team, race)
     assert total == 4000
+    assert discount == 0
     assert len(lines) == 1
     assert lines[0].count == 2
     assert lines[0].unit_price == 500
@@ -2537,3 +2538,150 @@ def test_member_tag_updated_at_set_on_create_and_advances_on_save():
     tag.refresh_from_db()
     assert tag.updated_at > first
     assert tag.number == 2
+
+
+# --- Promo codes: Payment fields ---
+
+
+@pytest.mark.django_db
+def test_payment_promo_defaults_to_none():
+    _, race, _, team = _create_team_for_edit(suffix="promo-def")
+
+    payment = Payment.objects.create(team=team, payment_amount=1000)
+
+    assert payment.promo is None
+    assert payment.discount_amount == 0
+    assert race.promos.count() == 0
+
+
+@pytest.mark.django_db
+def test_payment_stores_promo_and_discount():
+    from apps.race.models import RacePromo
+
+    _, race, _, team = _create_team_for_edit(suffix="promo-store")
+    promo = RacePromo.objects.create(race=race, code="SALE", value=40)
+
+    payment = Payment.objects.create(
+        team=team, payment_amount=600, promo=promo, discount_amount=400
+    )
+    payment.refresh_from_db()
+
+    assert payment.promo == promo
+    assert payment.discount_amount == 400
+    assert list(promo.payments.all()) == [payment]
+
+
+@pytest.mark.django_db
+def test_promo_with_payments_is_protected_from_delete():
+    from django.db.models import ProtectedError
+
+    from apps.race.models import RacePromo
+
+    _, race, _, team = _create_team_for_edit(suffix="promo-protect")
+    promo = RacePromo.objects.create(race=race, code="SALE", value=40)
+    Payment.objects.create(team=team, payment_amount=600, promo=promo)
+
+    with pytest.raises(ProtectedError):
+        promo.delete()
+
+
+# --- Promo codes: TeamForm ---
+
+
+def _form_data(category, ucount=4, **extra):
+    data = {"ucount": str(ucount), "category2_id": str(category.id)}
+    data.update(extra)
+    return data
+
+
+@pytest.mark.django_db
+def test_team_form_blank_promo_code_leaves_promo_none():
+    _, race, category, team = _create_team_for_edit(suffix="fpromo-blank")
+
+    form = TeamForm(race.id, _form_data(category), team=team)
+
+    assert form.is_valid(), form.errors
+    assert form.promo is None
+
+
+@pytest.mark.django_db
+def test_team_form_valid_promo_code_resolves():
+    from apps.race.models import RacePromo
+
+    _, race, category, team = _create_team_for_edit(suffix="fpromo-ok")
+    promo = RacePromo.objects.create(race=race, code="SALE40", value=40)
+
+    form = TeamForm(race.id, _form_data(category, promo_code=" sale40 "), team=team)
+
+    assert form.is_valid(), form.errors
+    assert form.promo == promo
+    assert form.cleaned_data["promo_code"] == "SALE40"
+
+
+@pytest.mark.django_db
+def test_team_form_unknown_promo_code_is_a_field_error():
+    _, race, category, team = _create_team_for_edit(suffix="fpromo-404")
+
+    form = TeamForm(race.id, _form_data(category, promo_code="NOPE"), team=team)
+
+    assert not form.is_valid()
+    assert form.errors["promo_code"] == ["Промокод не найден"]
+    assert form.promo is None
+
+
+@pytest.mark.django_db
+def test_team_form_inactive_promo_code_is_a_field_error():
+    from apps.race.models import RacePromo
+
+    _, race, category, team = _create_team_for_edit(suffix="fpromo-off")
+    RacePromo.objects.create(race=race, code="SALE40", value=40, is_active=False)
+
+    form = TeamForm(race.id, _form_data(category, promo_code="SALE40"), team=team)
+
+    assert not form.is_valid()
+    assert form.errors["promo_code"] == ["Промокод больше не действует"]
+
+
+@pytest.mark.django_db
+def test_team_form_promo_already_used_by_this_team():
+    from apps.race.models import RacePromo
+
+    _, race, category, team = _create_team_for_edit(suffix="fpromo-used")
+    promo = RacePromo.objects.create(race=race, code="SALE40", value=40)
+    Payment.objects.create(
+        team=team, promo=promo, payment_amount=100, status=Payment.STATUS_DONE
+    )
+
+    form = TeamForm(race.id, _form_data(category, promo_code="SALE40"), team=team)
+
+    assert not form.is_valid()
+    assert form.errors["promo_code"] == ["Ваша команда уже использовала этот промокод"]
+
+
+@pytest.mark.django_db
+def test_team_form_promo_limit_reached():
+    from apps.race.models import RacePromo
+
+    user, race, category, team = _create_team_for_edit(suffix="fpromo-limit")
+    promo = RacePromo.objects.create(race=race, code="SALE40", value=40, max_uses=1)
+    other = Team.objects.create(
+        owner=user, category2=category, ucount=4, paid_people=4, start_number="9"
+    )
+    Payment.objects.create(
+        team=other, promo=promo, payment_amount=100, status=Payment.STATUS_DONE
+    )
+
+    form = TeamForm(race.id, _form_data(category, promo_code="SALE40"), team=team)
+
+    assert not form.is_valid()
+    assert form.errors["promo_code"] == ["Лимит промокода исчерпан"]
+
+
+@pytest.mark.django_db
+def test_team_form_bad_race_id_ignores_promo_code():
+    # Defensive branch: a non-int race_id exposes no add-ons and no promo.
+    form = TeamForm(None, {"ucount": "4", "promo_code": "SALE40"})
+
+    assert not form.is_valid()  # category2_id missing
+    assert form.promo is None
+    assert "promo_code" not in form.errors
