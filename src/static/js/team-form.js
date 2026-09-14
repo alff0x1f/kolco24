@@ -9,7 +9,7 @@
    src/apps/race/pricing.py (compute_team_charge). Any change to the add-on or
    promo math here must be reflected there, and vice versa:
 
-       fee      = max(0, (ucount − paidPeople) × currentPrice)
+       fee      = max(0, floor((ucount − paidPeople) × currentPrice))
        discount = promo ? (percent ? floor(fee × value / 100)
                                    : min(value, fee)) : 0
        due      = max(0, fee − discount
@@ -389,12 +389,10 @@
       if (name) row.classList.toggle("filled", name.value.trim().length > 0);
     });
 
-    var peopleGross = ucount * COST;
-    // race-fee term (may be negative when overpaid); max(0,...) applied after
-    // all extras are summed, mirroring compute_team_charge in pricing.py
-    var fee = Math.max(0, peopleGross - PAID_PEOPLE * COST);
+    // paidPeople may be fractional; floor before the discount like the server
+    var fee = Math.max(0, Math.floor((ucount - PAID_PEOPLE) * COST));
     var discount = promoDiscount(fee);
-    var due = peopleGross - PAID_PEOPLE * COST - discount;
+    var due = fee - discount;
 
     if (sumPromoLine) {
       if (promo && discount > 0) {
