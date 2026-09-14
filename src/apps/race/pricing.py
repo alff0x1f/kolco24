@@ -97,7 +97,8 @@ def create_team_payment(request, team, race, promo=None):
     free slot must not be handed to two teams checking out at once — and
     ``PromoUnavailable`` is raised if it went away since the form validated.
     A promo that covers the whole fee charges nothing but still has to credit
-    the seats, so the payment is created as a draft and settled right here.
+    the seats, so the payment is created as a draft and settled in the same
+    transaction.
     """
     from apps.race.models import PaymentExtra, RacePromo
     from apps.race.promo import PromoError, PromoUnavailable, check_available
@@ -123,9 +124,6 @@ def create_team_payment(request, team, race, promo=None):
             except PromoError as exc:
                 raise PromoUnavailable(str(exc)) from exc
         cost, lines, discount = compute_team_charge(team, race, promo=promo)
-        # Zero charge here means a promo ate the fee → still credit what was
-        # bought, settling the draft below instead of sending it to the bank.
-        settles_for_free = cost == 0
         payment = Payment.objects.create(
             owner=request.user,
             team=team,
@@ -146,11 +144,15 @@ def create_team_payment(request, team, race, promo=None):
                 unit_price=line.unit_price,
             )
 
-    if settles_for_free:
-        # settle_payment flips the draft to done — creating it as done would
-        # trip its own idempotency guard and credit nothing.
-        settle_payment(payment)
-        return None
+        if cost == 0:
+            # A promo ate the fee: still credit what was bought. Settled inside
+            # this transaction because no VTBPayment exists for the poller to
+            # recover a stranded draft, and while the promo row is still locked
+            # so a parallel checkout for the same team sees the done payment.
+            # settle_payment flips the draft to done — creating it as done would
+            # trip its own idempotency guard and credit nothing.
+            settle_payment(payment)
+            return None
 
     vtb_client = VTBClient()
     vtb_client._ensure_token()

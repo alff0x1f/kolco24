@@ -5673,6 +5673,31 @@ def test_create_team_payment_full_discount_settles_without_vtb(rf):
 
 
 @pytest.mark.django_db
+def test_create_team_payment_full_discount_settle_failure_rolls_back(rf):
+    from unittest.mock import patch
+
+    owner, race, team = _priced_team("cpp8", cost=1000, ucount=3, paid_people=1)
+    promo = _promo(race, code="FREE", value=100)
+    request = rf.post("/")
+    request.user = owner
+
+    client_p, payment_p, prepared_p = _patch_vtb()
+    with (
+        client_p,
+        payment_p,
+        prepared_p,
+        patch("apps.race.settlement.settle_payment", side_effect=RuntimeError("boom")),
+    ):
+        with pytest.raises(RuntimeError):
+            create_team_payment(request, team, race, promo=promo)
+
+    # No stranded draft: without a VTBPayment nothing could ever settle it.
+    assert not Payment.objects.filter(team=team).exists()
+    team.refresh_from_db()
+    assert team.paid_people == 1
+
+
+@pytest.mark.django_db
 def test_create_team_payment_full_discount_credits_extras(rf):
     owner, race, team = _priced_team("cpp5", cost=1000, ucount=3, paid_people=1)
     free_extra = RaceExtra.objects.create(
