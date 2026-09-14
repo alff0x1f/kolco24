@@ -582,5 +582,8 @@
   }
   // A promo resolved server-side survives a re-render with errors; applied
   // after the size control is built so the total is recomputed with it.
+  // A rejected code stays visible next to its error, but must not be re-sent:
+  // otherwise removing it from the input never clears the submitted value.
   if (promo) setPromo(promo);
+  else if (promoCode) promoCode.value = "";
 })();
