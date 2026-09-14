@@ -38,9 +38,10 @@
      #consent                    — consent checkbox (add mode only)
      #submitBtn / #payBtn        — submit buttons (gated on consent in add mode)
      #promoInput / #promoBtn / #promoMsg / #promoCode (hidden, name="promo_code")
-   Sidebar (optional): #sumHeading, #sumCountLbl, #sumCost, #sumPeople,
-     #sumExtras (container for per-extra lines), #sumPromoLine/#sumPromoCode/
-     #sumPromoAmt, #sumPaidLine/#sumPaidN/#sumPaidAmt, #sumTotal, #regClosedWarn.
+   Sidebar (optional): #sumHeading, #sumPeopleLine/#sumCountLbl/#sumCost/
+     #sumPeople, #sumExtras (container for per-extra lines), #sumPromoLine/
+     #sumPromoCode/#sumPromoAmt, #sumPaidLine/#sumPaidN, #sumTotal,
+     #regClosedWarn.
    Submit buttons may carry data-label-due / data-label-zero to swap their text
    when an amount is / isn't due (used by edit: "Сохранить и доплатить").
    ────────────────────────────────────────────────────────────────────────── */
@@ -105,6 +106,7 @@
 
   // sidebar
   var sumHeading = document.getElementById("sumHeading");
+  var sumPeopleLine = document.getElementById("sumPeopleLine");
   var sumCountLbl = document.getElementById("sumCountLbl");
   var sumCost = document.getElementById("sumCost");
   var sumPeople = document.getElementById("sumPeople");
@@ -114,7 +116,6 @@
   var sumPromoAmt = document.getElementById("sumPromoAmt");
   var sumPaidLine = document.getElementById("sumPaidLine");
   var sumPaidN = document.getElementById("sumPaidN");
-  var sumPaidAmt = document.getElementById("sumPaidAmt");
   var sumTotal = document.getElementById("sumTotal");
 
   function fmt(n) {
@@ -430,17 +431,21 @@
     });
     due = Math.max(0, due);
 
-    if (sumCountLbl) sumCountLbl.textContent = ucount;
+    // Only the unpaid seats are priced. Paid seats get a note without an
+    // amount: valuing them at today's price would misstate what was paid (an
+    // earlier tier or a promo).
+    var newSeats = Math.max(0, ucount - PAID_PEOPLE);
+    if (sumPeopleLine) {
+      sumPeopleLine.style.display = PAID_PEOPLE > 0 && newSeats === 0 ? "none" : "";
+    }
+    if (sumCountLbl) sumCountLbl.textContent = newSeats;
     if (sumCost) sumCost.textContent = fmt(COST);
-    if (sumPeople) sumPeople.textContent = fmt(peopleGross) + " ₽";
+    if (sumPeople) sumPeople.textContent = fmt(newSeats * COST) + " ₽";
 
-    // edit mode: "уже оплачено за N чел." credit line
-    var credit = PAID_PEOPLE * COST;
     if (sumPaidLine) {
-      if (PAID_PEOPLE > 0 && credit > 0) {
+      if (PAID_PEOPLE > 0) {
         sumPaidLine.style.display = "";
         if (sumPaidN) sumPaidN.textContent = fmtPeople(PAID_PEOPLE);
-        if (sumPaidAmt) sumPaidAmt.textContent = "−" + fmt(credit) + " ₽";
       } else {
         sumPaidLine.style.display = "none";
       }

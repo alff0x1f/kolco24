@@ -162,19 +162,9 @@
                              отрисовывается team-form.js из конфиг-острова -->
                         <div class="extras" id="extrasRows"></div>
 
-                        <!-- промокод: код проверяется promo_check-эндпоинтом,
-                             скидку считает team-form.js (зеркало compute_team_charge) -->
-                        <div class="promo" id="promoBox">
-                            <div class="promo-row">
-                                <input class="input promo-input{% if team_form.promo_code.errors %} has-error{% endif %}"
-                                       id="promoInput" type="text" autocomplete="off"
-                                       placeholder="Промокод"
-                                       value="{{ team_form.promo_code.value|default:'' }}">
-                                <button class="btn btn-ghost promo-btn" id="promoBtn" type="button">Применить</button>
-                            </div>
-                            <span class="hint err promo-msg" id="promoMsg"{% if not team_form.promo_code.errors %} style="display:none;"{% endif %}>{{ team_form.promo_code.errors|join:", " }}</span>
-                            <input type="hidden" name="promo_code" id="promoCode" value="{{ team_form.promo_code.value|default:'' }}">
-                        </div>
+                        <!-- промокод вводится в сайдбаре «К оплате»; здесь только
+                             отправляемое значение, оно должно оставаться внутри формы -->
+                        <input type="hidden" name="promo_code" id="promoCode" value="{{ team_form.promo_code.value|default:'' }}">
                     </div>
 
                     <!-- Подвал: согласие + оплата -->
@@ -216,7 +206,7 @@
                         <span class="badge">СБП</span>
                     </div>
                     <div class="sum-lines">
-                        <div class="sum-line">
+                        <div class="sum-line" id="sumPeopleLine">
                             <span class="lbl">Взнос · <b id="sumCountLbl">0</b>&nbsp;уч. × <span id="sumCost">{{ current_price }}</span>&nbsp;₽</span>
                             <span class="amt" id="sumPeople">0 ₽</span>
                         </div>
@@ -227,8 +217,19 @@
                         </div>
                         <div class="sum-line muted" id="sumPaidLine" style="display:none;">
                             <span class="lbl">Уже оплачено за <b id="sumPaidN">0</b>&nbsp;чел.</span>
-                            <span class="amt" id="sumPaidAmt">0 ₽</span>
                         </div>
+                    </div>
+                    <!-- промокод: код проверяется promo_check-эндпоинтом,
+                         скидку считает team-form.js (зеркало compute_team_charge) -->
+                    <div class="promo" id="promoBox">
+                        <div class="promo-row">
+                            <input class="input promo-input{% if team_form.promo_code.errors %} has-error{% endif %}"
+                                   id="promoInput" type="text" autocomplete="off"
+                                   placeholder="Промокод"
+                                   value="{{ team_form.promo_code.value|default:'' }}">
+                            <button class="btn btn-ghost promo-btn" id="promoBtn" type="button">Применить</button>
+                        </div>
+                        <span class="hint err promo-msg" id="promoMsg"{% if not team_form.promo_code.errors %} style="display:none;"{% endif %}>{{ team_form.promo_code.errors|join:", " }}</span>
                     </div>
                     <div class="sum-total">
                         <span class="lbl">Итого</span>
