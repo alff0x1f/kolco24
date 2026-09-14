@@ -87,7 +87,7 @@ MAP_TILE_URL_TOPO = os.getenv("MAP_TILE_URL_TOPO", "/tiles/topo/{z}/{x}/{y}.png"
 
 EMAIL_BACKEND = "mailer.backend.DbBackend"
 
-EMAIL_HOST = "smtp.yandex.ru"
+EMAIL_HOST = os.getenv("EMAIL_HOST", "postbox.cloud.yandex.net")
 EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER")
 EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD")
 EMAIL_PORT = 587
