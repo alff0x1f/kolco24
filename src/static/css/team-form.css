@@ -65,6 +65,15 @@
 .team-register .stepper button:disabled { color: #d2d7de; cursor: not-allowed; }
 .team-register .stepper .val { min-width: 40px; text-align: center; font-weight: 600; color: var(--ink); font-size: 15px; font-variant-numeric: tabular-nums; }
 
+/* ── Промокод (в сайдбаре «К оплате», над «Итого») ──────── */
+.team-register .promo { padding: 4px 22px 8px; }
+.team-register .promo-row { display: flex; align-items: center; gap: 10px; }
+.team-register .promo-input { flex: 1; min-width: 0; text-transform: uppercase; }
+.team-register .promo-input[readonly] { background: var(--paper-2); color: var(--muted); }
+.team-register .promo-btn { flex-shrink: 0; }
+.team-register .promo-msg.ok { color: var(--muted); }
+.team-register .sum-line.promo-line .amt { color: var(--ok, #2f9e5f); }
+
 /* ── Подвал формы: согласие + кнопки вместе ─────────────── */
 .team-register .foot { padding: 20px 24px 22px; border-top: 1px solid var(--line-soft); background: #fafbfc; display: flex; flex-direction: column; gap: 16px; }
 .team-register .foot-actions { display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap; }
@@ -151,10 +160,12 @@
 }
 @media (max-width: 600px) {
   .team-register .foot { padding-left: 16px; padding-right: 16px; }
-  .team-register .sum-lines { padding-left: 16px; padding-right: 16px; }
+  .team-register .sum-lines,
+  .team-register .promo { padding-left: 16px; padding-right: 16px; }
   .team-register .aside-notes { padding-left: 16px; padding-right: 16px; }
   .team-register .member-row { grid-template-columns: 28px minmax(0,1fr) 96px; }
   .team-register .foot-actions .actions { width: 100%; }
   .team-register .foot-actions .actions .btn { flex: 1; }
   .team-register .maps-row { flex-direction: column; align-items: stretch; }
+  .team-register .promo-row { flex-direction: column; align-items: stretch; }
 }

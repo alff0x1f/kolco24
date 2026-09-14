@@ -35,12 +35,15 @@
     var catsField = document.getElementById("categoriesJson");
     var tiersField = document.getElementById("priceTiersJson");
     var extrasField = document.getElementById("extrasJson");
+    var promosField = document.getElementById("promosJson");
     var catsIsland = document.getElementById("categories-data");
     var tiersIsland = document.getElementById("price-tiers-data");
     var extrasIsland = document.getElementById("extras-data");
+    var promosIsland = document.getElementById("promos-data");
     if (catsField && catsIsland) catsField.value = catsIsland.textContent.trim();
     if (tiersField && tiersIsland) tiersField.value = tiersIsland.textContent.trim();
     if (extrasField && extrasIsland) extrasField.value = extrasIsland.textContent.trim();
+    if (promosField && promosIsland) promosField.value = promosIsland.textContent.trim();
   })();
 
   /* ── Categories repeater ─────────────────────────────────── */
@@ -357,6 +360,121 @@
     }
   }
 
+  /* ── Promo codes repeater ────────────────────────────────── */
+  var promosEl = document.getElementById("promos");
+  var promoCountEl = document.getElementById("promoCount");
+
+  function makePromoRow(p) {
+    p = p || {};
+    var saved = p.id != null;
+    var inUse = p.has_payments === true;
+    var row = document.createElement("div");
+    row.className = "promo-row" + (p.is_active === false ? " is-inactive" : "");
+    if (saved) row.dataset.id = p.id;
+    if (inUse) row.dataset.hasPayments = "1";
+    row.innerHTML =
+      '<div class="promo-ord">●</div>' +
+      '<input class="control mono p-code" type="text" maxlength="32" placeholder="КОД">' +
+      '<select class="control p-type">' +
+      '<option value="percent">Процент</option>' +
+      '<option value="fixed">Сумма</option>' +
+      "</select>" +
+      '<div class="promo-value"><input class="control p-value" type="number" min="1" step="1" placeholder="0"><span class="p-unit">%</span></div>' +
+      '<input class="control p-max" type="number" min="0" step="1" placeholder="0" title="0 — без лимита">' +
+      '<span class="p-used" title="Сколько команд уже применили код">—</span>' +
+      '<input class="control p-comment" type="text" maxlength="255" placeholder="для кого">' +
+      '<div class="promo-toggle-cell">' +
+      '<label class="switch"><input type="checkbox" class="p-active"><span class="track"></span></label>' +
+      "</div>" +
+      '<button class="promo-del" type="button" title="Удалить промокод">' +
+      '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 4h10M6.5 4V2.8h3V4M5 4l.6 9h4.8L11 4"/></svg>' +
+      "</button>";
+
+    var codeInput = row.querySelector(".p-code");
+    codeInput.value = p.code || "";
+    // Code is the natural key; once saved it must not change (unique per race).
+    if (saved) codeInput.readOnly = true;
+    codeInput.addEventListener("input", function () {
+      codeInput.value = codeInput.value.toUpperCase();
+    });
+    var typeInput = row.querySelector(".p-type");
+    typeInput.value = p.discount_type === "fixed" ? "fixed" : "percent";
+    var valueInput = row.querySelector(".p-value");
+    valueInput.value = p.value != null ? p.value : "";
+    var unitEl = row.querySelector(".p-unit");
+    function syncUnit() {
+      var isPercent = typeInput.value === "percent";
+      unitEl.textContent = isPercent ? "%" : "₽";
+      valueInput.max = isPercent ? 100 : "";
+    }
+    syncUnit();
+    typeInput.addEventListener("change", syncUnit);
+    row.querySelector(".p-max").value = p.max_uses != null ? p.max_uses : 0;
+    row.querySelector(".p-comment").value = p.comment || "";
+    row.querySelector(".p-used").textContent =
+      p.used != null ? p.used + " / " + (p.max_uses ? p.max_uses : "∞") : "—";
+    var activeInput = row.querySelector(".p-active");
+    activeInput.checked = p.is_active !== false;
+
+    activeInput.addEventListener("change", function (ev) {
+      row.classList.toggle("is-inactive", !ev.target.checked);
+    });
+    var delBtn = row.querySelector(".promo-del");
+    if (inUse) {
+      // A code someone already paid with can't be deleted — «remove» deactivates.
+      delBtn.title = "Промокод применяли — деактивировать";
+      delBtn.addEventListener("click", function () {
+        activeInput.checked = false;
+        row.classList.add("is-inactive");
+      });
+    } else {
+      delBtn.addEventListener("click", function () {
+        row.style.transition = "opacity .12s";
+        row.style.opacity = "0";
+        setTimeout(function () {
+          row.remove();
+          refreshPromoCount();
+        }, 120);
+      });
+    }
+    return row;
+  }
+
+  function refreshPromoCount() {
+    if (!promosEl) return;
+    var n = promosEl.querySelectorAll(".promo-row").length;
+    if (promoCountEl) promoCountEl.textContent = n;
+    var empty = promosEl.querySelector(".promos-empty");
+    if (n === 0 && !empty) {
+      empty = document.createElement("div");
+      empty.className = "promos-empty";
+      empty.textContent = "Промокодов нет — добавьте при необходимости.";
+      promosEl.appendChild(empty);
+    } else if (n > 0 && empty) {
+      empty.remove();
+    }
+  }
+
+  if (promosEl) {
+    readJson("promos-data").forEach(function (p) {
+      promosEl.appendChild(makePromoRow(p));
+    });
+    refreshPromoCount();
+    applyRowErrors(promosEl, ".promo-row", {
+      code: ".p-code", discount_type: ".p-type", value: ".p-value",
+      max_uses: ".p-max", comment: ".p-comment"
+    }, readJsonObj("promo-errors"));
+    var addPromo = document.getElementById("addPromo");
+    if (addPromo) {
+      addPromo.addEventListener("click", function () {
+        var row = makePromoRow();
+        promosEl.appendChild(row);
+        refreshPromoCount();
+        row.querySelector(".p-code").focus();
+      });
+    }
+  }
+
   /* ── Char counters ───────────────────────────────────────── */
   document.querySelectorAll("[data-count-for]").forEach(function (span) {
     var input = document.getElementById(span.getAttribute("data-count-for"));
@@ -480,12 +598,29 @@
           });
         });
       }
+      var promos = [];
+      if (promosEl) {
+        promosEl.querySelectorAll(".promo-row").forEach(function (row) {
+          var idAttr = row.dataset.id;
+          promos.push({
+            id: idAttr != null && idAttr !== "" ? parseInt(idAttr, 10) : null,
+            code: row.querySelector(".p-code").value.trim().toUpperCase(),
+            discount_type: row.querySelector(".p-type").value,
+            value: parseInt(row.querySelector(".p-value").value, 10) || 0,
+            max_uses: parseInt(row.querySelector(".p-max").value, 10) || 0,
+            comment: row.querySelector(".p-comment").value.trim(),
+            is_active: row.querySelector(".p-active").checked
+          });
+        });
+      }
       var catsField = document.getElementById("categoriesJson");
       var tiersField = document.getElementById("priceTiersJson");
       var extrasField = document.getElementById("extrasJson");
+      var promosField = document.getElementById("promosJson");
       if (catsField) catsField.value = JSON.stringify(cats);
       if (tiersField) tiersField.value = JSON.stringify(tiers);
       if (extrasField) extrasField.value = JSON.stringify(extras);
+      if (promosField) promosField.value = JSON.stringify(promos);
     });
   }
 })();

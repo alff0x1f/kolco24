@@ -21,6 +21,9 @@ class RaceForm(forms.ModelForm):
     # reconciled by the view (see ``_reconcile_extras``), like categories and
     # price tiers. Not a model field — parsed/validated in ``RaceEditView.post``.
     extras_json = forms.CharField(required=False, widget=forms.HiddenInput)
+    # Promo codes («Промокоды») — same hidden-JSON pattern as add-ons; parsed
+    # and validated in ``RaceEditView.post`` (see ``_reconcile_promos``).
+    promos_json = forms.CharField(required=False, widget=forms.HiddenInput)
 
     def clean_cost(self):
         v = self.cleaned_data.get("cost")

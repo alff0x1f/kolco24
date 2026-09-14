@@ -72,6 +72,65 @@ class PaymentExtra(models.Model):
         return f"payment {self.payment_id}: {self.race_extra.code} ×{self.count}"
 
 
+class RacePromo(models.Model):
+    """Per-race promo code: a discount on the participation fee.
+
+    Holds no usage counter — how many times a code was used is derived from the
+    ``Payment`` rows referencing it (see ``apps/race/promo.py``).
+    """
+
+    PERCENT = "percent"
+    FIXED = "fixed"
+    DISCOUNT_TYPE_CHOICES = [
+        (PERCENT, "Процент"),
+        (FIXED, "Фиксированная сумма"),
+    ]
+
+    race = models.ForeignKey(
+        "website.Race",
+        related_name="promos",
+        on_delete=models.CASCADE,
+    )
+    code = models.CharField(max_length=32)  # normalized to upper case in save()
+    discount_type = models.CharField(
+        max_length=8, choices=DISCOUNT_TYPE_CHOICES, default=PERCENT
+    )
+    value = models.IntegerField(default=0)  # percent (1..100) or ₽
+    max_uses = models.IntegerField(default=0)  # 0 = unlimited
+    is_active = models.BooleanField(default=True)
+    comment = models.CharField(max_length=255, blank=True, default="")
+    order = models.IntegerField(default=0)
+
+    class Meta:
+        unique_together = ("race", "code")
+        ordering = ["order", "id"]
+
+    def __str__(self):
+        unit = "%" if self.discount_type == self.PERCENT else "₽"
+        return f"{self.code} — {self.value}{unit}"
+
+    def save(self, *args, **kwargs):
+        self.code = (self.code or "").strip().upper()
+        super().save(*args, **kwargs)
+
+    def discount_for(self, fee):
+        """Return the discount in ₽ for a participation fee of ``fee``.
+
+        Always an ``int`` clamped to ``0 … fee``: ``fee`` may arrive as a float
+        (``Team.paid_people`` is a ``FloatField``), and the client mirror in
+        ``src/static/js/team-form.js`` rounds a percent down — so round here too,
+        before the discount is subtracted.
+        """
+        fee = int(fee)
+        if fee <= 0:
+            return 0
+        if self.discount_type == self.PERCENT:
+            raw = fee * int(self.value) // 100
+        else:
+            raw = int(self.value)
+        return max(0, min(raw, fee))
+
+
 class Protocol(models.Model):
     """A snapshot version of a race's results protocol (draft or frozen final)."""
 

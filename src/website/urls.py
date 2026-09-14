@@ -3,6 +3,7 @@ from django.conf.urls.static import static
 from django.urls import include, path
 
 from apps.race.views import (
+    PromoCheckView,
     ProtocolBuildView,
     ProtocolFreezeView,
     ProtocolView,
@@ -127,6 +128,11 @@ urlpatterns = [
         name="my_teams",
     ),
     path("race/<slug:race_slug>/teams/add/", views.AddTeam.as_view(), name="add_team"),
+    path(
+        "race/<slug:race_slug>/promo/check/",
+        PromoCheckView.as_view(),
+        name="promo_check",
+    ),
     path(
         "race/<slug:race_slug>/category/<category_id>/teams/",
         RaceTeamsView.as_view(),

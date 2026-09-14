@@ -4,26 +4,22 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Local environment
 
-**Container runtime**: use `docker`. Start the DB:
+**Container runtime**: use `docker`. A local PostgreSQL must be reachable at whatever `DB_HOST`/`DB_PORT` the `.env`
+names. The repo's `docker-compose_v2.yml` is the **deploy** stack (it needs `KOLCO24_IMAGE` and `DATA_LOCATION`, which
+the local env files don't define), so don't expect `docker compose up -d kolco24_db` to work here — use the Postgres the
+developer already runs locally, or an ad-hoc container matching the `.env`.
 
-```bash
-docker compose up -d kolco24_db
-```
+**`.env` file**: `src/config/settings.py` calls `load_dotenv()`, which searches **upwards from `src/config/`** — so
+`src/.env` wins if it exists, otherwise the repo-root `.env` is used. The working local setup is the **root `.env`**;
+do not create `src/.env`, it silently shadows the root one (different DB credentials → a confusing "works for me"
+split). A template with every variable lives in `deploy/kolco24.env.example`.
 
-**`.env` file**: `src/config/settings.py` loads `src/.env` via `python-dotenv`. Copy from `deploy/kolco24.env.example`
-and fill in secrets before running the server or tests:
-
-```bash
-cp deploy/kolco24.env.example src/.env
-```
-
-Without `.env`, most env vars will be `None` (DB password, VTB keys, etc.) and tests/server will fail.
+Without a `.env`, most env vars will be `None` (DB password, VTB keys, etc.) and tests/server will fail.
 
 ## Commands
 
 ```bash
-# Development
-docker compose up -d kolco24_db   # start local DB
+# Development (local Postgres must already be running — see above)
 uv run python src/manage.py migrate
 uv run python src/manage.py runserver 0:8080
 
@@ -566,8 +562,9 @@ handle `IntegrityError` from this constraint.
 
 **Payments**: models exist for four providers — VTB (OAuth), Yandex Wallet, Sberbank (phone transfer), SBP — each in
 `website/models/` (`VTBPayment`, `PaymentsYa`, etc.). Credentials come from env vars — see `deploy/kolco24.env.example`.
-The live flow is VTB `sbp2`, confirmed automatically by the `check_vtb_payments` polling command (
-`_settle_race_payment`). The legacy manual-verification stack (the admin `/payments/` confirm/cancel page, the
+The live flow is VTB `sbp2`, confirmed automatically by the `check_vtb_payments` polling command, whose
+`_settle_race_payment`/`_credit_extras` are now thin wrappers over `apps/race/settlement.py`
+(`settle_payment`/`credit_extras` — shared with the zero-charge promo path). The legacy manual-verification stack (the admin `/payments/` confirm/cancel page, the
 user-facing sberbank/sbp "I paid, here is my card" templates, and the older Yandex API stubs `new_payment`/
 `paymentinfo`/`getcost`/`yandexinform`/`success`) was **removed** — those routes now 404. The `Payment`/`PaymentLog`/
 `PaymentsYa`/`SbpPaymentRecipient` tables and admin registrations are kept for history.
@@ -618,6 +615,48 @@ redirects) — the `RaceExtra` `code="transfer"`/`"breakfast"` add-ons above are
 and the `FREE_MAPS`/`MAP_PRICE` constants in `website/forms.py` are **deprecated but still present** — their usages are
 gone but the column/constant definitions are pending removal in a deferred follow-up migration (kept through at least
 one deploy cycle so a payment created pre-deploy and confirmed post-deploy still reconciles).
+
+**Промокоды** (`src/apps/race/models.py:RacePromo`, `src/apps/race/promo.py`): a per-race discount code on the
+**participation fee only** — add-ons are always charged at full price. `RacePromo` (`code` normalized to upper case in
+`save()`, `discount_type` `percent`/`fixed`, `value`, `max_uses` where `0 = unlimited`, `is_active`, `comment`, `order`,
+`unique_together("race","code")`) carries **no usage counter**: `discount_for(fee)` returns an `int` clamped to `0 … fee`
+(a percent floored — the JS mirror in `team-form.js` floors too, so the fee is `int()`-rounded *before* the discount).
+`Payment` gained `promo` (FK, `PROTECT`) + `discount_amount` (snapshot); `payment_amount` is the money actually charged
+(already net of the discount), and the legacy `payment_with_discount` keeps mirroring it. Usage is **derived from
+`Payment` rows** (variant A — no denormalized counter, no `PromoUse` table): one team = one use, so the use count is the
+number of **distinct teams** occupying the code — those with a `done` payment or an *open* `draft` (`promo.py:
+open_draft_q`): one whose VTB order the bank has not reported `EXPIRED` (`expire_at` alone is **not** trusted — an order
+paid just before it stays `CREATED` until `check_vtb_payments` catches up, and the poller settles a `PAID` order
+unconditionally, so releasing early would let the slot be redeemed twice), or one with no VTB order yet younger than
+`RESERVATION_TTL` (checkout in flight; older is stranded — nothing can settle it). So, **unlike** `Race.reserved_people`'s
+20-min TTL, an abandoned order holds the quota until VTB expires it; a cancelled payment frees it immediately,
+`STATUS_DRAFT_WITH_INFO` is deliberately not counted. `resolve_promo`
+checks `not_found → inactive → already_used → limit_reached`; `occupied_team_ids` **must** keep its
+`.exclude(team__isnull=True)` and `check_available` its `team.pk is None` branch — on the add flow `TeamForm.team` is an
+unsaved `Team()` and Django would silently compile `filter(team=<unsaved>)` into `team_id IS NULL`.
+`compute_team_charge(team, race, promo=None)` returns `(total, lines, discount)`; `create_team_payment(…, promo=None)`
+re-checks the quota under `select_for_update()` on the promo row (so the last slot can't go to two teams at once) and
+raises `PromoUnavailable`, which `AddTeam`/`EditTeamView` turn into a form error. A team holds **at most one payable
+order per promo** (`promo.py:open_checkout`, same `open_draft_q` rule): an open order for the identical charge (amount,
+`paid_for`, discount, `PaymentExtra` lines) is reused — redirect to its pay URL, no new order — and any other open order
+raises `PromoUnavailable`; without this, two payable discounted orders would each settle independently. `AddTeam` also
+deletes the team it
+just created so a retry doesn't duplicate it. **Zero-charge path**: when a promo covers the whole fee but there are
+seats/add-ons to credit, the payment is created as a **`draft`** and settled right there via
+`apps/race/settlement.py:settle_payment` — creating it `done` would trip that function's own idempotency guard and
+credit nothing; `create_team_payment` still returns `None` so the caller redirects to its own success URL. Settlement
+itself moved out of `check_vtb_payments` into `apps/race/settlement.py` (`settle_payment`/`credit_extras`, logic
+unchanged) so the command and the zero-charge path share one implementation. The code is entered on the team form
+(hidden `promo_code`, validated in `TeamForm.clean_promo_code`) and checked live by `GET race/<slug>/promo/check/`
+(`promo_check`, `apps/race/views.py:PromoCheckView`) — **a GET on purpose**: the check writes nothing and no JS in this
+project posts, so there is no CSRF-token helper to reuse; it answers the discount *rule* (`type`/`value`), never a total,
+and the JS recomputes as the team size changes. Codes are managed on the race edit page (fourth block, hidden
+`promos_json` + `_validate_promo_rows`/`_reconcile_promos`, same `transaction.atomic()` as categories/tiers/extras):
+`code` matches `^[A-Z0-9_-]{2,32}$`, is unique within the race and **read-only once saved**; a code referenced by any
+`Payment` is deactivated instead of deleted (`PROTECT` is the backstop), exactly like add-ons. Accepted behaviours: a
+team that paid with a code pays full price on a top-up (`already_used`); a deleted team keeps holding its quota;
+editing `Payment.status` in `/admin/` immediately changes the code's availability (the price of the derived counter);
+`paid_people`/`paid_for`/`PaymentExtra` are untouched by discounts, so results and protocols are unaffected.
 
 **People limits** (`website/models/race.py`): two `IntegerField`s — `Race.people_limit` (cap across the whole race) and
 `Category.people_limit` (cap within a category), both `default=0` where `0 = unlimited` (distinct from per-team

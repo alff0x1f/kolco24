@@ -1,11 +1,9 @@
 from time import sleep
 
 from django.core.management.base import BaseCommand
-from django.db import transaction
-from django.db.models import F
-from django.db.models.functions import Greatest
 from django.utils import timezone
 
+from apps.race.settlement import credit_extras, settle_payment
 from donate.models import ClubMember, DonateRequest, DonationPeriod, MemberDonation
 from vtb.client import VTBClient
 from website.models import Payment, Team, VTBPayment
@@ -72,60 +70,14 @@ class Command(BaseCommand):
     def _settle_race_payment(self, payment) -> bool:
         """Credit a confirmed race Payment exactly once.
 
-        The ``status == STATUS_DONE`` guard makes this idempotent: a second
-        call for the same payment short-circuits and credits nothing. Returns
-        ``True`` only when the payment was settled on this call.
+        Thin wrapper over ``apps.race.settlement.settle_payment``, which the
+        zero-charge promo path in ``apps/race/pricing.py`` also calls.
         """
-        if not payment or payment.status == Payment.STATUS_DONE:
-            return False
-        team: Team = payment.team
-        with transaction.atomic():
-            if team:
-                team.paid_people += payment.paid_for
-                team.paid_sum += payment.payment_amount
-                team.save(
-                    update_fields=[
-                        "paid_people",
-                        "paid_sum",
-                        "updated_at",
-                    ]
-                )
-                # Credit add-ons from the per-payment snapshots.
-                self._credit_extras(team, payment)
-                from website.models.race import RegStatus
-
-                category = team.category2
-                race = category.race if category else None
-                if (
-                    race
-                    and race.people_limit
-                    and race.reg_status == RegStatus.OPEN
-                    and race.people_count() >= race.people_limit
-                ):
-                    race.reg_status = RegStatus.SOLD_OUT
-                    race.save(update_fields=["reg_status", "updated_at"])
-            payment.status = Payment.STATUS_DONE
-            payment.order = payment.pk
-            payment.save(update_fields=["status", "order"])
-        return True
+        return settle_payment(payment)
 
     def _credit_extras(self, team: Team, payment: Payment) -> None:
-        """Credit add-on counts from this payment's PaymentExtra snapshots.
-
-        Idempotency lives in the command (the outer loop excludes already-PAID
-        VTB payments and the `status == STATUS_DONE` guard short-circuits), not
-        in PaymentExtra — so this must only ever run once per payment.
-        """
-        from apps.race.models import TeamExtra
-
-        for pe in payment.extras.all():
-            te, _ = TeamExtra.objects.get_or_create(team=team, race_extra=pe.race_extra)
-            # Atomic SQL-level increment avoids a read-modify-write race when
-            # two command instances process different payments for the same team.
-            TeamExtra.objects.filter(pk=te.pk).update(
-                count_paid=F("count_paid") + pe.count,
-                count=Greatest(F("count"), F("count_paid") + pe.count),
-            )
+        """Thin wrapper over ``apps.race.settlement.credit_extras``."""
+        credit_extras(team, payment)
 
     def _resolve_race_payment(self, vtb_payment: VTBPayment):
         # New ORDER_<ulid> payments link via the explicit FK.

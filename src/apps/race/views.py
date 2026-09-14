@@ -24,8 +24,10 @@ from django.views.decorators.cache import never_cache
 from apps.mobile.models import Mark, TrackPoint
 from apps.race.app_data import build_overview, build_team_timeline
 from apps.race.forms import RaceForm
-from apps.race.models import Protocol, RaceExtra
+from apps.race.models import Protocol, RaceExtra, RacePromo
 from apps.race.permissions import can_edit_race, is_team_editing_open
+from apps.race.promo import ERROR_MESSAGES as PROMO_ERRORS
+from apps.race.promo import PromoError, occupied_team_ids, resolve_promo
 from apps.race.results import build_protocol, freeze_protocol
 from website.forms import NewsPostForm
 from website.models import Checkpoint, NewsPost, Race, Team
@@ -579,6 +581,118 @@ def _reconcile_extras(race, cleaned):
                 extra.save(update_fields=["is_active"])
 
 
+_PROMO_CODE_RE = re.compile(r"^[A-Z0-9_-]{2,32}$")
+
+
+def _validate_promo_rows(rows):
+    """Validate parsed promo-code rows.
+
+    Returns ``(cleaned, errors)`` like :func:`_validate_category_rows`. ``code``
+    is upper-cased, must match ``[A-Z0-9_-]{2,32}`` and be unique within the
+    race; ``value`` is 1..100 for a percent and > 0 for a fixed discount;
+    ``max_uses`` is a non-negative integer (0 = unlimited).
+    """
+    errors = {}
+    cleaned = []
+    seen_codes = set()
+    valid_types = {RacePromo.PERCENT, RacePromo.FIXED}
+    for index, row in enumerate(rows):
+        if not isinstance(row, dict):
+            errors[index] = {"__all__": "Некорректная строка."}
+            cleaned.append(None)
+            continue
+        row_errors = {}
+        code = str(row.get("code") or "").strip().upper()
+        if not code:
+            row_errors["code"] = "Укажите код."
+        elif not _PROMO_CODE_RE.match(code):
+            row_errors["code"] = "2–32 символа: A–Z, 0–9, «-», «_»."
+        elif code in seen_codes:
+            row_errors["code"] = "Код повторяется."
+
+        discount_type = str(row.get("discount_type") or "").strip()
+        if discount_type not in valid_types:
+            row_errors["discount_type"] = "Выберите тип скидки."
+
+        value, value_err = _people_limit_int(row.get("value"))
+        if value_err:
+            row_errors["value"] = value_err
+        elif discount_type == RacePromo.PERCENT and not (1 <= value <= 100):
+            row_errors["value"] = "Процент от 1 до 100."
+        elif discount_type == RacePromo.FIXED and value < 1:
+            row_errors["value"] = "Сумма должна быть больше 0."
+
+        max_uses, max_uses_err = _people_limit_int(row.get("max_uses"))
+        if max_uses_err:
+            row_errors["max_uses"] = max_uses_err
+
+        comment = str(row.get("comment") or "").strip()
+        if len(comment) > 255:
+            row_errors["comment"] = "Не длиннее 255 символов."
+
+        if code and "code" not in row_errors:
+            seen_codes.add(code)
+        if row_errors:
+            errors[index] = row_errors
+            cleaned.append(None)
+        else:
+            cleaned.append(
+                {
+                    "id": _row_id(row.get("id")),
+                    "code": code,
+                    "discount_type": discount_type,
+                    "value": value,
+                    "max_uses": max_uses,
+                    "comment": comment,
+                    "is_active": bool(row.get("is_active", True)),
+                }
+            )
+    return cleaned, errors
+
+
+def _reconcile_promos(race, cleaned):
+    """Update/create/delete this race's promo codes from ``cleaned`` rows.
+
+    Matches existing rows by ``id`` (cross-race ids treated as new) or by
+    ``code``. ``code`` is **read-only once saved**: an edit to an existing row
+    keeps the stored code, so payments already referencing it keep their meaning.
+    Rows missing from the payload are hard-deleted only when unused — a promo
+    referenced by any ``Payment`` is softly deactivated instead (same policy as
+    :func:`_reconcile_extras`; ``PROTECT`` on the FK is the backstop).
+    """
+    existing = {promo.id: promo for promo in race.promos.all()}
+    by_code = {promo.code: promo for promo in existing.values()}
+    seen = set()
+    for index, row in enumerate(cleaned):
+        row_id = row["id"]
+        instance = existing.get(row_id) if row_id is not None else None
+        if instance is None:
+            instance = by_code.get(row["code"])
+        if instance is None:
+            instance = RacePromo(race=race, code=row["code"])
+        if not instance.pk:
+            instance.code = row["code"]
+        instance.discount_type = row["discount_type"]
+        instance.value = row["value"]
+        instance.max_uses = row["max_uses"]
+        instance.comment = row["comment"]
+        instance.is_active = row["is_active"]
+        instance.order = index
+        instance.save()
+        seen.add(instance.id)
+    for promo in race.promos.exclude(id__in=seen):
+        if promo.payments.exists():
+            if promo.is_active:
+                promo.is_active = False
+                promo.save(update_fields=["is_active"])
+        else:
+            try:
+                promo.delete()
+            except ProtectedError:
+                promo.is_active = False
+                promo.save(update_fields=["is_active"])
+
+
 def _reconcile_categories(race, cleaned):
     """Update/create/delete this race's categories from ``cleaned`` rows.
 
@@ -769,9 +883,11 @@ class RaceEditView(View):
         categories_data=None,
         price_tiers_data=None,
         extras_data=None,
+        promos_data=None,
         category_errors=None,
         price_tier_errors=None,
         extra_errors=None,
+        promo_errors=None,
     ):
         if form is None:
             form = RaceForm(instance=race)
@@ -781,6 +897,8 @@ class RaceEditView(View):
             price_tiers_data = [] if race is None else self._existing_price_tiers(race)
         if extras_data is None:
             extras_data = [] if race is None else self._existing_extras(race)
+        if promos_data is None:
+            promos_data = [] if race is None else self._existing_promos(race)
         return {
             "race": race,
             "form": form,
@@ -788,9 +906,12 @@ class RaceEditView(View):
             "categories_data": _safe_json(categories_data),
             "price_tiers_data": _safe_json(price_tiers_data),
             "extras_data": _safe_json(extras_data),
+            "promos_data": _safe_json(promos_data),
             "category_errors": _safe_json(category_errors or {}),
             "price_tier_errors": _safe_json(price_tier_errors or {}),
             "extra_errors": _safe_json(extra_errors or {}),
+            "promo_errors": _safe_json(promo_errors or {}),
+            "promo_type_choices": RacePromo.DISCOUNT_TYPE_CHOICES,
             "reg_status_choices": RegStatus.choices,
         }
 
@@ -841,6 +962,26 @@ class RaceEditView(View):
             for extra in race.extras.order_by("order", "id")
         ]
 
+    @staticmethod
+    def _existing_promos(race):
+        # ``used`` is derived from Payment rows (apps/race/promo.py), so it is
+        # one small query per code — a race has a handful of them at most.
+        # ``has_payments`` drives the JS «remove → deactivate» switch.
+        return [
+            {
+                "id": promo.id,
+                "code": promo.code,
+                "discount_type": promo.discount_type,
+                "value": promo.value,
+                "max_uses": promo.max_uses,
+                "comment": promo.comment,
+                "is_active": promo.is_active,
+                "used": len(occupied_team_ids(promo)),
+                "has_payments": promo.payments.exists(),
+            }
+            for promo in race.promos.order_by("order", "id")
+        ]
+
     def get(self, request, race_slug=None):
         race, response = self._load_and_authorize(request, race_slug)
         if response is not None:
@@ -880,10 +1021,18 @@ class RaceEditView(View):
         except ValueError as exc:
             form.add_error(None, f"Доп-услуги: {exc}")
 
+        # Promo codes are optional too — an empty payload means «no codes».
+        promo_rows = None
+        try:
+            promo_rows = _parse_json_list(request.POST.get("promos_json") or "[]")
+        except ValueError as exc:
+            form.add_error(None, f"Промокоды: {exc}")
+
         category_errors = {}
         price_tier_errors = {}
         extra_errors = {}
-        cleaned_categories = cleaned_tiers = cleaned_extras = None
+        promo_errors = {}
+        cleaned_categories = cleaned_tiers = cleaned_extras = cleaned_promos = None
         if category_rows is not None:
             cleaned_categories, category_errors = _validate_category_rows(category_rows)
         if price_tier_rows is not None:
@@ -892,6 +1041,8 @@ class RaceEditView(View):
             )
         if extra_rows is not None:
             cleaned_extras, extra_errors = _validate_extra_rows(extra_rows)
+        if promo_rows is not None:
+            cleaned_promos, promo_errors = _validate_promo_rows(promo_rows)
 
         if category_errors:
             bad = ", ".join(str(i + 1) for i in sorted(category_errors))
@@ -902,15 +1053,20 @@ class RaceEditView(View):
         if extra_errors:
             bad = ", ".join(str(i + 1) for i in sorted(extra_errors))
             form.add_error(None, f"Ошибки в доп-услугах (строки: {bad}).")
+        if promo_errors:
+            bad = ", ".join(str(i + 1) for i in sorted(promo_errors))
+            form.add_error(None, f"Ошибки в промокодах (строки: {bad}).")
 
         if (
             form_valid
             and category_rows is not None
             and price_tier_rows is not None
             and extra_rows is not None
+            and promo_rows is not None
             and not category_errors
             and not price_tier_errors
             and not extra_errors
+            and not promo_errors
         ):
             try:
                 with transaction.atomic():
@@ -918,6 +1074,7 @@ class RaceEditView(View):
                     _reconcile_categories(race, cleaned_categories)
                     _reconcile_price_tiers(race, cleaned_tiers)
                     _reconcile_extras(race, cleaned_extras)
+                    _reconcile_promos(race, cleaned_promos)
             except ValueError as exc:
                 if not is_create:
                     race.refresh_from_db()
@@ -943,15 +1100,29 @@ class RaceEditView(View):
                 if row.get("id") in existing_map:
                     row["has_teams"] = existing_map[row["id"]]
 
+        # Same for promo codes: keep «used»/«deactivate» accurate on re-render.
+        if render_race is not None and promo_rows:
+            promo_map = {
+                p["id"]: p for p in self._existing_promos(render_race) if p["id"]
+            }
+            for row in promo_rows:
+                stored = promo_map.get(row.get("id"))
+                if stored:
+                    row["used"] = stored["used"]
+                    row["has_payments"] = stored["has_payments"]
+                    row["code"] = stored["code"]
+
         context = self._build_context(
             render_race,
             form=form,
             categories_data=category_rows or [],
             price_tiers_data=price_tier_rows or [],
             extras_data=extra_rows or [],
+            promos_data=promo_rows or [],
             category_errors=category_errors,
             price_tier_errors=price_tier_errors,
             extra_errors=extra_errors,
+            promo_errors=promo_errors,
         )
         return render(request, "race/race_form.html", context)
 
@@ -1535,3 +1706,57 @@ class RaceAppDataTeamView(View):
         context["race"] = race
         context["team"] = team
         return render(request, "race/app_data_team.html", context)
+
+
+class PromoCheckView(View):
+    """Validate a promo code for the team form and answer in JSON.
+
+    **GET, not POST**: the check writes nothing, and no JS in this project posts
+    — there is no CSRF-token helper to reuse — so a GET both avoids that and
+    follows the JSON-GET precedent of the race-map endpoints. The response
+    carries the discount *rule* (``type``/``value``), not a total: the JS
+    recomputes the sum as the team size changes.
+    """
+
+    def get(self, request, race_slug):
+        if not request.user.is_authenticated:
+            # JSON, not a redirect to the HTML login page — the caller is AJAX.
+            return JsonResponse({"ok": False, "error": "Войдите в аккаунт"}, status=403)
+        race = get_object_or_404(Race, slug=race_slug, is_published=True)
+        code = (request.GET.get("code") or "").strip()
+        if not code:
+            return JsonResponse({"ok": False, "error": PROMO_ERRORS["not_found"]})
+        try:
+            promo = resolve_promo(race, code, self._resolve_team(request, race))
+        except PromoError as exc:
+            return JsonResponse({"ok": False, "error": str(exc)})
+        return JsonResponse(
+            {
+                "ok": True,
+                "code": promo.code,
+                "type": promo.discount_type,
+                "value": promo.value,
+            }
+        )
+
+    @staticmethod
+    def _resolve_team(request, race):
+        """The team being edited, or ``None`` (the add flow).
+
+        A ``team_id`` outside this race, or one the user neither owns nor
+        administers, is ignored rather than rejected — the code is then checked
+        as it would be for a brand-new team.
+        """
+        raw = request.GET.get("team_id")
+        if not raw:
+            return None
+        try:
+            team_id = int(raw)
+        except (TypeError, ValueError):
+            return None
+        team = Team.objects.filter(id=team_id, category2__race=race).first()
+        if team is None:
+            return None
+        if team.owner_id != request.user.id and not can_edit_race(request.user, race):
+            return None
+        return team

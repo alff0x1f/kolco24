@@ -6,17 +6,24 @@
    live totals that mirror the server formula.
 
    This file is the CLIENT mirror of the charge formula in
-   src/apps/race/pricing.py (compute_team_charge). Any change to the add-on
-   math here must be reflected there, and vice versa:
+   src/apps/race/pricing.py (compute_team_charge). Any change to the add-on or
+   promo math here must be reflected there, and vice versa:
 
-       due = max(0, (ucount − paidPeople) × currentPrice
+       fee      = max(0, floor((ucount − paidPeople) × currentPrice))
+       discount = promo ? (percent ? floor(fee × value / 100)
+                                   : min(value, fee)) : 0
+       due      = max(0, fee − discount
                   + Σ active extras: max(0, count − countPaid) × price)
+
+   A promo discounts the participation fee only — add-ons stay at full price.
 
    Config island (rendered by the template):
      <script type="application/json" id="teamFormConfig">
        { "currentPrice": 3000, "paidPeople": 0, "isEdit": false,
          "extras": [{ "code": "map", "name": "Доп. карты", "price": 200,
-                      "freePerTeam": 2, "count": 0, "countPaid": 0 }] }
+                      "freePerTeam": 2, "count": 0, "countPaid": 0 }],
+         "promo": { "code": "SALE40", "type": "percent", "value": 40 },
+         "promoCheckUrl": "/race/<slug>/promo/check/", "teamId": 42 }
      </script>
 
    DOM contract the template MUST provide (everything else is optional and
@@ -30,9 +37,11 @@
                                    each with a hidden input name="extra_<code>"
      #consent                    — consent checkbox (add mode only)
      #submitBtn / #payBtn        — submit buttons (gated on consent in add mode)
-   Sidebar (optional): #sumHeading, #sumCountLbl, #sumCost, #sumPeople,
-     #sumExtras (container for per-extra lines), #sumPaidLine/#sumPaidN/
-     #sumPaidAmt, #sumTotal, #regClosedWarn.
+     #promoInput / #promoBtn / #promoMsg / #promoCode (hidden, name="promo_code")
+   Sidebar (optional): #sumHeading, #sumPeopleLine/#sumCountLbl/#sumCost/
+     #sumPeople, #sumExtras (container for per-extra lines), #sumPromoLine/
+     #sumPromoCode/#sumPromoAmt, #sumPaidLine/#sumPaidN, #sumTotal,
+     #regClosedWarn.
    Submit buttons may carry data-label-due / data-label-zero to swap their text
    when an amount is / isn't due (used by edit: "Сохранить и доплатить").
    ────────────────────────────────────────────────────────────────────────── */
@@ -51,6 +60,9 @@
     raceRemaining: null,
     currentCategoryId: null,
     bypassLimits: false,
+    promo: null,
+    promoCheckUrl: "",
+    teamId: null,
   };
   var cfgEl = document.getElementById("teamFormConfig");
   if (cfgEl) {
@@ -70,6 +82,10 @@
   var RACE_REMAINING = cfg.raceRemaining == null ? null : Number(cfg.raceRemaining);
   var CURRENT_CAT_ID = cfg.currentCategoryId == null ? null : String(cfg.currentCategoryId);
   var BYPASS_LIMITS = !!cfg.bypassLimits;
+  var PROMO_CHECK_URL = cfg.promoCheckUrl || "";
+  var TEAM_ID = cfg.teamId == null ? null : String(cfg.teamId);
+  // Applied promo: { code, type: "percent"|"fixed", value } or null.
+  var promo = cfg.promo || null;
 
   // ── DOM hooks ─────────────────────────────────────────
   var category = document.getElementById("category");
@@ -83,16 +99,23 @@
   var submitBtn = document.getElementById("submitBtn");
   var payBtn = document.getElementById("payBtn");
   var regClosedWarn = document.getElementById("regClosedWarn");
+  var promoInput = document.getElementById("promoInput");
+  var promoBtn = document.getElementById("promoBtn");
+  var promoMsg = document.getElementById("promoMsg");
+  var promoCode = document.getElementById("promoCode");
 
   // sidebar
   var sumHeading = document.getElementById("sumHeading");
+  var sumPeopleLine = document.getElementById("sumPeopleLine");
   var sumCountLbl = document.getElementById("sumCountLbl");
   var sumCost = document.getElementById("sumCost");
   var sumPeople = document.getElementById("sumPeople");
   var sumExtras = document.getElementById("sumExtras");
+  var sumPromoLine = document.getElementById("sumPromoLine");
+  var sumPromoCode = document.getElementById("sumPromoCode");
+  var sumPromoAmt = document.getElementById("sumPromoAmt");
   var sumPaidLine = document.getElementById("sumPaidLine");
   var sumPaidN = document.getElementById("sumPaidN");
-  var sumPaidAmt = document.getElementById("sumPaidAmt");
   var sumTotal = document.getElementById("sumTotal");
 
   function fmt(n) {
@@ -366,10 +389,20 @@
       if (name) row.classList.toggle("filled", name.value.trim().length > 0);
     });
 
-    var peopleGross = ucount * COST;
-    // race-fee term (may be negative when overpaid); max(0,...) applied after
-    // all extras are summed, mirroring compute_team_charge in pricing.py
-    var due = peopleGross - PAID_PEOPLE * COST;
+    // paidPeople may be fractional; floor before the discount like the server
+    var fee = Math.max(0, Math.floor((ucount - PAID_PEOPLE) * COST));
+    var discount = promoDiscount(fee);
+    var due = fee - discount;
+
+    if (sumPromoLine) {
+      if (promo && discount > 0) {
+        sumPromoLine.style.display = "";
+        if (sumPromoCode) sumPromoCode.textContent = promo.code;
+        if (sumPromoAmt) sumPromoAmt.textContent = "−" + fmt(discount) + " ₽";
+      } else {
+        sumPromoLine.style.display = "none";
+      }
+    }
 
     extras.forEach(function (item) {
       var max = extraMax(item);
@@ -396,17 +429,21 @@
     });
     due = Math.max(0, due);
 
-    if (sumCountLbl) sumCountLbl.textContent = ucount;
+    // Only the unpaid seats are priced. Paid seats get a note without an
+    // amount: valuing them at today's price would misstate what was paid (an
+    // earlier tier or a promo).
+    var newSeats = Math.max(0, ucount - PAID_PEOPLE);
+    if (sumPeopleLine) {
+      sumPeopleLine.style.display = PAID_PEOPLE > 0 && newSeats === 0 ? "none" : "";
+    }
+    if (sumCountLbl) sumCountLbl.textContent = newSeats;
     if (sumCost) sumCost.textContent = fmt(COST);
-    if (sumPeople) sumPeople.textContent = fmt(peopleGross) + " ₽";
+    if (sumPeople) sumPeople.textContent = fmt(newSeats * COST) + " ₽";
 
-    // edit mode: "уже оплачено за N чел." credit line
-    var credit = PAID_PEOPLE * COST;
     if (sumPaidLine) {
-      if (PAID_PEOPLE > 0 && credit > 0) {
+      if (PAID_PEOPLE > 0) {
         sumPaidLine.style.display = "";
         if (sumPaidN) sumPaidN.textContent = fmtPeople(PAID_PEOPLE);
-        if (sumPaidAmt) sumPaidAmt.textContent = "−" + fmt(credit) + " ₽";
       } else {
         sumPaidLine.style.display = "none";
       }
@@ -420,6 +457,75 @@
     if (regClosedWarn) regClosedWarn.style.display = due > 0 ? "" : "none";
 
     updateButtons(due);
+  }
+
+  // ── Promo code ────────────────────────────────────────
+  // Server mirror: RacePromo.discount_for (src/apps/race/models.py) — a percent
+  // is floored, and the discount never exceeds the fee.
+  function promoDiscount(fee) {
+    if (!promo || fee <= 0) return 0;
+    var value = Number(promo.value) || 0;
+    var raw =
+      promo.type === "percent"
+        ? Math.floor((fee * value) / 100)
+        : Math.min(value, fee);
+    return Math.max(0, Math.min(raw, fee));
+  }
+
+  function showPromoMsg(text, isError) {
+    if (!promoMsg) return;
+    promoMsg.textContent = text || "";
+    promoMsg.style.display = text ? "" : "none";
+    promoMsg.classList.toggle("err", !!isError);
+    promoMsg.classList.toggle("ok", !!text && !isError);
+  }
+
+  function setPromo(next) {
+    promo = next;
+    if (promoCode) promoCode.value = next ? next.code : "";
+    if (promoInput) {
+      promoInput.value = next ? next.code : "";
+      promoInput.readOnly = !!next;
+      promoInput.classList.toggle("has-error", false);
+    }
+    if (promoBtn) promoBtn.textContent = next ? "Убрать" : "Применить";
+    render();
+  }
+
+  function applyPromo() {
+    var code = (promoInput ? promoInput.value : "").trim();
+    if (!code || !PROMO_CHECK_URL) {
+      showPromoMsg("Введите промокод", true);
+      return;
+    }
+    var url = PROMO_CHECK_URL + "?code=" + encodeURIComponent(code);
+    if (TEAM_ID) url += "&team_id=" + encodeURIComponent(TEAM_ID);
+    if (promoBtn) promoBtn.disabled = true;
+    fetch(url, { credentials: "same-origin" })
+      .then(function (resp) {
+        return resp.json().catch(function () {
+          return { ok: false, error: "Не удалось проверить промокод" };
+        });
+      })
+      .then(function (data) {
+        if (data && data.ok) {
+          setPromo({ code: data.code, type: data.type, value: data.value });
+          showPromoMsg("Промокод применён", false);
+        } else {
+          setPromo(null);
+          if (promoInput) {
+            promoInput.value = code;
+            promoInput.classList.add("has-error");
+          }
+          showPromoMsg((data && data.error) || "Промокод не найден", true);
+        }
+      })
+      .catch(function () {
+        showPromoMsg("Не удалось проверить промокод", true);
+      })
+      .then(function () {
+        if (promoBtn) promoBtn.disabled = false;
+      });
   }
 
   function updateButtons(due) {
@@ -447,7 +553,24 @@
     });
   }
   if (consent) consent.addEventListener("change", render);
-
+  if (promoBtn) {
+    promoBtn.addEventListener("click", function () {
+      if (promo) {
+        setPromo(null);
+        showPromoMsg("", false);
+      } else {
+        applyPromo();
+      }
+    });
+  }
+  if (promoInput) {
+    promoInput.addEventListener("keydown", function (e) {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        if (!promo) applyPromo();
+      }
+    });
+  }
   // ── Init ──────────────────────────────────────────────
   if (seg && category) {
     syncCategoryOptions();
@@ -455,4 +578,10 @@
   } else {
     setCount(isNaN(ucount) ? counts()[0] || 2 : ucount);
   }
+  // A promo resolved server-side survives a re-render with errors; applied
+  // after the size control is built so the total is recomputed with it.
+  // A rejected code stays visible next to its error, but must not be re-sent:
+  // otherwise removing it from the input never clears the submitted value.
+  if (promo) setPromo(promo);
+  else if (promoCode) promoCode.value = "";
 })();

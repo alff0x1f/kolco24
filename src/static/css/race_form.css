@@ -339,6 +339,54 @@
 .race-form-page .extra-row .control[readonly] { background: var(--line-soft); color: var(--muted); }
 .race-form-page .extra-toggle-cell { display: grid; place-items: center; }
 
+/* ── Promo-codes repeater (mirrors add-ons) ────────────── */
+.race-form-page .promos { display: flex; flex-direction: column; }
+.race-form-page .promos-headrow,
+.race-form-page .promo-row {
+  display: grid;
+  grid-template-columns: 30px 130px 110px 110px 70px 64px minmax(0,1fr) 56px 34px;
+  gap: 10px; align-items: center;
+}
+.race-form-page .promos-headrow {
+  padding: 0 4px 10px;
+  font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--muted-2);
+}
+.race-form-page .promo-row {
+  padding: 9px 4px; border-top: 1px solid var(--line-soft); transition: background .12s;
+}
+.race-form-page .promo-row:hover { background: #fafbfc; }
+.race-form-page .promo-row.is-inactive { opacity: .55; }
+.race-form-page .promo-row .promo-ord {
+  display: grid; place-items: center; color: var(--muted-2);
+  font-size: 12.5px; font-variant-numeric: tabular-nums; user-select: none;
+}
+.race-form-page .promo-row .control { padding: 7px 10px; font-size: 13.5px; }
+.race-form-page .promo-row .control.mono { font-size: 12.5px; text-transform: uppercase; }
+.race-form-page .promo-row .control[readonly] { background: var(--line-soft); color: var(--muted); }
+.race-form-page .promo-value { display: flex; align-items: center; gap: 6px; }
+.race-form-page .promo-value .control { min-width: 0; }
+.race-form-page .promo-value .p-unit { color: var(--muted-2); font-size: 12.5px; }
+.race-form-page .promo-row .p-used {
+  color: var(--muted); font-size: 12.5px; font-variant-numeric: tabular-nums; text-align: center;
+}
+.race-form-page .promo-toggle-cell { display: grid; place-items: center; }
+.race-form-page .promos-foot { padding: 14px 4px 2px; }
+.race-form-page .add-promo {
+  display: inline-flex; align-items: center; gap: 8px;
+  font-size: 13.5px; font-weight: 500; color: var(--primary-2);
+  background: transparent; border: 1px dashed var(--line); padding: 9px 14px;
+  border-radius: 9px; cursor: pointer; transition: all .12s;
+}
+.race-form-page .add-promo:hover { border-color: var(--primary-2); background: var(--primary-tint); }
+.race-form-page .add-promo svg { width: 15px; height: 15px; }
+.race-form-page .promos-empty { padding: 22px 4px; text-align: center; color: var(--muted); font-size: 13.5px; }
+.race-form-page .promo-del {
+  display: grid; place-items: center; width: 30px; height: 30px; border-radius: 8px;
+  border: none; background: transparent; color: var(--muted-2); cursor: pointer; transition: all .12s;
+}
+.race-form-page .promo-del:hover { background: var(--danger-bg); color: var(--danger); }
+.race-form-page .promo-del svg { width: 16px; height: 16px; }
+
 /* ── Bottom sticky save bar (mobile-friendly) ──────────── */
 .race-form-page .savebar {
   position: sticky; bottom: 0; z-index: 30; margin-top: 4px;
@@ -360,7 +408,8 @@
 @media (max-width: 720px) {
   .race-form-page .cats-headrow,
   .race-form-page .tiers-headrow,
-  .race-form-page .extras-headrow { display: none; }
+  .race-form-page .extras-headrow,
+  .race-form-page .promos-headrow { display: none; }
   .race-form-page .cat-row {
     grid-template-columns: 28px 1fr 1fr 34px;
     grid-template-areas:
@@ -400,6 +449,24 @@
   .race-form-page .extra-row .e-free { grid-area: free; }
   .race-form-page .extra-row .extra-toggle-cell { grid-area: tog; justify-self: start; }
   .race-form-page .extra-row .extra-del { grid-area: del; justify-self: end; }
+  .race-form-page .promo-row {
+    grid-template-columns: 28px 1fr 1fr 34px;
+    grid-template-areas:
+      "ord  code    code  del"
+      "ord  type    value value"
+      "ord  max     used  tog"
+      "ord  comment comment comment";
+    gap: 8px; padding: 12px 4px; align-items: center;
+  }
+  .race-form-page .promo-row .promo-ord { grid-area: ord; }
+  .race-form-page .promo-row .p-code { grid-area: code; }
+  .race-form-page .promo-row .p-type { grid-area: type; }
+  .race-form-page .promo-row .promo-value { grid-area: value; }
+  .race-form-page .promo-row .p-max { grid-area: max; }
+  .race-form-page .promo-row .p-used { grid-area: used; }
+  .race-form-page .promo-row .p-comment { grid-area: comment; }
+  .race-form-page .promo-row .promo-toggle-cell { grid-area: tog; justify-self: start; }
+  .race-form-page .promo-row .promo-del { grid-area: del; justify-self: end; }
   .race-form-page .field-row.two,
   .race-form-page .field-row.three { grid-template-columns: 1fr; }
 }

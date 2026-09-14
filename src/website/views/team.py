@@ -7,6 +7,7 @@ from django.views import View
 
 from apps.race.permissions import can_edit_race
 from apps.race.pricing import create_team_payment, upsert_team_extras
+from apps.race.promo import PromoUnavailable
 from website.forms import TeamForm, TeamMemberMoveForm
 from website.models import Payment, Team, TeamMemberMove
 from website.models.race import RegStatus
@@ -160,13 +161,20 @@ class EditTeamView(View):
                 return HttpResponseRedirect(reverse("my_teams", args=[race.slug]))
 
             # payment (race fee + add-on deltas, one VTB/SBP order)
-            response = create_team_payment(request, team, race)
-            if response is not None:
-                return response
+            try:
+                response = create_team_payment(request, team, race, promo=form.promo)
+            except PromoUnavailable as exc:
+                # Quota taken between validation and checkout: show the form
+                # again instead of silently charging the full price. The team
+                # edits are already saved, like any abandoned payment.
+                form.add_error(None, str(exc))
+            else:
+                if response is not None:
+                    return response
 
-            return HttpResponseRedirect(
-                reverse("teams2", args=[race.slug, team.category2_id])
-            )
+                return HttpResponseRedirect(
+                    reverse("teams2", args=[race.slug, team.category2_id])
+                )
 
         # If form is not valid, re-render the form with errors
         return render(
