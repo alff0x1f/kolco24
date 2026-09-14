@@ -5312,7 +5312,7 @@ def test_resolve_promo_live_draft_of_other_team_blocks_last_slot():
 
 
 @pytest.mark.django_db
-def test_expired_draft_frees_the_quota():
+def test_stranded_draft_without_bank_order_frees_the_quota():
     owner, race, team = _priced_team("pm10", slug="pm-expired")
     promo = _promo(race, code="SALE40", max_uses=1)
     other = _make_team(owner, team.category2, start_number="2")
@@ -5322,6 +5322,45 @@ def test_expired_draft_frees_the_quota():
         status=Payment.STATUS_DRAFT,
         age=RESERVATION_TTL + datetime.timedelta(minutes=1),
     )
+
+    assert occupied_team_ids(promo) == set()
+    assert resolve_promo(race, "SALE40", team) == promo
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("vtb_status", ["CREATED", "PAID"])
+@pytest.mark.parametrize("expire_in_minutes", [None, 60, -1])
+def test_draft_with_unexpired_bank_order_holds_quota_past_ttl(
+    vtb_status, expire_in_minutes
+):
+    tag = f"{vtb_status}-{expire_in_minutes}"
+    owner, race, team = _priced_team(f"pm13-{tag}", slug=f"pm-hold-{tag}")
+    promo = _promo(race, code="SALE40", max_uses=1)
+    other = _make_team(owner, team.category2, start_number="2")
+    expire_in = (
+        datetime.timedelta(minutes=expire_in_minutes)
+        if expire_in_minutes is not None
+        else None
+    )
+    draft = _open_promo_order(other, promo, vtb_status=vtb_status, expire_in=expire_in)
+    Payment.objects.filter(pk=draft.pk).update(
+        created_at=timezone.now() - RESERVATION_TTL * 3
+    )
+
+    # Only the bank's EXPIRED releases the slot: a late-polled PAID order, or
+    # one paid just before expire_at, would still be settled by the poller.
+    assert occupied_team_ids(promo) == {other.id}
+    with pytest.raises(PromoError) as exc:
+        resolve_promo(race, "SALE40", team)
+    assert exc.value.key == "limit_reached"
+
+
+@pytest.mark.django_db
+def test_draft_with_expired_bank_order_frees_the_quota():
+    owner, race, team = _priced_team("pm14", slug="pm-bank-expired")
+    promo = _promo(race, code="SALE40", max_uses=1)
+    other = _make_team(owner, team.category2, start_number="2")
+    _open_promo_order(other, promo, vtb_status="EXPIRED")
 
     assert occupied_team_ids(promo) == set()
     assert resolve_promo(race, "SALE40", team) == promo
@@ -5858,23 +5897,31 @@ def test_create_team_payment_open_promo_order_paid_at_bank_raises(rf):
 
 
 @pytest.mark.django_db
-@pytest.mark.parametrize("dead", ["expired_status", "expire_at_passed"])
-def test_create_team_payment_ignores_dead_promo_order(rf, dead):
-    from datetime import timedelta
-
-    owner, race, team = _priced_team(
-        f"cpp14-{dead}", slug=f"cpp14-{dead}", cost=1000, ucount=3, paid_people=1
-    )
+def test_create_team_payment_ignores_expired_promo_order(rf):
+    owner, race, team = _priced_team("cpp14", cost=1000, ucount=3, paid_people=1)
     promo = _promo(race, code="SALE40", value=40)
-    if dead == "expired_status":
-        _open_promo_order(team, promo, vtb_status="EXPIRED")
-    else:
-        _open_promo_order(team, promo, expire_in=-timedelta(minutes=1))
+    _open_promo_order(team, promo, vtb_status="EXPIRED")
 
     result, mock_client = _checkout_with_promo(rf, owner, team, race, promo)
 
     mock_client.return_value.create_order.assert_called_once()
     assert Payment.objects.filter(team=team).count() == 2
+
+
+@pytest.mark.django_db
+def test_create_team_payment_order_past_expire_at_is_still_open(rf):
+    from datetime import timedelta
+
+    owner, race, team = _priced_team("cpp17", cost=1000, ucount=3, paid_people=1)
+    promo = _promo(race, code="SALE40", value=40)
+    # Possibly paid just before expiry; the poller has not confirmed either way.
+    _open_promo_order(team, promo, expire_in=-timedelta(minutes=1))
+
+    result, mock_client = _checkout_with_promo(rf, owner, team, race, promo)
+
+    assert result.url == "https://pay.example/old"
+    mock_client.return_value.create_order.assert_not_called()
+    assert Payment.objects.filter(team=team).count() == 1
 
 
 @pytest.mark.django_db

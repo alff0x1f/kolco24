@@ -624,19 +624,23 @@ one deploy cycle so a payment created pre-deploy and confirmed post-deploy still
 `Payment` gained `promo` (FK, `PROTECT`) + `discount_amount` (snapshot); `payment_amount` is the money actually charged
 (already net of the discount), and the legacy `payment_with_discount` keeps mirroring it. Usage is **derived from
 `Payment` rows** (variant A — no denormalized counter, no `PromoUse` table): one team = one use, so the use count is the
-number of **distinct teams** occupying the code — those with a `done` payment or a *live* `draft` one younger than
-`RESERVATION_TTL` (the same 20-min reservation pattern as `Race.reserved_people`; an abandoned draft frees the quota by
-itself, a cancelled payment frees it immediately, `STATUS_DRAFT_WITH_INFO` is deliberately not counted). `resolve_promo`
+number of **distinct teams** occupying the code — those with a `done` payment or an *open* `draft` (`promo.py:
+open_draft_q`): one whose VTB order the bank has not reported `EXPIRED` (`expire_at` alone is **not** trusted — an order
+paid just before it stays `CREATED` until `check_vtb_payments` catches up, and the poller settles a `PAID` order
+unconditionally, so releasing early would let the slot be redeemed twice), or one with no VTB order yet younger than
+`RESERVATION_TTL` (checkout in flight; older is stranded — nothing can settle it). So, **unlike** `Race.reserved_people`'s
+20-min TTL, an abandoned order holds the quota until VTB expires it; a cancelled payment frees it immediately,
+`STATUS_DRAFT_WITH_INFO` is deliberately not counted. `resolve_promo`
 checks `not_found → inactive → already_used → limit_reached`; `occupied_team_ids` **must** keep its
 `.exclude(team__isnull=True)` and `check_available` its `team.pk is None` branch — on the add flow `TeamForm.team` is an
 unsaved `Team()` and Django would silently compile `filter(team=<unsaved>)` into `team_id IS NULL`.
 `compute_team_charge(team, race, promo=None)` returns `(total, lines, discount)`; `create_team_payment(…, promo=None)`
 re-checks the quota under `select_for_update()` on the promo row (so the last slot can't go to two teams at once) and
 raises `PromoUnavailable`, which `AddTeam`/`EditTeamView` turn into a form error. A team holds **at most one payable
-order per promo** (`promo.py:open_checkout` — a `draft` whose VTB order is not `EXPIRED`/past `expire_at`, or a fresh
-draft still waiting for its VTB order): an open order for the identical charge (amount, `paid_for`, discount,
-`PaymentExtra` lines) is reused — redirect to its pay URL, no new order — and any other open order raises
-`PromoUnavailable`; without this, two payable discounted orders would each settle independently — `AddTeam` also deletes the team it
+order per promo** (`promo.py:open_checkout`, same `open_draft_q` rule): an open order for the identical charge (amount,
+`paid_for`, discount, `PaymentExtra` lines) is reused — redirect to its pay URL, no new order — and any other open order
+raises `PromoUnavailable`; without this, two payable discounted orders would each settle independently. `AddTeam` also
+deletes the team it
 just created so a retry doesn't duplicate it. **Zero-charge path**: when a promo covers the whole fee but there are
 seats/add-ons to credit, the payment is created as a **`draft`** and settled right there via
 `apps/race/settlement.py:settle_payment` — creating it `done` would trip that function's own idempotency guard and

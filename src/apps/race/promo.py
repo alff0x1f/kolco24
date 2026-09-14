@@ -5,12 +5,13 @@ there is no separate "use" table. One team may use a code once, so "how many
 times was this code used" is exactly "how many *distinct teams* occupy it":
 
 * a team with a ``done`` payment carrying the promo — a real use;
-* a team with a *live* ``draft`` payment (younger than ``RESERVATION_TTL``) —
-  it went to the bank and the seat/quota is held for it.
+* a team with an *open* ``draft`` payment — one that may still settle (see
+  :func:`open_draft_q`).
 
-That is the same 20-minute reservation pattern ``Race.reserved_people`` uses for
-seats. An abandoned draft frees the quota by itself once the TTL passes; a
-cancelled payment frees it immediately.
+A draft is released only once the bank confirms its order can no longer be paid
+(VTB status ``EXPIRED``), never by local age alone: ``check_vtb_payments`` settles
+a ``PAID`` order unconditionally, however late it gets to it, so a quota slot
+freed early could be redeemed twice. A cancelled payment frees it immediately.
 
 ``Payment.STATUS_DRAFT_WITH_INFO`` is deliberately **not** counted: it belongs to
 the removed manual-verification flow that no live code path creates, and
@@ -52,6 +53,23 @@ class PromoUnavailable(Exception):
     """The quota went away between form validation and payment creation."""
 
 
+def open_draft_q():
+    """``Q`` for draft payments that may still settle.
+
+    * With a VTB order: open until VTB reports ``EXPIRED``. ``expire_at`` is not
+      enough — an order paid just before it passes stays ``CREATED`` locally
+      until the poller catches up. ``PAID``-but-unsettled is open too.
+    * Without one: a checkout in flight (the order is minted after the promo lock
+      is released), open for ``RESERVATION_TTL``. After that it is stranded — the
+      poller only sees ``VTBPayment`` rows, so nothing can settle it.
+    """
+    cutoff = timezone.now() - RESERVATION_TTL
+    return Q(status=Payment.STATUS_DRAFT) & (
+        Q(vtb_payment__isnull=True, created_at__gt=cutoff)
+        | (Q(vtb_payment__isnull=False) & ~Q(vtb_payment__status__iexact="EXPIRED"))
+    )
+
+
 def occupied_team_ids(promo):
     """Return the ids of teams currently occupying ``promo``'s quota.
 
@@ -59,50 +77,29 @@ def occupied_team_ids(promo):
     and a ``None`` in the set would make an unsaved ``Team()`` (the add flow)
     look like an already-occupying team and skip the ``max_uses`` check.
     """
-    cutoff = timezone.now() - RESERVATION_TTL
     qs = (
         Payment.objects.filter(promo=promo)
         .exclude(team__isnull=True)
-        .filter(
-            Q(status=Payment.STATUS_DONE)
-            | Q(status=Payment.STATUS_DRAFT, created_at__gt=cutoff)
-        )
+        .filter(Q(status=Payment.STATUS_DONE) | open_draft_q())
     )
     return set(qs.values_list("team_id", flat=True))
 
 
 def open_checkout(promo, team):
-    """Return ``team``'s unpaid ``promo`` payment the bank may still accept.
+    """Return ``team``'s unpaid ``promo`` payment that may still settle.
 
     Only ``done`` payments count as a use, so without this a team could mint a
     second discounted order while the first is still payable, and each would be
-    settled on its own. A draft whose VTB order is not stored yet is a checkout
-    in flight (the order is minted after the lock is released) and counts as open
-    for ``RESERVATION_TTL``; after that it is stranded — nothing can settle it.
+    settled on its own.
     """
     if team is None or team.pk is None:
         return None
-    now = timezone.now()
-    cutoff = now - RESERVATION_TTL
-    drafts = (
-        Payment.objects.filter(
-            promo=promo, team_id=team.pk, status=Payment.STATUS_DRAFT
-        )
+    return (
+        Payment.objects.filter(open_draft_q(), promo=promo, team_id=team.pk)
         .select_related("vtb_payment")
         .order_by("-created_at")
+        .first()
     )
-    for payment in drafts:
-        vtb = payment.vtb_payment
-        if vtb is None:
-            if payment.created_at > cutoff:
-                return payment
-            continue
-        if vtb.status.upper() == "EXPIRED":
-            continue
-        if vtb.expire_at is not None and vtb.expire_at <= now:
-            continue
-        return payment
-    return None
 
 
 def check_available(promo, team=None):
