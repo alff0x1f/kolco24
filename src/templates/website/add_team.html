@@ -187,7 +187,8 @@
                             <div class="actions">
                                 <a class="btn btn-ghost" href="{% url 'my_teams' race.slug %}">Отмена</a>
                                 {% if is_editable %}
-                                <button class="btn btn-primary btn-lg" type="submit" id="submitBtn" disabled>Сохранить и&nbsp;оплатить</button>
+                                <button class="btn btn-primary btn-lg" type="submit" id="submitBtn" disabled
+                                        data-label-due="Сохранить и&nbsp;оплатить" data-label-zero="Зарегистрировать команду">Сохранить и&nbsp;оплатить</button>
                                 {% endif %}
                             </div>
                         </div>
@@ -237,7 +238,8 @@
                     </div>
                     <div class="sum-pay">
                         {% if is_editable %}
-                        <button class="btn btn-primary btn-block btn-lg" type="submit" form="teamForm" id="payBtn" disabled>Перейти к&nbsp;оплате</button>
+                        <button class="btn btn-primary btn-block btn-lg" type="submit" form="teamForm" id="payBtn" disabled
+                                data-label-due="Перейти к&nbsp;оплате" data-label-zero="Зарегистрировать команду">Перейти к&nbsp;оплате</button>
                         {% endif %}
                         <div class="pay-meta">
                             <span class="sbp"><i></i>СБП</span> · мгновенно · без комиссии
