@@ -232,8 +232,58 @@
   padding-top: 20px;
 }
 
-.community-section {
+/* Same columns and breakpoint as .overview-grid in race.css, so the feed
+   keeps one width on the home and race pages. */
+.home-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  align-items: start;
+  gap: 16px;
   padding-bottom: 42px;
+}
+
+.home-races { min-width: 0; }
+
+.home-races__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  padding: 17px 2px 13px;
+}
+
+.home-races__head h2 {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+}
+
+.home-races__list {
+  display: grid;
+  gap: 10px;
+}
+
+.home-races__empty {
+  padding: 19px 20px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--paper-2);
+  box-shadow: var(--shadow-sm);
+}
+
+.home-races__empty p {
+  margin: 0 0 10px;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.home-races__empty a {
+  color: var(--primary-2);
+  font-weight: 500;
 }
 
 .community-section__head {
@@ -354,7 +404,9 @@
   object-position: left top;
 }
 
+/* 60ch is ~70 Cyrillic letters in Rubik: its "0" is wider than an average letter. */
 .publication-post__summary {
+  max-width: 60ch;
   margin: 0;
   color: var(--ink-soft);
   font-size: 15px;
@@ -459,12 +511,6 @@
 .community-empty p { margin: 0; }
 
 /* Race cards reuse standard borders, spacing, and status colors. */
-.races-preview {
-  padding: 32px 0 48px;
-  border-top: 1px solid var(--line);
-  background: var(--paper);
-}
-
 .race-list-grid,
 .race-catalog__grid {
   display: grid;
@@ -569,32 +615,6 @@
   background: var(--primary-2);
 }
 
-.races-preview__offseason {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 22px;
-  padding: 22px 24px;
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  background: var(--paper-2);
-  box-shadow: var(--shadow-sm);
-}
-
-.races-preview__offseason p {
-  max-width: 720px;
-  margin: 0;
-  color: var(--muted);
-  font-size: 14px;
-  line-height: 1.5;
-}
-
-.races-preview__offseason a {
-  flex: 0 0 auto;
-  color: var(--primary-2);
-  font-weight: 500;
-}
-
 /* Catalog layout below the shared hero and section tabs. */
 .community-catalog {
   min-height: 60vh;
@@ -644,8 +664,9 @@
   box-shadow: var(--shadow-sm);
 }
 
+/* 600px of 17px text is ~70 letters per line; head shares the text column. */
 .publication-detail__head {
-  max-width: 750px;
+  max-width: 680px;
   margin: 0 auto;
   padding: 36px 40px 30px;
 }
@@ -661,7 +682,7 @@
 .publication-detail__lead {
   margin: 17px 0 0;
   color: var(--muted);
-  font-size: 15px;
+  font-size: 18px;
   line-height: 1.55;
 }
 
@@ -688,11 +709,11 @@
 }
 
 .publication-detail__body {
-  max-width: 750px;
+  max-width: 680px;
   margin: 0 auto;
   padding: 30px 40px 48px;
   color: var(--ink-soft);
-  font-size: 15px;
+  font-size: 17px;
   line-height: 1.65;
 }
 
@@ -707,7 +728,7 @@
 }
 
 .publication-detail__body h2 { font-size: 24px; }
-.publication-detail__body h3 { font-size: 19px; }
+.publication-detail__body h3 { font-size: 20px; }
 .publication-detail__body p { margin: 0 0 1.15em; }
 .publication-detail__body a { color: var(--primary-2); text-decoration: underline; text-underline-offset: 3px; }
 .publication-detail__body img { height: auto; border-radius: var(--radius-sm); }
@@ -716,7 +737,6 @@
   padding: 4px 0 4px 20px;
   border-left: 3px solid var(--primary-2);
   color: var(--muted);
-  font-size: 16px;
 }
 .publication-detail__body pre {
   overflow-x: auto;
@@ -799,6 +819,7 @@
 @media (max-width: 920px) {
   .race-spotlight__inner { grid-template-columns: 72px minmax(0, 1fr); }
   .race-spotlight__actions { grid-column: 2; }
+  .home-grid { grid-template-columns: 1fr; }
   .race-list-grid,
   .race-catalog__grid { grid-template-columns: 1fr; }
 }
@@ -826,10 +847,9 @@
   .community-hero__lead { margin-top: 7px; font-size: 12.5px; }
   .race-spotlight .container { padding: 0 12px; }
   .race-spotlight__actions .community-button { flex: 1; }
-  .community-section { padding-bottom: 32px; }
+  .home-grid { padding-bottom: 32px; }
   .community-section__head { align-items: flex-start; flex-direction: column; gap: 7px; }
-  .races-preview { padding: 27px 0 38px; }
-  .races-preview__offseason { align-items: flex-start; flex-direction: column; padding: 19px 17px; }
+  .home-races__empty { padding: 19px 17px; }
   .race-list-card { grid-template-columns: 50px minmax(0, 1fr) 22px; gap: 11px; padding: 15px 13px; border-radius: 0; border-right: 0; border-left: 0; }
   .publication-detail { padding: 14px 0 38px; }
   .publication-detail article { border-right: 0; border-left: 0; border-radius: 0; }
@@ -837,7 +857,8 @@
   .publication-detail__head h1 { font-size: 25px; }
   .publication-detail__cover { padding: 0; }
   .publication-detail__cover img { border-radius: 0; }
-  .publication-detail__body { padding: 25px 20px 36px; }
+  .publication-detail__lead { font-size: 16px; }
+  .publication-detail__body { padding: 25px 20px 36px; font-size: 16px; }
   .race-archive__year { grid-template-columns: 1fr; gap: 8px; }
   .race-archive__list > a { grid-template-columns: 48px minmax(0, 1fr) 20px; gap: 9px; padding: 12px; }
   .race-archive__list small { display: none; }

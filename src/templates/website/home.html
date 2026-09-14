@@ -14,8 +14,8 @@
   {% include "website/_race_spotlight.html" with featured_race=featured_race only %}
 
   <main class="community-content">
-    <section id="publications" class="community-section container" aria-labelledby="latest-title">
-      <div class="publication-column">
+    <div class="container home-grid">
+      <section id="publications" class="publication-column" aria-labelledby="latest-title">
         <div class="publication-feed">
           <div class="publication-feed__head">
             <h2 id="latest-title">Новости</h2>
@@ -35,32 +35,27 @@
         </div>
 
         {% include "website/_publication_pagination.html" with pagination_fragment="#publications" %}
-      </div>
-    </section>
+      </section>
 
-    <section class="races-preview" aria-labelledby="races-title">
-      <div class="container">
-        <div class="community-section__head">
-          <div>
-            <p class="community-eyebrow community-eyebrow--dark">Календарь</p>
-            <h2 id="races-title">Соревнования</h2>
-          </div>
+      <aside class="home-races" aria-labelledby="races-title">
+        <div class="home-races__head">
+          <h2 id="races-title">Соревнования</h2>
           <a class="community-all-link" href="{% url 'race_list' %}">Календарь и архив <span aria-hidden="true">→</span></a>
         </div>
         {% if upcoming_races %}
-        <div class="race-list-grid">
+        <div class="home-races__list">
           {% for race in upcoming_races %}
           {% include "website/_race_card.html" %}
           {% endfor %}
         </div>
         {% else %}
-        <div class="races-preview__offseason">
+        <div class="home-races__empty">
           <p>{% if featured_race %}Другие старты пока не объявлены.{% else %}Новые старты пока не объявлены.{% endif %} В архиве остаются маршруты, команды и результаты прошлых лет.</p>
           <a href="{% url 'race_list' %}#archive">Открыть архив <span aria-hidden="true">→</span></a>
         </div>
         {% endif %}
-      </div>
-    </section>
+      </aside>
+    </div>
   </main>
 </div>
 {% endblock %}
