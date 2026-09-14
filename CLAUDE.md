@@ -632,7 +632,11 @@ checks `not_found → inactive → already_used → limit_reached`; `occupied_te
 unsaved `Team()` and Django would silently compile `filter(team=<unsaved>)` into `team_id IS NULL`.
 `compute_team_charge(team, race, promo=None)` returns `(total, lines, discount)`; `create_team_payment(…, promo=None)`
 re-checks the quota under `select_for_update()` on the promo row (so the last slot can't go to two teams at once) and
-raises `PromoUnavailable`, which `AddTeam`/`EditTeamView` turn into a form error — `AddTeam` also deletes the team it
+raises `PromoUnavailable`, which `AddTeam`/`EditTeamView` turn into a form error. A team holds **at most one payable
+order per promo** (`promo.py:open_checkout` — a `draft` whose VTB order is not `EXPIRED`/past `expire_at`, or a fresh
+draft still waiting for its VTB order): an open order for the identical charge (amount, `paid_for`, discount,
+`PaymentExtra` lines) is reused — redirect to its pay URL, no new order — and any other open order raises
+`PromoUnavailable`; without this, two payable discounted orders would each settle independently — `AddTeam` also deletes the team it
 just created so a retry doesn't duplicate it. **Zero-charge path**: when a promo covers the whole fee but there are
 seats/add-ons to credit, the payment is created as a **`draft`** and settled right there via
 `apps/race/settlement.py:settle_payment` — creating it `done` would trip that function's own idempotency guard and

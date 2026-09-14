@@ -5731,6 +5731,180 @@ def test_create_team_payment_zero_without_discount_creates_nothing(rf):
     assert not Payment.objects.filter(team=team).exists()
 
 
+def _open_promo_order(team, promo, vtb_status="NEW", expire_in=None, **kwargs):
+    """A discounted draft with a VTB order, as if checkout reached the bank.
+
+    Defaults match ``_priced_team(cost=1000, ucount=3, paid_people=1)`` with a
+    40 % code: 2 seats, 2000 ₽ fee, 800 ₽ discount.
+    """
+    from website.models import VTBPayment
+
+    fields = {"payment_amount": 1200, "paid_for": 2, "discount_amount": 800}
+    fields.update(kwargs)
+    vtb = VTBPayment.objects.create(
+        order_id=VTBPayment.new_order_id("ORDER"),
+        amount_value=fields["payment_amount"],
+        status=vtb_status,
+        pay_url="https://pay.example/old",
+        expire_at=timezone.now() + expire_in if expire_in is not None else None,
+    )
+    return Payment.objects.create(
+        team=team,
+        promo=promo,
+        vtb_payment=vtb,
+        payment_method="sbp2",
+        status=Payment.STATUS_DRAFT,
+        **fields,
+    )
+
+
+def _checkout_with_promo(rf, owner, team, race, promo):
+    request = rf.post("/")
+    request.user = owner
+    client_p, payment_p, prepared_p = _patch_vtb()
+    with client_p as mock_client, payment_p as mock_payment, prepared_p as mock_prep:
+        from website.models import VTBPayment
+
+        mock_payment.new_order_id.return_value = "ORDER_NEW"
+        mock_payment.from_vtb_payload.return_value = VTBPayment.objects.create(
+            order_id="ORDER_NEW", amount_value="1200.00", status="NEW"
+        )
+        mock_prep.objects.filter.return_value.first.return_value = None
+        result = create_team_payment(request, team, race, promo=promo)
+    return result, mock_client
+
+
+@pytest.mark.django_db
+def test_create_team_payment_reuses_open_promo_order(rf):
+    from datetime import timedelta
+
+    owner, race, team = _priced_team("cpp9", cost=1000, ucount=3, paid_people=1)
+    promo = _promo(race, code="SALE40", value=40)
+    existing = _open_promo_order(team, promo, expire_in=timedelta(hours=1))
+
+    result, mock_client = _checkout_with_promo(rf, owner, team, race, promo)
+
+    assert result.url == "https://pay.example/old"
+    mock_client.return_value.create_order.assert_not_called()
+    assert list(Payment.objects.filter(team=team)) == [existing]
+
+
+@pytest.mark.django_db
+def test_create_team_payment_reuses_open_promo_order_long_after_ttl(rf):
+    owner, race, team = _priced_team("cpp10", cost=1000, ucount=3, paid_people=1)
+    promo = _promo(race, code="SALE40", value=40)
+    existing = _open_promo_order(team, promo)
+    Payment.objects.filter(pk=existing.pk).update(
+        created_at=timezone.now() - RESERVATION_TTL * 3
+    )
+
+    result, mock_client = _checkout_with_promo(rf, owner, team, race, promo)
+
+    # The bank order is still payable, so it still blocks a second one.
+    assert result.url == "https://pay.example/old"
+    mock_client.return_value.create_order.assert_not_called()
+    assert Payment.objects.filter(team=team).count() == 1
+
+
+@pytest.mark.django_db
+def test_create_team_payment_open_promo_order_for_other_charge_raises(rf):
+    owner, race, team = _priced_team("cpp11", cost=1000, ucount=3, paid_people=1)
+    promo = _promo(race, code="SALE40", value=40)
+    # The order was minted for one seat; the team has grown since.
+    _open_promo_order(team, promo, payment_amount=600, paid_for=1, discount_amount=400)
+
+    request = rf.post("/")
+    request.user = owner
+    client_p, payment_p, prepared_p = _patch_vtb()
+    with client_p as mock_client, payment_p, prepared_p:
+        with pytest.raises(PromoUnavailable):
+            create_team_payment(request, team, race, promo=promo)
+
+    mock_client.return_value.create_order.assert_not_called()
+    assert Payment.objects.filter(team=team).count() == 1
+
+
+@pytest.mark.django_db
+def test_create_team_payment_open_promo_order_with_other_extras_raises(rf):
+    owner, race, team = _priced_team("cpp12", cost=1000, ucount=3, paid_people=1)
+    extra = RaceExtra.objects.create(race=race, code="map", name="Карта", price=200)
+    TeamExtra.objects.create(team=team, race_extra=extra, count=1, count_paid=0)
+    promo = _promo(race, code="SALE40", value=40)
+    # Same fee and seats, but the open order does not cover the map.
+    _open_promo_order(team, promo, payment_amount=1400)
+
+    request = rf.post("/")
+    request.user = owner
+    client_p, payment_p, prepared_p = _patch_vtb()
+    with client_p, payment_p, prepared_p:
+        with pytest.raises(PromoUnavailable):
+            create_team_payment(request, team, race, promo=promo)
+
+    assert Payment.objects.filter(team=team).count() == 1
+
+
+@pytest.mark.django_db
+def test_create_team_payment_open_promo_order_paid_at_bank_raises(rf):
+    owner, race, team = _priced_team("cpp13", cost=1000, ucount=3, paid_people=1)
+    promo = _promo(race, code="SALE40", value=40)
+    _open_promo_order(team, promo, vtb_status="PAID")
+
+    request = rf.post("/")
+    request.user = owner
+    client_p, payment_p, prepared_p = _patch_vtb()
+    with client_p, payment_p, prepared_p:
+        with pytest.raises(PromoUnavailable, match="уже использовала"):
+            create_team_payment(request, team, race, promo=promo)
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("dead", ["expired_status", "expire_at_passed"])
+def test_create_team_payment_ignores_dead_promo_order(rf, dead):
+    from datetime import timedelta
+
+    owner, race, team = _priced_team(
+        f"cpp14-{dead}", slug=f"cpp14-{dead}", cost=1000, ucount=3, paid_people=1
+    )
+    promo = _promo(race, code="SALE40", value=40)
+    if dead == "expired_status":
+        _open_promo_order(team, promo, vtb_status="EXPIRED")
+    else:
+        _open_promo_order(team, promo, expire_in=-timedelta(minutes=1))
+
+    result, mock_client = _checkout_with_promo(rf, owner, team, race, promo)
+
+    mock_client.return_value.create_order.assert_called_once()
+    assert Payment.objects.filter(team=team).count() == 2
+
+
+@pytest.mark.django_db
+def test_create_team_payment_promo_checkout_in_flight_raises(rf):
+    owner, race, team = _priced_team("cpp15", cost=1000, ucount=3, paid_people=1)
+    promo = _promo(race, code="SALE40", value=40)
+    # A parallel checkout committed its draft and is still talking to VTB.
+    _promo_payment(team, promo, status=Payment.STATUS_DRAFT)
+
+    request = rf.post("/")
+    request.user = owner
+    client_p, payment_p, prepared_p = _patch_vtb()
+    with client_p as mock_client, payment_p, prepared_p:
+        with pytest.raises(PromoUnavailable):
+            create_team_payment(request, team, race, promo=promo)
+
+    mock_client.return_value.create_order.assert_not_called()
+
+
+@pytest.mark.django_db
+def test_create_team_payment_ignores_stranded_promo_draft(rf):
+    owner, race, team = _priced_team("cpp16", cost=1000, ucount=3, paid_people=1)
+    promo = _promo(race, code="SALE40", value=40)
+    _promo_payment(team, promo, status=Payment.STATUS_DRAFT, age=RESERVATION_TTL * 2)
+
+    result, mock_client = _checkout_with_promo(rf, owner, team, race, promo)
+
+    mock_client.return_value.create_order.assert_called_once()
+
+
 # --- Promo codes: promo_check endpoint ---
 
 

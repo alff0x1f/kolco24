@@ -99,9 +99,18 @@ def create_team_payment(request, team, race, promo=None):
     A promo that covers the whole fee charges nothing but still has to credit
     the seats, so the payment is created as a draft and settled in the same
     transaction.
+
+    A team holds at most one payable order per promo: an open order for the same
+    charge is reused (redirect to its pay URL), any other open order raises
+    ``PromoUnavailable`` — see ``apps.race.promo.open_checkout``.
     """
     from apps.race.models import PaymentExtra, RacePromo
-    from apps.race.promo import PromoError, PromoUnavailable, check_available
+    from apps.race.promo import (
+        PromoError,
+        PromoUnavailable,
+        check_available,
+        open_checkout,
+    )
     from apps.race.settlement import settle_payment
 
     # Nothing left to pay even before any discount → no payment at all. This
@@ -124,6 +133,18 @@ def create_team_payment(request, team, race, promo=None):
             except PromoError as exc:
                 raise PromoUnavailable(str(exc)) from exc
         cost, lines, discount = compute_team_charge(team, race, promo=promo)
+        if promo is not None:
+            existing = open_checkout(promo, team)
+            if existing is not None:
+                vtb = existing.vtb_payment
+                if vtb is not None and vtb.status.upper() == "PAID":
+                    # Paid at the bank, not settled by the poller yet.
+                    raise PromoUnavailable(str(PromoError("already_used")))
+                if vtb is not None and _same_charge(
+                    existing, cost, paid_for, discount, lines
+                ):
+                    return _pay_redirect(vtb)
+                raise PromoUnavailable(str(PromoError("checkout_open")))
         payment = Payment.objects.create(
             owner=request.user,
             team=team,
@@ -172,6 +193,24 @@ def create_team_payment(request, team, race, promo=None):
         payment.vtb_payment = vtb_payment
         payment.save(update_fields=["vtb_payment"])
 
+    return _pay_redirect(vtb_payment)
+
+
+def _same_charge(payment, cost, paid_for, discount, lines):
+    """Whether ``payment`` covers exactly the charge about to be created."""
+    stored_lines = {
+        (pe.race_extra_id, pe.count, pe.unit_price) for pe in payment.extras.all()
+    }
+    new_lines = {(line.race_extra.id, line.count, line.unit_price) for line in lines}
+    return (
+        payment.payment_amount == cost
+        and payment.paid_for == paid_for
+        and payment.discount_amount == discount
+        and stored_lines == new_lines
+    )
+
+
+def _pay_redirect(vtb_payment):
     prepared_payment = VTBPreparedPayment.objects.filter(payment=vtb_payment).first()
     if prepared_payment and prepared_payment.url:
         return HttpResponseRedirect(prepared_payment.url)

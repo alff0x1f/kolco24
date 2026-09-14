@@ -29,6 +29,10 @@ ERROR_MESSAGES = {
     "inactive": "Промокод больше не действует",
     "limit_reached": "Лимит промокода исчерпан",
     "already_used": "Ваша команда уже использовала этот промокод",
+    "checkout_open": (
+        "У команды уже есть неоплаченный заказ с этим промокодом на другую сумму. "
+        "Оплатите его или дождитесь, пока он истечёт"
+    ),
 }
 
 
@@ -65,6 +69,40 @@ def occupied_team_ids(promo):
         )
     )
     return set(qs.values_list("team_id", flat=True))
+
+
+def open_checkout(promo, team):
+    """Return ``team``'s unpaid ``promo`` payment the bank may still accept.
+
+    Only ``done`` payments count as a use, so without this a team could mint a
+    second discounted order while the first is still payable, and each would be
+    settled on its own. A draft whose VTB order is not stored yet is a checkout
+    in flight (the order is minted after the lock is released) and counts as open
+    for ``RESERVATION_TTL``; after that it is stranded — nothing can settle it.
+    """
+    if team is None or team.pk is None:
+        return None
+    now = timezone.now()
+    cutoff = now - RESERVATION_TTL
+    drafts = (
+        Payment.objects.filter(
+            promo=promo, team_id=team.pk, status=Payment.STATUS_DRAFT
+        )
+        .select_related("vtb_payment")
+        .order_by("-created_at")
+    )
+    for payment in drafts:
+        vtb = payment.vtb_payment
+        if vtb is None:
+            if payment.created_at > cutoff:
+                return payment
+            continue
+        if vtb.status.upper() == "EXPIRED":
+            continue
+        if vtb.expire_at is not None and vtb.expire_at <= now:
+            continue
+        return payment
+    return None
 
 
 def check_available(promo, team=None):
