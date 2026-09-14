@@ -5619,6 +5619,36 @@ def test_create_team_payment_raises_when_promo_deactivated(rf):
 
 
 @pytest.mark.django_db
+def test_create_team_payment_uses_promo_rule_from_locked_row(rf):
+    owner, race, team = _priced_team("cpp7", cost=1000, ucount=3, paid_people=1)
+    promo = _promo(race, code="FREE", value=100)
+    request = rf.post("/")
+    request.user = owner
+    # The organizer cuts the discount after the form validated `promo`.
+    RacePromo.objects.filter(pk=promo.pk).update(value=10)
+
+    from website.models import VTBPayment
+
+    client_p, payment_p, prepared_p = _patch_vtb()
+    with client_p as mock_client, payment_p as mock_payment, prepared_p as mock_prep:
+        mock_payment.new_order_id.return_value = "ORDER_TEST"
+        mock_payment.from_vtb_payload.return_value = VTBPayment.objects.create(
+            order_id="ORDER_TEST", amount_value="1800.00", status="NEW"
+        )
+        mock_prep.objects.filter.return_value.first.return_value = None
+        create_team_payment(request, team, race, promo=promo)
+        order_kwargs = mock_client.return_value.create_order.call_args.kwargs
+
+    payment = Payment.objects.get(team=team)
+    assert payment.discount_amount == 200
+    assert payment.payment_amount == 1800
+    assert payment.status == Payment.STATUS_DRAFT
+    assert order_kwargs["amount_value"] == 1800
+    team.refresh_from_db()
+    assert team.paid_people == 1
+
+
+@pytest.mark.django_db
 def test_create_team_payment_full_discount_settles_without_vtb(rf):
     owner, race, team = _priced_team("cpp4", cost=1000, ucount=3, paid_people=1)
     promo = _promo(race, code="FREE", value=100)

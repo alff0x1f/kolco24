@@ -103,25 +103,29 @@ def create_team_payment(request, team, race, promo=None):
     from apps.race.promo import PromoError, PromoUnavailable, check_available
     from apps.race.settlement import settle_payment
 
-    cost, lines, discount = compute_team_charge(team, race, promo=promo)
-    paid_for = int(team.ucount) - team.paid_people
-    # Zero charge because a promo ate the fee → still credit what was bought.
-    # Zero charge without a discount means there is simply nothing left to pay,
-    # which creates no payment at all (unchanged behaviour).
-    settles_for_free = cost == 0 and discount > 0 and (paid_for > 0 or lines)
-    if cost == 0 and not settles_for_free:
+    # Nothing left to pay even before any discount → no payment at all. This
+    # does not depend on the promo, so it is decided without taking the lock.
+    gross, _, _ = compute_team_charge(team, race)
+    if gross == 0:
         return None
 
+    paid_for = int(team.ucount) - team.paid_people
     cost_now = race.current_price
     with transaction.atomic():
         if promo is not None:
-            locked = RacePromo.objects.select_for_update().get(pk=promo.pk)
-            if not locked.is_active:
+            # The charge is computed from the locked row: the organizer may have
+            # changed the code's value or type since the form validated.
+            promo = RacePromo.objects.select_for_update().get(pk=promo.pk)
+            if not promo.is_active:
                 raise PromoUnavailable(str(PromoError("inactive")))
             try:
-                check_available(locked, team)
+                check_available(promo, team)
             except PromoError as exc:
                 raise PromoUnavailable(str(exc)) from exc
+        cost, lines, discount = compute_team_charge(team, race, promo=promo)
+        # Zero charge here means a promo ate the fee → still credit what was
+        # bought, settling the draft below instead of sending it to the bank.
+        settles_for_free = cost == 0
         payment = Payment.objects.create(
             owner=request.user,
             team=team,
