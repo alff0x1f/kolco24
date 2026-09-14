@@ -3,65 +3,42 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="format-detection" content="telephone=no, date=no, address=no, email=no, url=no">
+    <meta name="color-scheme" content="light only">
+    <meta name="supported-color-schemes" content="light">
     <title>Вход на kolco24.ru</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            background-color: #f9f9f9;
-            color: #333;
-        }
-        .email-container {
-            max-width: 600px;
-            margin: 0 auto;
-            padding: 20px;
-            background-color: #fff;
-            border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-        }
-        h1 {
-            color: #333;
-        }
-        .code {
-            font-size: 36px;
-            font-weight: bold;
-            letter-spacing: 8px;
-            color: #333;
-            margin: 20px 0;
-        }
-        a {
-            color: #007bff;
-            text-decoration: none;
-        }
-        a:hover {
-            text-decoration: underline;
-        }
-        .btn {
-            display: inline-block;
-            padding: 10px 20px;
-            color: #fff;
-            background-color: #007bff;
-            border-radius: 4px;
-            text-decoration: none;
-        }
-        .btn:hover {
-            background-color: #0056b3;
-        }
-        .muted {
-            color: #888;
-            font-size: 13px;
-        }
-    </style>
 </head>
-<body>
-    <div class="email-container">
-        <h1>Вход на kolco24.ru</h1>
-        <p>Ваш код для входа:</p>
-        <p class="code">{{ code }}</p>
-        <p>Или просто нажмите на кнопку:</p>
-        <p><a href="{{ magic_link_url }}" class="btn">Войти</a></p>
-        <p class="muted">Ссылка и код действуют 15 минут.</p>
-        <p class="muted">Если вы не запрашивали вход — проигнорируйте это письмо.</p>
-        <p>С уважением,<br>Команда Кольцо24</p>
+<body style="margin:0; padding:0; background-color:#f3f5f8; color:#161a1f; font-family:Arial, Helvetica, sans-serif;">
+    <div style="display:none; max-height:0; overflow:hidden; mso-hide:all; font-size:1px; line-height:1px; color:#f3f5f8; opacity:0;">
+        Код для входа: {{ code }}. Действует 15 минут.
     </div>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#f3f5f8;" bgcolor="#f3f5f8">
+        <tr>
+            <td align="center" style="padding:32px 16px;">
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:520px; background-color:#ffffff; border:1px solid #e2e6eb; border-radius:8px;" bgcolor="#ffffff">
+                    <tr>
+                        <td style="padding:32px 32px 28px 32px; font-family:Arial, Helvetica, sans-serif; color:#161a1f;">
+                            <h1 style="margin:0 0 24px 0; font-size:22px; line-height:28px; font-weight:bold; color:#161a1f;">
+                                Вход на kolco24<span>.</span>ru
+                            </h1>
+                            <p style="margin:0 0 8px 0; font-size:15px; line-height:22px; color:#161a1f;">Ваш код для входа:</p>
+                            <p style="margin:0 0 24px 0; font-size:36px; line-height:44px; font-weight:bold; letter-spacing:8px; color:#161a1f; font-family:'Courier New', Courier, monospace;">{{ code }}</p>
+                            <p style="margin:0 0 12px 0; font-size:15px; line-height:22px; color:#161a1f;">Или просто нажмите на кнопку:</p>
+                            <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 24px 0;">
+                                <tr>
+                                    <td align="center" bgcolor="#2a5288" style="background-color:#2a5288; border-radius:6px;">
+                                        <a href="{{ magic_link_url }}" target="_blank" style="display:inline-block; padding:12px 32px; font-family:Arial, Helvetica, sans-serif; font-size:16px; line-height:20px; font-weight:bold; color:#ffffff; text-decoration:none; border-radius:6px;"><span style="color:#ffffff; text-decoration:none;">Войти</span></a>
+                                    </td>
+                                </tr>
+                            </table>
+                            <p style="margin:0 0 6px 0; font-size:13px; line-height:20px; color:#6b7785;">Ссылка и код действуют 15 минут.</p>
+                            <p style="margin:0 0 24px 0; font-size:13px; line-height:20px; color:#6b7785;">Если вы не запрашивали вход — проигнорируйте это письмо.</p>
+                            <p style="margin:0; font-size:15px; line-height:22px; color:#161a1f;">С уважением,<br>Команда Кольцо24</p>
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+    </table>
 </body>
 </html>
