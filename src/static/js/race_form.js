@@ -364,6 +364,37 @@
   var promosEl = document.getElementById("promos");
   var promoCountEl = document.getElementById("promoCount");
 
+  // No 0/O, 1/I/L: codes are typed by hand from a phone.
+  var PROMO_ALPHABET = "23456789ABCDEFGHJKMNPQRSTUVWXYZ";
+
+  function randomPromoChars(n) {
+    var out = "";
+    var buf = new Uint8Array(16);
+    // Rejection sampling keeps every character equally likely.
+    var limit = 256 - (256 % PROMO_ALPHABET.length);
+    while (out.length < n) {
+      window.crypto.getRandomValues(buf);
+      for (var i = 0; i < buf.length && out.length < n; i++) {
+        if (buf[i] < limit) out += PROMO_ALPHABET[buf[i] % PROMO_ALPHABET.length];
+      }
+    }
+    return out;
+  }
+
+  function generatePromoCode() {
+    var taken = {};
+    if (promosEl) {
+      promosEl.querySelectorAll(".p-code").forEach(function (input) {
+        taken[input.value.trim().toUpperCase()] = true;
+      });
+    }
+    var code;
+    do {
+      code = randomPromoChars(4) + "-" + randomPromoChars(4);
+    } while (taken[code]);
+    return code;
+  }
+
   function makePromoRow(p) {
     p = p || {};
     var saved = p.id != null;
@@ -374,7 +405,12 @@
     if (inUse) row.dataset.hasPayments = "1";
     row.innerHTML =
       '<div class="promo-ord">●</div>' +
+      '<div class="promo-code">' +
       '<input class="control mono p-code" type="text" maxlength="32" placeholder="КОД">' +
+      '<button class="promo-gen" type="button" title="Сгенерировать код">' +
+      '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M13 8a5 5 0 1 1-1.5-3.6M13 2.5v3h-3"/></svg>' +
+      "</button>" +
+      "</div>" +
       '<select class="control p-type">' +
       '<option value="percent">Процент</option>' +
       '<option value="fixed">Сумма</option>' +
@@ -382,7 +418,7 @@
       '<div class="promo-value"><input class="control p-value" type="number" min="1" step="1" placeholder="0"><span class="p-unit">%</span></div>' +
       '<input class="control p-max" type="number" min="0" step="1" placeholder="0" title="0 — без лимита">' +
       '<span class="p-used" title="Сколько команд уже применили код">—</span>' +
-      '<input class="control p-comment" type="text" maxlength="255" placeholder="для кого">' +
+      '<input class="control p-comment" type="text" maxlength="255" placeholder="Комментарий: для кого код, например «Иванов Иван, 6 КП»">' +
       '<div class="promo-toggle-cell">' +
       '<label class="switch"><input type="checkbox" class="p-active"><span class="track"></span></label>' +
       "</div>" +
@@ -393,7 +429,15 @@
     var codeInput = row.querySelector(".p-code");
     codeInput.value = p.code || "";
     // Code is the natural key; once saved it must not change (unique per race).
-    if (saved) codeInput.readOnly = true;
+    var genBtn = row.querySelector(".promo-gen");
+    if (saved) {
+      codeInput.readOnly = true;
+      genBtn.remove();
+    } else {
+      genBtn.addEventListener("click", function () {
+        codeInput.value = generatePromoCode();
+      });
+    }
     codeInput.addEventListener("input", function () {
       codeInput.value = codeInput.value.toUpperCase();
     });
@@ -409,7 +453,7 @@
     }
     syncUnit();
     typeInput.addEventListener("change", syncUnit);
-    row.querySelector(".p-max").value = p.max_uses != null ? p.max_uses : 0;
+    row.querySelector(".p-max").value = p.max_uses != null ? p.max_uses : 1;
     row.querySelector(".p-comment").value = p.comment || "";
     row.querySelector(".p-used").textContent =
       p.used != null ? p.used + " / " + (p.max_uses ? p.max_uses : "∞") : "—";
@@ -467,10 +511,10 @@
     var addPromo = document.getElementById("addPromo");
     if (addPromo) {
       addPromo.addEventListener("click", function () {
-        var row = makePromoRow();
+        var row = makePromoRow({ code: generatePromoCode() });
         promosEl.appendChild(row);
         refreshPromoCount();
-        row.querySelector(".p-code").focus();
+        row.querySelector(".p-value").focus();
       });
     }
   }
