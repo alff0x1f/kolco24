@@ -1,10 +1,13 @@
 import json
 import random
+import re
+import uuid
 from datetime import datetime, timezone
 from urllib.parse import quote
 
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.core.files.storage import FileSystemStorage
+from django.db import IntegrityError, transaction
 from django.http import (
     Http404,
     HttpResponse,
@@ -22,7 +25,7 @@ from django.views import View
 from django.views.decorators.csrf import csrf_exempt
 
 from apps.race.permissions import can_edit_race
-from apps.race.pricing import create_team_payment, upsert_team_extras
+from apps.race.pricing import create_team_payment, open_pay_redirect, upsert_team_extras
 from apps.race.promo import PromoUnavailable
 from website.forms import NewsPostForm, PageForm, TeamForm
 from website.models import (
@@ -409,6 +412,9 @@ def build_team_form_context(race, team, is_edit=False, bypass_limits=False, form
     }
 
 
+SUBMIT_TOKEN_RE = re.compile(r"^[0-9a-f]{32}$")
+
+
 class AddTeam(View):
     def get(self, request, race_slug):
         race = get_object_or_404(Race, slug=race_slug)
@@ -428,9 +434,28 @@ class AddTeam(View):
                 "team_form": form,
                 "team": Team(),
                 "action": reverse("add_team", args=[race.slug]),
+                "submit_token": uuid.uuid4().hex,
                 **build_team_form_context(race, Team(), bypass_limits=bypass),
             },
         )
+
+    @staticmethod
+    def _submitted_team(request, token):
+        if not token:
+            return None
+        return Team.all_objects.filter(
+            owner_id=request.user.id, submit_token=token
+        ).first()
+
+    @staticmethod
+    def _resume(race, team):
+        """Answer a re-post of a form that already created ``team``."""
+        if team.is_deleted:
+            return HttpResponseRedirect(reverse("my_teams", args=[race.slug]))
+        response = open_pay_redirect(team)
+        if response is not None:
+            return response
+        return HttpResponseRedirect(reverse("edit_team", args=[team.id]))
 
     def post(self, request, race_slug):
         if not request.user.is_authenticated:
@@ -451,6 +476,15 @@ class AddTeam(View):
         if payment_method != "sbp2":
             raise Http404
 
+        submit_token = request.POST.get("submit_token", "")
+        if not SUBMIT_TOKEN_RE.match(submit_token):
+            submit_token = ""
+        # Checked before the form: the team from the first post already holds
+        # its seats, so re-validating could fail the capacity check on itself.
+        existing = self._submitted_team(request, submit_token)
+        if existing is not None:
+            return self._resume(race, existing)
+
         data = request.POST.copy()
         data["dist"] = category2.code
         data["paymentid"] = "%016x" % random.randrange(16**16)  # legacy
@@ -464,11 +498,20 @@ class AddTeam(View):
                 for k, v in form.cleaned_data.items()
                 if not k.startswith("extra_") and k != "promo_code"
             }
-            team: Team = Team.objects.create(
-                year=race.date.year,
-                owner_id=request.user.id,
-                **team_fields,
-            )
+            try:
+                with transaction.atomic():
+                    team: Team = Team.objects.create(
+                        year=race.date.year,
+                        owner_id=request.user.id,
+                        submit_token=submit_token,
+                        **team_fields,
+                    )
+            except IntegrityError:
+                # A parallel post of the same form won the insert.
+                existing = self._submitted_team(request, submit_token)
+                if existing is None:
+                    raise
+                return self._resume(race, existing)
 
             upsert_team_extras(team, form.cleaned_data, race)
 
@@ -498,6 +541,7 @@ class AddTeam(View):
                 "team_form": form,
                 "team": Team(),
                 "action": reverse("add_team", args=[race.slug]),
+                "submit_token": submit_token or uuid.uuid4().hex,
                 **build_team_form_context(
                     race, Team(), bypass_limits=bypass, form=form
                 ),

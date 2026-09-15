@@ -44,6 +44,7 @@
             <main>
                 <form class="card anim d1" id="teamForm" action="{{ action }}" method="POST" novalidate>
                     {% csrf_token %}
+                    <input type="hidden" name="submit_token" value="{{ submit_token }}">
 
                     {% if team_form.non_field_errors %}
                     <div class="card-section" style="padding-bottom:0;">

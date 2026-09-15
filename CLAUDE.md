@@ -683,10 +683,19 @@ top-up). `remaining_people()` = `people_limit − people_count() − reserved_pe
 own paid **and** reserved seats. Nothing else changed: the `TeamForm.clean()` gate, the displayed `raceRemaining`/
 `data-remaining` caps, and `bypass_limits` all tighten automatically because they already route through
 `remaining_people()`. `reg_status` SOLD_OUT still flips on **paid** fill only (no reservation-driven open/close churn).
-Two accepted caveats: (1) **fail-safe TTL** — the 20-min window is our estimate of the VTB order's life, not the real
+Accepted caveat: **fail-safe TTL** — the 20-min window is our estimate of the VTB order's life, not the real
 expiry; if a draft outlives or dies before it, the seat is held at most ~20 min (never longer, never overbooks past the
-window); (2) **double add-submit** — `AddTeam.post` creates a fresh `Team` per POST, so submitting the *add* form twice
-can briefly reserve seats against the same user (self-resolves in ≤20 min), not fixed.
+window).
+
+**Add-team double submit**: `add_team.html` carries a hidden one-time `submit_token` (uuid4 hex, minted on GET, kept on
+an error re-render) stored in `Team.submit_token` with a partial `UniqueConstraint(owner, submit_token)` where the token
+is non-empty (migration `website/0094`). `AddTeam.post` looks the token up **before** form validation (the first post's
+team already holds its seats, so re-validating could fail capacity on itself) and resumes instead of creating: an open
+VTB order → its pay URL (`pricing.open_pay_redirect`), otherwise → `edit_team`; a parallel post that loses the insert
+catches `IntegrityError` and resumes the same way. A missing/malformed token keeps the old create-per-POST behaviour.
+`team-form.js` also locks the submit buttons after the first `submit` (unlocked on a bfcache `pageshow`). Related
+load fixes: `VTBClient` caches the OAuth token per process (class-level, under a lock) instead of per instance, and
+`src/gunicorn.conf.py` (auto-loaded from `/app`) sets workers/threads/timeout via `GUNICORN_*` env vars.
 
 **Protocol snapshot (results)** (`src/apps/race/models.py`, `src/apps/race/results.py`): the results page
 (`/results/`, URL name `category_results`) reads a **denormalized snapshot**, never the live `Team`/`TakenKP`/

@@ -1071,6 +1071,180 @@ def test_add_team_mints_ulid_order_id_and_links_fk(
     assert payment.vtb_payment.order_id == order_id
 
 
+def _submit_token_setup(slug):
+    user = User.objects.create_user(
+        username=f"tok-{slug}", password="pass", email=f"tok-{slug}@example.com"
+    )
+    race = Race.objects.create(
+        name="Token Race",
+        slug=slug,
+        cost=1000,
+        reg_status=RegStatus.OPEN,
+        is_teams_editable=True,
+    )
+    category = Category.objects.create(
+        code="t", name="Team", short_name="T", race=race, min_people=2, max_people=6
+    )
+    return user, race, category
+
+
+@pytest.mark.django_db
+def test_add_team_get_renders_submit_token(client):
+    user, race, _ = _submit_token_setup("tok-get")
+    client.force_login(user)
+    response = client.get(reverse("add_team", args=[race.slug]))
+    token = response.context["submit_token"]
+    assert re.fullmatch(r"[0-9a-f]{32}", token)
+    assert f'name="submit_token" value="{token}"' in response.content.decode()
+
+
+@pytest.mark.django_db
+@patch("apps.race.pricing.VTBClient._ensure_token", return_value=None)
+@patch("apps.race.pricing.VTBClient.create_order", side_effect=_echo_order_payload)
+def test_add_team_repost_same_token_reuses_team_and_order(
+    create_order_mock, _token_mock, client
+):
+    user, race, category = _submit_token_setup("tok-repost")
+    client.force_login(user)
+    data = {
+        "ucount": "2",
+        "category2_id": str(category.id),
+        "map_count": "0",
+        "submit_token": "a" * 32,
+    }
+    first = client.post(reverse("add_team", args=[race.slug]), data)
+    second = client.post(reverse("add_team", args=[race.slug]), data)
+
+    assert first.status_code == 302
+    assert second.status_code == 302
+    assert second["Location"] == first["Location"]
+    assert Team.objects.filter(category2=category).count() == 1
+    assert Payment.objects.filter(team__category2=category).count() == 1
+    assert create_order_mock.call_count == 1
+
+
+@pytest.mark.django_db
+@patch("apps.race.pricing.VTBClient._ensure_token", return_value=None)
+@patch("apps.race.pricing.VTBClient.create_order", side_effect=_echo_order_payload)
+def test_add_team_concurrent_post_losing_insert_resumes(
+    create_order_mock, _token_mock, client
+):
+    from website.views.views_ import AddTeam
+
+    user, race, category = _submit_token_setup("tok-race")
+    client.force_login(user)
+    data = {
+        "ucount": "2",
+        "category2_id": str(category.id),
+        "map_count": "0",
+        "submit_token": "f" * 32,
+    }
+    first = client.post(reverse("add_team", args=[race.slug]), data)
+
+    # The second post passes the early lookup (as if the first had not
+    # committed yet) and then loses the insert on the unique constraint.
+    real_lookup = AddTeam._submitted_team
+    with patch.object(
+        AddTeam,
+        "_submitted_team",
+        side_effect=[None, real_lookup(_UserRequest(user), "f" * 32)],
+    ):
+        second = client.post(reverse("add_team", args=[race.slug]), data)
+
+    assert second.status_code == 302
+    assert second["Location"] == first["Location"]
+    assert Team.objects.filter(category2=category).count() == 1
+    assert create_order_mock.call_count == 1
+
+
+class _UserRequest:
+    def __init__(self, user):
+        self.user = user
+
+
+@pytest.mark.django_db
+@patch("apps.race.pricing.VTBClient._ensure_token", return_value=None)
+@patch("apps.race.pricing.VTBClient.create_order", side_effect=RuntimeError("bank"))
+def test_add_team_repost_after_bank_failure_goes_to_team(
+    _create_order_mock, _token_mock, client
+):
+    user, race, category = _submit_token_setup("tok-fail")
+    client.force_login(user)
+    data = {
+        "ucount": "2",
+        "category2_id": str(category.id),
+        "map_count": "0",
+        "submit_token": "b" * 32,
+    }
+    with pytest.raises(RuntimeError):
+        client.post(reverse("add_team", args=[race.slug]), data)
+    team = Team.objects.get(category2=category)
+
+    response = client.post(reverse("add_team", args=[race.slug]), data)
+
+    assert response.status_code == 302
+    assert response["Location"] == reverse("edit_team", args=[team.id])
+    assert Team.objects.filter(category2=category).count() == 1
+
+
+@pytest.mark.django_db
+@patch("apps.race.pricing.VTBClient._ensure_token", return_value=None)
+@patch("apps.race.pricing.VTBClient.create_order", side_effect=_echo_order_payload)
+def test_add_team_distinct_tokens_create_distinct_teams(
+    _create_order_mock, _token_mock, client
+):
+    user, race, category = _submit_token_setup("tok-distinct")
+    client.force_login(user)
+    for token in ("c" * 32, "d" * 32, ""):
+        client.post(
+            reverse("add_team", args=[race.slug]),
+            {
+                "ucount": "2",
+                "category2_id": str(category.id),
+                "map_count": "0",
+                "submit_token": token,
+            },
+        )
+    assert Team.objects.filter(category2=category).count() == 3
+
+
+@pytest.mark.django_db
+def test_same_submit_token_is_scoped_to_owner():
+    user1, race, category = _submit_token_setup("tok-owner")
+    user2 = User.objects.create_user(
+        username="tok-owner2", password="pass", email="tok-owner2@example.com"
+    )
+    Team.objects.create(owner=user1, category2=category, submit_token="e" * 32)
+    Team.objects.create(owner=user2, category2=category, submit_token="e" * 32)
+    Team.objects.create(owner=user1, category2=category)
+    Team.objects.create(owner=user1, category2=category)
+    with pytest.raises(IntegrityError), transaction.atomic():
+        Team.objects.create(owner=user1, category2=category, submit_token="e" * 32)
+
+
+def test_vtb_token_is_shared_between_clients():
+    from vtb.client import VTBClient, VTBConfig
+
+    cfg = VTBConfig(
+        env="sandbox",
+        client_id="shared-token-test",
+        client_secret="s",
+        client_id_header="h",
+        merchant_auth=None,
+        return_url_base="https://example.com",
+    )
+    VTBClient._tokens.clear()
+    with patch("vtb.client.requests.Session.post") as post:
+        post.return_value.json.return_value = {
+            "access_token": "tok",
+            "expires_in": 300,
+        }
+        assert VTBClient(cfg)._ensure_token() == "tok"
+        assert VTBClient(cfg)._ensure_token() == "tok"
+    assert post.call_count == 1
+    VTBClient._tokens.clear()
+
+
 # --- Reconciliation: _resolve_race_payment (FK + legacy fallback) ---
 
 

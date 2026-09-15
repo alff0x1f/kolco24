@@ -528,19 +528,46 @@
       });
   }
 
+  var submitting = false;
+  var lastDue = 0;
+
   function updateButtons(due) {
+    lastDue = due;
     // consent gates submit in add mode; in edit mode the gate is skipped.
-    var enabled = IS_EDIT || (consent ? consent.checked : true);
+    var enabled = !submitting && (IS_EDIT || (consent ? consent.checked : true));
     [submitBtn, payBtn].forEach(function (btn) {
       if (!btn) return;
       btn.disabled = !enabled;
       var labelDue = btn.getAttribute("data-label-due");
       var labelZero = btn.getAttribute("data-label-zero");
-      if (labelDue && labelZero) {
+      if (submitting) {
+        btn.textContent = "Отправляем…";
+      } else if (labelDue && labelZero) {
         btn.textContent = due > 0 ? labelDue : labelZero;
       }
     });
   }
+
+  // The server call to the bank can take seconds; a second click would post the
+  // form again, so the buttons stay locked until the page is left.
+  var teamForm = document.getElementById("teamForm");
+  if (teamForm) {
+    teamForm.addEventListener("submit", function (e) {
+      if (submitting) {
+        e.preventDefault();
+        return;
+      }
+      submitting = true;
+      updateButtons(lastDue);
+    });
+  }
+  // Back button restores the page from bfcache with the locked buttons.
+  window.addEventListener("pageshow", function (e) {
+    if (e.persisted && submitting) {
+      submitting = false;
+      updateButtons(lastDue);
+    }
+  });
 
   // ── Wiring ────────────────────────────────────────────
   if (category) category.addEventListener("change", buildSeg);

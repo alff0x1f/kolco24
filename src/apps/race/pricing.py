@@ -210,6 +210,23 @@ def _same_charge(payment, cost, paid_for, discount, lines):
     )
 
 
+def open_pay_redirect(team):
+    """Redirect to the team's latest still-payable VTB order, or ``None``."""
+    from apps.race.promo import open_draft_q
+
+    payment = (
+        Payment.objects.filter(team=team, vtb_payment__isnull=False)
+        .filter(open_draft_q())
+        .exclude(vtb_payment__status__iexact="PAID")
+        .select_related("vtb_payment")
+        .order_by("-created_at")
+        .first()
+    )
+    if payment is None:
+        return None
+    return _pay_redirect(payment.vtb_payment)
+
+
 def _pay_redirect(vtb_payment):
     prepared_payment = VTBPreparedPayment.objects.filter(payment=vtb_payment).first()
     if prepared_payment and prepared_payment.url:
