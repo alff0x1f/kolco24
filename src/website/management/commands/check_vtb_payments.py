@@ -1,3 +1,4 @@
+from datetime import timedelta
 from time import sleep
 
 from django.core.management.base import BaseCommand
@@ -13,59 +14,68 @@ class Command(BaseCommand):
     help = "Check VTB payments status and update related Payment and Team if paid."
     donate_prefix = "SPUTNIK"
 
+    fresh_age = timedelta(minutes=10)
+    stale_check_interval = timedelta(minutes=3)
+
     def handle(self, *args, **options):
         client = VTBClient()
+        last_stale_check = None
         while True:
+            now = timezone.now()
             payments = VTBPayment.objects.exclude(status__iexact="PAID").exclude(
                 status__iexact="EXPIRED"
             )
+            # Orders older than fresh_age are rechecked less often, but never
+            # dropped: one paid just before expiry still has to be settled.
+            fresh_only = (
+                last_stale_check is not None
+                and now - last_stale_check < self.stale_check_interval
+            )
+            if fresh_only:
+                payments = payments.filter(created__gte=now - self.fresh_age)
+            else:
+                last_stale_check = now
             if not payments:
-                self.stdout.write("No pending VTB payments found, sleeping...")
-                sleep(60)
-                continue
+                scope = "fresh " if fresh_only else ""
+                self.stdout.write(f"No pending {scope}VTB payments found, sleeping...")
             for vtb_payment in payments:
-                sleep(3)  # avoid hitting rate limits
-                self.stdout.write(f"Checking VTB payment {vtb_payment.pk}...")
+                self._check_payment(client, vtb_payment)
+                sleep(1)  # avoid hitting rate limits
+            sleep(10)
 
-                try:
-                    payload = client.get_order(vtb_payment.order_id)
-                except Exception as exc:  # pragma: no cover - network/HTTP failures
-                    self.stderr.write(
-                        f"Failed to fetch order {vtb_payment.order_id}: {exc}"
-                    )
-                    continue
-                new_status = (
-                    payload.get("object", {}).get("status", {}).get("value", "")
-                )
-                if new_status == "EXPIRED":
-                    vtb_payment.status = new_status
-                    vtb_payment.status_description = (
-                        payload.get("object", {})
-                        .get("status", {})
-                        .get("description", "")
-                    )
-                    vtb_payment.save(update_fields=["status", "status_description"])
-                    self.stdout.write(f"Payment {vtb_payment.pk} marked as expired")
-                    continue
+    def _check_payment(self, client: VTBClient, vtb_payment: VTBPayment) -> None:
+        self.stdout.write(f"Checking VTB payment {vtb_payment.pk}...")
 
-                if new_status.upper() == "PAID":
-                    vtb_payment.status = new_status
-                    vtb_payment.status_description = (
-                        payload.get("object", {})
-                        .get("status", {})
-                        .get("description", "")
-                    )
-                    vtb_payment.save(update_fields=["status", "status_description"])
-                    self.stdout.write(f"VTBPayment {vtb_payment.pk} status→PAID")
+        try:
+            payload = client.get_order(vtb_payment.order_id)
+        except Exception as exc:  # pragma: no cover - network/HTTP failures
+            self.stderr.write(f"Failed to fetch order {vtb_payment.order_id}: {exc}")
+            return
+        new_status = payload.get("object", {}).get("status", {}).get("value", "")
+        if new_status == "EXPIRED":
+            vtb_payment.status = new_status
+            vtb_payment.status_description = (
+                payload.get("object", {}).get("status", {}).get("description", "")
+            )
+            vtb_payment.save(update_fields=["status", "status_description"])
+            self.stdout.write(f"Payment {vtb_payment.pk} marked as expired")
+            return
 
-                    if vtb_payment.order_id.startswith(f"{self.donate_prefix}_"):
-                        self._process_donation(vtb_payment)
-                        continue
+        if new_status.upper() == "PAID":
+            vtb_payment.status = new_status
+            vtb_payment.status_description = (
+                payload.get("object", {}).get("status", {}).get("description", "")
+            )
+            vtb_payment.save(update_fields=["status", "status_description"])
+            self.stdout.write(f"VTBPayment {vtb_payment.pk} status→PAID")
 
-                    payment = self._resolve_race_payment(vtb_payment)
-                    if self._settle_race_payment(payment):
-                        self.stdout.write(f"Payment {payment.pk} marked as paid")
-            sleep(60)
+            if vtb_payment.order_id.startswith(f"{self.donate_prefix}_"):
+                self._process_donation(vtb_payment)
+                return
+
+            payment = self._resolve_race_payment(vtb_payment)
+            if self._settle_race_payment(payment):
+                self.stdout.write(f"Payment {payment.pk} marked as paid")
 
     def _settle_race_payment(self, payment) -> bool:
         """Credit a confirmed race Payment exactly once.
