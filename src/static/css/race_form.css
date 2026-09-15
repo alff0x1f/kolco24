@@ -344,9 +344,32 @@
 .race-form-page .promos-headrow,
 .race-form-page .promo-row {
   display: grid;
-  grid-template-columns: 30px 130px 110px 110px 70px 64px minmax(0,1fr) 56px 34px;
+  grid-template-columns: 30px 160px minmax(0,1fr) 110px 70px 64px 56px 34px;
   gap: 10px; align-items: center;
 }
+.race-form-page .promo-row {
+  grid-template-areas:
+    "ord code    type    value   max     used    tog     del"
+    ".   comment comment comment comment comment comment .";
+}
+.race-form-page .promo-row .promo-ord { grid-area: ord; }
+.race-form-page .promo-row .promo-code { grid-area: code; }
+.race-form-page .promo-row .p-type { grid-area: type; }
+.race-form-page .promo-row .promo-value { grid-area: value; }
+.race-form-page .promo-row .p-max { grid-area: max; }
+.race-form-page .promo-row .p-used { grid-area: used; }
+.race-form-page .promo-row .p-comment { grid-area: comment; }
+.race-form-page .promo-row .promo-toggle-cell { grid-area: tog; }
+.race-form-page .promo-row .promo-del { grid-area: del; }
+.race-form-page .promo-code { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+.race-form-page .promo-code .control { flex: 1; min-width: 0; }
+.race-form-page .promo-code .row-error { flex-basis: 100%; }
+.race-form-page .promo-gen {
+  display: grid; place-items: center; width: 28px; height: 28px; flex: none; border-radius: 8px;
+  border: none; background: transparent; color: var(--muted-2); cursor: pointer; transition: all .12s;
+}
+.race-form-page .promo-gen:hover { background: var(--primary-tint); color: var(--primary-2); }
+.race-form-page .promo-gen svg { width: 15px; height: 15px; }
 .race-form-page .promos-headrow {
   padding: 0 4px 10px;
   font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--muted-2);
@@ -458,15 +481,8 @@
       "ord  comment comment comment";
     gap: 8px; padding: 12px 4px; align-items: center;
   }
-  .race-form-page .promo-row .promo-ord { grid-area: ord; }
-  .race-form-page .promo-row .p-code { grid-area: code; }
-  .race-form-page .promo-row .p-type { grid-area: type; }
-  .race-form-page .promo-row .promo-value { grid-area: value; }
-  .race-form-page .promo-row .p-max { grid-area: max; }
-  .race-form-page .promo-row .p-used { grid-area: used; }
-  .race-form-page .promo-row .p-comment { grid-area: comment; }
-  .race-form-page .promo-row .promo-toggle-cell { grid-area: tog; justify-self: start; }
-  .race-form-page .promo-row .promo-del { grid-area: del; justify-self: end; }
+  .race-form-page .promo-row .promo-toggle-cell { justify-self: start; }
+  .race-form-page .promo-row .promo-del { justify-self: end; }
   .race-form-page .field-row.two,
   .race-form-page .field-row.three { grid-template-columns: 1fr; }
 }
