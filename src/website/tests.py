@@ -1114,11 +1114,11 @@ def test_add_team_repost_same_token_reuses_team_and_order(
     }
     first = client.post(reverse("add_team", args=[race.slug]), data)
     second = client.post(reverse("add_team", args=[race.slug]), data)
+    team = Team.objects.get(category2=category)
 
     assert first.status_code == 302
-    assert second.status_code == 302
-    assert second["Location"] == first["Location"]
-    assert Team.objects.filter(category2=category).count() == 1
+    assert second["Location"] == reverse("team_checkout", args=[team.id])
+    assert client.get(second["Location"])["Location"] == first["Location"]
     assert Payment.objects.filter(team__category2=category).count() == 1
     assert create_order_mock.call_count == 1
 
@@ -1151,9 +1151,9 @@ def test_add_team_concurrent_post_losing_insert_resumes(
     ):
         second = client.post(reverse("add_team", args=[race.slug]), data)
 
-    assert second.status_code == 302
-    assert second["Location"] == first["Location"]
-    assert Team.objects.filter(category2=category).count() == 1
+    team = Team.objects.get(category2=category)
+    assert second["Location"] == reverse("team_checkout", args=[team.id])
+    assert client.get(second["Location"])["Location"] == first["Location"]
     assert create_order_mock.call_count == 1
 
 
@@ -1182,9 +1182,100 @@ def test_add_team_repost_after_bank_failure_goes_to_team(
 
     response = client.post(reverse("add_team", args=[race.slug]), data)
 
-    assert response.status_code == 302
-    assert response["Location"] == reverse("edit_team", args=[team.id])
+    assert response["Location"] == reverse("team_checkout", args=[team.id])
+    assert client.get(response["Location"])["Location"] == reverse(
+        "edit_team", args=[team.id]
+    )
     assert Team.objects.filter(category2=category).count() == 1
+
+
+def _in_flight_team(slug, age=timedelta(0)):
+    """A team whose checkout minted a draft but has no VTB order yet."""
+    user, race, category = _submit_token_setup(slug)
+    team = Team.objects.create(
+        owner=user, category2=category, ucount=2, submit_token="9" * 32
+    )
+    payment = Payment.objects.create(
+        owner=user,
+        team=team,
+        payment_method="sbp2",
+        payment_amount=2000,
+        paid_for=2,
+        status=Payment.STATUS_DRAFT,
+    )
+    Payment.objects.filter(pk=payment.pk).update(created_at=timezone.now() - age)
+    return user, race, category, team
+
+
+@pytest.mark.django_db
+def test_add_team_repost_during_checkout_shows_pending_page(client):
+    user, race, category, team = _in_flight_team("tok-inflight")
+    client.force_login(user)
+
+    response = client.post(
+        reverse("add_team", args=[race.slug]),
+        {
+            "ucount": "2",
+            "category2_id": str(category.id),
+            "submit_token": "9" * 32,
+        },
+    )
+    assert response["Location"] == reverse("team_checkout", args=[team.id])
+
+    page = client.get(response["Location"])
+    assert page.status_code == 200
+    assert "website/checkout_pending.html" in [t.name for t in page.templates]
+    assert Payment.objects.filter(team=team).count() == 1
+
+
+@pytest.mark.django_db
+def test_team_checkout_stranded_draft_goes_to_edit(client):
+    user, _, _, team = _in_flight_team("tok-stranded", age=timedelta(minutes=5))
+    client.force_login(user)
+    response = client.get(reverse("team_checkout", args=[team.id]))
+    assert response["Location"] == reverse("edit_team", args=[team.id])
+
+
+@pytest.mark.django_db
+def test_team_checkout_other_owner_404(client):
+    _, _, _, team = _in_flight_team("tok-other")
+    stranger = User.objects.create_user(
+        username="tok-stranger", password="pass", email="tok-stranger@example.com"
+    )
+    client.force_login(stranger)
+    assert client.get(reverse("team_checkout", args=[team.id])).status_code == 404
+
+
+@pytest.mark.django_db
+@patch("apps.race.pricing.VTBClient.create_order")
+def test_edit_team_during_checkout_does_not_mint_second_order(
+    create_order_mock, client
+):
+    user, race, category, team = _in_flight_team("tok-edit")
+    client.force_login(user)
+
+    response = client.post(
+        reverse("edit_team", args=[team.id]),
+        {"ucount": "2", "category2_id": str(category.id)},
+    )
+
+    assert response["Location"] == reverse("team_checkout", args=[team.id])
+    assert Payment.objects.filter(team=team).count() == 1
+    create_order_mock.assert_not_called()
+
+
+@pytest.mark.django_db
+@patch("apps.race.pricing.VTBClient.create_order")
+def test_create_team_payment_refuses_while_checkout_in_flight(create_order_mock, rf):
+    from apps.race.pricing import CheckoutInFlight, create_team_payment
+
+    user, race, _, team = _in_flight_team("tok-backstop")
+    request = rf.post("/")
+    request.user = user
+    with pytest.raises(CheckoutInFlight):
+        create_team_payment(request, team, race)
+    assert Payment.objects.filter(team=team).count() == 1
+    create_order_mock.assert_not_called()
 
 
 @pytest.mark.django_db

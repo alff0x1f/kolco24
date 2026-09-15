@@ -1,0 +1,24 @@
+{% extends "website/base-2.html" %}
+
+{% block title %}Создаём заказ · Кольцо 24{% endblock %}
+
+{% block extra_head %}
+<meta http-equiv="refresh" content="3;url={{ refresh_url }}">
+<meta name="robots" content="noindex">
+{% endblock %}
+
+{% block content %}
+<main class="page login-page">
+  <div class="login-wrap">
+    <header class="page-head">
+      <h1>Создаём заказ в банке</h1>
+      <p class="sub">Команда «{{ team.teamname|default:"без названия" }}» сохранена. Обычно заказ создаётся за несколько секунд — страница обновится сама и откроет оплату. Не нажимайте оплату повторно.</p>
+    </header>
+    <div class="card">
+      <div class="card-pad">
+        <a class="btn btn-primary btn-block btn-lg" href="{{ refresh_url }}">Обновить</a>
+      </div>
+    </div>
+  </div>
+</main>
+{% endblock %}

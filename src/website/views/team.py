@@ -6,7 +6,13 @@ from django.urls import reverse
 from django.views import View
 
 from apps.race.permissions import can_edit_race
-from apps.race.pricing import create_team_payment, upsert_team_extras
+from apps.race.pricing import (
+    CheckoutInFlight,
+    checkout_in_flight,
+    create_team_payment,
+    open_pay_redirect,
+    upsert_team_extras,
+)
 from apps.race.promo import PromoUnavailable
 from website.forms import TeamForm, TeamMemberMoveForm
 from website.models import Payment, Team, TeamMemberMove
@@ -90,6 +96,9 @@ class EditTeamView(View):
         if request.POST.get("delete_team"):
             return self.delete_team(request, team)
 
+        if checkout_in_flight(team):
+            return HttpResponseRedirect(reverse("team_checkout", args=[team.id]))
+
         form = TeamForm(
             team.category2.race_id,
             request.POST,
@@ -163,6 +172,8 @@ class EditTeamView(View):
             # payment (race fee + add-on deltas, one VTB/SBP order)
             try:
                 response = create_team_payment(request, team, race, promo=form.promo)
+            except CheckoutInFlight:
+                return HttpResponseRedirect(reverse("team_checkout", args=[team.id]))
             except PromoUnavailable as exc:
                 # Quota taken between validation and checkout: show the form
                 # again instead of silently charging the full price. The team
@@ -222,6 +233,37 @@ class EditTeamView(View):
         if not self.request.user.is_superuser:
             qs = qs.filter(owner_id=self.request.user.id)
         return qs.first()
+
+
+class TeamCheckoutView(View):
+    """Where a repeated checkout lands: pay, wait for the order, or edit.
+
+    A repeat can arrive while the first request is still creating the VTB order
+    — then there is nothing to pay yet, and the edit form would offer a second
+    order for the same seats. This page waits for the order instead.
+    """
+
+    def get(self, request, team_id):
+        if not request.user.is_authenticated:
+            return HttpResponseRedirect(reverse("login") + f"?next={request.path}")
+
+        qs = Team.objects.filter(id=team_id)
+        if not request.user.is_superuser:
+            qs = qs.filter(owner_id=request.user.id)
+        team = qs.first()
+        if not team:
+            raise Http404
+
+        if checkout_in_flight(team):
+            return render(
+                request,
+                "website/checkout_pending.html",
+                {"team": team, "refresh_url": request.path},
+            )
+        response = open_pay_redirect(team)
+        if response is not None:
+            return response
+        return HttpResponseRedirect(reverse("edit_team", args=[team.id]))
 
 
 class TeamMemberMoveView(View):

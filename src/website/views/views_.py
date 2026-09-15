@@ -25,7 +25,7 @@ from django.views import View
 from django.views.decorators.csrf import csrf_exempt
 
 from apps.race.permissions import can_edit_race
-from apps.race.pricing import create_team_payment, open_pay_redirect, upsert_team_extras
+from apps.race.pricing import create_team_payment, upsert_team_extras
 from apps.race.promo import PromoUnavailable
 from website.forms import NewsPostForm, PageForm, TeamForm
 from website.models import (
@@ -452,10 +452,9 @@ class AddTeam(View):
         """Answer a re-post of a form that already created ``team``."""
         if team.is_deleted:
             return HttpResponseRedirect(reverse("my_teams", args=[race.slug]))
-        response = open_pay_redirect(team)
-        if response is not None:
-            return response
-        return HttpResponseRedirect(reverse("edit_team", args=[team.id]))
+        # The first post may still be creating the VTB order; team_checkout
+        # tells that apart from a ready order and from a failed checkout.
+        return HttpResponseRedirect(reverse("team_checkout", args=[team.id]))
 
     def post(self, request, race_slug):
         if not request.user.is_authenticated:

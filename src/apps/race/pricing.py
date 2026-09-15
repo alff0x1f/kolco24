@@ -18,16 +18,37 @@ change to the charge math here must be reflected there, and vice versa.
 """
 
 from collections import namedtuple
+from datetime import timedelta
 
 from django.db import transaction
 from django.http import HttpResponseRedirect
+from django.utils import timezone
 
 from vtb.client import VTBClient
-from website.models import Payment, VTBPayment, VTBPreparedPayment
+from website.models import Payment, Team, VTBPayment, VTBPreparedPayment
 
 # One line of the add-on charge: which extra, how many units this payment
 # covers (the delta), and the per-unit price snapshot at charge time.
 ExtraCharge = namedtuple("ExtraCharge", ["race_extra", "count", "unit_price"])
+
+# Longer than a checkout can run (VTB client timeouts 15 s + 20 s, gunicorn
+# worker timeout 60 s). A draft still without a VTB order after this is
+# stranded — its worker died mid-checkout — and must not block a new checkout.
+CHECKOUT_IN_FLIGHT_TTL = timedelta(seconds=90)
+
+
+class CheckoutInFlight(Exception):
+    """Another request is still creating this team's VTB order."""
+
+
+def checkout_in_flight(team):
+    """Whether a request is still creating a VTB order for ``team``."""
+    return Payment.objects.filter(
+        team=team,
+        status=Payment.STATUS_DRAFT,
+        vtb_payment__isnull=True,
+        created_at__gt=timezone.now() - CHECKOUT_IN_FLIGHT_TTL,
+    ).exists()
 
 
 def compute_team_charge(team, race, promo=None):
@@ -96,6 +117,9 @@ def create_team_payment(request, team, race, promo=None):
     With a ``promo``, the code's quota is re-checked under a row lock — the last
     free slot must not be handed to two teams checking out at once — and
     ``PromoUnavailable`` is raised if it went away since the form validated.
+
+    Raises ``CheckoutInFlight`` while another request is still creating this
+    team's order — a second order would charge the same seats twice.
     A promo that covers the whole fee charges nothing but still has to credit
     the seats, so the payment is created as a draft and settled in the same
     transaction.
@@ -122,6 +146,12 @@ def create_team_payment(request, team, race, promo=None):
     paid_for = int(team.ucount) - team.paid_people
     cost_now = race.current_price
     with transaction.atomic():
+        # The team row lock serializes checkouts of one team, so two requests
+        # cannot both see "nothing in flight" and mint two orders for the same
+        # seats.
+        Team.all_objects.select_for_update().only("pk").get(pk=team.pk)
+        if checkout_in_flight(team):
+            raise CheckoutInFlight
         if promo is not None:
             # The charge is computed from the locked row: the organizer may have
             # changed the code's value or type since the form validated.
