@@ -703,7 +703,8 @@ flight — without it the edit form would mint a second payable order for the sa
 `paid_people` twice); `EditTeamView.post` checks it before saving and turns the exception into a redirect to
 `team_checkout`. This precedes the promo `open_checkout` rule, so an in-flight promo checkout now yields
 `CheckoutInFlight`, not `PromoUnavailable`.
-`team-form.js` also locks the submit buttons after the first `submit` (unlocked on a bfcache `pageshow`). Related
+`team-form.js` also locks the submit buttons after the first `submit` (unlocked on a bfcache `pageshow`, or after `SUBMIT_LOCK_MS = 40 s` so a request stopped in the browser doesn't leave
+the page stuck). Related
 load fixes: `VTBClient` caches the OAuth token per process (class-level, under a lock) instead of per instance, and
 `src/gunicorn.conf.py` (auto-loaded from `/app`) sets workers/threads/timeout via `GUNICORN_*` env vars.
 

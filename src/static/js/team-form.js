@@ -549,7 +549,20 @@
   }
 
   // The server call to the bank can take seconds; a second click would post the
-  // form again, so the buttons stay locked until the page is left.
+  // form again, so the buttons stay locked while the page waits for it.
+  // Longer than the server can take (VTB timeouts 15 s + 20 s): past that the
+  // request was stopped in the browser (Esc) or lost, and the page must not stay
+  // stuck. A repeat post is safe — the server resumes it by submit_token.
+  var SUBMIT_LOCK_MS = 40000;
+  var submitTimer = null;
+
+  function unlockSubmit() {
+    clearTimeout(submitTimer);
+    submitTimer = null;
+    submitting = false;
+    updateButtons(lastDue);
+  }
+
   var teamForm = document.getElementById("teamForm");
   if (teamForm) {
     teamForm.addEventListener("submit", function (e) {
@@ -559,14 +572,12 @@
       }
       submitting = true;
       updateButtons(lastDue);
+      submitTimer = setTimeout(unlockSubmit, SUBMIT_LOCK_MS);
     });
   }
   // Back button restores the page from bfcache with the locked buttons.
   window.addEventListener("pageshow", function (e) {
-    if (e.persisted && submitting) {
-      submitting = false;
-      updateButtons(lastDue);
-    }
+    if (e.persisted && submitting) unlockSubmit();
   });
 
   // ── Wiring ────────────────────────────────────────────
