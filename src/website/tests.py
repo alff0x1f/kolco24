@@ -2399,6 +2399,20 @@ def test_custom_404_page_renders(client):
 
 
 @pytest.mark.django_db
+def test_static_page_uses_publication_layout(client):
+    from website.models import Page
+
+    Page.objects.create(slug="test-doc", title="Тестовый документ", content="Текст")
+    resp = client.get(reverse("page", args=["test-doc"]))
+    assert resp.status_code == 200
+    html = resp.content.decode()
+    assert "publication-detail__body" in html
+    assert "Тестовый документ" in html
+    assert "website/base-2.html" in [t.name for t in resp.templates]
+    assert reverse("edit_page", args=["test-doc"]) not in html
+
+
+@pytest.mark.django_db
 def test_custom_403_page_renders():
     # 403 extends base-2.html, whose footer calls {% footer_menu %} (a DB query),
     # so the render legitimately touches the DB — hence @pytest.mark.django_db.
