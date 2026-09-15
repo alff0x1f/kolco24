@@ -204,9 +204,22 @@ class Team(models.Model):
     points_sum = models.IntegerField(default=0)
     place = models.IntegerField(default=0)
     is_deleted = models.BooleanField(default=False)
+    # One-time token of the add-team form: a re-post of the same form (double
+    # click, refresh, retry after a timeout) finds this team instead of
+    # creating another one.
+    submit_token = models.CharField(max_length=32, blank=True, default="")
 
     objects = TeamManager()
     all_objects = models.Manager()
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["owner", "submit_token"],
+                condition=~models.Q(submit_token=""),
+                name="team_owner_submit_token_uniq",
+            )
+        ]
 
     def __str__(self):  # __str__ on Python 3
         return f"id{self.id} - {self.start_number} {self.teamname}"

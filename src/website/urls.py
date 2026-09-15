@@ -28,7 +28,7 @@ from .views import (
     RaceIdRedirectView,
     RaceListView,
 )
-from .views.team import EditTeamView, TeamMemberMoveView
+from .views.team import EditTeamView, TeamCheckoutView, TeamMemberMoveView
 
 urlpatterns = [
     path("", HomeView.as_view(), name="index"),
@@ -41,6 +41,11 @@ urlpatterns = [
     path("races/", RaceListView.as_view(), name="race_list"),
     # auth now lives in apps.accounts (mounted at /accounts/ in config/urls.py)
     path("team/<int:team_id>/", EditTeamView.as_view(), name="edit_team"),
+    path(
+        "team/<int:team_id>/checkout/",
+        TeamCheckoutView.as_view(),
+        name="team_checkout",
+    ),
     path(
         "team/<int:team_id>/move/",
         TeamMemberMoveView.as_view(),

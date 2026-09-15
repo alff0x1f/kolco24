@@ -2107,6 +2107,8 @@ def test_maps_migration_reverse_removes_map_rows():
 # --- Pricing helpers (compute_team_charge / upsert_team_extras / payment) ---
 
 from apps.race.pricing import (  # noqa: E402
+    CHECKOUT_IN_FLIGHT_TTL,
+    CheckoutInFlight,
     ExtraCharge,
     compute_team_charge,
     create_team_payment,
@@ -5930,6 +5932,25 @@ def test_create_team_payment_promo_checkout_in_flight_raises(rf):
     promo = _promo(race, code="SALE40", value=40)
     # A parallel checkout committed its draft and is still talking to VTB.
     _promo_payment(team, promo, status=Payment.STATUS_DRAFT)
+
+    request = rf.post("/")
+    request.user = owner
+    client_p, payment_p, prepared_p = _patch_vtb()
+    with client_p as mock_client, payment_p, prepared_p:
+        with pytest.raises(CheckoutInFlight):
+            create_team_payment(request, team, race, promo=promo)
+
+    mock_client.return_value.create_order.assert_not_called()
+
+
+@pytest.mark.django_db
+def test_create_team_payment_promo_draft_past_in_flight_window_raises(rf):
+    owner, race, team = _priced_team("cpp15b", cost=1000, ucount=3, paid_people=1)
+    promo = _promo(race, code="SALE40", value=40)
+    # No longer "in flight", but still inside the promo reservation window.
+    _promo_payment(
+        team, promo, status=Payment.STATUS_DRAFT, age=CHECKOUT_IN_FLIGHT_TTL * 2
+    )
 
     request = rf.post("/")
     request.user = owner

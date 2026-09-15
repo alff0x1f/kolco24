@@ -1,6 +1,7 @@
+import threading
 import time
 from dataclasses import dataclass
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Tuple
 
 import requests
 from django.conf import settings
@@ -32,8 +33,10 @@ class VTBConfig:
 
 
 class VTBClient:
-    _token: Optional[str] = None
-    _token_exp: float = 0.0
+    # Shared by every instance in the process: a client is created per request,
+    # so a per-instance token would cost an extra OAuth round-trip each time.
+    _tokens: Dict[Tuple[str, str], Tuple[str, float]] = {}
+    _tokens_lock = threading.Lock()
 
     def __init__(self, cfg: Optional[VTBConfig] = None):
         if cfg is None:
@@ -49,30 +52,36 @@ class VTBClient:
         self.cfg = cfg
         self.session = requests.Session()
 
-    def _ensure_token(self):
-        now = time.time()
-        if self._token and now < self._token_exp - 10:
-            return
-        # OAuth2 client_credentials — x-www-form-urlencoded
-        data = {
-            "grant_type": "client_credentials",
-            "client_id": self.cfg.client_id,
-            "client_secret": self.cfg.client_secret,
-        }
-        headers = {"Content-Type": "application/x-www-form-urlencoded"}
-        resp = self.session.post(
-            self.cfg.token_url, data=data, headers=headers, timeout=15
-        )
-        resp.raise_for_status()
-        j = resp.json()
-        self._token = j["access_token"]
-        # в проде ~170s, в песочнице ~300s — возьмём то, что вернулось
-        self._token_exp = now + int(j.get("expires_in", 150))
+    def _ensure_token(self) -> str:
+        key = (self.cfg.token_url, self.cfg.client_id)
+        # Under the lock so a burst of requests waits for one token fetch
+        # instead of each one hitting the OAuth endpoint.
+        with self._tokens_lock:
+            cached = self._tokens.get(key)
+            now = time.time()
+            if cached and now < cached[1] - 10:
+                return cached[0]
+            # OAuth2 client_credentials — x-www-form-urlencoded
+            data = {
+                "grant_type": "client_credentials",
+                "client_id": self.cfg.client_id,
+                "client_secret": self.cfg.client_secret,
+            }
+            headers = {"Content-Type": "application/x-www-form-urlencoded"}
+            resp = self.session.post(
+                self.cfg.token_url, data=data, headers=headers, timeout=15
+            )
+            resp.raise_for_status()
+            j = resp.json()
+            token = j["access_token"]
+            # в проде ~170s, в песочнице ~300s — возьмём то, что вернулось
+            self._tokens[key] = (token, now + int(j.get("expires_in", 150)))
+            return token
 
     def _headers(self) -> Dict[str, str]:
-        self._ensure_token()
+        token = self._ensure_token()
         headers = {
-            "Authorization": f"Bearer {self._token}",
+            "Authorization": f"Bearer {token}",
             "X-IBM-Client-Id": self.cfg.client_id_header,  # нижний регистр, без домена
             "Content-Type": "application/json",
         }

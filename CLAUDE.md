@@ -683,10 +683,30 @@ top-up). `remaining_people()` = `people_limit − people_count() − reserved_pe
 own paid **and** reserved seats. Nothing else changed: the `TeamForm.clean()` gate, the displayed `raceRemaining`/
 `data-remaining` caps, and `bypass_limits` all tighten automatically because they already route through
 `remaining_people()`. `reg_status` SOLD_OUT still flips on **paid** fill only (no reservation-driven open/close churn).
-Two accepted caveats: (1) **fail-safe TTL** — the 20-min window is our estimate of the VTB order's life, not the real
+Accepted caveat: **fail-safe TTL** — the 20-min window is our estimate of the VTB order's life, not the real
 expiry; if a draft outlives or dies before it, the seat is held at most ~20 min (never longer, never overbooks past the
-window); (2) **double add-submit** — `AddTeam.post` creates a fresh `Team` per POST, so submitting the *add* form twice
-can briefly reserve seats against the same user (self-resolves in ≤20 min), not fixed.
+window).
+
+**Add-team double submit**: `add_team.html` carries a hidden one-time `submit_token` (uuid4 hex, minted on GET, kept on
+an error re-render) stored in `Team.submit_token` with a partial `UniqueConstraint(owner, submit_token)` where the token
+is non-empty (migration `website/0094`). `AddTeam.post` looks the token up **before** form validation (the first post's
+team already holds its seats, so re-validating could fail capacity on itself) and resumes instead of creating by
+redirecting to `team_checkout` (`team/<id>/checkout/`, `TeamCheckoutView`, owner or superuser); a parallel post that
+loses the insert catches `IntegrityError` and resumes the same way. A missing/malformed token keeps the old
+create-per-POST behaviour. `TeamCheckoutView` tells three states apart: **in flight** (`pricing.checkout_in_flight` — a
+`draft` with no `vtb_payment` younger than `CHECKOUT_IN_FLIGHT_TTL = 90 s`, longer than VTB timeouts + gunicorn timeout)
+→ `checkout_pending.html`, a meta-refresh page polling itself every 3 s; an open VTB order → its pay URL
+(`pricing.open_pay_redirect`); otherwise (VTB failed → draft deleted, or a stranded draft older than the TTL) →
+`edit_team`. In-flight is checked **first** so an older open order for a different amount is never offered. Backstop:
+`create_team_payment` locks the `Team` row (`select_for_update`) and raises `CheckoutInFlight` while a checkout is in
+flight — without it the edit form would mint a second payable order for the same seats (a double settle would credit
+`paid_people` twice); `EditTeamView.post` checks it before saving and turns the exception into a redirect to
+`team_checkout`. This precedes the promo `open_checkout` rule, so an in-flight promo checkout now yields
+`CheckoutInFlight`, not `PromoUnavailable`.
+`team-form.js` also locks the submit buttons after the first `submit` (unlocked on a bfcache `pageshow`, or after `SUBMIT_LOCK_MS = 40 s` so a request stopped in the browser doesn't leave
+the page stuck). Related
+load fixes: `VTBClient` caches the OAuth token per process (class-level, under a lock) instead of per instance, and
+`src/gunicorn.conf.py` (auto-loaded from `/app`) sets workers/threads/timeout via `GUNICORN_*` env vars.
 
 **Protocol snapshot (results)** (`src/apps/race/models.py`, `src/apps/race/results.py`): the results page
 (`/results/`, URL name `category_results`) reads a **denormalized snapshot**, never the live `Team`/`TakenKP`/
