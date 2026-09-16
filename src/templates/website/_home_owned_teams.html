@@ -21,7 +21,7 @@
             <span>{{ team.category }}</span>
             {% if team.city %}<span class="my-teams__sep" aria-hidden="true">·</span><span>{{ team.city }}</span>{% endif %}
             <span class="my-teams__sep" aria-hidden="true">·</span>
-            <span>{{ team.participants }} {{ team.participants|ru_plural:"участник,участника,участников" }}</span>
+            <span>{{ team.participants }} {{ team.participants|ru_plural:"участник,участника,участников" }}{% if team.needs_payment %} (не оплачено){% endif %}</span>
           </div>
           {% if not team.can_change %}<span class="my-teams__locked">Редактирование закрыто</span>{% endif %}
         </div>

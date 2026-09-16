@@ -667,7 +667,8 @@ def test_race_page_authenticated_sees_plain_add_button(client):
 
 
 @pytest.mark.django_db
-def test_race_page_shows_owned_team_with_explicit_edit_action(client):
+@pytest.mark.parametrize("paid_people", [0, 1, 1.5, 2, 3])
+def test_race_page_shows_owned_team_with_explicit_edit_action(client, paid_people):
     owner = User.objects.create_user(
         username="team-owner", password="p", email="owner@example.com"
     )
@@ -681,6 +682,7 @@ def test_race_page_shows_owned_team_with_explicit_edit_action(client):
         teamname="Лесные коты",
         start_number="18",
         city="Уфа",
+        paid_people=paid_people,
     )
     client.force_login(owner)
 
@@ -688,7 +690,9 @@ def test_race_page_shows_owned_team_with_explicit_edit_action(client):
 
     assert resp.status_code == 200
     assert len(resp.context["owned_teams"]) == 1
+    assert resp.context["owned_teams"][0]["needs_payment"] == (paid_people < 2)
     html = resp.content.decode()
+    assert ("2 участника (не оплачено)" in html) == (paid_people < 2)
     assert "Ваша команда" in html
     assert "Лесные коты" in html
     assert '<div class="owned-team-number">18</div>' in html

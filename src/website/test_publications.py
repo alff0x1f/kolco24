@@ -991,6 +991,7 @@ def test_owned_teams_by_race_collects_team_card_fields(django_user_model):
             "url": reverse("edit_team", args=[team.id]),
             "action_label": "Редактировать команду",
             "can_change": True,
+            "needs_payment": False,
         }
     ]
 
@@ -1165,13 +1166,20 @@ def test_home_panel_is_empty_for_anonymous_visitors(client, django_user_model):
 
 
 @pytest.mark.django_db
-def test_home_panel_renders_race_heading_and_team_row(client, django_user_model):
+@pytest.mark.parametrize("paid_people", [0, 1, 2.5, 3, 4])
+def test_home_panel_renders_race_heading_and_team_row(
+    client, django_user_model, paid_people
+):
     user = django_user_model.objects.create_user(username="render-owner")
     race = create_owned_race(
         "home-render", name="Кольцо 24: весна", is_teams_editable=True
     )
     team = create_owned_team(
-        user, create_owned_category(race), teamname="Лесные коты", start_number="18"
+        user,
+        create_owned_category(race),
+        teamname="Лесные коты",
+        start_number="18",
+        paid_people=paid_people,
     )
     client.force_login(user)
 
@@ -1186,6 +1194,7 @@ def test_home_panel_renders_race_heading_and_team_row(client, django_user_model)
     assert "Редактировать команду" in panel
     assert '<div class="my-teams__number">18</div>' in panel
     assert "3 участника" in panel
+    assert ("3 участника (не оплачено)" in panel) == (paid_people < 3)
     # The panel sits between the spotlight and the main community content.
     assert html.index('class="my-teams"') < html.index("community-content")
 
