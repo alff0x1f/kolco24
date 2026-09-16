@@ -816,6 +816,145 @@
 .race-archive__list strong { overflow: hidden; font-size: 14px; font-weight: 500; text-overflow: ellipsis; white-space: nowrap; }
 .race-archive__list b { color: var(--primary-2); font-weight: 500; }
 
+/* Personal panel with the visitor's own teams, between the spotlight and the
+   grid. Deliberately duplicates the race-page panel (.owned-* in race.css)
+   instead of sharing it: the two pages speak different design systems. */
+.my-teams {
+  padding-top: 16px;
+}
+
+.my-teams__head {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  padding: 0 2px 13px;
+}
+
+.my-teams__kicker {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+}
+
+.my-teams__head h2 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: -.01em;
+}
+
+.my-teams__group {
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--paper-2);
+  box-shadow: var(--shadow-sm);
+}
+
+.my-teams__group + .my-teams__group {
+  margin-top: 10px;
+}
+
+.my-teams__race {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  margin: 0;
+  padding: 13px 18px;
+  border-bottom: 1px solid var(--line);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+}
+
+.my-teams__race a { color: var(--ink); }
+.my-teams__race a:hover { color: var(--primary-dk); }
+
+.my-teams__race-date {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.my-teams__row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 14px;
+  padding: 15px 18px;
+}
+
+.my-teams__row + .my-teams__row {
+  border-top: 1px solid var(--line-soft);
+}
+
+.my-teams__number {
+  min-width: 56px;
+  padding-right: 14px;
+  border-right: 1px solid var(--line);
+  color: var(--primary);
+  font-size: 14px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.my-teams__copy { min-width: 0; }
+
+.my-teams__copy h4 {
+  overflow: hidden;
+  margin: 0 0 4px;
+  color: var(--ink);
+  font-size: 16px;
+  font-weight: 500;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.my-teams__meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 7px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.my-teams__sep { color: var(--muted-2); }
+
+.my-teams__locked {
+  display: inline-block;
+  margin-top: 5px;
+  color: var(--warn);
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: .07em;
+  text-transform: uppercase;
+}
+
+/* Neutral button for the light card background: --outline-light is built for
+   the dark spotlight and would be invisible here. */
+.my-teams__row .community-button--ghost {
+  border-color: var(--line);
+  color: var(--ink-soft);
+  background: var(--paper-2);
+}
+
+.my-teams__row .community-button--ghost:hover {
+  border-color: #cdd3da;
+  color: var(--ink);
+  background: var(--line-soft);
+}
+
 @media (max-width: 920px) {
   .race-spotlight__inner { grid-template-columns: 72px minmax(0, 1fr); }
   .race-spotlight__actions { grid-column: 2; }
@@ -834,6 +973,9 @@
   .race-spotlight h2 { font-size: 21px; }
   .race-spotlight__actions { grid-column: 1 / -1; }
   .community-section__head h2 { font-size: 25px; }
+  .my-teams { padding-top: 12px; }
+  .my-teams__row { gap: 10px 14px; padding: 14px 16px; }
+  .my-teams__row .community-button { grid-column: 2; justify-self: start; }
 }
 
 @media (max-width: 620px) {
@@ -862,4 +1004,9 @@
   .race-archive__year { grid-template-columns: 1fr; gap: 8px; }
   .race-archive__list > a { grid-template-columns: 48px minmax(0, 1fr) 20px; gap: 9px; padding: 12px; }
   .race-archive__list small { display: none; }
+  .my-teams__group { border-radius: 0; border-right: 0; border-left: 0; }
+  .my-teams__race { padding: 12px 13px; }
+  .my-teams__row { grid-template-columns: minmax(0, 1fr); padding: 14px 13px; }
+  .my-teams__number { min-width: 0; padding-right: 0; border-right: 0; }
+  .my-teams__row .community-button { grid-column: 1; justify-self: stretch; }
 }
