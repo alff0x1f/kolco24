@@ -40,26 +40,34 @@ def credit_extras(team: Team, payment: Payment) -> None:
 def settle_payment(payment) -> bool:
     """Credit a confirmed race ``Payment`` exactly once.
 
-    The ``status == STATUS_DONE`` guard makes this idempotent: a second call for
-    the same payment short-circuits and credits nothing. Returns ``True`` only
-    when the payment was settled on this call.
+    The flip to ``STATUS_DONE`` is claimed with a conditional ``UPDATE`` before
+    anything is credited, so it is the single arbiter of who settles: a second
+    call — a concurrent one, or one holding a stale in-memory copy — changes no
+    row and credits nothing. Returns ``True`` only when the payment was settled
+    on this call.
     """
     if not payment or payment.status == Payment.STATUS_DONE:
         return False
     team: Team = payment.team
     with transaction.atomic():
+        claimed = (
+            Payment.objects.filter(pk=payment.pk)
+            .exclude(status=Payment.STATUS_DONE)
+            .update(status=Payment.STATUS_DONE, order=payment.pk)
+        )
+        if not claimed:
+            return False
         if team:
-            team.paid_people += payment.paid_for
-            team.paid_sum += payment.payment_amount
-            team.save(
-                update_fields=[
-                    "paid_people",
-                    "paid_sum",
-                    "updated_at",
-                ]
+            # Atomic SQL-level increment, like credit_extras: two commands
+            # settling two payments of the same team must not lose a credit.
+            Team.objects.filter(pk=team.pk).update(
+                paid_people=F("paid_people") + payment.paid_for,
+                paid_sum=F("paid_sum") + payment.payment_amount,
+                updated_at=timezone.now(),
             )
             # Credit add-ons from the per-payment snapshots.
             credit_extras(team, payment)
+            team.refresh_from_db(fields=["paid_people", "paid_sum"])
             from website.models.race import RegStatus
 
             category = team.category2
@@ -72,9 +80,8 @@ def settle_payment(payment) -> bool:
             ):
                 race.reg_status = RegStatus.SOLD_OUT
                 race.save(update_fields=["reg_status", "updated_at"])
-        payment.status = Payment.STATUS_DONE
-        payment.order = payment.pk
-        payment.save(update_fields=["status", "order"])
+    payment.status = Payment.STATUS_DONE
+    payment.order = payment.pk
     return True
 
 

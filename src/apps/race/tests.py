@@ -5565,6 +5565,35 @@ def test_settle_payment_is_idempotent():
 
 
 @pytest.mark.django_db
+def test_settle_payment_claims_status_before_crediting():
+    """A second copy of the same payment must not credit the team twice.
+
+    Stands in for two commands racing on one paid order: both hold a ``draft``
+    payment in memory, only the one that wins the status flip credits.
+    """
+    _, race, team = _priced_team("st4", cost=1000, ucount=4, paid_people=1)
+    transfer = RaceExtra.objects.create(
+        race=race, code="transfer", name="Трансфер", price=500
+    )
+    TeamExtra.objects.create(team=team, race_extra=transfer, count=2, count_paid=0)
+    payment = Payment.objects.create(
+        team=team, payment_amount=3000, paid_for=3, status=Payment.STATUS_DRAFT
+    )
+    PaymentExtra.objects.create(
+        payment=payment, race_extra=transfer, count=2, unit_price=500
+    )
+    stale = Payment.objects.get(pk=payment.pk)  # still 'draft' in memory
+
+    assert settle_payment(payment) is True
+    assert settle_payment(stale) is False
+
+    team.refresh_from_db()
+    assert team.paid_people == 4
+    assert team.paid_sum == 3000
+    assert team.extras.get(race_extra=transfer).count_paid == 2
+
+
+@pytest.mark.django_db
 def test_settle_payment_flips_race_to_sold_out():
     _, race, team = _priced_team("st3", cost=1000, ucount=4, paid_people=1)
     race.people_limit = 4
