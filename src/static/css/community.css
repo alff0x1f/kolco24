@@ -909,8 +909,6 @@
   white-space: nowrap;
 }
 
-.my-teams__number:empty { background: none; }
-
 .my-teams__copy { min-width: 0; }
 
 .my-teams__copy h4 {

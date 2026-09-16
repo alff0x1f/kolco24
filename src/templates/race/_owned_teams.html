@@ -12,7 +12,7 @@
     <div class="owned-teams-list">
       {% for team in owned_teams %}
       <article class="owned-team-row">
-        <div class="owned-team-number">{% if team.number %}№ {{ team.number }}{% else %}Без номера{% endif %}</div>
+        <div class="owned-team-number">{% if team.number %}{{ team.number }}{% else %}—{% endif %}</div>
         <div class="owned-team-copy">
           <h3>{{ team.name }}</h3>
           <div class="owned-team-meta">

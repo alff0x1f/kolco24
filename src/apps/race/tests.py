@@ -691,7 +691,7 @@ def test_race_page_shows_owned_team_with_explicit_edit_action(client):
     html = resp.content.decode()
     assert "Ваша команда" in html
     assert "Лесные коты" in html
-    assert "№ 18" in html
+    assert '<div class="owned-team-number">18</div>' in html
     assert "Редактировать команду" in html
     assert reverse("edit_team", args=[team.id]) in html
 

@@ -14,7 +14,7 @@
       </h3>
       {% for team in group.teams %}
       <article class="my-teams__row">
-        <div class="my-teams__number">{% if team.number %}№ {{ team.number }}{% endif %}</div>
+        <div class="my-teams__number">{% if team.number %}{{ team.number }}{% else %}—{% endif %}</div>
         <div class="my-teams__copy">
           <h4>{{ team.name }}</h4>
           <div class="my-teams__meta">

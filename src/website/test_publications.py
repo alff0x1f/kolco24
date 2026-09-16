@@ -1184,7 +1184,7 @@ def test_home_panel_renders_race_heading_and_team_row(client, django_user_model)
     assert reverse("race", args=[race.slug]) in panel
     assert reverse("edit_team", args=[team.id]) in panel
     assert "Редактировать команду" in panel
-    assert "№ 18" in panel
+    assert '<div class="my-teams__number">18</div>' in panel
     assert "3 участника" in panel
     # The panel sits between the spotlight and the main community content.
     assert html.index('class="my-teams"') < html.index("community-content")
@@ -1209,7 +1209,7 @@ def test_home_panel_renders_numberless_team_and_date_range(client, django_user_m
     number = _extract(
         r'<div class="my-teams__number">(.*?)</div>', panel, "team number cell"
     )
-    assert number.strip() == ""
+    assert number.strip() == "—"
     dates = _extract(
         r'<span class="my-teams__race-date">(.*?)</span>', panel, "race date"
     )
