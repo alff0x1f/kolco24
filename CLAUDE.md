@@ -569,6 +569,19 @@ user-facing sberbank/sbp "I paid, here is my card" templates, and the older Yand
 `paymentinfo`/`getcost`/`yandexinform`/`success`) was **removed** — those routes now 404. The `Payment`/`PaymentLog`/
 `PaymentsYa`/`SbpPaymentRecipient` tables and admin registrations are kept for history.
 
+**Refunds** (VTB order status `REFUNDED`): handled by `check_vtb_payments`, but **only on demand** — a refund appears on
+an order that is already `PAID`, and the endless poll loop excludes `PAID` (and now `REFUNDED`) rows forever. Run
+`manage.py check_vtb_payments --order-id ORDER_<ulid> [--order-id …]` after making a refund: it checks those orders once,
+whatever their local status, and exits. On `REFUNDED` the command stores the status and calls
+`apps/race/settlement.py:refund_payment` — the mirror of `settle_payment`: `Payment.status` `done → cancel` (its own
+idempotency token, so nothing is taken back twice), `Team.paid_people`/`paid_sum` decremented (floored at 0, via a
+SQL-level `update`) and `TeamExtra.count_paid` reduced by the `PaymentExtra` snapshots (`debit_extras`; `count`, the
+desired amount, is left alone). `Race.reg_status` is deliberately **not** reopened — same no-auto-reopen rule as the
+`OPEN → SOLD_OUT` flip. A **partial** refund (refund transactions summing to less than the order amount) is refused: the
+command logs and changes nothing, an organizer fixes the team by hand. A refunded `SPUTNIK_*` donation flips its
+`MemberDonation.is_paid` back to `False`. Note a `cancel` payment also frees its промокод slot immediately
+(`open_draft_q` counts only drafts).
+
 **VTB `order_id`s** (race-fee and donations) are random ULIDs — `ORDER_<ulid>` for race fees, `SPUTNIK_<ulid>` for
 donations — minted by the single generator `VTBPayment.new_order_id(prefix)` (`website/models/vtb.py`). They are
 globally unique across environments, which matters because dev and prod share VTB credentials (and thus the VTB

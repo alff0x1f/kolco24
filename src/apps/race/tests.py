@@ -5565,6 +5565,75 @@ def test_settle_payment_is_idempotent():
 
 
 @pytest.mark.django_db
+def test_settle_payment_claims_status_before_crediting():
+    """A second copy of the same payment must not credit the team twice.
+
+    Stands in for two commands racing on one paid order: both hold a ``draft``
+    payment in memory, only the one that wins the status flip credits.
+    """
+    _, race, team = _priced_team("st4", cost=1000, ucount=4, paid_people=1)
+    transfer = RaceExtra.objects.create(
+        race=race, code="transfer", name="Трансфер", price=500
+    )
+    TeamExtra.objects.create(team=team, race_extra=transfer, count=2, count_paid=0)
+    payment = Payment.objects.create(
+        team=team, payment_amount=3000, paid_for=3, status=Payment.STATUS_DRAFT
+    )
+    PaymentExtra.objects.create(
+        payment=payment, race_extra=transfer, count=2, unit_price=500
+    )
+    stale = Payment.objects.get(pk=payment.pk)  # still 'draft' in memory
+
+    assert settle_payment(payment) is True
+    assert settle_payment(stale) is False
+
+    team.refresh_from_db()
+    assert team.paid_people == 4
+    assert team.paid_sum == 3000
+    assert team.extras.get(race_extra=transfer).count_paid == 2
+
+
+@pytest.mark.django_db
+def test_settle_payment_credits_a_deleted_team():
+    """A team can be deleted while its payment is still a draft.
+
+    The bank may confirm that draft afterwards; the money still belongs on the
+    team's balance, and the flip to ``done`` means there is no second chance.
+    """
+    _, race, team = _priced_team("st5", cost=1000, ucount=4, paid_people=0)
+    team.is_deleted = True
+    team.save(update_fields=["is_deleted", "updated_at"])
+    payment = Payment.objects.create(
+        team=team, payment_amount=4000, paid_for=4, status=Payment.STATUS_DRAFT
+    )
+
+    assert settle_payment(payment) is True
+
+    team = Team.all_objects.get(pk=team.pk)
+    assert team.paid_people == 4
+    assert team.paid_sum == 4000
+
+
+@pytest.mark.django_db
+def test_refund_payment_debits_a_deleted_team():
+    from apps.race.settlement import refund_payment
+
+    _, race, team = _priced_team("st6", cost=1000, ucount=4, paid_people=0)
+    payment = Payment.objects.create(
+        team=team, payment_amount=4000, paid_for=4, status=Payment.STATUS_DRAFT
+    )
+    settle_payment(payment)
+    team.is_deleted = True
+    team.save(update_fields=["is_deleted", "updated_at"])
+
+    assert refund_payment(payment) is True
+
+    team = Team.all_objects.get(pk=team.pk)
+    assert team.paid_people == 0
+    assert team.paid_sum == 0
+
+
+@pytest.mark.django_db
 def test_settle_payment_flips_race_to_sold_out():
     _, race, team = _priced_team("st3", cost=1000, ucount=4, paid_people=1)
     race.people_limit = 4
@@ -5575,6 +5644,107 @@ def test_settle_payment_flips_race_to_sold_out():
     )
 
     settle_payment(payment)
+
+    race.refresh_from_db()
+    assert race.reg_status == RegStatus.SOLD_OUT
+
+
+@pytest.mark.django_db
+def test_refund_payment_takes_back_people_and_extras():
+    from apps.race.settlement import refund_payment
+
+    _, race, team = _priced_team("rf1", cost=1000, ucount=4, paid_people=1)
+    transfer = RaceExtra.objects.create(
+        race=race, code="transfer", name="Трансфер", price=500
+    )
+    TeamExtra.objects.create(team=team, race_extra=transfer, count=2, count_paid=0)
+    payment = Payment.objects.create(
+        team=team, payment_amount=4000, paid_for=3, status=Payment.STATUS_DRAFT
+    )
+    PaymentExtra.objects.create(
+        payment=payment, race_extra=transfer, count=2, unit_price=500
+    )
+    settle_payment(payment)
+
+    assert refund_payment(payment) is True
+
+    team.refresh_from_db()
+    payment.refresh_from_db()
+    assert team.paid_people == 1
+    assert team.paid_sum == 0
+    assert payment.status == Payment.STATUS_CANCEL
+    te = team.extras.get(race_extra=transfer)
+    assert te.count_paid == 0
+    assert te.count == 2
+
+
+@pytest.mark.django_db
+def test_refund_payment_only_settled_once():
+    from apps.race.settlement import refund_payment
+
+    _, race, team = _priced_team("rf2", cost=1000, ucount=4, paid_people=1)
+    payment = Payment.objects.create(
+        team=team, payment_amount=3000, paid_for=3, status=Payment.STATUS_DRAFT
+    )
+
+    # A draft was never credited, so there is nothing to take back.
+    assert refund_payment(payment) is False
+
+    settle_payment(payment)
+    assert refund_payment(payment) is True
+    assert refund_payment(payment) is False
+
+    team.refresh_from_db()
+    assert team.paid_people == 1
+
+
+@pytest.mark.django_db
+def test_refund_payment_claims_status_before_debiting():
+    """A second copy of the same payment must not debit the team twice.
+
+    Stands in for two commands racing on one refunded order: both hold a
+    ``done`` payment in memory, only the one that wins the status flip debits.
+    """
+    from apps.race.settlement import refund_payment
+
+    _, race, team = _priced_team("rf4", cost=1000, ucount=4, paid_people=1)
+    transfer = RaceExtra.objects.create(
+        race=race, code="transfer", name="Трансфер", price=500
+    )
+    TeamExtra.objects.create(team=team, race_extra=transfer, count=2, count_paid=2)
+    payment = Payment.objects.create(
+        team=team, payment_amount=3000, paid_for=3, status=Payment.STATUS_DRAFT
+    )
+    PaymentExtra.objects.create(
+        payment=payment, race_extra=transfer, count=2, unit_price=500
+    )
+    settle_payment(payment)
+    stale = Payment.objects.get(pk=payment.pk)  # still 'done' in memory
+
+    assert refund_payment(payment) is True
+    assert refund_payment(stale) is False
+
+    team.refresh_from_db()
+    assert team.paid_people == 1
+    assert team.paid_sum == 0
+    # The team's own 2 pre-paid add-ons survive; only this payment's 2 go back.
+    assert team.extras.get(race_extra=transfer).count_paid == 2
+
+
+@pytest.mark.django_db
+def test_refund_payment_leaves_sold_out_race_closed():
+    from apps.race.settlement import refund_payment
+
+    _, race, team = _priced_team("rf3", cost=1000, ucount=4, paid_people=1)
+    race.people_limit = 4
+    race.reg_status = RegStatus.OPEN
+    race.save(update_fields=["people_limit", "reg_status"])
+    payment = Payment.objects.create(
+        team=team, payment_amount=3000, paid_for=3, status=Payment.STATUS_DRAFT
+    )
+    settle_payment(payment)
+
+    refund_payment(payment)
 
     race.refresh_from_db()
     assert race.reg_status == RegStatus.SOLD_OUT
