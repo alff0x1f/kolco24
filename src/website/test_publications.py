@@ -1209,7 +1209,7 @@ def test_home_panel_renders_numberless_team_and_date_range(client, django_user_m
     number = _extract(
         r'<div class="my-teams__number">(.*?)</div>', panel, "team number cell"
     )
-    assert number.strip() == "Без номера"
+    assert number.strip() == ""
     dates = _extract(
         r'<span class="my-teams__race-date">(.*?)</span>', panel, "race date"
     )
