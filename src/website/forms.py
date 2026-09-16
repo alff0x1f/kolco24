@@ -20,6 +20,7 @@ MAP_PRICE = 200
 class TeamForm(forms.Form):
     teamname = forms.CharField(
         required=False,
+        max_length=100,
         widget=forms.TextInput(
             attrs={
                 "class": "form-control form-control-lg",
@@ -29,12 +30,14 @@ class TeamForm(forms.Form):
     )
     city = forms.CharField(
         required=False,
+        max_length=50,
         widget=forms.TextInput(
             attrs={"class": "form-control form-control-lg", "placeholder": "Город"}
         ),
     )
     organization = forms.CharField(
         required=False,
+        max_length=50,
         widget=forms.TextInput(
             attrs={
                 "class": "form-control form-control-lg",
@@ -47,7 +50,7 @@ class TeamForm(forms.Form):
         widget=forms.HiddenInput(),
         label="Количество участников",
     )
-    dist = forms.CharField(required=False)
+    dist = forms.CharField(required=False, max_length=15)
     paymentid = forms.CharField(widget=forms.HiddenInput(), required=False)
     # Promo code applied on the client via the promo_check endpoint; resolved
     # again here — the browser only fills the field in.
@@ -134,6 +137,7 @@ class TeamForm(forms.Form):
         for i in range(6):
             self.fields["athlet%s" % (i + 1)] = forms.CharField(
                 required=False,
+                max_length=50,
                 widget=forms.TextInput(
                     attrs={
                         "class": "form-control form-control-lg",
@@ -143,6 +147,7 @@ class TeamForm(forms.Form):
             )
             self.fields["birth%s" % (i + 1)] = forms.CharField(
                 required=False,
+                max_length=4,
                 widget=forms.TextInput(
                     attrs={
                         "class": "form-control form-control-lg",

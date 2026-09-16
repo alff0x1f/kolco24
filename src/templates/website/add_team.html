@@ -62,7 +62,7 @@
                             <div class="field full">
                                 <label for="teamname">Название</label>
                                 <input class="input{% if team_form.teamname.errors %} has-error{% endif %}"
-                                       id="teamname" name="teamname" type="text"
+                                       id="teamname" name="teamname" type="text" maxlength="100"
                                        value="{{ team_form.teamname.value|default:'' }}"
                                        placeholder="Название команды">
                                 {% if team_form.teamname.errors %}
@@ -72,7 +72,7 @@
                             <div class="field">
                                 <label for="city">Город</label>
                                 <input class="input{% if team_form.city.errors %} has-error{% endif %}"
-                                       id="city" name="city" type="text"
+                                       id="city" name="city" type="text" maxlength="50"
                                        value="{{ team_form.city.value|default:'' }}"
                                        placeholder="Город">
                                 {% if team_form.city.errors %}
@@ -82,7 +82,7 @@
                             <div class="field">
                                 <label for="org">Клуб <span class="opt">— необязательно</span></label>
                                 <input class="input{% if team_form.organization.errors %} has-error{% endif %}"
-                                       id="org" name="organization" type="text"
+                                       id="org" name="organization" type="text" maxlength="50"
                                        value="{{ team_form.organization.value|default:'' }}"
                                        placeholder="Клуб (организация)">
                                 {% if team_form.organization.errors %}
@@ -125,32 +125,32 @@
                         <div class="members" id="members">
                             <div class="member-row" data-idx="1">
                                 <div class="num">1</div>
-                                <input class="input m-name" name="athlet1" type="text" placeholder="Фамилия Имя" autocomplete="off" value="{{ team_form.athlet1.value|default:'' }}">
+                                <input class="input m-name" maxlength="50" name="athlet1" type="text" placeholder="Фамилия Имя" autocomplete="off" value="{{ team_form.athlet1.value|default:'' }}">
                                 <input class="input m-year" name="birth1" type="text" inputmode="numeric" maxlength="4" placeholder="Год рожд." value="{{ team_form.birth1.value|default:'' }}">
                             </div>
                             <div class="member-row" data-idx="2">
                                 <div class="num">2</div>
-                                <input class="input m-name" name="athlet2" type="text" placeholder="Фамилия Имя" autocomplete="off" value="{{ team_form.athlet2.value|default:'' }}">
+                                <input class="input m-name" maxlength="50" name="athlet2" type="text" placeholder="Фамилия Имя" autocomplete="off" value="{{ team_form.athlet2.value|default:'' }}">
                                 <input class="input m-year" name="birth2" type="text" inputmode="numeric" maxlength="4" placeholder="Год рожд." value="{{ team_form.birth2.value|default:'' }}">
                             </div>
                             <div class="member-row is-hidden" data-idx="3">
                                 <div class="num">3</div>
-                                <input class="input m-name" name="athlet3" type="text" placeholder="Фамилия Имя" autocomplete="off" value="{{ team_form.athlet3.value|default:'' }}">
+                                <input class="input m-name" maxlength="50" name="athlet3" type="text" placeholder="Фамилия Имя" autocomplete="off" value="{{ team_form.athlet3.value|default:'' }}">
                                 <input class="input m-year" name="birth3" type="text" inputmode="numeric" maxlength="4" placeholder="Год рожд." value="{{ team_form.birth3.value|default:'' }}">
                             </div>
                             <div class="member-row is-hidden" data-idx="4">
                                 <div class="num">4</div>
-                                <input class="input m-name" name="athlet4" type="text" placeholder="Фамилия Имя" autocomplete="off" value="{{ team_form.athlet4.value|default:'' }}">
+                                <input class="input m-name" maxlength="50" name="athlet4" type="text" placeholder="Фамилия Имя" autocomplete="off" value="{{ team_form.athlet4.value|default:'' }}">
                                 <input class="input m-year" name="birth4" type="text" inputmode="numeric" maxlength="4" placeholder="Год рожд." value="{{ team_form.birth4.value|default:'' }}">
                             </div>
                             <div class="member-row is-hidden" data-idx="5">
                                 <div class="num">5</div>
-                                <input class="input m-name" name="athlet5" type="text" placeholder="Фамилия Имя" autocomplete="off" value="{{ team_form.athlet5.value|default:'' }}">
+                                <input class="input m-name" maxlength="50" name="athlet5" type="text" placeholder="Фамилия Имя" autocomplete="off" value="{{ team_form.athlet5.value|default:'' }}">
                                 <input class="input m-year" name="birth5" type="text" inputmode="numeric" maxlength="4" placeholder="Год рожд." value="{{ team_form.birth5.value|default:'' }}">
                             </div>
                             <div class="member-row is-hidden" data-idx="6">
                                 <div class="num">6</div>
-                                <input class="input m-name" name="athlet6" type="text" placeholder="Фамилия Имя" autocomplete="off" value="{{ team_form.athlet6.value|default:'' }}">
+                                <input class="input m-name" maxlength="50" name="athlet6" type="text" placeholder="Фамилия Имя" autocomplete="off" value="{{ team_form.athlet6.value|default:'' }}">
                                 <input class="input m-year" name="birth6" type="text" inputmode="numeric" maxlength="4" placeholder="Год рожд." value="{{ team_form.birth6.value|default:'' }}">
                             </div>
                         </div>

@@ -3448,3 +3448,27 @@ def test_promo_quota_frees_after_reservation_ttl(client):
     )
 
     assert occupied_team_ids(promo) == set()
+
+
+@pytest.mark.django_db
+def test_add_team_rejects_overlong_text_fields(client):
+    """Values longer than the columns must be a form error, not a DB 500."""
+    user, race, category = _submit_token_setup("tok-long")
+    client.force_login(user)
+    response = client.post(
+        reverse("add_team", args=[race.slug]),
+        {
+            "ucount": "2",
+            "category2_id": str(category.id),
+            "city": "г" * 51,
+            "organization": "о" * 51,
+            "teamname": "н" * 101,
+            "athlet1": "а" * 51,
+            "submit_token": "c" * 32,
+        },
+    )
+
+    assert response.status_code == 200
+    form = response.context["team_form"]
+    assert set(form.errors) >= {"city", "organization", "teamname", "athlet1"}
+    assert not Team.objects.filter(category2=category).exists()
