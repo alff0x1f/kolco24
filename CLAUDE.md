@@ -491,6 +491,31 @@ the new design should extend `base-2.html`. Page-specific CSS goes in `src/stati
 `{% block extra_head %}`. Do not define a bare `.page` class in page-specific CSS — `theme-2.css` already defines it.
 Use a scoped wrapper class (e.g. `.race-page`).
 
+**Home page owned-teams panel**: the home page (`website/views/community.py:HomeView`, template
+`src/templates/website/home.html`) shows a «Личный кабинет» section listing the signed-in user's teams across **all**
+published races with `date_end >= today`, grouped by race. `HomeView.get` builds one base queryset `unfinished_races`
+(`is_published=True`, `date_end__gte=today`, `order_by("date", "pk")` — named for the criterion, since a race running
+right now counts; `RaceListView`'s separate `future_races` context key means the stricter `date > today`) —
+`upcoming_races` (right column) is derived from
+it (minus `featured_race`, `[:3]`) while the panel gets `unfinished_races` **whole**, since a team can be in the spotlight
+race (excluded from `upcoming_races`) or past the slice. `owned_teams_by_race(user, races)` makes **one** query
+(`select_related("category2", "category2__race")`) and groups in Python; an anonymous user gets `[]` with **zero**
+queries. Context key `owned_team_groups`, rendered by `src/templates/website/_home_owned_teams.html` (included without
+`only`), styled by the `.my-teams` block in `src/static/css/community.css` (no new breakpoints — rules added inside the
+existing 720/600 px media queries). `can_change` is computed once per race, carried on the group dict, and mirrored into each team dict (the template and
+tests read it there) via `apps.race.permissions.is_team_editing_open`. The module-local `_team_display_name(team, user)` takes the owner
+**explicitly** (unlike `apps.race.views._team_display_name`, which reads `team.owner` and would cost +1 query per
+unnamed team). This panel **deliberately duplicates** the race-page panel (`apps/race/views.py:_owned_teams`,
+`src/templates/race/_owned_teams.html`, `.owned-*` in `race.css`) — there is intentionally **no shared partial or shared
+CSS**: the two pages use different design vocabularies (`community.css`/`community-button` vs `race.css`/`.btn`), so
+~25 lines of Python and ~40 of markup are duplicated on purpose. Ordering is race `date` → race `id` → category
+`order` → `start_number` → team `id`; `Team.start_number` is a **`CharField`**, so that leg sorts lexicographically
+(`"10"` before `"9"`) — **deliberate**, matching the race-page panel, and it must not be "fixed" to a numeric sort in
+one panel only. There is **deliberately no empty state**: a signed-in user with no teams in any future race renders
+nothing at all (the template is wrapped in `{% if owned_team_groups %}`). Home-page tests live in
+`src/website/test_publications.py`, not `src/website/tests.py`; the test helper `_unfinished_races()` there calls the
+view's own `community.unfinished_races(today)` so the two definitions can't drift.
+
 **Custom error pages**: `src/templates/{404,403,500}.html` (themed «Сбились с маршрута»), sharing
 `src/static/css/error.css` (scoped under `.error-page`). Django's default handlers auto-load them by name — no
 `handler404/500/403` wiring in `config/urls.py`. `404.html`/`403.html` extend `base-2.html` (rendered with a

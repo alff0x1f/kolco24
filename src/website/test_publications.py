@@ -3,15 +3,16 @@ from datetime import timedelta
 from unittest.mock import patch
 
 import pytest
-from django.contrib.auth.models import Permission
+from django.contrib.auth.models import AnonymousUser, Permission
 from django.template.loader import render_to_string
 from django.urls import Resolver404, resolve, reverse
 from django.utils import timezone
 
 from website.forms import NewsPostForm
-from website.models import NewsPost, PublicationKind, Race, RaceAdmin
+from website.models import NewsPost, PublicationKind, Race, RaceAdmin, Team
 from website.models.news import _clean_feed_html, _render_markdown
-from website.models.race import RegStatus
+from website.models.race import Category, RegStatus
+from website.views.community import owned_teams_by_race, unfinished_races
 
 
 def create_publication(title, **kwargs):
@@ -921,3 +922,376 @@ def test_race_feed_uses_shared_visibility_and_stable_order(
     from apps.race.views import RacePageView
 
     assert RacePageView.build_context(race)["news_list"] == []
+
+
+def _unfinished_races():
+    """Same queryset the home view feeds the panel, so the two can't drift."""
+    return unfinished_races(timezone.localdate())
+
+
+def _extract(pattern, html, what):
+    """First capture group of ``pattern``, with a readable failure message."""
+    match = re.search(pattern, html, re.S)
+    assert match is not None, f"{what} was not rendered"
+    return match.group(1)
+
+
+def _panel(html):
+    """The owned-teams section alone, so assertions can't pass on other blocks."""
+    return _extract(
+        r'(<section class="my-teams".*?</section>)', html, "owned-teams panel"
+    )
+
+
+def create_owned_race(slug, days=3, **kwargs):
+    today = timezone.localdate()
+    defaults = {
+        "name": f"Гонка {slug}",
+        "date": today + timedelta(days=days),
+        "date_end": today + timedelta(days=days),
+    }
+    defaults.update(kwargs)
+    return Race.objects.create(slug=slug, **defaults)
+
+
+def create_owned_category(race, **kwargs):
+    defaults = {"code": "12h", "short_name": "12ч", "name": "12 часов", "order": 0}
+    defaults.update(kwargs)
+    return Category.objects.create(race=race, **defaults)
+
+
+def create_owned_team(owner, category, **kwargs):
+    defaults = {"ucount": 3, "paid_people": 3, "start_number": "7", "city": "Уфа"}
+    defaults.update(kwargs)
+    return Team.objects.create(owner=owner, category2=category, **defaults)
+
+
+@pytest.mark.django_db
+def test_owned_teams_by_race_collects_team_card_fields(django_user_model):
+    user = django_user_model.objects.create_user(
+        username="owner", first_name="Иван", last_name="Петров"
+    )
+    race = create_owned_race("owned-fields", is_teams_editable=True)
+    team = create_owned_team(
+        user, create_owned_category(race), teamname="Лесные коты", start_number="18"
+    )
+
+    groups = owned_teams_by_race(user, _unfinished_races())
+
+    assert len(groups) == 1
+    assert groups[0]["race"] == race
+    assert groups[0]["teams"] == [
+        {
+            "id": team.id,
+            "name": "Лесные коты",
+            "number": "18",
+            "category": "12ч",
+            "city": "Уфа",
+            "participants": 3,
+            "url": reverse("edit_team", args=[team.id]),
+            "action_label": "Редактировать команду",
+            "can_change": True,
+            "needs_payment": False,
+        }
+    ]
+
+
+@pytest.mark.django_db
+def test_owned_teams_by_race_ignores_anonymous_and_other_owners(django_user_model):
+    stranger = django_user_model.objects.create_user(username="stranger")
+    user = django_user_model.objects.create_user(username="viewer")
+    race = create_owned_race("owned-strangers")
+    create_owned_team(stranger, create_owned_category(race), teamname="Чужая")
+
+    assert owned_teams_by_race(AnonymousUser(), _unfinished_races()) == []
+    assert owned_teams_by_race(None, _unfinished_races()) == []
+    assert owned_teams_by_race(user, _unfinished_races()) == []
+
+
+@pytest.mark.django_db
+def test_owned_teams_by_race_marks_closed_editing_as_view_only(django_user_model):
+    user = django_user_model.objects.create_user(username="locked-owner")
+    race = create_owned_race("owned-locked", is_teams_editable=False)
+    create_owned_team(user, create_owned_category(race), teamname="Закрытая")
+
+    (group,) = owned_teams_by_race(user, _unfinished_races())
+
+    assert group["teams"][0]["can_change"] is False
+    assert group["teams"][0]["action_label"] == "Посмотреть команду"
+
+
+@pytest.mark.django_db
+def test_owned_teams_by_race_groups_races_in_date_order(django_user_model):
+    user = django_user_model.objects.create_user(username="multi-owner")
+    later = create_owned_race("owned-later", days=20)
+    sooner = create_owned_race("owned-sooner", days=2)
+    create_owned_team(user, create_owned_category(later), teamname="Поздняя")
+    create_owned_team(user, create_owned_category(sooner), teamname="Ранняя")
+
+    groups = owned_teams_by_race(user, _unfinished_races())
+
+    assert [group["race"] for group in groups] == [sooner, later]
+    assert [group["teams"][0]["name"] for group in groups] == ["Ранняя", "Поздняя"]
+
+
+@pytest.mark.django_db
+def test_owned_teams_by_race_falls_back_to_generated_name(django_user_model):
+    user = django_user_model.objects.create_user(
+        username="nameless", first_name="Иван", last_name="Петров"
+    )
+    race = create_owned_race("owned-nameless")
+    team = create_owned_team(user, create_owned_category(race), teamname="")
+
+    (group,) = owned_teams_by_race(user, _unfinished_races())
+
+    assert group["teams"][0]["name"] == f"Без названия {team.id} (Петров Иван)"
+
+
+@pytest.mark.django_db
+def test_owned_teams_by_race_keeps_one_group_per_race_in_team_order(
+    django_user_model,
+):
+    user = django_user_model.objects.create_user(username="many-teams")
+    race = create_owned_race("owned-many")
+    first = create_owned_category(race, code="12h", order=0)
+    second = create_owned_category(race, code="24h", short_name="24ч", order=1)
+    create_owned_team(user, first, teamname="A1", start_number="1")
+    create_owned_team(user, first, teamname="A2", start_number="10")
+    create_owned_team(user, second, teamname="B", start_number="2")
+
+    groups = owned_teams_by_race(user, _unfinished_races())
+
+    assert len(groups) == 1
+    # start_number is a CharField, so "1" < "10" lexicographically — deliberate.
+    assert [team["name"] for team in groups[0]["teams"]] == ["A1", "A2", "B"]
+
+
+@pytest.mark.django_db
+def test_owned_teams_by_race_skips_deleted_teams(django_user_model):
+    user = django_user_model.objects.create_user(username="deleted-owner")
+    race = create_owned_race("owned-deleted")
+    team = create_owned_team(user, create_owned_category(race), teamname="Удалённая")
+    Team.objects.filter(pk=team.pk).update(is_deleted=True)
+
+    assert owned_teams_by_race(user, _unfinished_races()) == []
+
+
+@pytest.mark.django_db
+def test_owned_teams_by_race_lets_a_superuser_edit_a_locked_race(django_user_model):
+    user = django_user_model.objects.create_superuser(
+        username="super-owner", email="super-owner@example.com", password="x"
+    )
+    race = create_owned_race("owned-super", is_teams_editable=False)
+    create_owned_team(user, create_owned_category(race), teamname="Админская")
+
+    (group,) = owned_teams_by_race(user, _unfinished_races())
+
+    assert group["teams"][0]["can_change"] is True
+    assert group["teams"][0]["action_label"] == "Редактировать команду"
+
+
+@pytest.mark.django_db
+def test_home_panel_includes_a_team_beyond_the_upcoming_slice(
+    client, django_user_model
+):
+    user = django_user_model.objects.create_user(username="slice-owner")
+    for index in range(4):
+        create_owned_race(f"home-slice-{index}", days=index + 2)
+    last = create_owned_race("home-slice-last", days=40)
+    create_owned_team(user, create_owned_category(last), teamname="Дальняя")
+    client.force_login(user)
+
+    response = client.get(reverse("index"))
+
+    assert len(response.context["upcoming_races"]) == 3
+    assert last not in list(response.context["upcoming_races"])
+    groups = response.context["owned_team_groups"]
+    assert [group["race"] for group in groups] == [last]
+
+
+@pytest.mark.django_db
+def test_home_panel_includes_a_team_in_the_featured_race(client, django_user_model):
+    user = django_user_model.objects.create_user(username="home-owner")
+    race = create_owned_race("home-featured", reg_status=RegStatus.OPEN)
+    create_owned_team(user, create_owned_category(race), teamname="Спотлайтовая")
+    client.force_login(user)
+
+    response = client.get(reverse("index"))
+
+    assert response.context["featured_race"] == race
+    assert list(response.context["upcoming_races"]) == []
+    groups = response.context["owned_team_groups"]
+    assert [group["race"] for group in groups] == [race]
+    assert groups[0]["teams"][0]["name"] == "Спотлайтовая"
+
+
+@pytest.mark.django_db
+def test_home_panel_skips_past_races(client, django_user_model):
+    user = django_user_model.objects.create_user(username="past-owner")
+    today = timezone.localdate()
+    race = create_owned_race(
+        "home-past",
+        date=today - timedelta(days=10),
+        date_end=today - timedelta(days=9),
+    )
+    create_owned_team(user, create_owned_category(race), teamname="Прошлая")
+    client.force_login(user)
+
+    response = client.get(reverse("index"))
+
+    assert response.context["owned_team_groups"] == []
+
+
+@pytest.mark.django_db
+def test_home_panel_skips_unpublished_races(client, django_user_model):
+    user = django_user_model.objects.create_user(username="draft-owner")
+    race = create_owned_race("home-draft", is_published=False)
+    create_owned_team(user, create_owned_category(race), teamname="Черновая")
+    client.force_login(user)
+
+    response = client.get(reverse("index"))
+
+    assert response.context["owned_team_groups"] == []
+
+
+@pytest.mark.django_db
+def test_home_panel_is_empty_for_anonymous_visitors(client, django_user_model):
+    user = django_user_model.objects.create_user(username="anon-owner")
+    race = create_owned_race("home-anon")
+    create_owned_team(user, create_owned_category(race), teamname="Чужая")
+
+    response = client.get(reverse("index"))
+
+    assert response.context["owned_team_groups"] == []
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("paid_people", [0, 1, 2.5, 3, 4])
+def test_home_panel_renders_race_heading_and_team_row(
+    client, django_user_model, paid_people
+):
+    user = django_user_model.objects.create_user(username="render-owner")
+    race = create_owned_race(
+        "home-render", name="Кольцо 24: весна", is_teams_editable=True
+    )
+    team = create_owned_team(
+        user,
+        create_owned_category(race),
+        teamname="Лесные коты",
+        start_number="18",
+        paid_people=paid_people,
+    )
+    client.force_login(user)
+
+    html = client.get(reverse("index")).content.decode()
+    panel = _panel(html)
+
+    assert "Личный кабинет" in panel
+    assert "Лесные коты" in panel
+    assert "Кольцо 24: весна" in panel
+    assert reverse("race", args=[race.slug]) in panel
+    assert reverse("edit_team", args=[team.id]) in panel
+    assert "Редактировать команду" in panel
+    assert '<div class="my-teams__number">18</div>' in panel
+    assert "3 участника" in panel
+    assert ("3 участника (не оплачено)" in panel) == (paid_people < 3)
+    # The panel sits between the spotlight and the main community content.
+    assert html.index('class="my-teams"') < html.index("community-content")
+
+
+@pytest.mark.django_db
+def test_home_panel_renders_numberless_team_and_date_range(client, django_user_model):
+    user = django_user_model.objects.create_user(username="range-owner")
+    today = timezone.localdate()
+    race = create_owned_race(
+        "home-range",
+        date=today + timedelta(days=5),
+        date_end=today + timedelta(days=6),
+    )
+    create_owned_team(
+        user, create_owned_category(race), teamname="Безномерные", start_number=""
+    )
+    client.force_login(user)
+
+    panel = _panel(client.get(reverse("index")).content.decode())
+
+    number = _extract(
+        r'<div class="my-teams__number">(.*?)</div>', panel, "team number cell"
+    )
+    assert number.strip() == "—"
+    dates = _extract(
+        r'<span class="my-teams__race-date">(.*?)</span>', panel, "race date"
+    )
+    assert "–" in dates
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(
+    ("ucount", "expected"),
+    [(1, "1 участник"), (3, "3 участника"), (5, "5 участников")],
+)
+def test_home_panel_pluralizes_participants(
+    client, django_user_model, ucount, expected
+):
+    user = django_user_model.objects.create_user(username="plural-owner")
+    race = create_owned_race("home-plural")
+    create_owned_team(
+        user,
+        create_owned_category(race),
+        teamname="Считалочка",
+        ucount=ucount,
+        paid_people=ucount,
+    )
+    client.force_login(user)
+
+    panel = _panel(client.get(reverse("index")).content.decode())
+
+    assert f">{expected}</span>" in panel
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("login", [False, True])
+def test_home_panel_is_absent_without_owned_teams(client, django_user_model, login):
+    owner = django_user_model.objects.create_user(username="panel-owner")
+    race = create_owned_race("home-absent")
+    create_owned_team(owner, create_owned_category(race), teamname="Чужая")
+    if login:
+        client.force_login(django_user_model.objects.create_user(username="empty"))
+
+    html = client.get(reverse("index")).content.decode()
+
+    assert "Личный кабинет" not in html
+    assert "Чужая" not in html
+
+
+@pytest.mark.django_db
+def test_home_panel_renders_view_only_team(client, django_user_model):
+    user = django_user_model.objects.create_user(username="locked-render")
+    race = create_owned_race("home-locked", is_teams_editable=False)
+    create_owned_team(user, create_owned_category(race), teamname="Закрытая")
+    client.force_login(user)
+
+    panel = _panel(client.get(reverse("index")).content.decode())
+
+    assert "Посмотреть команду" in panel
+    assert "Редактирование закрыто" in panel
+    assert "Редактировать команду" not in panel
+
+
+@pytest.mark.django_db
+def test_home_panel_meta_has_no_dangling_separator_without_city(
+    client, django_user_model
+):
+    user = django_user_model.objects.create_user(username="cityless")
+    race = create_owned_race("home-cityless")
+    create_owned_team(
+        user, create_owned_category(race), teamname="Безгородные", city=""
+    )
+    client.force_login(user)
+
+    panel = _panel(client.get(reverse("index")).content.decode())
+    meta = _extract(r'<div class="my-teams__meta">(.*?)</div>', panel, "team meta")
+
+    assert meta.count("·") == 1
+    assert "12ч" in meta
+    assert "3 участника" in meta

@@ -12,14 +12,14 @@
     <div class="owned-teams-list">
       {% for team in owned_teams %}
       <article class="owned-team-row">
-        <div class="owned-team-number">{% if team.number %}№ {{ team.number }}{% else %}Без номера{% endif %}</div>
+        <div class="owned-team-number">{% if team.number %}{{ team.number }}{% else %}—{% endif %}</div>
         <div class="owned-team-copy">
           <h3>{{ team.name }}</h3>
           <div class="owned-team-meta">
             <span>{{ team.category }}</span>
             {% if team.city %}<span class="meta-sep" aria-hidden="true"></span><span>{{ team.city }}</span>{% endif %}
             <span class="meta-sep" aria-hidden="true"></span>
-            <span>{{ team.participants }} {{ team.participants|ru_plural:"участник,участника,участников" }}</span>
+            <span>{{ team.participants }} {{ team.participants|ru_plural:"участник,участника,участников" }}{% if team.needs_payment %} (не оплачено){% endif %}</span>
           </div>
           {% if not team.can_change %}<span class="owned-team-locked">Редактирование закрыто</span>{% endif %}
         </div>

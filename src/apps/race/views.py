@@ -108,6 +108,7 @@ def _owned_teams(race, user):
                 "Редактировать команду" if can_change else "Посмотреть команду"
             ),
             "can_change": can_change,
+            "needs_payment": team.paid_people < team.ucount,
         }
         for team in teams
     ]

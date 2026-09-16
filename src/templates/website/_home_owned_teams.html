@@ -1,0 +1,36 @@
+{% load custom_filters %}
+{% if owned_team_groups %}
+<section class="my-teams" aria-labelledby="my-teams-title">
+  <div class="container">
+    <div class="my-teams__head">
+      <span class="my-teams__kicker">Личный кабинет</span>
+      <h2 id="my-teams-title">Ваши команды</h2>
+    </div>
+    {% for group in owned_team_groups %}
+    <div class="my-teams__group">
+      <h3 class="my-teams__race">
+        <a href="{% url 'race' group.race.slug %}">{{ group.race.name }}</a>
+        <span class="my-teams__race-date">{% if group.race.date_end != group.race.date %}{{ group.race.date|date:"j E" }}–{{ group.race.date_end|date:"j E Y" }}{% else %}{{ group.race.date|date:"j E Y" }}{% endif %}</span>
+      </h3>
+      {% for team in group.teams %}
+      <article class="my-teams__row">
+        <div class="my-teams__number">{% if team.number %}{{ team.number }}{% else %}—{% endif %}</div>
+        <div class="my-teams__copy">
+          <h4>{{ team.name }}</h4>
+          <div class="my-teams__meta">
+            <span>{{ team.category }}</span>
+            {% if team.city %}<span class="my-teams__sep" aria-hidden="true">·</span><span>{{ team.city }}</span>{% endif %}
+            <span class="my-teams__sep" aria-hidden="true">·</span>
+            <span>{{ team.participants }} {{ team.participants|ru_plural:"участник,участника,участников" }}{% if team.needs_payment %} (не оплачено){% endif %}</span>
+          </div>
+          {% if not team.can_change %}<span class="my-teams__locked">Редактирование закрыто</span>{% endif %}
+        </div>
+        <a class="community-button {% if team.can_change %}community-button--accent{% else %}community-button--ghost{% endif %}"
+           href="{{ team.url }}">{{ team.action_label }}</a>
+      </article>
+      {% endfor %}
+    </div>
+    {% endfor %}
+  </div>
+</section>
+{% endif %}
