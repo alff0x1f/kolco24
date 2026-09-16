@@ -5580,6 +5580,74 @@ def test_settle_payment_flips_race_to_sold_out():
     assert race.reg_status == RegStatus.SOLD_OUT
 
 
+@pytest.mark.django_db
+def test_refund_payment_takes_back_people_and_extras():
+    from apps.race.settlement import refund_payment
+
+    _, race, team = _priced_team("rf1", cost=1000, ucount=4, paid_people=1)
+    transfer = RaceExtra.objects.create(
+        race=race, code="transfer", name="Трансфер", price=500
+    )
+    TeamExtra.objects.create(team=team, race_extra=transfer, count=2, count_paid=0)
+    payment = Payment.objects.create(
+        team=team, payment_amount=4000, paid_for=3, status=Payment.STATUS_DRAFT
+    )
+    PaymentExtra.objects.create(
+        payment=payment, race_extra=transfer, count=2, unit_price=500
+    )
+    settle_payment(payment)
+
+    assert refund_payment(payment) is True
+
+    team.refresh_from_db()
+    payment.refresh_from_db()
+    assert team.paid_people == 1
+    assert team.paid_sum == 0
+    assert payment.status == Payment.STATUS_CANCEL
+    te = team.extras.get(race_extra=transfer)
+    assert te.count_paid == 0
+    assert te.count == 2
+
+
+@pytest.mark.django_db
+def test_refund_payment_only_settled_once():
+    from apps.race.settlement import refund_payment
+
+    _, race, team = _priced_team("rf2", cost=1000, ucount=4, paid_people=1)
+    payment = Payment.objects.create(
+        team=team, payment_amount=3000, paid_for=3, status=Payment.STATUS_DRAFT
+    )
+
+    # A draft was never credited, so there is nothing to take back.
+    assert refund_payment(payment) is False
+
+    settle_payment(payment)
+    assert refund_payment(payment) is True
+    assert refund_payment(payment) is False
+
+    team.refresh_from_db()
+    assert team.paid_people == 1
+
+
+@pytest.mark.django_db
+def test_refund_payment_leaves_sold_out_race_closed():
+    from apps.race.settlement import refund_payment
+
+    _, race, team = _priced_team("rf3", cost=1000, ucount=4, paid_people=1)
+    race.people_limit = 4
+    race.reg_status = RegStatus.OPEN
+    race.save(update_fields=["people_limit", "reg_status"])
+    payment = Payment.objects.create(
+        team=team, payment_amount=3000, paid_for=3, status=Payment.STATUS_DRAFT
+    )
+    settle_payment(payment)
+
+    refund_payment(payment)
+
+    race.refresh_from_db()
+    assert race.reg_status == RegStatus.SOLD_OUT
+
+
 # --- Promo codes: payment creation ---
 
 from apps.race.promo import PromoUnavailable  # noqa: E402

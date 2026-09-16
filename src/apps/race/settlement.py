@@ -13,6 +13,7 @@ create it as a ``draft`` and let :func:`settle_payment` flip it.
 from django.db import transaction
 from django.db.models import F
 from django.db.models.functions import Greatest
+from django.utils import timezone
 
 from website.models import Payment, Team
 
@@ -74,4 +75,44 @@ def settle_payment(payment) -> bool:
         payment.status = Payment.STATUS_DONE
         payment.order = payment.pk
         payment.save(update_fields=["status", "order"])
+    return True
+
+
+def debit_extras(team: Team, payment: Payment) -> None:
+    """Take back the add-on counts this payment credited.
+
+    The mirror of :func:`credit_extras`; ``count`` (what the team asked for) is
+    left alone, only ``count_paid`` drops. Idempotency lives in the caller.
+    """
+    from apps.race.models import TeamExtra
+
+    for pe in payment.extras.all():
+        TeamExtra.objects.filter(team=team, race_extra=pe.race_extra).update(
+            count_paid=Greatest(F("count_paid") - pe.count, 0),
+        )
+
+
+def refund_payment(payment) -> bool:
+    """Undo a settled race ``Payment`` after the bank refunded its order.
+
+    Only a ``done`` payment can be refunded, which also makes this idempotent:
+    the flip to ``cancel`` means a second call takes nothing back twice. The
+    race's ``reg_status`` is deliberately left as-is — a freed seat never
+    reopens registration automatically (same rule as elsewhere).
+    """
+    if not payment or payment.status != Payment.STATUS_DONE:
+        return False
+    team: Team = payment.team
+    with transaction.atomic():
+        if team:
+            Team.objects.filter(pk=team.pk).update(
+                paid_people=Greatest(F("paid_people") - payment.paid_for, 0.0),
+                paid_sum=Greatest(F("paid_sum") - payment.payment_amount, 0.0),
+                updated_at=timezone.now(),
+            )
+            debit_extras(team, payment)
+            # The caller's in-memory copy must not keep the pre-refund numbers.
+            team.refresh_from_db(fields=["paid_people", "paid_sum"])
+        payment.status = Payment.STATUS_CANCEL
+        payment.save(update_fields=["status"])
     return True

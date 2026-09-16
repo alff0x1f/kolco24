@@ -1,6 +1,6 @@
 import re
 from datetime import timedelta
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 import pytest
 from django.contrib.auth.models import User
@@ -1398,6 +1398,98 @@ def test_resolve_race_payment_legacy_fallback_no_row_returns_none():
     vtb_payment = _make_vtb_payment("ORDER_999999999")
 
     assert Command()._resolve_race_payment(vtb_payment) is None
+
+
+# --- Reconciliation: refunds ---
+
+
+def _refund_payload(order_id, *, amount=1000.0, refund_amount=None):
+    refund_amount = amount if refund_amount is None else refund_amount
+    return {
+        "object": {
+            "orderId": order_id,
+            "status": {"value": "REFUNDED", "description": "REFUNDED"},
+            "amount": {"value": amount, "code": "RUB"},
+            "transactions": {
+                "refunds": [
+                    {
+                        "object": {
+                            "amount": {"value": refund_amount, "code": "RUB"},
+                            "status": {"value": "RECONCILED"},
+                        }
+                    }
+                ]
+            },
+        }
+    }
+
+
+def _refunded_team_payment():
+    from apps.race.settlement import settle_payment
+
+    user = User.objects.create_user(
+        username="ref", password="pass", email="ref@example.com"
+    )
+    race = Race.objects.create(
+        name="Ref", slug="ref-1", cost=500, reg_status=RegStatus.OPEN
+    )
+    cat = Category.objects.create(
+        code="t", name="Team", short_name="T", race=race, min_people=2, max_people=6
+    )
+    team = Team.objects.create(
+        owner=user, paymentid="rf1", dist="t", category2=cat, ucount=4, paid_people=2
+    )
+    vtb_payment = _make_vtb_payment(VTBPayment.new_order_id("ORDER"))
+    payment = Payment.objects.create(
+        owner=user,
+        team=team,
+        payment_method="sbp2",
+        payment_amount=1000,
+        paid_for=2,
+        status=Payment.STATUS_DRAFT,
+        vtb_payment=vtb_payment,
+    )
+    settle_payment(payment)
+    return team, payment, vtb_payment
+
+
+@pytest.mark.django_db
+def test_refunded_order_rolls_back_team():
+    from website.management.commands.check_vtb_payments import Command
+
+    team, payment, vtb_payment = _refunded_team_payment()
+    payload = _refund_payload(vtb_payment.order_id)
+
+    client = Mock()
+    client.get_order.return_value = payload
+    Command()._check_payment(client, vtb_payment)
+
+    team.refresh_from_db()
+    payment.refresh_from_db()
+    vtb_payment.refresh_from_db()
+    assert vtb_payment.status == "REFUNDED"
+    assert payment.status == Payment.STATUS_CANCEL
+    assert team.paid_people == 2
+    assert team.paid_sum == 0
+
+
+@pytest.mark.django_db
+def test_partial_refund_is_not_rolled_back():
+    from website.management.commands.check_vtb_payments import Command
+
+    team, payment, vtb_payment = _refunded_team_payment()
+    payload = _refund_payload(vtb_payment.order_id, refund_amount=400.0)
+
+    client = Mock()
+    client.get_order.return_value = payload
+    Command()._check_payment(client, vtb_payment)
+
+    team.refresh_from_db()
+    payment.refresh_from_db()
+    vtb_payment.refresh_from_db()
+    assert vtb_payment.status == "PAID"  # left untouched for a human to sort out
+    assert payment.status == Payment.STATUS_DONE
+    assert team.paid_people == 4
 
 
 # --- Task 5: add_team.html rewritten on base-2 ---
