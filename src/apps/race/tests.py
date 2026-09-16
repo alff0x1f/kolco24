@@ -5594,6 +5594,46 @@ def test_settle_payment_claims_status_before_crediting():
 
 
 @pytest.mark.django_db
+def test_settle_payment_credits_a_deleted_team():
+    """A team can be deleted while its payment is still a draft.
+
+    The bank may confirm that draft afterwards; the money still belongs on the
+    team's balance, and the flip to ``done`` means there is no second chance.
+    """
+    _, race, team = _priced_team("st5", cost=1000, ucount=4, paid_people=0)
+    team.is_deleted = True
+    team.save(update_fields=["is_deleted", "updated_at"])
+    payment = Payment.objects.create(
+        team=team, payment_amount=4000, paid_for=4, status=Payment.STATUS_DRAFT
+    )
+
+    assert settle_payment(payment) is True
+
+    team = Team.all_objects.get(pk=team.pk)
+    assert team.paid_people == 4
+    assert team.paid_sum == 4000
+
+
+@pytest.mark.django_db
+def test_refund_payment_debits_a_deleted_team():
+    from apps.race.settlement import refund_payment
+
+    _, race, team = _priced_team("st6", cost=1000, ucount=4, paid_people=0)
+    payment = Payment.objects.create(
+        team=team, payment_amount=4000, paid_for=4, status=Payment.STATUS_DRAFT
+    )
+    settle_payment(payment)
+    team.is_deleted = True
+    team.save(update_fields=["is_deleted", "updated_at"])
+
+    assert refund_payment(payment) is True
+
+    team = Team.all_objects.get(pk=team.pk)
+    assert team.paid_people == 0
+    assert team.paid_sum == 0
+
+
+@pytest.mark.django_db
 def test_settle_payment_flips_race_to_sold_out():
     _, race, team = _priced_team("st3", cost=1000, ucount=4, paid_people=1)
     race.people_limit = 4

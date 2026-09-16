@@ -60,7 +60,11 @@ def settle_payment(payment) -> bool:
         if team:
             # Atomic SQL-level increment, like credit_extras: two commands
             # settling two payments of the same team must not lose a credit.
-            Team.objects.filter(pk=team.pk).update(
+            # ``all_objects``: a team may be deleted while its payment is still
+            # a draft, and the bank can confirm that draft afterwards — the
+            # default manager would silently skip the row and the money would
+            # be lost, since the flip to ``done`` stops any later retry.
+            Team.all_objects.filter(pk=team.pk).update(
                 paid_people=F("paid_people") + payment.paid_for,
                 paid_sum=F("paid_sum") + payment.payment_amount,
                 updated_at=timezone.now(),
@@ -122,7 +126,7 @@ def refund_payment(payment) -> bool:
         if not claimed:
             return False
         if team:
-            Team.objects.filter(pk=team.pk).update(
+            Team.all_objects.filter(pk=team.pk).update(
                 paid_people=Greatest(F("paid_people") - payment.paid_for, 0.0),
                 paid_sum=Greatest(F("paid_sum") - payment.payment_amount, 0.0),
                 updated_at=timezone.now(),
