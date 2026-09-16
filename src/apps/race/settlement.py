@@ -95,15 +95,25 @@ def debit_extras(team: Team, payment: Payment) -> None:
 def refund_payment(payment) -> bool:
     """Undo a settled race ``Payment`` after the bank refunded its order.
 
-    Only a ``done`` payment can be refunded, which also makes this idempotent:
-    the flip to ``cancel`` means a second call takes nothing back twice. The
-    race's ``reg_status`` is deliberately left as-is — a freed seat never
+    Only a ``done`` payment can be refunded. The ``done → cancel`` flip is
+    claimed with a conditional ``UPDATE`` before anything is debited, so it is
+    the single arbiter of who rolls back: a second call — a concurrent one, or
+    one holding a stale in-memory copy — changes no row and takes nothing back.
+    Debiting twice would eat seats and add-ons paid for by *other* payments of
+    the same team, which the ``Greatest(…, 0)`` floor would not catch.
+
+    The race's ``reg_status`` is deliberately left as-is — a freed seat never
     reopens registration automatically (same rule as elsewhere).
     """
     if not payment or payment.status != Payment.STATUS_DONE:
         return False
     team: Team = payment.team
     with transaction.atomic():
+        claimed = Payment.objects.filter(
+            pk=payment.pk, status=Payment.STATUS_DONE
+        ).update(status=Payment.STATUS_CANCEL)
+        if not claimed:
+            return False
         if team:
             Team.objects.filter(pk=team.pk).update(
                 paid_people=Greatest(F("paid_people") - payment.paid_for, 0.0),
@@ -113,6 +123,5 @@ def refund_payment(payment) -> bool:
             debit_extras(team, payment)
             # The caller's in-memory copy must not keep the pre-refund numbers.
             team.refresh_from_db(fields=["paid_people", "paid_sum"])
-        payment.status = Payment.STATUS_CANCEL
-        payment.save(update_fields=["status"])
+    payment.status = Payment.STATUS_CANCEL
     return True

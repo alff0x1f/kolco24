@@ -5630,6 +5630,39 @@ def test_refund_payment_only_settled_once():
 
 
 @pytest.mark.django_db
+def test_refund_payment_claims_status_before_debiting():
+    """A second copy of the same payment must not debit the team twice.
+
+    Stands in for two commands racing on one refunded order: both hold a
+    ``done`` payment in memory, only the one that wins the status flip debits.
+    """
+    from apps.race.settlement import refund_payment
+
+    _, race, team = _priced_team("rf4", cost=1000, ucount=4, paid_people=1)
+    transfer = RaceExtra.objects.create(
+        race=race, code="transfer", name="Трансфер", price=500
+    )
+    TeamExtra.objects.create(team=team, race_extra=transfer, count=2, count_paid=2)
+    payment = Payment.objects.create(
+        team=team, payment_amount=3000, paid_for=3, status=Payment.STATUS_DRAFT
+    )
+    PaymentExtra.objects.create(
+        payment=payment, race_extra=transfer, count=2, unit_price=500
+    )
+    settle_payment(payment)
+    stale = Payment.objects.get(pk=payment.pk)  # still 'done' in memory
+
+    assert refund_payment(payment) is True
+    assert refund_payment(stale) is False
+
+    team.refresh_from_db()
+    assert team.paid_people == 1
+    assert team.paid_sum == 0
+    # The team's own 2 pre-paid add-ons survive; only this payment's 2 go back.
+    assert team.extras.get(race_extra=transfer).count_paid == 2
+
+
+@pytest.mark.django_db
 def test_refund_payment_leaves_sold_out_race_closed():
     from apps.race.settlement import refund_payment
 
