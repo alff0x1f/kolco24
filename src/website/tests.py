@@ -1400,6 +1400,105 @@ def test_resolve_race_payment_legacy_fallback_no_row_returns_none():
     assert Command()._resolve_race_payment(vtb_payment) is None
 
 
+# --- Reconciliation: when the money actually arrived ---
+
+
+def _run_check(vtb_payment, payload):
+    """Прогнать команду опроса по одному заказу с подставным ответом ВТБ."""
+    from website.management.commands.check_vtb_payments import Command
+
+    client = Mock()
+    client.get_order.return_value = payload
+    Command()._check_payment(client, vtb_payment)
+
+
+def _paid_payload(
+    order_id, *, tx_changed_at, tx_created_at=None, order_changed_at=None
+):
+    return {
+        "object": {
+            "orderId": order_id,
+            "status": {
+                "value": "PAID",
+                "description": "PAID",
+                "changedAt": order_changed_at or "2026-09-15T14:01:44.852Z",
+            },
+            "amount": {"value": 1000.0, "code": "RUB"},
+            "transactions": {
+                "payments": [
+                    {
+                        "object": {
+                            "createdAt": tx_created_at or "2026-09-15T14:01:45.082Z",
+                            "status": {
+                                "value": "RECONCILED",
+                                "changedAt": tx_changed_at,
+                            },
+                        }
+                    }
+                ],
+                "refunds": [],
+            },
+        }
+    }
+
+
+@pytest.mark.django_db
+def test_paid_order_stores_the_transaction_moment_not_the_order_one():
+    """Статус заказа оплату не отслеживает — его changedAt равен созданию."""
+    vtb_payment = _make_vtb_payment(VTBPayment.new_order_id("ORDER"))
+    vtb_payment.status = "CREATED"
+    vtb_payment.save(update_fields=["status"])
+    payload = _paid_payload(
+        vtb_payment.order_id, tx_changed_at="2026-09-15T14:02:32.880Z"
+    )
+
+    _run_check(vtb_payment, payload)
+
+    vtb_payment.refresh_from_db()
+    assert vtb_payment.status == "PAID"
+    assert vtb_payment.status_changed_at.isoformat().startswith("2026-09-15T14:02:32")
+
+
+@pytest.mark.django_db
+def test_a_later_refund_does_not_move_the_paid_moment():
+    """ВТБ сдвигает changedAt транзакции при возврате — приход обязан устоять."""
+    vtb_payment = _make_vtb_payment(VTBPayment.new_order_id("ORDER"))
+    vtb_payment.status = "CREATED"
+    vtb_payment.save(update_fields=["status"])
+    _run_check(
+        vtb_payment,
+        _paid_payload(vtb_payment.order_id, tx_changed_at="2026-09-15T14:02:32.880Z"),
+    )
+    vtb_payment.refresh_from_db()
+
+    # Тот же заказ после возврата: банк переписал changedAt платежа на 17-е.
+    _run_check(
+        vtb_payment,
+        _paid_payload(vtb_payment.order_id, tx_changed_at="2026-09-17T12:40:22.722Z"),
+    )
+
+    vtb_payment.refresh_from_db()
+    assert vtb_payment.status_changed_at.isoformat().startswith("2026-09-15T14:02:32")
+
+
+@pytest.mark.django_db
+def test_paid_order_without_a_confirmed_transaction_falls_back_to_the_order():
+    vtb_payment = _make_vtb_payment(VTBPayment.new_order_id("ORDER"))
+    vtb_payment.status = "CREATED"
+    vtb_payment.save(update_fields=["status"])
+    payload = _paid_payload(
+        vtb_payment.order_id,
+        tx_changed_at="2026-09-15T14:02:32.880Z",
+        order_changed_at="2026-09-15T14:01:44.852Z",
+    )
+    payload["object"]["transactions"]["payments"] = []
+
+    _run_check(vtb_payment, payload)
+
+    vtb_payment.refresh_from_db()
+    assert vtb_payment.status_changed_at.isoformat().startswith("2026-09-15T14:01:44")
+
+
 # --- Reconciliation: refunds ---
 
 
@@ -1469,19 +1568,11 @@ def _refunded_team_payment(**payment_kwargs):
     return team, payment, vtb_payment
 
 
-def _run_refund(vtb_payment, payload):
-    from website.management.commands.check_vtb_payments import Command
-
-    client = Mock()
-    client.get_order.return_value = payload
-    Command()._check_payment(client, vtb_payment)
-
-
 @pytest.mark.django_db
 def test_refunded_order_rolls_back_team():
     team, payment, vtb_payment = _refunded_team_payment()
 
-    _run_refund(vtb_payment, _refund_payload(vtb_payment.order_id))
+    _run_check(vtb_payment, _refund_payload(vtb_payment.order_id))
 
     team.refresh_from_db()
     payment.refresh_from_db()
@@ -1501,7 +1592,7 @@ def test_partial_refund_debits_money_and_seats():
         vtb_payment.order_id, refunds=[_refund_entry("REFUND_1", 500.0)]
     )
 
-    _run_refund(vtb_payment, payload)
+    _run_check(vtb_payment, payload)
 
     team.refresh_from_db()
     payment.refresh_from_db()
@@ -1521,7 +1612,7 @@ def test_partial_refund_of_odd_amount_moves_money_only():
         vtb_payment.order_id, refunds=[_refund_entry("REFUND_1", 400.0)]
     )
 
-    _run_refund(vtb_payment, payload)
+    _run_check(vtb_payment, payload)
 
     team.refresh_from_db()
     assert team.paid_sum == 600
@@ -1536,9 +1627,9 @@ def test_same_refund_id_is_recorded_once():
         vtb_payment.order_id, refunds=[_refund_entry("REFUND_1", 500.0)]
     )
 
-    _run_refund(vtb_payment, payload)
+    _run_check(vtb_payment, payload)
     vtb_payment.refresh_from_db()
-    _run_refund(vtb_payment, payload)
+    _run_check(vtb_payment, payload)
 
     team.refresh_from_db()
     assert team.paid_sum == 500
@@ -1557,9 +1648,9 @@ def test_each_refund_of_an_order_debits_its_own_part():
         refunds=[_refund_entry("REFUND_1", 500.0), _refund_entry("REFUND_2", 400.0)],
     )
 
-    _run_refund(vtb_payment, first)
+    _run_check(vtb_payment, first)
     vtb_payment.refresh_from_db()
-    _run_refund(vtb_payment, both)
+    _run_check(vtb_payment, both)
 
     team.refresh_from_db()
     payment.refresh_from_db()
@@ -1580,9 +1671,9 @@ def test_closing_refund_after_partial_does_not_debit_twice():
         refunds=[_refund_entry("REFUND_1", 500.0), _refund_entry("REFUND_2", 500.0)],
     )
 
-    _run_refund(vtb_payment, first)
+    _run_check(vtb_payment, first)
     vtb_payment.refresh_from_db()
-    _run_refund(vtb_payment, both)
+    _run_check(vtb_payment, both)
 
     team.refresh_from_db()
     payment.refresh_from_db()
@@ -1602,7 +1693,7 @@ def test_closing_refund_with_promo_returns_all_seats():
         vtb_payment.order_id, amount=700.0, refunds=[_refund_entry("REFUND_1", 700.0)]
     )
 
-    _run_refund(vtb_payment, payload)
+    _run_check(vtb_payment, payload)
 
     team.refresh_from_db()
     payment.refresh_from_db()
@@ -1628,7 +1719,7 @@ def test_refund_beyond_the_payment_takes_nothing_back():
     payment.refresh_from_db()
     Team.all_objects.filter(pk=team.pk).update(paid_people=2, paid_sum=0)
 
-    _run_refund(vtb_payment, _refund_payload(vtb_payment.order_id))
+    _run_check(vtb_payment, _refund_payload(vtb_payment.order_id))
 
     team.refresh_from_db()
     payment.refresh_from_db()
@@ -1648,7 +1739,7 @@ def test_unconfirmed_refund_is_ignored():
         refunds=[_refund_entry("REFUND_1", 500.0, status="CREATED")],
     )
 
-    _run_refund(vtb_payment, payload)
+    _run_check(vtb_payment, payload)
 
     team.refresh_from_db()
     assert team.paid_sum == 1000
@@ -1663,7 +1754,7 @@ def test_refund_row_keeps_the_banks_own_date():
         refunds=[_refund_entry("REFUND_1", 1000.0, created_at="2026-09-16T10:29:13Z")],
     )
 
-    _run_refund(vtb_payment, payload)
+    _run_check(vtb_payment, payload)
 
     refund = payment.refunds.get()
     assert refund.refunded_at.isoformat().startswith("2026-09-16T10:29:13")

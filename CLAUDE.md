@@ -680,6 +680,15 @@ subtracted as its own «Возвращено» line, so «Итого» equals th
 by construction (`fee_sum = amount + discount − extras_sum`), which is why they must all use the same bucket. A
 read-only `PaymentRefundInline` shows the journal on the payment in `/admin/`.
 
+**When the money arrived** (`VTBPayment.status_changed_at`): written **once**, by `check_vtb_payments._store_status` on
+the **first** transition to `PAID`, from the confirmed entry of `transactions.payments[]` (`_payment_moment`; falls back
+to the order's own `status.changedAt` when there is none). Two traps make this shape non-negotiable: the **order's**
+`status.changedAt` equals its `createdAt` in VTB's payloads and never tracks the payment at all (it used to be the only
+writer, via `from_vtb_payload` at order creation — so the field meant "order created" while `apps/race/finance.py:
+_paid_moment` reads it as the payment date), and the **payment transaction's** `status.changedAt` is *moved by a later
+refund* (in the sample order a refund rewrote it two days forward). Re-polling a `PAID` order therefore must never
+rewrite the field, or a refunded payment's income would jump to the refund's day.
+
 **VTB `order_id`s** (race-fee and donations) are random ULIDs — `ORDER_<ulid>` for race fees, `SPUTNIK_<ulid>` for
 donations — minted by the single generator `VTBPayment.new_order_id(prefix)` (`website/models/vtb.py`). They are
 globally unique across environments, which matters because dev and prod share VTB credentials (and thus the VTB

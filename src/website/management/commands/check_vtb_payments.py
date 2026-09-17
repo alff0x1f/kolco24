@@ -105,10 +105,53 @@ class Command(BaseCommand):
             self._process_refund(vtb_payment, payload)
 
     def _store_status(self, vtb_payment: VTBPayment, payload: dict) -> None:
+        """Сохранить статус заказа, а при первой оплате — и момент прихода денег.
+
+        ``status_changed_at`` до этого выставлялся только при создании заказа
+        (``VTBPayment.from_vtb_payload``) и означал момент создания, хотя
+        читается как дата оплаты (``apps/race/finance.py:_paid_moment``).
+
+        Пишется он **один раз**, при первом переходе в ``PAID``, и намеренно не
+        трогается потом: в ответе ВТБ ``status.changedAt`` платёжной транзакции
+        **сдвигается возвратом** (в примере заказа возврат переписал её на дату
+        возврата), поэтому перезапись увела бы приход денег в чужой день —
+        ровно та ошибка, от которой мы уходим. На первом ``PAID`` возврата ещё
+        не было, и значение честное.
+        """
         status = (payload.get("object", {}) or {}).get("status", {}) or {}
-        vtb_payment.status = status.get("value", "")
+        new_value = status.get("value", "")
+        fields = ["status", "status_description"]
+        if new_value.upper() == "PAID" and vtb_payment.status.upper() != "PAID":
+            moment = self._payment_moment(payload)
+            if moment:
+                vtb_payment.status_changed_at = moment
+                fields.append("status_changed_at")
+        vtb_payment.status = new_value
         vtb_payment.status_description = status.get("description", "")
-        vtb_payment.save(update_fields=["status", "status_description"])
+        vtb_payment.save(update_fields=fields)
+
+    @staticmethod
+    def _payment_moment(payload: dict):
+        """Когда деньги реально пришли — по подтверждённой платёжной транзакции.
+
+        Статус самого заказа для этого не годится: в примерах ВТБ его
+        ``changedAt`` равен ``createdAt`` заказа и оплату не отслеживает. Если
+        подтверждённой транзакции нет, остаётся прежний фолбэк на заказ.
+        """
+        obj = payload.get("object", {}) or {}
+        payments = (obj.get("transactions", {}) or {}).get("payments", []) or []
+        for item in payments:
+            tx = (item or {}).get("object", {}) or {}
+            tx_status = (tx.get("status", {}) or {}).get("value", "")
+            if tx_status.upper() not in ("RECONCILED", "COMPLETED", "PAID"):
+                continue
+            moment = parse_datetime((tx.get("status", {}) or {}).get("changedAt") or "")
+            if moment:
+                return moment
+            moment = parse_datetime(tx.get("createdAt") or "")
+            if moment:
+                return moment
+        return parse_datetime((obj.get("status", {}) or {}).get("changedAt") or "")
 
     def _process_refund(self, vtb_payment: VTBPayment, payload: dict) -> None:
         """Take a refunded order's money back out of the team it was credited to.
