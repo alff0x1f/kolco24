@@ -6470,3 +6470,280 @@ def test_race_edit_page_renders_promo_block(client, django_user_model):
     assert 'name="promos_json"' in html
     assert 'id="addPromo"' in html
     assert _script_json(html, "promos-data")[0]["code"] == "SALE40"
+
+
+# --- Страница платежей гонки (apps/race/finance.py) ---
+
+from decimal import Decimal  # noqa: E402
+
+from apps.race.finance import extras_catalog, payment_rows  # noqa: E402
+from website.models.vtb import VTBPayment  # noqa: E402
+
+
+def _fin_setup(slug):
+    """Гонка + категория + владелец команд для тестов финансовой страницы."""
+    race = _make_race(slug=slug)
+    category = _make_category(race)
+    owner = User.objects.create_user(
+        username=f"fin-{slug}", password="p", email=f"fin-{slug}@e.com"
+    )
+    return race, category, owner
+
+
+def _fin_payment(owner, team, **kwargs):
+    defaults = {
+        "payment_method": "sbp2",
+        "status": Payment.STATUS_DONE,
+        "payment_amount": 1000,
+        "cost_per_person": 500,
+        "paid_for": 2,
+    }
+    defaults.update(kwargs)
+    return Payment.objects.create(owner=owner, team=team, **defaults)
+
+
+@pytest.mark.django_db
+def test_payment_rows_skips_other_race():
+    race, category, owner = _fin_setup("fin-other")
+    other_category = _make_category(_make_race(slug="fin-other-2"))
+    _fin_payment(owner, _make_team(owner, category))
+    _fin_payment(owner, _make_team(owner, other_category))
+
+    rows = payment_rows(race)
+
+    assert len(rows) == 1
+
+
+@pytest.mark.django_db
+def test_payment_rows_skips_payment_without_team():
+    race, category, owner = _fin_setup("fin-noteam")
+    _fin_payment(owner, None)
+
+    assert payment_rows(race) == []
+
+
+@pytest.mark.django_db
+def test_payment_rows_keeps_deleted_team():
+    """Деньги удалённой команды — реально полученные деньги."""
+    race, category, owner = _fin_setup("fin-deleted")
+    team = _make_team(owner, category, is_deleted=True)
+    _fin_payment(owner, team)
+
+    rows = payment_rows(race)
+
+    assert [row["team_id"] for row in rows] == [team.id]
+
+
+@pytest.mark.django_db
+def test_payment_rows_split_with_promo_and_extras():
+    race, category, owner = _fin_setup("fin-split")
+    team = _make_team(owner, category, ucount=3, paid_people=3)
+    maps = RaceExtra.objects.create(race=race, code="map", name="Карты", price=200)
+    transfer = RaceExtra.objects.create(
+        race=race, code="transfer", name="Трансфер", price=500
+    )
+    # Взнос 3 × 1000 = 3000, скидка 40 % = 1200, услуги 2×200 + 1×500 = 900.
+    payment = _fin_payment(
+        owner,
+        team,
+        payment_amount=2700,
+        discount_amount=1200,
+        cost_per_person=1000,
+        paid_for=3,
+        promo=_promo(race, code="SALE40", value=40),
+    )
+    PaymentExtra.objects.create(
+        payment=payment, race_extra=maps, count=2, unit_price=200
+    )
+    PaymentExtra.objects.create(
+        payment=payment, race_extra=transfer, count=1, unit_price=500
+    )
+
+    row = payment_rows(race)[0]
+
+    assert row["amount"] == 2700
+    assert row["discount"] == 1200
+    assert row["extras_sum"] == 900
+    assert row["fee_sum"] == 3000
+    assert row["extras"] == {"map": 2, "transfer": 1}
+    assert row["promo"] == "SALE40"
+
+
+@pytest.mark.django_db
+def test_payment_rows_fee_matches_price_formula_when_plain():
+    """Без промокода и услуг остаток обязан сойтись с независимой формулой."""
+    race, category, owner = _fin_setup("fin-plain")
+    _fin_payment(
+        owner,
+        _make_team(owner, category),
+        payment_amount=2400,
+        cost_per_person=800,
+        paid_for=3,
+    )
+
+    row = payment_rows(race)[0]
+
+    assert row["fee_sum"] == row["paid_for"] * row["cost_per_person"] == 2400
+    assert row["extras_sum"] == 0
+
+
+@pytest.mark.django_db
+def test_payment_rows_paid_at_from_vtb_status_change():
+    race, category, owner = _fin_setup("fin-vtb")
+    changed_at = datetime.datetime(2026, 9, 16, 14, 32, tzinfo=datetime.timezone.utc)
+    vtb = VTBPayment.objects.create(
+        order_id="ORDER_fin_vtb",
+        amount_value=Decimal("1000.00"),
+        status="PAID",
+        status_changed_at=changed_at,
+    )
+    _fin_payment(owner, _make_team(owner, category), vtb_payment=vtb)
+
+    row = payment_rows(race)[0]
+
+    local = timezone.localtime(changed_at)
+    assert row["paid_at"] == local.strftime("%d.%m.%y %H:%M")
+    assert row["paid_date"] == local.strftime("%Y-%m-%d")
+    assert row["order_id"] == "ORDER_fin_vtb"
+    assert isinstance(row["paid_at"], str)
+
+
+@pytest.mark.django_db
+def test_payment_rows_paid_at_falls_back_to_updated_at():
+    race, category, owner = _fin_setup("fin-fallback")
+    payment = _fin_payment(owner, _make_team(owner, category))
+
+    row = payment_rows(race)[0]
+
+    assert row["paid_at"] == timezone.localtime(payment.updated_at).strftime(
+        "%d.%m.%y %H:%M"
+    )
+    assert row["order_id"] == ""
+
+
+@pytest.mark.django_db
+def test_payment_rows_labels_merge_drafts_and_skip_zero_extras():
+    race, category, owner = _fin_setup("fin-labels")
+    team = _make_team(owner, category)
+    maps = RaceExtra.objects.create(race=race, code="map", name="Карты", price=200)
+    breakfast = RaceExtra.objects.create(
+        race=race, code="breakfast", name="Завтрак", price=300
+    )
+    payment = _fin_payment(owner, team, status=Payment.STATUS_DRAFT_WITH_INFO)
+    PaymentExtra.objects.create(
+        payment=payment, race_extra=maps, count=3, unit_price=200
+    )
+    PaymentExtra.objects.create(
+        payment=payment, race_extra=breakfast, count=0, unit_price=300
+    )
+
+    row = payment_rows(race)[0]
+
+    assert row["status"] == "unpaid"
+    assert row["status_label"] == "Не оплачено"
+    assert row["extras_label"] == "Карты ×3"
+    assert row["extras"] == {"map": 3}
+
+
+@pytest.mark.django_db
+def test_extras_catalog_keeps_order_and_inactive():
+    race, category, owner = _fin_setup("fin-catalog")
+    RaceExtra.objects.create(race=race, code="map", name="Карты", order=1)
+    RaceExtra.objects.create(
+        race=race, code="transfer", name="Трансфер", order=0, is_active=False
+    )
+
+    assert extras_catalog(race) == [
+        {"code": "transfer", "name": "Трансфер"},
+        {"code": "map", "name": "Карты"},
+    ]
+
+
+@pytest.mark.django_db
+def test_payments_page_anonymous_redirects_to_login(client):
+    race, category, owner = _fin_setup("fin-anon")
+
+    resp = client.get(reverse("race_payments", kwargs={"race_slug": race.slug}))
+
+    assert resp.status_code == 302
+    assert reverse("login") in resp.url
+    assert f"/race/{race.slug}/payments/" in resp.url
+
+
+@pytest.mark.django_db
+def test_payments_page_regular_user_forbidden(client, django_user_model):
+    race, category, owner = _fin_setup("fin-regular")
+    client.force_login(
+        django_user_model.objects.create_user(username="u2", password="x")
+    )
+
+    resp = client.get(reverse("race_payments", kwargs={"race_slug": race.slug}))
+
+    assert resp.status_code == 403
+
+
+@pytest.mark.django_db
+def test_payments_page_race_admin_allowed(client):
+    user, race = _promo_admin("fin-admin")
+    client.force_login(user)
+
+    resp = client.get(reverse("race_payments", kwargs={"race_slug": race.slug}))
+
+    assert resp.status_code == 200
+
+
+@pytest.mark.django_db
+def test_payments_page_moderator_forbidden(client, django_user_model):
+    race, category, owner = _fin_setup("fin-moder")
+    user = django_user_model.objects.create_user(username="mod2", password="x")
+    RaceAdmin.objects.create(race=race, user=user, role=RaceAdmin.Role.MODERATOR)
+    client.force_login(user)
+
+    resp = client.get(reverse("race_payments", kwargs={"race_slug": race.slug}))
+
+    assert resp.status_code == 403
+
+
+@pytest.mark.django_db
+def test_payments_page_plain_superuser_forbidden(client):
+    """Пиннит текущее поведение: can_edit_race не знает про суперюзера."""
+    race, category, owner = _fin_setup("fin-super")
+    client.force_login(User.objects.create_superuser("su-fin", "su@e.com", "pw"))
+
+    resp = client.get(reverse("race_payments", kwargs={"race_slug": race.slug}))
+
+    assert resp.status_code == 403
+
+
+@pytest.mark.django_db
+def test_payments_page_island_holds_only_this_race(client):
+    user, race = _promo_admin("fin-island")
+    category = _make_category(race)
+    other_category = _make_category(_make_race(slug="fin-island-2"))
+    team = _make_team(user, category, teamname="Наши")
+    _fin_payment(user, team, payment_amount=1500)
+    _fin_payment(user, _make_team(user, other_category, teamname="Чужие"))
+    client.force_login(user)
+
+    html = client.get(
+        reverse("race_payments", kwargs={"race_slug": race.slug})
+    ).content.decode()
+
+    rows = _script_json(html, "payments-data")
+    assert [row["team_name"] for row in rows] == ["Наши"]
+    assert rows[0]["amount"] == 1500
+    assert '<tbody id="payRows"></tbody>' in html
+
+
+@pytest.mark.django_db
+def test_race_page_shows_payments_link_to_admin_only(client, django_user_model):
+    user, race = _promo_admin("fin-link")
+    url = reverse("race_payments", kwargs={"race_slug": race.slug})
+
+    client.force_login(user)
+    assert url in client.get(reverse("race", args=[race.slug])).content.decode()
+
+    client.force_login(
+        django_user_model.objects.create_user(username="plain-fin", password="x")
+    )
+    assert url not in client.get(reverse("race", args=[race.slug])).content.decode()

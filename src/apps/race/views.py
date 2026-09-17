@@ -23,6 +23,7 @@ from django.views.decorators.cache import never_cache
 
 from apps.mobile.models import Mark, TrackPoint
 from apps.race.app_data import build_overview, build_team_timeline
+from apps.race.finance import extras_catalog, payment_rows
 from apps.race.forms import RaceForm
 from apps.race.models import Protocol, RaceExtra, RacePromo
 from apps.race.permissions import can_edit_race, is_team_editing_open
@@ -1761,3 +1762,41 @@ class PromoCheckView(View):
         if team.owner_id != request.user.id and not can_edit_race(request.user, race):
             return None
         return team
+
+
+def _load_race_for_admin(request, race_slug):
+    """``(race, error_response)`` for the race-admin pages.
+
+    Anonymous callers are sent to the login page with a ``?next=`` back-link;
+    a signed-in non-admin gets a 403. Shared by the payments page and its CSV
+    export so the two can't drift apart.
+    """
+    if not request.user.is_authenticated:
+        return None, HttpResponseRedirect(
+            reverse("login") + "?next=" + quote(request.path, safe="/:@")
+        )
+    race = get_object_or_404(Race, slug=race_slug)
+    if not can_edit_race(request.user, race):
+        return race, HttpResponseForbidden()
+    return race, None
+
+
+class RacePaymentsView(View):
+    """Организаторская страница платежей гонки: реестр + итоги.
+
+    Сервер отдаёт только строки (JSON-остров) — таблицу, плитки итогов,
+    разбивку дохода и динамику по дням рисует ``payments.js``, как
+    :class:`RaceTeamsView` рисует список команд. Ничего не пишет.
+    """
+
+    def get(self, request, race_slug):
+        race, response = _load_race_for_admin(request, race_slug)
+        if response is not None:
+            return response
+
+        context = {
+            "race": race,
+            "payments_json": _safe_json(payment_rows(race)),
+            "extras_json": _safe_json(extras_catalog(race)),
+        }
+        return render(request, "race/payments.html", context)

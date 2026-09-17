@@ -170,28 +170,28 @@ Payment.objects.filter(team__category2__race=race)
 - Create: `src/apps/race/finance.py`
 - Modify: `src/apps/race/tests.py`
 
-- [ ] создать `payment_rows(race) -> list[dict]` с queryset из Technical Details
-- [ ] реализовать `_paid_at(payment)`: `done` → `vtb_payment.status_changed_at` с фолбэком
+- [x] создать `payment_rows(race) -> list[dict]` с queryset из Technical Details
+- [x] реализовать `_paid_at(payment)`: `done` → `vtb_payment.status_changed_at` с фолбэком
       `updated_at`, иначе `created_at`; результат прогнать через `timezone.localtime` и вернуть
       три строки `paid_at` / `paid_sort` / `paid_date` (никаких `datetime` в строке)
-- [ ] реализовать разложение суммы: `extras_sum = Σ count × unit_price`,
+- [x] реализовать разложение суммы: `extras_sum = Σ count × unit_price`,
       `fee_sum = payment_amount + discount_amount − extras_sum`
-- [ ] собрать `status_label` (`draft` + `draft_with_info` → «не оплачено») и `extras_label`
+- [x] собрать `status_label` (`draft` + `draft_with_info` → «не оплачено») и `extras_label`
       («Карты ×3, Трансфер ×2», только ненулевые); имя команды — из `team.teamname`
-- [ ] добавить `extras_catalog(race) -> list[dict]` — `RaceExtra` гонки в порядке каталога
+- [x] добавить `extras_catalog(race) -> list[dict]` — `RaceExtra` гонки в порядке каталога
       (`code`, `name`), для колонок CSV и строк разбивки
-- [ ] написать тест: платёж другой гонки не попадает в срез
-- [ ] написать тест: платёж с `team=None` не попадает в срез
-- [ ] написать тест: платёж удалённой команды (`is_deleted=True`) **попадает** в срез
-- [ ] написать тест арифметики на конкретных числах: команда с известной ценой, промокодом и
+- [x] написать тест: платёж другой гонки не попадает в срез
+- [x] написать тест: платёж с `team=None` не попадает в срез
+- [x] написать тест: платёж удалённой команды (`is_deleted=True`) **попадает** в срез
+- [x] написать тест арифметики на конкретных числах: команда с известной ценой, промокодом и
       двумя услугами → проверить точные значения `fee_sum`, `extras_sum`, `amount`
-- [ ] написать тест перекрёстной проверки: без промокода и услуг
+- [x] написать тест перекрёстной проверки: без промокода и услуг
       `fee_sum == paid_for × cost_per_person`
-- [ ] написать тест `paid_at`: берётся `vtb_payment.status_changed_at`; при его отсутствии —
+- [x] написать тест `paid_at`: берётся `vtb_payment.status_changed_at`; при его отсутствии —
       `updated_at`; формат — строка, а не `datetime`
-- [ ] написать тест меток: `draft_with_info` → «не оплачено»; `extras_label` даёт
+- [x] написать тест меток: `draft_with_info` → «не оплачено»; `extras_label` даёт
       «Карты ×3, Трансфер ×2» и пропускает услуги с нулевым `count`
-- [ ] запустить `uv run pytest src/apps/race/tests.py` — должно пройти до задачи 2
+- [x] запустить `uv run pytest src/apps/race/tests.py` — должно пройти до задачи 2
 
 ### Task 2: RacePaymentsView и маршрут страницы
 
@@ -200,18 +200,18 @@ Payment.objects.filter(team__category2__race=race)
 - Modify: `src/website/urls.py`
 - Modify: `src/apps/race/tests.py`
 
-- [ ] добавить `RacePaymentsView` в `src/apps/race/views.py`; гейт — через общий помощник
-      в духе `RaceAppDataView._load_and_authorize` (аноним → `redirect(login?next=)`,
-      не-админ → 403), пригодный и для экспорта из задачи 5
-- [ ] собрать контекст: `race`, `rows_json` и `extras_json` через существующий `_safe_json`
-- [ ] зарегистрировать путь `race/<slug:race_slug>/payments/` name=`race_payments` в
+- [x] добавить `RacePaymentsView` в `src/apps/race/views.py`; гейт — через общий помощник
+      `_load_race_for_admin` (аноним → `redirect(login?next=)`, не-админ → 403),
+      пригодный и для экспорта из задачи 5
+- [x] собрать контекст: `race`, `payments_json` и `extras_json` через существующий `_safe_json`
+- [x] зарегистрировать путь `race/<slug:race_slug>/payments/` name=`race_payments` в
       `src/website/urls.py` (префикс `race_` — как у `race_map`/`race_app_data`)
-- [ ] написать тесты доступа по образцу тестов `legend_codes` (`tests.py:2937-3003`):
+- [x] написать тесты доступа по образцу тестов `legend_codes` (`tests.py:2937-3003`):
       аноним → 302 на login, посторонний юзер → 403, `RaceAdmin(ADMIN)` → 200,
       `RaceAdmin(MODERATOR)` → 403
-- [ ] написать тест, пиннящий текущее поведение: суперюзер без `RaceAdmin` → 403
-- [ ] написать тест: в `rows_json` попадают только платежи этой гонки, и это валидный JSON
-- [ ] запустить тесты — должно пройти до задачи 3
+- [x] написать тест, пиннящий текущее поведение: суперюзер без `RaceAdmin` → 403
+- [x] написать тест: в `payments_json` попадают только платежи этой гонки, и это валидный JSON
+- [x] запустить тесты — должно пройти до задачи 3
 
 ### Task 3: Шаблон страницы и серверная таблица
 
@@ -222,23 +222,24 @@ Payment.objects.filter(team__category2__race=race)
 - Modify: `src/templates/race/race_page.html`
 - Modify: `src/apps/race/tests.py`
 
-- [ ] создать `payments.html`, extends `website/base-2.html`, обёртка `.race-payments`
+- [x] создать `payments.html`, extends `website/base-2.html`, обёртка `.race-payments`
       (не голый `.page` — `theme-2.css` его уже определяет)
-- [ ] отрисовать заголовок, панель фильтров (статус, поиск), кнопку «Скачать CSV»
+- [x] отрисовать заголовок, панель фильтров (статус, поиск)
       и контейнеры под плитки итогов / разбивку / динамику (заполняет JS)
-- [ ] отрисовать шапку таблицы (Дата, Команда, Категория, Статус, Участников, Цена/чел,
-      Доп-услуги, Промокод, Скидка, Сумма, Заказ) и **пустой `<tbody id="paymentRows">`** —
+- [x] отрисовать шапку таблицы (Дата, Команда, Категория, Статус, Участников, Цена/чел,
+      Доп-услуги, Промокод, Скидка, Сумма, Заказ) и **пустой `<tbody id="payRows">`** —
       строки рисует JS, как в `teams.html:57` + `teams.js:251`; дублировать разметку строки
       в шаблоне и в JS нельзя
-- [ ] добавить JSON-острова `<script id="payments-data" type="application/json">` и
+- [x] добавить JSON-острова `<script id="payments-data" type="application/json">` и
       `<script id="extras-data" type="application/json">`
-- [ ] создать пустые `payments.css` / `payments.js` до подключения через `{% static %}` —
+- [x] создать пустые `payments.css` / `payments.js` до подключения через `{% static %}` —
       `CacheBustingStaticFilesStorage` (`src/config/storage.py`) роняет рендер на отсутствующем
       файле
-- [ ] подключить `payments.css` через `{% block extra_head %}`, `payments.js` — в конце
-- [ ] добавить кнопку «Платежи» в админский блок `race_page.html` (рядом с «Карта гонки»)
-- [ ] написать тест: кнопка «Платежи» видна админу гонки и не видна обычному юзеру
-- [ ] запустить тесты — должно пройти до задачи 4
+- [x] подключить `payments.css` через `{% block extra_head %}`, `payments.js` — в конце
+- [x] добавить кнопку «Платежи» в админский блок `race_page.html` (рядом с «Карта гонки»)
+- [x] написать тест: кнопка «Платежи» видна админу гонки и не видна обычному юзеру
+- [x] запустить тесты — должно пройти до задачи 4
+- ➕ кнопка «Скачать CSV» перенесена в задачу 5: её URL появляется вместе с вью экспорта
 
 ### Task 4: Клиентская логика — фильтры, сортировка, итоги
 
