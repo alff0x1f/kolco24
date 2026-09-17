@@ -6812,3 +6812,52 @@ def test_payments_export_status_all_and_unknown(client):
     assert line_count(status="all") == 4
     assert line_count(status="cancel") == 2
     assert line_count(status="zzz") == 2  # неизвестное значение → done
+
+
+@pytest.mark.django_db
+def test_payments_page_without_payments_renders(client):
+    user, race = _promo_admin("fin-empty")
+    client.force_login(user)
+
+    html = client.get(
+        reverse("race_payments", kwargs={"race_slug": race.slug})
+    ).content.decode()
+
+    assert _script_json(html, "payments-data") == []
+    assert _script_json(html, "extras-data") == []
+
+
+@pytest.mark.django_db
+def test_payment_rows_totals_converge():
+    """Σ взносов + Σ услуг − Σ скидок обязаны дать Σ сумм платежей."""
+    race, category, owner = _fin_setup("fin-sum")
+    maps = RaceExtra.objects.create(race=race, code="map", name="Карты", price=200)
+    promo = _promo(race, code="HALF", value=50)
+    with_extras = _fin_payment(
+        owner,
+        _make_team(owner, category),
+        payment_amount=1400,
+        discount_amount=600,
+        cost_per_person=600,
+        paid_for=2,
+        promo=promo,
+    )
+    PaymentExtra.objects.create(
+        payment=with_extras, race_extra=maps, count=1, unit_price=200
+    )
+    _fin_payment(owner, _make_team(owner, category), payment_amount=900)
+    _fin_payment(
+        owner,
+        _make_team(owner, category),
+        payment_amount=500,
+        status=Payment.STATUS_CANCEL,
+    )
+
+    rows = payment_rows(race)
+    done = [row for row in rows if row["status"] == "done"]
+
+    fee = sum(row["fee_sum"] for row in done)
+    extras = sum(row["extras_sum"] for row in done)
+    discount = sum(row["discount"] for row in done)
+    assert fee + extras - discount == sum(row["amount"] for row in done) == 2300
+    assert sum(row["amount"] for row in rows if row["status"] == "cancel") == 500

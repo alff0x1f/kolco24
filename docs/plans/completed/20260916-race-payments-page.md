@@ -291,23 +291,23 @@ Payment.objects.filter(team__category2__race=race)
 
 ### Task 6: Verify acceptance criteria
 
-- [ ] проверить, что все требования из Overview реализованы
-- [ ] проверить краевые случаи: гонка без платежей, платёж без услуг, платёж без `vtb_payment`,
+- [x] проверить, что все требования из Overview реализованы
+- [x] проверить краевые случаи: гонка без платежей, платёж без услуг, платёж без `vtb_payment`,
       услуга с нулевыми продажами (должна быть строкой в разбивке), платёж удалённой команды
-- [ ] сверить сходимость: Σ `fee_sum` + Σ `extras_sum` − Σ `discount` == Σ `amount`
-- [ ] прогнать весь набор: `uv run pytest`
-- [ ] `make format && make lint`
+- [x] сверить сходимость: Σ `fee_sum` + Σ `extras_sum` − Σ `discount` == Σ `amount`
+- [x] прогнать весь набор: `uv run pytest` — 1239 тестов зелёные
+- [x] `make format && make lint`
 
 ### Task 7: [Final] Update documentation
 
-- [ ] дописать в `CLAUDE.md` абзац про страницу платежей в разделе `apps.race`
+- [x] дописать в `CLAUDE.md` абзац про страницу платежей в разделе `apps.race`
       (URL-имена, гейт, `finance.py` как единый источник, правило «участие — остаток»,
       включение удалённых команд, BOM в CSV)
-- [ ] исправить в `CLAUDE.md` утверждение «`can_edit_race` — superuser, или RaceAdmin с
-      role=ADMIN»: суперюзерной ветки в `permissions.py` нет (упоминается в описаниях
-      `RaceEditView`, `RaceLegendEditView`, `CanEditRaceLegend`, judge-scans)
-- [ ] README трогать не нужно
-- [ ] переместить план в `docs/plans/completed/`
+- [x] исправить в `CLAUDE.md` утверждение «`can_edit_race` — superuser, или RaceAdmin с
+      role=ADMIN»: суперюзерной ветки в `permissions.py` нет (правки в описаниях
+      `RaceEditView` и `CanEditRaceLegend`)
+- [x] README трогать не нужно
+- [x] переместить план в `docs/plans/completed/`
 
 ## Post-Completion
 

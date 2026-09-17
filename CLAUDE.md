@@ -78,8 +78,9 @@ Django 4.2 project. Source lives entirely under `src/`, with `manage.py` at `src
   client-side. `RaceEditView` (template `src/templates/race/race_form.html`, assets `src/static/css/race_form.css` +
   `src/static/js/race_form.js`, form `src/apps/race/forms.py:RaceForm`) is one CBV for both creating and editing a race,
   backing the `add_race` (`races/new/`) and `edit_race` (`race/<slug>/edit/`) URL names. Create is superuser-only; edit
-  requires `can_edit_race(user, race)` (in `src/apps/race/permissions.py` — superuser, or `RaceAdmin` with
-  `role=ADMIN`). It edits all scalar `Race` fields and inline-manages the race's `Category` rows (incl. `min_people`,
+  requires `can_edit_race(user, race)` (in `src/apps/race/permissions.py` — **only** a `RaceAdmin` row with
+  `role=ADMIN`; being a superuser grants nothing here, so a superuser without such a row gets a 403 on every
+  `can_edit_race` page — legend, codes, map, app-data, payments, protocol build/freeze). It edits all scalar `Race` fields and inline-manages the race's `Category` rows (incl. `min_people`,
   `max_people`, `people_limit`), `RacePriceTier` rows, and `RaceExtra` («Доп-услуги») rows, posted as hidden
   `categories_json` + `price_tiers_json` + `extras_json` inputs and reconciled (add/update/delete, `order=index`) inside
   one `transaction.atomic()`. Add-on reconciliation (`_reconcile_extras` + `_validate_extra_rows`) uses a **softer**
@@ -100,6 +101,27 @@ Django 4.2 project. Source lives entirely under `src/`, with `manage.py` at `src
   <id>` — same `CheckpointTag` queryset ordered by `checkpoint__number` then `id`, same `—` placeholder for tags without
   a `code` yet, same `nfc_uid / КП number / code(hex)` columns. The JS "Скопировать CSV" button builds RFC-4180 CSV
   from the rendered table and writes it to the clipboard. Gated on `can_edit_race`.
+  `RacePaymentsView`/`RacePaymentsExportView` back the organizer-only «Платежи» page — a read-only payment register
+  plus totals, for tracking how the money came in. URL names `race_payments` (`race/<slug>/payments/`, template
+  `src/templates/race/payments.html`, assets `src/static/css/payments.css` + `src/static/js/payments.js`) and
+  `race_payments_export` (`race/<slug>/payments/export/`, CSV). Both gated by the module-level helper
+  `_load_race_for_admin` (anon → `login` redirect with `?next=`, non-admin → 403) — the same rule as the map page.
+  **`src/apps/race/finance.py` is the single source** for both: `payment_rows(race)` returns flat dicts over
+  `Payment.objects.filter(team__category2__race=race)` (a payment with `team=None` can't be tied to a race and is
+  skipped; payments of **soft-deleted** teams are deliberately **kept** — `Payment.objects` doesn't go through
+  `TeamManager`, and that money was really received), `extras_catalog(race)` lists the race's `RaceExtra` rows
+  (inactive ones included — they may still carry sales), `filter_rows`/`csv_rows` serve the export only. Invariants:
+  **participation is the residual** `fee_sum = payment_amount + discount_amount − extras_sum`, never
+  `paid_for × cost_per_person` (with a promo or add-ons `payment_amount` deliberately diverges from that product — see
+  `create_team_payment`); per-add-on revenue comes from each `PaymentExtra.unit_price` snapshot (`extras_money`), not
+  from splitting the payment total; **all dates are formatted server-side** (`paid_at`/`paid_sort`/`paid_date` via
+  `timezone.localtime`) because `_safe_json` is a bare `json.dumps` that can't serialize `datetime`, and day buckets
+  must use the project timezone rather than the browser's. `paid_at` is `VTBPayment.status_changed_at` for a `done`
+  payment (fallback `updated_at`), `created_at` otherwise — `Payment.payment_date` is never populated anywhere and is
+  not read. The page ships **all** rows in a JSON island with an empty `<tbody>` and does filtering, sorting and every
+  total client-side (like `RaceTeamsView`), so totals always follow the visible filter; refunds (`cancel`) get their
+  own «Возвращено» tile and are never folded into the income breakdown. The CSV uses `;` **plus a BOM** for Russian
+  Excel — a deliberate divergence from `api/views/teams.py`'s BOM-less export, which is read by scripts.
   `RaceMapView`/`RaceMapPositionsView`/`RaceMapTrackView` (`src/apps/race/views.py`) back the organizer-only «Карта
   гонки» page — the read side of `apps.mobile`'s `/app/race/<id>/track/` upload (`TrackPoint` rows were write-only
   until this). All three share the same `_load_and_authorize` gate as `RaceLegendEditView` (anon → `login` redirect
@@ -163,7 +185,7 @@ Django 4.2 project. Source lives entirely under `src/`, with `manage.py` at `src
       (`permissions.py`): `IsMobileUser` resolves `Authorization: Bearer <token>` → `request.mobile_user` +
       `request.mobile_token` (identity only, authorizes nothing; stack **after** `SignedAppPermission`);
       `CanEditRaceLegend` reads `view.kwargs["race_id"]`, loads `Race` (missing → 404), returns
-      `apps.race.permissions.can_edit_race` (same superuser-or-`RaceAdmin(role=ADMIN)` as the web `RaceLegendEditView`);
+      `apps.race.permissions.can_edit_race` (same `RaceAdmin(role=ADMIN)`-only rule as the web `RaceLegendEditView`);
       it reads `request.mobile_user` defensively (`getattr(..., None)` → `False`/403, not 500) and must stack **after**
       `IsMobileUser`. **Actionable-vs-neutral error split**: the anonymous build layer stays a neutral
       `403 {"detail":"Forbidden"}` (no brute-force hint), but the authenticated layers are actionable — an invalid/
