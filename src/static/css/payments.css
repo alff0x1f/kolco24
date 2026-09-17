@@ -123,6 +123,9 @@
   white-space: nowrap;
   color: var(--ink);
 }
+/* День, в который вернули больше, чем получили. */
+.race-payments .pay-day.is-back .pay-day-bar i { background: var(--danger); }
+.race-payments .pay-day.is-back .pay-day-sum { color: var(--danger); }
 .race-payments .pay-day-count {
   text-align: right;
   color: var(--muted-2);
@@ -211,6 +214,8 @@
   font-variant-numeric: tabular-nums;
 }
 .race-payments .pay-table .strong { font-weight: 600; color: var(--ink); }
+.race-payments .st-refund td { color: var(--danger); }
+.race-payments .st-refund .strong { color: var(--danger); }
 .race-payments .pay-table .order {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 12px;
@@ -227,6 +232,7 @@
 .race-payments .st-done .pay-status { background: #e6f7f0; color: var(--success-dk); }
 .race-payments .st-unpaid .pay-status { background: var(--warn-bg); color: var(--warn); }
 .race-payments .st-cancel .pay-status { background: var(--danger-bg); color: var(--danger); }
+.race-payments .st-refund .pay-status { background: var(--danger-bg); color: var(--danger); }
 .race-payments .pay-promo {
   border-bottom: 1px dotted var(--muted);
   cursor: help;

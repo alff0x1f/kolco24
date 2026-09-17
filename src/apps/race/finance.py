@@ -14,12 +14,17 @@ from .models import RacePromo
 STATUS_DONE = "done"
 STATUS_UNPAID = "unpaid"
 STATUS_CANCEL = "cancel"
+# Строка возврата — не платёж, а движение денег обратно (``PaymentRefund``).
+STATUS_REFUND = "refund"
 STATUS_ALL = "all"
 
 _STATUS_LABELS = {
     STATUS_DONE: "Оплачено",
     STATUS_UNPAID: "Не оплачено",
-    STATUS_CANCEL: "Возврат",
+    # ``cancel`` — платёж, который пришёл и был возвращён целиком; ``refund`` —
+    # сама строка возврата, движение денег обратно.
+    STATUS_CANCEL: "Возвращён",
+    STATUS_REFUND: "Возврат",
 }
 
 _NO_NAME = "без названия"
@@ -37,12 +42,16 @@ def _row_status(payment):
 def _paid_moment(payment):
     """Момент, которым платёж попадает в отчётность.
 
-    Для оплаченного это время, когда банк сообщил об оплате
-    (``VTBPayment.status_changed_at``); ``updated_at`` — фолбэк для платежей без
-    VTB-заказа или без отметки статуса. Для остальных — момент создания.
-    ``Payment.payment_date`` в коде нигде не заполняется, поэтому не читается.
+    ``cancel`` считается наравне с ``done``: это деньги, которые **пришли** и
+    были возвращены, а уход учтён отдельной строкой возврата со своей датой.
+    Брать у них момент создания заказа значило бы отнести приход к чужому дню.
+
+    Дата прихода — ``VTBPayment.status_changed_at``, с фолбэком на
+    ``updated_at`` для платежей без VTB-заказа или без отметки статуса. Для
+    неоплаченных — момент создания. ``Payment.payment_date`` в коде нигде не
+    заполняется, поэтому не читается.
     """
-    if payment.status == Payment.STATUS_DONE:
+    if payment.status in (Payment.STATUS_DONE, Payment.STATUS_CANCEL):
         vtb = payment.vtb_payment
         if vtb is not None and vtb.status_changed_at:
             return vtb.status_changed_at
@@ -102,7 +111,7 @@ def payments_queryset(race):
     return (
         Payment.objects.filter(team__category2__race=race)
         .select_related("team", "team__category2", "promo", "vtb_payment")
-        .prefetch_related("extras__race_extra")
+        .prefetch_related("extras__race_extra", "refunds")
         .order_by("-created_at")
     )
 
@@ -156,6 +165,52 @@ def payment_rows(race):
                 "fee_sum": round(amount + discount - extras_sum, 2),
             }
         )
+        rows.extend(_refund_rows(payment))
+    return rows
+
+
+def _refund_rows(payment):
+    """Строки возвратов платежа — со своей датой и отрицательной суммой.
+
+    Возврат живёт в реестре отдельной строкой, а не припиской к сумме платежа:
+    у него своя дата, и в дневную разбивку он обязан попасть своим днём.
+    Строки с нулевой суммой (возврат банка сверх того, что платёж ещё держал —
+    см. ``settlement.record_refund``) в реестр не идут: денег они не двигали.
+    """
+    team = payment.team
+    rows = []
+    for refund in payment.refunds.all():
+        if not refund.amount:
+            continue
+        moment = refund.refunded_at or refund.created_at
+        local = timezone.localtime(moment) if moment else None
+        rows.append(
+            {
+                "id": payment.id,
+                "paid_at": local.strftime("%d.%m.%y %H:%M") if local else "",
+                "paid_sort": local.strftime("%Y-%m-%dT%H:%M") if local else "",
+                "paid_date": local.strftime("%Y-%m-%d") if local else "",
+                "team_id": team.id,
+                "team_name": team.teamname or _NO_NAME,
+                "category": team.category2.code if team.category2 else "",
+                "status": STATUS_REFUND,
+                "status_label": _STATUS_LABELS[STATUS_REFUND],
+                "paid_for": -refund.people,
+                "cost_per_person": payment.cost_per_person,
+                "promo": "",
+                "promo_rule": "",
+                "promo_hint": "",
+                "discount": 0,
+                "amount": -round(refund.amount, 2),
+                "order_id": payment.vtb_payment.order_id if payment.vtb_payment else "",
+                # Разбивки у возврата нет: банк не говорит, что именно вернул.
+                "extras": {},
+                "extras_money": {},
+                "extras_sum": 0,
+                "extras_label": "",
+                "fee_sum": 0,
+            }
+        )
     return rows
 
 
@@ -166,7 +221,7 @@ def filter_rows(rows, status, promo_only=False):
     из query string, поэтому неизвестное значение молча трактуется как ``done``.
     """
     if status != STATUS_ALL:
-        if status not in (STATUS_UNPAID, STATUS_CANCEL):
+        if status not in (STATUS_UNPAID, STATUS_CANCEL, STATUS_REFUND):
             status = STATUS_DONE
         rows = [row for row in rows if row["status"] == status]
     if promo_only:

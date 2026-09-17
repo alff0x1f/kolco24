@@ -5620,7 +5620,7 @@ def test_settle_payment_credits_a_deleted_team():
 
 @pytest.mark.django_db
 def test_refund_payment_debits_a_deleted_team():
-    from apps.race.settlement import refund_payment
+    from apps.race.settlement import record_refund
 
     _, race, team = _priced_team("st6", cost=1000, ucount=4, paid_people=0)
     payment = Payment.objects.create(
@@ -5630,7 +5630,7 @@ def test_refund_payment_debits_a_deleted_team():
     team.is_deleted = True
     team.save(update_fields=["is_deleted", "updated_at"])
 
-    assert refund_payment(payment) is True
+    assert record_refund(payment, "R_del", 4000).money == 4000
 
     team = Team.all_objects.get(pk=team.pk)
     assert team.paid_people == 0
@@ -5655,7 +5655,7 @@ def test_settle_payment_flips_race_to_sold_out():
 
 @pytest.mark.django_db
 def test_refund_payment_takes_back_people_and_extras():
-    from apps.race.settlement import refund_payment
+    from apps.race.settlement import record_refund
 
     _, race, team = _priced_team("rf1", cost=1000, ucount=4, paid_people=1)
     transfer = RaceExtra.objects.create(
@@ -5670,7 +5670,7 @@ def test_refund_payment_takes_back_people_and_extras():
     )
     settle_payment(payment)
 
-    assert refund_payment(payment) is True
+    assert record_refund(payment, "R_extras", 4000).closing is True
 
     team.refresh_from_db()
     payment.refresh_from_db()
@@ -5684,7 +5684,7 @@ def test_refund_payment_takes_back_people_and_extras():
 
 @pytest.mark.django_db
 def test_refund_payment_only_settled_once():
-    from apps.race.settlement import refund_payment
+    from apps.race.settlement import record_refund
 
     _, race, team = _priced_team("rf2", cost=1000, ucount=4, paid_people=1)
     payment = Payment.objects.create(
@@ -5692,11 +5692,12 @@ def test_refund_payment_only_settled_once():
     )
 
     # A draft was never credited, so there is nothing to take back.
-    assert refund_payment(payment) is False
+    assert record_refund(payment, "R_draft", 3000).money == 0
 
     settle_payment(payment)
-    assert refund_payment(payment) is True
-    assert refund_payment(payment) is False
+    assert record_refund(payment, "R_once", 3000).money == 3000
+    # Тот же refundId второй раз — строка уже есть, деньги не двигаются.
+    assert record_refund(payment, "R_once", 3000).recorded is False
 
     team.refresh_from_db()
     assert team.paid_people == 1
@@ -5707,9 +5708,9 @@ def test_refund_payment_claims_status_before_debiting():
     """A second copy of the same payment must not debit the team twice.
 
     Stands in for two commands racing on one refunded order: both hold a
-    ``done`` payment in memory, only the one that wins the status flip debits.
+    ``done`` payment in memory, only the one that wins the row insert debits.
     """
-    from apps.race.settlement import refund_payment
+    from apps.race.settlement import record_refund
 
     _, race, team = _priced_team("rf4", cost=1000, ucount=4, paid_people=1)
     transfer = RaceExtra.objects.create(
@@ -5725,8 +5726,8 @@ def test_refund_payment_claims_status_before_debiting():
     settle_payment(payment)
     stale = Payment.objects.get(pk=payment.pk)  # still 'done' in memory
 
-    assert refund_payment(payment) is True
-    assert refund_payment(stale) is False
+    assert record_refund(payment, "R_race", 3000).money == 3000
+    assert record_refund(stale, "R_race", 3000).recorded is False
 
     team.refresh_from_db()
     assert team.paid_people == 1
@@ -5737,7 +5738,7 @@ def test_refund_payment_claims_status_before_debiting():
 
 @pytest.mark.django_db
 def test_refund_payment_leaves_sold_out_race_closed():
-    from apps.race.settlement import refund_payment
+    from apps.race.settlement import record_refund
 
     _, race, team = _priced_team("rf3", cost=1000, ucount=4, paid_people=1)
     race.people_limit = 4
@@ -5748,7 +5749,7 @@ def test_refund_payment_leaves_sold_out_race_closed():
     )
     settle_payment(payment)
 
-    refund_payment(payment)
+    record_refund(payment, "R_soldout", 3000)
 
     race.refresh_from_db()
     assert race.reg_status == RegStatus.SOLD_OUT
@@ -6590,6 +6591,41 @@ def test_payment_rows_fee_matches_price_formula_when_plain():
 
 
 @pytest.mark.django_db
+def test_payment_rows_add_a_refund_row_with_its_own_date():
+    """Возврат — своя строка: своя дата, минусовая сумма, минусовые места."""
+    from apps.race.settlement import record_refund
+
+    race, category, owner = _fin_setup("fin-part-refund")
+    payment = _fin_payment(owner, _make_team(owner, category))
+    when = datetime.datetime(2026, 9, 17, 12, 40, tzinfo=datetime.timezone.utc)
+    record_refund(payment, "R_fin", 500, refunded_at=when)
+
+    rows = payment_rows(race)
+
+    pay_row, refund_row = rows[0], rows[1]
+    assert (pay_row["status"], pay_row["amount"]) == ("done", 1000)
+    assert refund_row["status"] == "refund"
+    assert refund_row["status_label"] == "Возврат"
+    assert refund_row["amount"] == -500
+    assert refund_row["paid_for"] == -1
+    assert refund_row["paid_at"] == timezone.localtime(when).strftime("%d.%m.%y %H:%M")
+    # Разбивки у возврата нет — банк не говорит, что именно вернул.
+    assert refund_row["extras"] == {} and refund_row["fee_sum"] == 0
+
+
+@pytest.mark.django_db
+def test_payment_rows_skip_a_refund_that_moved_no_money():
+    """Строка возврата сверх платежа — след в аудите, а не движение денег."""
+    from website.models import PaymentRefund
+
+    race, category, owner = _fin_setup("fin-zero-refund")
+    payment = _fin_payment(owner, _make_team(owner, category))
+    PaymentRefund.objects.create(payment=payment, vtb_refund_id="R_zero", amount=0)
+
+    assert len(payment_rows(race)) == 1
+
+
+@pytest.mark.django_db
 def test_payment_rows_paid_at_from_vtb_status_change():
     race, category, owner = _fin_setup("fin-vtb")
     changed_at = datetime.datetime(2026, 9, 16, 14, 32, tzinfo=datetime.timezone.utc)
@@ -6621,6 +6657,30 @@ def test_payment_rows_paid_at_falls_back_to_updated_at():
         "%d.%m.%y %H:%M"
     )
     assert row["order_id"] == ""
+
+
+@pytest.mark.django_db
+def test_payment_rows_keep_the_paid_date_of_a_refunded_payment():
+    """Возвращённый платёж всё равно пришёл — и пришёл в день оплаты."""
+    race, category, owner = _fin_setup("fin-cancel-date")
+    changed_at = datetime.datetime(2026, 9, 16, 14, 32, tzinfo=datetime.timezone.utc)
+    vtb = VTBPayment.objects.create(
+        order_id="ORDER_fin_cancel",
+        amount_value=Decimal("1000.00"),
+        status="REFUNDED",
+        status_changed_at=changed_at,
+    )
+    _fin_payment(
+        owner,
+        _make_team(owner, category),
+        status=Payment.STATUS_CANCEL,
+        vtb_payment=vtb,
+    )
+
+    row = payment_rows(race)[0]
+
+    assert row["status"] == "cancel"
+    assert row["paid_date"] == timezone.localtime(changed_at).strftime("%Y-%m-%d")
 
 
 @pytest.mark.django_db
@@ -6925,6 +6985,7 @@ def test_payments_export_keeps_plain_values_untouched():
             "discount": 0,
             "fee_sum": 1000,
             "amount": 1000,
+            "refunded": 0,
             "order_id": "ORDER_x",
             "extras": {},
         }
