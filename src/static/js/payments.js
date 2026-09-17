@@ -221,9 +221,15 @@
       ? list.map(rowHtml).join("")
       : '<tr class="pay-none"><td colspan="11">Ничего не найдено.</td></tr>';
     countEl.textContent = "Показано: " + num(list.length) + " из " + num(ROWS.length);
-    renderTiles(list);
-    renderBreakdown(list);
-    renderDaily(list);
+  }
+
+  // Сводка — всегда по всей гонке, фильтры управляют только таблицей. Иначе при
+  // дефолтном фильтре «Оплачено» строки cancel выпадали бы из расчёта и плитка
+  // «Возвращено» всегда показывала бы 0. Данные статичны, так что считаем раз.
+  function renderSummary() {
+    renderTiles(ROWS);
+    renderBreakdown(ROWS);
+    renderDaily(ROWS);
   }
 
   statusEl.addEventListener("click", function (event) {
@@ -265,5 +271,6 @@
     });
   });
 
+  renderSummary();
   render();
 })();
