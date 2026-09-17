@@ -45,6 +45,8 @@
     <input class="pay-search" id="paySearch" type="search"
            placeholder="Команда или номер заказа…">
     <span class="pay-count" id="payCount"></span>
+    <a class="btn btn-outline pay-export" id="payExport"
+       href="{% url 'race_payments_export' race.slug %}?status=done">Скачать CSV</a>
   </div>
 
   <div class="pay-table-wrap">
@@ -73,6 +75,7 @@
 
 <script id="payments-data" type="application/json">{{ payments_json }}</script>
 <script id="extras-data" type="application/json">{{ extras_json }}</script>
+<script id="payments-config" type="application/json">{{ payments_config }}</script>
 {% endblock %}
 
 {% block footer_js_include %}

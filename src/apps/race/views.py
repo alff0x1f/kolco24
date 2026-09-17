@@ -1,3 +1,4 @@
+import csv
 import datetime
 import json
 import re
@@ -9,6 +10,7 @@ from django.db import transaction
 from django.db.models import Count, OuterRef, ProtectedError, Q, Subquery
 from django.http import (
     Http404,
+    HttpResponse,
     HttpResponseForbidden,
     HttpResponseRedirect,
     JsonResponse,
@@ -23,7 +25,7 @@ from django.views.decorators.cache import never_cache
 
 from apps.mobile.models import Mark, TrackPoint
 from apps.race.app_data import build_overview, build_team_timeline
-from apps.race.finance import extras_catalog, payment_rows
+from apps.race.finance import csv_rows, extras_catalog, filter_rows, payment_rows
 from apps.race.forms import RaceForm
 from apps.race.models import Protocol, RaceExtra, RacePromo
 from apps.race.permissions import can_edit_race, is_team_editing_open
@@ -1794,9 +1796,42 @@ class RacePaymentsView(View):
         if response is not None:
             return response
 
+        # ``reverse()`` не умеет оставить плейсхолдер в пути, поэтому ссылка на
+        # команду строится подстановкой — тот же приём, что в ``RaceMapView``.
+        team_url = reverse("edit_team", kwargs={"team_id": 0})
         context = {
             "race": race,
             "payments_json": _safe_json(payment_rows(race)),
             "extras_json": _safe_json(extras_catalog(race)),
+            "payments_config": _safe_json(
+                {"teamUrlTemplate": re.sub(r"/0/$", "/{team_id}/", team_url)}
+            ),
         }
         return render(request, "race/payments.html", context)
+
+
+class RacePaymentsExportView(View):
+    """CSV-выгрузка реестра платежей — те же строки, что видит страница.
+
+    Разделитель ``;`` и BOM в начале: файл открывают в русском Excel. Это
+    расхождение с выгрузкой команд (``api/views/teams.py``, без BOM) намеренное
+    — ту читают скриптом.
+    """
+
+    def get(self, request, race_slug):
+        race, response = _load_race_for_admin(request, race_slug)
+        if response is not None:
+            return response
+
+        extras = extras_catalog(race)
+        rows = filter_rows(payment_rows(race), request.GET.get("status"))
+        today = datetime.date.today().isoformat()
+        csv_response = HttpResponse(content_type="text/csv; charset=utf-8")
+        csv_response["Content-Disposition"] = (
+            f'attachment; filename="payments-{race.slug}-{today}.csv"'
+        )
+        csv_response.write("﻿")
+        writer = csv.writer(csv_response, delimiter=";")
+        for line in csv_rows(rows, extras):
+            writer.writerow(line)
+        return csv_response

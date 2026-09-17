@@ -49,17 +49,22 @@ def _paid_moment(payment):
 
 
 def _extras_of(payment):
-    """``(словарь code → count, сумма услуг, подпись)`` по снапшотам платежа."""
+    """Снапшоты доп-услуг платежа: количества, деньги по каждой, подпись.
+
+    Деньги считаются по каждой услуге отдельно (``unit_price`` — снапшот на
+    момент оплаты), чтобы разбивка дохода не восстанавливала их из общей суммы.
+    """
     counts = {}
-    total = 0
+    money = {}
     labels = []
     for pe in payment.extras.all():
         if not pe.count:
             continue
-        counts[pe.race_extra.code] = counts.get(pe.race_extra.code, 0) + pe.count
-        total += pe.count * pe.unit_price
+        code = pe.race_extra.code
+        counts[code] = counts.get(code, 0) + pe.count
+        money[code] = money.get(code, 0) + pe.count * pe.unit_price
         labels.append(f"{pe.race_extra.name} ×{pe.count}")
-    return counts, total, ", ".join(labels)
+    return counts, money, ", ".join(labels)
 
 
 def payments_queryset(race):
@@ -91,7 +96,8 @@ def payment_rows(race):
     for payment in payments_queryset(race):
         moment = _paid_moment(payment)
         local = timezone.localtime(moment) if moment else None
-        counts, extras_sum, extras_label = _extras_of(payment)
+        counts, extras_money, extras_label = _extras_of(payment)
+        extras_sum = sum(extras_money.values())
         status = _row_status(payment)
         team = payment.team
         # Участие считается остатком, а не ``paid_for × cost_per_person``: при
@@ -118,12 +124,61 @@ def payment_rows(race):
                 "amount": amount,
                 "order_id": payment.vtb_payment.order_id if payment.vtb_payment else "",
                 "extras": counts,
+                "extras_money": extras_money,
                 "extras_sum": extras_sum,
                 "extras_label": extras_label,
                 "fee_sum": round(amount + discount - extras_sum, 2),
             }
         )
     return rows
+
+
+def filter_rows(rows, status):
+    """Отфильтровать строки по статусу — только для CSV.
+
+    Страница отдаёт все строки и фильтрует их в браузере; сюда приходит значение
+    из query string, поэтому неизвестное значение молча трактуется как ``done``.
+    """
+    if status == STATUS_ALL:
+        return list(rows)
+    if status not in (STATUS_UNPAID, STATUS_CANCEL):
+        status = STATUS_DONE
+    return [row for row in rows if row["status"] == status]
+
+
+def csv_rows(rows, extras):
+    """Заголовок и строки CSV: по колонке на каждую услугу каталога."""
+    header = [
+        "Дата",
+        "Команда",
+        "Категория",
+        "Статус",
+        "Участников",
+        "Цена за человека",
+        "Промокод",
+        "Скидка",
+        "Взнос",
+        "Сумма",
+        "Заказ",
+    ]
+    header += [extra["name"] for extra in extras]
+    yield header
+    for row in rows:
+        line = [
+            row["paid_at"],
+            row["team_name"],
+            row["category"],
+            row["status_label"],
+            row["paid_for"],
+            row["cost_per_person"],
+            row["promo"],
+            row["discount"],
+            row["fee_sum"],
+            row["amount"],
+            row["order_id"],
+        ]
+        line += [row["extras"].get(extra["code"], 0) for extra in extras]
+        yield line
 
 
 def extras_catalog(race):

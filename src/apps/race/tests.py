@@ -6566,6 +6566,8 @@ def test_payment_rows_split_with_promo_and_extras():
     assert row["extras_sum"] == 900
     assert row["fee_sum"] == 3000
     assert row["extras"] == {"map": 2, "transfer": 1}
+    # Доход по каждой услуге считается из её снапшота цены, не из общей суммы.
+    assert row["extras_money"] == {"map": 400, "transfer": 500}
     assert row["promo"] == "SALE40"
 
 
@@ -6747,3 +6749,66 @@ def test_race_page_shows_payments_link_to_admin_only(client, django_user_model):
         django_user_model.objects.create_user(username="plain-fin", password="x")
     )
     assert url not in client.get(reverse("race", args=[race.slug])).content.decode()
+
+
+def _export_url(race, **params):
+    url = reverse("race_payments_export", kwargs={"race_slug": race.slug})
+    return url + (
+        "?" + "&".join(f"{k}={v}" for k, v in params.items()) if params else ""
+    )
+
+
+@pytest.mark.django_db
+def test_payments_export_regular_user_forbidden(client, django_user_model):
+    race, category, owner = _fin_setup("fin-exp-403")
+    client.force_login(
+        django_user_model.objects.create_user(username="u3", password="x")
+    )
+
+    assert client.get(_export_url(race)).status_code == 403
+
+
+@pytest.mark.django_db
+def test_payments_export_defaults_to_paid_only(client):
+    user, race = _promo_admin("fin-exp")
+    category = _make_category(race)
+    RaceExtra.objects.create(race=race, code="map", name="Карты", price=200)
+    paid = _fin_payment(user, _make_team(user, category, teamname="Оплатили"))
+    PaymentExtra.objects.create(
+        payment=paid,
+        race_extra=RaceExtra.objects.get(race=race, code="map"),
+        count=2,
+        unit_price=200,
+    )
+    _fin_payment(user, _make_team(user, category), status=Payment.STATUS_DRAFT)
+    client.force_login(user)
+
+    resp = client.get(_export_url(race))
+    body = resp.content.decode("utf-8")
+
+    assert resp.status_code == 200
+    assert body.startswith("﻿")
+    assert f"payments-{race.slug}-" in resp["Content-Disposition"]
+    lines = [line for line in body.splitlines() if line]
+    assert len(lines) == 2  # заголовок + один оплаченный
+    assert lines[0].endswith("Карты")
+    assert "Оплатили" in lines[1]
+    assert lines[1].endswith(";2")
+
+
+@pytest.mark.django_db
+def test_payments_export_status_all_and_unknown(client):
+    user, race = _promo_admin("fin-exp-all")
+    category = _make_category(race)
+    _fin_payment(user, _make_team(user, category))
+    _fin_payment(user, _make_team(user, category), status=Payment.STATUS_DRAFT)
+    _fin_payment(user, _make_team(user, category), status=Payment.STATUS_CANCEL)
+    client.force_login(user)
+
+    def line_count(**params):
+        body = client.get(_export_url(race, **params)).content.decode("utf-8")
+        return len([line for line in body.splitlines() if line])
+
+    assert line_count(status="all") == 4
+    assert line_count(status="cancel") == 2
+    assert line_count(status="zzz") == 2  # неизвестное значение → done

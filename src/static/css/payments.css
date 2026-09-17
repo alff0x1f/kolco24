@@ -1,1 +1,220 @@
-/* Стили страницы платежей гонки — наполняется в задаче 4 плана. */
+/* Страница платежей гонки — /race/<slug>/payments/
+   Только специфика страницы: оболочку (.container, .card, .btn, .breadcrumb)
+   даёт theme-2.css. Всё под .race-payments. */
+
+.race-payments {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 20px 16px 56px;
+}
+
+.race-payments .pay-title {
+  font-size: 24px;
+  font-weight: 600;
+  color: var(--ink);
+  margin: 10px 0 18px;
+}
+
+/* ── Плитки итогов ───────────────────────────────────── */
+.race-payments .pay-tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px;
+  margin-bottom: 20px;
+}
+.race-payments .pay-tile {
+  background: var(--paper-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  padding: 14px 16px;
+}
+.race-payments .pay-tile-value {
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.race-payments .pay-tile-label {
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 4px;
+}
+.race-payments .pay-tile.is-back .pay-tile-value { color: var(--danger); }
+.race-payments .pay-tile.is-total { border-color: var(--primary); }
+.race-payments .pay-tile.is-total .pay-tile-value { color: var(--primary); }
+
+/* ── Разбивка дохода и динамика ──────────────────────── */
+.race-payments .pay-panels {
+  display: grid;
+  grid-template-columns: minmax(260px, 1fr) minmax(300px, 1.4fr);
+  gap: 14px;
+  margin-bottom: 22px;
+}
+.race-payments .pay-panel {
+  background: var(--paper-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  padding: 14px 16px;
+}
+.race-payments .pay-panel h2 {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--muted);
+  margin-bottom: 10px;
+}
+.race-payments .pay-breakdown {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+.race-payments .pay-breakdown th {
+  text-align: left;
+  font-weight: 400;
+  color: var(--ink-soft);
+  padding: 6px 0;
+}
+.race-payments .pay-breakdown td {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  padding: 6px 0;
+  white-space: nowrap;
+}
+.race-payments .pay-breakdown tr.is-minus td { color: var(--danger); }
+.race-payments .pay-breakdown tr.is-total th,
+.race-payments .pay-breakdown tr.is-total td {
+  border-top: 1px solid var(--line);
+  font-weight: 600;
+  color: var(--ink);
+  padding-top: 9px;
+}
+
+.race-payments .pay-day {
+  display: grid;
+  grid-template-columns: 60px 1fr auto 34px;
+  align-items: center;
+  gap: 9px;
+  font-size: 13px;
+  padding: 3px 0;
+}
+.race-payments .pay-day-date { color: var(--muted); font-variant-numeric: tabular-nums; }
+.race-payments .pay-day-bar {
+  background: var(--line-soft);
+  border-radius: 4px;
+  height: 10px;
+  overflow: hidden;
+}
+.race-payments .pay-day-bar i {
+  display: block;
+  height: 100%;
+  background: var(--primary-2);
+  border-radius: 4px;
+}
+.race-payments .pay-day-sum {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  color: var(--ink);
+}
+.race-payments .pay-day-count {
+  text-align: right;
+  color: var(--muted-2);
+  font-variant-numeric: tabular-nums;
+}
+.race-payments .pay-empty { color: var(--muted); font-size: 13px; }
+
+/* ── Фильтры ─────────────────────────────────────────── */
+.race-payments .pay-controls {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+.race-payments .pay-filters { display: flex; flex-wrap: wrap; gap: 6px; }
+.race-payments .pay-chip {
+  font-family: inherit;
+  font-size: 13px;
+  color: var(--ink-soft);
+  background: var(--paper-2);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 6px 14px;
+  cursor: pointer;
+}
+.race-payments .pay-chip.is-on {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #fff;
+}
+.race-payments .pay-search {
+  flex: 1;
+  min-width: 180px;
+  max-width: 320px;
+  font-family: inherit;
+  font-size: 14px;
+  color: var(--ink);
+  background: var(--paper-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  padding: 8px 12px;
+}
+.race-payments .pay-count { font-size: 13px; color: var(--muted); }
+
+/* ── Реестр ──────────────────────────────────────────── */
+.race-payments .pay-table-wrap {
+  overflow-x: auto;
+  background: var(--paper-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+}
+.race-payments .pay-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  white-space: nowrap;
+}
+.race-payments .pay-table th {
+  text-align: left;
+  font-weight: 500;
+  color: var(--muted);
+  padding: 11px 12px;
+  border-bottom: 1px solid var(--line);
+  position: sticky;
+  top: 0;
+  background: var(--paper-2);
+}
+.race-payments .pay-table th.sortable { cursor: pointer; user-select: none; }
+.race-payments .pay-table th.is-sorted { color: var(--primary); }
+.race-payments .pay-table th.is-sorted::after { content: " ▾"; }
+.race-payments .pay-table th.is-sorted[data-dir="up"]::after { content: " ▴"; }
+.race-payments .pay-table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--line-soft);
+  color: var(--ink-soft);
+}
+.race-payments .pay-table .num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.race-payments .pay-table .strong { font-weight: 600; color: var(--ink); }
+.race-payments .pay-table .order {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+  color: var(--muted);
+}
+.race-payments .pay-table a { color: var(--primary); text-decoration: none; }
+.race-payments .pay-table a:hover { text-decoration: underline; }
+.race-payments .pay-status {
+  display: inline-block;
+  font-size: 12px;
+  border-radius: 999px;
+  padding: 2px 9px;
+}
+.race-payments .st-done .pay-status { background: #e6f7f0; color: var(--success-dk); }
+.race-payments .st-unpaid .pay-status { background: var(--warn-bg); color: var(--warn); }
+.race-payments .st-cancel .pay-status { background: var(--danger-bg); color: var(--danger); }
+.race-payments .pay-none td { color: var(--muted); text-align: center; padding: 22px; }
+
+@media (max-width: 860px) {
+  .race-payments .pay-panels { grid-template-columns: 1fr; }
+}
