@@ -449,6 +449,42 @@ class Payment(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
 
+class PaymentRefund(models.Model):
+    """Один возврат банка по платежу — строка журнала, а не поле платежа.
+
+    Append-only по деньгам: строка появляется, когда банк подтвердил возврат, и
+    ровно в этот момент списывает деньги и места с команды. ``vtb_refund_id``
+    (``refundId`` банка) уникален и служит токеном идемпотентности: состав и
+    порядок ``transactions.refunds[]`` в ответе ВТБ значения не имеют.
+
+    ``LEGACY_<payment_id>`` в ``vtb_refund_id`` — синтетический ключ возвратов,
+    сделанных до появления этой таблицы: у них нет ни даты, ни id от банка.
+    """
+
+    LEGACY_STATUS = "LEGACY"
+
+    payment = models.ForeignKey(
+        "Payment",
+        on_delete=models.CASCADE,
+        related_name="refunds",
+    )
+    vtb_refund_id = models.CharField(max_length=64, unique=True)
+    amount = models.FloatField(default=0)
+    # Места, списанные именно этой строкой. Хранится, а не вычисляется: иначе
+    # полный возврат после частичного снова гадал бы, сколько мест уже ушло.
+    people = models.FloatField(default=0)
+    refunded_at = models.DateTimeField(null=True, blank=True)
+    status = models.CharField(max_length=32, blank=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ("-refunded_at", "-id")
+
+    def __str__(self):
+        return f"Возврат {self.amount} по платежу {self.payment_id}"
+
+
 class Athlet(models.Model):
     owner = models.ForeignKey(
         settings.AUTH_USER_MODEL,

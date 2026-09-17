@@ -123,23 +123,26 @@
     var done = list.filter(function (row) {
       return row.status === "done";
     });
-    var refunded = list.filter(function (row) {
-      return row.status === "cancel";
+    // Возврат — отдельная строка с отрицательной суммой (finance.py), поэтому
+    // итоги считаются простым сложением. Платёж, возвращённый целиком, остаётся
+    // «пришедшими» деньгами (cancel) — его уход учтён строкой возврата.
+    var paid = list.filter(function (row) {
+      return row.status === "done" || row.status === "cancel";
     });
-    // Возврат переводит платёж done → cancel (settlement.py:refund_payment),
-    // поэтому «осталось» — это уже сумма по done, а не done минус возвраты.
-    // Брутто восстанавливается обратным сложением: cancel — всегда деньги,
-    // которые когда-то пришли.
-    var kept = sum(done, "amount");
-    var back = sum(refunded, "amount");
+    var refunds = list.filter(function (row) {
+      return row.status === "refund";
+    });
+    var came = sum(paid, "amount");
+    var back = -sum(refunds, "amount");
+    var left = came - back;
     tilesEl.innerHTML =
-      tile("Поступило", money(kept + back)) +
+      tile("Поступило", money(came)) +
       tile("Возвращено", back ? "−" + money(back) : money(0), "is-back") +
-      tile("Осталось", money(kept), "is-total") +
+      tile("Осталось", money(left), "is-total") +
       tile("Платежей", num(done.length)) +
-      tile("Участников оплачено", num(sum(done, "paid_for"))) +
+      tile("Участников оплачено", num(sum(paid, "paid_for") + sum(refunds, "paid_for"))) +
       tile("Скидок", money(sum(done, "discount"))) +
-      tile("Средний чек", money(done.length ? kept / done.length : 0));
+      tile("Средний чек", money(done.length ? left / done.length : 0));
   }
 
   function sum(list, key) {
@@ -158,17 +161,26 @@
   }
 
   function renderBreakdown(list) {
-    var done = list.filter(function (row) {
-      return row.status === "done";
+    // Строки разбивки — брутто по всем пришедшим деньгам (done + cancel):
+    // возврат по ним не разносится, банк не говорит, что именно вернул. Он
+    // вычитается отдельной строкой, поэтому «Итого» сходится с «Осталось».
+    var paid = list.filter(function (row) {
+      return row.status === "done" || row.status === "cancel";
     });
-    var html = breakdownRow("Участие", money(sum(done, "fee_sum")));
+    var back = -sum(
+      list.filter(function (row) {
+        return row.status === "refund";
+      }),
+      "amount"
+    );
+    var html = breakdownRow("Участие", money(sum(paid, "fee_sum")));
     EXTRAS.forEach(function (extra) {
       var count = 0;
-      done.forEach(function (row) {
+      paid.forEach(function (row) {
         count += row.extras[extra.code] || 0;
       });
       var revenue = 0;
-      done.forEach(function (row) {
+      paid.forEach(function (row) {
         revenue += row.extras_money[extra.code] || 0;
       });
       html += breakdownRow(
@@ -176,11 +188,14 @@
         money(revenue)
       );
     });
-    var discount = sum(done, "discount");
+    var discount = sum(paid, "discount");
     if (discount) {
       html += breakdownRow("Скидка", "−" + money(discount), "is-minus");
     }
-    html += breakdownRow("Итого", money(sum(done, "amount")), "is-total");
+    if (back) {
+      html += breakdownRow("Возвращено", "−" + money(back), "is-minus");
+    }
+    html += breakdownRow("Итого", money(sum(paid, "amount") - back), "is-total");
     breakdownEl.innerHTML = html;
   }
 
@@ -188,7 +203,9 @@
     var byDate = {};
     list
       .filter(function (row) {
-        return row.status === "done" && row.paid_date;
+        // Возврат — такое же движение денег, как платёж, и у него своя дата
+        // (finance.py), поэтому день возврата обязан быть в разбивке.
+        return row.status !== "unpaid" && row.paid_date;
       })
       .forEach(function (row) {
         var day = byDate[row.paid_date] || { sum: 0, count: 0 };
@@ -201,8 +218,10 @@
       dailyEl.innerHTML = '<p class="pay-empty">Нет оплаченных платежей.</p>';
       return;
     }
+    // Длина полосы — по модулю: день, в который вернули больше, чем получили,
+    // даёт отрицательную сумму, и полоса всё равно должна быть видна.
     var max = days.reduce(function (acc, day) {
-      return Math.max(acc, byDate[day].sum);
+      return Math.max(acc, Math.abs(byDate[day].sum));
     }, 0);
     // Дней может быть сотня (регистрация открыта месяцами), поэтому панель
     // ограничена по высоте в CSS и прокручивается к последним дням — там
@@ -210,9 +229,9 @@
     dailyEl.innerHTML = days
       .map(function (day) {
         var item = byDate[day];
-        var width = max ? (item.sum / max) * 100 : 0;
+        var width = max ? (Math.abs(item.sum) / max) * 100 : 0;
         return (
-          '<div class="pay-day">' +
+          '<div class="pay-day' + (item.sum < 0 ? " is-back" : "") + '">' +
           '<span class="pay-day-date">' + esc(dayLabel(day)) + "</span>" +
           '<span class="pay-day-bar"><i style="width:' + width.toFixed(1) + '%"></i></span>' +
           '<span class="pay-day-sum">' + money(item.sum) + "</span>" +

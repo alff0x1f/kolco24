@@ -4,8 +4,9 @@ from time import sleep
 
 from django.core.management.base import BaseCommand
 from django.utils import timezone
+from django.utils.dateparse import parse_datetime
 
-from apps.race.settlement import credit_extras, refund_payment, settle_payment
+from apps.race.settlement import credit_extras, record_refund, settle_payment
 from donate.models import ClubMember, DonateRequest, DonationPeriod, MemberDonation
 from vtb.client import VTBClient
 from website.models import Payment, Team, VTBPayment
@@ -44,6 +45,7 @@ class Command(BaseCommand):
                 VTBPayment.objects.exclude(status__iexact="PAID")
                 .exclude(status__iexact="EXPIRED")
                 .exclude(status__iexact="REFUNDED")
+                .exclude(status__iexact="PARTIALLY_REFUNDED")
             )
             # Orders older than fresh_age are rechecked less often, but never
             # dropped: one paid just before expiry still has to be settled.
@@ -99,7 +101,7 @@ class Command(BaseCommand):
                 self.stdout.write(f"Payment {payment.pk} marked as paid")
             return
 
-        if new_status.upper() == "REFUNDED":
+        if new_status.upper() in ("REFUNDED", "PARTIALLY_REFUNDED"):
             self._process_refund(vtb_payment, payload)
 
     def _store_status(self, vtb_payment: VTBPayment, payload: dict) -> None:
@@ -114,45 +116,101 @@ class Command(BaseCommand):
         A refund only ever shows up on an order that was already ``PAID``, and
         such an order is excluded from the polling loop — so this normally runs
         from ``--order-id``, started by hand after a refund is made.
+
+        Every confirmed entry of ``transactions.refunds[]`` is handed to
+        ``record_refund`` on its own, keyed by the bank's ``refundId`` — so the
+        order's own status label decides nothing, and re-checking an order
+        changes nothing. Whether the payment is closed out entirely is a
+        property of the refund that dries up its amount, not of the label.
         """
-        refunded = self._refunded_amount(payload)
-        if refunded < Decimal(str(vtb_payment.amount_value)):
-            self.stderr.write(
-                f"Order {vtb_payment.order_id} is REFUNDED for {refunded} of "
-                f"{vtb_payment.amount_value}; partial refunds are not handled, "
-                f"fix the team by hand"
-            )
+        entries = self._refund_entries(payload)
+        if vtb_payment.order_id.startswith(f"{self.donate_prefix}_"):
+            self._refund_donation_order(vtb_payment, payload, entries)
             return
         self._store_status(vtb_payment, payload)
 
-        if vtb_payment.order_id.startswith(f"{self.donate_prefix}_"):
-            self._refund_donation(vtb_payment)
-            return
-
         payment = self._resolve_race_payment(vtb_payment)
-        if refund_payment(payment):
-            self.stdout.write(f"Payment {payment.pk} rolled back after refund")
-        else:
+        if payment is None:
             self.stderr.write(
-                f"Order {vtb_payment.order_id} is REFUNDED but its Payment is "
-                f"not 'done' — nothing to roll back"
+                f"Order {vtb_payment.order_id} is refunded but its Payment is "
+                f"not found — nothing to roll back"
+            )
+            return
+        for entry in entries:
+            self._record_refund_entry(vtb_payment, payment, entry)
+
+    def _record_refund_entry(self, vtb_payment, payment, entry: dict) -> None:
+        outcome = record_refund(
+            payment,
+            entry["refund_id"],
+            entry["amount"],
+            refunded_at=entry["refunded_at"],
+            status=entry["status"],
+        )
+        if not outcome.recorded:
+            self.stdout.write(f"Refund {entry['refund_id']} already recorded, skipping")
+            return
+        if not outcome.money:
+            self.stderr.write(
+                f"Refund {entry['refund_id']} of {entry['amount']}: payment "
+                f"{payment.pk} is {payment.status} and its {payment.payment_amount} "
+                f"is already refunded — recorded, nothing taken back"
+            )
+            return
+        scope = "closed out" if outcome.closing else "partially refunded"
+        self.stdout.write(
+            f"Payment {payment.pk} {scope}: −{outcome.money} ₽, "
+            f"−{outcome.people} people (refund {entry['refund_id']})"
+        )
+        if not outcome.people:
+            self.stderr.write(
+                f"Refund {entry['refund_id']}: {outcome.money} is not a whole "
+                f"number of fees ({payment.cost_per_person} ₽), so only the money "
+                f"was taken back — check the team's seats and add-ons by hand"
             )
 
+    def _refund_donation_order(self, vtb_payment, payload: dict, entries: list) -> None:
+        """Донат либо оплачен, либо нет — частичный возврат тут не выражается."""
+        refunded = sum(Decimal(str(entry["amount"])) for entry in entries)
+        if refunded < Decimal(str(vtb_payment.amount_value)):
+            self.stderr.write(
+                f"Donation {vtb_payment.order_id} is refunded for {refunded} of "
+                f"{vtb_payment.amount_value}; a donation is paid or not, fix it "
+                f"by hand"
+            )
+            return
+        self._store_status(vtb_payment, payload)
+        self._refund_donation(vtb_payment)
+
     @staticmethod
-    def _refunded_amount(payload: dict) -> Decimal:
+    def _refund_entries(payload: dict) -> list:
+        """Подтверждённые возвраты заказа, по одному на элемент ответа ВТБ.
+
+        Неподтверждённый возврат пропускается целиком: он ещё может не
+        состояться, а строка журнала — это уже движение денег.
+        """
         refunds = ((payload.get("object", {}) or {}).get("transactions", {}) or {}).get(
             "refunds", []
         ) or []
-        total = Decimal("0")
+        entries = []
         for refund in refunds:
             obj = (refund or {}).get("object", {}) or {}
             status = (obj.get("status", {}) or {}).get("value", "")
             if status.upper() not in ("RECONCILED", "REFUNDED", "COMPLETED"):
                 continue
             value = (obj.get("amount", {}) or {}).get("value")
-            if value is not None:
-                total += Decimal(str(value))
-        return total
+            refund_id = obj.get("refundId") or ""
+            if value is None or not refund_id:
+                continue
+            entries.append(
+                {
+                    "refund_id": refund_id,
+                    "amount": value,
+                    "refunded_at": parse_datetime(obj.get("createdAt") or ""),
+                    "status": status,
+                }
+            )
+        return entries
 
     def _refund_donation(self, vtb_payment: VTBPayment) -> None:
         """Mark a refunded donation unpaid; the mirror of ``_process_donation``."""

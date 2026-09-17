@@ -1403,28 +1403,39 @@ def test_resolve_race_payment_legacy_fallback_no_row_returns_none():
 # --- Reconciliation: refunds ---
 
 
-def _refund_payload(order_id, *, amount=1000.0, refund_amount=None):
-    refund_amount = amount if refund_amount is None else refund_amount
+def _refund_entry(refund_id, amount, *, status="RECONCILED", created_at=None):
     return {
         "object": {
-            "orderId": order_id,
-            "status": {"value": "REFUNDED", "description": "REFUNDED"},
+            "refundId": refund_id,
+            "createdAt": created_at or "2026-09-17T12:40:20.678Z",
             "amount": {"value": amount, "code": "RUB"},
-            "transactions": {
-                "refunds": [
-                    {
-                        "object": {
-                            "amount": {"value": refund_amount, "code": "RUB"},
-                            "status": {"value": "RECONCILED"},
-                        }
-                    }
-                ]
-            },
+            "status": {"value": status},
         }
     }
 
 
-def _refunded_team_payment():
+def _refund_payload(order_id, *, amount=1000.0, refunds=None, status=None):
+    """Ответ ВТБ по заказу с возвратами.
+
+    По умолчанию — один полный возврат. ``refunds`` принимает готовые элементы
+    ``_refund_entry`` для случаев с несколькими возвратами.
+    """
+    if refunds is None:
+        refunds = [_refund_entry("REFUND_1", amount)]
+    if status is None:
+        total = sum(r["object"]["amount"]["value"] for r in refunds)
+        status = "REFUNDED" if total >= amount else "PARTIALLY_REFUNDED"
+    return {
+        "object": {
+            "orderId": order_id,
+            "status": {"value": status, "description": status},
+            "amount": {"value": amount, "code": "RUB"},
+            "transactions": {"refunds": refunds},
+        }
+    }
+
+
+def _refunded_team_payment(**payment_kwargs):
     from apps.race.settlement import settle_payment
 
     user = User.objects.create_user(
@@ -1440,29 +1451,37 @@ def _refunded_team_payment():
         owner=user, paymentid="rf1", dist="t", category2=cat, ucount=4, paid_people=2
     )
     vtb_payment = _make_vtb_payment(VTBPayment.new_order_id("ORDER"))
+    defaults = {
+        "payment_amount": 1000,
+        "cost_per_person": 500,
+        "paid_for": 2,
+    }
+    defaults.update(payment_kwargs)
     payment = Payment.objects.create(
         owner=user,
         team=team,
         payment_method="sbp2",
-        payment_amount=1000,
-        paid_for=2,
         status=Payment.STATUS_DRAFT,
         vtb_payment=vtb_payment,
+        **defaults,
     )
     settle_payment(payment)
     return team, payment, vtb_payment
 
 
-@pytest.mark.django_db
-def test_refunded_order_rolls_back_team():
+def _run_refund(vtb_payment, payload):
     from website.management.commands.check_vtb_payments import Command
-
-    team, payment, vtb_payment = _refunded_team_payment()
-    payload = _refund_payload(vtb_payment.order_id)
 
     client = Mock()
     client.get_order.return_value = payload
     Command()._check_payment(client, vtb_payment)
+
+
+@pytest.mark.django_db
+def test_refunded_order_rolls_back_team():
+    team, payment, vtb_payment = _refunded_team_payment()
+
+    _run_refund(vtb_payment, _refund_payload(vtb_payment.order_id))
 
     team.refresh_from_db()
     payment.refresh_from_db()
@@ -1471,25 +1490,184 @@ def test_refunded_order_rolls_back_team():
     assert payment.status == Payment.STATUS_CANCEL
     assert team.paid_people == 2
     assert team.paid_sum == 0
+    refund = payment.refunds.get()
+    assert (refund.vtb_refund_id, refund.amount, refund.people) == ("REFUND_1", 1000, 2)
 
 
 @pytest.mark.django_db
-def test_partial_refund_is_not_rolled_back():
-    from website.management.commands.check_vtb_payments import Command
-
+def test_partial_refund_debits_money_and_seats():
     team, payment, vtb_payment = _refunded_team_payment()
-    payload = _refund_payload(vtb_payment.order_id, refund_amount=400.0)
+    payload = _refund_payload(
+        vtb_payment.order_id, refunds=[_refund_entry("REFUND_1", 500.0)]
+    )
 
-    client = Mock()
-    client.get_order.return_value = payload
-    Command()._check_payment(client, vtb_payment)
+    _run_refund(vtb_payment, payload)
 
     team.refresh_from_db()
     payment.refresh_from_db()
     vtb_payment.refresh_from_db()
-    assert vtb_payment.status == "PAID"  # left untouched for a human to sort out
-    assert payment.status == Payment.STATUS_DONE
+    assert vtb_payment.status == "PARTIALLY_REFUNDED"
+    assert payment.status == Payment.STATUS_DONE  # часть денег всё ещё наша
+    assert payment.refunds.get().amount == 500
+    assert team.paid_sum == 500
+    assert team.paid_people == 3  # 500 ₽ — ровно один взнос
+
+
+@pytest.mark.django_db
+def test_partial_refund_of_odd_amount_moves_money_only():
+    """400 ₽ — не целое число взносов по 500 ₽, места оставляем человеку."""
+    team, payment, vtb_payment = _refunded_team_payment()
+    payload = _refund_payload(
+        vtb_payment.order_id, refunds=[_refund_entry("REFUND_1", 400.0)]
+    )
+
+    _run_refund(vtb_payment, payload)
+
+    team.refresh_from_db()
+    assert team.paid_sum == 600
     assert team.paid_people == 4
+
+
+@pytest.mark.django_db
+def test_same_refund_id_is_recorded_once():
+    """Повторный опрос заказа не должен списать тот же возврат заново."""
+    team, payment, vtb_payment = _refunded_team_payment()
+    payload = _refund_payload(
+        vtb_payment.order_id, refunds=[_refund_entry("REFUND_1", 500.0)]
+    )
+
+    _run_refund(vtb_payment, payload)
+    vtb_payment.refresh_from_db()
+    _run_refund(vtb_payment, payload)
+
+    team.refresh_from_db()
+    assert team.paid_sum == 500
+    assert team.paid_people == 3
+    assert payment.refunds.count() == 1
+
+
+@pytest.mark.django_db
+def test_each_refund_of_an_order_debits_its_own_part():
+    team, payment, vtb_payment = _refunded_team_payment()
+    first = _refund_payload(
+        vtb_payment.order_id, refunds=[_refund_entry("REFUND_1", 500.0)]
+    )
+    both = _refund_payload(
+        vtb_payment.order_id,
+        refunds=[_refund_entry("REFUND_1", 500.0), _refund_entry("REFUND_2", 400.0)],
+    )
+
+    _run_refund(vtb_payment, first)
+    vtb_payment.refresh_from_db()
+    _run_refund(vtb_payment, both)
+
+    team.refresh_from_db()
+    payment.refresh_from_db()
+    assert sum(r.amount for r in payment.refunds.all()) == 900
+    assert team.paid_sum == 100
+    assert team.paid_people == 3  # ещё 400 ₽ — снова не целый взнос
+    assert payment.refunds.count() == 2
+
+
+@pytest.mark.django_db
+def test_closing_refund_after_partial_does_not_debit_twice():
+    team, payment, vtb_payment = _refunded_team_payment()
+    first = _refund_payload(
+        vtb_payment.order_id, refunds=[_refund_entry("REFUND_1", 500.0)]
+    )
+    both = _refund_payload(
+        vtb_payment.order_id,
+        refunds=[_refund_entry("REFUND_1", 500.0), _refund_entry("REFUND_2", 500.0)],
+    )
+
+    _run_refund(vtb_payment, first)
+    vtb_payment.refresh_from_db()
+    _run_refund(vtb_payment, both)
+
+    team.refresh_from_db()
+    payment.refresh_from_db()
+    assert vtb_payment.status == "REFUNDED"
+    assert payment.status == Payment.STATUS_CANCEL
+    assert team.paid_sum == 0
+    assert team.paid_people == 2  # только те 2 места, что дал этот платёж
+
+
+@pytest.mark.django_db
+def test_closing_refund_with_promo_returns_all_seats():
+    """Платёж со скидкой: 700 ₽ при взносе 500 — правило кратности не годится."""
+    team, payment, vtb_payment = _refunded_team_payment(
+        payment_amount=700, discount_amount=300
+    )
+    payload = _refund_payload(
+        vtb_payment.order_id, amount=700.0, refunds=[_refund_entry("REFUND_1", 700.0)]
+    )
+
+    _run_refund(vtb_payment, payload)
+
+    team.refresh_from_db()
+    payment.refresh_from_db()
+    assert payment.status == Payment.STATUS_CANCEL
+    assert team.paid_people == 2
+    assert payment.refunds.get().people == 2
+
+
+@pytest.mark.django_db
+def test_refund_beyond_the_payment_takes_nothing_back():
+    """Легаси-откат + настоящий refundId из банка не должны списать дважды."""
+    from website.models import PaymentRefund
+
+    team, payment, vtb_payment = _refunded_team_payment()
+    PaymentRefund.objects.create(
+        payment=payment,
+        vtb_refund_id=f"LEGACY_{payment.pk}",
+        amount=payment.payment_amount,
+        people=payment.paid_for,
+        status=PaymentRefund.LEGACY_STATUS,
+    )
+    Payment.objects.filter(pk=payment.pk).update(status=Payment.STATUS_CANCEL)
+    payment.refresh_from_db()
+    Team.all_objects.filter(pk=team.pk).update(paid_people=2, paid_sum=0)
+
+    _run_refund(vtb_payment, _refund_payload(vtb_payment.order_id))
+
+    team.refresh_from_db()
+    payment.refresh_from_db()
+    assert sum(r.amount for r in payment.refunds.all()) == 1000
+    assert team.paid_sum == 0
+    assert team.paid_people == 2
+    assert payment.refunds.count() == 2  # след в аудите есть
+    assert payment.refunds.get(vtb_refund_id="REFUND_1").amount == 0
+
+
+@pytest.mark.django_db
+def test_unconfirmed_refund_is_ignored():
+    """Возврат без подтверждения банка ещё может не состояться."""
+    team, payment, vtb_payment = _refunded_team_payment()
+    payload = _refund_payload(
+        vtb_payment.order_id,
+        refunds=[_refund_entry("REFUND_1", 500.0, status="CREATED")],
+    )
+
+    _run_refund(vtb_payment, payload)
+
+    team.refresh_from_db()
+    assert team.paid_sum == 1000
+    assert payment.refunds.count() == 0
+
+
+@pytest.mark.django_db
+def test_refund_row_keeps_the_banks_own_date():
+    team, payment, vtb_payment = _refunded_team_payment()
+    payload = _refund_payload(
+        vtb_payment.order_id,
+        refunds=[_refund_entry("REFUND_1", 1000.0, created_at="2026-09-16T10:29:13Z")],
+    )
+
+    _run_refund(vtb_payment, payload)
+
+    refund = payment.refunds.get()
+    assert refund.refunded_at.isoformat().startswith("2026-09-16T10:29:13")
+    assert refund.status == "RECONCILED"
 
 
 # --- Task 5: add_team.html rewritten on base-2 ---

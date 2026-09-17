@@ -622,18 +622,63 @@ user-facing sberbank/sbp "I paid, here is my card" templates, and the older Yand
 `paymentinfo`/`getcost`/`yandexinform`/`success`) was **removed** — those routes now 404. The `Payment`/`PaymentLog`/
 `PaymentsYa`/`SbpPaymentRecipient` tables and admin registrations are kept for history.
 
-**Refunds** (VTB order status `REFUNDED`): handled by `check_vtb_payments`, but **only on demand** — a refund appears on
-an order that is already `PAID`, and the endless poll loop excludes `PAID` (and now `REFUNDED`) rows forever. Run
+**Refunds** (VTB order status `REFUNDED` / `PARTIALLY_REFUNDED`) are a **journal, not a field**: every refund the bank
+reports is one **`PaymentRefund`** row (`website/models/models.py`, migration `website/0095`) hanging off its `Payment`
+(`related_name="refunds"`). Full and partial refunds are the same mechanism — the difference is only whether a row dries
+up the payment's remaining amount.
+
+Handled by `check_vtb_payments`, but **only on demand** — a refund appears on an order that is already `PAID`, and the
+endless poll loop excludes `PAID` (and `REFUNDED`/`PARTIALLY_REFUNDED`) rows forever. Run
 `manage.py check_vtb_payments --order-id ORDER_<ulid> [--order-id …]` after making a refund: it checks those orders once,
-whatever their local status, and exits. On `REFUNDED` the command stores the status and calls
-`apps/race/settlement.py:refund_payment` — the mirror of `settle_payment`: `Payment.status` `done → cancel` (its own
-idempotency token, so nothing is taken back twice), `Team.paid_people`/`paid_sum` decremented (floored at 0, via a
-SQL-level `update`) and `TeamExtra.count_paid` reduced by the `PaymentExtra` snapshots (`debit_extras`; `count`, the
-desired amount, is left alone). `Race.reg_status` is deliberately **not** reopened — same no-auto-reopen rule as the
-`OPEN → SOLD_OUT` flip. A **partial** refund (refund transactions summing to less than the order amount) is refused: the
-command logs and changes nothing, an organizer fixes the team by hand. A refunded `SPUTNIK_*` donation flips its
-`MemberDonation.is_paid` back to `False`. Note a `cancel` payment also frees its промокод slot immediately
-(`open_draft_q` counts only drafts).
+whatever their local status, and exits. `_refund_entries(payload)` walks `transactions.refunds[]` and hands **each
+confirmed entry** (`RECONCILED`/`REFUNDED`/`COMPLETED`; an unconfirmed one is skipped entirely — it may still fall
+through, and a row is already a money movement) to `apps/race/settlement.py:record_refund` on its own. The **order's
+status label decides nothing**.
+
+**Idempotency is the bank's own key**: `PaymentRefund.vtb_refund_id` (`refundId`) is `unique`, and `get_or_create` on it
+is the single arbiter — re-polling an order, a different order of `refunds[]`, or two commands racing all change
+nothing; a known row only has its `status` refreshed. **Invariant**: total refunds (summed over the rows) can never
+exceed `payment_amount`,
+and money moves only from a `done` payment. A row beyond that is still **recorded with `amount = 0`** (audit trace) but
+debits nothing — needed literally, because a real `refundId` arriving for an order rolled back before this table existed
+would otherwise debit the team a second time, and an order paid and refunded between two polls (its `Payment` still
+`draft`) would take back what was never credited.
+
+**Seats** (`PaymentRefund.people`, stored, not derived — so nothing has to guess later what earlier rows took):
+- a **closing** row (one that brings the total up to `payment_amount`) takes `paid_for − seats already refunded`. Its
+  amount need not divide by the fee: with a promo a 700 ₽ payment covers two people at a 500 ₽ fee, and a divisibility
+  rule would free zero seats.
+- an ordinary **partial** row takes seats only when its amount is a whole number of `cost_per_person` (±0.001). The
+  payload has **no line breakdown**, so any other amount (an add-on, a hand-made sum) moves **money only** and the
+  command warns on stderr for an organizer to fix the seats by hand.
+
+A **closing** row also flips `Payment.status` `done → cancel` and calls `debit_extras` — `TeamExtra.count_paid` is
+**never** touched by a non-closing refund (guessing which add-on came back would eat units the team still has).
+
+**There is deliberately no `refunded_amount` on `Payment`**: how much came back is read off the journal itself, with one
+`aggregate(Sum("amount"), Sum("people"))` that `record_refund` needs for the seats anyway — a cached copy would buy no
+query and add a second source of truth to keep in step. The admin list column annotates the same sum
+(`PaymentAdmin.get_queryset`) rather than reading a field. Data migration `website/0096` backfills a synthetic
+`LEGACY_<payment_id>` row for every pre-existing `cancel` payment (no date, no bank id — `refunded_at` falls back to
+`updated_at`): without it they would vanish from the page's «Возвращено», and a real `refundId` arriving later on the
+same order would find the payment's amount untouched and debit the team a second time. It is a **separate migration**
+from the schema one on purpose — a backfill that fails on data then leaves the table in place, and only the data needs
+fixing.
+
+`Race.reg_status` is deliberately **not** reopened — same no-auto-reopen rule as the `OPEN → SOLD_OUT` flip. Donations
+(`SPUTNIK_*`) have no `Payment`, so they keep the old all-or-nothing path: a full refund flips `MemberDonation.is_paid`
+back to `False`, a partial one is refused (a donation is paid or not). Note a `cancel` payment also frees its промокод
+slot immediately (`open_draft_q` counts only drafts). On the «Платежи» page a refund is **its own row** (`finance.py:
+_refund_rows`, `status="refund"`, label «Возврат») with a negative `amount`, negative `paid_for` and the **bank's own
+date**, so it lands in its own day bucket; zero-amount audit rows are skipped. Every total on the page is therefore a
+plain sum over the same three buckets, and **all three panels must agree**: the tiles («Поступило» over `done` +
+`cancel` payments, «Возвращено» the refund rows, «Осталось» the difference), the breakdown, and the daily chart, which
+buckets **every** money row (`status !== "unpaid"`) so a refund day is never missing and a net-negative day draws its
+bar from `Math.abs`. In the breakdown the per-line figures (Участие, each add-on, Скидка) stay **gross over
+`done` + `cancel`** — a refund cannot be split across them, the bank never says which line came back — and the refund is
+subtracted as its own «Возвращено» line, so «Итого» equals the «Осталось» tile. The lines reconcile to the gross total
+by construction (`fee_sum = amount + discount − extras_sum`), which is why they must all use the same bucket. A
+read-only `PaymentRefundInline` shows the journal on the payment in `/admin/`.
 
 **VTB `order_id`s** (race-fee and donations) are random ULIDs — `ORDER_<ulid>` for race fees, `SPUTNIK_<ulid>` for
 donations — minted by the single generator `VTBPayment.new_order_id(prefix)` (`website/models/vtb.py`). They are

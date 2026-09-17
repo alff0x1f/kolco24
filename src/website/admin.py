@@ -1,4 +1,5 @@
 from django.contrib import admin
+from django.db import models
 
 from .models import (
     Checkpoint,
@@ -7,6 +8,7 @@ from .models import (
     NewsPost,
     Page,
     Payment,
+    PaymentRefund,
     PaymentsYa,
     Race,
     RaceAdmin,
@@ -192,15 +194,48 @@ class PaymentsYaAdmin(admin.ModelAdmin):
     list_filter = ("datetime", "amount")
 
 
+class PaymentRefundInline(admin.TabularInline):
+    """Журнал возвратов платежа — только на просмотр.
+
+    Строка возврата уже сняла деньги и места с команды, а правка здесь ничего
+    бы не пересчитала, поэтому она read-only. Правильный способ завести возврат
+    — ``manage.py check_vtb_payments --order-id``.
+    """
+
+    model = PaymentRefund
+    extra = 0
+    can_delete = False
+    fields = ("vtb_refund_id", "amount", "people", "refunded_at", "status")
+    readonly_fields = fields
+
+    def has_add_permission(self, request, obj):
+        return False
+
+
 class PaymentAdmin(admin.ModelAdmin):
     list_display = (
         "id",
         "team",
         "payment_amount",
+        "refunded",
         "cost_per_person",
         "paid_for",
         "status",
     )
+    inlines = [PaymentRefundInline]
+
+    def get_queryset(self, request):
+        # Возвращённое считается по журналу; аннотация — чтобы колонка не стала
+        # запросом на строку списка.
+        return (
+            super()
+            .get_queryset(request)
+            .annotate(refunded_total=models.Sum("refunds__amount"))
+        )
+
+    @admin.display(description="Возвращено", ordering="refunded_total")
+    def refunded(self, obj):
+        return obj.refunded_total or 0
 
 
 class RaceAdminInline(admin.TabularInline):
