@@ -159,17 +159,19 @@ def payment_rows(race):
     return rows
 
 
-def filter_rows(rows, status):
-    """Отфильтровать строки по статусу — только для CSV.
+def filter_rows(rows, status, promo_only=False):
+    """Отфильтровать строки по статусу и промокоду — только для CSV.
 
     Страница отдаёт все строки и фильтрует их в браузере; сюда приходит значение
     из query string, поэтому неизвестное значение молча трактуется как ``done``.
     """
-    if status == STATUS_ALL:
-        return list(rows)
-    if status not in (STATUS_UNPAID, STATUS_CANCEL):
-        status = STATUS_DONE
-    return [row for row in rows if row["status"] == status]
+    if status != STATUS_ALL:
+        if status not in (STATUS_UNPAID, STATUS_CANCEL):
+            status = STATUS_DONE
+        rows = [row for row in rows if row["status"] == status]
+    if promo_only:
+        rows = [row for row in rows if row["promo"]]
+    return list(rows)
 
 
 # Excel и LibreOffice вычисляют ячейку, начинающуюся с любого из этих символов.

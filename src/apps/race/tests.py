@@ -6815,6 +6815,37 @@ def test_payments_export_status_all_and_unknown(client):
 
 
 @pytest.mark.django_db
+def test_payments_export_promo_only_stacks_with_status(client):
+    user, race = _promo_admin("fin-exp-promo")
+    category = _make_category(race)
+    promo = RacePromo.objects.create(race=race, code="TEN", value=10)
+    _fin_payment(user, _make_team(user, category, teamname="Со скидкой"), promo=promo)
+    _fin_payment(user, _make_team(user, category, teamname="Без скидки"))
+    _fin_payment(
+        user,
+        _make_team(user, category, teamname="Черновик со скидкой"),
+        promo=promo,
+        status=Payment.STATUS_DRAFT,
+    )
+    client.force_login(user)
+
+    def teams(**params):
+        body = client.get(_export_url(race, **params)).content.decode("utf-8")
+        return [line.split(";")[1] for line in body.splitlines() if line][1:]
+
+    assert teams(promo="1") == ["Со скидкой"]
+    assert teams(status="all", promo="1") == [
+        "Черновик со скидкой",
+        "Со скидкой",
+    ]
+    assert sorted(teams(status="all")) == [
+        "Без скидки",
+        "Со скидкой",
+        "Черновик со скидкой",
+    ]
+
+
+@pytest.mark.django_db
 def test_payments_page_without_payments_renders(client):
     user, race = _promo_admin("fin-empty")
     client.force_login(user)

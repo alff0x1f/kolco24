@@ -139,6 +139,12 @@
   margin-bottom: 12px;
 }
 .race-payments .pay-filters { display: flex; flex-wrap: wrap; gap: 6px; }
+/* Переключатель складывается с фильтром статуса — отделяем его чертой, чтобы
+   он не читался как ещё один взаимоисключающий вариант. */
+.race-payments .pay-filters-promo {
+  border-left: 1px solid var(--line);
+  padding-left: 10px;
+}
 .race-payments .pay-chip {
   font-family: inherit;
   font-size: 13px;

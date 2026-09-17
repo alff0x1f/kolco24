@@ -42,6 +42,10 @@
       <button type="button" class="pay-chip" data-status="cancel">Возвраты</button>
       <button type="button" class="pay-chip" data-status="all">Все</button>
     </div>
+    {# Отдельная группа: переключатель складывается с фильтром статуса, а не заменяет его. #}
+    <div class="pay-filters pay-filters-promo">
+      <button type="button" class="pay-chip" id="payPromoOnly">С промокодом</button>
+    </div>
     <input class="pay-search" id="paySearch" type="search"
            placeholder="Команда или номер заказа…">
     <span class="pay-count" id="payCount"></span>

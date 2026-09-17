@@ -29,8 +29,11 @@
   var searchEl = document.getElementById("paySearch");
   var statusEl = document.getElementById("payStatus");
   var exportEl = document.getElementById("payExport");
+  var promoEl = document.getElementById("payPromoOnly");
+  var exportBase = exportEl.getAttribute("href").split("?")[0];
 
   var status = "done";
+  var promoOnly = false;
   var query = "";
   var sortKey = "paid_sort";
   var sortDir = -1;
@@ -58,7 +61,8 @@
 
   function visible() {
     var list = ROWS.filter(function (row) {
-      return status === "all" || row.status === status;
+      if (status !== "all" && row.status !== status) return false;
+      return !promoOnly || Boolean(row.promo);
     });
     if (query) {
       var q = query.toLowerCase();
@@ -249,10 +253,22 @@
     statusEl.querySelectorAll(".pay-chip").forEach(function (chip) {
       chip.classList.toggle("is-on", chip === button);
     });
-    // Поиск и сортировка в выгрузку не переносятся — только фильтр статуса.
-    exportEl.href = exportEl.href.replace(/status=[a-z]+/, "status=" + status);
+    syncExport();
     render();
   });
+
+  promoEl.addEventListener("click", function () {
+    promoOnly = !promoOnly;
+    promoEl.classList.toggle("is-on", promoOnly);
+    syncExport();
+    render();
+  });
+
+  // Поиск и сортировка в выгрузку не переносятся — только фильтры.
+  function syncExport() {
+    exportEl.href =
+      exportBase + "?status=" + status + (promoOnly ? "&promo=1" : "");
+  }
 
   var debounce;
   searchEl.addEventListener("input", function (event) {

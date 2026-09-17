@@ -1824,7 +1824,11 @@ class RacePaymentsExportView(View):
             return response
 
         extras = extras_catalog(race)
-        rows = filter_rows(payment_rows(race), request.GET.get("status"))
+        rows = filter_rows(
+            payment_rows(race),
+            request.GET.get("status"),
+            promo_only=request.GET.get("promo") == "1",
+        )
         today = datetime.date.today().isoformat()
         csv_response = HttpResponse(content_type="text/csv; charset=utf-8")
         csv_response["Content-Disposition"] = (
