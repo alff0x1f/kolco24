@@ -120,7 +120,10 @@ Django 4.2 project. Source lives entirely under `src/`, with `manage.py` at `src
   payment (fallback `updated_at`), `created_at` otherwise — `Payment.payment_date` is never populated anywhere and is
   not read. The page ships **all** rows in a JSON island with an empty `<tbody>` and does filtering, sorting and every
   total client-side (like `RaceTeamsView`), so totals always follow the visible filter; refunds (`cancel`) get their
-  own «Возвращено» tile and are never folded into the income breakdown. The CSV uses `;` **plus a BOM** for Russian
+  own «Возвращено» tile and are never folded into the income breakdown. **A refund flips the payment `done → cancel`**
+  (`settlement.py:refund_payment`, the only writer of `cancel`, and only ever from `done`), so the `done` sum is
+  **already net** — «Осталось» is that sum as-is and must never subtract refunds again, while gross («Поступило») is
+  reconstructed by adding the `cancel` sum back. The CSV uses `;` **plus a BOM** for Russian
   Excel — a deliberate divergence from `api/views/teams.py`'s BOM-less export, which is read by scripts.
   `RaceMapView`/`RaceMapPositionsView`/`RaceMapTrackView` (`src/apps/race/views.py`) back the organizer-only «Карта
   гонки» page — the read side of `apps.mobile`'s `/app/race/<id>/track/` upload (`TrackPoint` rows were write-only

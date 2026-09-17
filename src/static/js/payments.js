@@ -112,16 +112,20 @@
     var refunded = list.filter(function (row) {
       return row.status === "cancel";
     });
-    var collected = sum(done, "amount");
+    // Возврат переводит платёж done → cancel (settlement.py:refund_payment),
+    // поэтому «осталось» — это уже сумма по done, а не done минус возвраты.
+    // Брутто восстанавливается обратным сложением: cancel — всегда деньги,
+    // которые когда-то пришли.
+    var kept = sum(done, "amount");
     var back = sum(refunded, "amount");
     tilesEl.innerHTML =
-      tile("Собрано", money(collected)) +
+      tile("Поступило", money(kept + back)) +
       tile("Возвращено", back ? "−" + money(back) : money(0), "is-back") +
-      tile("Итого", money(collected - back), "is-total") +
+      tile("Осталось", money(kept), "is-total") +
       tile("Платежей", num(done.length)) +
       tile("Участников оплачено", num(sum(done, "paid_for"))) +
       tile("Скидок", money(sum(done, "discount"))) +
-      tile("Средний чек", money(done.length ? collected / done.length : 0));
+      tile("Средний чек", money(done.length ? kept / done.length : 0));
   }
 
   function sum(list, key) {

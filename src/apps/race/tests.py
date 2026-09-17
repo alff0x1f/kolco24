@@ -6860,4 +6860,8 @@ def test_payment_rows_totals_converge():
     extras = sum(row["extras_sum"] for row in done)
     discount = sum(row["discount"] for row in done)
     assert fee + extras - discount == sum(row["amount"] for row in done) == 2300
-    assert sum(row["amount"] for row in rows if row["status"] == "cancel") == 500
+    # Возврат ушёл из done в cancel, значит сумма done — уже нетто: вычитать из
+    # неё возвраты ещё раз нельзя, брутто наоборот получается сложением.
+    back = sum(row["amount"] for row in rows if row["status"] == "cancel")
+    assert back == 500
+    assert sum(row["amount"] for row in done) + back == 2800
