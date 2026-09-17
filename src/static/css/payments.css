@@ -221,6 +221,10 @@
 .race-payments .st-done .pay-status { background: #e6f7f0; color: var(--success-dk); }
 .race-payments .st-unpaid .pay-status { background: var(--warn-bg); color: var(--warn); }
 .race-payments .st-cancel .pay-status { background: var(--danger-bg); color: var(--danger); }
+.race-payments .pay-promo {
+  border-bottom: 1px dotted var(--muted);
+  cursor: help;
+}
 .race-payments .pay-none td { color: var(--muted); text-align: center; padding: 22px; }
 
 @media (max-width: 860px) {

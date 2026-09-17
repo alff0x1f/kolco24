@@ -78,6 +78,16 @@
     });
   }
 
+  // В колонке интересен размер скидки, а не метка кода — код уходит в подсказку.
+  function promoCell(row) {
+    if (!row.promo_rule) return "—";
+    return (
+      '<span class="pay-promo" title="' + esc(row.promo) + '">' +
+      esc(row.promo_rule) +
+      "</span>"
+    );
+  }
+
   function rowHtml(row) {
     return (
       '<tr class="st-' + row.status + '">' +
@@ -88,7 +98,7 @@
       '<td class="num">' + num(row.paid_for) + "</td>" +
       '<td class="num">' + num(row.cost_per_person) + "</td>" +
       "<td>" + esc(row.extras_label) + "</td>" +
-      "<td>" + (row.promo ? esc(row.promo) : "—") + "</td>" +
+      "<td>" + promoCell(row) + "</td>" +
       '<td class="num">' + (row.discount ? num(row.discount) : "—") + "</td>" +
       '<td class="num strong">' + num(row.amount) + "</td>" +
       '<td class="order">' + esc(row.order_id) + "</td>" +
