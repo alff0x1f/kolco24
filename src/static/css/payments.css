@@ -89,6 +89,14 @@
   padding-top: 9px;
 }
 
+/* Дней может быть под сотню — панель не должна растягивать страницу.
+   ~14 строк видно, остальное прокручивается (JS листает к последним дням). */
+.race-payments .pay-daily {
+  max-height: 264px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
 .race-payments .pay-day {
   display: grid;
   grid-template-columns: 60px 1fr auto 34px;

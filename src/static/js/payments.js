@@ -190,6 +190,9 @@
     var max = days.reduce(function (acc, day) {
       return Math.max(acc, byDate[day].sum);
     }, 0);
+    // Дней может быть сотня (регистрация открыта месяцами), поэтому панель
+    // ограничена по высоте в CSS и прокручивается к последним дням — там
+    // идёт актуальная активность.
     dailyEl.innerHTML = days
       .map(function (day) {
         var item = byDate[day];
@@ -204,6 +207,7 @@
         );
       })
       .join("");
+    dailyEl.scrollTop = dailyEl.scrollHeight;
   }
 
   function dayLabel(iso) {
