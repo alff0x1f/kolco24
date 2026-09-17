@@ -146,6 +146,24 @@ def filter_rows(rows, status):
     return [row for row in rows if row["status"] == status]
 
 
+# Excel и LibreOffice вычисляют ячейку, начинающуюся с любого из этих символов.
+_CSV_FORMULA_STARTS = ("=", "+", "-", "@", "\t", "\r")
+
+
+def _csv_safe(value):
+    """Обезвредить формулу в текстовой ячейке.
+
+    Название команды пишет участник, поэтому «=1+1» в выгрузке стало бы
+    вычисляемой ячейкой: ``csv.writer`` экранирует структуру файла, но не
+    защищает от интерпретации формул. Апостроф в начале заставляет Excel
+    показать значение как текст. Числа проходят мимо — их формирует сервер, и
+    отрицательные суммы не должны получить апостроф.
+    """
+    if isinstance(value, str) and value.startswith(_CSV_FORMULA_STARTS):
+        return "'" + value
+    return value
+
+
 def csv_rows(rows, extras):
     """Заголовок и строки CSV: по колонке на каждую услугу каталога."""
     header = [
@@ -161,21 +179,24 @@ def csv_rows(rows, extras):
         "Сумма",
         "Заказ",
     ]
-    header += [extra["name"] for extra in extras]
+    header += [_csv_safe(extra["name"]) for extra in extras]
     yield header
     for row in rows:
         line = [
-            row["paid_at"],
-            row["team_name"],
-            row["category"],
-            row["status_label"],
-            row["paid_for"],
-            row["cost_per_person"],
-            row["promo"],
-            row["discount"],
-            row["fee_sum"],
-            row["amount"],
-            row["order_id"],
+            _csv_safe(value)
+            for value in (
+                row["paid_at"],
+                row["team_name"],
+                row["category"],
+                row["status_label"],
+                row["paid_for"],
+                row["cost_per_person"],
+                row["promo"],
+                row["discount"],
+                row["fee_sum"],
+                row["amount"],
+                row["order_id"],
+            )
         ]
         line += [row["extras"].get(extra["code"], 0) for extra in extras]
         yield line

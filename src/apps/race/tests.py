@@ -6476,7 +6476,7 @@ def test_race_edit_page_renders_promo_block(client, django_user_model):
 
 from decimal import Decimal  # noqa: E402
 
-from apps.race.finance import extras_catalog, payment_rows  # noqa: E402
+from apps.race.finance import csv_rows, extras_catalog, payment_rows  # noqa: E402
 from website.models.vtb import VTBPayment  # noqa: E402
 
 
@@ -6865,3 +6865,43 @@ def test_payment_rows_totals_converge():
     back = sum(row["amount"] for row in rows if row["status"] == "cancel")
     assert back == 500
     assert sum(row["amount"] for row in done) + back == 2800
+
+
+@pytest.mark.django_db
+def test_payments_export_neutralizes_formula_in_team_name(client):
+    user, race = _promo_admin("fin-exp-formula")
+    category = _make_category(race)
+    _fin_payment(user, _make_team(user, category, teamname="=1+1"))
+    client.force_login(user)
+
+    body = client.get(_export_url(race)).content.decode("utf-8")
+    cells = [line for line in body.splitlines() if line][1].split(";")
+
+    assert cells[1] == "'=1+1"
+
+
+@pytest.mark.django_db
+def test_payments_export_keeps_plain_values_untouched():
+    rows = [
+        {
+            "paid_at": "16.09.26 14:32",
+            "team_name": "Обычные",
+            "category": "12 часов",
+            "status_label": "Оплачено",
+            "paid_for": 2,
+            "cost_per_person": 500,
+            "promo": "",
+            "discount": 0,
+            "fee_sum": 1000,
+            "amount": 1000,
+            "order_id": "ORDER_x",
+            "extras": {},
+        }
+    ]
+
+    header, line = list(csv_rows(rows, []))
+
+    assert header[1] == "Команда"
+    assert line[1] == "Обычные"
+    # Числа не должны получить апостроф — в том числе отрицательные.
+    assert line[4] == 2 and line[9] == 1000
