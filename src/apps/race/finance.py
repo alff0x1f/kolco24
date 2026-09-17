@@ -114,7 +114,7 @@ def payment_rows(race):
                 "paid_date": local.strftime("%Y-%m-%d") if local else "",
                 "team_id": team.id,
                 "team_name": team.teamname or _NO_NAME,
-                "category": team.category2.name if team.category2 else "",
+                "category": team.category2.code if team.category2 else "",
                 "status": status,
                 "status_label": _STATUS_LABELS[status],
                 "paid_for": payment.paid_for,
