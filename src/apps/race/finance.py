@@ -8,6 +8,8 @@ from django.utils import timezone
 
 from website.models.models import Payment
 
+from .models import RacePromo
+
 # Значения фильтра статуса (query string ``?status=``).
 STATUS_DONE = "done"
 STATUS_UNPAID = "unpaid"
@@ -67,6 +69,28 @@ def _extras_of(payment):
     return counts, money, ", ".join(labels)
 
 
+def _promo_rule(promo):
+    """Размер скидки промокода: «10%» или «300 ₽».
+
+    В таблице важна не сама метка кода, а правило — сам код уходит в подсказку.
+    """
+    if not promo:
+        return ""
+    unit = "%" if promo.discount_type == RacePromo.PERCENT else " ₽"
+    return f"{promo.value}{unit}"
+
+
+def _promo_hint(promo):
+    """Подсказка к промокоду: описание, а без него — сам код.
+
+    ``comment`` необязателен, и пустая подсказка оставила бы строку без всякого
+    признака, каким кодом платили.
+    """
+    if not promo:
+        return ""
+    return promo.comment or promo.code
+
+
 def payments_queryset(race):
     """Платежи гонки. Связь с гонкой — только через ``team.category2.race``.
 
@@ -114,12 +138,14 @@ def payment_rows(race):
                 "paid_date": local.strftime("%Y-%m-%d") if local else "",
                 "team_id": team.id,
                 "team_name": team.teamname or _NO_NAME,
-                "category": team.category2.name if team.category2 else "",
+                "category": team.category2.code if team.category2 else "",
                 "status": status,
                 "status_label": _STATUS_LABELS[status],
                 "paid_for": payment.paid_for,
                 "cost_per_person": payment.cost_per_person,
                 "promo": payment.promo.code if payment.promo else "",
+                "promo_rule": _promo_rule(payment.promo),
+                "promo_hint": _promo_hint(payment.promo),
                 "discount": discount,
                 "amount": amount,
                 "order_id": payment.vtb_payment.order_id if payment.vtb_payment else "",
@@ -133,17 +159,19 @@ def payment_rows(race):
     return rows
 
 
-def filter_rows(rows, status):
-    """Отфильтровать строки по статусу — только для CSV.
+def filter_rows(rows, status, promo_only=False):
+    """Отфильтровать строки по статусу и промокоду — только для CSV.
 
     Страница отдаёт все строки и фильтрует их в браузере; сюда приходит значение
     из query string, поэтому неизвестное значение молча трактуется как ``done``.
     """
-    if status == STATUS_ALL:
-        return list(rows)
-    if status not in (STATUS_UNPAID, STATUS_CANCEL):
-        status = STATUS_DONE
-    return [row for row in rows if row["status"] == status]
+    if status != STATUS_ALL:
+        if status not in (STATUS_UNPAID, STATUS_CANCEL):
+            status = STATUS_DONE
+        rows = [row for row in rows if row["status"] == status]
+    if promo_only:
+        rows = [row for row in rows if row["promo"]]
+    return list(rows)
 
 
 # Excel и LibreOffice вычисляют ячейку, начинающуюся с любого из этих символов.

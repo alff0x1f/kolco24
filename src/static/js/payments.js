@@ -29,8 +29,11 @@
   var searchEl = document.getElementById("paySearch");
   var statusEl = document.getElementById("payStatus");
   var exportEl = document.getElementById("payExport");
+  var promoEl = document.getElementById("payPromoOnly");
+  var exportBase = exportEl.getAttribute("href").split("?")[0];
 
   var status = "done";
+  var promoOnly = false;
   var query = "";
   var sortKey = "paid_sort";
   var sortDir = -1;
@@ -58,7 +61,8 @@
 
   function visible() {
     var list = ROWS.filter(function (row) {
-      return status === "all" || row.status === status;
+      if (status !== "all" && row.status !== status) return false;
+      return !promoOnly || Boolean(row.promo);
     });
     if (query) {
       var q = query.toLowerCase();
@@ -78,6 +82,16 @@
     });
   }
 
+  // В колонке интересен размер скидки, а не метка кода — описание в подсказке.
+  function promoCell(row) {
+    if (!row.promo_rule) return "—";
+    return (
+      '<span class="pay-promo" title="' + esc(row.promo_hint) + '">' +
+      esc(row.promo_rule) +
+      "</span>"
+    );
+  }
+
   function rowHtml(row) {
     return (
       '<tr class="st-' + row.status + '">' +
@@ -88,7 +102,7 @@
       '<td class="num">' + num(row.paid_for) + "</td>" +
       '<td class="num">' + num(row.cost_per_person) + "</td>" +
       "<td>" + esc(row.extras_label) + "</td>" +
-      "<td>" + (row.promo ? esc(row.promo) : "—") + "</td>" +
+      "<td>" + promoCell(row) + "</td>" +
       '<td class="num">' + (row.discount ? num(row.discount) : "—") + "</td>" +
       '<td class="num strong">' + num(row.amount) + "</td>" +
       '<td class="order">' + esc(row.order_id) + "</td>" +
@@ -221,9 +235,15 @@
       ? list.map(rowHtml).join("")
       : '<tr class="pay-none"><td colspan="11">Ничего не найдено.</td></tr>';
     countEl.textContent = "Показано: " + num(list.length) + " из " + num(ROWS.length);
-    renderTiles(list);
-    renderBreakdown(list);
-    renderDaily(list);
+  }
+
+  // Сводка — всегда по всей гонке, фильтры управляют только таблицей. Иначе при
+  // дефолтном фильтре «Оплачено» строки cancel выпадали бы из расчёта и плитка
+  // «Возвращено» всегда показывала бы 0. Данные статичны, так что считаем раз.
+  function renderSummary() {
+    renderTiles(ROWS);
+    renderBreakdown(ROWS);
+    renderDaily(ROWS);
   }
 
   statusEl.addEventListener("click", function (event) {
@@ -233,10 +253,22 @@
     statusEl.querySelectorAll(".pay-chip").forEach(function (chip) {
       chip.classList.toggle("is-on", chip === button);
     });
-    // Поиск и сортировка в выгрузку не переносятся — только фильтр статуса.
-    exportEl.href = exportEl.href.replace(/status=[a-z]+/, "status=" + status);
+    syncExport();
     render();
   });
+
+  promoEl.addEventListener("click", function () {
+    promoOnly = !promoOnly;
+    promoEl.classList.toggle("is-on", promoOnly);
+    syncExport();
+    render();
+  });
+
+  // Поиск и сортировка в выгрузку не переносятся — только фильтры.
+  function syncExport() {
+    exportEl.href =
+      exportBase + "?status=" + status + (promoOnly ? "&promo=1" : "");
+  }
 
   var debounce;
   searchEl.addEventListener("input", function (event) {
@@ -265,5 +297,6 @@
     });
   });
 
+  renderSummary();
   render();
 })();
