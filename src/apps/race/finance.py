@@ -80,6 +80,17 @@ def _promo_rule(promo):
     return f"{promo.value}{unit}"
 
 
+def _promo_hint(promo):
+    """Подсказка к промокоду: описание, а без него — сам код.
+
+    ``comment`` необязателен, и пустая подсказка оставила бы строку без всякого
+    признака, каким кодом платили.
+    """
+    if not promo:
+        return ""
+    return promo.comment or promo.code
+
+
 def payments_queryset(race):
     """Платежи гонки. Связь с гонкой — только через ``team.category2.race``.
 
@@ -134,6 +145,7 @@ def payment_rows(race):
                 "cost_per_person": payment.cost_per_person,
                 "promo": payment.promo.code if payment.promo else "",
                 "promo_rule": _promo_rule(payment.promo),
+                "promo_hint": _promo_hint(payment.promo),
                 "discount": discount,
                 "amount": amount,
                 "order_id": payment.vtb_payment.order_id if payment.vtb_payment else "",

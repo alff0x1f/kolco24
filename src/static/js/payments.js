@@ -78,11 +78,11 @@
     });
   }
 
-  // В колонке интересен размер скидки, а не метка кода — код уходит в подсказку.
+  // В колонке интересен размер скидки, а не метка кода — описание в подсказке.
   function promoCell(row) {
     if (!row.promo_rule) return "—";
     return (
-      '<span class="pay-promo" title="' + esc(row.promo) + '">' +
+      '<span class="pay-promo" title="' + esc(row.promo_hint) + '">' +
       esc(row.promo_rule) +
       "</span>"
     );
