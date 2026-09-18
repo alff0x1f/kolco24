@@ -138,6 +138,7 @@
 .team-register .pay-history .pay-row:first-child { border-top: none; }
 .team-register .pay-history .pay-row .when { color: var(--muted); }
 .team-register .pay-history .pay-row .amt { color: var(--ink-soft); font-weight: 500; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.team-register .pay-history .pay-row.is-refund .amt { color: var(--danger); }
 .team-register .danger-zone { border-color: var(--danger-bg); }
 .team-register .danger-zone .section-title { color: var(--danger); }
 .team-register .btn-danger { background: var(--danger); color: #fff; border-color: var(--danger); }

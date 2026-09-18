@@ -396,6 +396,9 @@ def build_team_form_context(race, team, is_edit=False, bypass_limits=False, form
         "promo": promo_config,
         "promoCheckUrl": reverse("promo_check", args=[race.slug]),
         "teamId": team.pk,
+        # Mirrors the reg_status gate in EditTeamView.post: with registration
+        # closed the form only saves, it never goes to checkout.
+        "canPay": race.reg_status == RegStatus.OPEN,
     }
     return {
         "current_price": current_price,

@@ -63,6 +63,7 @@
     promo: null,
     promoCheckUrl: "",
     teamId: null,
+    canPay: true,
   };
   var cfgEl = document.getElementById("teamFormConfig");
   if (cfgEl) {
@@ -84,6 +85,9 @@
   var BYPASS_LIMITS = !!cfg.bypassLimits;
   var PROMO_CHECK_URL = cfg.promoCheckUrl || "";
   var TEAM_ID = cfg.teamId == null ? null : String(cfg.teamId);
+  // Registration closed => the form only saves; the buttons must not promise
+  // a payment step (server mirror: the reg_status gate in EditTeamView.post).
+  var CAN_PAY = cfg.canPay !== false;
   // Applied promo: { code, type: "percent"|"fixed", value } or null.
   var promo = cfg.promo || null;
 
@@ -543,7 +547,7 @@
       if (submitting) {
         btn.textContent = "Отправляем…";
       } else if (labelDue && labelZero) {
-        btn.textContent = due > 0 ? labelDue : labelZero;
+        btn.textContent = due > 0 && CAN_PAY ? labelDue : labelZero;
       }
     });
   }
