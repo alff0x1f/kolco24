@@ -20,6 +20,45 @@ from website.models.race import RegStatus
 from website.views.views_ import build_team_form_context
 
 
+def payment_history(team: Team) -> list[dict]:
+    """Строки «Истории оплат»: платежи и возвраты по ним, по дате.
+
+    Полный возврат переводит платёж ``done → cancel`` (см. settlement.py), так
+    что фильтр по одному ``done`` прятал бы возвращённый платёж целиком — вместе
+    с самим фактом возврата.
+    """
+    rows = []
+    payments = (
+        Payment.objects.filter(team=team, status__in=("done", "cancel"))
+        .prefetch_related("refunds")
+        .order_by("id")
+    )
+    for payment in payments:
+        if payment.payment_amount:
+            rows.append(
+                {
+                    "kind": "payment",
+                    "people": payment.paid_for,
+                    "date": payment.created_at,
+                    "amount": payment.payment_amount,
+                }
+            )
+        for refund in payment.refunds.all():
+            # Нулевая строка — только аудит банка, денег она не двигала.
+            if not refund.amount:
+                continue
+            rows.append(
+                {
+                    "kind": "refund",
+                    "people": refund.people,
+                    "date": refund.refunded_at or payment.updated_at,
+                    "amount": -refund.amount,
+                }
+            )
+    rows.sort(key=lambda row: row["date"])
+    return rows
+
+
 class EditTeamView(View):
     def get(self, request, team_id):
         if not request.user.is_authenticated:
@@ -67,9 +106,7 @@ class EditTeamView(View):
                 "team_form": form,
                 "team": team,
                 "action": reverse("edit_team", args=[team_id]),
-                "payments": Payment.objects.filter(team=team, status="done").order_by(
-                    "id"
-                ),
+                "payment_history": payment_history(team),
                 "member_moves": TeamMemberMove.objects.filter(
                     Q(from_team=team) | Q(to_team=team)
                 ).order_by("id"),
@@ -129,9 +166,7 @@ class EditTeamView(View):
                         "team_form": form,
                         "team": team,
                         "action": reverse("edit_team", args=[team_id]),
-                        "payments": Payment.objects.filter(
-                            team=team, status="done"
-                        ).order_by("id"),
+                        "payment_history": payment_history(team),
                         "member_moves": TeamMemberMove.objects.filter(
                             Q(from_team=team) | Q(to_team=team)
                         ).order_by("id"),
@@ -197,9 +232,7 @@ class EditTeamView(View):
                 "team_form": form,
                 "team": team,
                 "action": reverse("edit_team", args=[team_id]),
-                "payments": Payment.objects.filter(team=team, status="done").order_by(
-                    "id"
-                ),
+                "payment_history": payment_history(team),
                 "member_moves": TeamMemberMove.objects.filter(
                     Q(from_team=team) | Q(to_team=team)
                 ).order_by("id"),

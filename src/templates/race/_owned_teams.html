@@ -19,7 +19,7 @@
             <span>{{ team.category }}</span>
             {% if team.city %}<span class="meta-sep" aria-hidden="true"></span><span>{{ team.city }}</span>{% endif %}
             <span class="meta-sep" aria-hidden="true"></span>
-            <span>{{ team.participants }} {{ team.participants|ru_plural:"участник,участника,участников" }}{% if team.needs_payment %} (не оплачено){% endif %}</span>
+            <span>{{ team.participants }} {{ team.participants|ru_plural:"участник,участника,участников" }}{% if team.needs_payment %}{% if team.paid_people %} (оплачено {{ team.paid_people|floatformat:"-1" }} из {{ team.participants }}){% else %} (не оплачено){% endif %}{% endif %}</span>
           </div>
           {% if not team.can_change %}<span class="owned-team-locked">Редактирование закрыто</span>{% endif %}
         </div>

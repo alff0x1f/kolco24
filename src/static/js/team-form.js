@@ -63,6 +63,7 @@
     promo: null,
     promoCheckUrl: "",
     teamId: null,
+    canPay: true,
   };
   var cfgEl = document.getElementById("teamFormConfig");
   if (cfgEl) {
@@ -84,6 +85,9 @@
   var BYPASS_LIMITS = !!cfg.bypassLimits;
   var PROMO_CHECK_URL = cfg.promoCheckUrl || "";
   var TEAM_ID = cfg.teamId == null ? null : String(cfg.teamId);
+  // Registration closed => the form only saves; the buttons must not promise
+  // a payment step (server mirror: the reg_status gate in EditTeamView.post).
+  var CAN_PAY = cfg.canPay !== false;
   // Applied promo: { code, type: "percent"|"fixed", value } or null.
   var promo = cfg.promo || null;
 
@@ -297,6 +301,7 @@
   // allowed team size can't fit. The team's own category is never disabled.
   function syncCategoryOptions() {
     if (!category) return;
+    var prev = category.value;
     Array.prototype.forEach.call(category.options, function (opt) {
       if (BYPASS_LIMITS) {
         opt.disabled = false;
@@ -320,6 +325,15 @@
       var minN = sizes.length ? sizes[0] : 2;
       opt.disabled = !countAllowed(opt, minN);
     });
+    // The browser deselects a selected option once it is disabled, so with
+    // every category full the form would post an empty category2_id. Keep the
+    // value: the server then answers why the choice does not fit.
+    if (category.selectedIndex < 0) {
+      category.value = prev;
+      if (category.selectedIndex < 0 && category.options.length) {
+        category.selectedIndex = 0;
+      }
+    }
   }
 
   function buildSeg() {
@@ -543,7 +557,7 @@
       if (submitting) {
         btn.textContent = "Отправляем…";
       } else if (labelDue && labelZero) {
-        btn.textContent = due > 0 ? labelDue : labelZero;
+        btn.textContent = due > 0 && CAN_PAY ? labelDue : labelZero;
       }
     });
   }

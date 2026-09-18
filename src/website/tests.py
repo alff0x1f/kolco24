@@ -1015,6 +1015,33 @@ def test_add_team_rejects_out_of_range_ucount(client):
     assert not Team.objects.filter(category2=category).exists()
 
 
+@pytest.mark.django_db
+@pytest.mark.parametrize("post_data", [{}, {"category2_id": ""}])
+def test_add_team_without_category_reports_form_error(client, post_data):
+    """A full race disables every option, so the browser posts no category."""
+    user = User.objects.create_user(
+        username="addnocat", password="pass", email="addnocat@example.com"
+    )
+    race = Race.objects.create(
+        name="Add No Cat",
+        slug="add-no-cat",
+        cost=1000,
+        reg_status=RegStatus.OPEN,
+        is_teams_editable=True,
+    )
+    category = Category.objects.create(code="t", name="Team", short_name="T", race=race)
+    client.force_login(user)
+
+    response = client.post(
+        reverse("add_team", args=[race.slug]),
+        {"ucount": "2", **post_data},
+    )
+
+    assert response.status_code == 200
+    assert "Выберите категорию." in response.content.decode()
+    assert not Team.objects.filter(category2=category).exists()
+
+
 def _echo_order_payload(order_id, order_name, amount_value, return_payment_data):
     """create_order stub that echoes the minted order_id back in the payload."""
     return {

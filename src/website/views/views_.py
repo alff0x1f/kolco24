@@ -396,6 +396,9 @@ def build_team_form_context(race, team, is_edit=False, bypass_limits=False, form
         "promo": promo_config,
         "promoCheckUrl": reverse("promo_check", args=[race.slug]),
         "teamId": team.pk,
+        # Mirrors the reg_status gate in EditTeamView.post: with registration
+        # closed the form only saves, it never goes to checkout.
+        "canPay": race.reg_status == RegStatus.OPEN,
     }
     return {
         "current_price": current_price,
@@ -413,6 +416,19 @@ def build_team_form_context(race, team, is_edit=False, bypass_limits=False, form
 
 
 SUBMIT_TOKEN_RE = re.compile(r"^[0-9a-f]{32}$")
+
+
+def _category_from_post(raw_id, race):
+    """Race category named by a posted ``category2_id``, or ``None``.
+
+    Missing, blank and non-numeric values all mean «no category» — the form
+    turns that into a field error instead of a bare 404.
+    """
+    try:
+        category_id = int(raw_id)
+    except (TypeError, ValueError):
+        return None
+    return Category.objects.filter(id=category_id, race_id=race.id).first()
 
 
 class AddTeam(View):
@@ -466,10 +482,9 @@ class AddTeam(View):
         if not race.is_teams_editable:
             return HttpResponse("Регистрация закрыта")
 
-        category2_id = request.POST.get("category2_id")
-        category2 = Category.objects.filter(id=category2_id).first()
-        if not category2:
-            return JsonResponse({"error": "Category not found"}, status=404)
+        # A select whose options are all disabled (race full) submits no value
+        # at all, so the category may be missing: the form reports it.
+        category2 = _category_from_post(request.POST.get("category2_id"), race)
 
         payment_method = request.GET.get("method", "sbp2")
         if payment_method != "sbp2":
@@ -485,7 +500,7 @@ class AddTeam(View):
             return self._resume(race, existing)
 
         data = request.POST.copy()
-        data["dist"] = category2.code
+        data["dist"] = category2.code if category2 else ""
         data["paymentid"] = "%016x" % random.randrange(16**16)  # legacy
         bypass = can_edit_race(request.user, race)
         form = TeamForm(race.id, data, bypass_limits=bypass)

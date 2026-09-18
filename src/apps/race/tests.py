@@ -692,7 +692,9 @@ def test_race_page_shows_owned_team_with_explicit_edit_action(client, paid_peopl
     assert len(resp.context["owned_teams"]) == 1
     assert resp.context["owned_teams"][0]["needs_payment"] == (paid_people < 2)
     html = resp.content.decode()
-    assert ("2 участника (не оплачено)" in html) == (paid_people < 2)
+    assert ("2 участника (не оплачено)" in html) == (paid_people == 0)
+    assert ("(оплачено 1,5 из 2)" in html) == (paid_people == 1.5)
+    assert ("(оплачено 1 из 2)" in html) == (paid_people == 1)
     assert "Ваша команда" in html
     assert "Лесные коты" in html
     assert '<div class="owned-team-number">18</div>' in html

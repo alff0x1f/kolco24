@@ -92,6 +92,7 @@ def owned_teams_by_race(user, races):
                 ),
                 "can_change": can_change,
                 "needs_payment": team.paid_people < team.ucount,
+                "paid_people": team.paid_people,
             }
         )
     return groups

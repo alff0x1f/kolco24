@@ -184,7 +184,7 @@
                         {% endif %}
 
                         <div class="foot-actions">
-                            <p class="small">Изменения состава сохранятся сразу. Если команда выросла или добавлены карты&nbsp;— перейдёте к&nbsp;доплате через&nbsp;СБП.</p>
+                            <p class="small">Изменения состава сохранятся сразу.{% if reg_status == 'open' %} Если команда выросла или добавлены карты&nbsp;— перейдёте к&nbsp;доплате через&nbsp;СБП.{% endif %}</p>
                             <div class="actions">
                                 <a class="btn btn-ghost" href="{% url 'my_teams' race.slug %}">Отмена</a>
                                 {% if is_editable or user.is_superuser %}
@@ -198,18 +198,20 @@
                 </form>
 
                 <!-- ─────────── EDIT-ONLY: история оплат ─────────── -->
-                {% if payments %}
+                {% if payment_history %}
                 <div class="card anim d2">
                     <div class="card-section">
                         <div class="section-title">История оплат</div>
                         <div class="pay-history">
-                            {% for payment in payments %}
-                            {% if payment.payment_amount %}
-                            <div class="pay-row">
-                                <span class="when">Платёж за&nbsp;{{ payment.paid_for|floatformat:"0" }}&nbsp;чел. · {{ payment.created_at|date:"j.m.Y" }}</span>
-                                <span class="amt">{{ payment.payment_amount }}&nbsp;₽</span>
+                            {% for row in payment_history %}
+                            <div class="pay-row{% if row.kind == 'refund' %} is-refund{% endif %}">
+                                {% if row.kind == 'refund' %}
+                                <span class="when">Возврат за&nbsp;{{ row.people|floatformat:"0" }}&nbsp;чел. · {{ row.date|date:"j.m.Y" }}</span>
+                                {% else %}
+                                <span class="when">Платёж за&nbsp;{{ row.people|floatformat:"0" }}&nbsp;чел. · {{ row.date|date:"j.m.Y" }}</span>
+                                {% endif %}
+                                <span class="amt">{{ row.amount|floatformat:"-2" }}&nbsp;₽</span>
                             </div>
-                            {% endif %}
                             {% endfor %}
                         </div>
                     </div>
