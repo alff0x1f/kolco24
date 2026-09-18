@@ -334,8 +334,10 @@
 }
 
 .publication-feed__head--manage {
+  position: relative;
   align-items: center;
   flex-wrap: nowrap;
+  padding-right: 190px;
 }
 
 .publication-feed__head h2 {
@@ -355,9 +357,14 @@
 }
 
 .publication-feed__head--manage .btn {
-  flex: 0 0 auto;
-  padding: 8px 12px;
-  font-size: 13px;
+  position: absolute;
+  top: 50%;
+  right: 21px;
+  transform: translateY(-50%);
+  padding: 5px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  line-height: 1.25;
 }
 
 .publication-post {
