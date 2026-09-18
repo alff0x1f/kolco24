@@ -333,6 +333,11 @@
   border-bottom: 1px solid var(--line);
 }
 
+.publication-feed__head--manage {
+  align-items: center;
+  flex-wrap: nowrap;
+}
+
 .publication-feed__head h2 {
   margin: 0;
   font-size: 13px;
@@ -341,9 +346,18 @@
   text-transform: uppercase;
 }
 
-.publication-feed__head > span {
-  color: var(--muted);
-  font-size: 12px;
+.publication-feed__head--manage h2 {
+  min-width: 0;
+  flex: 1 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.publication-feed__head--manage .btn {
+  flex: 0 0 auto;
+  padding: 8px 12px;
+  font-size: 13px;
 }
 
 .publication-post {

@@ -21,9 +21,8 @@
 
       <main class="overview-news">
         <section class="publication-feed" aria-labelledby="race-news-title">
-          <div class="publication-feed__head">
+          <div class="publication-feed__head publication-feed__head--manage">
             <h2 id="race-news-title">Новости соревнования</h2>
-            <span>Всего: {{ news_count }}</span>
             {% if can_manage_posts %}
             <a class="btn btn-primary" href="{% url 'add_post' race.slug %}">+ Новая публикация</a>
             {% endif %}
