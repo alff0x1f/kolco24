@@ -350,7 +350,12 @@ class PageForm(forms.ModelForm):
                 attrs={"class": "form-control", "placeholder": "Заголовок страницы"}
             ),
             "content": forms.Textarea(
-                attrs={"class": "form-control", "rows": 20, "placeholder": "Markdown"}
+                attrs={
+                    "class": "form-control",
+                    "rows": 20,
+                    "placeholder": "Markdown",
+                    "data-markdown-editor": True,
+                }
             ),
         }
 

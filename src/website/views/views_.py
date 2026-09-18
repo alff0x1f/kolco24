@@ -3,7 +3,6 @@ import random
 import re
 import uuid
 from datetime import datetime, timezone
-from urllib.parse import quote
 
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.core.files.storage import FileSystemStorage
@@ -11,8 +10,6 @@ from django.db import IntegrityError, transaction
 from django.http import (
     Http404,
     HttpResponse,
-    HttpResponseForbidden,
-    HttpResponseNotAllowed,
     HttpResponsePermanentRedirect,
     HttpResponseRedirect,
     JsonResponse,
@@ -27,7 +24,7 @@ from django.views.decorators.csrf import csrf_exempt
 from apps.race.permissions import can_edit_race
 from apps.race.pricing import create_team_payment, upsert_team_extras
 from apps.race.promo import PromoUnavailable
-from website.forms import NewsPostForm, PageForm, TeamForm
+from website.forms import PageForm, TeamForm
 from website.models import (
     Checkpoint,
     Race,
@@ -50,31 +47,6 @@ def is_race_admin(user, race):
     if not user.is_authenticated:
         return False
     return RaceAdmin.objects.filter(race=race, user=user).exists()
-
-
-class AddNewsPostView(View):
-    def get(self, request, race_slug):
-        return HttpResponseNotAllowed(["POST"])
-
-    def post(self, request, race_slug):
-        if not request.user.is_authenticated:
-            return HttpResponseRedirect(
-                reverse("login") + "?next=" + quote(request.path, safe="/:@")
-            )
-        race = get_object_or_404(Race, slug=race_slug)
-        if not is_race_admin(request.user, race):
-            return HttpResponseForbidden()
-        form = NewsPostForm(request.POST, request.FILES)
-        if form.is_valid():
-            post = form.save(commit=False)
-            post.race = race
-            post.save()
-            return HttpResponseRedirect(post.get_absolute_url())
-        from apps.race.views import RacePageView
-
-        context = RacePageView.build_context(race, request.user)
-        context["post_form"] = form
-        return render(request, "race/race_page.html", context)
 
 
 class RaceIdRedirectView(View):

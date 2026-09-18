@@ -275,8 +275,9 @@ leaving the field empty does not wipe an existing image. Title/heading switch on
 
 - `src/static/vendor/easymde/easymde.min.css`, `easymde.min.js` — EasyMDE 2.18.0.
 - `src/static/vendor/fontawesome/css/fontawesome.min.css` (the icon definitions) +
-  `css/solid.min.css` (~570 B, the solid `@font-face` only) + `webfonts/fa-solid-900.woff2`. FA's official
-  modular split, so **no vendored file is edited** and only one webfont ships. `all.min.css` is explicitly
+  `css/solid.min.css` (~570 B, the solid `@font-face` only) + both
+  `webfonts/fa-solid-900.woff2` and `webfonts/fa-solid-900.ttf`. FA's official modular split, so **no
+  vendored file is edited** and only the solid family ships. `all.min.css` is explicitly
   **not** used: it declares six `@font-face` families and would 404 on five missing webfonts.
 - JS is loaded at the **end of the content block** (the Leaflet precedent in `race/map.html:59`), or with
   `defer` — never as a synchronous `<head>` script, since `easymde.min.js` is ~350 KB.
@@ -334,44 +335,44 @@ must render byte-identically to today.
 - Create: `src/static/vendor/fontawesome/webfonts/fa-solid-900.woff2`
 - Create: `src/static/vendor/fontawesome/webfonts/fa-solid-900.ttf`
 
-- [ ] download EasyMDE 2.18.0 `easymde.min.css` + `easymde.min.js` into `src/static/vendor/easymde/`
+- [x] download EasyMDE 2.18.0 `easymde.min.css` + `easymde.min.js` into `src/static/vendor/easymde/`
       (pinned version, mirroring the flat `src/static/vendor/leaflet/` layout)
-- [ ] pick **one exact FontAwesome 6 version** and take every file from that same release (6.5.2 is the
+- [x] pick **one exact FontAwesome 6 version** and take every file from that same release (6.5.2 is the
       version whose icon coverage was verified against EasyMDE's 20 classes); record the version in a
       comment or the CLAUDE.md note so a later partial upgrade cannot mix releases
-- [ ] download the FontAwesome **modular** files: `fontawesome.min.css` and `solid.min.css` into
+- [x] download the FontAwesome **modular** files: `fontawesome.min.css` and `solid.min.css` into
       `src/static/vendor/fontawesome/css/`, and **both** `fa-solid-900.woff2` **and** `fa-solid-900.ttf`
       into `.../webfonts/` — **not** `all.min.css`, which declares six `@font-face` families and would need
       editing (forbidden: the vendor dir is off-limits for edits)
-- [ ] grep both CSS files for every `url(...)` and confirm each target is committed — under
+- [x] grep both CSS files for every `url(...)` and confirm each target is committed — under
       `ManifestStaticFilesStorage` an unresolvable reference is a hard `collectstatic` failure, so a
       missing `.ttf` breaks the Docker build even though no browser requests it
-- [ ] verify with a **real** production-storage collect, not `--dry-run`:
+- [x] verify with a **real** production-storage collect, not `--dry-run`:
       `DEBUG=False uv run python src/manage.py collectstatic --noinput` into a throwaway `STATIC_ROOT`
       (the `STORAGES` override lives inside `if not DEBUG`, so a default local run would pass regardless),
       then confirm the hashed files exist and the FA CSS in `staticfiles/` points at the hashed webfont
-- [ ] no tests in this task (assets only) — the linked-asset assertions live in Tasks 3 and 5
-- [ ] run tests to confirm nothing regressed: `uv run pytest --reuse-db`
+- [x] no tests in this task (assets only) — the linked-asset assertions live in Tasks 3 and 5
+- [x] run tests to confirm nothing regressed: `uv run pytest --reuse-db`
 
 ### Task 2: Extract the shared Markdown editor init
 
 **Files:**
 - Create: `src/static/js/markdown-editor.js`
 
-- [ ] create `src/static/js/markdown-editor.js` with a `DOMContentLoaded` handler iterating
+- [x] create `src/static/js/markdown-editor.js` with a `DOMContentLoaded` handler iterating
       `document.querySelectorAll("[data-markdown-editor]")`
-- [ ] guard `typeof EasyMDE === "undefined"` and return early, so a missing asset leaves a usable plain textarea
-- [ ] port the config from `src/templates/website/edit_page.html`: `minHeight: "300px"`,
+- [x] guard `typeof EasyMDE === "undefined"` and return early, so a missing asset leaves a usable plain textarea
+- [x] port the config from `src/templates/website/edit_page.html`: `minHeight: "300px"`,
       `spellChecker: false`, `autosave: {enabled: false}`, the toolbar list including the custom
       `drawTable` button (`className: "fa fa-th mde-icon-table"`), `renderingConfig: {singleLineBreaks: false}`
-- [ ] **add `autoDownloadFontAwesome: false`** — the one deliberate addition to the ported config. EasyMDE
+- [x] **add `autoDownloadFontAwesome: false`** — the one deliberate addition to the ported config. EasyMDE
       otherwise injects a `maxcdn.bootstrapcdn.com` FontAwesome `<link>` at runtime, and its
       already-loaded check only recognizes that maxcdn href, so it cannot see our vendored CSS
-- [ ] port the on-`submit` sync `el.value = mde.value()`, guarding `el.form` being absent
-- [ ] add a cross-reference comment naming the two templates that load this file (the repo convention used
+- [x] port the on-`submit` sync `el.value = mde.value()`, guarding `el.form` being absent
+- [x] add a cross-reference comment naming the two templates that load this file (the repo convention used
       by `team-form.js` ↔ `apps/race/pricing.py`)
-- [ ] no tests in this task (the file has no consumer yet) — Tasks 3 and 5 assert it is linked
-- [ ] run tests: `uv run pytest --reuse-db`
+- [x] no tests in this task (the file has no consumer yet) — Tasks 3 and 5 assert it is linked
+- [x] run tests: `uv run pytest --reuse-db`
 
 ### Task 3: Migrate `/page/<slug>/edit/` onto the vendored assets
 
@@ -380,22 +381,22 @@ must render byte-identically to today.
 - Modify: `src/website/forms.py`
 - Modify: `src/website/tests.py`
 
-- [ ] replace the two unpkg `<link>`/`<script>` tags with `{% static 'vendor/easymde/easymde.min.css' %}`
+- [x] replace the two unpkg `<link>`/`<script>` tags with `{% static 'vendor/easymde/easymde.min.css' %}`
       and `{% static 'vendor/easymde/easymde.min.js' %}` (the JS `defer`red or at the end of the content
       block, not a synchronous head script)
-- [ ] add `{% static 'vendor/fontawesome/css/fontawesome.min.css' %}` and `.../solid.min.css` — replacing
+- [x] add `{% static 'vendor/fontawesome/css/fontawesome.min.css' %}` and `.../solid.min.css` — replacing
       the FontAwesome that EasyMDE has been pulling from maxcdn at runtime, now suppressed by
       `autoDownloadFontAwesome: false` from Task 2
-- [ ] delete the ~35-line inline `<script>` and load `{% static 'js/markdown-editor.js' %}` with `defer`
-- [ ] add `data-markdown-editor` to `PageForm.Meta.widgets["content"]` attrs in `src/website/forms.py:352`
+- [x] delete the ~35-line inline `<script>` and load `{% static 'js/markdown-editor.js' %}` with `defer`
+- [x] add `data-markdown-editor` to `PageForm.Meta.widgets["content"]` attrs in `src/website/forms.py:352`
       (the template renders `{{ form.content }}`, so the attribute cannot go in the template)
-- [ ] write a test that a user in the Django group `"Moderators"` (created in the test — this is the group
+- [x] write a test that a user in the Django group `"Moderators"` (created in the test — this is the group
       gate at `views_.py:238`, unrelated to `RaceAdmin.Role.MODERATOR`) GETting `/page/<slug>/edit/` gets
       200, the HTML links the vendored easymde/fontawesome/markdown-editor assets, the textarea carries
       `data-markdown-editor`, and **neither `unpkg.com` nor `maxcdn` appears** anywhere in the response
-- [ ] write tests for the error/edge cases: a logged-in non-group user still gets 404; an anon user is
+- [x] write tests for the error/edge cases: a logged-in non-group user still gets 404; an anon user is
       redirected by `@login_required` (not 404)
-- [ ] run tests - must pass before next task
+- [x] run tests - must pass before next task
 
 ### Task 4: Add `is_draft` / `is_scheduled` to `NewsPost`
 
@@ -403,15 +404,15 @@ must render byte-identically to today.
 - Modify: `src/website/models/news.py`
 - Modify: `src/website/tests.py`
 
-- [ ] add `is_draft` property returning `not self.is_published`
-- [ ] add `is_scheduled` property returning `self.is_published and self.publication_date > timezone.now()`
+- [x] add `is_draft` property returning `not self.is_published`
+- [x] add `is_scheduled` property returning `self.is_published and self.publication_date > timezone.now()`
       (`timezone` is already imported in this module)
-- [ ] confirm no migration is generated: `uv run python src/manage.py makemigrations --check --dry-run`
-- [ ] write tests for the success cases: a published past-dated post is neither draft nor scheduled; an
+- [x] confirm no migration is generated: `uv run python src/manage.py makemigrations --check --dry-run`
+- [x] write tests for the success cases: a published past-dated post is neither draft nor scheduled; an
       `is_published=False` post is a draft; a published future-dated post is scheduled
-- [ ] write tests for the edge cases: a draft with a future date reports `is_draft` and **not**
+- [x] write tests for the edge cases: a draft with a future date reports `is_draft` and **not**
       `is_scheduled`; a post dated exactly `now` is not scheduled
-- [ ] run tests - must pass before next task
+- [x] run tests - must pass before next task
 
 ### Task 5: Add `RacePostEditView`, its URLs, template and CSS
 
@@ -423,48 +424,48 @@ must render byte-identically to today.
 - Modify: `src/apps/race/tests.py`
 - Modify: `src/website/tests.py`
 
-- [ ] add `RacePostEditView` to `src/apps/race/views.py` with `template_name = "race/post_form.html"` and
+- [x] add `RacePostEditView` to `src/apps/race/views.py` with `template_name = "race/post_form.html"` and
       `_load(request, race_slug, post_id=None)` returning a `(race, post, response)` triple (matching the
       module's five existing `_load_and_authorize` helpers): race by slug (404) → anon →
       `HttpResponseRedirect(reverse("login") + "?next=" + quote(request.path, safe="/:@"))` →
       `is_race_admin` else `HttpResponseForbidden()` → `get_object_or_404(NewsPost, pk=post_id, race=race)`
       when `post_id` (the `race=race` filter blocks cross-race id guessing)
-- [ ] implement `get` (render `NewsPostForm(instance=post)` with `race`, `post`, `is_edit`) and `post`
+- [x] implement `get` (render `NewsPostForm(instance=post)` with `race`, `post`, `is_edit`) and `post`
       (valid → `obj.race = race`, save, redirect `obj.get_absolute_url()`; invalid → re-render the bound
       form, **no** `build_context` call and **no** deferred import)
-- [ ] confirm no new imports are needed — `quote`, `NewsPost`, `NewsPostForm` and `is_race_admin` are
+- [x] confirm no new imports are needed — `quote`, `NewsPost`, `NewsPostForm` and `is_race_admin` are
       already imported at module level (lines 5, 35, 36, 40)
-- [ ] wire both URLs in `src/website/urls.py` in this task (the tests below need them): keep `add_post`'s
+- [x] wire both URLs in `src/website/urls.py` in this task (the tests below need them): keep `add_post`'s
       name and path, add `edit_post` at `race/<slug:race_slug>/post/<int:post_id>/edit/`, importing
       `RacePostEditView` alongside the other `apps.race.views` names
-- [ ] create `src/templates/race/post_form.html`: extends `base-2.html`, `{% load static tz %}`, a
+- [x] create `src/templates/race/post_form.html`: extends `base-2.html`, `{% load static tz %}`, a
       `.breadcrumb` back to the race (**not** `_race_header.html`, whose context this view does not build),
       `.post-form` scoped wrapper, all 7 fields written manually per the base-2 rule,
       `data-markdown-editor` on the content textarea, the `{% get_current_timezone %}` date hint,
       `{{ form.image }}` (`ClearableFileInput`) for the image row, `is_edit`-switched title/heading,
       «Сохранить» + «Отмена»
-- [ ] load `css/post_form.css` and the vendored FontAwesome + EasyMDE CSS from `{% block extra_head %}`,
+- [x] load `css/post_form.css` and the vendored FontAwesome + EasyMDE CSS from `{% block extra_head %}`,
       and `easymde.min.js` + `js/markdown-editor.js` deferred / at the end of the content block
-- [ ] create `src/static/css/post_form.css` scoped under `.post-form` (no bare `.page`), with the
+- [x] create `src/static/css/post_form.css` scoped under `.post-form` (no bare `.page`), with the
       EasyMDE-to-`theme-2.css` override block
-- [ ] write tests for the success cases: GET add returns 200 for an ADMIN and for a MODERATOR, and the HTML
+- [x] write tests for the success cases: GET add returns 200 for an ADMIN and for a MODERATOR, and the HTML
       carries `data-markdown-editor` + the vendored assets; POST valid creates the post with the right
       `race` and redirects to its detail URL; POST valid for a **draft** followed with `follow=True`
       returns 200 (`PublicationDetailView` has a `RaceAdmin`-gated preview branch, so the author is not
       bounced to 404); GET edit returns 200 and prefills; POST edit updates in place without creating a
       second row
-- [ ] write tests for the error/edge cases: anon GET and POST redirect to `login` with `?next=`; a
+- [x] write tests for the error/edge cases: anon GET and POST redirect to `login` with `?next=`; a
       logged-in non-admin gets 403; POST invalid (blank title) re-renders with errors and creates nothing;
       GET **and** POST edit for a post of another race 404s; edit of a `race=NULL` post 404s; GET on
       `add_post` no longer returns 405
-- [ ] write form-level tests for the image branch (no real upload needed):
+- [x] write form-level tests for the image branch (no real upload needed):
       `NewsPostForm(data=..., instance=post_with_image)` with the file field absent keeps the stored image,
       and the same with `image-clear=on` clears it
-- [ ] delete `test_add_post_invalid_form_shows_errors` (`src/website/tests.py:530`) **in this task** — it
+- [x] delete `test_add_post_invalid_form_shows_errors` (`src/website/tests.py:530`) **in this task** — it
       asserts `race/race_page.html` and `post_form`, and re-pointing `add_post` above breaks it
       immediately; this task cannot go green with it in place. Its case is covered by the invalid-POST test
       written here
-- [ ] run tests - must pass before next task
+- [x] run tests - must pass before next task
 
 ### Task 6: Delete `AddNewsPostView` and migrate its tests
 
@@ -475,24 +476,24 @@ must render byte-identically to today.
 - Modify: `src/website/tests.py`
 - Modify: `src/apps/race/tests.py`
 
-- [ ] delete `AddNewsPostView` from `src/website/views/views_.py`, keeping `is_race_admin` (imported by
+- [x] delete `AddNewsPostView` from `src/website/views/views_.py`, keeping `is_race_admin` (imported by
       `RacePageView`)
-- [ ] remove `AddNewsPostView` from the re-export list in `src/website/views/__init__.py:3` — without this
+- [x] remove `AddNewsPostView` from the re-export list in `src/website/views/__init__.py:3` — without this
       Django fails to start and the whole suite errors
-- [ ] drop the imports left unused in `views_.py` by the deletion: `HttpResponseNotAllowed`,
+- [x] drop the imports left unused in `views_.py` by the deletion: `HttpResponseNotAllowed`,
       `HttpResponseForbidden`, `NewsPostForm`, `quote` (verified used only by that class; flake8 F401
       otherwise)
-- [ ] reword the dangling `RaceEditView` docstring at `src/apps/race/views.py:861` ("Auth mirrors
+- [x] reword the dangling `RaceEditView` docstring at `src/apps/race/views.py:861` ("Auth mirrors
       ``AddNewsPostView``") to reference `RacePostEditView`
-- [ ] move `test_add_post_by_race_admin`, `test_add_post_unauthorized` and `test_add_post_non_admin_user`
+- [x] move `test_add_post_by_race_admin`, `test_add_post_unauthorized` and `test_add_post_non_admin_user`
       (`src/website/tests.py:215/238/249`) to `src/apps/race/tests.py`, or delete them where Task 5 already
       covers the same case — no coverage may be lost either way. These three assert only status codes and
       DB state (no template or context keys), so they pass unchanged after Task 5 and can safely move here
-- [ ] grep for remaining references to `AddNewsPostView` and for the deferred
+- [x] grep for remaining references to `AddNewsPostView` and for the deferred
       `from apps.race.views import RacePageView` inside `views_.py`, confirming both are gone
-- [ ] write a test that `reverse("add_post", args=[slug])` still resolves to the documented path and now
+- [x] write a test that `reverse("add_post", args=[slug])` still resolves to the documented path and now
       resolves to `RacePostEditView`, and that `reverse("edit_post", args=[slug, pk])` resolves
-- [ ] run tests - must pass before next task
+- [x] run tests - must pass before next task
 
 ### Task 7: Show drafts to admins and add the feed entry point
 
@@ -502,34 +503,34 @@ must render byte-identically to today.
 - Modify: `src/static/css/race.css`
 - Modify: `src/apps/race/tests.py`
 
-- [ ] in `build_context`, delete the `post_form` block but **keep** the module-level `NewsPostForm` import
+- [x] in `build_context`, delete the `post_form` block but **keep** the module-level `NewsPostForm` import
       (`RacePostEditView` in the same module now uses it), and compute
       `is_admin = user is not None and is_race_admin(user, race)`
-- [ ] branch `news_qs`: admins get
+- [x] branch `news_qs`: admins get
       `NewsPost.objects.filter(race=race).select_related("race").order_by("-publication_date", "-pk")`,
       others keep `NewsPost.objects.visible().filter(race=race)`; leave `news_count` and the `[:10]` slice
       as they are
-- [ ] add code comments covering the three non-obvious points: why the ordering is repeated instead of
+- [x] add code comments covering the three non-obvious points: why the ordering is repeated instead of
       reusing `visible()`; that admins now also see posts of an unpublished race; that a far-future
       scheduled post sorts to the top of the admin slice and can push a real item out of the ten
-- [ ] set `context["can_manage_posts"] = is_admin`
-- [ ] delete the whole `{% if post_form %}` block (lines ~23-86) from `src/templates/race/race_page.html`
-- [ ] add the «+ Новая публикация» link to `.publication-feed__head` under `{% if can_manage_posts %}`,
+- [x] set `context["can_manage_posts"] = is_admin`
+- [x] delete the whole `{% if post_form %}` block (lines ~23-86) from `src/templates/race/race_page.html`
+- [x] add the «+ Новая публикация» link to `.publication-feed__head` under `{% if can_manage_posts %}`,
       next to «Всего: N», pointing at `{% url 'add_post' race.slug %}`
-- [ ] remove the now-unreachable `.post-add-card` rules from `src/static/css/race.css:342-351` and add the
+- [x] remove the now-unreachable `.post-add-card` rules from `src/static/css/race.css:342-351` and add the
       feed-head button styling if existing classes do not cover it
-- [ ] update `test_race_overview_visibility` (`src/apps/race/tests.py:483`) and its "The feed uses public
+- [x] update `test_race_overview_visibility` (`src/apps/race/tests.py:483`) and its "The feed uses public
       visibility rules even in a private race preview" comment **per role**: for `admin` and `moderator`
       the post is now in `news_list` regardless of `published`; for `superuser` the old
       `is published` expectation **stands unchanged** (no `RaceAdmin` row → `is_race_admin` is `False` →
       public feed), and the comment should say so explicitly so nobody "fixes" it later
-- [ ] write tests for the success cases: a draft and a future-dated post appear in `news_list` for an ADMIN
+- [x] write tests for the success cases: a draft and a future-dated post appear in `news_list` for an ADMIN
       and for a MODERATOR; the admin-rendered page contains the «Новая публикация» link
-- [ ] write tests for the error/edge cases: anon and a logged-in non-admin see neither the draft nor the
+- [x] write tests for the error/edge cases: anon and a logged-in non-admin see neither the draft nor the
       link; **a bare superuser (no `RaceAdmin` row) also sees neither** — they get the public feed on an
       unpublished race they can otherwise view; `news_count` for a non-admin still counts only visible
       posts; the page no longer renders the old inline form (assert its form action is absent)
-- [ ] run tests - must pass before next task
+- [x] run tests - must pass before next task
 
 ### Task 8: Add the edit link and state badge to the feed partial
 
@@ -540,64 +541,64 @@ must render byte-identically to today.
 - Modify: `src/apps/race/tests.py`
 - Modify: `src/website/test_publications.py`
 
-- [ ] add a `{% if can_edit %}` «Редактировать» link to the partial's footer, using the `edit_url` passed in
-- [ ] add the state badge under the same `{% if can_edit %}` guard: «Черновик» when
+- [x] add a `{% if can_edit %}` «Редактировать» link to the partial's footer, using the `edit_url` passed in
+- [x] add the state badge under the same `{% if can_edit %}` guard: «Черновик» when
       `publication.is_draft`, «Запланирована на {{ publication.publication_date|date:"j E Y" }}» when
       `publication.is_scheduled` (the `|date:` filter is required — a raw datetime would render otherwise)
-- [ ] pass the flags at the race-page include site (`race_page.html:94`):
+- [x] pass the flags at the race-page include site (`race_page.html:94`):
       `{% include "website/_publication_post.html" with publication=news hide_race=True can_edit=can_manage_posts edit_url=... %}`
       with `edit_url` built from `{% url 'edit_post' race.slug news.pk %}`
-- [ ] leave the other two include sites (`home.html:29`, `publication_list.html:25`) untouched — the flags
+- [x] leave the other two include sites (`home.html:29`, `publication_list.html:25`) untouched — the flags
       default falsy, so `/`, `/news/` and `/articles/` render unchanged
-- [ ] style the badge and link in `src/static/css/community.css` (the publication-feed block) without
+- [x] style the badge and link in `src/static/css/community.css` (the publication-feed block) without
       adding new breakpoints
-- [ ] write tests for the success cases: an admin sees the edit link with the right URL on each card, a
+- [x] write tests for the success cases: an admin sees the edit link with the right URL on each card, a
       «Черновик» badge on a draft and a «Запланирована» badge on a future-dated post
-- [ ] write tests for the error/edge cases: anon sees no link and no badge on the race page; the **home**
+- [x] write tests for the error/edge cases: anon sees no link and no badge on the race page; the **home**
       feed (`src/website/test_publications.py`) and the `/news/` catalog page render with neither link nor
       badge
-- [ ] run tests - must pass before next task
+- [x] run tests - must pass before next task
 
 ### Task 9: Verify acceptance criteria
 
-- [ ] verify all requirements from Overview are implemented: standalone create page, edit page, rich
+- [x] verify all requirements from Overview are implemented: standalone create page, edit page, rich
       editor on both it and `/page/<slug>/edit/`, vendored assets with no `unpkg` reference left in the
       repo, admins see drafts in the feed, `AddNewsPostView` and the deferred import gone
-- [ ] verify edge cases are handled: cross-race post id 404s, `race=NULL` post 404s, anon redirect carries
+- [x] verify edge cases are handled: cross-race post id 404s, `race=NULL` post 404s, anon redirect carries
       `?next=`, non-admin 403, MODERATOR allowed everywhere ADMIN is, empty image field on edit does not
       wipe the stored image, GET `add_post` no longer 405s
-- [ ] verify no vendored file under `src/static/vendor/` was edited (the CLAUDE.md rule): the committed
+- [x] verify no vendored file under `src/static/vendor/` was edited (the CLAUDE.md rule): the committed
       easymde/fontawesome files must be byte-identical to their upstream downloads
-- [ ] **verify zero external requests from either editor page**: load both with the network tab open (or
+- [x] **verify zero external requests from either editor page**: load both with the network tab open (or
       grep the rendered HTML) and confirm no `maxcdn.bootstrapcdn.com` or `unpkg.com` request — the
       `autoDownloadFontAwesome: false` flag is the only thing preventing the runtime CDN injection, and a
       typo in it fails silently with icons that still work
-- [ ] confirm `add_post` kept its name and path: grep templates and Python for `add_post` and check each
+- [x] confirm `add_post` kept its name and path: grep templates and Python for `add_post` and check each
       call site still works
-- [ ] run full test suite: `uv run pytest`
-- [ ] no e2e suite in this project — nothing to run (see Testing Strategy)
-- [ ] run `make format && make lint` and fix anything they report
-- [ ] verify test coverage: every new view branch, both new model properties, the image preserve/clear
+- [x] run full test suite: `uv run pytest`
+- [x] no e2e suite in this project — nothing to run (see Testing Strategy)
+- [x] run `make format && make lint` and fix anything they report
+- [x] verify test coverage: every new view branch, both new model properties, the image preserve/clear
       branches, and the two updated legacy tests are covered
 
 ### Task 10: [Final] Update documentation
 
-- [ ] update `CLAUDE.md`: the `apps.race` entry gains `RacePostEditView` (template, assets, URL names, the
+- [x] update `CLAUDE.md`: the `apps.race` entry gains `RacePostEditView` (template, assets, URL names, the
       `is_race_admin` gate incl. MODERATOR, the `race=race` lookup rule, the `(race, post, response)`
       helper shape); the note about `RacePageView.build_context` being called by
       `website.views.views_.AddNewsPostView` via a deferred import must be **removed** (both the caller and
       the workaround are gone)
-- [ ] document in `CLAUDE.md`: the admin-only wider `news_qs` and its two consequences (posts of an
+- [x] document in `CLAUDE.md`: the admin-only wider `news_qs` and its two consequences (posts of an
       unpublished race become visible to a `RaceAdmin` — **not** to a bare superuser, who has no row and so
       keeps the public feed; scheduled posts sort to the top of the admin slice); the
       new vendored `easymde`/`fontawesome` assets as off-limits for edits (like Leaflet), including why
       `all.min.css` is deliberately not used; the shared `markdown-editor.js` and its
       `data-markdown-editor` hook, loaded by both `post_form.html` and `edit_page.html`
-- [ ] document the `autoDownloadFontAwesome: false` trap in `CLAUDE.md` — that it is load-bearing, why
+- [x] document the `autoDownloadFontAwesome: false` trap in `CLAUDE.md` — that it is load-bearing, why
       (EasyMDE's already-loaded check only recognizes a maxcdn href, so it cannot see the vendored CSS),
       and that removing it silently restores the CDN call while leaving the icons working
-- [ ] README.md needs no change (it does not document page-level routes) — confirm and note it
-- [ ] move this plan to `docs/plans/completed/` (`mkdir -p docs/plans/completed` if needed)
+- [x] README.md needs no change (it does not document page-level routes) — confirmed; README.md remains unchanged
+- [x] move this plan to `docs/plans/completed/` (`mkdir -p docs/plans/completed` if needed)
 
 ## Post-Completion
 

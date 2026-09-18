@@ -187,6 +187,56 @@ def test_newspost_xss_event_handler_stripped():
 
 
 @pytest.mark.django_db
+def test_newspost_status_properties():
+    from website.models.news import NewsPost
+
+    now = timezone.now()
+    past_post = NewsPost.objects.create(
+        title="Published past post",
+        content="Past content",
+        is_published=True,
+        publication_date=now - timedelta(days=1),
+    )
+    draft = NewsPost.objects.create(
+        title="Draft",
+        content="Draft content",
+        is_published=False,
+        publication_date=now - timedelta(days=1),
+    )
+    scheduled_post = NewsPost.objects.create(
+        title="Scheduled post",
+        content="Scheduled content",
+        is_published=True,
+        publication_date=now + timedelta(days=1),
+    )
+    future_draft = NewsPost.objects.create(
+        title="Future draft",
+        content="Future draft content",
+        is_published=False,
+        publication_date=now + timedelta(days=1),
+    )
+
+    assert not past_post.is_draft
+    assert not past_post.is_scheduled
+    assert draft.is_draft
+    assert not draft.is_scheduled
+    assert not scheduled_post.is_draft
+    assert scheduled_post.is_scheduled
+    assert future_draft.is_draft
+    assert not future_draft.is_scheduled
+
+
+def test_newspost_dated_exactly_now_is_not_scheduled():
+    from website.models.news import NewsPost
+
+    now = timezone.now()
+    post = NewsPost(is_published=True, publication_date=now)
+
+    with patch("website.models.news.timezone.now", return_value=now):
+        assert not post.is_scheduled
+
+
+@pytest.mark.django_db
 def test_news_post_form_valid():
     from website.forms import NewsPostForm
 
@@ -209,52 +259,6 @@ def test_news_post_form_invalid():
     form = NewsPostForm(data={"title": "", "content": "Some content"})
     assert not form.is_valid()
     assert "title" in form.errors
-
-
-@pytest.mark.django_db
-def test_add_post_by_race_admin(client):
-    from website.models.news import NewsPost
-    from website.models.race import RaceAdmin
-
-    race = Race.objects.create(name="Post Race", slug="post-race-2025")
-    user = User.objects.create_user(username="postadmin", password="pass")
-    RaceAdmin.objects.create(race=race, user=user, role=RaceAdmin.Role.ADMIN)
-    client.force_login(user)
-    response = client.post(
-        f"/race/{race.slug}/post/add/",
-        {
-            "title": "New Post",
-            "content": "Hello world",
-            "kind": "news",
-            "is_published": True,
-            "publication_date": "2026-09-11T10:00",
-        },
-    )
-    assert response.status_code == 302
-    assert NewsPost.objects.filter(race=race, title="New Post").exists()
-
-
-@pytest.mark.django_db
-def test_add_post_unauthorized(client):
-    race = Race.objects.create(name="Post Race2", slug="post-race-2026")
-    response = client.post(
-        f"/race/{race.slug}/post/add/",
-        {"title": "Should fail", "content": "No auth"},
-    )
-    assert response.status_code == 302
-    assert "/accounts/login/" in response["Location"]
-
-
-@pytest.mark.django_db
-def test_add_post_non_admin_user(client):
-    race = Race.objects.create(name="Post Race3", slug="post-race-2027")
-    user = User.objects.create_user(username="notadmin", password="pass")
-    client.force_login(user)
-    response = client.post(
-        f"/race/{race.slug}/post/add/",
-        {"title": "Should fail", "content": "Not admin"},
-    )
-    assert response.status_code == 403
 
 
 REG_FORM_BASE = {
@@ -421,7 +425,7 @@ def test_register_view_post_blocks_open_redirect(client):
 
 
 @pytest.mark.django_db
-def test_race_page_view_shows_form_for_admin(client):
+def test_race_page_view_shows_post_management_link_for_admin(client):
     from website.models.race import RaceAdmin
 
     race = Race.objects.create(name="Admin Race", slug="admin-race-2025")
@@ -432,12 +436,19 @@ def test_race_page_view_shows_form_for_admin(client):
     client.force_login(admin_user)
     response = client.get(f"/race/{race.slug}/")
     assert response.status_code == 200
-    assert "post_form" in response.context
+    assert response.context["can_manage_posts"] is True
+    html = response.content.decode()
+    assert "+ Новая публикация" in html
+    assert reverse("add_post", args=[race.slug]) in html
+    assert f'action="{reverse("add_post", args=[race.slug])}"' not in html
 
     client.force_login(regular_user)
     response = client.get(f"/race/{race.slug}/")
     assert response.status_code == 200
-    assert "post_form" not in response.context
+    assert response.context["can_manage_posts"] is False
+    html = response.content.decode()
+    assert "+ Новая публикация" not in html
+    assert f'action="{reverse("add_post", args=[race.slug])}"' not in html
 
 
 @pytest.mark.django_db
@@ -463,6 +474,7 @@ def test_race_page_view_context_keys(client):
         "links",
         "news_list",
         "news_count",
+        "can_manage_posts",
         "reg_open",
         "reg_upcoming",
         "race_team_count",
@@ -472,10 +484,11 @@ def test_race_page_view_context_keys(client):
 
 
 @pytest.mark.django_db
-def test_race_page_view_no_post_form_for_anon(client):
+def test_race_page_view_no_post_management_for_anon(client):
     race = Race.objects.create(name="A", slug="a-2025")
     response = client.get(f"/race/{race.slug}/")
-    assert "post_form" not in response.context
+    assert response.context["can_manage_posts"] is False
+    assert "+ Новая публикация" not in response.content.decode()
 
 
 @pytest.mark.django_db
@@ -524,21 +537,6 @@ def test_race_page_view_news_list_capped_at_10(client):
     # List is capped at 10, but the badge count reflects the true total (11).
     assert len(response.context["news_list"]) == 10
     assert response.context["news_count"] == 11
-
-
-@pytest.mark.django_db
-def test_add_post_invalid_form_shows_errors(client):
-    from website.models.race import RaceAdmin
-
-    race = Race.objects.create(name="R", slug="ap-2025")
-    admin_user = User.objects.create_user(username="postadmin", password="pass")
-    RaceAdmin.objects.create(race=race, user=admin_user, role=RaceAdmin.Role.ADMIN)
-    client.force_login(admin_user)
-    response = client.post(f"/race/{race.slug}/post/add/", {"title": "", "content": ""})
-    assert response.status_code == 200
-    assert "race/race_page.html" in [t.name for t in response.templates]
-    assert "post_form" in response.context
-    assert "title" in response.context["post_form"].errors
 
 
 @pytest.mark.django_db
@@ -3063,6 +3061,59 @@ def test_static_page_uses_publication_layout(client):
     assert "Тестовый документ" in html
     assert "website/base-2.html" in [t.name for t in resp.templates]
     assert reverse("edit_page", args=["test-doc"]) not in html
+
+
+@pytest.mark.django_db
+def test_edit_page_moderator_uses_vendored_markdown_editor(client):
+    from django.contrib.auth.models import Group
+
+    from website.models import Page
+
+    page = Page.objects.create(
+        slug="editable-doc", title="Редактируемый документ", content="Текст"
+    )
+    user = User.objects.create_user(username="page-moderator", password="pass")
+    user.groups.add(Group.objects.create(name="Moderators"))
+    client.force_login(user)
+
+    response = client.get(reverse("edit_page", args=[page.slug]))
+
+    assert response.status_code == 200
+    html = response.content.decode()
+    assert "/static/vendor/easymde/easymde.min.css" in html
+    assert "/static/vendor/easymde/easymde.min.js" in html
+    assert "/static/vendor/fontawesome/css/fontawesome.min.css" in html
+    assert "/static/vendor/fontawesome/css/solid.min.css" in html
+    assert "/static/js/markdown-editor.js" in html
+    assert "data-markdown-editor" in html
+    assert "unpkg.com" not in html
+    assert "maxcdn" not in html
+
+
+@pytest.mark.django_db
+def test_edit_page_non_moderator_is_not_found(client):
+    from website.models import Page
+
+    page = Page.objects.create(slug="restricted-doc", title="Закрытый документ")
+    user = User.objects.create_user(username="regular-page-user", password="pass")
+    client.force_login(user)
+
+    response = client.get(reverse("edit_page", args=[page.slug]))
+
+    assert response.status_code == 404
+
+
+@pytest.mark.django_db
+def test_edit_page_anonymous_user_is_redirected_to_login(client):
+    from website.models import Page
+
+    page = Page.objects.create(slug="anonymous-doc", title="Анонимный документ")
+
+    response = client.get(reverse("edit_page", args=[page.slug]))
+
+    assert response.status_code == 302
+    assert reverse("login") in response.url
+    assert f"next={reverse('edit_page', args=[page.slug])}" in response.url
 
 
 @pytest.mark.django_db

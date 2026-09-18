@@ -1,0 +1,106 @@
+{% extends "website/base-2.html" %}
+{% load static tz %}
+
+{% block title %}{% if is_edit %}Редактировать: {{ post.title }}{% else %}Новая публикация{% endif %} — {{ race.name }}{% endblock %}
+
+{% block extra_head %}
+<link href="{% static 'css/post_form.css' %}" rel="stylesheet">
+<link href="{% static 'vendor/fontawesome/css/fontawesome.min.css' %}" rel="stylesheet">
+<link href="{% static 'vendor/fontawesome/css/solid.min.css' %}" rel="stylesheet">
+<link href="{% static 'vendor/easymde/easymde.min.css' %}" rel="stylesheet">
+{% endblock %}
+
+{% block content %}
+<div class="post-form">
+  <div class="container">
+    <nav class="breadcrumb">
+      <a href="/">Кольцо&nbsp;24</a>
+      <span class="sep">/</span>
+      <a href="{% url 'race' race.slug %}">{{ race.name }}</a>
+      <span class="sep">/</span>
+      <span class="cur">{% if is_edit %}Редактирование публикации{% else %}Новая публикация{% endif %}</span>
+    </nav>
+
+    <div class="post-form__head">
+      <div>
+        <h1>{% if is_edit %}Редактировать: {{ post.title }}{% else %}Новая публикация{% endif %}</h1>
+        <p class="post-form__sub">Публикация для гонки «{{ race.name }}»</p>
+      </div>
+    </div>
+
+    <form class="post-form__card" method="post" enctype="multipart/form-data">
+      {% csrf_token %}
+      {% if form.non_field_errors %}
+      <div class="post-form__errors">{{ form.non_field_errors|join:", " }}</div>
+      {% endif %}
+
+      <div class="field full">
+        <label for="id_title">Заголовок</label>
+        <input class="input{% if form.title.errors %} has-error{% endif %}" id="id_title"
+               name="title" type="text" value="{{ form.title.value|default_if_none:'' }}"
+               placeholder="Заголовок новости">
+        {% if form.title.errors %}<span class="hint err">{{ form.title.errors|join:", " }}</span>{% endif %}
+      </div>
+
+      <div class="field full">
+        <label for="id_summary">Короткий анонс (необязательно)</label>
+        <textarea class="input{% if form.summary.errors %} has-error{% endif %}"
+                  id="id_summary" name="summary" rows="3"
+                  placeholder="Для ленты публикаций">{{ form.summary.value|default_if_none:'' }}</textarea>
+        {% if form.summary.errors %}<span class="hint err">{{ form.summary.errors|join:", " }}</span>{% endif %}
+      </div>
+
+      <div class="field full">
+        <label for="id_content">Текст (Markdown)</label>
+        <textarea class="input{% if form.content.errors %} has-error{% endif %}"
+                  id="id_content" name="content" rows="8" data-markdown-editor
+                  placeholder="Markdown">{{ form.content.value|default_if_none:'' }}</textarea>
+        {% if form.content.errors %}<span class="hint err">{{ form.content.errors|join:", " }}</span>{% endif %}
+      </div>
+
+      <div class="field full">
+        <label for="id_image">Фото (необязательно)</label>
+        {{ form.image }}
+        {% if form.image.errors %}<span class="hint err">{{ form.image.errors|join:", " }}</span>{% endif %}
+      </div>
+
+      <div class="field">
+        <label for="id_kind">Тип публикации</label>
+        <select class="input{% if form.kind.errors %} has-error{% endif %}" id="id_kind" name="kind">
+          {% for value, label in form.kind.field.choices %}
+          <option value="{{ value }}"{% if form.kind.value == value %} selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+        {% if form.kind.errors %}<span class="hint err">{{ form.kind.errors|join:", " }}</span>{% endif %}
+      </div>
+
+      <div class="field">
+        <label for="id_publication_date">Дата публикации</label>
+        <input class="input{% if form.publication_date.errors %} has-error{% endif %}"
+               id="id_publication_date" name="publication_date" type="datetime-local"
+               value="{% if form.is_bound %}{{ form.publication_date.value|default_if_none:'' }}{% else %}{{ form.initial.publication_date|date:'Y-m-d\TH:i' }}{% endif %}">
+        {% if form.publication_date.errors %}<span class="hint err">{{ form.publication_date.errors|join:", " }}</span>{% endif %}
+        {% get_current_timezone as publication_timezone %}
+        <span class="hint">Часовой пояс: {{ publication_timezone }}. Будущая дата отложит публикацию.</span>
+      </div>
+
+      <div class="field full post-form__publish">
+        <label for="id_is_published">
+          <input id="id_is_published" name="is_published" type="checkbox" value="on"
+                 {% if form.is_published.value %}checked{% endif %}>
+          Разрешить публикацию
+        </label>
+        {% if form.is_published.errors %}<span class="hint err">{{ form.is_published.errors|join:", " }}</span>{% endif %}
+        <span class="hint">Снимите отметку, чтобы сохранить черновик.</span>
+      </div>
+
+      <div class="post-form__actions">
+        <button class="btn btn-primary" type="submit">Сохранить</button>
+        <a class="btn btn-ghost" href="{% url 'race' race.slug %}">Отмена</a>
+      </div>
+    </form>
+  </div>
+</div>
+<script defer src="{% static 'vendor/easymde/easymde.min.js' %}"></script>
+<script defer src="{% static 'js/markdown-editor.js' %}"></script>
+{% endblock %}

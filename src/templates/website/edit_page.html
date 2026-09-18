@@ -1,8 +1,12 @@
 {% extends "website/base.html" %}
+{% load static %}
 
 {% block extra_head %}
-  <link rel="stylesheet" href="https://unpkg.com/easymde/dist/easymde.min.css">
-  <script src="https://unpkg.com/easymde/dist/easymde.min.js"></script>
+  <link rel="stylesheet" href="{% static 'vendor/easymde/easymde.min.css' %}">
+  <link rel="stylesheet" href="{% static 'vendor/fontawesome/css/fontawesome.min.css' %}">
+  <link rel="stylesheet" href="{% static 'vendor/fontawesome/css/solid.min.css' %}">
+  <script defer src="{% static 'vendor/easymde/easymde.min.js' %}"></script>
+  <script defer src="{% static 'js/markdown-editor.js' %}"></script>
 {% endblock %}
 
 {% block title %}Редактировать: {{ page.title }}{% endblock %}
@@ -31,38 +35,4 @@
     </div>
   </section>
 
-  <script>
-      document.addEventListener('DOMContentLoaded', function () {
-          const el = document.getElementById('{{ form.content.id_for_label }}') || document.getElementById('id_content');
-          if (!el) return;
-
-          const mde = new EasyMDE({
-              element: el,
-              minHeight: "300px",
-              spellChecker: false,
-              autosave: {
-                  enabled: false,
-              },
-              toolbar: [
-                  "bold", "italic", "heading", "|",
-                  "quote", "unordered-list", "ordered-list",
-                  {
-                      name: "table1",
-                      action: EasyMDE.drawTable,
-                      className: "fa fa-th mde-icon-table", // вместо конфликтного "table"
-                      title: "Вставить таблицу"
-                  },
-                  "code", "|",
-                  "link", "image", "|",
-                  "preview", "side-by-side", "fullscreen", "guide"
-              ],
-              renderingConfig: {singleLineBreaks: false}
-          });
-
-          // На submit возвращаем Markdown обратно в textarea (на всякий случай)
-          el.form.addEventListener('submit', () => {
-              el.value = mde.value();
-          });
-      });
-  </script>
 {% endblock %}

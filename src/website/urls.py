@@ -19,6 +19,7 @@ from apps.race.views import (
     RacePageView,
     RacePaymentsExportView,
     RacePaymentsView,
+    RacePostEditView,
     RaceTeamsView,
 )
 
@@ -79,8 +80,13 @@ urlpatterns = [
     # Slug-based (primary)
     path(
         "race/<slug:race_slug>/post/add/",
-        views.AddNewsPostView.as_view(),
+        RacePostEditView.as_view(),
         name="add_post",
+    ),
+    path(
+        "race/<slug:race_slug>/post/<int:post_id>/edit/",
+        RacePostEditView.as_view(),
+        name="edit_post",
     ),
     path(
         "race/<slug:race_slug>/edit/",

@@ -20,78 +20,17 @@
     <div class="overview-grid">
 
       <main class="overview-news">
-        {% if post_form %}
-        <div class="card post-add-card">
-          <div class="card-pad">
-            <form action="{% url 'add_post' race.slug %}" method="post" enctype="multipart/form-data">
-              {% csrf_token %}
-              <div class="field-row">
-                <label for="id_title">Заголовок</label>
-                <input class="input{% if post_form.title.errors %} has-error{% endif %}"
-                  id="id_title" name="title" type="text"
-                  value="{{ post_form.title.value|default:'' }}"
-                  placeholder="Заголовок новости">
-                {% if post_form.title.errors %}
-                <span class="hint err">{{ post_form.title.errors|join:", " }}</span>
-                {% endif %}
-              </div>
-              <div class="field-row">
-                <label for="id_summary">Короткий анонс (необязательно)</label>
-                <textarea class="input{% if post_form.summary.errors %} has-error{% endif %}"
-                  id="id_summary" name="summary"
-                  rows="2" placeholder="Для ленты публикаций">{{ post_form.summary.value|default:'' }}</textarea>
-                {% if post_form.summary.errors %}
-                <span class="hint err">{{ post_form.summary.errors|join:", " }}</span>
-                {% endif %}
-              </div>
-              <div class="field-row">
-                <label for="id_content">Текст (Markdown)</label>
-                <textarea class="input{% if post_form.content.errors %} has-error{% endif %}"
-                  id="id_content" name="content"
-                  rows="5" placeholder="Markdown">{{ post_form.content.value|default:'' }}</textarea>
-                {% if post_form.content.errors %}
-                <span class="hint err">{{ post_form.content.errors|join:", " }}</span>
-                {% endif %}
-              </div>
-              <div class="field-row">
-                <label for="id_image">Фото (необязательно)</label>
-                <input class="input" id="id_image" name="image" type="file" accept="image/*">
-                {% if post_form.image.errors %}
-                <span class="hint err">{{ post_form.image.errors|join:", " }}</span>
-                {% endif %}
-              </div>
-              <div class="field-row">
-                {{ post_form.kind.label_tag }}
-                {{ post_form.kind }}
-                {{ post_form.kind.errors }}
-              </div>
-              <div class="field-row">
-                {{ post_form.publication_date.label_tag }}
-                {{ post_form.publication_date }}
-                {{ post_form.publication_date.errors }}
-                {% get_current_timezone as publication_timezone %}
-                <span class="hint">Часовой пояс: {{ publication_timezone }}. Будущая дата отложит публикацию.</span>
-              </div>
-              <div class="field-row">
-                <label for="{{ post_form.is_published.id_for_label }}">
-                  {{ post_form.is_published }} Разрешить публикацию
-                </label>
-                {{ post_form.is_published.errors }}
-                <span class="hint">Снимите отметку, чтобы сохранить черновик.</span>
-              </div>
-              <button class="btn btn-primary" type="submit">Сохранить и посмотреть</button>
-            </form>
-          </div>
-        </div>
-        {% endif %}
-
         <section class="publication-feed" aria-labelledby="race-news-title">
           <div class="publication-feed__head">
             <h2 id="race-news-title">Новости соревнования</h2>
             <span>Всего: {{ news_count }}</span>
+            {% if can_manage_posts %}
+            <a class="btn btn-primary" href="{% url 'add_post' race.slug %}">+ Новая публикация</a>
+            {% endif %}
           </div>
           {% for news in news_list %}
-          {% include "website/_publication_post.html" with publication=news hide_race=True %}
+          {% url 'edit_post' race.slug news.pk as edit_url %}
+          {% include "website/_publication_post.html" with publication=news hide_race=True can_edit=can_manage_posts edit_url=edit_url %}
           {% empty %}
           <div class="publication-feed__empty">
             <p>Новостей пока нет.</p>

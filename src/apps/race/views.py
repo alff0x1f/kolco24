@@ -138,7 +138,21 @@ class RacePageView(View):
                     if not cat.people_limit
                     else max(0, cat.people_limit - cat.people)
                 )
-        news_qs = NewsPost.objects.visible().filter(race=race)
+        is_admin = user is not None and is_race_admin(user, race)
+        if is_admin:
+            # ``visible()`` applies public filters as well as ordering, so only
+            # its ordering is repeated for the admin queryset.
+            # Omitting the race publication filter lets admins see posts while
+            # previewing an unpublished race.
+            news_qs = (
+                NewsPost.objects.filter(race=race)
+                .select_related("race")
+                .order_by("-publication_date", "-pk")
+            )
+            # A far-future scheduled post sorts first and can push a real post
+            # out of the ten rows retained for the admin feed.
+        else:
+            news_qs = NewsPost.objects.visible().filter(race=race)
         news_count = news_qs.count()
         news_list = list(news_qs[:10])
         context = {
@@ -155,6 +169,7 @@ class RacePageView(View):
             "race_full": race_full,
             "owned_teams": _owned_teams(race, user),
         }
+        context["can_manage_posts"] = is_admin
         context["can_edit_race"] = bool(user is not None and can_edit_race(user, race))
         if context["can_edit_race"]:
             context["race_administrators"] = sorted(
@@ -170,8 +185,6 @@ class RacePageView(View):
                 ],
                 key=lambda member: (member["role"], member["name"].casefold()),
             )
-        if user is not None and is_race_admin(user, race):
-            context["post_form"] = NewsPostForm()
         return context
 
     def get(self, request, race_slug):
@@ -185,6 +198,56 @@ class RacePageView(View):
             raise Http404
         context = self.build_context(race, request.user)
         return render(request, "race/race_page.html", context)
+
+
+class RacePostEditView(View):
+    template_name = "race/post_form.html"
+
+    def _load(self, request, race_slug, post_id=None):
+        race = get_object_or_404(Race, slug=race_slug)
+        if not request.user.is_authenticated:
+            return (
+                None,
+                None,
+                HttpResponseRedirect(
+                    reverse("login") + "?next=" + quote(request.path, safe="/:@")
+                ),
+            )
+        if not is_race_admin(request.user, race):
+            return race, None, HttpResponseForbidden()
+        post = (
+            get_object_or_404(NewsPost, pk=post_id, race=race)
+            if post_id is not None
+            else None
+        )
+        return race, post, None
+
+    def get(self, request, race_slug, post_id=None):
+        race, post, response = self._load(request, race_slug, post_id)
+        if response is not None:
+            return response
+        form = NewsPostForm(instance=post)
+        return render(
+            request,
+            self.template_name,
+            {"race": race, "post": post, "form": form, "is_edit": post is not None},
+        )
+
+    def post(self, request, race_slug, post_id=None):
+        race, post, response = self._load(request, race_slug, post_id)
+        if response is not None:
+            return response
+        form = NewsPostForm(request.POST, request.FILES, instance=post)
+        if form.is_valid():
+            obj = form.save(commit=False)
+            obj.race = race
+            obj.save()
+            return HttpResponseRedirect(obj.get_absolute_url())
+        return render(
+            request,
+            self.template_name,
+            {"race": race, "post": post, "form": form, "is_edit": post is not None},
+        )
 
 
 class RaceTeamsView(View):
@@ -858,7 +921,7 @@ class RaceEditView(View):
     """Create (``races/new/``) and edit (``race/<slug>/edit/``) a race.
 
     Create is superuser-only; edit is gated on :func:`can_edit_race`. Auth
-    mirrors ``AddNewsPostView``: anonymous users are bounced to the login page
+    mirrors ``RacePostEditView``: anonymous users are bounced to the login page
     with a ``?next=``, authorized-but-forbidden users get a 403.
     """
 

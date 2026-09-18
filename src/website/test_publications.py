@@ -268,8 +268,11 @@ def test_home_is_a_real_page_and_shows_only_visible_publications(client):
     assert response.status_code == 200
     assert "website/home.html" in [template.name for template in response.templates]
     assert list(response.context["publications"]) == [visible]
-    assert "Видимый материал" in response.content.decode()
-    assert "Черновик" not in response.content.decode()
+    html = response.content.decode()
+    assert "Видимый материал" in html
+    assert "Черновик" not in html
+    assert "Запланирована на" not in html
+    assert "Редактировать" not in html
 
 
 @pytest.mark.django_db
@@ -536,6 +539,10 @@ def test_article_catalog_filters_out_news(client):
     articles_response = client.get(reverse("article_list"))
 
     assert list(articles_response.context["publications"]) == [article]
+    html = articles_response.content.decode()
+    assert "Редактировать" not in html
+    assert "Черновик" not in html
+    assert "Запланирована на" not in html
 
 
 @pytest.mark.parametrize("path", ["/posts/", "/news/"])
@@ -847,8 +854,12 @@ def test_race_form_saves_drafts_and_scheduled_articles(
         second=0, microsecond=0
     )
     page = client.get(reverse("race", kwargs={"race_slug": race.slug}))
+    assert page.status_code == 200
+    assert reverse("add_post", args=[race.slug]) in page.content.decode()
+    form_page = client.get(reverse("add_post", args=[race.slug]))
+    assert form_page.status_code == 200
     for field in ("kind", "is_published", "publication_date"):
-        assert f'name="{field}"' in page.content.decode()
+        assert f'name="{field}"' in form_page.content.decode()
     data = {
         "title": "Запланированная статья",
         "content": "**Подробности**",

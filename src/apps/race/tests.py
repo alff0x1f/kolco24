@@ -10,6 +10,7 @@ from django.contrib.messages.storage.fallback import FallbackStorage
 from django.template.loader import render_to_string
 from django.test import RequestFactory
 from django.urls import resolve, reverse
+from django.utils.formats import date_format
 
 from apps.mobile.models import JudgeScan, Mark, MarkPhoto, MarkPresent, TrackPoint
 from apps.race.app_data import build_overview, build_team_timeline, format_ms
@@ -29,9 +30,11 @@ from apps.race.views import (
     RaceMapTrackView,
     RaceMapView,
     RacePageView,
+    RacePostEditView,
     RaceTeamsView,
 )
-from website.models import Race
+from website.forms import NewsPostForm
+from website.models import NewsPost, Race
 from website.models.checkpoint import Checkpoint
 from website.models.models import Team
 from website.models.race import Category, RaceAdmin, RacePriceTier, RegStatus
@@ -488,14 +491,427 @@ def test_race_overview_visibility(client, published, role):
     assert response.status_code == (200 if allowed else 404)
     if allowed:
         assert response.context["race"] == race
-        # The feed uses public visibility rules even in a private race preview.
-        assert (post in response.context["news_list"]) is published
+        # Race admins and moderators get the private feed in an unpublished-race
+        # preview; a bare superuser has no RaceAdmin row and keeps the public feed.
+        assert (post in response.context["news_list"]) is (
+            published or role in {"admin", "moderator"}
+        )
         if not published:
             assert client.get(post.get_absolute_url()).status_code == 200
     else:
         html = response.content.decode()
         assert race.name not in html
         assert post.title not in html
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("role", [RaceAdmin.Role.ADMIN, RaceAdmin.Role.MODERATOR])
+def test_race_admin_feed_includes_draft_and_scheduled_posts(client, role):
+    race = _make_race(slug=f"private-feed-{role}")
+    race.is_published = False
+    race.save(update_fields=["is_published"])
+    user = User.objects.create_user(username=f"feed-{role}", password="p")
+    RaceAdmin.objects.create(race=race, user=user, role=role)
+    now = datetime.datetime.now(datetime.timezone.utc)
+    draft = NewsPost.objects.create(
+        race=race,
+        title="Черновик публикации",
+        content="Черновик",
+        is_published=False,
+        publication_date=now,
+    )
+    scheduled = NewsPost.objects.create(
+        race=race,
+        title="Будущая публикация",
+        content="Будущая публикация",
+        publication_date=now + datetime.timedelta(days=1),
+    )
+    client.force_login(user)
+
+    response = client.get(reverse("race", args=[race.slug]))
+
+    assert response.status_code == 200
+    assert {post.pk for post in response.context["news_list"]} == {
+        draft.pk,
+        scheduled.pk,
+    }
+    assert response.context["news_count"] == 2
+    assert response.context["can_manage_posts"] is True
+    html = response.content.decode()
+    assert "+ Новая публикация" in html
+    assert reverse("add_post", args=[race.slug]) in html
+    assert f'action="{reverse("add_post", args=[race.slug])}"' not in html
+    for post in (draft, scheduled):
+        assert f'href="{reverse("edit_post", args=[race.slug, post.pk])}"' in html
+    assert html.count('class="publication-post__edit"') == 2
+    assert (
+        'class="publication-post__state publication-post__state--draft">Черновик</span>'
+        in html
+    )
+    assert (
+        f"Запланирована на {date_format(scheduled.publication_date, 'j E Y')}" in html
+    )
+    assert scheduled.publication_date.isoformat() not in html
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(
+    ("role", "published", "expected_count"),
+    [
+        ("anonymous", True, 1),
+        ("visitor", True, 1),
+        ("superuser", False, 0),
+    ],
+)
+def test_race_public_feed_hides_admin_posts_and_management_link(
+    client, role, published, expected_count
+):
+    race = _make_race(slug=f"public-feed-{role}")
+    race.is_published = published
+    race.save(update_fields=["is_published"])
+    now = datetime.datetime.now(datetime.timezone.utc)
+    visible = NewsPost.objects.create(
+        race=race,
+        title="Доступная публикация",
+        content="Доступный текст",
+        publication_date=now - datetime.timedelta(days=1),
+    )
+    draft = NewsPost.objects.create(
+        race=race,
+        title="Скрытый черновик",
+        content="Скрытый текст",
+        is_published=False,
+        publication_date=now,
+    )
+    scheduled = NewsPost.objects.create(
+        race=race,
+        title="Скрытая будущая публикация",
+        content="Скрытый будущий текст",
+        publication_date=now + datetime.timedelta(days=1),
+    )
+    if role != "anonymous":
+        user = User.objects.create_user(
+            username=role, password="p", is_superuser=role == "superuser"
+        )
+        client.force_login(user)
+
+    response = client.get(reverse("race", args=[race.slug]))
+
+    assert response.status_code == 200
+    assert response.context["can_manage_posts"] is False
+    assert response.context["news_count"] == expected_count
+    assert (visible in response.context["news_list"]) is bool(expected_count)
+    assert draft not in response.context["news_list"]
+    assert scheduled not in response.context["news_list"]
+    html = response.content.decode()
+    assert "+ Новая публикация" not in html
+    assert f'action="{reverse("add_post", args=[race.slug])}"' not in html
+    assert "Редактировать" not in html
+    assert "Черновик" not in html
+    assert "Запланирована на" not in html
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("role", [RaceAdmin.Role.ADMIN, RaceAdmin.Role.MODERATOR])
+def test_race_post_add_get_for_race_admin_roles(client, role):
+    race = _make_race(slug=f"post-form-{role}")
+    user = User.objects.create_user(username=f"post-{role}", password="p")
+    RaceAdmin.objects.create(race=race, user=user, role=role)
+    client.force_login(user)
+
+    response = client.get(reverse("add_post", args=[race.slug]))
+
+    assert response.status_code == 200
+    html = response.content.decode()
+    assert "data-markdown-editor" in html
+    assert "vendor/easymde/easymde.min.css" in html
+    assert "vendor/easymde/easymde.min.js" in html
+    assert "vendor/fontawesome/css/fontawesome.min.css" in html
+    assert "vendor/fontawesome/css/solid.min.css" in html
+    assert "js/markdown-editor.js" in html
+
+
+@pytest.mark.django_db
+def test_race_post_url_names_resolve_to_race_post_edit_view():
+    race = _make_race(slug="post-routes")
+    post = NewsPost.objects.create(race=race, title="Пост", content="Текст")
+
+    add_url = reverse("add_post", args=[race.slug])
+    edit_url = reverse("edit_post", args=[race.slug, post.pk])
+
+    assert add_url == "/race/post-routes/post/add/"
+    assert resolve(add_url).func.view_class is RacePostEditView
+    assert edit_url == f"/race/post-routes/post/{post.pk}/edit/"
+    assert resolve(edit_url).func.view_class is RacePostEditView
+
+
+@pytest.mark.django_db
+def test_add_post_by_race_admin(client):
+    race = Race.objects.create(name="Post Race", slug="post-race-2025")
+    user = User.objects.create_user(username="postadmin", password="pass")
+    RaceAdmin.objects.create(race=race, user=user, role=RaceAdmin.Role.ADMIN)
+    client.force_login(user)
+    response = client.post(
+        f"/race/{race.slug}/post/add/",
+        {
+            "title": "New Post",
+            "content": "Hello world",
+            "kind": "news",
+            "is_published": True,
+            "publication_date": "2026-09-11T10:00",
+        },
+    )
+    assert response.status_code == 302
+    assert NewsPost.objects.filter(race=race, title="New Post").exists()
+
+
+@pytest.mark.django_db
+def test_add_post_unauthorized(client):
+    race = Race.objects.create(name="Post Race2", slug="post-race-2026")
+    response = client.post(
+        f"/race/{race.slug}/post/add/",
+        {"title": "Should fail", "content": "No auth"},
+    )
+    assert response.status_code == 302
+    assert "/accounts/login/" in response["Location"]
+
+
+@pytest.mark.django_db
+def test_add_post_non_admin_user(client):
+    race = Race.objects.create(name="Post Race3", slug="post-race-2027")
+    user = User.objects.create_user(username="notadmin", password="pass")
+    client.force_login(user)
+    response = client.post(
+        f"/race/{race.slug}/post/add/",
+        {"title": "Should fail", "content": "Not admin"},
+    )
+    assert response.status_code == 403
+
+
+def _news_post_data(**overrides):
+    data = {
+        "title": "Новая публикация",
+        "summary": "Короткий анонс",
+        "content": "Основной текст",
+        "kind": "news",
+        "publication_date": "2026-09-11T10:00",
+        "is_published": "on",
+    }
+    data.update(overrides)
+    return data
+
+
+@pytest.mark.django_db
+def test_race_post_add_creates_post_and_redirects(client):
+    race = _make_race(slug="post-create")
+    user = User.objects.create_user(username="post-create-user", password="p")
+    RaceAdmin.objects.create(race=race, user=user, role=RaceAdmin.Role.ADMIN)
+    client.force_login(user)
+
+    response = client.post(reverse("add_post", args=[race.slug]), _news_post_data())
+
+    post = NewsPost.objects.get(title="Новая публикация")
+    assert response.status_code == 302
+    assert response.url == post.get_absolute_url()
+    assert post.race == race
+
+
+@pytest.mark.django_db
+def test_race_post_add_draft_detail_preview_is_reachable(client):
+    race = _make_race(slug="post-draft")
+    user = User.objects.create_user(username="post-draft-user", password="p")
+    RaceAdmin.objects.create(race=race, user=user, role=RaceAdmin.Role.ADMIN)
+    client.force_login(user)
+    data = _news_post_data()
+    data.pop("is_published")
+
+    response = client.post(
+        reverse("add_post", args=[race.slug]),
+        data,
+        follow=True,
+    )
+
+    assert response.status_code == 200
+    assert response.context["is_preview"] is True
+
+
+@pytest.mark.django_db
+def test_race_post_edit_get_prefills_and_post_updates_in_place(client):
+    race = _make_race(slug="post-edit")
+    user = User.objects.create_user(username="post-edit-user", password="p")
+    RaceAdmin.objects.create(race=race, user=user, role=RaceAdmin.Role.MODERATOR)
+    post = NewsPost.objects.create(
+        race=race,
+        title="Старый заголовок",
+        content="Старый текст",
+        publication_date="2026-09-11T10:00Z",
+    )
+    client.force_login(user)
+
+    get_response = client.get(reverse("edit_post", args=[race.slug, post.pk]))
+    post_count = NewsPost.objects.count()
+    update_response = client.post(
+        reverse("edit_post", args=[race.slug, post.pk]),
+        _news_post_data(title="Обновлённый заголовок"),
+    )
+
+    assert get_response.status_code == 200
+    assert "Старый заголовок" in get_response.content.decode()
+    assert 'value="2026-09-11T15:00"' in get_response.content.decode()
+    assert update_response.status_code == 302
+    assert update_response.url == post.get_absolute_url()
+    post.refresh_from_db()
+    assert post.title == "Обновлённый заголовок"
+    assert NewsPost.objects.count() == post_count
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("method", ["get", "post"])
+def test_race_post_anonymous_redirects_to_login(client, method):
+    race = _make_race(slug="post-anon")
+    request = getattr(client, method)
+    response = request(
+        reverse("add_post", args=[race.slug]),
+        _news_post_data() if method == "post" else None,
+    )
+
+    assert response.status_code == 302
+    assert f"?next=/race/{race.slug}/post/add/" in response.url
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("method", ["get", "post"])
+def test_race_post_anonymous_bogus_race_is_404(client, method):
+    request = getattr(client, method)
+    response = request(
+        reverse("add_post", args=["post-does-not-exist"]),
+        _news_post_data() if method == "post" else None,
+    )
+
+    assert response.status_code == 404
+
+
+@pytest.mark.django_db
+def test_race_post_non_admin_is_forbidden(client):
+    race = _make_race(slug="post-forbidden")
+    user = User.objects.create_user(username="post-forbidden-user", password="p")
+    client.force_login(user)
+
+    response = client.get(reverse("add_post", args=[race.slug]))
+
+    assert response.status_code == 403
+
+
+@pytest.mark.django_db
+def test_race_post_invalid_form_rerenders_without_creating_post(client):
+    race = _make_race(slug="post-invalid")
+    user = User.objects.create_user(username="post-invalid-user", password="p")
+    RaceAdmin.objects.create(race=race, user=user, role=RaceAdmin.Role.ADMIN)
+    client.force_login(user)
+
+    response = client.post(
+        reverse("add_post", args=[race.slug]), _news_post_data(title="")
+    )
+
+    assert response.status_code == 200
+    assert "race/post_form.html" in [template.name for template in response.templates]
+    assert "title" in response.context["form"].errors
+    assert not NewsPost.objects.filter(race=race).exists()
+
+
+@pytest.mark.django_db
+def test_race_post_invalid_datetime_value_is_preserved(client):
+    race = _make_race(slug="post-invalid-datetime")
+    user = User.objects.create_user(username="post-invalid-datetime-user", password="p")
+    RaceAdmin.objects.create(race=race, user=user, role=RaceAdmin.Role.ADMIN)
+    client.force_login(user)
+
+    response = client.post(
+        reverse("add_post", args=[race.slug]),
+        _news_post_data(publication_date="not-a-datetime"),
+    )
+
+    assert response.status_code == 200
+    assert 'name="publication_date" type="datetime-local"' in response.content.decode()
+    assert 'value="not-a-datetime"' in response.content.decode()
+    assert not NewsPost.objects.filter(race=race).exists()
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("method", ["get", "post"])
+def test_race_post_edit_zero_id_is_404(client, method):
+    race = _make_race(slug="post-zero-id")
+    user = User.objects.create_user(username="post-zero-id-user", password="p")
+    RaceAdmin.objects.create(race=race, user=user, role=RaceAdmin.Role.ADMIN)
+    client.force_login(user)
+
+    response = getattr(client, method)(
+        reverse("edit_post", args=[race.slug, 0]),
+        _news_post_data() if method == "post" else None,
+    )
+
+    assert response.status_code == 404
+    assert not NewsPost.objects.filter(race=race).exists()
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("method", ["get", "post"])
+def test_race_post_edit_other_race_is_404(client, method):
+    race = _make_race(slug="post-owner")
+    other_race = _make_race(slug="post-other")
+    user = User.objects.create_user(username="post-cross-race", password="p")
+    RaceAdmin.objects.create(race=race, user=user, role=RaceAdmin.Role.ADMIN)
+    post = NewsPost.objects.create(race=other_race, title="Чужая", content="Текст")
+    client.force_login(user)
+
+    response = getattr(client, method)(
+        reverse("edit_post", args=[race.slug, post.pk]),
+        _news_post_data() if method == "post" else None,
+    )
+
+    assert response.status_code == 404
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("method", ["get", "post"])
+def test_race_post_edit_null_race_is_404(client, method):
+    race = _make_race(slug="post-null-race")
+    user = User.objects.create_user(username="post-null-race-user", password="p")
+    RaceAdmin.objects.create(race=race, user=user, role=RaceAdmin.Role.ADMIN)
+    post = NewsPost.objects.create(race=None, title="Общая", content="Текст")
+    client.force_login(user)
+
+    response = getattr(client, method)(
+        reverse("edit_post", args=[race.slug, post.pk]),
+        _news_post_data() if method == "post" else None,
+    )
+
+    assert response.status_code == 404
+
+
+@pytest.mark.django_db
+def test_news_post_form_preserves_or_clears_existing_image():
+    post = NewsPost.objects.create(
+        title="Фото",
+        content="Текст",
+        image="blog_images/existing.jpg",
+    )
+
+    form = NewsPostForm(
+        data=_news_post_data(title="Без замены"),
+        instance=post,
+    )
+    assert form.is_valid(), form.errors
+    saved = form.save()
+    assert saved.image.name == "blog_images/existing.jpg"
+
+    clear_form = NewsPostForm(
+        data=_news_post_data(title="Удалить фото", **{"image-clear": "on"}),
+        instance=saved,
+    )
+    assert clear_form.is_valid(), clear_form.errors
+    cleared = clear_form.save()
+    assert not cleared.image
 
 
 @pytest.mark.django_db
