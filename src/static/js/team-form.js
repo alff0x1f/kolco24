@@ -301,6 +301,7 @@
   // allowed team size can't fit. The team's own category is never disabled.
   function syncCategoryOptions() {
     if (!category) return;
+    var prev = category.value;
     Array.prototype.forEach.call(category.options, function (opt) {
       if (BYPASS_LIMITS) {
         opt.disabled = false;
@@ -324,6 +325,15 @@
       var minN = sizes.length ? sizes[0] : 2;
       opt.disabled = !countAllowed(opt, minN);
     });
+    // The browser deselects a selected option once it is disabled, so with
+    // every category full the form would post an empty category2_id. Keep the
+    // value: the server then answers why the choice does not fit.
+    if (category.selectedIndex < 0) {
+      category.value = prev;
+      if (category.selectedIndex < 0 && category.options.length) {
+        category.selectedIndex = 0;
+      }
+    }
   }
 
   function buildSeg() {

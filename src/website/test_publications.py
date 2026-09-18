@@ -992,6 +992,7 @@ def test_owned_teams_by_race_collects_team_card_fields(django_user_model):
             "action_label": "Редактировать команду",
             "can_change": True,
             "needs_payment": False,
+            "paid_people": 3.0,
         }
     ]
 
