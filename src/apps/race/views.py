@@ -112,6 +112,7 @@ def _owned_teams(race, user):
             ),
             "can_change": can_change,
             "needs_payment": team.paid_people < team.ucount,
+            "paid_people": team.paid_people,
         }
         for team in teams
     ]

@@ -1194,7 +1194,9 @@ def test_home_panel_renders_race_heading_and_team_row(
     assert "Редактировать команду" in panel
     assert '<div class="my-teams__number">18</div>' in panel
     assert "3 участника" in panel
-    assert ("3 участника (не оплачено)" in panel) == (paid_people < 3)
+    assert ("3 участника (не оплачено)" in panel) == (paid_people == 0)
+    assert ("(оплачено 2,5 из 3)" in panel) == (paid_people == 2.5)
+    assert ("(оплачено 1 из 3)" in panel) == (paid_people == 1)
     # The panel sits between the spotlight and the main community content.
     assert html.index('class="my-teams"') < html.index("community-content")
 
