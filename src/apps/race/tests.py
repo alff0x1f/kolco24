@@ -10,6 +10,7 @@ from django.contrib.messages.storage.fallback import FallbackStorage
 from django.template.loader import render_to_string
 from django.test import RequestFactory
 from django.urls import resolve, reverse
+from django.utils import timezone
 from django.utils.formats import date_format
 
 from apps.mobile.models import JudgeScan, Mark, MarkPhoto, MarkPresent, TrackPoint
@@ -506,7 +507,8 @@ def test_race_overview_visibility(client, published, role):
 
 @pytest.mark.django_db
 @pytest.mark.parametrize("role", [RaceAdmin.Role.ADMIN, RaceAdmin.Role.MODERATOR])
-def test_race_admin_feed_includes_draft_and_scheduled_posts(client, role):
+@pytest.mark.parametrize("utc_hour", [12, 23])
+def test_race_admin_feed_includes_draft_and_scheduled_posts(client, role, utc_hour):
     race = _make_race(slug=f"private-feed-{role}")
     race.is_published = False
     race.save(update_fields=["is_published"])
@@ -524,7 +526,7 @@ def test_race_admin_feed_includes_draft_and_scheduled_posts(client, role):
         race=race,
         title="Будущая публикация",
         content="Будущая публикация",
-        publication_date=now + datetime.timedelta(days=1),
+        publication_date=(now + datetime.timedelta(days=1)).replace(hour=utc_hour),
     )
     client.force_login(user)
 
@@ -548,9 +550,10 @@ def test_race_admin_feed_includes_draft_and_scheduled_posts(client, role):
         'class="publication-post__state publication-post__state--draft">Черновик</span>'
         in html
     )
-    assert (
-        f"Запланирована на {date_format(scheduled.publication_date, 'j E Y')}" in html
+    scheduled_date = date_format(
+        timezone.localtime(scheduled.publication_date), "j E Y"
     )
+    assert f"Запланирована на {scheduled_date}" in html
     assert scheduled.publication_date.isoformat() not in html
 
 
@@ -5618,8 +5621,6 @@ def test_promo_code_unique_within_race_only():
 
 
 # --- Promo codes: resolve + quota ---
-
-from django.utils import timezone  # noqa: E402
 
 from apps.race.promo import PromoError, occupied_team_ids, resolve_promo  # noqa: E402
 from website.models.race import RESERVATION_TTL  # noqa: E402
