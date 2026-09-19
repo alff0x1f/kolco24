@@ -198,6 +198,14 @@ class NewsPost(models.Model):
     def get_absolute_url(self):
         return reverse("publication_detail", kwargs={"pk": self.pk})
 
+    @property
+    def is_draft(self):
+        return not self.is_published
+
+    @property
+    def is_scheduled(self):
+        return self.is_published and self.publication_date > timezone.now()
+
     def _summary(self, limit):
         if self.summary.strip():
             return self.summary.strip()

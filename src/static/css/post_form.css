@@ -1,0 +1,131 @@
+/* Race publication form — /race/<slug>/post/add/ and /edit/. */
+
+.post-form {
+  padding: 0 0 72px;
+}
+
+.post-form .breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 16px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+.post-form .breadcrumb a { color: var(--muted); }
+.post-form .breadcrumb a:hover { color: var(--ink); }
+.post-form .breadcrumb .sep { color: var(--muted-2); }
+.post-form .breadcrumb .cur { color: var(--ink-soft); }
+
+.post-form__head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 10px 0 20px;
+}
+.post-form__head h1 {
+  margin: 0;
+  color: var(--ink);
+  font-size: 26px;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+}
+.post-form__sub {
+  margin: 7px 0 0;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.post-form__card {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  padding: 24px;
+  background: var(--paper-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+}
+.post-form .field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+.post-form .field.full { grid-column: 1 / -1; }
+.post-form .field label {
+  color: var(--ink-soft);
+  font-size: 13px;
+  font-weight: 500;
+}
+.post-form .field .hint {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.4;
+}
+.post-form .hint.err { color: var(--danger); }
+.post-form .input {
+  box-sizing: border-box;
+  width: 100%;
+}
+.post-form input[type="file"] {
+  padding: 8px 10px;
+}
+.post-form__publish label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.post-form__publish input[type="checkbox"] { width: 16px; height: 16px; }
+
+.post-form__errors {
+  grid-column: 1 / -1;
+  padding: 11px 14px;
+  color: var(--danger);
+  background: var(--danger-bg);
+  border: 1px solid var(--danger);
+  border-radius: var(--radius-sm);
+  font-size: 13.5px;
+}
+.post-form__actions {
+  grid-column: 1 / -1;
+  display: flex;
+  gap: 10px;
+  padding-top: 4px;
+  border-top: 1px solid var(--line-soft);
+}
+
+/* EasyMDE alignment with theme-2.css controls. */
+.post-form .EasyMDEContainer .CodeMirror,
+.post-form .EasyMDEContainer .editor-toolbar {
+  border-color: var(--line);
+  border-radius: 8px;
+  font-family: inherit;
+}
+.post-form .EasyMDEContainer .editor-toolbar {
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+  background: var(--paper-2);
+}
+.post-form .EasyMDEContainer .CodeMirror {
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
+  color: var(--ink);
+  font-size: 14.5px;
+}
+.post-form .EasyMDEContainer .editor-toolbar button {
+  color: var(--ink-soft);
+}
+.post-form .EasyMDEContainer .editor-toolbar button:hover,
+.post-form .EasyMDEContainer .editor-toolbar button.active {
+  background: var(--line-soft);
+  color: var(--ink);
+}
+
+@media (max-width: 680px) {
+  .post-form__card { grid-template-columns: 1fr; padding: 18px; }
+  .post-form .field.full,
+  .post-form__errors,
+  .post-form__actions { grid-column: 1; }
+}

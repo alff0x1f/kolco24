@@ -38,6 +38,24 @@ make build-push TAG=v1.2.3
 make login                # auth to registry
 ```
 
+**Vendored editor assets**: EasyMDE is pinned to 2.18.0. Font Awesome is pinned
+to 6.5.2; keep `fontawesome.min.css`, `solid.min.css`, and both solid webfonts
+from that same release. Files under `src/static/vendor/leaflet/`,
+`src/static/vendor/easymde/`, and `src/static/vendor/fontawesome/` are vendored
+upstream assets and are off-limits for edits. Use the modular Font Awesome CSS;
+`all.min.css` is deliberately absent because it declares six `@font-face`
+families and would require editing the upstream file to ship only the solid
+webfont.
+
+The shared `src/static/js/markdown-editor.js` initializes EasyMDE on the
+`data-markdown-editor` hook. Both `src/templates/race/post_form.html` and
+`src/templates/website/edit_page.html` load it along with the vendored
+EasyMDE/Font Awesome assets. Keep `autoDownloadFontAwesome: false` in its
+configuration: this is load-bearing because EasyMDE's already-loaded check
+recognizes only an href containing `//maxcdn.bootstrapcdn.com/font-awesome/`,
+so it cannot see the vendored stylesheet. Removing the flag silently restores
+the CDN request while the icons continue to work.
+
 ## Architecture
 
 Django 4.2 project. Source lives entirely under `src/`, with `manage.py` at `src/manage.py`.
@@ -69,9 +87,19 @@ Django 4.2 project. Source lives entirely under `src/`, with `manage.py` at `src
   migrations** (`src/apps/race/models.py`, `migrations/` — its first; `0001_initial` declares an explicit
   `dependencies = [("website", "0072_payment_vtb_payment")]` because the FKs cross into `website`): `RaceExtra`/
   `TeamExtra`/`PaymentExtra` (see the **Team add-ons** note below). All other models still remain in `website`. Entry
-  points: `src/apps/race/views.py:RacePageView`, `RaceTeamsView`, and `RaceEditView`. Uses `label = "race_app"` in
-  `AppConfig` to avoid Django app-registry collision with the `race` model label. `RacePageView.build_context` is also
-  called by `website.views.views_.AddNewsPostView` via a deferred import to avoid a circular dependency.
+  points: `src/apps/race/views.py:RacePageView`, `RaceTeamsView`, `RaceEditView`, and `RacePostEditView`. Uses
+  `label = "race_app"` in `AppConfig` to avoid Django app-registry collision with the `race` model label.
+  `RacePostEditView` (template `src/templates/race/post_form.html`, assets `src/static/css/post_form.css`,
+  vendored EasyMDE/Font Awesome CSS and JS, plus `src/static/js/markdown-editor.js`) is one create/edit CBV for
+  `add_post` (`race/<slug>/post/add/`) and `edit_post` (`race/<slug>/post/<id>/edit/`). It gates on
+  `is_race_admin`, which allows both `RaceAdmin` ADMIN and MODERATOR rows, looks up the race by slug before auth,
+  and filters an edit lookup by `race=race` as well as the post id. Its `_load` helper always returns the
+  `(race, post, response)` triple; callers return a non-`None` response immediately. `RacePageView.build_context`
+  uses a wider `news_qs` only for that same `is_race_admin` check:
+  `NewsPost.objects.filter(race=race).select_related("race").order_by("-publication_date", "-pk")`.
+  This lets a RaceAdmin see posts of an unpublished race, while a bare superuser with no `RaceAdmin` row keeps the
+  public feed; a far-future scheduled post sorts to the top of the admin slice and can displace a real post from its
+  ten-row limit.
   `RaceTeamsView` (template `src/templates/race/teams.html`, assets `src/static/css/teams.css` +
   `src/static/js/teams.js`) backs all three teams URL names (`all_teams`, `teams2`, `my_teams`, wired in
   `website/urls.py`); it embeds teams/categories as JSON `<script>` blocks and does search/filter/sort entirely

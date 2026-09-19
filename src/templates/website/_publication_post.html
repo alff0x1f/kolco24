@@ -17,6 +17,14 @@
     {% if publication.has_more_content %}
     <a class="publication-read" href="{{ publication.get_absolute_url }}" aria-label="Читать полностью: {{ publication.title }}">Читать полностью <span aria-hidden="true">→</span></a>
     {% endif %}
+    {% if can_edit %}
+    <a class="publication-post__edit" href="{{ edit_url }}">Редактировать</a>
+    {% if publication.is_draft %}
+    <span class="publication-post__state publication-post__state--draft">Черновик</span>
+    {% elif publication.is_scheduled %}
+    <span class="publication-post__state publication-post__state--scheduled">Запланирована на {{ publication.publication_date|date:"j E Y" }}</span>
+    {% endif %}
+    {% endif %}
     <time datetime="{{ publication.publication_date|date:'c' }}">{{ publication.publication_date|date:"j E Y" }}</time>
   </footer>
 </article>
