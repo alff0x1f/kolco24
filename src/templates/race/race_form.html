@@ -115,7 +115,7 @@
                 <label for="f-cost">Стоимость участия</label>
                 <div class="input-affix">
                   <input class="control{% if form.cost.errors %} has-error{% endif %}" id="f-cost"
-                         name="cost" type="number" min="0" step="50"
+                         name="cost" type="number" min="0" step="1"
                          value="{{ form.cost.value|default_if_none:'' }}">
                   <span class="suffix">₽ / уч.</span>
                 </div>
