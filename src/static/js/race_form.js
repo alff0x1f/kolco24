@@ -213,7 +213,7 @@
       '<div class="tier-ord">●</div>' +
       '<input class="control t-until" type="date">' +
       '<div class="input-affix">' +
-      '<input class="control t-price" type="number" min="1" step="50" placeholder="цена">' +
+      '<input class="control t-price" type="number" min="1" step="1" placeholder="цена">' +
       '<span class="suffix">₽</span>' +
       "</div>" +
       '<button class="tier-del" type="button" title="Удалить период">' +
@@ -282,7 +282,7 @@
       '<div class="extra-ord">●</div>' +
       '<input class="control mono e-code" type="text" maxlength="32" placeholder="код">' +
       '<input class="control e-name" type="text" maxlength="100" placeholder="название">' +
-      '<input class="control e-price" type="number" min="0" step="50" placeholder="цена">' +
+      '<input class="control e-price" type="number" min="0" step="1" placeholder="цена">' +
       '<input class="control e-free" type="number" min="0" step="1" placeholder="0" title="Сколько входит в команду бесплатно">' +
       '<div class="extra-toggle-cell">' +
       '<label class="switch"><input type="checkbox" class="e-active"><span class="track"></span></label>' +
