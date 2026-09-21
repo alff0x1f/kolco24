@@ -1173,6 +1173,37 @@ def test_race_page_hides_add_button_when_reg_not_open(client):
 
 
 @pytest.mark.django_db
+def test_race_page_fee_uses_active_price_tier(client):
+    race = _make_race(slug="fee-tier")
+    race.cost = 1000
+    race.save()
+    today = datetime.date.today()
+    RacePriceTier.objects.create(
+        race=race, price=1500, active_until=today - datetime.timedelta(days=1)
+    )
+    RacePriceTier.objects.create(
+        race=race, price=1800, active_until=today + datetime.timedelta(days=10)
+    )
+
+    resp = client.get(reverse("race", args=[race.slug]))
+
+    html = resp.content.decode()
+    assert "1800&nbsp;₽/уч" in html
+    assert "1000&nbsp;₽/уч" not in html
+
+
+@pytest.mark.django_db
+def test_race_page_fee_falls_back_to_race_cost(client):
+    race = _make_race(slug="fee-cost")
+    race.cost = 1000
+    race.save()
+
+    resp = client.get(reverse("race", args=[race.slug]))
+
+    assert "1000&nbsp;₽/уч" in resp.content.decode()
+
+
+@pytest.mark.django_db
 def test_race_page_admin_sees_edit_button(client):
     user = User.objects.create_user(
         username="raedit", password="p", email="raedit@example.com"
