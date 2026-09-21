@@ -167,6 +167,7 @@ class RacePageView(View):
             "race_people_count": race.people_count(),
             "race_remaining": race_remaining,
             "race_full": race_full,
+            "race_price": race.current_price,
             "owned_teams": _owned_teams(race, user),
         }
         context["can_manage_posts"] = is_admin
