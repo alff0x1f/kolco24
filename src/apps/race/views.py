@@ -1354,6 +1354,70 @@ class RaceLegendCodesView(View):
         return render(request, "race/legend_codes.html", {"race": race, "rows": rows})
 
 
+def _start_number_key(team):
+    number = team.start_number.strip()
+    if number.isdigit():
+        return (0, int(number), "", team.id)
+    return (1, 0, number, team.id)
+
+
+class RaceChecklistView(View):
+    """Printable team checklist for handing out start packets or maps.
+
+    One compact row per paid team: start number, name, ``paid/ucount``,
+    members one per line and an empty box to tick with a pen. Sorted by start
+    number numerically — on paper the crew looks teams up by number.
+
+    ``?category=<id>`` narrows the list to one category, so each category can
+    go on its own sheet; an unknown id falls back to the whole race.
+    """
+
+    def get(self, request, race_slug):
+        race, response = _load_race_for_admin(request, race_slug)
+        if response is not None:
+            return response
+
+        categories = list(Category.objects.filter(race=race).order_by("order", "id"))
+        selected = request.GET.get("category", "")
+        selected_category = next((c for c in categories if str(c.id) == selected), None)
+
+        teams = Team.objects.filter(
+            category2__race=race, paid_people__gt=0
+        ).select_related("owner", "category2")
+        if selected_category is not None:
+            teams = teams.filter(category2=selected_category)
+        rows = [
+            {
+                "id": team.id,
+                "number": team.start_number,
+                "name": _team_display_name(team),
+                "category": team.category2.code,
+                "count": f"{team.paid_people:g}/{team.ucount}",
+                "members": [
+                    " ".join(name.split())
+                    for name in (
+                        team.athlet1,
+                        team.athlet2,
+                        team.athlet3,
+                        team.athlet4,
+                        team.athlet5,
+                        team.athlet6,
+                    )
+                    if name.strip()
+                ],
+            }
+            for team in sorted(teams, key=_start_number_key)
+        ]
+        context = {
+            "race": race,
+            "rows": rows,
+            "categories": categories,
+            "selected_category": selected_category,
+            "column": request.GET.get("column", "").strip()[:30] or "Отметка",
+        }
+        return render(request, "race/checklist.html", context)
+
+
 class ProtocolView(View):
     """Read-only results-protocol page, backed by the ``ProtocolRow`` snapshot.
 

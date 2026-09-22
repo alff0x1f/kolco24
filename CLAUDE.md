@@ -129,6 +129,13 @@ Django 4.2 project. Source lives entirely under `src/`, with `manage.py` at `src
   <id>` — same `CheckpointTag` queryset ordered by `checkpoint__number` then `id`, same `—` placeholder for tags without
   a `code` yet, same `nfc_uid / КП number / code(hex)` columns. The JS "Скопировать CSV" button builds RFC-4180 CSV
   from the rendered table and writes it to the clipboard. Gated on `can_edit_race`.
+  `RaceChecklistView` (`race_checklist`, `race/<slug>/checklist/`, template `src/templates/race/checklist.html` —
+  **standalone, no base template**, so nothing but the table prints; CSS `src/static/css/checklist.css`) is a printable
+  A4 list for handing out start packets/maps by hand: one row per paid team (`paid_people > 0`) with start number,
+  team id, name, category `code`, `paid/ucount`, full member names (non-empty `athlet1…6`, one per line) and an empty
+  box column whose header comes from `?column=` (default «Отметка»). `?category=<id>` prints one category at a time
+  (an unknown id falls back to the whole race). Sorted by `start_number` **numerically**
+  (non-numeric numbers after). Gated by `_load_race_for_admin`.
   `RacePaymentsView`/`RacePaymentsExportView` back the organizer-only «Платежи» page — a read-only payment register
   plus totals, for tracking how the money came in. URL names `race_payments` (`race/<slug>/payments/`, template
   `src/templates/race/payments.html`, assets `src/static/css/payments.css` + `src/static/js/payments.js`) and

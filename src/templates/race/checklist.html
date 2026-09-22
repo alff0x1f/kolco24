@@ -1,0 +1,61 @@
+{% load static %}<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <title>{{ column }} — {{ race.name }}{% if selected_category %} — {{ selected_category.code }}{% endif %}</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link href="{% static 'css/checklist.css' %}" rel="stylesheet">
+</head>
+<body class="checklist">
+  <form class="toolbar" method="get">
+    <a href="{% url 'race' race.slug %}">← {{ race.name }}</a>
+    <label>
+      Категория
+      <select name="category">
+        <option value="">Все</option>
+        {% for category in categories %}
+        <option value="{{ category.id }}" {% if category == selected_category %}selected{% endif %}>{{ category.code }} — {{ category.name }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>
+      Столбец
+      <input name="column" value="{{ column }}" maxlength="30">
+    </label>
+    <button type="submit">Обновить</button>
+    <button type="button" class="primary" onclick="window.print()">Печать</button>
+  </form>
+
+  <h1>{{ race.name }}{% if selected_category %} · {{ selected_category.name }}{% endif %}
+    <span>{{ column }} · {{ rows|length }} ком.</span></h1>
+
+  <table>
+    <thead>
+      <tr>
+        <th class="num">№</th>
+        <th class="id">ID</th>
+        <th>Команда</th>
+        <th>Категория</th>
+        <th class="cnt">Чел.</th>
+        <th>Участники</th>
+        <th class="mark">{{ column }}</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in rows %}
+      <tr>
+        <td class="num">{{ row.number }}</td>
+        <td class="id">{{ row.id }}</td>
+        <td class="name">{{ row.name }}</td>
+        <td class="category">{{ row.category }}</td>
+        <td class="cnt">{{ row.count }}</td>
+        <td class="people">{% for member in row.members %}<div>{{ member }}</div>{% endfor %}</td>
+        <td class="mark"></td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="7" class="empty">Нет оплаченных команд.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</body>
+</html>
