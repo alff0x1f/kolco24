@@ -7447,3 +7447,92 @@ def test_payments_export_keeps_plain_values_untouched():
     assert line[1] == "Обычные"
     # Числа не должны получить апостроф — в том числе отрицательные.
     assert line[4] == 2 and line[9] == 1000
+
+
+# ---------------------------------------------------------------------------
+# Printable team checklist
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.django_db
+def test_checklist_anonymous_redirects_to_login(client):
+    race = _make_race()
+    resp = client.get(reverse("race_checklist", kwargs={"race_slug": race.slug}))
+    assert resp.status_code == 302
+    assert reverse("login") in resp.url
+
+
+@pytest.mark.django_db
+def test_checklist_non_admin_forbidden(client, django_user_model):
+    race = _make_race()
+    user = django_user_model.objects.create_user(username="u", password="x")
+    client.force_login(user)
+    resp = client.get(reverse("race_checklist", kwargs={"race_slug": race.slug}))
+    assert resp.status_code == 403
+
+
+@pytest.mark.django_db
+def test_checklist_rows_sorted_numerically_with_members(client, django_user_model):
+    race = _make_race()
+    category = _make_category(race)
+    admin = django_user_model.objects.create_user(username="adm", password="x")
+    RaceAdmin.objects.create(race=race, user=admin, role=RaceAdmin.Role.ADMIN)
+    ten = _make_team(
+        admin,
+        category,
+        start_number="10",
+        teamname="Десятка",
+        paid_people=3,
+        ucount=4,
+        athlet1="Иванов Иван",
+        athlet2="  Петров  Пётр ",
+        athlet3="",
+    )
+    _make_team(admin, category, start_number="9", teamname="Девятка")
+    _make_team(admin, category, start_number="1", teamname="Unpaid", paid_people=0)
+    other_race = _make_race(slug="other")
+    _make_team(admin, _make_category(other_race), start_number="2", teamname="Чужая")
+    client.force_login(admin)
+
+    resp = client.get(
+        reverse("race_checklist", kwargs={"race_slug": race.slug}),
+        {"column": "Карты"},
+    )
+
+    assert resp.status_code == 200
+    rows = resp.context["rows"]
+    assert [r["number"] for r in rows] == ["9", "10"]
+    assert rows[1] == {
+        "id": ten.id,
+        "number": "10",
+        "name": "Десятка",
+        "category": "12h",
+        "count": "3/4",
+        "members": ["Иванов Иван", "Петров Пётр"],
+    }
+    assert resp.context["column"] == "Карты"
+    assert "Карты" in resp.content.decode()
+
+
+@pytest.mark.django_db
+def test_checklist_filters_by_category(client, django_user_model):
+    race = _make_race()
+    twelve = _make_category(race)
+    six = _make_category(race, code="6h", short_name="6ч", name="6 часов", order=1)
+    admin = django_user_model.objects.create_user(username="adm2", password="x")
+    RaceAdmin.objects.create(race=race, user=admin, role=RaceAdmin.Role.ADMIN)
+    _make_team(admin, twelve, start_number="1", teamname="Двенадцать")
+    _make_team(admin, six, start_number="2", teamname="Шесть")
+    client.force_login(admin)
+    url = reverse("race_checklist", kwargs={"race_slug": race.slug})
+
+    resp = client.get(url, {"category": six.id})
+    assert [r["name"] for r in resp.context["rows"]] == ["Шесть"]
+    assert resp.context["selected_category"] == six
+    assert [c.id for c in resp.context["categories"]] == [twelve.id, six.id]
+
+    # An unknown (or empty) id keeps the whole race.
+    for value in ("", "999999", "abc"):
+        resp = client.get(url, {"category": value})
+        assert len(resp.context["rows"]) == 2
+        assert resp.context["selected_category"] is None

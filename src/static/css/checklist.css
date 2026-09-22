@@ -1,0 +1,169 @@
+@page {
+  size: A4;
+  margin: 10mm;
+}
+
+.checklist {
+  margin: 0 auto;
+  padding: 16px;
+  max-width: 190mm;
+  font: 10pt/1.25 Arial, Helvetica, sans-serif;
+  color: #000;
+  background: #fff;
+}
+
+.checklist .toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  margin-bottom: 16px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: #f1f3f5;
+  font-size: 14px;
+}
+
+.checklist .toolbar a {
+  margin-right: auto;
+  color: #1c5fd6;
+  text-decoration: none;
+}
+
+.checklist .toolbar input,
+.checklist .toolbar select {
+  padding: 4px 6px;
+  font: inherit;
+}
+
+.checklist .toolbar input {
+  width: 140px;
+}
+
+.checklist .toolbar button {
+  padding: 5px 12px;
+  border: 1px solid #adb5bd;
+  border-radius: 6px;
+  background: #fff;
+  font: inherit;
+  cursor: pointer;
+}
+
+.checklist .toolbar button.primary {
+  border-color: #1c5fd6;
+  background: #1c5fd6;
+  color: #fff;
+}
+
+.checklist h1 {
+  margin: 0 0 6px;
+  font-size: 13pt;
+}
+
+.checklist h1 span {
+  font-weight: normal;
+  font-size: 10pt;
+  color: #444;
+}
+
+/* Separate borders, not ``collapse``: a collapsed border belongs to the table,
+   and print engines drop parts of it (vertical lines go missing on paper).
+   Each cell owning its right/bottom line always prints. */
+.checklist table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.checklist th,
+.checklist td {
+  padding: 3px 5px;
+  border-right: 1px solid #000;
+  border-bottom: 1px solid #000;
+  text-align: left;
+  vertical-align: middle;
+}
+
+/* Left and top lines live on the cells too, so the header repeated at the top
+   of every printed page keeps its full frame. */
+.checklist th:first-child,
+.checklist td:first-child {
+  border-left: 1px solid #000;
+}
+
+.checklist thead th {
+  border-top: 1px solid #000;
+}
+
+.checklist th {
+  background: #e9ecef;
+  font-size: 9pt;
+}
+
+.checklist tbody tr {
+  break-inside: avoid;
+}
+
+.checklist tbody tr:nth-child(even) td {
+  background: #f6f6f6;
+}
+
+.checklist .num {
+  width: 1%;
+  white-space: nowrap;
+  text-align: right;
+  font-weight: bold;
+}
+
+.checklist .name {
+  width: 32%;
+}
+
+.checklist .id {
+  width: 1%;
+  white-space: nowrap;
+  text-align: right;
+  font-size: 9pt;
+}
+
+.checklist .category {
+  width: 1%;
+  white-space: nowrap;
+  font-size: 9pt;
+}
+
+.checklist .cnt {
+  width: 1%;
+  white-space: nowrap;
+  text-align: center;
+}
+
+.checklist .people {
+  font-size: 9pt;
+}
+
+.checklist .mark {
+  width: 22mm;
+}
+
+.checklist .empty {
+  text-align: center;
+  color: #666;
+}
+
+@media print {
+  .checklist {
+    padding: 0;
+    max-width: none;
+  }
+
+  .checklist .toolbar {
+    display: none;
+  }
+
+  .checklist th,
+  .checklist tbody tr:nth-child(even) td {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+}
