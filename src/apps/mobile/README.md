@@ -13,7 +13,8 @@ Read-путь самодостаточен — не трогает `/api/`, `don
 
 Поверх подписи сборки есть **тонкий слой записи** — вход по человеку
 (`POST /app/login/` → отзываемый bearer-токен) и добавление тегов легенды
-(`POST /app/race/<id>/tags/`). Запись надстраивается, а не заменяет read-only
+(`POST /app/race/<id>/tags/`), привязка браслетов участников с выдачей кода
+(`POST /app/race/<id>/member_tags/bind/`). Запись надстраивается, а не заменяет read-only
 контракт: см. раздел **Запись: вход по человеку и добавление тегов легенды**.
 Загрузка GPS-треков (`POST /app/race/<id>/track/`) и взятий КП
 (`POST /app/race/<id>/marks/`) — **третий и четвёртый POST**, но гейтятся
@@ -69,6 +70,9 @@ POST /app/login/                 SignedAppPermission                      → be
 POST /app/logout/                SignedAppPermission + IsMobileUser       → revoke
 POST /app/race/<id>/tags/        SignedAppPermission + IsMobileUser
                                    + CanEditRaceLegend                    → CheckpointTag
+POST /app/race/<id>/member_tags/bind/
+                                 SignedAppPermission + IsMobileUser
+                                   + CanEditRaceLegend                    → Tag (+ код браслета)
 ```
 
 **Scope — только ADD:** добавление тега. Нет редактирования/удаления тегов,
@@ -150,6 +154,50 @@ related_name="provisioned_tags")` (миграция `website/0088`), прост�
 `MAX(updated_at)|COUNT`), но создание тега двигает `versions.legend`/ETag через
 `CheckpointTag.updated_at` — без правок `versioning.py`.
 
+### `POST /app/race/<id>/member_tags/bind/`
+
+Браслетный близнец `tags/` (`MemberTagBindView`): тот же стек
+`SignedAppPermission + IsMobileUser + CanEditRaceLegend`, тот же троттлинг
+`mobile-write`. Приложение сканирует браслет участника и получает секретный
+16-байтный `code` (hex), который пишет в NFC-память браслета (формат `K24`, тип
+`0x2`) — чтобы браслет опознавался не только по легко подделываемому UID.
+Пул браслетов **глобальный** (у `Tag` нет FK на гонку), поэтому админ **любой**
+опубликованной гонки может привязывать браслеты; `race_id` нужен только для
+проверки прав (неопубликованная гонка → 404). Отдельный путь `bind/` (а не POST на
+`member_tags/`) — чтобы права жили в атрибутах класса, без ветвления по методу
+рядом с GET `MemberTagsView`.
+
+Тело — `{nfc_uid, number}` (`MemberTagBindSerializer`): `nfc_uid` непустой, ≤ 255;
+`number` — `1 … 2147483647` или явный `null`, **ключ обязателен** (нет ключа → 400).
+`nfc_uid` нормализуется (`.strip().upper()`). Ответ 200/201 —
+`{number, nfc_uid, code}`, где `number` берётся **из БД** (на `number: null` клиент
+узнаёт номер из ответа).
+
+| Статус | Когда |
+|---|---|
+| `201` | UID неизвестен, `number` задан → создан `Tag` (код выпускается сразу при вставке) |
+| `200` | UID известен, `number` `null` или совпадает — идемпотентно, тот же код |
+| `404` | UID неизвестен и `number: null` (`«Браслет не найден»`); гонка не опубликована |
+| `409` | UID привязан к **другому** номеру (`«Браслет уже привязан к другому участнику»`), код не выпускается |
+| `400` | невалидное тело |
+| `401` / `403` / `429` | нет/плохой Bearer / нейтральный отказ подписи или не-админ / троттлинг |
+
+`Tag.number` не уникален: новый UID с уже занятым номером → `201` (запасной
+браслет). Параллельное создание одного UID ловится как `IntegrityError` от
+глобального `unique(nfc_uid)` → перечитываем строку и отвечаем как на известный
+UID (200/409); если строки нет — исходная ошибка пробрасывается.
+
+**Код** — `Tag.code` (`BinaryField`, 16 случайных байт, миграция `website/0097`).
+Старые браслеты без кода получают его **лениво** при первом POST: под
+`select_for_update()` с перепроверкой (и ответ строится из залоченной строки),
+так что два параллельных запроса не выпустят два разных кода. Выпущенный код не
+меняется никогда. `code` **не отдаётся ни одним GET** (`MemberTagSerializer` и
+`api`-`TagSerializer` — явные поля) и не показывается в `TagAdmin`. В отпечаток
+`member_tags_version` код не входит: **создание** `Tag` двигает ETag/
+`versions.member_tags`, **выпуск кода** — нет. Код привязан к **строке** `Tag`, а
+не к UID: если организатор правит `nfc_uid` в `/admin/` (замена браслета), старый
+код переходит на новый UID.
+
 ### Слой прав (`permissions.py`)
 
 - **`IsMobileUser`** — личность: читает `Authorization: Bearer <token>`, через
@@ -184,6 +232,10 @@ HMAC-сборки, так что брутфорс «в масштабе» тре
 добавлен явный `CACHES` (Django `LocMemCache` — пер-процессный, счётчики
 приблизительны под несколькими воркерами, что приемлемо при гейте HMAC-сборки).
 Email-keyed троттл сознательно **отложен** (YAGNI при гейте сборки).
+
+`mobile-write` — **один общий IP-бакет** для `tags/`, `member_tags/bind/`,
+`track/`, `marks/` и `judge_scans/`: за одним NAT станция провижининга делит
+лимит 60/min с загрузками треков и взятий. Отдельный scope сознательно не вводим.
 
 ### Подпись тела на POST
 
@@ -884,6 +936,7 @@ ETag/`If-None-Match` на ресурсах остаётся (см. выше) —
 | POST | `/app/login/` | `mobile:login` | вход email+пароль → `{token, expires_at}`; см. **Запись** выше |
 | POST | `/app/logout/` | `mobile:logout` | отзыв предъявленного токена |
 | POST | `/app/race/<id>/tags/` | `mobile:tag_create` | привязка NFC-чипа к КП → `{bid, checkpoint_id, number, nfc_uid, code}` |
+| POST | `/app/race/<id>/member_tags/bind/` | `mobile:member_tag_bind` | привязка браслета участника `nfc_uid → number` и выдача его кода → `{number, nfc_uid, code}` (201/200/404/409); см. **`POST /app/race/<id>/member_tags/bind/`** выше |
 | POST | `/app/race/<id>/track/` | `mobile:track` | приём батча GPS-точек (только подпись сборки) → `{"accepted": [id, …]}`; см. **Загрузка GPS-треков** |
 | POST | `/app/race/<id>/marks/` | `mobile:marks` | приём батча взятий КП (только подпись сборки; `Mark` обогащается-апсёртится) → `{"accepted": [id, …]}`; см. **Загрузка взятий КП** |
 | POST | `/app/race/<id>/mark/<mark_id>/photo/<frame_id>` | `mobile:mark_photo` | приём одного сырого JPEG-кадра для `photo`-отметки (только подпись сборки, без завершающего слэша в URL) → `201`/`200`; см. **Загрузка фото-кадров** |

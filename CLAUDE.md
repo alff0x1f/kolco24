@@ -197,7 +197,7 @@ Django 4.2 project. Source lives entirely under `src/`, with `manage.py` at `src
   upload** invariants below) are the documented exceptions, holding
   cross-app FKs into `website.Team`/`website.Race` (like `apps.race`). The reads are accountless — the
   app authenticates **itself** (per-build HMAC); a thin **write layer** adds a per-person bearer token on top (login +
-  legend-tag create — see the **Per-person write layer** invariant below). Two further POSTs —
+  legend-tag create + member-tag bind — see the **Per-person write layer** and **Member-tag bind** invariants below). Two further POSTs —
   `POST /app/race/<id>/track/` (`track`) and `POST /app/race/<id>/marks/` (`marks`) — are **build-HMAC-only** like the
   reads (NOT part of the per-person write layer); see the **Track upload** / **Marks upload** invariants below. Full
   design (background-sync model,
@@ -271,7 +271,8 @@ Django 4.2 project. Source lives entirely under `src/`, with `manage.py` at `src
       `autouse` `_clear_throttle_cache` fixture in `src/apps/mobile/tests.py` calls `cache.clear()` before/after every
       test to prevent throttle counts leaking across tests (all test requests share the same client IP); any new test
       module that exercises throttled mobile endpoints must replicate this fixture.
-    - **Endpoints** (reads all GET; writes are the three POSTs in the **Per-person write layer** invariant below; see
+    - **Endpoints** (reads all GET; writes are the three POSTs in the **Per-person write layer** invariant below plus
+      `member_tags/bind/` (**Member-tag bind**); see
       `urls.py`): `/app/races/` (published races), `/app/race/<id>/teams/` (teams **plus the
       embedded category catalogue** — deliberately no separate categories endpoint; inactive categories included so
       every `category2` id resolves), `/app/race/<id>/legend/` (checkpoints **plus a per-tag `tags` array** — `bid → checkpoint_id`
@@ -543,6 +544,26 @@ Django 4.2 project. Source lives entirely under `src/`, with `manage.py` at `src
       each scan's `nfc_uid` → `bulk_create(ignore_conflicts=True)` → 200 `{"accepted": [all submitted ids]}`. Empty
       `scans` → ack `[]` (an empty `bulk_create` is a no-op). Read-side scoring, per-`participant_number` peak dedup,
       and admin reattribution/rendering of judge scans are **out of scope** (a future task).
+    - **Member-tag bind** (`POST /app/race/<id>/member_tags/bind/`, name `member_tag_bind` — a **seventh POST**, on the
+      **per-person write layer** with the tag-create stack `[SignedAppPermission, IsMobileUser, CanEditRaceLegend]`,
+      throttle `mobile-write` — the one IP bucket shared with `/tags/`/`/track/`/`/marks/`/`/judge_scans/`).
+      `MemberTagBindView` (`views.py`) binds a participant bracelet `nfc_uid → number` and returns its secret code for
+      the app to write into the bracelet (`K24` format, type `0x2`). A separate `bind/` path (not a POST on
+      `member_tags/`) so permissions stay class attributes next to the GET `MemberTagsView`. The `Tag` pool is
+      **global**, so an admin of **any** published race may bind (`race_id` only drives the permission; unpublished →
+      404). Body `{nfc_uid, number}` (`MemberTagBindSerializer`: `nfc_uid` non-blank ≤255, normalized
+      `.strip().upper()`; `number` `1…2147483647` or explicit `null`, **key required**). Response `{number, nfc_uid,
+      code}` (`number` from the DB, `code` hex): unknown UID + number → **201**; known UID + `null`/same number →
+      idempotent **200**, same code; unknown UID + `null` → **404**; known UID on a **different** number → **409** (no
+      rebind, no code minted); `Tag.number` is not unique, so a new UID on a taken number is a 201 (spare bracelet).
+      Concurrent create → `IntegrityError` on the global `nfc_uid` unique → re-query (`filter().first()`) and resolve as
+      known (200/409), no row ⇒ re-raise the original. **Code**: `Tag.code` (`BinaryField`, 16 random bytes, migration
+      `website/0097`) is minted **on insert**; a legacy code-less row gets one **lazily** under `select_for_update()`
+      with a re-check (the response is built from the locked row, so two requests can't issue two codes); an issued
+      code never changes. `code` is served by **no GET** (`MemberTagSerializer`/`api` `TagSerializer` use explicit
+      fields) and is absent from `TagAdmin`; it's not in `member_tags_version`, so **creating** a `Tag` moves the ETag /
+      `versions.member_tags` but **minting a code** doesn't (`update_fields` still includes `"updated_at"`). The code
+      belongs to the `Tag` **row**, not the UID: editing `nfc_uid` in `/admin/` (bracelet swap) carries the old code over.
 
 New feature apps that don't fit in `website` live under `src/apps/<name>/`. Each needs a unique `AppConfig` label (e.g.
 `label = "race_app"`).
