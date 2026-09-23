@@ -9645,3 +9645,43 @@ def test_mark_photo_upload_over_django_default_cap_is_accepted(
 
     response = _signed_photo_post(client, path, SECRET, body)
     assert response.status_code == 201
+
+
+# --- MemberTagBindSerializer ------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "body, expected",
+    [
+        ({"nfc_uid": " 04a1b2 ", "number": 101}, {"nfc_uid": "04a1b2", "number": 101}),
+        ({"nfc_uid": "04A1B2", "number": None}, {"nfc_uid": "04A1B2", "number": None}),
+    ],
+)
+def test_member_tag_bind_serializer_valid(body, expected):
+    from apps.mobile.serializers import MemberTagBindSerializer
+
+    serializer = MemberTagBindSerializer(data=body)
+    assert serializer.is_valid(), serializer.errors
+    assert dict(serializer.validated_data) == expected
+
+
+@pytest.mark.parametrize(
+    "body, bad_field",
+    [
+        ({"nfc_uid": "04A1B2"}, "number"),
+        ({"number": 101}, "nfc_uid"),
+        ({"nfc_uid": "04A1B2", "number": 0}, "number"),
+        ({"nfc_uid": "04A1B2", "number": 2**31}, "number"),
+        ({"nfc_uid": "04A1B2", "number": "abc"}, "number"),
+        ({"nfc_uid": "04A1B2", "number": 1.5}, "number"),
+        ({"nfc_uid": "", "number": 101}, "nfc_uid"),
+        ({"nfc_uid": "   ", "number": 101}, "nfc_uid"),
+        ({"nfc_uid": "A" * 256, "number": 101}, "nfc_uid"),
+    ],
+)
+def test_member_tag_bind_serializer_invalid(body, bad_field):
+    from apps.mobile.serializers import MemberTagBindSerializer
+
+    serializer = MemberTagBindSerializer(data=body)
+    assert not serializer.is_valid()
+    assert bad_field in serializer.errors

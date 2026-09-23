@@ -168,10 +168,10 @@
 - Modify: `src/apps/mobile/serializers.py`
 - Modify: `src/apps/mobile/tests.py`
 
-- [ ] `MemberTagBindSerializer` (`nfc_uid`, `number` — см. Technical Details) с docstring по образцу `TagCreateSerializer`
-- [ ] тесты: валидное тело с номером и с `null`
-- [ ] тесты: нет ключа `number`, нет ключа `nfc_uid`, `number: 0`, `number: 2**31`, `number: "abc"`, `number: 1.5`, пустой `nfc_uid`, `nfc_uid` длиннее 255 → невалидно
-- [ ] прогнать тесты — зелёные
+- [x] `MemberTagBindSerializer` (`nfc_uid`, `number` — см. Technical Details) с docstring по образцу `TagCreateSerializer`
+- [x] тесты: валидное тело с номером и с `null`
+- [x] тесты: нет ключа `number`, нет ключа `nfc_uid`, `number: 0`, `number: 2**31`, `number: "abc"`, `number: 1.5`, пустой `nfc_uid`, `nfc_uid` длиннее 255 → невалидно
+- [x] прогнать тесты — зелёные
 
 ### Task 3: `MemberTagBindView` и URL
 
