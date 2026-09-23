@@ -336,43 +336,23 @@ class TagCreateView(AppAPIView):
         return self._tag_response(tag, status.HTTP_201_CREATED)
 
 
-def _find_member_tag(nfc_uid):
-    """Return the pool ``Tag`` for an already-normalized ``nfc_uid`` (or ``None``).
+# Length of a bracelet's secret ``Tag.code`` — part of the wire contract (the app
+# writes these raw bytes into the bracelet's NFC memory).
+MEMBER_TAG_CODE_BYTES = 16
 
-    A tiny module-level seam so tests can simulate the concurrent-create race
-    (the row appears between this lookup and the insert).
-    """
-    return Tag.objects.filter(nfc_uid=nfc_uid).first()
+
+def _new_member_code():
+    return os.urandom(MEMBER_TAG_CODE_BYTES)
 
 
 class MemberTagBindView(AppAPIView):
     """``POST /app/race/<race_id>/member_tags/bind/`` — bind a bracelet, issue its code.
 
-    The participant-bracelet twin of :class:`TagCreateView`: the app scans a
-    bracelet UID and gets back the secret 16-byte ``code`` (hex) to write into
-    the bracelet's NFC memory. The member-tag pool is **global** (``Tag`` has no
-    race FK), so an admin of any race may bind bracelets; ``race_id`` only
-    drives the permission check and must name a published race.
-
-    Permission stack (order matters) — same as tag-create:
-
-    1. :class:`SignedAppPermission` — per-build HMAC (over the request **body**);
-    2. :class:`IsMobileUser` — resolves the bearer to ``request.mobile_user``;
-    3. :class:`CanEditRaceLegend` — per-race ``can_edit_race`` authorization.
-
-    Semantics:
-
-    - unknown UID + ``number`` → 201, a new ``Tag`` with a code minted on insert
-      (``Tag.number`` is not unique — a spare bracelet for a taken number is fine);
-    - unknown UID + ``number: null`` → 404;
-    - known UID + ``null`` or the same number → idempotent 200, the same code;
-    - known UID bound to a **different** number → 409 (never auto-rebind, no
-      code minted).
-
-    A legacy row without a code gets one lazily under ``select_for_update`` with
-    a re-check, so two concurrent requests can't issue two different codes. An
-    issued code never changes. The code is not part of ``member_tags_version``,
-    so issuing it doesn't move the member-tags ETag (creating a ``Tag`` does).
+    The participant-bracelet twin of :class:`TagCreateView` (same permission
+    stack and throttle): unknown UID + number → 201, known UID + ``null``/same
+    number → idempotent 200, unknown UID + ``null`` → 404, different number →
+    409. Full status table and the code/ETag rules live in
+    ``src/apps/mobile/README.md`` (``POST /app/race/<id>/member_tags/bind/``).
     """
 
     permission_classes = [SignedAppPermission, IsMobileUser, CanEditRaceLegend]
@@ -380,7 +360,7 @@ class MemberTagBindView(AppAPIView):
     throttle_scope = "mobile-write"
 
     @staticmethod
-    def _response(tag, http_status):
+    def _member_tag_response(tag, http_status):
         """Build ``{number, nfc_uid, code}``, lazily minting a missing code.
 
         The mint runs under ``select_for_update`` and re-checks the locked row,
@@ -391,7 +371,7 @@ class MemberTagBindView(AppAPIView):
             with transaction.atomic():
                 tag = Tag.objects.select_for_update().get(pk=tag.pk)
                 if tag.code is None:
-                    tag.code = os.urandom(16)
+                    tag.code = _new_member_code()
                     tag.save(update_fields=["code", "updated_at"])
         return Response(
             {
@@ -408,17 +388,18 @@ class MemberTagBindView(AppAPIView):
                 {"detail": "Браслет уже привязан к другому участнику"},
                 status=status.HTTP_409_CONFLICT,
             )
-        return self._response(tag, status.HTTP_200_OK)
+        return self._member_tag_response(tag, status.HTTP_200_OK)
 
     def post(self, request, race_id):
         get_object_or_404(Race, pk=race_id, is_published=True)
 
         serializer = MemberTagBindSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        nfc_uid = serializer.validated_data["nfc_uid"].strip().upper()
+        # Already normalized (strip + upper, post-upper cap) by the serializer.
+        nfc_uid = serializer.validated_data["nfc_uid"]
         number = serializer.validated_data["number"]
 
-        tag = _find_member_tag(nfc_uid)
+        tag = Tag.objects.filter(nfc_uid=nfc_uid).first()
         if tag is not None:
             return self._resolve_existing(tag, number)
 
@@ -429,18 +410,19 @@ class MemberTagBindView(AppAPIView):
 
         try:
             with transaction.atomic():
-                tag = Tag(number=number, nfc_uid=nfc_uid, code=os.urandom(16))
+                tag = Tag(number=number, nfc_uid=nfc_uid, code=_new_member_code())
                 tag.save()
-        except IntegrityError as exc:
+        except IntegrityError as original_exc:
             # Most likely a concurrent create hit the global nfc_uid unique
             # constraint. filter().first() (not get()) so an unrelated DB error
             # re-raises as itself, not as a nested Tag.DoesNotExist.
             tag = Tag.objects.filter(nfc_uid=nfc_uid).first()
             if tag is None:
-                raise exc
+                raise original_exc
             return self._resolve_existing(tag, number)
 
-        return self._response(tag, status.HTTP_201_CREATED)
+        # The code was minted on insert, so the lazy mint is a no-op here.
+        return self._member_tag_response(tag, status.HTTP_201_CREATED)
 
 
 class TrackUploadView(AppAPIView):
