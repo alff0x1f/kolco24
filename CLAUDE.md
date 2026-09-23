@@ -196,10 +196,11 @@ Django 4.2 project. Source lives entirely under `src/`, with `manage.py` at `src
   **track-upload and marks-upload writes** (`TrackPoint`/`Mark`+`MarkPresent`, see the **Track upload** and **Marks
   upload** invariants below) are the documented exceptions, holding
   cross-app FKs into `website.Team`/`website.Race` (like `apps.race`). The reads are accountless — the
-  app authenticates **itself** (per-build HMAC); a thin **write layer** adds a per-person bearer token on top (login +
-  legend-tag create — see the **Per-person write layer** invariant below). Two further POSTs —
-  `POST /app/race/<id>/track/` (`track`) and `POST /app/race/<id>/marks/` (`marks`) — are **build-HMAC-only** like the
-  reads (NOT part of the per-person write layer); see the **Track upload** / **Marks upload** invariants below. Full
+  app authenticates **itself** (per-build HMAC); a thin **write layer** adds a per-person bearer token on top (login/
+  logout, legend-tag create, judge scans, member-tag bind — see the **Per-person write layer** invariant below). The
+  track, marks and photo POSTs are **build-HMAC-only** like the reads (NOT part of the per-person write layer); each
+  POST's gate is stated in its own invariant bullet below (**Track upload** / **Marks upload** / **Photo upload** /
+  **Judge scans upload** / **Member-tag bind**). Full
   design (background-sync model,
   two-server lease/handoff, secret-rotation runbook, 403 reason codes) lives in `src/apps/mobile/README.md`; exact
   response fields are pinned by the serializers and the field-set tests in `tests.py`. Invariants to preserve:
@@ -216,7 +217,8 @@ Django 4.2 project. Source lives entirely under `src/`, with `manage.py` at `src
       aggregated `AppAuthFailure` row happen in `AppAPIView.permission_denied()`, and `AppInstall` stats are recorded
       best-effort in `initial()` after permissions pass (a stats-write failure never breaks a response; a denied request
       never writes `AppInstall`).
-    - **Per-person write layer** (login + legend-tag create, on top of the build HMAC): a **layered permission stack** —
+    - **Per-person write layer** (login + legend-tag create + judge scans + member-tag bind, on top of the build HMAC):
+      a **layered permission stack** —
       build HMAC → person identity → per-race authorization. `MobileToken` (`models.py`) is a revocable **opaque** bearer
       (not JWT — instant revoke via `revoked_at` is the priority for an admin credential): only `sha256(raw)` is stored
       in `token_hash` (unique-indexed), the raw `secrets.token_urlsafe(32)` is returned **once** at login (a high-entropy
@@ -260,7 +262,9 @@ Django 4.2 project. Source lives entirely under `src/`, with `manage.py` at `src
       compromised admin cuts off provisioning instantly without waiting out the 30-day TTL.
       `CheckpointTag.created_by` (`FK(AUTH_USER_MODEL, null, SET_NULL, related_name="provisioned_tags")`, migration
       `website/0088`) is **not** in any version fingerprint, but creating a tag still moves `versions.legend`/the legend
-      ETag via `CheckpointTag.updated_at`. **Throttling** (first use here): IP-scoped
+      ETag via `CheckpointTag.updated_at`. The same stack also gates `POST /app/race/<id>/judge_scans/` and
+      `POST /app/race/<id>/member_tags/bind/` (see **Judge scans upload** / **Member-tag bind** below).
+      **Throttling** (first use here): IP-scoped
       `ClientIPScopedRateThrottle` (`throttling.py`) — a thin `ScopedRateThrottle` subclass that overrides only
       `get_ident` to key on the un-spoofable `_client_ip` (last `X-Forwarded-For` entry, the one nginx appends), so a
       client can't rotate a forged XFF prefix for a fresh bucket (DRF's stock `get_ident` trusts the *first* entry
@@ -271,8 +275,8 @@ Django 4.2 project. Source lives entirely under `src/`, with `manage.py` at `src
       `autouse` `_clear_throttle_cache` fixture in `src/apps/mobile/tests.py` calls `cache.clear()` before/after every
       test to prevent throttle counts leaking across tests (all test requests share the same client IP); any new test
       module that exercises throttled mobile endpoints must replicate this fixture.
-    - **Endpoints** (reads all GET; writes are the three POSTs in the **Per-person write layer** invariant below; see
-      `urls.py`): `/app/races/` (published races), `/app/race/<id>/teams/` (teams **plus the
+    - **Endpoints** (reads all GET, listed here; each POST is described in its own invariant bullet — the gate of each
+      is stated there; see `urls.py`): `/app/races/` (published races), `/app/race/<id>/teams/` (teams **plus the
       embedded category catalogue** — deliberately no separate categories endpoint; inactive categories included so
       every `category2` id resolves), `/app/race/<id>/legend/` (checkpoints **plus a per-tag `tags` array** — `bid → checkpoint_id`
       identity for **every** tag (open + locked), plus `iv`/`ct` for the offline legend unlock on locked КП only — see
@@ -280,8 +284,11 @@ Django 4.2 project. Source lives entirely under `src/`, with `manage.py` at `src
       visibility gate), with `type="hidden"` КП excluded), `/app/race/<id>/member_tags/` (the participant-bracelet pool —
       `{number, nfc_uid}` per `Tag` for offline scan resolution; the chip pool is **global** today (one physical set
       reused across races) so `race_id` is accepted but **not used for filtering** — a reserved hook for a future
-      per-race chip set; the served set is a **data-anchored** window `last_seen_at >= MAX(last_seen_at) − 30d` (not
-      wall-clock `now()`, so an idle race is stable; a never-scanned pool returns everything); the api read
+      per-race chip set; the served set is a **data-anchored** window
+      `last_seen_at IS NULL OR last_seen_at >= MAX(last_seen_at) − 30d` (not wall-clock `now()`, so an idle race is
+      stable; a never-scanned pool returns everything; never-scanned rows — e.g. a bracelet just created by
+      `member_tags/bind/` — are always served, which is load-bearing for the bind endpoint's "create moves the ETag");
+      the api read
       `GET /api/member_tag/` stays unchanged — this only *adds* the read to the mobile app), `/app/race/<id>/sync/`
       (pure version manifest — no data, no
       ETag; lease/handoff stubbed: `data_source` from
@@ -520,7 +527,8 @@ Django 4.2 project. Source lives entirely under `src/`, with `manage.py` at `src
     - **Judge scans upload** (`POST /app/race/<id>/judge_scans/`, name `judge_scans` — a **sixth POST**; unlike
       `/track/`/`/marks/` it is on the **per-person write layer**, gated by the same stack as tag-create
       `[SignedAppPermission, IsMobileUser, CanEditRaceLegend]` — a judge station is an admin credential, so the caller
-      must present a `MobileToken` bearer owned by a race admin (superuser or `RaceAdmin(role=ADMIN)`); a missing/invalid
+      must present a `MobileToken` bearer owned by a race admin (`RaceAdmin(role=ADMIN)` only — `can_edit_race` grants a bare superuser nothing, so
+      one without such a row is 403); a missing/invalid
       token → `401`, a non-admin → actionable `403`, a bad build sig → neutral `403 {"detail":"Forbidden"}`.
       `CanEditRaceLegend` reads `view.kwargs["race_id"]` (loads `Race`, missing → 404, **without** the `is_published`
       filter — an unpublished race the admin owns clears the permission, then the view's `get_object_or_404(...,
@@ -543,6 +551,21 @@ Django 4.2 project. Source lives entirely under `src/`, with `manage.py` at `src
       each scan's `nfc_uid` → `bulk_create(ignore_conflicts=True)` → 200 `{"accepted": [all submitted ids]}`. Empty
       `scans` → ack `[]` (an empty `bulk_create` is a no-op). Read-side scoring, per-`participant_number` peak dedup,
       and admin reattribution/rendering of judge scans are **out of scope** (a future task).
+    - **Member-tag bind** (`POST /app/race/<id>/member_tags/bind/`, name `member_tag_bind`, `MemberTagBindView`) —
+      on the **per-person write layer** with the tag-create stack `[SignedAppPermission, IsMobileUser,
+      CanEditRaceLegend]` (`RaceAdmin(role=ADMIN)` only — a bare superuser is 403, same as tag-create), throttle
+      `mobile-write` (the one IP bucket shared with `/tags/`/`/track/`/`/marks/`/`/judge_scans/`). Binds a bracelet
+      `nfc_uid → number` and returns its secret `code` (hex) to write into the bracelet; the full status table
+      (201/200/404/409) lives in `src/apps/mobile/README.md`. Invariants: **no auto-rebind** — a known UID on a different
+      number is 409 and mints nothing; a `404` means either an unpublished race or an unknown UID with
+      `number: null` (clients tell them apart by `detail`). `Tag.code` (`BinaryField`, 16 random bytes, `website/0097`)
+      is minted on insert, or lazily for a legacy row under `select_for_update()` with a re-check; an issued code never
+      changes, is served by **no GET**, and is **not in `member_tags_version`** (creating a `Tag` moves the ETag, minting
+      a code doesn't). The code belongs to the `Tag` **row**, not the UID (an `/admin/` `nfc_uid` edit carries it over).
+      Bind **never touches `last_seen_at`**, so re-binding an aged-out chip does not bring it back into the served
+      window — deliberate: stamping "now" would advance the data-anchored `MAX(last_seen_at)` floor and could drop
+      every other chip of an idle pool; a real scan (api touch) revives it. **Accepted risk**: the pool is global, so an
+      admin of any published race can read any bracelet's code (`number: null`); revisit once `Tag` gets a race FK.
 
 New feature apps that don't fit in `website` live under `src/apps/<name>/`. Each needs a unique `AppConfig` label (e.g.
 `label = "race_app"`).

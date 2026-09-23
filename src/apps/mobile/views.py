@@ -8,6 +8,7 @@ failure break the response.
 
 import hashlib
 import logging
+import os
 import re
 
 from django.conf import settings
@@ -27,6 +28,7 @@ from website.models.checkpoint import Checkpoint, CheckpointTag
 from website.models.enums import CheckpointType
 from website.models.models import Athlet, Team
 from website.models.race import Category, Race
+from website.models.tag import Tag
 
 from .legend_crypto import build_bundle
 from .models import (
@@ -48,6 +50,7 @@ from .serializers import (
     LegendCheckpointSerializer,
     LoginSerializer,
     MarkUploadSerializer,
+    MemberTagBindSerializer,
     MemberTagSerializer,
     RaceListSerializer,
     TagCreateSerializer,
@@ -331,6 +334,95 @@ class TagCreateView(AppAPIView):
 
         tag.refresh_from_db()
         return self._tag_response(tag, status.HTTP_201_CREATED)
+
+
+# Length of a bracelet's secret ``Tag.code`` — part of the wire contract (the app
+# writes these raw bytes into the bracelet's NFC memory).
+MEMBER_TAG_CODE_BYTES = 16
+
+
+def _new_member_code():
+    return os.urandom(MEMBER_TAG_CODE_BYTES)
+
+
+class MemberTagBindView(AppAPIView):
+    """``POST /app/race/<race_id>/member_tags/bind/`` — bind a bracelet, issue its code.
+
+    The participant-bracelet twin of :class:`TagCreateView` (same permission
+    stack and throttle): unknown UID + number → 201, known UID + ``null``/same
+    number → idempotent 200, unknown UID + ``null`` → 404, different number →
+    409. Full status table and the code/ETag rules live in
+    ``src/apps/mobile/README.md`` (``POST /app/race/<id>/member_tags/bind/``).
+    """
+
+    permission_classes = [SignedAppPermission, IsMobileUser, CanEditRaceLegend]
+    throttle_classes = [ClientIPScopedRateThrottle]
+    throttle_scope = "mobile-write"
+
+    @staticmethod
+    def _member_tag_response(tag, http_status):
+        """Build ``{number, nfc_uid, code}``, lazily minting a missing code.
+
+        The mint runs under ``select_for_update`` and re-checks the locked row,
+        and ``tag`` is re-bound to that row — so a stale instance whose code was
+        already issued by a concurrent request answers with the stored code.
+        """
+        if tag.code is None:
+            with transaction.atomic():
+                tag = Tag.objects.select_for_update().get(pk=tag.pk)
+                if tag.code is None:
+                    tag.code = _new_member_code()
+                    tag.save(update_fields=["code", "updated_at"])
+        return Response(
+            {
+                "number": tag.number,
+                "nfc_uid": tag.nfc_uid,
+                "code": bytes(tag.code).hex(),
+            },
+            status=http_status,
+        )
+
+    def _resolve_existing(self, tag, number):
+        if number is not None and tag.number != number:
+            return Response(
+                {"detail": "Браслет уже привязан к другому участнику"},
+                status=status.HTTP_409_CONFLICT,
+            )
+        return self._member_tag_response(tag, status.HTTP_200_OK)
+
+    def post(self, request, race_id):
+        get_object_or_404(Race, pk=race_id, is_published=True)
+
+        serializer = MemberTagBindSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        # Already normalized (strip + upper, post-upper cap) by the serializer.
+        nfc_uid = serializer.validated_data["nfc_uid"]
+        number = serializer.validated_data["number"]
+
+        tag = Tag.objects.filter(nfc_uid=nfc_uid).first()
+        if tag is not None:
+            return self._resolve_existing(tag, number)
+
+        if number is None:
+            return Response(
+                {"detail": "Браслет не найден"}, status=status.HTTP_404_NOT_FOUND
+            )
+
+        try:
+            with transaction.atomic():
+                tag = Tag(number=number, nfc_uid=nfc_uid, code=_new_member_code())
+                tag.save()
+        except IntegrityError as original_exc:
+            # Most likely a concurrent create hit the global nfc_uid unique
+            # constraint. filter().first() (not get()) so an unrelated DB error
+            # re-raises as itself, not as a nested Tag.DoesNotExist.
+            tag = Tag.objects.filter(nfc_uid=nfc_uid).first()
+            if tag is None:
+                raise original_exc
+            return self._resolve_existing(tag, number)
+
+        # The code was minted on insert, so the lazy mint is a no-op here.
+        return self._member_tag_response(tag, status.HTTP_201_CREATED)
 
 
 class TrackUploadView(AppAPIView):

@@ -44,6 +44,42 @@ class TagCreateSerializer(serializers.Serializer):
     )
 
 
+class MemberTagBindSerializer(serializers.Serializer):
+    """Validate the ``POST /app/race/<race_id>/member_tags/bind/`` body.
+
+    ``nfc_uid`` is the scanned participant-bracelet UID; a blank value is
+    rejected here (400) before it reaches ``Tag.save()``, and the validated
+    value comes back normalized (trimmed + upper-cased, see
+    :meth:`validate_nfc_uid`). ``number`` is the
+    participant number to bind a **new** UID to, or an explicit ``null`` to
+    look up an already-bound bracelet. The key itself is required (the client
+    always sends it, ``null`` explicitly) — a missing key is a 400.
+    ``min_value=1`` keeps a nonsense ``0``/negative number out of the pool;
+    ``max_value`` mirrors the 32-bit ``Tag.number`` column so an oversized
+    number is a 400 rather than a DB-insert 500.
+    """
+
+    # max_length mirrors Tag.nfc_uid (255) — oversized UID → 400, not 500.
+    nfc_uid = serializers.CharField(
+        allow_blank=False, trim_whitespace=True, max_length=255
+    )
+    number = serializers.IntegerField(
+        allow_null=True, min_value=1, max_value=2147483647
+    )
+
+    def validate_nfc_uid(self, value):
+        """Normalize to upper case (already trimmed) and re-check the column cap.
+
+        ``upper()`` can grow the string (e.g. ``"ß"`` → ``"SS"``), so the cap is
+        re-checked after it — a 400, not a ``DataError`` 500 on INSERT.
+        """
+        value = value.upper()
+        field = self.fields["nfc_uid"]
+        if len(value) > field.max_length:
+            field.fail("max_length", max_length=field.max_length)
+        return value
+
+
 class FiniteFloatField(serializers.FloatField):
     """FloatField that rejects NaN and infinity.
 
