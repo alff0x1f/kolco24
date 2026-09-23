@@ -4635,6 +4635,45 @@ def test_member_tags_valid_signature_returns_200_with_fields(client, settings):
 
 
 @pytest.mark.django_db
+def test_member_tags_get_does_not_expose_code(client, settings):
+    from website.models.race import Race
+    from website.models.tag import Tag
+
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    race = Race.objects.create(name="MT code", slug="mt-code")
+    Tag.objects.create(number=8, nfc_uid="aa02", code=os.urandom(16))
+
+    path = f"/app/race/{race.id}/member_tags/"
+    response = client.get(path, **_signed_headers("GET", path, SECRET))
+
+    assert response.status_code == 200
+    entries = response.json()["member_tags"]
+    assert len(entries) == 1
+    assert "code" not in entries[0]
+
+
+@pytest.mark.django_db
+def test_api_member_tag_list_does_not_expose_code(client):
+    from django.utils import timezone
+
+    from website.models.tag import Tag
+
+    Tag.objects.create(
+        number=9, nfc_uid="aa03", code=os.urandom(16), last_seen_at=timezone.now()
+    )
+
+    response = client.get("/api/member_tag/")
+
+    assert response.status_code == 200
+    entries = response.json()
+    assert len(entries) == 1
+    assert entries[0]["nfc_uid"] == "AA03"
+    assert "code" not in entries[0]
+
+
+@pytest.mark.django_db
 def test_member_tags_no_headers_returns_403(client, settings):
     settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
     race, _ = _make_race_with_category(slug="mt-403")

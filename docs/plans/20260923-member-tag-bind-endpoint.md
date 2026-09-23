@@ -155,12 +155,12 @@
 - Create: `src/website/migrations/0097_tag_code.py`
 - Modify: `src/apps/mobile/tests.py`
 
-- [ ] добавить `code = models.BinaryField("Код браслета", null=True, blank=True)` в `Tag`
-- [ ] `uv run python src/manage.py makemigrations website -n tag_code` → `0097_tag_code`
-- [ ] `TagAdmin` не меняется (`list_display` без `code`)
-- [ ] тест: `Tag` с `code` → GET `/app/race/<id>/member_tags/` не содержит ключа `code`
-- [ ] тест: `Tag` с `code` → `/api/member_tag/` не содержит ключа `code`
-- [ ] прогнать тесты — зелёные
+- [x] добавить `code = models.BinaryField("Код браслета", null=True, blank=True)` в `Tag`
+- [x] `uv run python src/manage.py makemigrations website -n tag_code` → `0097_tag_code`
+- [x] `TagAdmin` не меняется (`list_display` без `code`)
+- [x] тест: `Tag` с `code` → GET `/app/race/<id>/member_tags/` не содержит ключа `code`
+- [x] тест: `Tag` с `code` → `/api/member_tag/` не содержит ключа `code`
+- [x] прогнать тесты — зелёные
 
 ### Task 2: Serializer `MemberTagBindSerializer`
 

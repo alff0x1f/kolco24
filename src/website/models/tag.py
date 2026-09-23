@@ -10,6 +10,9 @@ class Tag(models.Model):
         verbose_name="Последнее сканирование",
     )
     updated_at = models.DateTimeField(auto_now=True, verbose_name="Изменён")
+    # Secret 16-byte code written into the bracelet (K24 format, type 0x2).
+    # Never exposed by any GET (mobile member_tags / api member_tag).
+    code = models.BinaryField("Код браслета", null=True, blank=True)
 
     def save(self, *args, **kwargs):
         self.nfc_uid = (self.nfc_uid or "").strip().upper()
