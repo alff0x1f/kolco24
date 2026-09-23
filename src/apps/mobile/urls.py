@@ -7,6 +7,7 @@ from .views import (
     LogoutView,
     MarkPhotoUploadView,
     MarkUploadView,
+    MemberTagBindView,
     MemberTagsView,
     RaceListView,
     SyncView,
@@ -27,6 +28,11 @@ urlpatterns = [
         "race/<int:race_id>/member_tags/",
         MemberTagsView.as_view(),
         name="member_tags",
+    ),
+    path(
+        "race/<int:race_id>/member_tags/bind/",
+        MemberTagBindView.as_view(),
+        name="member_tag_bind",
     ),
     path("race/<int:race_id>/sync/", SyncView.as_view(), name="sync"),
     path(

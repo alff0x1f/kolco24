@@ -9685,3 +9685,378 @@ def test_member_tag_bind_serializer_invalid(body, bad_field):
     serializer = MemberTagBindSerializer(data=body)
     assert not serializer.is_valid()
     assert bad_field in serializer.errors
+
+
+# --- POST /app/race/<race_id>/member_tags/bind/ -----------------------------
+
+
+def _bind_path(race_id):
+    return f"/app/race/{race_id}/member_tags/bind/"
+
+
+def _bind_body(nfc_uid, number):
+    import json
+
+    return json.dumps({"nfc_uid": nfc_uid, "number": number}).encode()
+
+
+def _bind(client, race, raw, nfc_uid, number):
+    return _signed_post_auth(
+        client, _bind_path(race.id), SECRET, _bind_body(nfc_uid, number), raw
+    )
+
+
+def _member_tags_etag(client, race):
+    path = f"/app/race/{race.id}/member_tags/"
+    response = client.get(path, **_signed_headers("GET", path, SECRET))
+    assert response.status_code == 200
+    return response["ETag"]
+
+
+def _sync_member_tags_version(client, race):
+    path = f"/app/race/{race.id}/sync/"
+    response = client.get(path, **_signed_headers("GET", path, SECRET))
+    assert response.status_code == 200
+    return response.json()["versions"]["member_tags"]
+
+
+@pytest.fixture
+def bind_keys(settings):
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+
+@pytest.mark.django_db
+def test_member_tag_bind_unknown_uid_with_number_creates_201(
+    client, bind_keys, django_user_model
+):
+    from website.models.tag import Tag
+
+    race, _, raw, _ = _make_admin_race(django_user_model, "bind-new")
+
+    response = _bind(client, race, raw, "04A1B2C3D4E5F6", 101)
+
+    assert response.status_code == 201
+    tag = Tag.objects.get(nfc_uid="04A1B2C3D4E5F6")
+    assert tag.number == 101
+    assert tag.code is not None
+    assert len(bytes(tag.code)) == 16
+    assert response.json() == {
+        "number": 101,
+        "nfc_uid": "04A1B2C3D4E5F6",
+        "code": bytes(tag.code).hex(),
+    }
+    assert len(response.json()["code"]) == 32
+
+
+@pytest.mark.django_db
+def test_member_tag_bind_normalizes_nfc_uid(client, bind_keys, django_user_model):
+    from website.models.tag import Tag
+
+    race, _, raw, _ = _make_admin_race(django_user_model, "bind-norm")
+
+    response = _bind(client, race, raw, " 04ab ", 5)
+
+    assert response.status_code == 201
+    assert response.json()["nfc_uid"] == "04AB"
+    assert Tag.objects.filter(nfc_uid="04AB").count() == 1
+
+
+@pytest.mark.django_db
+def test_member_tag_bind_repeat_is_idempotent(client, bind_keys, django_user_model):
+    from website.models.tag import Tag
+
+    race, _, raw, _ = _make_admin_race(django_user_model, "bind-idem")
+
+    first = _bind(client, race, raw, "04A1", 101)
+    assert first.status_code == 201
+
+    same = _bind(client, race, raw, "04a1", 101)
+    assert same.status_code == 200
+    assert same.json() == first.json()
+
+    lookup = _bind(client, race, raw, "04A1", None)
+    assert lookup.status_code == 200
+    assert lookup.json()["number"] == 101
+    assert lookup.json()["code"] == first.json()["code"]
+
+    assert Tag.objects.filter(nfc_uid="04A1").count() == 1
+
+
+@pytest.mark.django_db
+def test_member_tag_bind_unknown_uid_null_number_returns_404(
+    client, bind_keys, django_user_model
+):
+    from website.models.tag import Tag
+
+    race, _, raw, _ = _make_admin_race(django_user_model, "bind-404")
+
+    response = _bind(client, race, raw, "04FF", None)
+
+    assert response.status_code == 404
+    assert response.json() == {"detail": "Браслет не найден"}
+    assert not Tag.objects.exists()
+
+
+@pytest.mark.django_db
+def test_member_tag_bind_different_number_returns_409_without_code(
+    client, bind_keys, django_user_model
+):
+    from website.models.tag import Tag
+
+    race, _, raw, _ = _make_admin_race(django_user_model, "bind-409")
+    tag = Tag.objects.create(number=7, nfc_uid="04C0")
+    updated_before = tag.updated_at
+
+    response = _bind(client, race, raw, "04C0", 8)
+
+    assert response.status_code == 409
+    assert response.json() == {"detail": "Браслет уже привязан к другому участнику"}
+    tag.refresh_from_db()
+    assert tag.code is None
+    assert tag.number == 7
+    assert tag.updated_at == updated_before
+
+
+@pytest.mark.django_db
+def test_member_tag_bind_legacy_tag_gets_code_lazily(
+    client, bind_keys, django_user_model
+):
+    from website.models.tag import Tag
+
+    race, _, raw, _ = _make_admin_race(django_user_model, "bind-lazy")
+    tag = Tag.objects.create(number=12, nfc_uid="04D0")
+    assert tag.code is None
+
+    first = _bind(client, race, raw, "04D0", None)
+    assert first.status_code == 200
+    tag.refresh_from_db()
+    assert tag.code is not None
+    assert first.json() == {
+        "number": 12,
+        "nfc_uid": "04D0",
+        "code": bytes(tag.code).hex(),
+    }
+
+    second = _bind(client, race, raw, "04D0", 12)
+    assert second.status_code == 200
+    assert second.json()["code"] == first.json()["code"]
+
+
+@pytest.mark.django_db
+def test_member_tag_bind_lazy_code_does_not_move_member_tags_version(
+    client, bind_keys, django_user_model
+):
+    from website.models.tag import Tag
+
+    race, _, raw, _ = _make_admin_race(django_user_model, "bind-etag-lazy")
+    Tag.objects.create(number=3, nfc_uid="04E0")
+    etag_before = _member_tags_etag(client, race)
+    sync_before = _sync_member_tags_version(client, race)
+
+    response = _bind(client, race, raw, "04E0", None)
+    assert response.status_code == 200
+    assert Tag.objects.get(nfc_uid="04E0").code is not None
+
+    assert _member_tags_etag(client, race) == etag_before
+    assert _sync_member_tags_version(client, race) == sync_before
+
+
+@pytest.mark.django_db
+def test_member_tag_bind_response_uses_locked_row_for_stale_instance():
+    from apps.mobile.views import MemberTagBindView
+    from website.models.tag import Tag
+
+    tag = Tag.objects.create(number=4, nfc_uid="04F0")
+    stale = Tag.objects.get(pk=tag.pk)  # code is None in memory
+    stored = os.urandom(16)
+    Tag.objects.filter(pk=tag.pk).update(code=stored)
+
+    response = MemberTagBindView._response(stale, 200)
+
+    assert response.status_code == 200
+    assert response.data["code"] == stored.hex()
+    tag.refresh_from_db()
+    assert bytes(tag.code) == stored
+
+
+@pytest.mark.django_db
+def test_member_tag_bind_new_uid_with_taken_number_creates_spare(
+    client, bind_keys, django_user_model
+):
+    from website.models.tag import Tag
+
+    race, _, raw, _ = _make_admin_race(django_user_model, "bind-spare")
+    Tag.objects.create(number=55, nfc_uid="04AA")
+
+    response = _bind(client, race, raw, "04BB", 55)
+
+    assert response.status_code == 201
+    assert Tag.objects.filter(number=55).count() == 2
+
+
+@pytest.mark.django_db
+def test_member_tag_bind_integrity_error_resolves_existing_row(
+    client, bind_keys, django_user_model, monkeypatch
+):
+    from apps.mobile import views
+    from website.models.tag import Tag
+
+    race, _, raw, _ = _make_admin_race(django_user_model, "bind-race")
+    Tag.objects.create(number=20, nfc_uid="04CC")
+    # Simulate the concurrent-create race: the primary lookup misses the row,
+    # so the insert hits the global nfc_uid unique constraint.
+    monkeypatch.setattr(views, "_find_member_tag", lambda nfc_uid: None)
+
+    other = _bind(client, race, raw, "04CC", 21)
+    assert other.status_code == 409
+    assert Tag.objects.get(nfc_uid="04CC").code is None
+
+    same = _bind(client, race, raw, "04CC", 20)
+    assert same.status_code == 200
+    tag = Tag.objects.get(nfc_uid="04CC")
+    assert tag.code is not None
+    assert same.json()["code"] == bytes(tag.code).hex()
+    assert Tag.objects.filter(nfc_uid="04CC").count() == 1
+
+
+@pytest.mark.django_db
+def test_member_tag_bind_integrity_error_without_row_is_reraised(
+    client, bind_keys, django_user_model, monkeypatch
+):
+    from website.models.tag import Tag
+
+    race, _, raw, _ = _make_admin_race(django_user_model, "bind-reraise")
+
+    def boom(self, *args, **kwargs):
+        raise IntegrityError("unrelated failure")
+
+    monkeypatch.setattr(Tag, "save", boom)
+
+    with pytest.raises(IntegrityError, match="unrelated failure"):
+        _bind(client, race, raw, "04DD", 30)
+
+
+@pytest.mark.django_db
+def test_member_tag_bind_missing_signature_returns_neutral_403(
+    client, bind_keys, django_user_model
+):
+    race, _, raw, _ = _make_admin_race(django_user_model, "bind-nosig")
+
+    response = client.post(
+        _bind_path(race.id),
+        data=_bind_body("04A1", 1),
+        content_type="application/json",
+        HTTP_AUTHORIZATION=f"Bearer {raw}",
+    )
+
+    assert response.status_code == 403
+    assert response.json() == {"detail": "Forbidden"}
+
+
+@pytest.mark.django_db
+def test_member_tag_bind_missing_bearer_returns_401(
+    client, bind_keys, django_user_model
+):
+    race, _, _, _ = _make_admin_race(django_user_model, "bind-nobearer")
+
+    response = _bind(client, race, None, "04A1", 1)
+
+    assert response.status_code == 401
+
+
+@pytest.mark.django_db
+def test_member_tag_bind_revoked_token_returns_401(
+    client, bind_keys, django_user_model
+):
+    from django.utils import timezone
+
+    from apps.mobile.models import MobileToken
+
+    race, user, raw, _ = _make_admin_race(django_user_model, "bind-revoked")
+    MobileToken.objects.filter(user=user).update(revoked_at=timezone.now())
+
+    response = _bind(client, race, raw, "04A1", 1)
+
+    assert response.status_code == 401
+
+
+@pytest.mark.django_db
+def test_member_tag_bind_non_admin_returns_403(client, bind_keys, django_user_model):
+    from website.models.race import Race
+    from website.models.tag import Tag
+
+    race = Race.objects.create(name="Bind plain", slug="bind-plain")
+    user = django_user_model.objects.create_user(
+        username="bind-plain", email="bind-plain@example.com", password="x"
+    )
+    raw = _make_active_token(user)
+
+    response = _bind(client, race, raw, "04A1", 1)
+
+    assert response.status_code == 403
+    assert response.json() != {"detail": "Forbidden"}
+    assert not Tag.objects.exists()
+
+
+@pytest.mark.django_db
+def test_member_tag_bind_unpublished_race_returns_404(
+    client, bind_keys, django_user_model
+):
+    from website.models.race import Race, RaceAdmin
+    from website.models.tag import Tag
+
+    race = Race.objects.create(name="Bind unpub", slug="bind-unpub", is_published=False)
+    user = django_user_model.objects.create_user(
+        username="bind-unpub", email="bind-unpub@example.com", password="x"
+    )
+    RaceAdmin.objects.create(race=race, user=user, role=RaceAdmin.Role.ADMIN)
+    raw = _make_active_token(user)
+
+    response = _bind(client, race, raw, "04A1", 1)
+
+    assert response.status_code == 404
+    assert not Tag.objects.exists()
+
+
+@pytest.mark.django_db
+def test_member_tag_bind_missing_number_returns_400(
+    client, bind_keys, django_user_model
+):
+    import json
+
+    from website.models.tag import Tag
+
+    race, _, raw, _ = _make_admin_race(django_user_model, "bind-400")
+    body = json.dumps({"nfc_uid": "04A1"}).encode()
+
+    response = _signed_post_auth(client, _bind_path(race.id), SECRET, body, raw)
+
+    assert response.status_code == 400
+    assert "number" in response.json()
+    assert not Tag.objects.exists()
+
+
+@pytest.mark.django_db
+def test_member_tag_bind_create_moves_member_tags_etag(
+    client, bind_keys, django_user_model
+):
+    race, _, raw, _ = _make_admin_race(django_user_model, "bind-etag-new")
+    etag_before = _member_tags_etag(client, race)
+
+    response = _bind(client, race, raw, "04A1", 1)
+    assert response.status_code == 201
+
+    assert _member_tags_etag(client, race) != etag_before
+
+
+@pytest.mark.django_db
+def test_member_tag_bind_get_returns_405(client, bind_keys, django_user_model):
+    race, _, raw, _ = _make_admin_race(django_user_model, "bind-get")
+    path = _bind_path(race.id)
+    headers = _signed_headers("GET", path, SECRET)
+    headers["HTTP_AUTHORIZATION"] = f"Bearer {raw}"
+
+    response = client.get(path, **headers)
+
+    assert response.status_code == 405

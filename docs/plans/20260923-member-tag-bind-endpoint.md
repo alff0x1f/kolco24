@@ -180,31 +180,31 @@
 - Modify: `src/apps/mobile/urls.py`
 - Modify: `src/apps/mobile/tests.py`
 
-- [ ] `MemberTagBindView(AppAPIView)`: права, троттлинг, `post`, `_resolve_existing`, `_response` (поток из Technical Details), docstring по образцу `TagCreateView`
-- [ ] URL `race/<int:race_id>/member_tags/bind/`, name `member_tag_bind`
-- [ ] тест: неизвестный UID + номер → 201, `Tag` создан, `code` 16 байт, ответ `{number, nfc_uid, code}` с hex-кодом из БД
-- [ ] тест: UID нормализуется (` 04ab ` → `04AB`)
-- [ ] тест: повтор с тем же номером → 200, тот же код; повтор с `number: null` → 200, номер из БД
-- [ ] тест: неизвестный UID + `null` → 404, ничего не создано
-- [ ] тест: UID старого `Tag` без кода привязан к другому номеру → 409, `code` остался `None`, `updated_at` не изменился
-- [ ] тест: старый `Tag` без кода → 200, код выпущен и сохранён; второй запрос отдаёт тот же код
-- [ ] тест: выпуск кода старому `Tag` через POST не меняет ETag `/member_tags/` и `versions.member_tags` в `sync`
-- [ ] тест: устаревший экземпляр — `_response` получает `Tag` с `code=None`, а в БД код уже есть → в ответе код из БД, перезаписи нет
-- [ ] тест: новый UID с уже занятым номером → 201 (два `Tag` с одним номером)
-- [ ] тест: `IntegrityError` при создании — `Tag` заранее в БД, первичный поиск во view (вынести в маленький хелпер) патчится в `None`; POST с тем же номером → 200 с кодом, с другим → 409 без выпуска кода
-- [ ] тест: `IntegrityError` без строки в БД (patch `Tag.save`) → исходная ошибка пробрасывается (`client.raise_request_exception`/`pytest.raises`)
-- [ ] тесты прав: без подписи → нейтральный 403 `{"detail": "Forbidden"}`; без Bearer / отозванный токен → 401; не-админ гонки → 403; неопубликованная гонка → 404
-- [ ] тест: 400 на невалидном теле через эндпоинт (нет `number`)
-- [ ] тест: создание сдвигает ETag `member_tags`
-- [ ] тест: подписанный GET с Bearer админа на `/bind/` → 405 (без полной авторизации DRF отдаёт 401/403 раньше 405)
-- [ ] прогнать тесты — зелёные
+- [x] `MemberTagBindView(AppAPIView)`: права, троттлинг, `post`, `_resolve_existing`, `_response` (поток из Technical Details), docstring по образцу `TagCreateView`
+- [x] URL `race/<int:race_id>/member_tags/bind/`, name `member_tag_bind`
+- [x] тест: неизвестный UID + номер → 201, `Tag` создан, `code` 16 байт, ответ `{number, nfc_uid, code}` с hex-кодом из БД
+- [x] тест: UID нормализуется (` 04ab ` → `04AB`)
+- [x] тест: повтор с тем же номером → 200, тот же код; повтор с `number: null` → 200, номер из БД
+- [x] тест: неизвестный UID + `null` → 404, ничего не создано
+- [x] тест: UID старого `Tag` без кода привязан к другому номеру → 409, `code` остался `None`, `updated_at` не изменился
+- [x] тест: старый `Tag` без кода → 200, код выпущен и сохранён; второй запрос отдаёт тот же код
+- [x] тест: выпуск кода старому `Tag` через POST не меняет ETag `/member_tags/` и `versions.member_tags` в `sync`
+- [x] тест: устаревший экземпляр — `_response` получает `Tag` с `code=None`, а в БД код уже есть → в ответе код из БД, перезаписи нет
+- [x] тест: новый UID с уже занятым номером → 201 (два `Tag` с одним номером)
+- [x] тест: `IntegrityError` при создании — `Tag` заранее в БД, первичный поиск во view (вынести в маленький хелпер) патчится в `None`; POST с тем же номером → 200 с кодом, с другим → 409 без выпуска кода
+- [x] тест: `IntegrityError` без строки в БД (patch `Tag.save`) → исходная ошибка пробрасывается (`client.raise_request_exception`/`pytest.raises`)
+- [x] тесты прав: без подписи → нейтральный 403 `{"detail": "Forbidden"}`; без Bearer / отозванный токен → 401; не-админ гонки → 403; неопубликованная гонка → 404
+- [x] тест: 400 на невалидном теле через эндпоинт (нет `number`)
+- [x] тест: создание сдвигает ETag `member_tags`
+- [x] тест: подписанный GET с Bearer админа на `/bind/` → 405 (без полной авторизации DRF отдаёт 401/403 раньше 405)
+- [x] прогнать тесты — зелёные
 
 ### Task 4: Verify acceptance criteria
 
-- [ ] все строки таблицы ответов реализованы и покрыты тестами
-- [ ] GET `member_tags` и `/api/member_tag/` не изменились (существующие тесты зелёные)
-- [ ] полный suite: `uv run pytest`
-- [ ] `make format && make lint`
+- [x] все строки таблицы ответов реализованы и покрыты тестами
+- [x] GET `member_tags` и `/api/member_tag/` не изменились (существующие тесты зелёные)
+- [x] полный suite: `uv run pytest`
+- [x] `make format && make lint`
 
 ### Task 5: [Final] Update documentation
 
