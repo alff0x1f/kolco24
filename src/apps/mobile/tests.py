@@ -1049,7 +1049,7 @@ def test_legend_etag_changes_when_tag_edited_and_304_with_new_etag(client, setti
     first = client.get(path, **_signed_headers("GET", path, SECRET))
     old_etag = first["ETag"]
 
-    tag.check_method = "online"
+    tag.check_method = "cloud"
     tag.save()
 
     second = client.get(path, **_signed_headers("GET", path, SECRET))
@@ -1088,7 +1088,7 @@ def test_legend_etag_changes_when_tag_edited_with_update_fields(client, settings
     first = client.get(path, **_signed_headers("GET", path, SECRET))
     old_etag = first["ETag"]
 
-    tag.check_method = "online"
+    tag.check_method = "cloud"
     tag.save(update_fields=["check_method", "updated_at"])
 
     second = client.get(path, **_signed_headers("GET", path, SECRET))
@@ -1696,7 +1696,7 @@ def test_legend_version_changes_when_tag_check_method_edited():
         checkpoint=cp, nfc_uid="AA:BB", check_method="offline"
     )
     before = legend_version(race.id)
-    tag.check_method = "online"
+    tag.check_method = "cloud"
     tag.save()
     after = legend_version(race.id)
     assert before != after
@@ -3838,7 +3838,7 @@ def test_signal_no_infinite_recursion():
     tag = CheckpointTag.objects.create(checkpoint=cp, nfc_uid="04A1B2C3")
 
     # Each of these would blow the stack if the receivers re-triggered each other.
-    tag.check_method = "online"
+    tag.check_method = "cloud"
     tag.save()
     tag.unlocks.set([cp])
     tag.unlocks.clear()
@@ -4203,7 +4203,8 @@ def test_admin_regenerate_code_action_changes_code(client, django_user_model):
 
 
 @pytest.mark.django_db
-def test_tag_serializer_open_tag_identity_only():
+@pytest.mark.parametrize("check_method", ["offline", "cloud", "local"])
+def test_tag_serializer_open_tag_identity_only(check_method):
     """Open-КП tag (no bundle_blob) → {bid, checkpoint_id, check_method}, iv/ct None."""
     from apps.mobile.serializers import TagSerializer
     from website.models.checkpoint import Checkpoint, CheckpointTag
@@ -4212,7 +4213,7 @@ def test_tag_serializer_open_tag_identity_only():
     race = Race.objects.create(name="Open tag ser", slug="open-tag-ser")
     cp = Checkpoint.objects.create(race=race, number=1, cost=2, description="open")
     tag = CheckpointTag.objects.create(
-        checkpoint=cp, nfc_uid="04A1B2C3", check_method="offline"
+        checkpoint=cp, nfc_uid="04A1B2C3", check_method=check_method
     )
     tag.refresh_from_db()
     assert tag.bundle_blob is None  # open КП → no unlock envelope
@@ -4220,13 +4221,14 @@ def test_tag_serializer_open_tag_identity_only():
     data = TagSerializer(tag).data
     assert data["bid"] == tag.bid
     assert data["checkpoint_id"] == cp.id
-    assert data["check_method"] == "offline"
+    assert data["check_method"] == check_method
     assert data["iv"] is None
     assert data["ct"] is None
 
 
 @pytest.mark.django_db
-def test_tag_serializer_locked_tag_includes_iv_ct():
+@pytest.mark.parametrize("check_method", ["offline", "cloud", "local"])
+def test_tag_serializer_locked_tag_includes_iv_ct(check_method):
     """A locked-КП tag → identity fields plus non-null iv/ct from bundle_blob."""
     from apps.mobile.serializers import TagSerializer
     from website.models.checkpoint import Checkpoint, CheckpointTag
@@ -4238,7 +4240,7 @@ def test_tag_serializer_locked_tag_includes_iv_ct():
     )
     # Empty unlocks falls back to [point]; signals seal + build the bundle.
     tag = CheckpointTag.objects.create(
-        checkpoint=cp, nfc_uid="04A1B2C3", check_method="offline"
+        checkpoint=cp, nfc_uid="04A1B2C3", check_method=check_method
     )
     tag.refresh_from_db()
     assert tag.bundle_blob is not None  # locked КП → unlock envelope present
@@ -4246,7 +4248,7 @@ def test_tag_serializer_locked_tag_includes_iv_ct():
     data = TagSerializer(tag).data
     assert data["bid"] == tag.bid
     assert data["checkpoint_id"] == cp.id
-    assert data["check_method"] == "offline"
+    assert data["check_method"] == check_method
     assert data["iv"] == tag.bundle_blob["iv"]
     assert data["ct"] == tag.bundle_blob["ct"]
     assert data["iv"] is not None

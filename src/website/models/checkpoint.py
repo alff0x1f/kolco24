@@ -76,9 +76,9 @@ class CheckpointTag(models.Model):
         "Метод проверки",
         max_length=20,
         choices=[
-            ("offline", "Offline"),
-            ("online", "Online"),
-            ("local_server", "Local Server"),
+            ("offline", "Офлайн"),
+            ("cloud", "Облако"),
+            ("local", "Локальный сервер"),
         ],
         default="offline",
     )
