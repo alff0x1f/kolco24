@@ -107,13 +107,13 @@ Client:
 - Modify: `src/static/js/race_map.js`
 - Modify: `src/static/css/race_map.css`
 
-- [ ] extend `drawTrack` to store `devices`, `hidden = {}`, `byInstall`; call `renderSidebar()` after drawing
-- [ ] render the device submenu in `renderGroup` as a sibling `<div class="rm-devices">` after the team row, for a selected team with `devices.length >= 2`; checkboxes read state from `hidden`, keyed by device array index; `platform` escaped
-- [ ] bind `change` listeners in `renderSidebar` to a `toggleDevice(teamId, idx)` that shows/hides that device's polylines
-- [ ] update `appendLivePoint`: hidden device's new line stays off the map; add unknown `install_id` to `devices`; no live stats for known devices
-- [ ] in `fetchPositions`, call `renderSidebar()` after the `appendLivePoint` loop
-- [ ] add compact submenu styles as flat selectors (`.rm-devices`, `.rm-device`, `.rm-device.is-stale`) in `race_map.css`, matching the existing `.rm-*` style (mobile sidebar is only 260 px high)
-- [ ] no JS tests exist — run the full Python suite to make sure nothing else broke: `uv run pytest`
+- [x] extend `drawTrack` to store `devices`, `hidden = {}`, `byInstall`; call `renderSidebar()` after drawing
+- [x] render the device submenu in `renderGroup` as a sibling `<div class="rm-devices">` after the team row, for a selected team with `devices.length >= 2`; checkboxes read state from `hidden`, keyed by device array index; `platform` escaped
+- [x] bind `change` listeners in `renderSidebar` to a `toggleDevice(teamId, idx)` that shows/hides that device's polylines
+- [x] update `appendLivePoint`: hidden device's new line stays off the map; add unknown `install_id` to `devices`; no live stats for known devices
+- [x] in `fetchPositions`, call `renderSidebar()` after the `appendLivePoint` loop
+- [x] add compact submenu styles as flat selectors (`.rm-devices`, `.rm-device`, `.rm-device.is-stale`) in `race_map.css`, matching the existing `.rm-*` style (mobile sidebar is only 260 px high)
+- [x] no JS tests exist — run the full Python suite to make sure nothing else broke: `uv run pytest`
 
 ### Task 3: Verify acceptance criteria
 - [ ] a selected team with 2+ devices shows the submenu; with 1 device it does not

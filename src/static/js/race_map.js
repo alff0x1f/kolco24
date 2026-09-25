@@ -71,7 +71,7 @@
   var selected = {}; // team_id -> true
   var teamColors = {}; // team_id -> color
   var nextColorIdx = 0;
-  var tracks = {}; // team_id -> { polylines, bySessionKey }
+  var tracks = {}; // team_id -> { polylines, bySessionKey, devices, hidden, byInstall }
   var trackRequestId = {}; // team_id -> token of the most recently issued fetchTrack call
   var boundsFitted = false;
   var pollTimer = null;
@@ -202,6 +202,67 @@
         toggleTeam(rowEl.getAttribute("data-team-id"));
       });
     });
+    listEl.querySelectorAll(".rm-device input").forEach(function (inputEl) {
+      inputEl.addEventListener("change", function () {
+        toggleDevice(
+          inputEl.getAttribute("data-team-id"),
+          Number(inputEl.getAttribute("data-device-idx"))
+        );
+      });
+    });
+  }
+
+  function pluralRu(n, forms) {
+    var mod10 = n % 10;
+    var mod100 = n % 100;
+    if (mod10 === 1 && mod100 !== 11) return forms[0];
+    if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return forms[1];
+    return forms[2];
+  }
+
+  // Stats are as of track load: the positions poll carries only the team's
+  // newest fix, so it can't keep per-phone freshness or counts right.
+  // last_gps_time_ms is the phone's clock (may run ahead), hence the clamp.
+  function renderDevices(teamId) {
+    var track = selected[teamId] ? tracks[teamId] : null;
+    if (!track || track.devices.length < 2) return "";
+    var now = Date.now();
+    var items = track.devices.map(function (device, idx) {
+      var ageMs = Math.max(0, now - device.last_gps_time_ms);
+      var parts = ["Устр. " + escapeHtml(device.index)];
+      if (device.platform) parts.push(escapeHtml(device.platform));
+      parts.push(Math.floor(ageMs / 60000) + " мин назад");
+      parts.push(device.points + " " + pluralRu(device.points, ["точка", "точки", "точек"]));
+      var classes = "rm-device" + (ageMs > STALE_MS ? " is-stale" : "");
+      var checked = track.hidden[device.install_id] ? "" : " checked";
+      return (
+        '<label class="' + classes + '">' +
+        '<input type="checkbox" data-team-id="' + escapeHtml(teamId) + '"' +
+        ' data-device-idx="' + idx + '"' + checked + ">" +
+        "<span>" + parts.join(" · ") + "</span>" +
+        "</label>"
+      );
+    });
+    return '<div class="rm-devices">' + items.join("") + "</div>";
+  }
+
+  function toggleDevice(teamId, idx) {
+    var track = tracks[teamId];
+    if (!track || !track.devices[idx]) return;
+    var installId = track.devices[idx].install_id;
+    var hide = !track.hidden[installId];
+    if (hide) {
+      track.hidden[installId] = true;
+    } else {
+      delete track.hidden[installId];
+    }
+    (track.byInstall[installId] || []).forEach(function (line) {
+      if (hide) {
+        map.removeLayer(line);
+      } else {
+        line.addTo(map);
+      }
+    });
   }
 
   function renderGroup(rows, flagText) {
@@ -218,7 +279,8 @@
           '<div class="rm-row-num">' + escapeHtml(row.number) + "</div>" +
           '<div class="rm-row-name">' + escapeHtml(row.name) + "</div>" +
           (flagText ? '<div class="rm-row-flag">' + flagText + "</div>" : "") +
-          "</div>"
+          "</div>" +
+          renderDevices(String(row.team_id))
         );
       })
       .join("");
@@ -269,7 +331,8 @@
         // deselect+reselect must not overlay a second, unreferenced set of
         // polylines on the map).
         if (!selected[teamId] || trackRequestId[teamId] !== requestId) return;
-        drawTrack(teamId, data.segments || []);
+        drawTrack(teamId, data.segments || [], data.devices || []);
+        renderSidebar();
       })
       .catch(function () {
         /* leave marker selected but without a drawn track on failure */
@@ -281,7 +344,7 @@
      array position — keeping live-poll appends attached to the correct
      phone's line even when a stale/short session sorts after a still-active
      one in the server's by-first-point-time segment order. */
-  function drawTrack(teamId, segments) {
+  function drawTrack(teamId, segments, devices) {
     var existing = tracks[teamId];
     if (existing) {
       existing.polylines.forEach(function (line) {
@@ -290,14 +353,21 @@
     }
     var color = colorFor(teamId);
     var bySessionKey = {};
+    // Prototype-less: install_id is an unrestricted client string, so a
+    // "__proto__" id must be an ordinary key here.
+    var byInstall = Object.create(null);
     var polylines = segments.map(function (segment) {
       var line = L.polyline(segment.points, { color: color, weight: 3, opacity: 0.85 }).addTo(map);
       bySessionKey[sessionKey(segment.install_id, segment.segment_id)] = line;
+      (byInstall[segment.install_id] = byInstall[segment.install_id] || []).push(line);
       return line;
     });
     tracks[teamId] = {
       polylines: polylines,
-      bySessionKey: bySessionKey
+      bySessionKey: bySessionKey,
+      devices: devices,
+      hidden: Object.create(null),
+      byInstall: byInstall
     };
   }
 
@@ -322,9 +392,24 @@
       }
     } else {
       var color = colorFor(teamId);
-      line = L.polyline([], { color: color, weight: 3, opacity: 0.85 }).addTo(map);
+      line = L.polyline([], { color: color, weight: 3, opacity: 0.85 });
+      if (!track.hidden[row.install_id]) line.addTo(map);
       track.bySessionKey[key] = line;
       track.polylines.push(line);
+      (track.byInstall[row.install_id] = track.byInstall[row.install_id] || []).push(line);
+      var known = track.devices.some(function (device) {
+        return device.install_id === row.install_id;
+      });
+      if (!known) {
+        track.devices.push({
+          install_id: row.install_id,
+          index: track.devices.length + 1,
+          platform: "",
+          first_gps_time_ms: row.gps_time_ms,
+          last_gps_time_ms: row.gps_time_ms,
+          points: 1
+        });
+      }
     }
     line.addLatLng([row.lat, row.lon]);
   }
@@ -477,12 +562,12 @@
           teams[String(row.team_id)] = row;
         });
         renderMarkers();
-        renderSidebar();
         updateEmptyHint();
         fitBoundsOnce();
         Object.keys(selected).forEach(function (teamId) {
           appendLivePoint(teamId, teams[teamId]);
         });
+        renderSidebar();
       })
       .catch(function () {
         /* keep last known state on transient failure */
