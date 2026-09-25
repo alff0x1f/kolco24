@@ -173,7 +173,11 @@ Django 4.2 project. Source lives entirely under `src/`, with `manage.py` at `src
   (`race/<slug>/map/positions/`, JSON list, one row per **every** team of the race — a team with no `TrackPoint` rows
   gets `lat`/`lon`/`gps_time_ms`/`received_at`/`install_id`/`segment_id` all `null` so the JS sidebar can group it
   under «не шлют трек»); `race_map_track` (`race/<slug>/map/track/<int:team_id>/`, JSON `{"segments": [{"install_id",
-  "segment_id", "points": [[lat, lon], …]}, …]}`, 404 if the team isn't in the race). Positions uses
+  "segment_id", "points": [[lat, lon], …]}, …], "devices": [{"install_id", "index", "platform", "first_gps_time_ms",
+  "last_gps_time_ms", "points"}, …]}`, 404 if the team isn't in the race; `devices` is always present, one entry per
+  `install_id` (an empty `install_id` is its own device), sorted by first fix (tie-break `install_id`), 1-based
+  `index`, `points` = raw pre-thinning count, `platform` from one `AppInstall` query, `""` when there is no row).
+  Positions uses
   `DISTINCT ON (team_id)` ordered by `-gps_time_ms, -created_at, -id` — the extra tie-breakers make the picked row
   deterministic when two phones of one team upload different points with the same `gps_time_ms` (otherwise marker
   flicker across polls). Track grouping keys a "session" by the pair `(install_id, segment_id)` (not `segment_id`
@@ -185,7 +189,11 @@ Django 4.2 project. Source lives entirely under `src/`, with `manage.py` at `src
   correct per-session polyline by key instead of assuming array position. The frontend polls positions every 20 s and
   fetches a team's track only on click (multi-select, per-team polyline color cycling, live point-append on poll
   while a track is selected — skipped when the polled point repeats the last-appended `(session, lat, lon)`,
-  `>10 min` stale markers greyed). Leaflet 1.9.4 is vendored (no CDN) at `src/static/vendor/leaflet/` — off-limits for edits,
+  `>10 min` stale markers greyed). A selected team with 2+ devices gets a checkbox submenu (sibling of the team row)
+  that hides/shows only that device's polylines — the team marker and the marks layer are unaffected; checkboxes are
+  keyed by the `devices` array index, never the raw (client-supplied) `install_id`. Device stats are as of track load,
+  not live (the positions poll returns one row per team, so it can't keep per-device stats right); a live poll only
+  adds a newly seen `install_id`; hidden state resets on deselect. Leaflet 1.9.4 is vendored (no CDN) at `src/static/vendor/leaflet/` — off-limits for edits,
   served by WhiteNoise like any other static asset — with OSM as the default base tile layer and OpenTopoMap as a
   switchable second layer. `TrackPoint` (`apps.mobile`) gained
   `Meta.indexes = [models.Index(fields=["race", "team", "-gps_time_ms"], name="mobile_tp_race_team_ts")]` (migration

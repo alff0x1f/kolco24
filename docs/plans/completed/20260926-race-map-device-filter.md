@@ -116,16 +116,16 @@ Client:
 - [x] no JS tests exist — run the full Python suite to make sure nothing else broke: `uv run pytest`
 
 ### Task 3: Verify acceptance criteria
-- [ ] a selected team with 2+ devices shows the submenu; with 1 device it does not
-- [ ] toggling a device hides/shows only its polylines; the marker and marks layer do not change
-- [ ] the checkbox state survives the 20 s poll re-render
-- [ ] deselect + reselect shows all devices again
-- [ ] run full test suite: `uv run pytest`
-- [ ] run `make format && make lint`
+- [x] a selected team with 2+ devices shows the submenu; with 1 device it does not (verified by code review, not in a browser)
+- [x] toggling a device hides/shows only its polylines; the marker and marks layer do not change (verified by code review, not in a browser)
+- [x] the checkbox state survives the 20 s poll re-render (verified by code review, not in a browser)
+- [x] deselect + reselect shows all devices again (verified by code review, not in a browser)
+- [x] run full test suite: `uv run pytest`
+- [x] run `make format && make lint`
 
 ### Task 4: [Final] Update documentation
-- [ ] update the `RaceMapTrackView` part of `CLAUDE.md` (response now has `devices`; JS device submenu filters tracks only, marker unchanged)
-- [ ] move this plan to `docs/plans/completed/`
+- [x] update the `RaceMapTrackView` part of `CLAUDE.md` (response now has `devices`; JS device submenu filters tracks only, marker unchanged)
+- [x] move this plan to `docs/plans/completed/`
 
 ## Post-Completion
 
