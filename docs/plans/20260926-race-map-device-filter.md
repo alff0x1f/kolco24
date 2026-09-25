@@ -88,18 +88,18 @@ Client:
 - Modify: `src/apps/race/views.py`
 - Modify: `src/apps/race/tests.py`
 
-- [ ] in `RaceMapTrackView.get`, collect per-`install_id` `first_gps_time_ms`, `last_gps_time_ms` (max), raw `points` inside the existing loop over points
-- [ ] fetch `platform` with one `AppInstall.objects.filter(install_id__in=...)` query; missing row → `""`
-- [ ] build `devices` sorted by `(first_gps_time_ms, install_id)` with 1-based `index`; add it to the `JsonResponse`
-- [ ] update the class docstring with the new field
-- [ ] update existing track tests if they assert the exact response dict
-- [ ] test: two devices → correct `index` order, `points` (raw, not thinned), `first/last`, `platform` from `AppInstall`
-- [ ] test: device without an `AppInstall` row → `platform == ""`
-- [ ] test: team with no points → `devices == []`
-- [ ] test: device with empty `install_id` is its own device
-- [ ] test: query count does not grow with the number of devices — capture the count for 1 device with `CaptureQueriesContext`, assert 3 devices give the same count (no hardcoded total; don't compare with the no-points case, where `install_id__in=[]` skips a query)
-- [ ] tests pass distinct `gps_time_ms` values under 30 s apart (the `_make_track_point` default is one fixed value), so raw `points` differs from the thinned count
-- [ ] run `uv run pytest src/apps/race/tests.py -k race_map` — must pass before task 2
+- [x] in `RaceMapTrackView.get`, collect per-`install_id` `first_gps_time_ms`, `last_gps_time_ms` (max), raw `points` inside the existing loop over points
+- [x] fetch `platform` with one `AppInstall.objects.filter(install_id__in=...)` query; missing row → `""`
+- [x] build `devices` sorted by `(first_gps_time_ms, install_id)` with 1-based `index`; add it to the `JsonResponse`
+- [x] update the class docstring with the new field
+- [x] update existing track tests if they assert the exact response dict
+- [x] test: two devices → correct `index` order, `points` (raw, not thinned), `first/last`, `platform` from `AppInstall`
+- [x] test: device without an `AppInstall` row → `platform == ""`
+- [x] test: team with no points → `devices == []`
+- [x] test: device with empty `install_id` is its own device
+- [x] test: query count does not grow with the number of devices — capture the count for 1 device with `CaptureQueriesContext`, assert 3 devices give the same count (no hardcoded total; don't compare with the no-points case, where `install_id__in=[]` skips a query)
+- [x] tests pass distinct `gps_time_ms` values under 30 s apart (the `_make_track_point` default is one fixed value), so raw `points` differs from the thinned count
+- [x] run `uv run pytest src/apps/race/tests.py -k race_map` — must pass before task 2
 
 ### Task 2: Device submenu and toggle on the map page
 

@@ -4880,6 +4880,169 @@ def test_race_map_track_keeps_true_last_point_on_tied_gps_time(
     assert segment["points"] == [[0.0, 0.0], [1.0, 1.0], [2.0, 2.0]]
 
 
+def _track_admin_client(client, django_user_model, race, name):
+    admin = django_user_model.objects.create_user(
+        username=f"{name}-admin", password="x", email=f"{name}-admin@example.com"
+    )
+    RaceAdmin.objects.create(race=race, user=admin, role=RaceAdmin.Role.ADMIN)
+    client.force_login(admin)
+    return client
+
+
+def _track_team(django_user_model, race, name):
+    category = _make_category(race)
+    owner = django_user_model.objects.create_user(
+        username=f"{name}-owner", password="x"
+    )
+    return _make_team(owner, category, teamname=name, start_number="1")
+
+
+@pytest.mark.django_db
+def test_race_map_track_devices_two_phones(client, django_user_model):
+    from apps.mobile.models import AppInstall
+
+    race = _make_race(slug="map-track-dev-two")
+    team = _track_team(django_user_model, race, "map-track-dev-two")
+    base = 1_700_000_000_000
+    # phone-b starts first -> index 1, despite sorting after phone-a by id.
+    for i in range(4):
+        _make_track_point(
+            team,
+            race,
+            f"tp-dev-b-{i}",
+            install_id="phone-b",
+            gps_time_ms=base + i * 5_000,
+        )
+    for i in range(3):
+        _make_track_point(
+            team,
+            race,
+            f"tp-dev-a-{i}",
+            install_id="phone-a",
+            gps_time_ms=base + 1_000 + i * 5_000,
+        )
+    AppInstall.objects.create(install_id="phone-b", platform="android")
+    AppInstall.objects.create(install_id="phone-a", platform="ios")
+
+    _track_admin_client(client, django_user_model, race, "map-track-dev-two")
+    resp = client.get(
+        reverse("race_map_track", kwargs={"race_slug": race.slug, "team_id": team.id})
+    )
+
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["devices"] == [
+        {
+            "install_id": "phone-b",
+            "index": 1,
+            "platform": "android",
+            "first_gps_time_ms": base,
+            "last_gps_time_ms": base + 15_000,
+            "points": 4,
+        },
+        {
+            "install_id": "phone-a",
+            "index": 2,
+            "platform": "ios",
+            "first_gps_time_ms": base + 1_000,
+            "last_gps_time_ms": base + 11_000,
+            "points": 3,
+        },
+    ]
+    thinned = {s["install_id"]: len(s["points"]) for s in data["segments"]}
+    assert thinned == {"phone-b": 2, "phone-a": 2}
+
+
+@pytest.mark.django_db
+def test_race_map_track_device_without_app_install_has_empty_platform(
+    client, django_user_model
+):
+    race = _make_race(slug="map-track-dev-noinst")
+    team = _track_team(django_user_model, race, "map-track-dev-noinst")
+    _make_track_point(team, race, "tp-dev-noinst", install_id="ghost")
+
+    _track_admin_client(client, django_user_model, race, "map-track-dev-noinst")
+    resp = client.get(
+        reverse("race_map_track", kwargs={"race_slug": race.slug, "team_id": team.id})
+    )
+
+    assert resp.status_code == 200
+    [device] = resp.json()["devices"]
+    assert device["install_id"] == "ghost"
+    assert device["platform"] == ""
+
+
+@pytest.mark.django_db
+def test_race_map_track_no_points_has_empty_devices(client, django_user_model):
+    race = _make_race(slug="map-track-dev-none")
+    team = _track_team(django_user_model, race, "map-track-dev-none")
+
+    _track_admin_client(client, django_user_model, race, "map-track-dev-none")
+    resp = client.get(
+        reverse("race_map_track", kwargs={"race_slug": race.slug, "team_id": team.id})
+    )
+
+    assert resp.status_code == 200
+    assert resp.json() == {"segments": [], "devices": []}
+
+
+@pytest.mark.django_db
+def test_race_map_track_empty_install_id_is_own_device(client, django_user_model):
+    race = _make_race(slug="map-track-dev-blank")
+    team = _track_team(django_user_model, race, "map-track-dev-blank")
+    base = 1_700_000_000_000
+    _make_track_point(team, race, "tp-dev-blank", install_id="", gps_time_ms=base)
+    _make_track_point(
+        team, race, "tp-dev-named", install_id="phone-1", gps_time_ms=base + 1_000
+    )
+
+    _track_admin_client(client, django_user_model, race, "map-track-dev-blank")
+    resp = client.get(
+        reverse("race_map_track", kwargs={"race_slug": race.slug, "team_id": team.id})
+    )
+
+    assert resp.status_code == 200
+    devices = resp.json()["devices"]
+    assert [(d["install_id"], d["index"], d["points"]) for d in devices] == [
+        ("", 1, 1),
+        ("phone-1", 2, 1),
+    ]
+
+
+@pytest.mark.django_db
+def test_race_map_track_devices_query_count_constant(client, django_user_model):
+    from django.db import connection
+    from django.test.utils import CaptureQueriesContext
+
+    from apps.mobile.models import AppInstall
+
+    race = _make_race(slug="map-track-dev-queries")
+    team = _track_team(django_user_model, race, "map-track-dev-queries")
+    base = 1_700_000_000_000
+    _make_track_point(team, race, "tp-q-0", install_id="phone-0", gps_time_ms=base)
+    AppInstall.objects.create(install_id="phone-0", platform="android")
+
+    _track_admin_client(client, django_user_model, race, "map-track-dev-queries")
+    url = reverse("race_map_track", kwargs={"race_slug": race.slug, "team_id": team.id})
+    with CaptureQueriesContext(connection) as one_device:
+        assert client.get(url).status_code == 200
+
+    for i in (1, 2):
+        _make_track_point(
+            team,
+            race,
+            f"tp-q-{i}",
+            install_id=f"phone-{i}",
+            gps_time_ms=base + i * 1_000,
+        )
+        AppInstall.objects.create(install_id=f"phone-{i}", platform="ios")
+    with CaptureQueriesContext(connection) as three_devices:
+        resp = client.get(url)
+
+    assert len(resp.json()["devices"]) == 3
+    assert len(three_devices.captured_queries) == len(one_device.captured_queries)
+
+
 def test_race_map_track_url_resolves():
     resolved = resolve("/race/some-slug/map/track/7/")
     assert resolved.func.view_class is RaceMapTrackView

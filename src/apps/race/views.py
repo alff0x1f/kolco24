@@ -23,7 +23,7 @@ from django.utils.safestring import mark_safe
 from django.views import View
 from django.views.decorators.cache import never_cache
 
-from apps.mobile.models import Mark, TrackPoint
+from apps.mobile.models import AppInstall, Mark, TrackPoint
 from apps.race.app_data import build_overview, build_team_timeline
 from apps.race.finance import csv_rows, extras_catalog, filter_rows, payment_rows
 from apps.race.forms import RaceForm
@@ -1647,6 +1647,12 @@ class RaceMapTrackView(View):
     not merge into one line. Within a session a point is kept only if
     ``THIN_INTERVAL_MS`` has passed since the previously kept point; a
     session's last point is always kept so the line reaches its true end.
+
+    ``devices`` lists one entry per ``install_id`` (phone) for the map's
+    per-device filter: 1-based ``index`` in order of the device's first fix
+    (tie-break ``install_id``), ``platform`` from ``AppInstall`` (``""`` when
+    there is no row — it is written best-effort), first/last ``gps_time_ms``
+    and the raw, pre-thinning point count.
     """
 
     THIN_INTERVAL_MS = 30_000
@@ -1689,12 +1695,26 @@ class RaceMapTrackView(View):
 
         sessions = {}
         session_order = []
+        device_stats = {}
         for install_id, segment_id, lat, lon, gps_time_ms in points:
             key = (install_id, segment_id)
             if key not in sessions:
                 sessions[key] = []
                 session_order.append(key)
             sessions[key].append((lat, lon, gps_time_ms))
+            stats = device_stats.get(install_id)
+            if stats is None:
+                device_stats[install_id] = {
+                    "first_gps_time_ms": gps_time_ms,
+                    "last_gps_time_ms": gps_time_ms,
+                    "points": 1,
+                }
+            else:
+                stats["first_gps_time_ms"] = min(
+                    stats["first_gps_time_ms"], gps_time_ms
+                )
+                stats["last_gps_time_ms"] = max(stats["last_gps_time_ms"], gps_time_ms)
+                stats["points"] += 1
 
         segments = [
             {
@@ -1704,7 +1724,28 @@ class RaceMapTrackView(View):
             }
             for key in session_order
         ]
-        return JsonResponse({"segments": segments})
+
+        platforms = {}
+        if device_stats:
+            platforms = dict(
+                AppInstall.objects.filter(
+                    install_id__in=list(device_stats)
+                ).values_list("install_id", "platform")
+            )
+        ordered = sorted(
+            device_stats.items(),
+            key=lambda item: (item[1]["first_gps_time_ms"], item[0]),
+        )
+        devices = [
+            {
+                "install_id": install_id,
+                "index": index,
+                "platform": platforms.get(install_id, ""),
+                **stats,
+            }
+            for index, (install_id, stats) in enumerate(ordered, start=1)
+        ]
+        return JsonResponse({"segments": segments, "devices": devices})
 
 
 class RaceMapMarksView(View):
