@@ -7,13 +7,22 @@ import pytest
 from django.conf import settings
 from django.contrib.auth.models import AnonymousUser, User
 from django.contrib.messages.storage.fallback import FallbackStorage
+from django.db import connection
 from django.template.loader import render_to_string
 from django.test import RequestFactory
+from django.test.utils import CaptureQueriesContext
 from django.urls import resolve, reverse
 from django.utils import timezone
 from django.utils.formats import date_format
 
-from apps.mobile.models import JudgeScan, Mark, MarkPhoto, MarkPresent, TrackPoint
+from apps.mobile.models import (
+    AppInstall,
+    JudgeScan,
+    Mark,
+    MarkPhoto,
+    MarkPresent,
+    TrackPoint,
+)
 from apps.race.app_data import build_overview, build_team_timeline, format_ms
 from apps.race.forms import RaceForm
 from apps.race.models import Protocol
@@ -4899,8 +4908,6 @@ def _track_team(django_user_model, race, name):
 
 @pytest.mark.django_db
 def test_race_map_track_devices_two_phones(client, django_user_model):
-    from apps.mobile.models import AppInstall
-
     race = _make_race(slug="map-track-dev-two")
     team = _track_team(django_user_model, race, "map-track-dev-two")
     base = 1_700_000_000_000
@@ -5010,12 +5017,106 @@ def test_race_map_track_empty_install_id_is_own_device(client, django_user_model
 
 
 @pytest.mark.django_db
+def test_race_map_track_devices_tied_first_fix_breaks_on_install_id(
+    client, django_user_model
+):
+    race = _make_race(slug="map-track-dev-tie")
+    team = _track_team(django_user_model, race, "map-track-dev-tie")
+    base = 1_700_000_000_000
+    # Same first gps_time_ms; phone-z is inserted first and has the smaller
+    # TrackPoint.id, so it is seen first in the ordered scan — the index must
+    # still follow install_id.
+    _make_track_point(team, race, "tp-devtie-0", install_id="phone-z", gps_time_ms=base)
+    _make_track_point(team, race, "tp-devtie-1", install_id="phone-a", gps_time_ms=base)
+
+    _track_admin_client(client, django_user_model, race, "map-track-dev-tie")
+    resp = client.get(
+        reverse("race_map_track", kwargs={"race_slug": race.slug, "team_id": team.id})
+    )
+
+    assert resp.status_code == 200
+    devices = resp.json()["devices"]
+    assert [(d["install_id"], d["index"]) for d in devices] == [
+        ("phone-a", 1),
+        ("phone-z", 2),
+    ]
+
+
+@pytest.mark.django_db
+def test_race_map_track_device_stats_span_sessions(client, django_user_model):
+    race = _make_race(slug="map-track-dev-sess")
+    team = _track_team(django_user_model, race, "map-track-dev-sess")
+    base = 1_700_000_000_000
+    for i in range(3):
+        _make_track_point(
+            team,
+            race,
+            f"tp-devsess-1-{i}",
+            install_id="phone-1",
+            segment_id="seg-1",
+            gps_time_ms=base + i * 1_000,
+        )
+    for i in range(2):
+        _make_track_point(
+            team,
+            race,
+            f"tp-devsess-2-{i}",
+            install_id="phone-1",
+            segment_id="seg-2",
+            gps_time_ms=base + 600_000 + i * 1_000,
+        )
+
+    _track_admin_client(client, django_user_model, race, "map-track-dev-sess")
+    resp = client.get(
+        reverse("race_map_track", kwargs={"race_slug": race.slug, "team_id": team.id})
+    )
+
+    assert resp.status_code == 200
+    data = resp.json()
+    [device] = data["devices"]
+    assert device["install_id"] == "phone-1"
+    assert device["points"] == 5
+    assert device["first_gps_time_ms"] == base
+    assert device["last_gps_time_ms"] == base + 601_000
+    sessions = [
+        (s["install_id"], s["segment_id"])
+        for s in data["segments"]
+        if s["install_id"] == "phone-1"
+    ]
+    assert sessions == [("phone-1", "seg-1"), ("phone-1", "seg-2")]
+
+
+@pytest.mark.django_db
+def test_race_map_track_devices_scoped_to_team(client, django_user_model):
+    race = _make_race(slug="map-track-dev-scope")
+    team = _track_team(django_user_model, race, "map-track-dev-scope")
+    other = _track_team(django_user_model, race, "map-track-dev-scope-other")
+    base = 1_700_000_000_000
+    _make_track_point(
+        team, race, "tp-devscope-a", install_id="phone-a", gps_time_ms=base
+    )
+    _make_track_point(
+        team, race, "tp-devscope-b", install_id="phone-b", gps_time_ms=base + 1
+    )
+    _make_track_point(
+        other, race, "tp-devscope-c", install_id="phone-c", gps_time_ms=base - 1
+    )
+
+    _track_admin_client(client, django_user_model, race, "map-track-dev-scope")
+    resp = client.get(
+        reverse("race_map_track", kwargs={"race_slug": race.slug, "team_id": team.id})
+    )
+
+    assert resp.status_code == 200
+    devices = resp.json()["devices"]
+    assert [(d["install_id"], d["index"]) for d in devices] == [
+        ("phone-a", 1),
+        ("phone-b", 2),
+    ]
+
+
+@pytest.mark.django_db
 def test_race_map_track_devices_query_count_constant(client, django_user_model):
-    from django.db import connection
-    from django.test.utils import CaptureQueriesContext
-
-    from apps.mobile.models import AppInstall
-
     race = _make_race(slug="map-track-dev-queries")
     team = _track_team(django_user_model, race, "map-track-dev-queries")
     base = 1_700_000_000_000

@@ -37,7 +37,7 @@
 ## Solution Overview
 - Devices come **with the track** (option A). The track is fetched only when a team is selected, and the submenu is only shown for a selected team, so no extra request and no change to the positions contract.
 - The server computes per-device stats in the loop it already runs over the team's points, plus one `AppInstall` query for `platform`.
-- The client keeps hidden-device state in JS (`tracks[teamId].hidden`), not in the DOM, so the 20 s sidebar re-render keeps the checkboxes.
+- The client keeps hidden-device state in JS (a `hidden` flag on each `tracks[teamId].devices` entry), not in the DOM, so the 20 s sidebar re-render keeps the checkboxes.
 - Deselecting a team drops all its state. Re-selecting shows all devices again.
 
 ## Technical Details
@@ -62,17 +62,18 @@ Track response:
 - Empty `install_id` (`""`) is its own device, same as in `segments`.
 
 Client:
-- `tracks[teamId] = {polylines, bySessionKey, devices, hidden: {install_id: true}, byInstall: {install_id: [polyline]}}`.
+- `tracks[teamId] = {lines: [{line, installId}], bySessionKey, devices}`; each device entry carries its own `hidden` flag (review fix: replaced the separate `polylines`/`byInstall`/`hidden` maps).
 - Submenu row text: `Устр. N · <platform> · X мин назад · N точек` (drop the platform part when empty). «X мин назад» is computed from `last_gps_time_ms` on each render, clamped at 0 (it is the phone's clock, which may run ahead; team-row staleness uses the server `received_at` — different clocks, on purpose). A device with no point for more than `STALE_MS` gets the stale (grey) style.
-- **Device stats are as of track load, not live.** The positions poll returns one row per team (the newest fix across all phones), so it can't keep per-device stats right: the second phone would freeze and turn grey while still sending, and `points` would undercount (a phone uploads batches of up to 500 points). Stats refresh on deselect + reselect.
+- **Device stats are those of track load, advanced by the poll's fix.** The positions poll returns one row per team (the newest fix across all phones). The phone that fix belongs to gets `last_gps_time_ms = max(…)` and `points += 1` (review fix — otherwise every phone, even an active one, aged into grey ~10 min after selection). A second phone that is also sending but never has the newest fix still gets no updates and can age into grey; the age reads "newest fix this page has seen from that phone", and `points` undercounts (a phone uploads batches of up to 500 points). Stats fully refresh on deselect + reselect.
 - Submenu markup: a **sibling** `<div class="rm-devices">` right after the team's `.rm-row` div, not inside it (`.rm-row` is flex, dims when stale, and toggles the team on click). Listeners are bound in `renderSidebar` after the `innerHTML` write, next to the `.rm-row` binding, on the `change` event. No `stopPropagation` needed.
 - Checkboxes carry `data-team-id` + `data-device-idx` (array index into `tracks[teamId].devices`), never the raw `install_id`. `platform` goes through `escapeHtml()`. Both `install_id` and `platform` are unrestricted client-supplied strings (`X-Install-Id`, `X-App-Platform`).
-- Toggle: `map.removeLayer(line)` / `line.addTo(map)` for every polyline in `byInstall[install_id]`.
-- `appendLivePoint`:
-  - new polyline for a hidden device → create it and register it in `byInstall`, but don't add it to the map;
-  - unknown `install_id` → push `{install_id, index: devices.length + 1, platform: "", first/last = row.gps_time_ms, points: 1}` (the only live-derivable fact);
-  - known device → stats unchanged.
-- Empty `install_id` (`""`): shown in the submenu and toggled via `byInstall[""]`, but `sessionKey()` returns `null` for it, so it never gets live points. Same as today — leave it.
+- Toggle: `map.removeLayer(line)` / `line.addTo(map)` for every `lines` record whose `installId` matches the device.
+- `appendLivePoint` (after the "same fix" early return):
+  - new polyline for a hidden device → create it and register it in `lines`, but don't add it to the map;
+  - unknown `install_id` → push `{install_id, index: devices.length + 1, platform: "", first/last = row.gps_time_ms, points: 1}`;
+  - known device → `last_gps_time_ms = max(last, row.gps_time_ms)`, `points += 1` only when `row.gps_time_ms > last` (the poll re-delivers the same row until a new fix lands). Both run before the same-coordinates polyline dedup, so a stationary phone that keeps sending new fixes at unchanged coordinates stays fresh (external review fix).
+- The sidebar re-render restores keyboard focus to a focused device checkbox (review fix).
+- Empty `install_id` (`""`): shown in the submenu and toggleable, but `sessionKey()` returns `null` for it, so it never gets live points. Same as today — leave it.
 - After `drawTrack` → `renderSidebar()`, so the submenu shows up without waiting for the next poll.
 - In `fetchPositions`, move `renderSidebar()` after the `appendLivePoint` loop, so a newly seen device appears in the same poll.
 
@@ -110,7 +111,7 @@ Client:
 - [x] extend `drawTrack` to store `devices`, `hidden = {}`, `byInstall`; call `renderSidebar()` after drawing
 - [x] render the device submenu in `renderGroup` as a sibling `<div class="rm-devices">` after the team row, for a selected team with `devices.length >= 2`; checkboxes read state from `hidden`, keyed by device array index; `platform` escaped
 - [x] bind `change` listeners in `renderSidebar` to a `toggleDevice(teamId, idx)` that shows/hides that device's polylines
-- [x] update `appendLivePoint`: hidden device's new line stays off the map; add unknown `install_id` to `devices`; no live stats for known devices
+- [x] update `appendLivePoint`: hidden device's new line stays off the map; add unknown `install_id` to `devices`; a known device's last fix/points advance from the poll row (review fix)
 - [x] in `fetchPositions`, call `renderSidebar()` after the `appendLivePoint` loop
 - [x] add compact submenu styles as flat selectors (`.rm-devices`, `.rm-device`, `.rm-device.is-stale`) in `race_map.css`, matching the existing `.rm-*` style (mobile sidebar is only 260 px high)
 - [x] no JS tests exist — run the full Python suite to make sure nothing else broke: `uv run pytest`

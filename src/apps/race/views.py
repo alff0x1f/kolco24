@@ -1702,19 +1702,13 @@ class RaceMapTrackView(View):
                 sessions[key] = []
                 session_order.append(key)
             sessions[key].append((lat, lon, gps_time_ms))
-            stats = device_stats.get(install_id)
-            if stats is None:
-                device_stats[install_id] = {
-                    "first_gps_time_ms": gps_time_ms,
-                    "last_gps_time_ms": gps_time_ms,
-                    "points": 1,
-                }
-            else:
-                stats["first_gps_time_ms"] = min(
-                    stats["first_gps_time_ms"], gps_time_ms
-                )
-                stats["last_gps_time_ms"] = max(stats["last_gps_time_ms"], gps_time_ms)
-                stats["points"] += 1
+            # Relies on order_by("gps_time_ms", ...): a device's first row
+            # carries its smallest gps_time_ms and its latest row the largest.
+            stats = device_stats.setdefault(
+                install_id, {"first_gps_time_ms": gps_time_ms, "points": 0}
+            )
+            stats["last_gps_time_ms"] = gps_time_ms
+            stats["points"] += 1
 
         segments = [
             {
@@ -1725,13 +1719,12 @@ class RaceMapTrackView(View):
             for key in session_order
         ]
 
-        platforms = {}
-        if device_stats:
-            platforms = dict(
-                AppInstall.objects.filter(
-                    install_id__in=list(device_stats)
-                ).values_list("install_id", "platform")
+        # An empty __in list short-circuits in Django without a DB query.
+        platforms = dict(
+            AppInstall.objects.filter(install_id__in=list(device_stats)).values_list(
+                "install_id", "platform"
             )
+        )
         ordered = sorted(
             device_stats.items(),
             key=lambda item: (item[1]["first_gps_time_ms"], item[0]),
