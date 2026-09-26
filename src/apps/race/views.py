@@ -1751,7 +1751,11 @@ class RaceMapTrackView(View):
 def _gpx_time(ms):
     if ms is None or ms <= 0:
         return None
-    moment = datetime.datetime.fromtimestamp(ms / 1000, tz=datetime.timezone.utc)
+    try:
+        moment = datetime.datetime.fromtimestamp(ms / 1000, tz=datetime.timezone.utc)
+    except (ValueError, OverflowError, OSError):
+        # The upload API accepts any BigInt, far past datetime's year 9999.
+        return None
     return moment.strftime("%Y-%m-%dT%H:%M:%S.") + f"{moment.microsecond // 1000:03d}Z"
 
 

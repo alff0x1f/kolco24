@@ -42,6 +42,7 @@ from apps.race.views import (
     RacePageView,
     RacePostEditView,
     RaceTeamsView,
+    _gpx_time,
 )
 from website.forms import NewsPostForm
 from website.models import NewsPost, Race
@@ -7936,3 +7937,31 @@ def test_race_map_gpx_marks_only(client, django_user_model):
 
     assert root.find("g:trk", GPX_NS) is None
     assert len(root.findall("g:wpt", GPX_NS)) == 2
+
+
+@pytest.mark.parametrize("ms", [253_402_300_800_000, 2**63 - 1])
+def test_gpx_time_out_of_range_is_none(ms):
+    assert _gpx_time(ms) is None
+
+
+@pytest.mark.django_db
+def test_race_map_gpx_out_of_range_time_exports_point_without_time(
+    client, django_user_model
+):
+    race = _make_race(slug="map-gpx-huge")
+    team = _track_team(django_user_model, race, "map-gpx-huge")
+    _make_track_point(team, race, "map-gpx-huge-p1", gps_time_ms=2**63 - 1)
+    cp = _make_checkpoint(race, 7, 10)
+    _make_located_mark(team, cp, wall_ms=2**63 - 1)
+    _track_admin_client(client, django_user_model, race, "map-gpx-huge")
+
+    resp = client.get(_gpx_url(race, team))
+
+    assert resp.status_code == 200
+    root = _parse_gpx(resp)
+    wpt = root.find("g:wpt", GPX_NS)
+    assert wpt.findtext("g:name", namespaces=GPX_NS) == "7"
+    assert wpt.find("g:time", GPX_NS) is None
+    trkpt = root.find("g:trk/g:trkseg/g:trkpt", GPX_NS)
+    assert trkpt is not None
+    assert trkpt.find("g:time", GPX_NS) is None
