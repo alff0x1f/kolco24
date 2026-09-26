@@ -173,10 +173,13 @@ Django 4.2 project. Source lives entirely under `src/`, with `manage.py` at `src
   (`race/<slug>/map/positions/`, JSON list, one row per **every** team of the race — a team with no `TrackPoint` rows
   gets `lat`/`lon`/`gps_time_ms`/`received_at`/`install_id`/`segment_id` all `null` so the JS sidebar can group it
   under «не шлют трек»); `race_map_track` (`race/<slug>/map/track/<int:team_id>/`, JSON `{"segments": [{"install_id",
-  "segment_id", "points": [[lat, lon], …]}, …]}`, 404 if the team isn't in the race). Positions uses
-  `DISTINCT ON (team_id)` ordered by `-gps_time_ms, -created_at, -id` — the extra tie-breakers make the picked row
-  deterministic when two phones of one team upload different points with the same `gps_time_ms` (otherwise marker
-  flicker across polls). Track grouping keys a "session" by the pair `(install_id, segment_id)` (not `segment_id`
+  "segment_id", "points": [[lat, lon], …]}, …], "devices": [{"install_id", "index", "platform", "first_gps_time_ms",
+  "last_gps_time_ms", "points"}, …]}`, 404 if the team isn't in the race; `devices` is always present, one entry per
+  `install_id` (an empty `install_id` is its own device), sorted by first fix (tie-break `install_id`), 1-based
+  `index`, `points` = raw pre-thinning count, `platform` from one `AppInstall` query, `""` when there is no row).
+  Positions uses `DISTINCT ON (team_id)` ordered by `-gps_time_ms, -created_at, -id` — the extra tie-breakers make the
+  picked row deterministic when two phones of one team upload different points with the same `gps_time_ms` (otherwise
+  marker flicker across polls). Track grouping keys a "session" by the pair `(install_id, segment_id)` (not `segment_id`
   alone — two phones of one team must not merge into one line), orders each session's points by
   `(gps_time_ms, created_at, id)` (same tie-breaker discipline as positions), thins each session to one point per
   `THIN_INTERVAL_MS = 30_000` ms of `gps_time_ms` while always keeping the session's true last point (compared by
@@ -185,9 +188,20 @@ Django 4.2 project. Source lives entirely under `src/`, with `manage.py` at `src
   correct per-session polyline by key instead of assuming array position. The frontend polls positions every 20 s and
   fetches a team's track only on click (multi-select, per-team polyline color cycling, live point-append on poll
   while a track is selected — skipped when the polled point repeats the last-appended `(session, lat, lon)`,
-  `>10 min` stale markers greyed). Leaflet 1.9.4 is vendored (no CDN) at `src/static/vendor/leaflet/` — off-limits for edits,
-  served by WhiteNoise like any other static asset — with OSM as the default base tile layer and OpenTopoMap as a
-  switchable second layer. `TrackPoint` (`apps.mobile`) gained
+  `>10 min` stale markers greyed). A selected team with 2+ devices gets a checkbox submenu (sibling of the team row)
+  that hides/shows only that device's polylines — the team marker and the marks layer are unaffected; checkboxes are
+  keyed by the `devices` array index, never the raw (client-supplied) `install_id`. Device stats are those of track
+  load, advanced only by the fix the positions poll delivers: the poll returns one row per team (its newest fix across
+  all phones), so that phone gets `last_gps_time_ms = max(…)` and — only when the row's `gps_time_ms` is strictly
+  newer (the same row is re-delivered every poll until a new fix lands) — `points += 1`; both happen before, and
+  independently of, the same-coordinates polyline dedup, so a stationary phone stays fresh; while a second phone that is also
+  sending but never has the newest fix gets no updates and can still age into grey — the age reads "newest fix this
+  page has seen", and `points` undercounts batch uploads; deselect + reselect refreshes. A live poll adds a newly seen
+  non-empty `install_id` as a device (the empty-`install_id` device never gets live points: `sessionKey()` is `null`
+  for it); hidden state is a flag on the device entry and resets on deselect; keyboard focus on a device checkbox is
+  restored across the 20 s re-render. Leaflet 1.9.4 is vendored (no CDN) at `src/static/vendor/leaflet/` — off-limits
+  for edits, served by WhiteNoise like any other static asset — with OSM as the default base tile layer and
+  OpenTopoMap as a switchable second layer. `TrackPoint` (`apps.mobile`) gained
   `Meta.indexes = [models.Index(fields=["race", "team", "-gps_time_ms"], name="mobile_tp_race_team_ts")]` (migration
   in `apps.mobile`) to serve both the positions `DISTINCT ON` query and the per-team track scan; the model is still
   immutable and still intentionally absent from `apps.mobile`'s `versioning.py` — the index doesn't change that.

@@ -26,6 +26,11 @@
 
   var POLL_INTERVAL_MS = 20000;
   var STALE_MS = 10 * 60 * 1000;
+
+  function trackStyle(color) {
+    return { color: color, weight: 3, opacity: 0.85 };
+  }
+
   var DEFAULT_CENTER = [55.751244, 37.618423];
   var DEFAULT_ZOOM = 5;
   var COLOR_PALETTE = [
@@ -71,7 +76,9 @@
   var selected = {}; // team_id -> true
   var teamColors = {}; // team_id -> color
   var nextColorIdx = 0;
-  var tracks = {}; // team_id -> { polylines, bySessionKey }
+  // team_id -> { lines: [{line, installId}], bySessionKey, devices }
+  // (a device entry carries its own `hidden` flag for the per-phone toggle)
+  var tracks = {};
   var trackRequestId = {}; // team_id -> token of the most recently issued fetchTrack call
   var boundsFitted = false;
   var pollTimer = null;
@@ -195,12 +202,87 @@
     if (!html) {
       html = '<div class="rm-empty">Нет команд.</div>';
     }
+    // The 20 s poll rebuilds the list: keep keyboard focus on a device
+    // checkbox across the rebuild instead of dropping it to <body>.
+    var focused = document.activeElement;
+    var focusSelector = null;
+    if (focused && listEl.contains(focused) && focused.matches(".rm-device input")) {
+      focusSelector =
+        '.rm-device input[data-team-id="' + focused.getAttribute("data-team-id") +
+        '"][data-device-idx="' + focused.getAttribute("data-device-idx") + '"]';
+    }
     listEl.innerHTML = html;
 
     listEl.querySelectorAll(".rm-row").forEach(function (rowEl) {
       rowEl.addEventListener("click", function () {
         toggleTeam(rowEl.getAttribute("data-team-id"));
       });
+    });
+    listEl.querySelectorAll(".rm-device input").forEach(function (inputEl) {
+      inputEl.addEventListener("change", function () {
+        toggleDevice(
+          inputEl.getAttribute("data-team-id"),
+          Number(inputEl.getAttribute("data-device-idx"))
+        );
+      });
+    });
+    if (focusSelector) {
+      var refocus = listEl.querySelector(focusSelector);
+      if (refocus) refocus.focus();
+    }
+  }
+
+  function pluralRu(n, forms) {
+    var mod10 = n % 10;
+    var mod100 = n % 100;
+    if (mod10 === 1 && mod100 !== 11) return forms[0];
+    if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return forms[1];
+    return forms[2];
+  }
+
+  // Stats are those of track load, advanced by the fixes the positions poll
+  // delivers (appendLivePoint). The poll carries only the team's single
+  // newest fix, so while two phones both send, the one whose fix isn't the
+  // newest gets no updates and its age can still grow: "N мин назад" is the
+  // age of the newest fix *this page has seen* from that phone, and points
+  // counts load-time raw points plus poll-delivered new fixes (a strictly
+  // newer gps_time_ms — not every upload, not a re-delivered row).
+  // last_gps_time_ms is the phone's clock (may run ahead), hence the clamp.
+  function renderDevices(teamId) {
+    var track = selected[teamId] ? tracks[teamId] : null;
+    if (!track || track.devices.length < 2) return "";
+    var now = Date.now();
+    var items = track.devices.map(function (device, idx) {
+      var ageMs = Math.max(0, now - device.last_gps_time_ms);
+      var parts = ["Устр. " + escapeHtml(device.index)];
+      if (device.platform) parts.push(escapeHtml(device.platform));
+      parts.push(Math.floor(ageMs / 60000) + " мин назад");
+      parts.push(device.points + " " + pluralRu(device.points, ["точка", "точки", "точек"]));
+      var classes = "rm-device" + (ageMs > STALE_MS ? " is-stale" : "");
+      var checked = device.hidden ? "" : " checked";
+      return (
+        '<label class="' + classes + '">' +
+        '<input type="checkbox" data-team-id="' + escapeHtml(teamId) + '"' +
+        ' data-device-idx="' + idx + '"' + checked + ">" +
+        "<span>" + parts.join(" · ") + "</span>" +
+        "</label>"
+      );
+    });
+    return '<div class="rm-devices">' + items.join("") + "</div>";
+  }
+
+  function toggleDevice(teamId, idx) {
+    var track = tracks[teamId];
+    if (!track || !track.devices[idx]) return;
+    var device = track.devices[idx];
+    device.hidden = !device.hidden;
+    track.lines.forEach(function (rec) {
+      if (rec.installId !== device.install_id) return;
+      if (device.hidden) {
+        map.removeLayer(rec.line);
+      } else {
+        rec.line.addTo(map);
+      }
     });
   }
 
@@ -218,7 +300,8 @@
           '<div class="rm-row-num">' + escapeHtml(row.number) + "</div>" +
           '<div class="rm-row-name">' + escapeHtml(row.name) + "</div>" +
           (flagText ? '<div class="rm-row-flag">' + flagText + "</div>" : "") +
-          "</div>"
+          "</div>" +
+          renderDevices(String(row.team_id))
         );
       })
       .join("");
@@ -247,8 +330,8 @@
     delete selected[teamId];
     var track = tracks[teamId];
     if (track) {
-      track.polylines.forEach(function (line) {
-        map.removeLayer(line);
+      track.lines.forEach(function (rec) {
+        map.removeLayer(rec.line);
       });
     }
     delete tracks[teamId];
@@ -269,7 +352,8 @@
         // deselect+reselect must not overlay a second, unreferenced set of
         // polylines on the map).
         if (!selected[teamId] || trackRequestId[teamId] !== requestId) return;
-        drawTrack(teamId, data.segments || []);
+        drawTrack(teamId, data.segments || [], data.devices || []);
+        renderSidebar();
       })
       .catch(function () {
         /* leave marker selected but without a drawn track on failure */
@@ -281,24 +365,28 @@
      array position — keeping live-poll appends attached to the correct
      phone's line even when a stale/short session sorts after a still-active
      one in the server's by-first-point-time segment order. */
-  function drawTrack(teamId, segments) {
+  function drawTrack(teamId, segments, devices) {
     var existing = tracks[teamId];
     if (existing) {
-      existing.polylines.forEach(function (line) {
-        map.removeLayer(line);
+      existing.lines.forEach(function (rec) {
+        map.removeLayer(rec.line);
       });
     }
     var color = colorFor(teamId);
     var bySessionKey = {};
-    var polylines = segments.map(function (segment) {
-      var line = L.polyline(segment.points, { color: color, weight: 3, opacity: 0.85 }).addTo(map);
+    var lines = segments.map(function (segment) {
+      var line = L.polyline(segment.points, trackStyle(color)).addTo(map);
       bySessionKey[sessionKey(segment.install_id, segment.segment_id)] = line;
-      return line;
+      return { line: line, installId: segment.install_id };
     });
-    tracks[teamId] = {
-      polylines: polylines,
-      bySessionKey: bySessionKey
-    };
+    tracks[teamId] = { lines: lines, bySessionKey: bySessionKey, devices: devices };
+  }
+
+  function findDevice(track, installId) {
+    for (var i = 0; i < track.devices.length; i++) {
+      if (track.devices[i].install_id === installId) return track.devices[i];
+    }
+    return null;
   }
 
   function appendLivePoint(teamId, row) {
@@ -306,6 +394,29 @@
     if (!track || row.lat == null || row.lon == null) return;
     var key = sessionKey(row.install_id, row.segment_id);
     if (!key) return;
+    var device = findDevice(track, row.install_id);
+    if (device) {
+      // Freshness and the fix count are updated independently of the
+      // polyline dedup below: a stationary phone keeps sending new fixes at
+      // identical coordinates and must not turn stale. The positions poll
+      // re-delivers the same row every 20 s until a new fix lands, so only a
+      // strictly newer gps_time_ms counts as a new fix.
+      if (row.gps_time_ms > device.last_gps_time_ms) {
+        device.points += 1;
+      }
+      device.last_gps_time_ms = Math.max(device.last_gps_time_ms, row.gps_time_ms);
+    } else {
+      device = {
+        install_id: row.install_id,
+        index: track.devices.length + 1,
+        platform: "",
+        first_gps_time_ms: row.gps_time_ms,
+        last_gps_time_ms: row.gps_time_ms,
+        points: 1,
+        hidden: false
+      };
+      track.devices.push(device);
+    }
     var line = track.bySessionKey[key];
     if (line) {
       // Compare against the polyline's own last drawn vertex — the actual
@@ -318,13 +429,15 @@
       var pts = line.getLatLngs();
       var last = pts.length ? pts[pts.length - 1] : null;
       if (last && last.lat === row.lat && last.lng === row.lon) {
-        return; // same fix as what's already drawn — nothing to append
+        return; // same coordinates as what's already drawn — nothing to append
       }
-    } else {
+    }
+    if (!line) {
       var color = colorFor(teamId);
-      line = L.polyline([], { color: color, weight: 3, opacity: 0.85 }).addTo(map);
+      line = L.polyline([], trackStyle(color));
+      if (!device.hidden) line.addTo(map);
       track.bySessionKey[key] = line;
-      track.polylines.push(line);
+      track.lines.push({ line: line, installId: row.install_id });
     }
     line.addLatLng([row.lat, row.lon]);
   }
@@ -477,12 +590,12 @@
           teams[String(row.team_id)] = row;
         });
         renderMarkers();
-        renderSidebar();
         updateEmptyHint();
         fitBoundsOnce();
         Object.keys(selected).forEach(function (teamId) {
           appendLivePoint(teamId, teams[teamId]);
         });
+        renderSidebar();
       })
       .catch(function () {
         /* keep last known state on transient failure */

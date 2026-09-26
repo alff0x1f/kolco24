@@ -93,6 +93,20 @@
 }
 .rm-row-flag { font-size: 11px; color: var(--muted); flex-shrink: 0; }
 
+.rm-devices {
+  display: flex; flex-direction: column; gap: 2px;
+  /* left = .rm-row padding 16 + border 3 + .rm-row-num 26 + gap 9: aligns with .rm-row-name */
+  padding: 0 16px 6px 54px;
+  background: var(--paper);
+}
+.rm-device {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 12px; color: var(--ink-soft);
+  cursor: pointer; user-select: none;
+}
+.rm-device span { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rm-device.is-stale { opacity: 0.55; }
+
 .rm-empty { padding: 14px 16px; font-size: 13px; color: var(--muted); }
 
 /* ── Map canvas ───────────────────────────────────────────── */
