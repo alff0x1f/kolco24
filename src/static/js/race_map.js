@@ -43,6 +43,7 @@
   var searchEl = document.getElementById("rmSearch");
   var listEl = document.getElementById("rmTeamList");
   var emptyHintEl = document.getElementById("rmEmptyHint");
+  var gpxIncludeEl = document.getElementById("rmGpxInclude");
 
   /* ── Leaflet init ─────────────────────────────────────────── */
   var map = L.map(mapEl).setView(DEFAULT_CENTER, DEFAULT_ZOOM);
@@ -214,7 +215,8 @@
     listEl.innerHTML = html;
 
     listEl.querySelectorAll(".rm-row").forEach(function (rowEl) {
-      rowEl.addEventListener("click", function () {
+      rowEl.addEventListener("click", function (event) {
+        if (event.target.closest(".rm-gpx")) return;
         toggleTeam(rowEl.getAttribute("data-team-id"));
       });
     });
@@ -286,6 +288,14 @@
     });
   }
 
+  function renderGpxLink(teamId) {
+    if (!config.gpxUrlTemplate || !selected[teamId]) return "";
+    var url =
+      config.gpxUrlTemplate.replace("{team_id}", encodeURIComponent(teamId)) +
+      "?include=" + encodeURIComponent(gpxIncludeEl ? gpxIncludeEl.value : "both");
+    return '<a class="rm-gpx" href="' + escapeHtml(url) + '" download title="Скачать GPX">GPX</a>';
+  }
+
   function renderGroup(rows, flagText) {
     return rows
       .filter(matchesSearch)
@@ -300,6 +310,7 @@
           '<div class="rm-row-num">' + escapeHtml(row.number) + "</div>" +
           '<div class="rm-row-name">' + escapeHtml(row.name) + "</div>" +
           (flagText ? '<div class="rm-row-flag">' + flagText + "</div>" : "") +
+          renderGpxLink(row.team_id) +
           "</div>" +
           renderDevices(String(row.team_id))
         );
@@ -610,6 +621,7 @@
     searchQuery = searchEl.value.trim().toLowerCase();
     renderSidebar();
   });
+  if (gpxIncludeEl) gpxIncludeEl.addEventListener("change", renderSidebar);
 
   fetchPositions();
   pollTimer = setInterval(fetchPositions, POLL_INTERVAL_MS);

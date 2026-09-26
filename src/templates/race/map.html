@@ -39,6 +39,14 @@
           <label><input type="checkbox" id="rmMarksNfc" checked> nfc</label>
           <label><input type="checkbox" id="rmMarksPhoto" checked> photo</label>
         </div>
+        <label class="rm-gpx-choice">
+          Экспорт GPX:
+          <select id="rmGpxInclude">
+            <option value="both">трек + КП</option>
+            <option value="track">трек</option>
+            <option value="marks">взятые КП</option>
+          </select>
+        </label>
       </div>
       <div class="rm-team-list" id="rmTeamList">
         <!-- rows injected by race_map.js -->

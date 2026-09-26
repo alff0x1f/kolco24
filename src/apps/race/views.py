@@ -2,6 +2,7 @@ import csv
 import datetime
 import json
 import re
+import xml.etree.ElementTree as ET
 from urllib.parse import quote
 
 from django.conf import settings
@@ -11,6 +12,7 @@ from django.db.models import Count, OuterRef, ProtectedError, Q, Subquery
 from django.http import (
     Http404,
     HttpResponse,
+    HttpResponseBadRequest,
     HttpResponseForbidden,
     HttpResponseRedirect,
     JsonResponse,
@@ -1555,6 +1557,10 @@ class RaceMapView(View):
             "race_map_track", kwargs={"race_slug": race.slug, "team_id": 0}
         )
         track_url_template = re.sub(r"/0/$", "/{team_id}/", track_url_placeholder)
+        gpx_url_placeholder = reverse(
+            "race_map_gpx", kwargs={"race_slug": race.slug, "team_id": 0}
+        )
+        gpx_url_template = re.sub(r"/0/gpx/$", "/{team_id}/gpx/", gpx_url_placeholder)
         marks_url = reverse("race_map_marks", kwargs={"race_slug": race.slug})
 
         context = {
@@ -1563,6 +1569,7 @@ class RaceMapView(View):
                 {
                     "positionsUrl": positions_url,
                     "trackUrlTemplate": track_url_template,
+                    "gpxUrlTemplate": gpx_url_template,
                     "marksUrl": marks_url,
                     "tileUrls": {
                         "osm": settings.MAP_TILE_URL_OSM,
@@ -1739,6 +1746,147 @@ class RaceMapTrackView(View):
             for index, (install_id, stats) in enumerate(ordered, start=1)
         ]
         return JsonResponse({"segments": segments, "devices": devices})
+
+
+def _gpx_time(ms):
+    if ms is None or ms <= 0:
+        return None
+    moment = datetime.datetime.fromtimestamp(ms / 1000, tz=datetime.timezone.utc)
+    return moment.strftime("%Y-%m-%dT%H:%M:%S.") + f"{moment.microsecond // 1000:03d}Z"
+
+
+def _gpx_add_point(parent, tag, lat, lon, time_ms, name=None, desc=None):
+    point = ET.SubElement(parent, tag, lat=repr(float(lat)), lon=repr(float(lon)))
+    time_text = _gpx_time(time_ms)
+    if time_text:
+        ET.SubElement(point, "time").text = time_text
+    if name is not None:
+        ET.SubElement(point, "name").text = name
+    if desc is not None:
+        ET.SubElement(point, "desc").text = desc
+    return point
+
+
+class RaceMapGpxView(View):
+    """One team's GPX export for the race-map page.
+
+    ``?include=`` picks the content: ``track`` (the raw, unthinned track —
+    one ``<trkseg>`` per ``(install_id, segment_id)`` session, as on the
+    map), ``marks`` (located checkpoint takes as ``<wpt>`` named by the КП
+    number, ``?`` for an unknown ``checkpoint_id``) or ``both`` (default).
+    """
+
+    INCLUDE_CHOICES = ("track", "marks", "both")
+
+    def _load_and_authorize(self, request, race_slug):
+        if not request.user.is_authenticated:
+            return None, HttpResponseRedirect(
+                reverse("login") + "?next=" + quote(request.path, safe="/:@")
+            )
+        race = get_object_or_404(Race, slug=race_slug)
+        if not can_edit_race(request.user, race):
+            return race, HttpResponseForbidden()
+        return race, None
+
+    def get(self, request, race_slug, team_id):
+        race, response = self._load_and_authorize(request, race_slug)
+        if response is not None:
+            return response
+
+        team = get_object_or_404(Team, pk=team_id, category2__race_id=race.id)
+        include = request.GET.get("include", "both")
+        if include not in self.INCLUDE_CHOICES:
+            return HttpResponseBadRequest("include must be track, marks or both")
+
+        team_label = f"№{team.start_number} {team.teamname}".strip()
+        root = ET.Element(
+            "gpx",
+            {
+                "version": "1.1",
+                "creator": "kolco24",
+                "xmlns": "http://www.topografix.com/GPX/1/1",
+            },
+        )
+        metadata = ET.SubElement(root, "metadata")
+        ET.SubElement(metadata, "name").text = f"{race.name} — {team_label}"
+
+        if include in ("marks", "both"):
+            self._add_marks(root, race, team)
+        if include in ("track", "both"):
+            self._add_track(root, race, team, team_label)
+
+        body = ET.tostring(root, encoding="utf-8", xml_declaration=True)
+        response = HttpResponse(body, content_type="application/gpx+xml")
+        number = re.sub(r"[^A-Za-z0-9_-]", "", team.start_number or "") or team.id
+        filename = f"{race.slug}-team-{number}-{include}.gpx"
+        response["Content-Disposition"] = f'attachment; filename="{filename}"'
+        return response
+
+    def _add_marks(self, root, race, team):
+        cp_numbers = dict(
+            Checkpoint.objects.filter(race=race).values_list("id", "number")
+        )
+        marks = (
+            Mark.objects.filter(
+                race_id=race.id,
+                team_id=team.id,
+                loc_lat__isnull=False,
+                loc_lon__isnull=False,
+            )
+            .order_by("created_at", "id")
+            .values(
+                "checkpoint_id",
+                "loc_lat",
+                "loc_lon",
+                "verified",
+                "method",
+                "trusted_ms",
+                "wall_ms",
+            )
+        )
+        for mark in marks:
+            number = cp_numbers.get(mark["checkpoint_id"])
+            time_ms = (
+                mark["trusted_ms"]
+                if mark["trusted_ms"] is not None
+                else mark["wall_ms"]
+            )
+            desc = (
+                f"{mark['method']}, {'verified' if mark['verified'] else 'не verified'}"
+            )
+            _gpx_add_point(
+                root,
+                "wpt",
+                mark["loc_lat"],
+                mark["loc_lon"],
+                time_ms,
+                name=str(number) if number is not None else "?",
+                desc=desc,
+            )
+
+    def _add_track(self, root, race, team, team_label):
+        points = (
+            TrackPoint.objects.filter(race_id=race.id, team_id=team.id)
+            .order_by("gps_time_ms", "created_at", "id")
+            .values_list(
+                "install_id", "segment_id", "lat", "lon", "altitude", "gps_time_ms"
+            )
+        )
+        trk = ET.SubElement(root, "trk")
+        ET.SubElement(trk, "name").text = team_label
+        segments = {}
+        for install_id, segment_id, lat, lon, altitude, gps_time_ms in points:
+            key = (install_id, segment_id)
+            if key not in segments:
+                segments[key] = ET.SubElement(trk, "trkseg")
+            trkpt = ET.SubElement(
+                segments[key], "trkpt", lat=repr(float(lat)), lon=repr(float(lon))
+            )
+            if altitude is not None:
+                ET.SubElement(trkpt, "ele").text = repr(float(altitude))
+            time_text = _gpx_time(gps_time_ms)
+            if time_text:
+                ET.SubElement(trkpt, "time").text = time_text
 
 
 class RaceMapMarksView(View):
