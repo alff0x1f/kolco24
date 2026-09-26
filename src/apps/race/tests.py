@@ -42,6 +42,7 @@ from apps.race.views import (
     RacePageView,
     RacePostEditView,
     RaceTeamsView,
+    _gpx_time,
 )
 from website.forms import NewsPostForm
 from website.models import NewsPost, Race
@@ -5246,6 +5247,7 @@ def test_race_map_page_config_island_handles_numeric_zero_slug(
     assert resp.status_code == 200
     config = _script_json(resp.content.decode(), "raceMapConfig")
     assert config["trackUrlTemplate"] == "/race/0/map/track/{team_id}/"
+    assert config["gpxUrlTemplate"] == "/race/0/map/track/{team_id}/gpx/"
 
 
 def test_race_map_page_url_resolves():
@@ -7800,3 +7802,166 @@ def test_checklist_filters_by_category(client, django_user_model):
         resp = client.get(url, {"category": value})
         assert len(resp.context["rows"]) == 2
         assert resp.context["selected_category"] is None
+
+
+# --- RaceMapGpxView (GPX export) --------------------------------------------
+
+GPX_NS = {"g": "http://www.topografix.com/GPX/1/1"}
+
+
+def _gpx_url(race, team, include=None):
+    url = reverse("race_map_gpx", kwargs={"race_slug": race.slug, "team_id": team.id})
+    return url + (f"?include={include}" if include else "")
+
+
+def _gpx_setup(client, django_user_model, name):
+    race = _make_race(slug=name)
+    team = _track_team(django_user_model, race, name)
+    base = 1_700_000_000_000
+    _make_track_point(team, race, f"{name}-p1", gps_time_ms=base, lat=55.1, lon=37.1)
+    _make_track_point(
+        team, race, f"{name}-p2", gps_time_ms=base + 5_000, lat=55.2, lon=37.2
+    )
+    _make_track_point(
+        team,
+        race,
+        f"{name}-p3",
+        gps_time_ms=base + 1_000,
+        lat=55.3,
+        lon=37.3,
+        install_id="install-2",
+        altitude=150.5,
+    )
+    cp = _make_checkpoint(race, 31, 10)
+    _make_located_mark(team, cp, lat=55.5, lon=37.5, wall_ms=base + 2_000)
+    _make_located_mark(team, 999_999, lat=55.6, lon=37.6, verified=False, wall_ms=0)
+    _make_mark(team, cp)  # no GPS fix -> not exported
+    _track_admin_client(client, django_user_model, race, name)
+    return race, team
+
+
+def _parse_gpx(resp):
+    import xml.etree.ElementTree as ET
+
+    return ET.fromstring(resp.content)
+
+
+@pytest.mark.django_db
+def test_race_map_gpx_anonymous_redirects_to_login(client, django_user_model):
+    race = _make_race(slug="map-gpx-anon")
+    team = _track_team(django_user_model, race, "map-gpx-anon")
+
+    resp = client.get(_gpx_url(race, team))
+
+    assert resp.status_code == 302
+    assert reverse("login") in resp.url
+
+
+@pytest.mark.django_db
+def test_race_map_gpx_denies_unassigned_superuser(client, django_user_model):
+    race = _make_race(slug="map-gpx-su")
+    team = _track_team(django_user_model, race, "map-gpx-su")
+    superuser = django_user_model.objects.create_superuser(
+        username="map-gpx-su", password="x", email="map-gpx-su@example.com"
+    )
+    client.force_login(superuser)
+
+    assert client.get(_gpx_url(race, team)).status_code == 403
+
+
+@pytest.mark.django_db
+def test_race_map_gpx_team_of_other_race_404(client, django_user_model):
+    race = _make_race(slug="map-gpx-own")
+    other = _make_race(slug="map-gpx-other")
+    team = _track_team(django_user_model, other, "map-gpx-other")
+    _track_admin_client(client, django_user_model, race, "map-gpx-own")
+
+    assert client.get(_gpx_url(race, team)).status_code == 404
+
+
+@pytest.mark.django_db
+def test_race_map_gpx_bad_include_400(client, django_user_model):
+    race, team = _gpx_setup(client, django_user_model, "map-gpx-bad")
+
+    assert client.get(_gpx_url(race, team, "all")).status_code == 400
+
+
+@pytest.mark.django_db
+def test_race_map_gpx_both(client, django_user_model):
+    race, team = _gpx_setup(client, django_user_model, "map-gpx-both")
+
+    resp = client.get(_gpx_url(race, team))
+
+    assert resp.status_code == 200
+    assert resp["Content-Type"] == "application/gpx+xml"
+    assert resp["Content-Disposition"] == (
+        'attachment; filename="map-gpx-both-team-1-both.gpx"'
+    )
+    root = _parse_gpx(resp)
+    assert root.get("version") == "1.1"
+
+    wpts = root.findall("g:wpt", GPX_NS)
+    assert [w.findtext("g:name", namespaces=GPX_NS) for w in wpts] == ["31", "?"]
+    assert wpts[0].get("lat") == "55.5"
+    assert wpts[0].get("lon") == "37.5"
+    assert wpts[0].findtext("g:time", namespaces=GPX_NS) == "2023-11-14T22:13:22.000Z"
+    # wall_ms=0 is the unset sentinel
+    assert wpts[1].find("g:time", GPX_NS) is None
+
+    segs = root.findall("g:trk/g:trkseg", GPX_NS)
+    assert len(segs) == 2
+    first = [(p.get("lat"), p.get("lon")) for p in segs[0].findall("g:trkpt", GPX_NS)]
+    assert first == [("55.1", "37.1"), ("55.2", "37.2")]
+    second = segs[1].findall("g:trkpt", GPX_NS)
+    assert second[0].findtext("g:ele", namespaces=GPX_NS) == "150.5"
+    assert second[0].findtext("g:time", namespaces=GPX_NS) == (
+        "2023-11-14T22:13:21.000Z"
+    )
+
+
+@pytest.mark.django_db
+def test_race_map_gpx_track_only(client, django_user_model):
+    race, team = _gpx_setup(client, django_user_model, "map-gpx-track")
+
+    root = _parse_gpx(client.get(_gpx_url(race, team, "track")))
+
+    assert root.findall("g:wpt", GPX_NS) == []
+    assert len(root.findall("g:trk/g:trkseg/g:trkpt", GPX_NS)) == 3
+
+
+@pytest.mark.django_db
+def test_race_map_gpx_marks_only(client, django_user_model):
+    race, team = _gpx_setup(client, django_user_model, "map-gpx-marks")
+
+    root = _parse_gpx(client.get(_gpx_url(race, team, "marks")))
+
+    assert root.find("g:trk", GPX_NS) is None
+    assert len(root.findall("g:wpt", GPX_NS)) == 2
+
+
+@pytest.mark.parametrize("ms", [253_402_300_800_000, 2**63 - 1])
+def test_gpx_time_out_of_range_is_none(ms):
+    assert _gpx_time(ms) is None
+
+
+@pytest.mark.django_db
+def test_race_map_gpx_out_of_range_time_exports_point_without_time(
+    client, django_user_model
+):
+    race = _make_race(slug="map-gpx-huge")
+    team = _track_team(django_user_model, race, "map-gpx-huge")
+    _make_track_point(team, race, "map-gpx-huge-p1", gps_time_ms=2**63 - 1)
+    cp = _make_checkpoint(race, 7, 10)
+    _make_located_mark(team, cp, wall_ms=2**63 - 1)
+    _track_admin_client(client, django_user_model, race, "map-gpx-huge")
+
+    resp = client.get(_gpx_url(race, team))
+
+    assert resp.status_code == 200
+    root = _parse_gpx(resp)
+    wpt = root.find("g:wpt", GPX_NS)
+    assert wpt.findtext("g:name", namespaces=GPX_NS) == "7"
+    assert wpt.find("g:time", GPX_NS) is None
+    trkpt = root.find("g:trk/g:trkseg/g:trkpt", GPX_NS)
+    assert trkpt is not None
+    assert trkpt.find("g:time", GPX_NS) is None

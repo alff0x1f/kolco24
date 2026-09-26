@@ -59,6 +59,24 @@
   cursor: pointer; user-select: none;
 }
 
+.rm-gpx-choice {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 13px; color: var(--ink-soft);
+}
+.rm-gpx-choice select {
+  flex: 1; min-width: 0; padding: 4px 6px; font-size: 13px;
+  border: 1px solid var(--line); border-radius: var(--radius-sm);
+  background: var(--paper); color: var(--ink-soft);
+}
+
+.rm-gpx {
+  flex-shrink: 0; padding: 2px 7px;
+  font-size: 11px; font-weight: 600; color: var(--rm-color, var(--primary-2));
+  border: 1px solid currentColor; border-radius: var(--radius-sm);
+  text-decoration: none;
+}
+.rm-gpx:hover { background: var(--paper-2); }
+
 .rm-team-list { flex: 1; overflow-y: auto; }
 .rm-group-label {
   padding: 10px 16px 4px;

@@ -176,7 +176,12 @@ Django 4.2 project. Source lives entirely under `src/`, with `manage.py` at `src
   "segment_id", "points": [[lat, lon], …]}, …], "devices": [{"install_id", "index", "platform", "first_gps_time_ms",
   "last_gps_time_ms", "points"}, …]}`, 404 if the team isn't in the race; `devices` is always present, one entry per
   `install_id` (an empty `install_id` is its own device), sorted by first fix (tie-break `install_id`), 1-based
-  `index`, `points` = raw pre-thinning count, `platform` from one `AppInstall` query, `""` when there is no row).
+  `index`, `points` = raw pre-thinning count, `platform` from one `AppInstall` query, `""` when there is no row);
+  `race_map_gpx` (`race/<slug>/map/track/<int:team_id>/gpx/?include=track|marks|both`, default `both`, other → 400;
+  `RaceMapGpxView`, same gate, 404 for a team outside the race) — GPX 1.1 download: the **unthinned** track, one
+  `<trkseg>` per `(install_id, segment_id)` session, and/or the team's located `Mark`s as `<wpt>` named by the КП
+  `number` (`?` for an unknown `checkpoint_id`); the page shows a «GPX» link on each selected team row, content picked
+  by the `#rmGpxInclude` select, URL from the `gpxUrlTemplate` config key.
   Positions uses `DISTINCT ON (team_id)` ordered by `-gps_time_ms, -created_at, -id` — the extra tie-breakers make the
   picked row deterministic when two phones of one team upload different points with the same `gps_time_ms` (otherwise
   marker flicker across polls). Track grouping keys a "session" by the pair `(install_id, segment_id)` (not `segment_id`
