@@ -1440,8 +1440,11 @@ def test_race_form_saves_map_url():
 
 
 @pytest.mark.django_db
-def test_race_form_rejects_http_map_url():
-    form = RaceForm(data=_race_form_data(map_url="http://example.com/r.mbtiles"))
+@pytest.mark.parametrize(
+    "value", ["http://example.com/r.mbtiles", "/\t/evil.com/r.mbtiles"]
+)
+def test_race_form_rejects_bad_map_url(value):
+    form = RaceForm(data=_race_form_data(map_url=value))
 
     assert not form.is_valid()
     assert "map_url" in form.errors

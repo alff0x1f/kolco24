@@ -32,10 +32,13 @@ RESERVATION_TTL = timedelta(minutes=20)
 
 
 def _is_map_url_valid(value):
-    # "//host" and "/\host" are protocol-relative: browsers and OkHttp treat a
-    # backslash as "/", so both would point the download at another host.
+    # "//host" is protocol-relative and would point the download at another host.
+    # URL parsers treat a backslash as "/" and strip tab/newline before parsing,
+    # so "/\host" or "/\t/host" would too: reject those characters anywhere.
     if value.startswith("/"):
-        return not value.startswith(("//", "/\\"))
+        if any(c == "\\" or c.isspace() or not c.isprintable() for c in value):
+            return False
+        return not value.startswith("//")
     try:
         _https_validator(value)
     except ValidationError:
