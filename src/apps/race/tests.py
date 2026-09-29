@@ -1421,6 +1421,7 @@ def _race_form_data(**overrides):
         "cost": 1000,
         "header_image": "",
         "header_logo": "",
+        "map_url": "",
         "reg_status": RegStatus.UPCOMING,
         "is_published": True,
         "is_teams_editable": False,
@@ -1428,6 +1429,22 @@ def _race_form_data(**overrides):
     }
     data.update(overrides)
     return data
+
+
+@pytest.mark.django_db
+def test_race_form_saves_map_url():
+    form = RaceForm(data=_race_form_data(map_url="https://example.com/r.mbtiles"))
+
+    assert form.is_valid(), form.errors
+    assert form.save().map_url == "https://example.com/r.mbtiles"
+
+
+@pytest.mark.django_db
+def test_race_form_rejects_http_map_url():
+    form = RaceForm(data=_race_form_data(map_url="http://example.com/r.mbtiles"))
+
+    assert not form.is_valid()
+    assert "map_url" in form.errors
 
 
 @pytest.mark.django_db
@@ -1689,6 +1706,37 @@ def test_race_edit_post_edit_updates_scalar_fields():
     assert race.name == "Updated Name"
     assert race.reg_status == RegStatus.OPEN
     assert race.cost == 2500
+
+
+@pytest.mark.django_db
+def test_race_edit_post_saves_map_url():
+    user = User.objects.create_user(username="pm1", password="p", email="pm1@e.com")
+    race = _make_race(slug="pm1")
+    RaceAdmin.objects.create(race=race, user=user, role=RaceAdmin.Role.ADMIN)
+
+    data = _post_data(slug="pm1", map_url="/media/maps/pm1.mbtiles")
+    resp = _edit_post(f"/race/{race.slug}/edit/", user, data, race_slug=race.slug)
+
+    assert resp.status_code == 302
+    race.refresh_from_db()
+    assert race.map_url == "/media/maps/pm1.mbtiles"
+
+
+@pytest.mark.django_db
+def test_race_edit_post_invalid_map_url_rerenders_with_error():
+    user = User.objects.create_user(username="pm2", password="p", email="pm2@e.com")
+    race = _make_race(slug="pm2")
+    RaceAdmin.objects.create(race=race, user=user, role=RaceAdmin.Role.ADMIN)
+
+    data = _post_data(slug="pm2", map_url="//evil.com/r.mbtiles")
+    resp = _edit_post(f"/race/{race.slug}/edit/", user, data, race_slug=race.slug)
+
+    assert resp.status_code == 200
+    html = resp.content.decode()
+    assert 'name="map_url"' in html
+    assert "has-error" in html
+    race.refresh_from_db()
+    assert race.map_url == ""
 
 
 @pytest.mark.django_db

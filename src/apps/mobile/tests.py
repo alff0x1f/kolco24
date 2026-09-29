@@ -1159,6 +1159,7 @@ RACE_FIELDS = {
     "date_end",
     "place",
     "reg_status",
+    "map_url",
 }
 
 
@@ -1363,6 +1364,35 @@ def test_races_empty_list_carries_etag_and_304(client, settings):
     assert second["ETag"] == etag
 
 
+@pytest.mark.django_db
+def test_races_map_url_empty_is_null_and_values_pass_through(client, settings):
+    from website.models.race import Race
+
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    Race.objects.create(name="None", slug="none", date="2026-01-03")
+    Race.objects.create(
+        name="Abs",
+        slug="abs",
+        date="2026-01-02",
+        map_url="https://cdn.example.com/abs.mbtiles",
+    )
+    Race.objects.create(
+        name="Rel", slug="rel", date="2026-01-01", map_url="/media/maps/rel.mbtiles"
+    )
+
+    response = client.get(RACES_PATH, **_signed_headers("GET", RACES_PATH, SECRET))
+
+    assert response.status_code == 200
+    by_slug = {r["slug"]: r["map_url"] for r in response.json()["races"]}
+    assert by_slug == {
+        "none": None,
+        "abs": "https://cdn.example.com/abs.mbtiles",
+        "rel": "/media/maps/rel.mbtiles",
+    }
+
+
 # --- races_version fingerprint -----------------------------------------------
 
 
@@ -1391,6 +1421,19 @@ def test_races_version_changes_on_publish_and_unpublish():
     race.is_published = False
     race.save()
     assert races_version() != published
+
+
+@pytest.mark.django_db
+def test_races_version_changes_when_map_url_set():
+    from apps.mobile.versioning import races_version
+    from website.models.race import Race
+
+    race = Race.objects.create(name="Race", slug="race")
+    before = races_version()
+
+    race.map_url = "https://cdn.example.com/race.mbtiles"
+    race.save()
+    assert races_version() != before
 
 
 @pytest.mark.django_db

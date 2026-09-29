@@ -322,7 +322,8 @@ Django 4.2 project. Source lives entirely under `src/`, with `manage.py` at `src
       so a response-shape change (fields added or removed) forces a cache bust at deploy time even when no DB row
       changed; bump `_LEGEND_SCHEMA_VERSION` whenever the legend response shape changes (`LegendCheckpointSerializer` or the
       per-tag `TagSerializer` fields) (current value: 3, bumped to 2 when `color` was added, to 3 when the `tags[]` identity
-      key was renamed `point` → `checkpoint_id`). Deliberately **no `versions.categories`** — category edits must move `versions.teams`;
+      key was renamed `point` → `checkpoint_id`). `races_version()` likewise prefixes `_RACES_SCHEMA_VERSION` — bump it whenever
+      `RaceListSerializer` fields change. Deliberately **no `versions.categories`** — category edits must move `versions.teams`;
       `races_version()` is global and deliberately absent from the per-race `sync` manifest (the races list is the app's
       entry point, probed via its own conditional GET).
     - **Member tags** (`active_member_tags()` + `member_tags_version()` in `versioning.py`; `MemberTagSerializer` in

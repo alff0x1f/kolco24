@@ -21,6 +21,7 @@ from django.db.models import (
 from django.utils import timezone
 
 _url_validator = URLValidator(schemes=["http", "https"])
+_https_validator = URLValidator(schemes=["https"])
 
 # «Живая бронь» места: команда создала draft-платёж (ушла на оплату), но ещё не
 # подтверждена. Такой черновик держит её места занятыми в течение этого окна,
@@ -28,6 +29,18 @@ _url_validator = URLValidator(schemes=["http", "https"])
 # реальное окно оплаты VTB (~5–10 мин) с запасом; fail-safe — расхождение TTL и
 # фактического срока заказа ограничено этим интервалом.
 RESERVATION_TTL = timedelta(minutes=20)
+
+
+def _is_map_url_valid(value):
+    # "//host" and "/\host" are protocol-relative: browsers and OkHttp treat a
+    # backslash as "/", so both would point the download at another host.
+    if value.startswith("/"):
+        return not value.startswith(("//", "/\\"))
+    try:
+        _https_validator(value)
+    except ValidationError:
+        return False
+    return True
 
 
 class RegStatus(TextChoices):
@@ -55,6 +68,11 @@ class Race(Model):
 
     header_image = CharField("Картинка в шапке", max_length=255, blank=True, default="")
     header_logo = CharField("Логотип в шапке", max_length=255, blank=True, default="")
+    # Offline MBTiles basemap for the mobile apps: an https URL or a root-relative
+    # path, which the app resolves against its own API base URL.
+    map_url = CharField(
+        "Оффлайн-карта (MBTiles)", max_length=500, blank=True, default=""
+    )
 
     is_teams_editable = BooleanField("Команды редактируемы", default=False)
     is_photo_upload_enabled = BooleanField("Загрузка фото включена", default=False)
@@ -91,6 +109,8 @@ class Race(Model):
                         "Введите корректный URL (http/https) "
                         "или путь от корня (/static/…)."
                     )
+        if self.map_url and not _is_map_url_valid(self.map_url):
+            errors["map_url"] = "Введите https-URL или путь от корня (/media/maps/…)."
         if errors:
             raise ValidationError(errors)
 

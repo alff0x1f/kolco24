@@ -81,13 +81,13 @@
 - Create: `src/website/migrations/0099_race_map_url.py`
 - Modify: `src/website/tests.py`
 
-- [ ] add `map_url` CharField to `Race`
-- [ ] extend `Race.clean()` with the `map_url` rules above (separate from the `header_image` loop — different rules)
-- [ ] generate migration `uv run python src/manage.py makemigrations website -n race_map_url`
-- [ ] write tests: `clean()` accepts `""`, `https://example.com/r.mbtiles`, `/media/maps/r.mbtiles`
-- [ ] write tests: `clean()` rejects `http://example.com/r.mbtiles`, `//evil.com/r.mbtiles`, `ftp://example.com/r`,
+- [x] add `map_url` CharField to `Race`
+- [x] extend `Race.clean()` with the `map_url` rules above (separate from the `header_image` loop — different rules)
+- [x] generate migration `uv run python src/manage.py makemigrations website -n race_map_url`
+- [x] write tests: `clean()` accepts `""`, `https://example.com/r.mbtiles`, `/media/maps/r.mbtiles`
+- [x] write tests: `clean()` rejects `http://example.com/r.mbtiles`, `//evil.com/r.mbtiles`, `ftp://example.com/r`,
       `/\evil.com/r.mbtiles`, `not-a-url` with an error on `map_url`
-- [ ] run `uv run pytest src/website/tests.py` - must pass before next task
+- [x] run `uv run pytest src/website/tests.py` - must pass before next task
 
 ### Task 2: Edit `map_url` on the race edit page
 
@@ -96,15 +96,15 @@
 - Modify: `src/templates/race/race_form.html`
 - Modify: `src/apps/race/tests.py`
 
-- [ ] add `"map_url"` to `RaceForm.Meta.fields`
-- [ ] add a manual `<input class="control mono…" name="map_url" type="text" maxlength="500">` in its own small
+- [x] add `"map_url"` to `RaceForm.Meta.fields`
+- [x] add a manual `<input class="control mono…" name="map_url" type="text" maxlength="500">` in its own small
       card «Мобильное приложение» (not inside the «Шапка страницы» card), with error display and hint
       «https://… или /media/maps/&lt;файл&gt;.mbtiles»
-- [ ] add `"map_url"` to `_race_form_data` (~1413) — not required (a missing blank CharField cleans to `""`),
+- [x] add `"map_url"` to `_race_form_data` (~1413) — not required (a missing blank CharField cleans to `""`),
       but keeps the fixture a full form
-- [ ] write test: editing a race with a valid `map_url` saves it
-- [ ] write test: an invalid `map_url` (`http://…`) re-renders the form with a field error and does not save
-- [ ] run `uv run pytest src/apps/race/tests.py` - must pass before next task
+- [x] write test: editing a race with a valid `map_url` saves it
+- [x] write test: an invalid `map_url` (`http://…`) re-renders the form with a field error and does not save
+- [x] run `uv run pytest src/apps/race/tests.py` - must pass before next task
 
 ### Task 3: Serve `map_url` in `GET /app/races/` and bust the races ETag
 
@@ -113,26 +113,26 @@
 - Modify: `src/apps/mobile/versioning.py`
 - Modify: `src/apps/mobile/tests.py`
 
-- [ ] add `map_url` to `RaceListSerializer` (empty string → `null`)
-- [ ] add `_RACES_SCHEMA_VERSION = 1` and fold it into `races_version()`; update the docstring
-- [ ] update the races field-set test (~1161) to include `map_url`
-- [ ] write tests: empty → `null`; `https://…` and `/media/maps/…` returned as is
-- [ ] write test: saving a new `map_url` moves `races_version()`
-- [ ] run `uv run pytest src/apps/mobile/tests.py` - must pass before next task
+- [x] add `map_url` to `RaceListSerializer` (empty string → `null`)
+- [x] add `_RACES_SCHEMA_VERSION = 1` and fold it into `races_version()`; update the docstring
+- [x] update the races field-set test (~1161) to include `map_url`
+- [x] write tests: empty → `null`; `https://…` and `/media/maps/…` returned as is
+- [x] write test: saving a new `map_url` moves `races_version()`
+- [x] run `uv run pytest src/apps/mobile/tests.py` - must pass before next task
 
 ### Task 4: Verify acceptance criteria
-- [ ] verify all requirements from Overview are implemented
-- [ ] verify edge cases (`//host`, `http`, empty) are handled
-- [ ] run full test suite: `uv run pytest`
-- [ ] run `make format` and `make lint`
+- [x] verify all requirements from Overview are implemented
+- [x] verify edge cases (`//host`, `http`, empty) are handled
+- [x] run full test suite: `uv run pytest`
+- [x] run `make format` and `make lint`
 
 ### Task 5: [Final] Update documentation
-- [ ] `src/apps/mobile/README.md`: add `map_url` to the `/app/races/` table row (~949) and describe its semantics
+- [x] `src/apps/mobile/README.md`: add `map_url` to the `/app/races/` table row (~949) and describe its semantics
       (null / https / root-relative resolved by the client, downloaded without HMAC); also update the races
       fingerprint line (~702) to mention the schema prefix
-- [ ] `CLAUDE.md`: note `_RACES_SCHEMA_VERSION` under **Conditional GET** (bump on `RaceListSerializer` shape change);
+- [x] `CLAUDE.md`: note `_RACES_SCHEMA_VERSION` under **Conditional GET** (bump on `RaceListSerializer` shape change);
       don't restate current constant values there (the legend value in CLAUDE.md is already stale)
-- [ ] move this plan to `docs/plans/completed/`
+- [x] move this plan to `docs/plans/completed/`
 
 ## Post-Completion
 

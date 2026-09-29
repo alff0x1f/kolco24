@@ -59,6 +59,7 @@ class RaceForm(forms.ModelForm):
             "people_limit",
             "header_image",
             "header_logo",
+            "map_url",
             "reg_status",
             "is_published",
             "is_teams_editable",
