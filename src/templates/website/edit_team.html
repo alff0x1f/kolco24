@@ -24,7 +24,7 @@
         <header class="page-head anim d1">
             <div>
                 <h1>Редактирование команды</h1>
-                {% if team.teamname %}<div class="sub">{{ team.teamname }}</div>{% endif %}
+                <div class="sub">{% if team.teamname %}{{ team.teamname }} {% endif %}(ID-{{ team.id|stringformat:"d" }})</div>
             </div>
             <div class="race-chip{% if reg_status != 'open' %} is-closed{% endif %}">
                 <span class="dot"></span>
@@ -238,10 +238,10 @@
                         {% if team_move_form %}
                         <div class="reg-closed-warn" style="margin-bottom:14px;">
                             <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="10" cy="10" r="8"/><path d="M10 6v5M10 13.5v.1"/></svg>
-                            Внимание: слот участника будет безвозвратно передан в&nbsp;другой аккаунт. Вернуть его обратно невозможно.
+                            Внимание: оплаченные места будут перенесены в&nbsp;выбранную команду. Если она принадлежит другому участнику, для обратного переноса потребуется его помощь.
                         </div>
                         <form method="post" action="{% url 'move_team_member' team.id %}"
-                              onsubmit="return confirm('Подтвердите перенос: слот будет безвозвратно передан другому аккаунту и вернуть его не получится. Продолжить?');">
+                              onsubmit="return confirm('Перенести оплаченные места в выбранную команду?');">
                             {% csrf_token %}
                             {% if team_move_form.non_field_errors %}
                             <span class="hint err">{{ team_move_form.non_field_errors|join:", " }}</span>

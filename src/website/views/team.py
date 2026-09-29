@@ -59,6 +59,18 @@ def payment_history(team: Team) -> list[dict]:
     return rows
 
 
+def member_move_history(team: Team):
+    return (
+        TeamMemberMove.objects.filter(
+            Q(from_team=team) | Q(to_team=team),
+            from_team__is_deleted=False,
+            to_team__is_deleted=False,
+        )
+        .select_related("from_team", "to_team")
+        .order_by("id")
+    )
+
+
 class EditTeamView(View):
     def get(self, request, team_id):
         if not request.user.is_authenticated:
@@ -107,9 +119,7 @@ class EditTeamView(View):
                 "team": team,
                 "action": reverse("edit_team", args=[team_id]),
                 "payment_history": payment_history(team),
-                "member_moves": TeamMemberMove.objects.filter(
-                    Q(from_team=team) | Q(to_team=team)
-                ).order_by("id"),
+                "member_moves": member_move_history(team),
                 "team_move_form": TeamMemberMoveForm(race_id=team.category2.race_id),
                 **build_team_form_context(
                     race, team, is_edit=True, bypass_limits=bypass
@@ -167,9 +177,7 @@ class EditTeamView(View):
                         "team": team,
                         "action": reverse("edit_team", args=[team_id]),
                         "payment_history": payment_history(team),
-                        "member_moves": TeamMemberMove.objects.filter(
-                            Q(from_team=team) | Q(to_team=team)
-                        ).order_by("id"),
+                        "member_moves": member_move_history(team),
                         "team_move_form": TeamMemberMoveForm(
                             race_id=team.category2.race_id
                         ),
@@ -233,9 +241,7 @@ class EditTeamView(View):
                 "team": team,
                 "action": reverse("edit_team", args=[team_id]),
                 "payment_history": payment_history(team),
-                "member_moves": TeamMemberMove.objects.filter(
-                    Q(from_team=team) | Q(to_team=team)
-                ).order_by("id"),
+                "member_moves": member_move_history(team),
                 "team_move_form": TeamMemberMoveForm(race_id=team.category2.race_id),
                 **build_team_form_context(
                     race,

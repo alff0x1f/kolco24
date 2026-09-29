@@ -11,7 +11,7 @@ from django.utils import timezone
 
 from apps.race.models import PaymentExtra, RaceExtra, TeamExtra
 from website.forms import TeamForm
-from website.models import Payment, Race, VTBPayment
+from website.models import Payment, Race, TeamMemberMove, VTBPayment
 from website.models.models import Team
 from website.models.race import (
     RESERVATION_TTL,
@@ -1907,6 +1907,7 @@ def test_edit_team_renders_base2_template(client):
     assert 'name="consent" checked disabled' in html
     # submit reads "Сохранить" with a доплата label swap available to the JS
     assert 'data-label-due="Сохранить и&nbsp;доплатить"' in html
+    assert f"(ID-{team.id})</div>" in html
 
 
 @pytest.mark.django_db
@@ -1921,6 +1922,60 @@ def test_edit_team_shows_move_section_when_paid_and_editable(client):
     assert "Переносы участников" in html
     assert reverse("move_team_member", args=[team.id]) in html
     assert 'name="moved_people"' in html
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("incoming", [False, True])
+def test_edit_team_excludes_deleted_teams_from_moves(client, incoming):
+    user, race, category, team = _create_team_for_edit(suffix="mvdeleted")
+    active = Team.objects.create(
+        owner=user, category2=category, teamname="Active destination"
+    )
+    deleted = Team.all_objects.create(
+        owner=user,
+        category2=category,
+        teamname="Deleted destination",
+        is_deleted=True,
+    )
+    moves = []
+    for other in (active, deleted):
+        moves.append(
+            TeamMemberMove.objects.create(
+                from_team=other if incoming else team,
+                to_team=team if incoming else other,
+                moved_people=1,
+            )
+        )
+    client.force_login(user)
+
+    response = client.get(reverse("edit_team", args=[team.id]))
+
+    assert response.status_code == 200
+    assert list(response.context["member_moves"]) == [moves[0]]
+    html = response.content.decode()
+    assert active.teamname in html
+    assert f"ID-{active.id} - {active.start_number} {active.teamname}" in html
+    assert deleted.teamname not in html
+    assert TeamMemberMove.objects.filter(pk=moves[1].pk).exists()
+
+
+@pytest.mark.django_db
+def test_member_move_rejects_deleted_destination(client):
+    user, race, category, team = _create_team_for_edit(suffix="mvdeletedpost")
+    deleted = Team.all_objects.create(owner=user, category2=category, is_deleted=True)
+    client.force_login(user)
+
+    response = client.post(
+        reverse("move_team_member", args=[team.id]),
+        {"to_team": deleted.id, "moved_people": 1},
+    )
+
+    assert response.status_code == 400
+    assert not TeamMemberMove.objects.filter(from_team=team).exists()
+    team.refresh_from_db()
+    deleted.refresh_from_db()
+    assert team.paid_people == 4
+    assert deleted.paid_people == 0
 
 
 @pytest.mark.django_db

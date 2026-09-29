@@ -305,6 +305,9 @@ class TeamMemberMoveForm(forms.ModelForm):
                 category2__race_id=race_id
             ).order_by("id")
         self.fields["to_team"].label = "Команда назначения"
+        self.fields["to_team"].label_from_instance = (
+            lambda team: f"ID-{team.id} - {team.start_number} {team.teamname}"
+        )
         self.fields["moved_people"].label = "Количество переносимых участников"
         self.fields["moved_people"].widget.attrs["min"] = 1
 
