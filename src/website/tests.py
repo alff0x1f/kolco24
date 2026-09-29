@@ -1960,7 +1960,7 @@ def test_edit_team_excludes_deleted_teams_from_moves(client, incoming):
     assert list(response.context["member_moves"]) == [moves[0]]
     html = response.content.decode()
     assert active.teamname in html
-    assert f"ID-{active.id} - {active.start_number} {active.teamname}" in html
+    assert f"ID-{active.id} - Active destination" in html
     assert deleted.teamname not in html
     assert TeamMemberMove.objects.filter(pk=moves[1].pk).exists()
 

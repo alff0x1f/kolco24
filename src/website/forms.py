@@ -310,8 +310,14 @@ class TeamMemberMoveForm(forms.ModelForm):
                 pk=from_team_id
             )
         self.fields["to_team"].label = "Команда назначения"
-        self.fields["to_team"].label_from_instance = (
-            lambda team: f"ID-{team.id} - {team.start_number} {team.teamname}"
+        self.fields["to_team"].label_from_instance = lambda team: " - ".join(
+            filter(
+                None,
+                (
+                    f"ID-{team.id}",
+                    " ".join(filter(None, (team.start_number, team.teamname))),
+                ),
+            )
         )
         self.fields["moved_people"].label = "Количество переносимых участников"
         self.fields["moved_people"].widget.attrs["min"] = 1
