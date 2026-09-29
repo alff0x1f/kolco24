@@ -4128,3 +4128,35 @@ def test_add_team_rejects_overlong_text_fields(client):
     form = response.context["team_form"]
     assert set(form.errors) >= {"city", "organization", "teamname", "athlet1"}
     assert not Team.objects.filter(category2=category).exists()
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(
+    "value",
+    ["", "https://example.com/r.mbtiles", "/media/maps/r.mbtiles"],
+)
+def test_race_clean_accepts_map_url(value):
+    race = Race.objects.create(name="Map", slug="map-ok", map_url=value)
+    race.full_clean()
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(
+    "value",
+    [
+        "http://example.com/r.mbtiles",
+        "//evil.com/r.mbtiles",
+        "/\\evil.com/r.mbtiles",
+        "/\t/evil.com/r.mbtiles",
+        "/\n/evil.com/r.mbtiles",
+        "/\r/evil.com/r.mbtiles",
+        "/media/maps/a\\b.mbtiles",
+        "ftp://example.com/r",
+        "not-a-url",
+    ],
+)
+def test_race_clean_rejects_map_url(value):
+    race = Race.objects.create(name="Map", slug="map-bad", map_url=value)
+    with pytest.raises(ValidationError) as exc_info:
+        race.full_clean()
+    assert list(exc_info.value.message_dict) == ["map_url"]

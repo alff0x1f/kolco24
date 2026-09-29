@@ -185,6 +185,25 @@
           </div>
         </section>
 
+        <!-- ── Мобильное приложение ── -->
+        <section class="card">
+          <div class="card-head">
+            <h2>Мобильное приложение</h2>
+            <span class="aux">map_url</span>
+          </div>
+          <div class="card-body">
+            <div class="field" style="margin-bottom: 0;">
+              <label for="f-map-url">Оффлайн-карта <span class="opt">— необязательно, MBTiles</span></label>
+              <input class="control mono{% if form.map_url.errors %} has-error{% endif %}" id="f-map-url"
+                     name="map_url" type="text" maxlength="500"
+                     value="{{ form.map_url.value|default_if_none:'' }}"
+                     placeholder="https://…/map.mbtiles или /media/maps/map.mbtiles">
+              {% if form.map_url.errors %}<span class="field-error">{{ form.map_url.errors|join:", " }}</span>
+              {% else %}<span class="field-hint">Растровая подложка, которую приложение скачивает перед стартом. Пусто — карты нет.</span>{% endif %}
+            </div>
+          </div>
+        </section>
+
         <!-- ── Категории ── -->
         <section class="card">
           <div class="card-head">

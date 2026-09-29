@@ -283,7 +283,13 @@ class JudgeScanUploadSerializer(serializers.Serializer):
 
 
 class RaceListSerializer(serializers.ModelSerializer):
-    """Public list view of a published race (no images)."""
+    """Public list view of a published race (no images).
+
+    ``map_url`` is the offline MBTiles basemap: an https URL or a root-relative
+    path the app resolves against its API base URL; ``null`` = no map.
+    """
+
+    map_url = serializers.SerializerMethodField()
 
     class Meta:
         model = Race
@@ -295,7 +301,11 @@ class RaceListSerializer(serializers.ModelSerializer):
             "date_end",
             "place",
             "reg_status",
+            "map_url",
         ]
+
+    def get_map_url(self, obj):
+        return obj.map_url or None
 
 
 class TagSerializer(serializers.Serializer):

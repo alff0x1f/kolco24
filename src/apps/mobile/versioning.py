@@ -97,10 +97,16 @@ def teams_version(race_id):
     return hashlib.blake2b(raw.encode(), digest_size=8).hexdigest()
 
 
+# Bump whenever the races response schema changes (fields added or removed on
+# RaceListSerializer), for the same cache-bust reason as _TEAMS_SCHEMA_VERSION.
+# History: 1 = map_url added.
+_RACES_SCHEMA_VERSION = 1
+
+
 def races_version():
     """Return a short, stable fingerprint of the published-races list.
 
-    Combines ``MAX(Race.updated_at)|COUNT`` over
+    Combines ``_RACES_SCHEMA_VERSION|MAX(Race.updated_at)|COUNT`` over
     ``Race.objects.filter(is_published=True)`` — the exact queryset
     ``RaceListView`` serves (single-source contract). An edit to a published
     race moves ``MAX(updated_at)`` (``auto_now``); a publish/unpublish moves
@@ -115,7 +121,7 @@ def races_version():
         max_updated=Max("updated_at"),
         count=Count("id"),
     )
-    raw = f"{agg['max_updated']}|{agg['count']}"
+    raw = f"{_RACES_SCHEMA_VERSION}|{agg['max_updated']}|{agg['count']}"
     return hashlib.blake2b(raw.encode(), digest_size=8).hexdigest()
 
 
