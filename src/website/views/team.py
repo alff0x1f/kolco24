@@ -21,7 +21,7 @@ from website.views.views_ import build_team_form_context
 
 
 def payment_history(team: Team) -> list[dict]:
-    """Строки «Истории оплат»: платежи и возвраты по ним, по дате.
+    """Строки «Истории оплат»: платежи, возвраты и переносы, по дате.
 
     Полный возврат переводит платёж ``done → cancel`` (см. settlement.py), так
     что фильтр по одному ``done`` прятал бы возвращённый платёж целиком — вместе
@@ -55,6 +55,17 @@ def payment_history(team: Team) -> list[dict]:
                     "amount": -refund.amount,
                 }
             )
+    for move in member_move_history(team):
+        incoming = move.to_team_id == team.id
+        rows.append(
+            {
+                "kind": "transfer",
+                "people": move.moved_people,
+                "date": move.move_date,
+                "incoming": incoming,
+                "other_team": move.from_team if incoming else move.to_team,
+            }
+        )
     rows.sort(key=lambda row: row["date"])
     return rows
 
@@ -119,7 +130,6 @@ class EditTeamView(View):
                 "team": team,
                 "action": reverse("edit_team", args=[team_id]),
                 "payment_history": payment_history(team),
-                "member_moves": member_move_history(team),
                 "team_move_form": TeamMemberMoveForm(
                     race_id=team.category2.race_id, from_team_id=team.id
                 ),
@@ -179,7 +189,6 @@ class EditTeamView(View):
                         "team": team,
                         "action": reverse("edit_team", args=[team_id]),
                         "payment_history": payment_history(team),
-                        "member_moves": member_move_history(team),
                         "team_move_form": TeamMemberMoveForm(
                             race_id=team.category2.race_id, from_team_id=team.id
                         ),
@@ -243,7 +252,6 @@ class EditTeamView(View):
                 "team": team,
                 "action": reverse("edit_team", args=[team_id]),
                 "payment_history": payment_history(team),
-                "member_moves": member_move_history(team),
                 "team_move_form": TeamMemberMoveForm(
                     race_id=team.category2.race_id, from_team_id=team.id
                 ),

@@ -205,12 +205,18 @@
                         <div class="pay-history">
                             {% for row in payment_history %}
                             <div class="pay-row{% if row.kind == 'refund' %} is-refund{% endif %}">
-                                {% if row.kind == 'refund' %}
+                                {% if row.kind == 'transfer' %}
+                                <span class="when">Перенос {% if row.incoming %}из команды{% else %}в команду{% endif %} {% if row.other_team.teamname %}{{ row.other_team.teamname }} {% endif %}(ID-{{ row.other_team.id|stringformat:"d" }}) · {{ row.date|date:"j.m.Y" }}</span>
+                                {% elif row.kind == 'refund' %}
                                 <span class="when">Возврат за&nbsp;{{ row.people|floatformat:"0" }}&nbsp;чел. · {{ row.date|date:"j.m.Y" }}</span>
                                 {% else %}
                                 <span class="when">Платёж за&nbsp;{{ row.people|floatformat:"0" }}&nbsp;чел. · {{ row.date|date:"j.m.Y" }}</span>
                                 {% endif %}
+                                {% if row.kind == 'transfer' %}
+                                <span class="amt">{% if row.incoming %}+{% else %}−{% endif %}{{ row.people|floatformat:"0" }}&nbsp;чел.</span>
+                                {% else %}
                                 <span class="amt">{{ row.amount|floatformat:"-2" }}&nbsp;₽</span>
+                                {% endif %}
                             </div>
                             {% endfor %}
                         </div>
@@ -223,17 +229,6 @@
                 <div class="card danger-zone anim d2">
                     <div class="card-section">
                         <div class="section-title">Переносы участников</div>
-
-                        {% if member_moves %}
-                        <div class="pay-history" style="margin-bottom:16px;">
-                            {% for move in member_moves %}
-                            <div class="pay-row">
-                                <span class="when">{{ move.from_team.teamname }} → {{ move.to_team.teamname }} · {{ move.move_date|date:"j.m.Y" }}</span>
-                                <span class="amt">{{ move.moved_people|floatformat:"0" }}&nbsp;чел.</span>
-                            </div>
-                            {% endfor %}
-                        </div>
-                        {% endif %}
 
                         {% if team_move_form %}
                         <div class="reg-closed-warn" style="margin-bottom:14px;">

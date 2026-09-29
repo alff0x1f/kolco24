@@ -1957,12 +1957,67 @@ def test_edit_team_excludes_deleted_teams_from_moves(client, incoming):
     response = client.get(reverse("edit_team", args=[team.id]))
 
     assert response.status_code == 200
-    assert list(response.context["member_moves"]) == [moves[0]]
+    transfers = response.context["payment_history"]
+    assert len(transfers) == 1
+    assert transfers[0]["kind"] == "transfer"
+    assert transfers[0]["other_team"] == active
+    assert transfers[0]["incoming"] == incoming
     html = response.content.decode()
     assert active.teamname in html
     assert f"ID-{active.id} - Active destination" in html
     assert deleted.teamname not in html
     assert TeamMemberMove.objects.filter(pk=moves[1].pk).exists()
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("is_editable", [False, True])
+@pytest.mark.parametrize("has_payment", [False, True])
+def test_transfer_history_remains_after_all_paid_places_are_moved(
+    client, is_editable, has_payment
+):
+    user, race, category, team = _create_team_for_edit(suffix="mvall")
+    destination = Team.objects.create(
+        owner=user, category2=category, teamname="Destination"
+    )
+    if has_payment:
+        Payment.objects.create(
+            owner=user,
+            team=team,
+            payment_method="sbp2",
+            payment_amount=4000,
+            paid_for=4,
+            status=Payment.STATUS_DONE,
+            sender_card_number="",
+        )
+    client.force_login(user)
+    response = client.post(
+        reverse("move_team_member", args=[team.id]),
+        {"to_team": destination.id, "moved_people": 4},
+    )
+    assert response.status_code == 302
+    team.refresh_from_db()
+    assert team.paid_people == 0
+    race.is_teams_editable = is_editable
+    race.save(update_fields=["is_teams_editable"])
+
+    response = client.get(reverse("edit_team", args=[team.id]))
+
+    assert response.status_code == 200
+    html = response.content.decode()
+    assert "История оплат" in html
+    assert f"Перенос в команду Destination (ID-{destination.id})" in html
+    assert "−4&nbsp;чел." in html
+    assert 'name="moved_people"' not in html
+    assert [row["kind"] for row in response.context["payment_history"]] == (
+        ["payment", "transfer"] if has_payment else ["transfer"]
+    )
+
+    response = client.get(reverse("edit_team", args=[destination.id]))
+    html = response.content.decode()
+    assert "История оплат" in html
+    assert f"Перенос из команды (ID-{team.id})" in html
+    assert "+4&nbsp;чел." in html
+    assert len(response.context["payment_history"]) == 1
 
 
 @pytest.mark.django_db
