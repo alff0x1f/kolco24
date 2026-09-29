@@ -21,7 +21,7 @@ from website.views.views_ import build_team_form_context
 
 
 def payment_history(team: Team) -> list[dict]:
-    """Строки «Истории оплат»: платежи и возвраты по ним, по дате.
+    """Строки «Истории оплат»: платежи, возвраты и переносы, по дате.
 
     Полный возврат переводит платёж ``done → cancel`` (см. settlement.py), так
     что фильтр по одному ``done`` прятал бы возвращённый платёж целиком — вместе
@@ -55,8 +55,28 @@ def payment_history(team: Team) -> list[dict]:
                     "amount": -refund.amount,
                 }
             )
+    for move in member_move_history(team):
+        incoming = move.to_team_id == team.id
+        rows.append(
+            {
+                "kind": "transfer",
+                "people": move.moved_people,
+                "date": move.move_date,
+                "incoming": incoming,
+                "other_team": move.from_team if incoming else move.to_team,
+            }
+        )
     rows.sort(key=lambda row: row["date"])
     return rows
+
+
+def member_move_history(team: Team):
+    # Удаление связанной команды не отменяет уже выполненный перенос мест.
+    return (
+        TeamMemberMove.objects.filter(Q(from_team=team) | Q(to_team=team))
+        .select_related("from_team", "to_team")
+        .order_by("id")
+    )
 
 
 class EditTeamView(View):
@@ -107,10 +127,9 @@ class EditTeamView(View):
                 "team": team,
                 "action": reverse("edit_team", args=[team_id]),
                 "payment_history": payment_history(team),
-                "member_moves": TeamMemberMove.objects.filter(
-                    Q(from_team=team) | Q(to_team=team)
-                ).order_by("id"),
-                "team_move_form": TeamMemberMoveForm(race_id=team.category2.race_id),
+                "team_move_form": TeamMemberMoveForm(
+                    race_id=team.category2.race_id, from_team_id=team.id
+                ),
                 **build_team_form_context(
                     race, team, is_edit=True, bypass_limits=bypass
                 ),
@@ -167,11 +186,8 @@ class EditTeamView(View):
                         "team": team,
                         "action": reverse("edit_team", args=[team_id]),
                         "payment_history": payment_history(team),
-                        "member_moves": TeamMemberMove.objects.filter(
-                            Q(from_team=team) | Q(to_team=team)
-                        ).order_by("id"),
                         "team_move_form": TeamMemberMoveForm(
-                            race_id=team.category2.race_id
+                            race_id=team.category2.race_id, from_team_id=team.id
                         ),
                         **build_team_form_context(
                             race,
@@ -233,10 +249,9 @@ class EditTeamView(View):
                 "team": team,
                 "action": reverse("edit_team", args=[team_id]),
                 "payment_history": payment_history(team),
-                "member_moves": TeamMemberMove.objects.filter(
-                    Q(from_team=team) | Q(to_team=team)
-                ).order_by("id"),
-                "team_move_form": TeamMemberMoveForm(race_id=team.category2.race_id),
+                "team_move_form": TeamMemberMoveForm(
+                    race_id=team.category2.race_id, from_team_id=team.id
+                ),
                 **build_team_form_context(
                     race,
                     team,
@@ -314,7 +329,9 @@ class TeamMemberMoveView(View):
 
         data = request.POST.copy()
         data["from_team"] = from_team.id
-        form = TeamMemberMoveForm(data, race_id=from_team.category2.race_id)
+        form = TeamMemberMoveForm(
+            data, race_id=from_team.category2.race_id, from_team_id=from_team.id
+        )
         if form.is_valid():
             form.save()
             form.instance.move_people()

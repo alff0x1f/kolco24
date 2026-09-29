@@ -10,8 +10,8 @@ from django.urls import reverse
 from django.utils import timezone
 
 from apps.race.models import PaymentExtra, RaceExtra, TeamExtra
-from website.forms import TeamForm
-from website.models import Payment, Race, VTBPayment
+from website.forms import TeamForm, TeamMemberMoveForm
+from website.models import Payment, Race, TeamMemberMove, VTBPayment
 from website.models.models import Team
 from website.models.race import (
     RESERVATION_TTL,
@@ -1907,6 +1907,7 @@ def test_edit_team_renders_base2_template(client):
     assert 'name="consent" checked disabled' in html
     # submit reads "Сохранить" with a доплата label swap available to the JS
     assert 'data-label-due="Сохранить и&nbsp;доплатить"' in html
+    assert f"(ID-{team.id})</div>" in html
 
 
 @pytest.mark.django_db
@@ -1921,6 +1922,222 @@ def test_edit_team_shows_move_section_when_paid_and_editable(client):
     assert "Переносы участников" in html
     assert reverse("move_team_member", args=[team.id]) in html
     assert 'name="moved_people"' in html
+    assert (
+        not response.context["team_move_form"]
+        .fields["to_team"]
+        .queryset.filter(pk=team.pk)
+        .exists()
+    )
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("incoming", [False, True])
+def test_edit_team_keeps_deleted_teams_in_transfer_history(client, incoming):
+    user, race, category, team = _create_team_for_edit(suffix="mvdeleted")
+    active = Team.objects.create(
+        owner=user, category2=category, teamname="Active destination"
+    )
+    deleted = Team.all_objects.create(
+        owner=user,
+        category2=category,
+        teamname="Deleted destination",
+        is_deleted=True,
+    )
+    moves = []
+    for other in (active, deleted):
+        moves.append(
+            TeamMemberMove.objects.create(
+                from_team=other if incoming else team,
+                to_team=team if incoming else other,
+                moved_people=1,
+            )
+        )
+    client.force_login(user)
+
+    response = client.get(reverse("edit_team", args=[team.id]))
+
+    assert response.status_code == 200
+    transfers = response.context["payment_history"]
+    assert len(transfers) == 2
+    assert [row["other_team"] for row in transfers] == [active, deleted]
+    assert all(row["kind"] == "transfer" for row in transfers)
+    assert all(row["incoming"] == incoming for row in transfers)
+    html = response.content.decode()
+    assert active.teamname in html
+    assert f"ID-{active.id} - Active destination" in html
+    assert deleted.teamname in html
+    assert (
+        not response.context["team_move_form"]
+        .fields["to_team"]
+        .queryset.filter(pk=deleted.pk)
+        .exists()
+    )
+    assert TeamMemberMove.objects.filter(pk=moves[1].pk).exists()
+
+
+@pytest.mark.django_db
+def test_transfer_history_survives_intermediate_team_deletion(client):
+    user, race, category, source = _create_team_for_edit(suffix="mvchain")
+    intermediate = Team.objects.create(
+        owner=user, category2=category, teamname="Intermediate"
+    )
+    destination = Team.objects.create(owner=user, category2=category)
+    client.force_login(user)
+
+    for sender, receiver in [(source, intermediate), (intermediate, destination)]:
+        response = client.post(
+            reverse("move_team_member", args=[sender.id]),
+            {"to_team": receiver.id, "moved_people": 4},
+        )
+        assert response.status_code == 302
+
+    intermediate.refresh_from_db()
+    assert intermediate.can_be_deleted
+    response = client.post(
+        reverse("edit_team", args=[intermediate.id]), {"delete_team": "1"}
+    )
+    assert response.status_code == 302
+    intermediate.refresh_from_db()
+    assert intermediate.is_deleted
+
+    for team, incoming, paid_people in [(source, False, 0), (destination, True, 4)]:
+        team.refresh_from_db()
+        assert team.paid_people == paid_people
+        response = client.get(reverse("edit_team", args=[team.id]))
+        assert response.status_code == 200
+        history = response.context["payment_history"]
+        assert len(history) == 1
+        assert history[0]["kind"] == "transfer"
+        assert history[0]["other_team"] == intermediate
+        assert history[0]["incoming"] == incoming
+        assert history[0]["people"] == 4
+        html = response.content.decode()
+        direction = "из команды" if incoming else "в команду"
+        assert f"Перенос {direction} Intermediate (ID-{intermediate.id})" in html
+        assert "История оплат" in html
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("is_editable", [False, True])
+@pytest.mark.parametrize("has_payment", [False, True])
+def test_transfer_history_remains_after_all_paid_places_are_moved(
+    client, is_editable, has_payment
+):
+    user, race, category, team = _create_team_for_edit(suffix="mvall")
+    destination = Team.objects.create(
+        owner=user, category2=category, teamname="Destination"
+    )
+    if has_payment:
+        Payment.objects.create(
+            owner=user,
+            team=team,
+            payment_method="sbp2",
+            payment_amount=4000,
+            paid_for=4,
+            status=Payment.STATUS_DONE,
+            sender_card_number="",
+        )
+    client.force_login(user)
+    response = client.post(
+        reverse("move_team_member", args=[team.id]),
+        {"to_team": destination.id, "moved_people": 4},
+    )
+    assert response.status_code == 302
+    team.refresh_from_db()
+    assert team.paid_people == 0
+    race.is_teams_editable = is_editable
+    race.save(update_fields=["is_teams_editable"])
+
+    response = client.get(reverse("edit_team", args=[team.id]))
+
+    assert response.status_code == 200
+    html = response.content.decode()
+    assert "История оплат" in html
+    assert f"Перенос в команду Destination (ID-{destination.id})" in html
+    assert "−4&nbsp;чел." in html
+    assert 'name="moved_people"' not in html
+    assert [row["kind"] for row in response.context["payment_history"]] == (
+        ["payment", "transfer"] if has_payment else ["transfer"]
+    )
+
+    response = client.get(reverse("edit_team", args=[destination.id]))
+    html = response.content.decode()
+    assert "История оплат" in html
+    assert f"Перенос из команды (ID-{team.id})" in html
+    assert "+4&nbsp;чел." in html
+    assert len(response.context["payment_history"]) == 1
+
+
+@pytest.mark.django_db
+def test_member_move_form_rejects_same_team_without_queryset_exclusion():
+    user, race, category, team = _create_team_for_edit(suffix="mvsameform")
+    form = TeamMemberMoveForm(
+        {"from_team": team.id, "to_team": team.id, "moved_people": 1},
+        race_id=race.id,
+    )
+
+    assert not form.is_valid()
+    assert "Нельзя перенести в ту же команду" in form.non_field_errors()
+
+
+@pytest.mark.django_db
+def test_member_move_rejects_same_team(client):
+    user, race, category, team = _create_team_for_edit(suffix="mvsamepost")
+    race.people_limit = 5
+    race.save(update_fields=["people_limit"])
+    client.force_login(user)
+
+    response = client.post(
+        reverse("move_team_member", args=[team.id]),
+        {"to_team": team.id, "moved_people": 1},
+    )
+
+    assert response.status_code == 400
+    assert not TeamMemberMove.objects.filter(from_team=team).exists()
+    team.refresh_from_db()
+    race.refresh_from_db()
+    assert team.paid_people == 4
+    assert race.reg_status == RegStatus.OPEN
+
+
+@pytest.mark.django_db
+def test_member_move_allows_another_team_of_same_owner(client):
+    user, race, category, team = _create_team_for_edit(suffix="mvownpost")
+    destination = Team.objects.create(owner=user, category2=category)
+    client.force_login(user)
+
+    response = client.post(
+        reverse("move_team_member", args=[team.id]),
+        {"to_team": destination.id, "moved_people": 1},
+    )
+
+    assert response.status_code == 302
+    team.refresh_from_db()
+    destination.refresh_from_db()
+    assert team.paid_people == 3
+    assert destination.paid_people == 1
+    assert TeamMemberMove.objects.filter(
+        from_team=team, to_team=destination, moved_people=1
+    ).exists()
+
+
+@pytest.mark.django_db
+def test_member_move_rejects_deleted_destination(client):
+    user, race, category, team = _create_team_for_edit(suffix="mvdeletedpost")
+    deleted = Team.all_objects.create(owner=user, category2=category, is_deleted=True)
+    client.force_login(user)
+
+    response = client.post(
+        reverse("move_team_member", args=[team.id]),
+        {"to_team": deleted.id, "moved_people": 1},
+    )
+
+    assert response.status_code == 400
+    assert not TeamMemberMove.objects.filter(from_team=team).exists()
+    team.refresh_from_db()
+    deleted.refresh_from_db()
+    assert team.paid_people == 4
+    assert deleted.paid_people == 0
 
 
 @pytest.mark.django_db

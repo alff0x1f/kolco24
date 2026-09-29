@@ -299,12 +299,26 @@ class TeamForm(forms.Form):
 class TeamMemberMoveForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         race_id = kwargs.pop("race_id", None)
+        from_team_id = kwargs.pop("from_team_id", None)
         super().__init__(*args, **kwargs)
         if race_id:
             self.fields["to_team"].queryset = Team.objects.filter(
                 category2__race_id=race_id
             ).order_by("id")
+        if from_team_id is not None:
+            self.fields["to_team"].queryset = self.fields["to_team"].queryset.exclude(
+                pk=from_team_id
+            )
         self.fields["to_team"].label = "Команда назначения"
+        self.fields["to_team"].label_from_instance = lambda team: " - ".join(
+            filter(
+                None,
+                (
+                    f"ID-{team.id}",
+                    " ".join(filter(None, (team.start_number, team.teamname))),
+                ),
+            )
+        )
         self.fields["moved_people"].label = "Количество переносимых участников"
         self.fields["moved_people"].widget.attrs["min"] = 1
 
@@ -336,6 +350,8 @@ class TeamMemberMoveForm(forms.ModelForm):
         from_team = self.cleaned_data.get("from_team")
         to_team = self.cleaned_data.get("to_team")
         if from_team and to_team:
+            if from_team.pk == to_team.pk:
+                raise forms.ValidationError("Нельзя перенести в ту же команду")
             if from_team.category2.race_id != to_team.category2.race_id:
                 raise forms.ValidationError("Teams must be in the same Race")
         return super().clean()

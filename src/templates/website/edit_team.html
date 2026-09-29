@@ -24,7 +24,7 @@
         <header class="page-head anim d1">
             <div>
                 <h1>Редактирование команды</h1>
-                {% if team.teamname %}<div class="sub">{{ team.teamname }}</div>{% endif %}
+                <div class="sub">{% if team.teamname %}{{ team.teamname }} {% endif %}(ID-{{ team.id|stringformat:"d" }})</div>
             </div>
             <div class="race-chip{% if reg_status != 'open' %} is-closed{% endif %}">
                 <span class="dot"></span>
@@ -205,12 +205,18 @@
                         <div class="pay-history">
                             {% for row in payment_history %}
                             <div class="pay-row{% if row.kind == 'refund' %} is-refund{% endif %}">
-                                {% if row.kind == 'refund' %}
+                                {% if row.kind == 'transfer' %}
+                                <span class="when">Перенос {% if row.incoming %}из команды{% else %}в команду{% endif %} {% if row.other_team.teamname %}{{ row.other_team.teamname }} {% endif %}(ID-{{ row.other_team.id|stringformat:"d" }}) · {{ row.date|date:"j.m.Y" }}</span>
+                                {% elif row.kind == 'refund' %}
                                 <span class="when">Возврат за&nbsp;{{ row.people|floatformat:"0" }}&nbsp;чел. · {{ row.date|date:"j.m.Y" }}</span>
                                 {% else %}
                                 <span class="when">Платёж за&nbsp;{{ row.people|floatformat:"0" }}&nbsp;чел. · {{ row.date|date:"j.m.Y" }}</span>
                                 {% endif %}
+                                {% if row.kind == 'transfer' %}
+                                <span class="amt">{% if row.incoming %}+{% else %}−{% endif %}{{ row.people|floatformat:"0" }}&nbsp;чел.</span>
+                                {% else %}
                                 <span class="amt">{{ row.amount|floatformat:"-2" }}&nbsp;₽</span>
+                                {% endif %}
                             </div>
                             {% endfor %}
                         </div>
@@ -224,24 +230,13 @@
                     <div class="card-section">
                         <div class="section-title">Переносы участников</div>
 
-                        {% if member_moves %}
-                        <div class="pay-history" style="margin-bottom:16px;">
-                            {% for move in member_moves %}
-                            <div class="pay-row">
-                                <span class="when">{{ move.from_team.teamname }} → {{ move.to_team.teamname }} · {{ move.move_date|date:"j.m.Y" }}</span>
-                                <span class="amt">{{ move.moved_people|floatformat:"0" }}&nbsp;чел.</span>
-                            </div>
-                            {% endfor %}
-                        </div>
-                        {% endif %}
-
                         {% if team_move_form %}
                         <div class="reg-closed-warn" style="margin-bottom:14px;">
                             <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="10" cy="10" r="8"/><path d="M10 6v5M10 13.5v.1"/></svg>
-                            Внимание: слот участника будет безвозвратно передан в&nbsp;другой аккаунт. Вернуть его обратно невозможно.
+                            Внимание: оплаченные места будут перенесены в&nbsp;выбранную команду. Если она принадлежит другому участнику, для обратного переноса потребуется его помощь.
                         </div>
                         <form method="post" action="{% url 'move_team_member' team.id %}"
-                              onsubmit="return confirm('Подтвердите перенос: слот будет безвозвратно передан другому аккаунту и вернуть его не получится. Продолжить?');">
+                              onsubmit="return confirm('Перенести оплаченные места в выбранную команду?');">
                             {% csrf_token %}
                             {% if team_move_form.non_field_errors %}
                             <span class="hint err">{{ team_move_form.non_field_errors|join:", " }}</span>
