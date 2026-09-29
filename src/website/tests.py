@@ -10,7 +10,7 @@ from django.urls import reverse
 from django.utils import timezone
 
 from apps.race.models import PaymentExtra, RaceExtra, TeamExtra
-from website.forms import TeamForm
+from website.forms import TeamForm, TeamMemberMoveForm
 from website.models import Payment, Race, TeamMemberMove, VTBPayment
 from website.models.models import Team
 from website.models.race import (
@@ -1922,6 +1922,12 @@ def test_edit_team_shows_move_section_when_paid_and_editable(client):
     assert "Переносы участников" in html
     assert reverse("move_team_member", args=[team.id]) in html
     assert 'name="moved_people"' in html
+    assert (
+        not response.context["team_move_form"]
+        .fields["to_team"]
+        .queryset.filter(pk=team.pk)
+        .exists()
+    )
 
 
 @pytest.mark.django_db
@@ -1957,6 +1963,59 @@ def test_edit_team_excludes_deleted_teams_from_moves(client, incoming):
     assert f"ID-{active.id} - {active.start_number} {active.teamname}" in html
     assert deleted.teamname not in html
     assert TeamMemberMove.objects.filter(pk=moves[1].pk).exists()
+
+
+@pytest.mark.django_db
+def test_member_move_form_rejects_same_team_without_queryset_exclusion():
+    user, race, category, team = _create_team_for_edit(suffix="mvsameform")
+    form = TeamMemberMoveForm(
+        {"from_team": team.id, "to_team": team.id, "moved_people": 1},
+        race_id=race.id,
+    )
+
+    assert not form.is_valid()
+    assert "Нельзя перенести в ту же команду" in form.non_field_errors()
+
+
+@pytest.mark.django_db
+def test_member_move_rejects_same_team(client):
+    user, race, category, team = _create_team_for_edit(suffix="mvsamepost")
+    race.people_limit = 5
+    race.save(update_fields=["people_limit"])
+    client.force_login(user)
+
+    response = client.post(
+        reverse("move_team_member", args=[team.id]),
+        {"to_team": team.id, "moved_people": 1},
+    )
+
+    assert response.status_code == 400
+    assert not TeamMemberMove.objects.filter(from_team=team).exists()
+    team.refresh_from_db()
+    race.refresh_from_db()
+    assert team.paid_people == 4
+    assert race.reg_status == RegStatus.OPEN
+
+
+@pytest.mark.django_db
+def test_member_move_allows_another_team_of_same_owner(client):
+    user, race, category, team = _create_team_for_edit(suffix="mvownpost")
+    destination = Team.objects.create(owner=user, category2=category)
+    client.force_login(user)
+
+    response = client.post(
+        reverse("move_team_member", args=[team.id]),
+        {"to_team": destination.id, "moved_people": 1},
+    )
+
+    assert response.status_code == 302
+    team.refresh_from_db()
+    destination.refresh_from_db()
+    assert team.paid_people == 3
+    assert destination.paid_people == 1
+    assert TeamMemberMove.objects.filter(
+        from_team=team, to_team=destination, moved_people=1
+    ).exists()
 
 
 @pytest.mark.django_db

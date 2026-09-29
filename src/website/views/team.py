@@ -120,7 +120,9 @@ class EditTeamView(View):
                 "action": reverse("edit_team", args=[team_id]),
                 "payment_history": payment_history(team),
                 "member_moves": member_move_history(team),
-                "team_move_form": TeamMemberMoveForm(race_id=team.category2.race_id),
+                "team_move_form": TeamMemberMoveForm(
+                    race_id=team.category2.race_id, from_team_id=team.id
+                ),
                 **build_team_form_context(
                     race, team, is_edit=True, bypass_limits=bypass
                 ),
@@ -179,7 +181,7 @@ class EditTeamView(View):
                         "payment_history": payment_history(team),
                         "member_moves": member_move_history(team),
                         "team_move_form": TeamMemberMoveForm(
-                            race_id=team.category2.race_id
+                            race_id=team.category2.race_id, from_team_id=team.id
                         ),
                         **build_team_form_context(
                             race,
@@ -242,7 +244,9 @@ class EditTeamView(View):
                 "action": reverse("edit_team", args=[team_id]),
                 "payment_history": payment_history(team),
                 "member_moves": member_move_history(team),
-                "team_move_form": TeamMemberMoveForm(race_id=team.category2.race_id),
+                "team_move_form": TeamMemberMoveForm(
+                    race_id=team.category2.race_id, from_team_id=team.id
+                ),
                 **build_team_form_context(
                     race,
                     team,
@@ -320,7 +324,9 @@ class TeamMemberMoveView(View):
 
         data = request.POST.copy()
         data["from_team"] = from_team.id
-        form = TeamMemberMoveForm(data, race_id=from_team.category2.race_id)
+        form = TeamMemberMoveForm(
+            data, race_id=from_team.category2.race_id, from_team_id=from_team.id
+        )
         if form.is_valid():
             form.save()
             form.instance.move_people()
