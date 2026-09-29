@@ -71,12 +71,9 @@ def payment_history(team: Team) -> list[dict]:
 
 
 def member_move_history(team: Team):
+    # Удаление связанной команды не отменяет уже выполненный перенос мест.
     return (
-        TeamMemberMove.objects.filter(
-            Q(from_team=team) | Q(to_team=team),
-            from_team__is_deleted=False,
-            to_team__is_deleted=False,
-        )
+        TeamMemberMove.objects.filter(Q(from_team=team) | Q(to_team=team))
         .select_related("from_team", "to_team")
         .order_by("id")
     )
