@@ -120,10 +120,6 @@ class HomeView(View):
 
         unfinished = unfinished_races(today)
 
-        upcoming_races = unfinished
-        if featured_race is not None:
-            upcoming_races = upcoming_races.exclude(pk=featured_race.pk)
-
         page_obj = Paginator(
             visible_publications(), self.publication_paginate_by
         ).get_page(request.GET.get("page"))
@@ -132,7 +128,7 @@ class HomeView(View):
             "owned_team_groups": owned_teams_by_race(request.user, unfinished),
             "page_obj": page_obj,
             "publications": page_obj.object_list,
-            "upcoming_races": upcoming_races[:3],
+            "upcoming_races": unfinished[:3],
         }
         return render(request, self.template_name, context)
 

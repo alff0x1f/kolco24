@@ -604,9 +604,9 @@ Use a scoped wrapper class (e.g. `.race-page`).
 published races with `date_end >= today`, grouped by race. `HomeView.get` builds one base queryset `unfinished_races`
 (`is_published=True`, `date_end__gte=today`, `order_by("date", "pk")` — named for the criterion, since a race running
 right now counts; `RaceListView`'s separate `future_races` context key means the stricter `date > today`) —
-`upcoming_races` (right column) is derived from
-it (minus `featured_race`, `[:3]`) while the panel gets `unfinished_races` **whole**, since a team can be in the spotlight
-race (excluded from `upcoming_races`) or past the slice. `owned_teams_by_race(user, races)` makes **one** query
+`upcoming_races` (right column) is its first three
+(`[:3]`, the spotlight `featured_race` deliberately **included** — the sidebar duplicates the banner) while the panel gets
+`unfinished_races` **whole**, since a team's race can be past the slice. `owned_teams_by_race(user, races)` makes **one** query
 (`select_related("category2", "category2__race")`) and groups in Python; an anonymous user gets `[]` with **zero**
 queries. Context key `owned_team_groups`, rendered by `src/templates/website/_home_owned_teams.html` (included without
 `only`), styled by the `.my-teams` block in `src/static/css/community.css` (no new breakpoints — rules added inside the

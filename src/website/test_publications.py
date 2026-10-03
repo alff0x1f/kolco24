@@ -1131,7 +1131,7 @@ def test_home_panel_includes_a_team_in_the_featured_race(client, django_user_mod
     response = client.get(reverse("index"))
 
     assert response.context["featured_race"] == race
-    assert list(response.context["upcoming_races"]) == []
+    assert list(response.context["upcoming_races"]) == [race]
     groups = response.context["owned_team_groups"]
     assert [group["race"] for group in groups] == [race]
     assert groups[0]["teams"][0]["name"] == "Спотлайтовая"
