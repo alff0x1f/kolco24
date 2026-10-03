@@ -593,9 +593,10 @@ New feature apps that don't fit in `website` live under `src/apps/<name>/`. Each
 `label = "race_app"`).
 
 **Template stacks**: `src/templates/website/` has two base templates. `base.html` + `src/static/css/theme.css` —
-Bootstrap-based, used by all pages except registration and login. `base-2.html` + `src/static/css/theme-2.css` — custom
-CSS (Rubik font, vanilla JS), used by `register.html`, `login.html`, `start.html`, and `verify.html`. New pages matching
-the new design should extend `base-2.html`. Page-specific CSS goes in `src/static/css/<page>.css` and is loaded via
+the legacy Bootstrap stack, still used by older pages. `base-2.html` + `src/static/css/theme-2.css` — custom CSS (Rubik
+font, vanilla JS), used by the home page, race catalog, publications, the race pages under `apps.race`, and login/register/
+passwordless pages (password reset is still on `base.html`). New pages matching the new design should extend
+`base-2.html`. Page-specific CSS goes in `src/static/css/<page>.css` and is loaded via
 `{% block extra_head %}`. Do not define a bare `.page` class in page-specific CSS — `theme-2.css` already defines it.
 Use a scoped wrapper class (e.g. `.race-page`).
 

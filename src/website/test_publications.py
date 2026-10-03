@@ -1339,6 +1339,14 @@ def test_home_new_race_button_superuser_only(client, django_user_model, role, vi
         ((2026, 10, 9), (2026, 10, 9), "9", "Окт", "2026", "9 октября 2026"),
         ((2026, 10, 9), (2026, 10, 11), "9–11", "Окт", "2026", "9–11 октября 2026"),
         (
+            (2026, 10, 10),
+            (2026, 10, 30),
+            "10–30",
+            "Окт",
+            "2026",
+            "10–30 октября 2026",
+        ),
+        (
             (2026, 9, 30),
             (2026, 10, 2),
             "30–2",
@@ -1373,14 +1381,16 @@ def test_race_card_shows_date_range_once(start, end, day, month, year, phrase):
 
 
 @pytest.mark.parametrize(
-    "start,end,day,month",
+    "start,end,day,month,year",
     [
-        ((2026, 10, 9), (2026, 10, 9), "9", "октября"),
-        ((2026, 10, 9), (2026, 10, 11), "9–11", "октября"),
-        ((2026, 9, 30), (2026, 10, 2), "30–2", "Сен–Окт"),
+        ((2026, 10, 9), (2026, 10, 9), "9", "октября", "2026"),
+        ((2026, 10, 9), (2026, 10, 11), "9–11", "октября", "2026"),
+        ((2026, 10, 10), (2026, 10, 30), "10–30", "октября", "2026"),
+        ((2026, 9, 30), (2026, 10, 2), "30–2", "Сен–Окт", "2026"),
+        ((2026, 12, 31), (2027, 1, 2), "31–2", "Дек–Янв", "2026–2027"),
     ],
 )
-def test_race_spotlight_date_badge_shows_range(start, end, day, month):
+def test_race_spotlight_date_badge_shows_range(start, end, day, month, year):
     race = Race(name="Гонка", slug="spot", date=date(*start), date_end=date(*end))
 
     html = render_to_string("website/_race_spotlight.html", {"featured_race": race})
@@ -1390,3 +1400,4 @@ def test_race_spotlight_date_badge_shows_range(start, end, day, month):
     )
     assert f"<strong>{day}</strong>" in badge
     assert f"<span>{month}</span>" in badge
+    assert f"<small>{year}</small>" in badge

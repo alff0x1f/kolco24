@@ -189,13 +189,21 @@
   white-space: nowrap;
 }
 
-.race-spotlight__date span {
-  margin-top: 4px;
+.race-spotlight__date span,
+.race-spotlight__date small {
   color: rgba(255, 255, 255, .72);
   font-size: 10px;
   font-weight: 500;
   letter-spacing: .12em;
   text-transform: uppercase;
+}
+
+.race-spotlight__date span { margin-top: 4px; }
+
+.race-spotlight__date--range span,
+.race-spotlight__date--range small {
+  letter-spacing: .02em;
+  white-space: nowrap;
 }
 
 .race-spotlight__eyebrow {
@@ -574,7 +582,7 @@
 
 .race-list-card {
   display: grid;
-  grid-template-columns: 55px minmax(0, 1fr) 22px;
+  grid-template-columns: 62px minmax(0, 1fr) 22px;
   align-items: center;
   gap: 14px;
   min-width: 0;
@@ -584,11 +592,6 @@
   background: var(--paper-2);
   box-shadow: var(--shadow-sm);
   position: relative;
-}
-
-.race-list-card:has(h3 a:focus-visible) {
-  outline: 2px solid var(--primary-2);
-  outline-offset: 2px;
 }
 
 .race-list-card__date {
@@ -622,6 +625,12 @@
 }
 
 .race-list-card__date span { margin-top: 4px; }
+
+.race-list-card__date--range span,
+.race-list-card__date--range small {
+  letter-spacing: .02em;
+  white-space: nowrap;
+}
 .race-list-card__body { min-width: 0; }
 .race-list-card__status { min-height: 17px; margin-bottom: 4px; }
 
@@ -655,6 +664,11 @@
   inset: 0;
   border-radius: inherit;
   content: "";
+}
+
+.race-list-card h3 a:focus-visible::after {
+  outline: 2px solid var(--primary-2);
+  outline-offset: 2px;
 }
 
 .race-list-card:hover { background: #f4f6f9; }
@@ -1060,7 +1074,7 @@
   .home-grid { padding-bottom: 32px; }
   .community-section__head { align-items: flex-start; flex-direction: column; gap: 7px; }
   .home-races__empty { padding: 19px 17px; }
-  .race-list-card { grid-template-columns: 50px minmax(0, 1fr) 22px; gap: 11px; padding: 15px 13px; border-radius: 0; border-right: 0; border-left: 0; }
+  .race-list-card { grid-template-columns: 56px minmax(0, 1fr) 22px; gap: 11px; padding: 15px 13px; border-radius: 0; border-right: 0; border-left: 0; }
   .publication-detail { padding: 14px 0 38px; }
   .publication-detail article { border-right: 0; border-left: 0; border-radius: 0; }
   .publication-detail__head { padding: 28px 20px 24px; }

@@ -14,6 +14,7 @@
         {% else %}
         <span>{{ start|date:"E" }}</span>
         {% endif %}
+        <small>{{ start|date:"Y" }}{% if end.year != start.year %}–{{ end|date:"Y" }}{% endif %}</small>
       </div>
       {% endwith %}
       <div class="race-spotlight__copy">
