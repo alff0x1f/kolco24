@@ -1300,11 +1300,12 @@ def test_race_administrators_visibility(client, role):
     response = client.get(reverse("race", args=[race.slug]))
 
     assert response.status_code == 200
-    allowed = role == "admin"
+    allowed = role in {"admin", "superuser"}
     html = response.content.decode()
     assert ('id="race-administrators-title"' in html) is allowed
     assert ("private-roster-member" in html) is allowed
     assert ("race_administrators" in response.context) is allowed
+    assert ('class="race-administrators-add"' in html) is (role == "superuser")
 
 
 @pytest.mark.django_db
@@ -1360,6 +1361,118 @@ def test_race_administrators_template_empty_state():
     context.update(can_edit_race=True, race_administrators=[], user=AnonymousUser())
     html = render_to_string("race/race_page.html", context)
     assert "Администраторы и модераторы не назначены" in html
+
+
+@pytest.mark.django_db
+def test_race_admins_superuser_adds_by_email_and_id(client):
+    race = _make_race(slug="admins-add")
+    su = User.objects.create_superuser(username="su", password="p", email="su@x.ru")
+    by_email = User.objects.create_user(username="e", email="Judge@Example.com")
+    by_id = User.objects.create_user(username="i", email="i@x.ru")
+    client.force_login(su)
+    url = reverse("race_admins", args=[race.slug])
+
+    response = client.post(
+        url, {"action": "add", "user": " judge@example.com ", "role": "moderator"}
+    )
+    assert response.status_code == 302
+    assert response["Location"].startswith(reverse("race", args=[race.slug]))
+    client.post(url, {"action": "add", "user": str(by_id.pk), "role": "admin"})
+
+    roles = dict(race.race_admins.values_list("user_id", "role"))
+    assert roles == {
+        by_email.pk: RaceAdmin.Role.MODERATOR,
+        by_id.pk: RaceAdmin.Role.ADMIN,
+    }
+    html = client.get(reverse("race", args=[race.slug])).content.decode()
+    assert "назначен(а): Администратор" in html
+
+
+@pytest.mark.django_db
+def test_race_admins_add_existing_changes_role(client):
+    race = _make_race(slug="admins-rerole")
+    su = User.objects.create_superuser(username="su", password="p", email="su@x.ru")
+    member = User.objects.create_user(username="m", email="m@x.ru")
+    RaceAdmin.objects.create(race=race, user=member, role=RaceAdmin.Role.MODERATOR)
+    client.force_login(su)
+
+    client.post(
+        reverse("race_admins", args=[race.slug]),
+        {"action": "add", "user": "m@x.ru", "role": "admin"},
+    )
+
+    assert RaceAdmin.objects.get(race=race, user=member).role == RaceAdmin.Role.ADMIN
+    assert RaceAdmin.objects.filter(race=race).count() == 1
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(
+    "data, error",
+    [
+        ({"user": "nobody@x.ru", "role": "admin"}, "не найден"),
+        ({"user": "", "role": "admin"}, "Укажите email или ID"),
+        ({"user": "m@x.ru", "role": "owner"}, "Неизвестная роль"),
+    ],
+)
+def test_race_admins_add_errors(client, data, error):
+    race = _make_race(slug="admins-errors")
+    su = User.objects.create_superuser(username="su", password="p", email="su@x.ru")
+    User.objects.create_user(username="m", email="m@x.ru")
+    client.force_login(su)
+
+    response = client.post(
+        reverse("race_admins", args=[race.slug]), {"action": "add", **data}, follow=True
+    )
+
+    assert not RaceAdmin.objects.filter(race=race).exists()
+    assert error in response.content.decode()
+
+
+@pytest.mark.django_db
+def test_race_admins_superuser_removes(client):
+    race = _make_race(slug="admins-remove")
+    other_race = _make_race(slug="admins-remove-other")
+    su = User.objects.create_superuser(username="su", password="p", email="su@x.ru")
+    member = User.objects.create_user(username="m", email="m@x.ru")
+    RaceAdmin.objects.create(race=race, user=member)
+    RaceAdmin.objects.create(race=other_race, user=member)
+    client.force_login(su)
+
+    client.post(
+        reverse("race_admins", args=[race.slug]),
+        {"action": "remove", "user_id": member.pk},
+    )
+
+    assert not RaceAdmin.objects.filter(race=race).exists()
+    assert RaceAdmin.objects.filter(race=other_race, user=member).exists()
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("role", ["anonymous", "visitor", "admin"])
+def test_race_admins_requires_superuser(client, role):
+    race = _make_race(slug="admins-deny")
+    target = User.objects.create_user(username="t", email="t@x.ru")
+    if role != "anonymous":
+        viewer = User.objects.create_user(username=role, email=f"{role}@x.ru")
+        if role == "admin":
+            RaceAdmin.objects.create(race=race, user=viewer)
+        client.force_login(viewer)
+
+    response = client.post(
+        reverse("race_admins", args=[race.slug]),
+        {"action": "add", "user": "t@x.ru", "role": "admin"},
+    )
+
+    assert response.status_code == (302 if role == "anonymous" else 403)
+    assert not RaceAdmin.objects.filter(race=race, user=target).exists()
+
+
+@pytest.mark.django_db
+def test_race_admins_get_not_allowed(client):
+    race = _make_race(slug="admins-get")
+    su = User.objects.create_superuser(username="su", password="p", email="su@x.ru")
+    client.force_login(su)
+    assert client.get(reverse("race_admins", args=[race.slug])).status_code == 405
 
 
 # --- can_edit_race access-control matrix ---

@@ -98,22 +98,52 @@
             <a class="btn btn-outline" href="{% url 'race_app_data' race.slug %}">Данные приложения</a>
           </div>
         </div>
-        <section class="card card-admin" aria-labelledby="race-administrators-title">
+        {% endif %}
+        {% if can_edit_race or can_manage_race_admins %}
+        <section class="card card-admin" id="race-administrators" aria-labelledby="race-administrators-title">
           <div class="side-head">
             <h3 id="race-administrators-title">Администраторы и модераторы</h3>
           </div>
           <div class="card-pad">
+            {% if messages %}
+            {% for message in messages %}
+            {% if "race-admins" in message.tags %}
+            <p class="race-administrators-msg{% if message.level_tag == "error" %} is-error{% endif %}">{{ message }}</p>
+            {% endif %}
+            {% endfor %}
+            {% endif %}
             {% if race_administrators %}
             <ul class="race-administrators">
               {% for member in race_administrators %}
               <li>
                 <span>{{ member.name }} <small class="race-administrators-id">ID: {{ member.user_id|unlocalize }}</small></span>
                 <span class="race-administrators-role">{{ member.role_label }}</span>
+                {% if can_manage_race_admins %}
+                <form method="post" action="{% url 'race_admins' race.slug %}" class="race-administrators-remove">
+                  {% csrf_token %}
+                  <input type="hidden" name="action" value="remove">
+                  <input type="hidden" name="user_id" value="{{ member.user_id|unlocalize }}">
+                  <button type="submit" class="race-administrators-remove-btn" aria-label="Удалить {{ member.name }}" title="Удалить">×</button>
+                </form>
+                {% endif %}
               </li>
               {% endfor %}
             </ul>
             {% else %}
             <p class="race-administrators-empty">Администраторы и модераторы не назначены</p>
+            {% endif %}
+            {% if can_manage_race_admins %}
+            <form method="post" action="{% url 'race_admins' race.slug %}" class="race-administrators-add">
+              {% csrf_token %}
+              <input type="hidden" name="action" value="add">
+              <input class="input" name="user" placeholder="Email или ID пользователя" required aria-label="Email или ID пользователя">
+              <select class="select" name="role" aria-label="Роль">
+                {% for value, label in race_admin_roles %}
+                <option value="{{ value }}">{{ label }}</option>
+                {% endfor %}
+              </select>
+              <button type="submit" class="btn btn-primary">Добавить</button>
+            </form>
             {% endif %}
           </div>
         </section>

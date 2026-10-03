@@ -118,6 +118,11 @@ Django 4.2 project. Source lives entirely under `src/`, with `manage.py` at `src
   shows an "Редактировать" button (admins). The "+ Новая гонка" link is not here — it lives
   in a superuser-only «Управление» card under «Соревнования» on the home page. That card reuses the race page's
   `.card-admin`/`.admin-actions` markup; both classes live in `theme-2.css` so every `base-2.html` page can use them.
+  The race page's «Администраторы и модераторы» card is shown to `can_edit_race` users (read-only) and to
+  superusers, who also get an add form (email or numeric user ID + role; adding an already-assigned user changes the
+  role) and per-row remove buttons. Both POST to `RaceAdminsView` (`race_admins`, `race/<slug>/admins/`,
+  `action=add|remove`) — superuser-only (anon → `login`, others → 403), PRG back to `#race-administrators`, feedback via
+  `messages` tagged `race-admins` and rendered only inside that card.
   `RaceLegendEditView` (template `src/templates/race/legend_form.html`, assets `src/static/css/legend_form.css` +
   `src/static/js/legend_form.js`) is a bulk-edit spreadsheet page for a race's checkpoints, backing the `edit_legend`
   (`race/<slug>/legend/edit/`) URL name. Gated on `can_edit_race`. **Must save via `instance.save()`** — never
