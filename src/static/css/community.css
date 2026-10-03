@@ -657,7 +657,7 @@
   content: "";
 }
 
-.race-list-card:hover h3 a { color: var(--primary-2); }
+.race-list-card:hover { background: #f4f6f9; }
 
 .race-list-card__body > p {
   overflow: hidden;
@@ -677,11 +677,6 @@
   color: var(--primary);
   background: #e7eef7;
   font-size: 13px;
-}
-
-.race-list-card:hover .race-list-card__arrow {
-  color: #fff;
-  background: var(--primary-2);
 }
 
 /* Catalog layout below the shared hero and section tabs. */
