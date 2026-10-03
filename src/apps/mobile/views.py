@@ -27,7 +27,7 @@ from rest_framework.views import APIView
 from website.models.checkpoint import Checkpoint, CheckpointTag
 from website.models.enums import CheckpointType
 from website.models.models import Athlet, Team
-from website.models.race import Category, Race
+from website.models.race import Category, Race, RaceAdmin
 from website.models.tag import Tag
 
 from .legend_crypto import build_bundle
@@ -166,7 +166,14 @@ class LoginView(AppAPIView):
     token of its own and requires no bearer. On success it authenticates via the
     project's :class:`apps.accounts.backends.EmailBackend` (``email__iexact``),
     creates a :class:`MobileToken` row (storing only the sha256 hash) and returns
-    the raw token **once** plus ``expires_at``.
+    the raw token **once** plus ``expires_at`` and ``admin_race_ids`` (sorted
+    ids of the races where the user holds ``RaceAdmin(role=ADMIN)``).
+
+    Login is open to every user (participants will sign in too); the list is
+    empty for a non-admin, and the app uses it to hide the admin actions. It is
+    a UI hint only: every write still checks ``can_edit_race`` itself, so a role
+    removed while a token lives is enforced at once. A moderator or a bare
+    superuser gets no ids, matching ``can_edit_race``.
 
     Failures are deliberately enumeration-safe: a wrong password and an unknown
     email both return ``401`` with the **same** generic message, never hinting
@@ -197,12 +204,23 @@ class LoginView(AppAPIView):
                 status=status.HTTP_401_UNAUTHORIZED,
             )
 
+        admin_race_ids = list(
+            RaceAdmin.objects.filter(user=user, role=RaceAdmin.Role.ADMIN)
+            .order_by("race_id")
+            .values_list("race_id", flat=True)
+        )
         raw, token_hash = generate_token()
         expires_at = timezone.now() + settings.MOBILE_TOKEN_TTL
         MobileToken.objects.create(
             user=user, token_hash=token_hash, expires_at=expires_at
         )
-        return Response({"token": raw, "expires_at": expires_at})
+        return Response(
+            {
+                "token": raw,
+                "expires_at": expires_at,
+                "admin_race_ids": admin_race_ids,
+            }
+        )
 
 
 class LogoutView(AppAPIView):

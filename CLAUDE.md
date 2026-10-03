@@ -262,8 +262,11 @@ Django 4.2 project. Source lives entirely under `src/`, with `manage.py` at `src
       `authentication_classes = []` a raised `NotAuthenticated` renders as 403), and a non-admin user gets an actionable
       403. Endpoints (all POST, `views.py`): `POST /app/login/` (gated by `SignedAppPermission` **only** — even the
       password endpoint is build-only; authenticates email+password via `EmailBackend`, mints a `MobileToken`, returns
-      `{token, expires_at}`; failures are enumeration-safe — wrong password and unknown email both 401 with the **same**
-      message, malformed body 400); `POST /app/logout/` (`SignedAppPermission + IsMobileUser`; flips `revoked_at` on the
+      `{token, expires_at, admin_race_ids}`; login stays **open to every user** (participants will use it too) —
+      `admin_race_ids` = sorted ids of the user's `RaceAdmin(role=ADMIN)` races (`[]` for a plain user, moderator or
+      bare superuser), a **UI hint only** so the app can hide the admin actions; every write re-checks
+      `can_edit_race`; failures are enumeration-safe — wrong password and unknown email both 401 with
+      the **same** message, malformed body 400); `POST /app/logout/` (`SignedAppPermission + IsMobileUser`; flips `revoked_at` on the
       **presented** token only, other tokens of the user stay valid); `POST /app/race/<id>/tags/`
       (`SignedAppPermission + IsMobileUser + CanEditRaceLegend`; the online-only NFC-chip→КП provisioning endpoint). Tag
       create takes body `{checkpoint_id, nfc_uid}` where **`checkpoint_id` is the checkpoint `id`** (`number` is not unique
