@@ -1,7 +1,6 @@
-{% load custom_filters %}
 <article class="race-list-card">
   {% with start=race.date end=race.date_end %}
-  <div class="race-list-card__date{% if end != start %} race-list-card__date--range{% endif %}" aria-hidden="true">
+  <div class="race-list-card__date{% if end != start %} race-list-card__date--range{% endif %}">
     <strong>{{ start|date:"j" }}{% if end != start %}–{{ end|date:"j" }}{% endif %}</strong>
     <span>{{ start|date:"M" }}{% if end.month != start.month or end.year != start.year %}–{{ end|date:"M" }}{% endif %}</span>
     <small>{{ start|date:"Y" }}{% if end.year != start.year %}–{{ end|date:"Y" }}{% endif %}</small>
@@ -20,10 +19,7 @@
       {% endif %}
     </div>
     <h3><a href="{% url 'race' race.slug %}">{{ race.name }}</a></h3>
-    <p>
-      {{ race|race_dates }}
-      {% if race.place %}<span aria-hidden="true"> · </span>{{ race.place }}{% endif %}
-    </p>
+    {% if race.place %}<p>{{ race.place }}</p>{% endif %}
   </div>
   <a class="race-list-card__arrow" href="{% url 'race' race.slug %}" aria-label="Открыть соревнование «{{ race.name }}»">→</a>
 </article>

@@ -1,4 +1,3 @@
-{% load custom_filters %}
 {% if featured_race %}
 <section class="race-spotlight" aria-labelledby="featured-race-title">
   <div class="container">
@@ -20,7 +19,7 @@
       <div class="race-spotlight__copy">
         <p class="race-spotlight__eyebrow"><span></span> {% if featured_race.reg_status == "open" %}Регистрация открыта{% else %}Регистрация скоро откроется{% endif %}</p>
         <h2 id="featured-race-title">{{ featured_race.name }}</h2>
-        <p>{{ featured_race|race_dates }}{% if featured_race.place %} · {{ featured_race.place }}{% endif %}</p>
+        {% if featured_race.place %}<p>{{ featured_race.place }}</p>{% endif %}
       </div>
       <div class="race-spotlight__actions">
         {% if featured_race.reg_status == "open" %}

@@ -12,6 +12,7 @@ from website.forms import NewsPostForm
 from website.models import NewsPost, PublicationKind, Race, RaceAdmin, Team
 from website.models.news import _clean_feed_html, _render_markdown
 from website.models.race import Category, RegStatus
+from website.templatetags.custom_filters import race_dates
 from website.views.community import owned_teams_by_race, unfinished_races
 
 
@@ -1355,7 +1356,7 @@ def test_home_new_race_button_superuser_only(client, django_user_model, role, vi
         ),
     ],
 )
-def test_race_card_shows_date_range(start, end, day, month, year, phrase):
+def test_race_card_shows_date_range_once(start, end, day, month, year, phrase):
     race = Race(name="Гонка", slug="card", date=date(*start), date_end=date(*end))
 
     html = render_to_string("website/_race_card.html", {"race": race})
@@ -1367,7 +1368,8 @@ def test_race_card_shows_date_range(start, end, day, month, year, phrase):
     assert f"<span>{month}</span>" in badge
     assert f"<small>{year}</small>" in badge
     assert ("race-list-card__date--range" in html) is (start != end)
-    assert phrase in html
+    assert phrase not in html  # the badge alone carries the date
+    assert race_dates(race) == phrase  # the owned-teams panel still uses it
 
 
 @pytest.mark.parametrize(
