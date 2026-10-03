@@ -115,7 +115,8 @@ Django 4.2 project. Source lives entirely under `src/`, with `manage.py` at `src
   delete policy than categories: a row still referenced by any `TeamExtra` is force-deactivated (`is_active=False`)
   rather than deleted (and `PROTECT` on the FK is the backstop); `code` is validated `^[a-z_]+$`, unique-within-race,
   editable on create but read-only once saved. `RacePageView.build_context` exposes `can_edit_race` so `race_page.html`
-  shows an "Редактировать" button (admins) and "+ Новая гонка" link (superusers).
+  shows an "Редактировать" button (admins). The "+ Новая гонка" link is not here — it lives
+  in a superuser-only «Управление» card (`.home-admin` in `community.css`) under «Соревнования» on the home page.
   `RaceLegendEditView` (template `src/templates/race/legend_form.html`, assets `src/static/css/legend_form.css` +
   `src/static/js/legend_form.js`) is a bulk-edit spreadsheet page for a race's checkpoints, backing the `edit_legend`
   (`race/<slug>/legend/edit/`) URL name. Gated on `can_edit_race`. **Must save via `instance.save()`** — never

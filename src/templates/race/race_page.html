@@ -96,9 +96,6 @@
             <a class="btn btn-outline" href="{% url 'race_payments' race.slug %}">Платежи</a>
             <a class="btn btn-outline" href="{% url 'race_checklist' race.slug %}">Лист выдачи</a>
             <a class="btn btn-outline" href="{% url 'race_app_data' race.slug %}">Данные приложения</a>
-            {% if user.is_superuser %}
-            <a class="btn btn-outline" href="{% url 'add_race' %}">+ Новая гонка</a>
-            {% endif %}
           </div>
         </div>
         <section class="card card-admin" aria-labelledby="race-administrators-title">

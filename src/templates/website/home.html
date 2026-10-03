@@ -55,6 +55,13 @@
           <a href="{% url 'race_list' %}#archive">Открыть архив <span aria-hidden="true">→</span></a>
         </div>
         {% endif %}
+
+        {% if user.is_superuser %}
+        <section class="home-admin" aria-labelledby="home-admin-title">
+          <h3 id="home-admin-title">Управление</h3>
+          <a class="community-button community-button--accent" href="{% url 'add_race' %}">+ Новая гонка</a>
+        </section>
+        {% endif %}
       </aside>
     </div>
   </main>

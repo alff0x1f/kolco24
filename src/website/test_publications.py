@@ -1309,3 +1309,24 @@ def test_home_panel_meta_has_no_dangling_separator_without_city(
     assert meta.count("·") == 1
     assert "12ч" in meta
     assert "3 участника" in meta
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(
+    "role,visible",
+    [("anonymous", False), ("user", False), ("staff", False), ("superuser", True)],
+)
+def test_home_new_race_button_superuser_only(client, django_user_model, role, visible):
+    if role != "anonymous":
+        user = django_user_model.objects.create_user(
+            username=role,
+            email=f"{role}@example.com",
+            is_staff=role == "staff",
+            is_superuser=role == "superuser",
+        )
+        client.force_login(user)
+
+    html = client.get(reverse("index")).content.decode()
+
+    assert (reverse("add_race") in html) is visible
+    assert ("+ Новая гонка" in html) is visible

@@ -1253,7 +1253,7 @@ def test_race_page_regular_user_no_edit_button(client):
 
 
 @pytest.mark.django_db
-def test_race_page_assigned_superuser_sees_edit_and_new_buttons(client):
+def test_race_page_assigned_superuser_sees_edit_button_not_new_race(client):
     admin = User.objects.create_superuser(
         username="su-buttons", password="p", email="su-buttons@example.com"
     )
@@ -1268,8 +1268,8 @@ def test_race_page_assigned_superuser_sees_edit_and_new_buttons(client):
     html = resp.content.decode()
     assert "card-admin" in html  # «Управление» panel in the sidebar
     assert reverse("edit_race", args=[race.slug]) in html
-    assert reverse("add_race") in html
-    assert "+ Новая гонка" in html
+    # «+ Новая гонка» lives on the home page now.
+    assert reverse("add_race") not in html
 
 
 @pytest.mark.django_db
