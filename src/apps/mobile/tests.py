@@ -5180,6 +5180,15 @@ def test_resolve_token_none_for_deactivated_user(django_user_model):
 LOGIN_PATH = "/app/login/"
 
 
+def _grant_race_role(user, role="admin", slug="login-race"):
+    """Give ``user`` a ``RaceAdmin`` row on a fresh race; return the race."""
+    from website.models.race import Race, RaceAdmin
+
+    race = Race.objects.create(name=slug, slug=slug)
+    RaceAdmin.objects.create(race=race, user=user, role=role)
+    return race
+
+
 def _signed_post(client, path, secret, body_bytes, key_id="test-v1"):
     """POST a JSON body with a build-HMAC signature over that exact body."""
     headers = _signed_headers("POST", path, secret, body=body_bytes, key_id=key_id)
@@ -5198,9 +5207,10 @@ def test_login_valid_creds_returns_token(client, settings, django_user_model):
     settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
     settings.MOBILE_APP_TS_WINDOW = 300
 
-    django_user_model.objects.create_user(
+    user = django_user_model.objects.create_user(
         username="crew1", email="crew1@example.com", password="s3cret-pass"
     )
+    race = _grant_race_role(user)
     body = json.dumps(
         {"email": "crew1@example.com", "password": "s3cret-pass"}
     ).encode()
@@ -5208,7 +5218,8 @@ def test_login_valid_creds_returns_token(client, settings, django_user_model):
 
     assert response.status_code == 200
     data = response.json()
-    assert set(data.keys()) == {"token", "expires_at"}
+    assert set(data.keys()) == {"token", "expires_at", "admin_race_ids"}
+    assert data["admin_race_ids"] == [race.id]
     raw = data["token"]
     assert raw
 
@@ -5227,12 +5238,107 @@ def test_login_case_insensitive_email(client, settings, django_user_model):
     settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
     settings.MOBILE_APP_TS_WINDOW = 300
 
-    django_user_model.objects.create_user(
+    user = django_user_model.objects.create_user(
         username="crewmixed", email="Mixed@Example.com", password="pw-123456"
     )
+    _grant_race_role(user)
     body = json.dumps({"email": "mixed@example.com", "password": "pw-123456"}).encode()
     response = _signed_post(client, LOGIN_PATH, SECRET, body)
     assert response.status_code == 200
+
+
+def _login(client, email, password="pw-123456"):
+    import json
+
+    body = json.dumps({"email": email, "password": password}).encode()
+    return _signed_post(client, LOGIN_PATH, SECRET, body)
+
+
+@pytest.mark.django_db
+def test_login_user_without_race_role_gets_empty_admin_race_ids(
+    client, settings, django_user_model
+):
+    from apps.mobile.models import MobileToken
+
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    django_user_model.objects.create_user(
+        username="plain", email="plain@example.com", password="pw-123456"
+    )
+    response = _login(client, "plain@example.com")
+
+    assert response.status_code == 200
+    assert response.json()["admin_race_ids"] == []
+    assert MobileToken.objects.count() == 1
+
+
+@pytest.mark.django_db
+def test_login_moderator_gets_empty_admin_race_ids(client, settings, django_user_model):
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    user = django_user_model.objects.create_user(
+        username="mod", email="mod@example.com", password="pw-123456"
+    )
+    _grant_race_role(user, role="moderator")
+    response = _login(client, "mod@example.com")
+
+    assert response.status_code == 200
+    assert response.json()["admin_race_ids"] == []
+
+
+@pytest.mark.django_db
+def test_login_superuser_without_race_role_gets_empty_admin_race_ids(
+    client, settings, django_user_model
+):
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    django_user_model.objects.create_superuser(
+        username="root", email="root@example.com", password="pw-123456"
+    )
+    response = _login(client, "root@example.com")
+
+    assert response.status_code == 200
+    assert response.json()["admin_race_ids"] == []
+
+
+@pytest.mark.django_db
+def test_login_admin_wrong_password_returns_401(client, settings, django_user_model):
+    from apps.mobile.models import MobileToken
+
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    user = django_user_model.objects.create_user(
+        username="adm", email="adm@example.com", password="pw-123456"
+    )
+    _grant_race_role(user)
+    response = _login(client, "adm@example.com", password="WRONG")
+
+    assert response.status_code == 401
+    assert response.json() == {"detail": "Неверный email или пароль"}
+    assert MobileToken.objects.count() == 0
+
+
+@pytest.mark.django_db
+def test_login_admin_race_ids_lists_only_admin_races_sorted(
+    client, settings, django_user_model
+):
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    user = django_user_model.objects.create_user(
+        username="multi", email="multi@example.com", password="pw-123456"
+    )
+    first = _grant_race_role(user, slug="race-a")
+    _grant_race_role(user, role="moderator", slug="race-b")
+    third = _grant_race_role(user, slug="race-c")
+    response = _login(client, "multi@example.com")
+
+    assert response.status_code == 200
+    assert response.json()["admin_race_ids"] == sorted([first.id, third.id])
 
 
 @pytest.mark.django_db
@@ -6191,9 +6297,10 @@ def test_post_body_signature_roundtrip_passes_and_parses_data(
     settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
     settings.MOBILE_APP_TS_WINDOW = 300
 
-    django_user_model.objects.create_user(
+    user = django_user_model.objects.create_user(
         username="bsr1", email="bsr1@example.com", password="pw-123456"
     )
+    _grant_race_role(user)
     body = json.dumps({"email": "bsr1@example.com", "password": "pw-123456"}).encode()
     headers = _signed_headers("POST", LOGIN_PATH, SECRET, body=body)
 
