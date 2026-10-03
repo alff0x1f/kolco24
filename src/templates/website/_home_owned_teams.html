@@ -10,7 +10,7 @@
     <div class="my-teams__group">
       <h3 class="my-teams__race">
         <a href="{% url 'race' group.race.slug %}">{{ group.race.name }}</a>
-        <span class="my-teams__race-date">{% if group.race.date_end != group.race.date %}{{ group.race.date|date:"j E" }}–{{ group.race.date_end|date:"j E Y" }}{% else %}{{ group.race.date|date:"j E Y" }}{% endif %}</span>
+        <span class="my-teams__race-date">{{ group.race|race_dates }}</span>
       </h3>
       {% for team in group.teams %}
       <article class="my-teams__row">

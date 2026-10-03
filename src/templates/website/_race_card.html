@@ -1,3 +1,4 @@
+{% load custom_filters %}
 <article class="race-list-card">
   {% with start=race.date end=race.date_end %}
   <div class="race-list-card__date{% if end != start %} race-list-card__date--range{% endif %}" aria-hidden="true">
@@ -20,7 +21,7 @@
     </div>
     <h3><a href="{% url 'race' race.slug %}">{{ race.name }}</a></h3>
     <p>
-      {% if race.date_end != race.date %}{{ race.date|date:"j E" }}–{{ race.date_end|date:"j E Y" }}{% else %}{{ race.date|date:"j E Y" }}{% endif %}
+      {{ race|race_dates }}
       {% if race.place %}<span aria-hidden="true"> · </span>{{ race.place }}{% endif %}
     </p>
   </div>

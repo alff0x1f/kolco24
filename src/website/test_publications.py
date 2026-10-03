@@ -1333,15 +1333,29 @@ def test_home_new_race_button_superuser_only(client, django_user_model, role, vi
 
 
 @pytest.mark.parametrize(
-    "start,end,day,month,year",
+    "start,end,day,month,year,phrase",
     [
-        ((2026, 10, 9), (2026, 10, 9), "9", "Окт", "2026"),
-        ((2026, 10, 9), (2026, 10, 11), "9–11", "Окт", "2026"),
-        ((2026, 9, 30), (2026, 10, 2), "30–2", "Сен–Окт", "2026"),
-        ((2026, 12, 31), (2027, 1, 2), "31–2", "Дек–Янв", "2026–2027"),
+        ((2026, 10, 9), (2026, 10, 9), "9", "Окт", "2026", "9 октября 2026"),
+        ((2026, 10, 9), (2026, 10, 11), "9–11", "Окт", "2026", "9–11 октября 2026"),
+        (
+            (2026, 9, 30),
+            (2026, 10, 2),
+            "30–2",
+            "Сен–Окт",
+            "2026",
+            "30 сентября – 2 октября 2026",
+        ),
+        (
+            (2026, 12, 31),
+            (2027, 1, 2),
+            "31–2",
+            "Дек–Янв",
+            "2026–2027",
+            "31 декабря 2026 – 2 января 2027",
+        ),
     ],
 )
-def test_race_card_date_badge_shows_range(start, end, day, month, year):
+def test_race_card_shows_date_range(start, end, day, month, year, phrase):
     race = Race(name="Гонка", slug="card", date=date(*start), date_end=date(*end))
 
     html = render_to_string("website/_race_card.html", {"race": race})
@@ -1353,3 +1367,24 @@ def test_race_card_date_badge_shows_range(start, end, day, month, year):
     assert f"<span>{month}</span>" in badge
     assert f"<small>{year}</small>" in badge
     assert ("race-list-card__date--range" in html) is (start != end)
+    assert phrase in html
+
+
+@pytest.mark.parametrize(
+    "start,end,day,month",
+    [
+        ((2026, 10, 9), (2026, 10, 9), "9", "октября"),
+        ((2026, 10, 9), (2026, 10, 11), "9–11", "октября"),
+        ((2026, 9, 30), (2026, 10, 2), "30–2", "Сен–Окт"),
+    ],
+)
+def test_race_spotlight_date_badge_shows_range(start, end, day, month):
+    race = Race(name="Гонка", slug="spot", date=date(*start), date_end=date(*end))
+
+    html = render_to_string("website/_race_spotlight.html", {"featured_race": race})
+
+    badge = _extract(
+        r'<div class="race-spotlight__date[^"]*">(.*?)</div>', html, "badge"
+    )
+    assert f"<strong>{day}</strong>" in badge
+    assert f"<span>{month}</span>" in badge

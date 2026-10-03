@@ -184,6 +184,11 @@
   line-height: 1;
 }
 
+.race-spotlight__date--range strong {
+  font-size: 21px;
+  white-space: nowrap;
+}
+
 .race-spotlight__date span {
   margin-top: 4px;
   color: rgba(255, 255, 255, .72);
@@ -1021,6 +1026,7 @@
   .race-spotlight__inner { grid-template-columns: 64px minmax(0, 1fr); gap: 16px; padding: 18px; }
   .race-spotlight__date { width: 62px; height: 67px; }
   .race-spotlight__date strong { font-size: 24px; }
+  .race-spotlight__date--range strong { font-size: 18px; }
   .race-spotlight h2 { font-size: 21px; }
   .race-spotlight__actions { grid-column: 1 / -1; }
   .community-section__head h2 { font-size: 25px; }
