@@ -214,12 +214,14 @@ class RaceAdminsView(View):
     """
 
     MESSAGE_TAG = "race-admins"
+    MAX_QUERY_LENGTH = 254
 
     def post(self, request, race_slug):
         race = get_object_or_404(Race, slug=race_slug)
+        race_url = reverse("race", kwargs={"race_slug": race.slug})
         if not request.user.is_authenticated:
             return HttpResponseRedirect(
-                reverse("login") + "?next=" + quote(request.path, safe="/:@")
+                reverse("login") + "?next=" + quote(race_url, safe="/:@")
             )
         if not request.user.is_superuser:
             return HttpResponseForbidden()
@@ -230,9 +232,7 @@ class RaceAdminsView(View):
             self._remove(request, race)
         else:
             return HttpResponseBadRequest()
-        return HttpResponseRedirect(
-            reverse("race", kwargs={"race_slug": race.slug}) + "#race-administrators"
-        )
+        return HttpResponseRedirect(race_url + "#race-administrators")
 
     def _error(self, request, text):
         messages.error(request, text, extra_tags=self.MESSAGE_TAG)
@@ -243,7 +243,10 @@ class RaceAdminsView(View):
     @staticmethod
     def _find_user(query):
         user_model = get_user_model()
-        if query.isdigit():
+        # isdigit() alone also accepts "²"/"①", which int() rejects.
+        if query.isascii() and query.isdigit():
+            if len(query) > 18:
+                return None
             return user_model.objects.filter(pk=int(query)).first()
         return user_model.objects.filter(email__iexact=query).order_by("pk").first()
 
@@ -255,6 +258,9 @@ class RaceAdminsView(View):
             return
         if not query:
             self._error(request, "Укажите email или ID пользователя.")
+            return
+        if len(query) > self.MAX_QUERY_LENGTH:
+            self._error(request, "Слишком длинное значение.")
             return
         user = self._find_user(query)
         if user is None:
@@ -279,7 +285,7 @@ class RaceAdminsView(View):
             race=race, user_id=_row_id(request.POST.get("user_id"))
         ).delete()
         if deleted:
-            self._success(request, "Назначение удалено.")
+            self._success(request, "Роль снята.")
         else:
             self._error(request, "Назначение не найдено.")
 

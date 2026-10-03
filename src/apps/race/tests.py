@@ -1412,6 +1412,9 @@ def test_race_admins_add_existing_changes_role(client):
         ({"user": "nobody@x.ru", "role": "admin"}, "не найден"),
         ({"user": "", "role": "admin"}, "Укажите email или ID"),
         ({"user": "m@x.ru", "role": "owner"}, "Неизвестная роль"),
+        ({"user": "²", "role": "admin"}, "не найден"),
+        ({"user": "1" * 40, "role": "admin"}, "не найден"),
+        ({"user": "a" * 255, "role": "admin"}, "Слишком длинное значение"),
     ],
 )
 def test_race_admins_add_errors(client, data, error):
@@ -1463,7 +1466,12 @@ def test_race_admins_requires_superuser(client, role):
         {"action": "add", "user": "t@x.ru", "role": "admin"},
     )
 
-    assert response.status_code == (302 if role == "anonymous" else 403)
+    if role == "anonymous":
+        assert response.status_code == 302
+        race_url = reverse("race", args=[race.slug])
+        assert response["Location"] == f"{reverse('login')}?next={race_url}"
+    else:
+        assert response.status_code == 403
     assert not RaceAdmin.objects.filter(race=race, user=target).exists()
 
 

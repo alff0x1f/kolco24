@@ -117,15 +117,17 @@
               {% for member in race_administrators %}
               <li>
                 <span>{{ member.name }} <small class="race-administrators-id">ID: {{ member.user_id|unlocalize }}</small></span>
-                <span class="race-administrators-role">{{ member.role_label }}</span>
-                {% if can_manage_race_admins %}
-                <form method="post" action="{% url 'race_admins' race.slug %}" class="race-administrators-remove">
-                  {% csrf_token %}
-                  <input type="hidden" name="action" value="remove">
-                  <input type="hidden" name="user_id" value="{{ member.user_id|unlocalize }}">
-                  <button type="submit" class="race-administrators-remove-btn" aria-label="Удалить {{ member.name }}" title="Удалить">×</button>
-                </form>
-                {% endif %}
+                <div class="race-administrators-meta">
+                  <span class="race-administrators-role">{{ member.role_label }}</span>
+                  {% if can_manage_race_admins %}
+                  <form method="post" action="{% url 'race_admins' race.slug %}" class="race-administrators-remove">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="remove">
+                    <input type="hidden" name="user_id" value="{{ member.user_id|unlocalize }}">
+                    <button type="submit" class="race-administrators-remove-btn" aria-label="Снять роль у {{ member.name }}" title="Снять роль">×</button>
+                  </form>
+                  {% endif %}
+                </div>
               </li>
               {% endfor %}
             </ul>
@@ -136,13 +138,20 @@
             <form method="post" action="{% url 'race_admins' race.slug %}" class="race-administrators-add">
               {% csrf_token %}
               <input type="hidden" name="action" value="add">
-              <input class="input" name="user" placeholder="Email или ID пользователя" required aria-label="Email или ID пользователя">
-              <select class="select" name="role" aria-label="Роль">
-                {% for value, label in race_admin_roles %}
-                <option value="{{ value }}">{{ label }}</option>
-                {% endfor %}
-              </select>
-              <button type="submit" class="btn btn-primary">Добавить</button>
+              <div class="field">
+                <label for="race-admin-user">Пользователь</label>
+                <input class="input" id="race-admin-user" name="user" placeholder="Email или ID" maxlength="254" required>
+              </div>
+              <div class="field">
+                <label for="race-admin-role">Роль</label>
+                <select class="select" id="race-admin-role" name="role">
+                  {% for value, label in race_admin_roles %}
+                  <option value="{{ value }}"{% if value == "moderator" %} selected{% endif %}>{{ label }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+              <p class="race-administrators-hint">Если пользователь уже назначен, его роль изменится.</p>
+              <button type="submit" class="btn btn-primary">Назначить</button>
             </form>
             {% endif %}
           </div>
