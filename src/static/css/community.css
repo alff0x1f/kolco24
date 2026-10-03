@@ -578,12 +578,6 @@
   border-radius: var(--radius);
   background: var(--paper-2);
   box-shadow: var(--shadow-sm);
-  transition: border-color .12s, box-shadow .12s;
-}
-
-.race-list-card:hover {
-  border-color: #cdd3da;
-  box-shadow: var(--shadow);
 }
 
 .race-list-card__date {
