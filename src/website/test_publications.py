@@ -1,5 +1,5 @@
 import re
-from datetime import timedelta
+from datetime import date, timedelta
 from unittest.mock import patch
 
 import pytest
@@ -1330,3 +1330,26 @@ def test_home_new_race_button_superuser_only(client, django_user_model, role, vi
 
     assert (reverse("add_race") in html) is visible
     assert ("+ Новая гонка" in html) is visible
+
+
+@pytest.mark.parametrize(
+    "start,end,day,month,year",
+    [
+        ((2026, 10, 9), (2026, 10, 9), "9", "Окт", "2026"),
+        ((2026, 10, 9), (2026, 10, 11), "9–11", "Окт", "2026"),
+        ((2026, 9, 30), (2026, 10, 2), "30–2", "Сен–Окт", "2026"),
+        ((2026, 12, 31), (2027, 1, 2), "31–2", "Дек–Янв", "2026–2027"),
+    ],
+)
+def test_race_card_date_badge_shows_range(start, end, day, month, year):
+    race = Race(name="Гонка", slug="card", date=date(*start), date_end=date(*end))
+
+    html = render_to_string("website/_race_card.html", {"race": race})
+
+    badge = _extract(
+        r'<div class="race-list-card__date[^"]*"[^>]*>(.*?)</div>', html, "badge"
+    )
+    assert f"<strong>{day}</strong>" in badge
+    assert f"<span>{month}</span>" in badge
+    assert f"<small>{year}</small>" in badge
+    assert ("race-list-card__date--range" in html) is (start != end)

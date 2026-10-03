@@ -596,6 +596,11 @@
   line-height: 1;
 }
 
+.race-list-card__date--range strong {
+  font-size: 17px;
+  white-space: nowrap;
+}
+
 .race-list-card__date span,
 .race-list-card__date small {
   color: var(--muted);
