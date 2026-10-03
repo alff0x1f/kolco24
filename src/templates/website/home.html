@@ -57,9 +57,13 @@
         {% endif %}
 
         {% if user.is_superuser %}
-        <section class="home-admin" aria-labelledby="home-admin-title">
-          <h3 id="home-admin-title">Управление</h3>
-          <a class="community-button community-button--accent" href="{% url 'add_race' %}">+ Новая гонка</a>
+        <section class="card card-admin" aria-labelledby="home-admin-title">
+          <div class="side-head">
+            <h3 id="home-admin-title">Управление</h3>
+          </div>
+          <div class="card-pad admin-actions">
+            <a class="btn btn-primary" href="{% url 'add_race' %}">+ Новая гонка</a>
+          </div>
         </section>
         {% endif %}
       </aside>

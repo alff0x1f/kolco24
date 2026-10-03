@@ -286,40 +286,7 @@
   font-weight: 500;
 }
 
-.home-admin {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  margin-top: 16px;
-  padding: 16px 18px 18px;
-  border: 1px solid #c5d6f3;
-  border-radius: var(--radius);
-  background: var(--paper-2);
-  box-shadow: 0 1px 2px rgba(69, 130, 236, .08),
-              0 8px 24px rgba(69, 130, 236, .06);
-}
-
-.community-page .home-admin h3 {
-  margin: 0;
-  color: var(--primary);
-  font-size: 13px;
-  font-weight: 600;
-  letter-spacing: .1em;
-  text-transform: uppercase;
-}
-
-.home-admin h3::before {
-  display: inline-block;
-  width: 7px;
-  height: 7px;
-  margin-right: 8px;
-  border-radius: 50%;
-  background: var(--primary-2);
-  vertical-align: middle;
-  content: "";
-}
-
-.home-admin .community-button { width: 100%; }
+.home-races .card-admin { margin: 16px 0 0; }
 
 .community-section__head {
   display: flex;
