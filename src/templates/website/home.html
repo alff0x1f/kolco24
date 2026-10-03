@@ -51,9 +51,20 @@
         </div>
         {% else %}
         <div class="home-races__empty">
-          <p>{% if featured_race %}Другие старты пока не объявлены.{% else %}Новые старты пока не объявлены.{% endif %} В архиве остаются маршруты, команды и результаты прошлых лет.</p>
+          <p>Новые старты пока не объявлены. В архиве остаются маршруты, команды и результаты прошлых лет.</p>
           <a href="{% url 'race_list' %}#archive">Открыть архив <span aria-hidden="true">→</span></a>
         </div>
+        {% endif %}
+
+        {% if user.is_superuser %}
+        <section class="card card-admin" aria-labelledby="home-admin-title">
+          <div class="side-head">
+            <h3 id="home-admin-title">Управление</h3>
+          </div>
+          <div class="card-pad admin-actions">
+            <a class="btn btn-primary" href="{% url 'add_race' %}">+ Новая гонка</a>
+          </div>
+        </section>
         {% endif %}
       </aside>
     </div>

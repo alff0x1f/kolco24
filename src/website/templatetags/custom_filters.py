@@ -1,6 +1,7 @@
 from urllib.parse import parse_qs, urlsplit
 
 from django import template
+from django.template.defaultfilters import date as date_filter
 from django.urls import Resolver404, resolve
 
 register = template.Library()
@@ -109,3 +110,16 @@ def ru_plural(value, forms):
     if 2 <= n % 10 <= 4 and not (12 <= n % 100 <= 14):
         return few
     return many
+
+
+@register.filter(name="race_dates")
+def race_dates(race):
+    """Race dates as one phrase, e.g. «9–11 октября 2026», sharing month/year."""
+    start, end = race.date, race.date_end
+    if end == start:
+        return date_filter(start, "j E Y")
+    if (start.year, start.month) == (end.year, end.month):
+        return f"{date_filter(start, 'j')}–{date_filter(end, 'j E Y')}"
+    if start.year == end.year:
+        return f"{date_filter(start, 'j E')} – {date_filter(end, 'j E Y')}"
+    return f"{date_filter(start, 'j E Y')} – {date_filter(end, 'j E Y')}"

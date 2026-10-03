@@ -1,5 +1,5 @@
 import re
-from datetime import timedelta
+from datetime import date, timedelta
 from unittest.mock import patch
 
 import pytest
@@ -12,6 +12,7 @@ from website.forms import NewsPostForm
 from website.models import NewsPost, PublicationKind, Race, RaceAdmin, Team
 from website.models.news import _clean_feed_html, _render_markdown
 from website.models.race import Category, RegStatus
+from website.templatetags.custom_filters import race_dates
 from website.views.community import owned_teams_by_race, unfinished_races
 
 
@@ -1131,7 +1132,7 @@ def test_home_panel_includes_a_team_in_the_featured_race(client, django_user_mod
     response = client.get(reverse("index"))
 
     assert response.context["featured_race"] == race
-    assert list(response.context["upcoming_races"]) == []
+    assert list(response.context["upcoming_races"]) == [race]
     groups = response.context["owned_team_groups"]
     assert [group["race"] for group in groups] == [race]
     assert groups[0]["teams"][0]["name"] == "Спотлайтовая"
@@ -1309,3 +1310,94 @@ def test_home_panel_meta_has_no_dangling_separator_without_city(
     assert meta.count("·") == 1
     assert "12ч" in meta
     assert "3 участника" in meta
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(
+    "role,visible",
+    [("anonymous", False), ("user", False), ("staff", False), ("superuser", True)],
+)
+def test_home_new_race_button_superuser_only(client, django_user_model, role, visible):
+    if role != "anonymous":
+        user = django_user_model.objects.create_user(
+            username=role,
+            email=f"{role}@example.com",
+            is_staff=role == "staff",
+            is_superuser=role == "superuser",
+        )
+        client.force_login(user)
+
+    html = client.get(reverse("index")).content.decode()
+
+    assert (reverse("add_race") in html) is visible
+    assert ("+ Новая гонка" in html) is visible
+
+
+@pytest.mark.parametrize(
+    "start,end,day,month,year,phrase",
+    [
+        ((2026, 10, 9), (2026, 10, 9), "9", "Окт", "2026", "9 октября 2026"),
+        ((2026, 10, 9), (2026, 10, 11), "9–11", "Окт", "2026", "9–11 октября 2026"),
+        (
+            (2026, 10, 10),
+            (2026, 10, 30),
+            "10–30",
+            "Окт",
+            "2026",
+            "10–30 октября 2026",
+        ),
+        (
+            (2026, 9, 30),
+            (2026, 10, 2),
+            "30–2",
+            "Сен–Окт",
+            "2026",
+            "30 сентября – 2 октября 2026",
+        ),
+        (
+            (2026, 12, 31),
+            (2027, 1, 2),
+            "31–2",
+            "Дек–Янв",
+            "2026–2027",
+            "31 декабря 2026 – 2 января 2027",
+        ),
+    ],
+)
+def test_race_card_shows_date_range_once(start, end, day, month, year, phrase):
+    race = Race(name="Гонка", slug="card", date=date(*start), date_end=date(*end))
+
+    html = render_to_string("website/_race_card.html", {"race": race})
+
+    badge = _extract(
+        r'<div class="race-list-card__date[^"]*"[^>]*>(.*?)</div>', html, "badge"
+    )
+    assert f"<strong>{day}</strong>" in badge
+    assert f"<span>{month}</span>" in badge
+    assert f"<small>{year}</small>" in badge
+    assert ("race-list-card__date--range" in html) is (start != end)
+    assert phrase not in html  # the badge alone carries the date
+    assert race_dates(race) == phrase  # the owned-teams panel still uses it
+
+
+@pytest.mark.parametrize(
+    "start,end,day,month,year",
+    [
+        ((2026, 10, 9), (2026, 10, 9), "9", "октября", "2026"),
+        ((2026, 10, 9), (2026, 10, 11), "9–11", "октября", "2026"),
+        ((2026, 10, 10), (2026, 10, 30), "10–30", "октября", "2026"),
+        ((2026, 9, 30), (2026, 10, 2), "30–2", "Сен–Окт", "2026"),
+        ((2026, 12, 31), (2027, 1, 2), "31–2", "Дек–Янв", "2026–2027"),
+    ],
+)
+def test_race_spotlight_date_badge_shows_range(start, end, day, month, year):
+    race = Race(name="Гонка", slug="spot", date=date(*start), date_end=date(*end))
+
+    html = render_to_string("website/_race_spotlight.html", {"featured_race": race})
+
+    badge = _extract(
+        r'<div class="race-spotlight__date[^"]*">(.*?)</div>', html, "badge"
+    )
+    assert f"<strong>{day}</strong>" in badge
+    assert f"<span>{month}</span>" in badge
+    assert f"<small>{year}</small>" in badge

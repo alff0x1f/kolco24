@@ -115,7 +115,9 @@ Django 4.2 project. Source lives entirely under `src/`, with `manage.py` at `src
   delete policy than categories: a row still referenced by any `TeamExtra` is force-deactivated (`is_active=False`)
   rather than deleted (and `PROTECT` on the FK is the backstop); `code` is validated `^[a-z_]+$`, unique-within-race,
   editable on create but read-only once saved. `RacePageView.build_context` exposes `can_edit_race` so `race_page.html`
-  shows an "Редактировать" button (admins) and "+ Новая гонка" link (superusers).
+  shows an "Редактировать" button (admins). The "+ Новая гонка" link is not here — it lives
+  in a superuser-only «Управление» card under «Соревнования» on the home page. That card reuses the race page's
+  `.card-admin`/`.admin-actions` markup; both classes live in `theme-2.css` so every `base-2.html` page can use them.
   `RaceLegendEditView` (template `src/templates/race/legend_form.html`, assets `src/static/css/legend_form.css` +
   `src/static/js/legend_form.js`) is a bulk-edit spreadsheet page for a race's checkpoints, backing the `edit_legend`
   (`race/<slug>/legend/edit/`) URL name. Gated on `can_edit_race`. **Must save via `instance.save()`** — never
@@ -591,9 +593,10 @@ New feature apps that don't fit in `website` live under `src/apps/<name>/`. Each
 `label = "race_app"`).
 
 **Template stacks**: `src/templates/website/` has two base templates. `base.html` + `src/static/css/theme.css` —
-Bootstrap-based, used by all pages except registration and login. `base-2.html` + `src/static/css/theme-2.css` — custom
-CSS (Rubik font, vanilla JS), used by `register.html`, `login.html`, `start.html`, and `verify.html`. New pages matching
-the new design should extend `base-2.html`. Page-specific CSS goes in `src/static/css/<page>.css` and is loaded via
+the legacy Bootstrap stack, still used by older pages. `base-2.html` + `src/static/css/theme-2.css` — custom CSS (Rubik
+font, vanilla JS), used by the home page, race catalog, publications, the race pages under `apps.race`, and login/register/
+passwordless pages (password reset is still on `base.html`). New pages matching the new design should extend
+`base-2.html`. Page-specific CSS goes in `src/static/css/<page>.css` and is loaded via
 `{% block extra_head %}`. Do not define a bare `.page` class in page-specific CSS — `theme-2.css` already defines it.
 Use a scoped wrapper class (e.g. `.race-page`).
 
@@ -602,9 +605,9 @@ Use a scoped wrapper class (e.g. `.race-page`).
 published races with `date_end >= today`, grouped by race. `HomeView.get` builds one base queryset `unfinished_races`
 (`is_published=True`, `date_end__gte=today`, `order_by("date", "pk")` — named for the criterion, since a race running
 right now counts; `RaceListView`'s separate `future_races` context key means the stricter `date > today`) —
-`upcoming_races` (right column) is derived from
-it (minus `featured_race`, `[:3]`) while the panel gets `unfinished_races` **whole**, since a team can be in the spotlight
-race (excluded from `upcoming_races`) or past the slice. `owned_teams_by_race(user, races)` makes **one** query
+`upcoming_races` (right column) is its first three
+(`[:3]`, the spotlight `featured_race` deliberately **included** — the sidebar duplicates the banner) while the panel gets
+`unfinished_races` **whole**, since a team's race can be past the slice. `owned_teams_by_race(user, races)` makes **one** query
 (`select_related("category2", "category2__race")`) and groups in Python; an anonymous user gets `[]` with **zero**
 queries. Context key `owned_team_groups`, rendered by `src/templates/website/_home_owned_teams.html` (included without
 `only`), styled by the `.my-teams` block in `src/static/css/community.css` (no new breakpoints — rules added inside the
