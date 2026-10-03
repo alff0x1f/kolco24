@@ -583,6 +583,12 @@
   border-radius: var(--radius);
   background: var(--paper-2);
   box-shadow: var(--shadow-sm);
+  position: relative;
+}
+
+.race-list-card:has(h3 a:focus-visible) {
+  outline: 2px solid var(--primary-2);
+  outline-offset: 2px;
 }
 
 .race-list-card__date {
@@ -641,7 +647,17 @@
   white-space: nowrap;
 }
 
-.race-list-card h3 a { color: var(--ink); }
+.race-list-card h3 a { color: var(--ink); outline: none; }
+
+/* The title link covers the whole card. */
+.race-list-card h3 a::after {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  content: "";
+}
+
+.race-list-card:hover h3 a { color: var(--primary-2); }
 
 .race-list-card__body > p {
   overflow: hidden;
@@ -663,7 +679,7 @@
   font-size: 13px;
 }
 
-.race-list-card__arrow:hover {
+.race-list-card:hover .race-list-card__arrow {
   color: #fff;
   background: var(--primary-2);
 }

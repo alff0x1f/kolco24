@@ -21,5 +21,5 @@
     <h3><a href="{% url 'race' race.slug %}">{{ race.name }}</a></h3>
     {% if race.place %}<p>{{ race.place }}</p>{% endif %}
   </div>
-  <a class="race-list-card__arrow" href="{% url 'race' race.slug %}" aria-label="Открыть соревнование «{{ race.name }}»">→</a>
+  <span class="race-list-card__arrow" aria-hidden="true">→</span>
 </article>
