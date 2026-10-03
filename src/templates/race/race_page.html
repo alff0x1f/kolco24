@@ -98,22 +98,61 @@
             <a class="btn btn-outline" href="{% url 'race_app_data' race.slug %}">Данные приложения</a>
           </div>
         </div>
-        <section class="card card-admin" aria-labelledby="race-administrators-title">
+        {% endif %}
+        {% if can_edit_race or can_manage_race_admins %}
+        <section class="card card-admin" id="race-administrators" aria-labelledby="race-administrators-title">
           <div class="side-head">
             <h3 id="race-administrators-title">Администраторы и модераторы</h3>
           </div>
           <div class="card-pad">
+            {% if messages %}
+            {% for message in messages %}
+            {% if "race-admins" in message.tags %}
+            <p class="race-administrators-msg{% if message.level_tag == "error" %} is-error{% endif %}">{{ message }}</p>
+            {% endif %}
+            {% endfor %}
+            {% endif %}
             {% if race_administrators %}
             <ul class="race-administrators">
               {% for member in race_administrators %}
               <li>
                 <span>{{ member.name }} <small class="race-administrators-id">ID: {{ member.user_id|unlocalize }}</small></span>
-                <span class="race-administrators-role">{{ member.role_label }}</span>
+                <div class="race-administrators-meta">
+                  <span class="race-administrators-role">{{ member.role_label }}</span>
+                  {% if can_manage_race_admins %}
+                  <form method="post" action="{% url 'race_admins' race.slug %}" class="race-administrators-remove">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="remove">
+                    <input type="hidden" name="user_id" value="{{ member.user_id|unlocalize }}">
+                    <button type="submit" class="race-administrators-remove-btn" aria-label="Снять роль у {{ member.name }}" title="Снять роль">×</button>
+                  </form>
+                  {% endif %}
+                </div>
               </li>
               {% endfor %}
             </ul>
             {% else %}
             <p class="race-administrators-empty">Администраторы и модераторы не назначены</p>
+            {% endif %}
+            {% if can_manage_race_admins %}
+            <form method="post" action="{% url 'race_admins' race.slug %}" class="race-administrators-add">
+              {% csrf_token %}
+              <input type="hidden" name="action" value="add">
+              <div class="field">
+                <label for="race-admin-user">Пользователь</label>
+                <input class="input" id="race-admin-user" name="user" placeholder="Email или ID" maxlength="254" required>
+              </div>
+              <div class="field">
+                <label for="race-admin-role">Роль</label>
+                <select class="select" id="race-admin-role" name="role">
+                  {% for value, label in race_admin_roles %}
+                  <option value="{{ value }}"{% if value == "moderator" %} selected{% endif %}>{{ label }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+              <p class="race-administrators-hint">Если пользователь уже назначен, его роль изменится.</p>
+              <button type="submit" class="btn btn-primary">Назначить</button>
+            </form>
             {% endif %}
           </div>
         </section>

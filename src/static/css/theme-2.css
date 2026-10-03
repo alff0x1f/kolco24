@@ -356,6 +356,13 @@ button { font-family: inherit; }
   line-height: 1.4;
   transition: border-color .12s, box-shadow .12s;
 }
+.select {
+  cursor: pointer;
+  padding-right: 34px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 14 14' fill='none' stroke='%236b7785' stroke-width='1.5'%3E%3Cpath d='M3 5l4 4 4-4'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+}
 .input::placeholder { color: var(--muted-2); }
 .input:hover, .select:hover { border-color: #c7cdd6; }
 .input:focus, .select:focus {
@@ -366,7 +373,7 @@ button { font-family: inherit; }
 .input.has-error,
 .select.has-error {
   border-color: var(--danger);
-  background: var(--danger-bg);
+  background-color: var(--danger-bg);
 }
 .input.has-error:focus,
 .select.has-error:focus { box-shadow: 0 0 0 3px rgba(217,54,68,.15); }
