@@ -8075,7 +8075,7 @@ def test_teams_admin_rows_include_teams_with_history(client, django_user_model):
 
 
 @pytest.mark.django_db
-def test_teams_admin_groups_moves_by_other_team(client, django_user_model):
+def test_teams_admin_lists_every_move(client, django_user_model):
     race = _make_race()
     category = _make_category(race)
     admin = _ta_admin(django_user_model, race)
@@ -8095,15 +8095,12 @@ def test_teams_admin_groups_moves_by_other_team(client, django_user_model):
 
     assert row["id"] == a.id
     assert row["moved_people"] == -1
-    assert len(row["moves"]) == 5
-    groups = [
-        (g["people"], g["other"], g["count"], g["last_date"])
-        for g in row["move_groups"]
-    ]
-    assert groups == [
-        (1, f"ID-{c.id}", 1, _ta_fmt(_ta_dt(9))),
-        (1, f"ID-{b.id} «Лисы»", 1, _ta_fmt(_ta_dt(12))),
-        (-3, f"ID-{b.id} «Лисы»", 3, _ta_fmt(_ta_dt(14))),
+    assert [(m["date"], m["people"], m["other"]) for m in row["moves"]] == [
+        (_ta_fmt(_ta_dt(9)), 1, f"ID-{c.id}"),
+        (_ta_fmt(_ta_dt(10)), -1, f"ID-{b.id} «Лисы»"),
+        (_ta_fmt(_ta_dt(11)), -1, f"ID-{b.id} «Лисы»"),
+        (_ta_fmt(_ta_dt(12)), 1, f"ID-{b.id} «Лисы»"),
+        (_ta_fmt(_ta_dt(14)), -1, f"ID-{b.id} «Лисы»"),
     ]
 
 
@@ -8171,20 +8168,18 @@ def test_teams_admin_filters_by_category(client, django_user_model):
 
 
 @pytest.mark.django_db
-def test_teams_admin_details_only_for_several_events(client, django_user_model):
+def test_teams_admin_details_only_for_several_refunds(client, django_user_model):
     race = _make_race()
     category = _make_category(race)
     admin = _ta_admin(django_user_model, race)
-    a = _make_team(admin, category, start_number="1")
-    b = _make_team(admin, category, start_number="2")
-    _ta_move(a, b, 1, _ta_dt(10))
+    team = _make_team(admin, category, paid_people=4, ucount=4)
+    _ta_refund(admin, team, "R_ta_d1", 500, 1, _ta_dt(10))
     client.force_login(admin)
 
     assert "<details>" not in client.get(_ta_url(race)).content.decode()
 
-    _ta_move(a, b, 1, _ta_dt(11))
-    html = client.get(_ta_url(race)).content.decode()
-    assert "все (2)" in html
+    _ta_refund(admin, team, "R_ta_d2", 500, 1, _ta_dt(11))
+    assert "все (2)" in client.get(_ta_url(race)).content.decode()
 
 
 @pytest.mark.django_db
@@ -8228,7 +8223,8 @@ def test_teams_admin_csv(client, django_user_model):
         "2",
         "4",
         "-2",
-        f"в ID-{b.id} «Лисы»: -2 (2 шт., посл. {_ta_fmt(_ta_dt(14))})",
+        f"{_ta_fmt(_ta_dt(10))} в ID-{b.id} «Лисы»: -1; "
+        f"{_ta_fmt(_ta_dt(14))} в ID-{b.id} «Лисы»: -1",
         "1.5",
         "1500",
         _ta_fmt(_ta_dt(20)),
@@ -8236,7 +8232,8 @@ def test_teams_admin_csv(client, django_user_model):
     ]
     assert lines[2][6:8] == [
         "2",
-        f"из ID-{a.id} «=1+1»: +2 (2 шт., посл. {_ta_fmt(_ta_dt(14))})",
+        f"{_ta_fmt(_ta_dt(10))} из ID-{a.id} «=1+1»: +1; "
+        f"{_ta_fmt(_ta_dt(14))} из ID-{a.id} «=1+1»: +1",
     ]
 
 

@@ -50,33 +50,12 @@ def _moves_by_team(race):
         ):
             by_team[team_id].append(
                 {
-                    "moment": move.move_date,
                     "date": _format_date(move.move_date),
                     "people": people,
-                    "other_id": other.id,
                     "other": _team_label(other),
                 }
             )
     return by_team
-
-
-def _group_moves(moves):
-    """Переносы по второй команде и направлению, по дате последнего.
-
-    Встречные переносы с одной командой не гасятся: −2 туда и +1 обратно —
-    две группы, чтобы было видно реальное движение мест.
-    """
-    groups = {}
-    for move in moves:
-        key = (move["other_id"], move["people"] >= 0)
-        group = groups.setdefault(
-            key, {"people": 0, "other": move["other"], "count": 0}
-        )
-        group["people"] += move["people"]
-        group["count"] += 1
-        group["moment"] = move["moment"]
-        group["last_date"] = move["date"]
-    return sorted(groups.values(), key=lambda group: group["moment"])
 
 
 def _refunds_by_team(race):
@@ -133,7 +112,6 @@ def team_rows(race, category=None):
                 "paid_people": team.paid_people,
                 "ucount": team.ucount,
                 "moves": team_moves,
-                "move_groups": _group_moves(team_moves),
                 "moved_people": sum(move["people"] for move in team_moves),
                 "refunds": team_refunds,
                 "refunded_people": sum(item["people"] for item in team_refunds),
@@ -154,14 +132,11 @@ def _when(count, last_date):
     return f"({last_date})"
 
 
-def move_group_text(group):
-    # Направление впереди: ячейка, начатая с «+» или «-», получила бы апостроф
+def move_text(move):
+    # Дата впереди: ячейка, начатая с «+» или «-», получила бы апостроф
     # от ``_csv_safe``.
-    direction = "из" if group["people"] >= 0 else "в"
-    return (
-        f"{direction} {group['other']}: {group['people']:+g} "
-        f"{_when(group['count'], group['last_date'])}"
-    )
+    direction = "из" if move["people"] >= 0 else "в"
+    return f"{move['date']} {direction} {move['other']}: {move['people']:+g}"
 
 
 def refund_summary_text(row):
@@ -197,7 +172,7 @@ def csv_rows(rows):
             _number(row["paid_people"]),
             row["ucount"],
             _number(row["moved_people"]),
-            _csv_safe("; ".join(move_group_text(g) for g in row["move_groups"])),
+            _csv_safe("; ".join(move_text(move) for move in row["moves"])),
             _number(row["refunded_people"]),
             _number(row["refunded_amount"]),
             row["last_refund_date"],

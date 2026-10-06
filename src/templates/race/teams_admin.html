@@ -47,18 +47,9 @@
         <td class="cnt">{{ row.paid_people|floatformat:"-1" }}{% if row.paid_people != row.ucount %} <span class="muted">/ {{ row.ucount }}</span>{% endif %}</td>
         <td class="category">{{ row.category }}</td>
         <td class="events">
-          {% for group in row.move_groups %}
-          <div>{% if group.people >= 0 %}<b class="plus">+{{ group.people|floatformat:"-1" }}</b> ← {% else %}<b class="minus">−{{ group.people|floatformat:"-1"|cut:"-" }}</b> → {% endif %}{{ group.other }}
-            <span class="muted">({% if group.count > 1 %}{{ group.count }} шт., посл. {% endif %}{{ group.last_date }})</span></div>
+          {% for move in row.moves %}
+          <div><span class="muted">{{ move.date }}</span> {% if move.people >= 0 %}<b class="plus">+{{ move.people|floatformat:"-1" }}</b> ← {% else %}<b class="minus">−{{ move.people|floatformat:"-1"|cut:"-" }}</b> → {% endif %}{{ move.other }}</div>
           {% endfor %}
-          {% if row.moves|length > 1 %}
-          <details>
-            <summary>все ({{ row.moves|length }})</summary>
-            {% for move in row.moves %}
-            <div><span class="muted">{{ move.date }}</span> {% if move.people >= 0 %}+{{ move.people|floatformat:"-1" }} ← {% else %}−{{ move.people|floatformat:"-1"|cut:"-" }} → {% endif %}{{ move.other }}</div>
-            {% endfor %}
-          </details>
-          {% endif %}
         </td>
         <td class="events">
           {% if row.refunds %}
