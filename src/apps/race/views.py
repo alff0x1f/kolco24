@@ -35,6 +35,8 @@ from apps.race.permissions import can_edit_race, is_team_editing_open
 from apps.race.promo import ERROR_MESSAGES as PROMO_ERRORS
 from apps.race.promo import PromoError, occupied_team_ids, resolve_promo
 from apps.race.results import build_protocol, freeze_protocol
+from apps.race.teams_admin import csv_rows as teams_admin_csv_rows
+from apps.race.teams_admin import start_number_key, team_rows
 from website.forms import NewsPostForm
 from website.models import Checkpoint, NewsPost, Race, RaceAdmin, Team
 from website.models.checkpoint import CheckpointTag
@@ -1443,13 +1445,6 @@ class RaceLegendCodesView(View):
         return render(request, "race/legend_codes.html", {"race": race, "rows": rows})
 
 
-def _start_number_key(team):
-    number = team.start_number.strip()
-    if number.isdigit():
-        return (0, int(number), "", team.id)
-    return (1, 0, number, team.id)
-
-
 class RaceChecklistView(View):
     """Printable team checklist for handing out start packets or maps.
 
@@ -1495,7 +1490,7 @@ class RaceChecklistView(View):
                     if name.strip()
                 ],
             }
-            for team in sorted(teams, key=_start_number_key)
+            for team in sorted(teams, key=start_number_key)
         ]
         context = {
             "race": race,
@@ -1505,6 +1500,56 @@ class RaceChecklistView(View):
             "column": request.GET.get("column", "").strip()[:30] or "Отметка",
         }
         return render(request, "race/checklist.html", context)
+
+
+def _selected_category(request, race):
+    categories = list(Category.objects.filter(race=race).order_by("order", "id"))
+    selected = request.GET.get("category", "")
+    return categories, next((c for c in categories if str(c.id) == selected), None)
+
+
+class RaceTeamsAdminView(View):
+    """Team list for organizers: paid seats plus member transfers and refunds.
+
+    ``?category=<id>`` narrows the list (an unknown id keeps the whole race);
+    the CSV link carries the same filter.
+    """
+
+    def get(self, request, race_slug):
+        race, response = _load_race_for_admin(request, race_slug)
+        if response is not None:
+            return response
+        categories, selected_category = _selected_category(request, race)
+        rows = team_rows(race, selected_category)
+        context = {
+            "race": race,
+            "rows": rows,
+            "categories": categories,
+            "selected_category": selected_category,
+            "paid_total": sum(row["paid_people"] for row in rows),
+        }
+        return render(request, "race/teams_admin.html", context)
+
+
+class RaceTeamsAdminExportView(View):
+    """CSV of :class:`RaceTeamsAdminView` — ``;`` plus a BOM for Russian Excel."""
+
+    def get(self, request, race_slug):
+        race, response = _load_race_for_admin(request, race_slug)
+        if response is not None:
+            return response
+        _, selected_category = _selected_category(request, race)
+        suffix = f"-{selected_category.code}" if selected_category else ""
+        today = datetime.date.today().isoformat()
+        csv_response = HttpResponse(content_type="text/csv; charset=utf-8")
+        csv_response["Content-Disposition"] = (
+            f'attachment; filename="teams-{race.slug}{quote(suffix)}-{today}.csv"'
+        )
+        csv_response.write("\ufeff")
+        writer = csv.writer(csv_response, delimiter=";")
+        for line in teams_admin_csv_rows(team_rows(race, selected_category)):
+            writer.writerow(line)
+        return csv_response
 
 
 class ProtocolView(View):

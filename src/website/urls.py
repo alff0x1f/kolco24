@@ -23,6 +23,8 @@ from apps.race.views import (
     RacePaymentsExportView,
     RacePaymentsView,
     RacePostEditView,
+    RaceTeamsAdminExportView,
+    RaceTeamsAdminView,
     RaceTeamsView,
 )
 
@@ -110,6 +112,16 @@ urlpatterns = [
         "race/<slug:race_slug>/checklist/",
         RaceChecklistView.as_view(),
         name="race_checklist",
+    ),
+    path(
+        "race/<slug:race_slug>/teams-admin/",
+        RaceTeamsAdminView.as_view(),
+        name="race_teams_admin",
+    ),
+    path(
+        "race/<slug:race_slug>/teams-admin/export/",
+        RaceTeamsAdminExportView.as_view(),
+        name="race_teams_admin_export",
     ),
     path(
         "race/<slug:race_slug>/map/",

@@ -1,0 +1,84 @@
+{% load static %}<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <title>Список команд — {{ race.name }}{% if selected_category %} — {{ selected_category.code }}{% endif %}</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link href="{% static 'css/checklist.css' %}" rel="stylesheet">
+  <link href="{% static 'css/teams_admin.css' %}" rel="stylesheet">
+</head>
+<body class="checklist teams-admin">
+  <form class="toolbar" method="get">
+    <a href="{% url 'race' race.slug %}">← {{ race.name }}</a>
+    <label>
+      Категория
+      <select name="category">
+        <option value="">Все</option>
+        {% for category in categories %}
+        <option value="{{ category.id }}" {% if category == selected_category %}selected{% endif %}>{{ category.code }} — {{ category.name }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <button type="submit">Обновить</button>
+    <a class="csv" href="{% url 'race_teams_admin_export' race.slug %}{% if selected_category %}?category={{ selected_category.id }}{% endif %}">Скачать CSV</a>
+  </form>
+
+  <h1>{{ race.name }}{% if selected_category %} · {{ selected_category.name }}{% endif %}
+    <span>{{ rows|length }} ком. · оплачено {{ paid_total|floatformat:"-1" }} чел.</span></h1>
+
+  <table>
+    <thead>
+      <tr>
+        <th class="id">ID</th>
+        <th class="num">Старт номер</th>
+        <th>Название команды</th>
+        <th class="cnt">Оплачено чел</th>
+        <th>Категория</th>
+        <th>Переносы</th>
+        <th>Возвраты</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in rows %}
+      <tr>
+        <td class="id">{{ row.id }}</td>
+        <td class="num">{{ row.number }}</td>
+        <td class="name">{{ row.name }}</td>
+        <td class="cnt">{{ row.paid_people|floatformat:"-1" }}{% if row.paid_people != row.ucount %} <span class="muted">/ {{ row.ucount }}</span>{% endif %}</td>
+        <td class="category">{{ row.category }}</td>
+        <td class="events">
+          {% for group in row.move_groups %}
+          <div>{% if group.people >= 0 %}<b class="plus">+{{ group.people|floatformat:"-1" }}</b> ← {% else %}<b class="minus">−{{ group.people|floatformat:"-1"|cut:"-" }}</b> → {% endif %}{{ group.other }}
+            <span class="muted">({% if group.count > 1 %}{{ group.count }} шт., посл. {% endif %}{{ group.last_date }})</span></div>
+          {% endfor %}
+          {% if row.moves|length > 1 %}
+          <details>
+            <summary>все ({{ row.moves|length }})</summary>
+            {% for move in row.moves %}
+            <div><span class="muted">{{ move.date }}</span> {% if move.people >= 0 %}+{{ move.people|floatformat:"-1" }} ← {% else %}−{{ move.people|floatformat:"-1"|cut:"-" }} → {% endif %}{{ move.other }}</div>
+            {% endfor %}
+          </details>
+          {% endif %}
+        </td>
+        <td class="events">
+          {% if row.refunds %}
+          <div><b class="minus">−{{ row.refunded_people|floatformat:"-1" }} чел.</b>, {{ row.refunded_amount|floatformat:"-2" }} ₽
+            <span class="muted">({% if row.refunds|length > 1 %}{{ row.refunds|length }} шт., посл. {% endif %}{{ row.last_refund_date }})</span></div>
+          {% if row.refunds|length > 1 %}
+          <details>
+            <summary>все ({{ row.refunds|length }})</summary>
+            {% for refund in row.refunds %}
+            <div><span class="muted">{{ refund.date }}</span> −{{ refund.people|floatformat:"-1" }} чел., {{ refund.amount|floatformat:"-2" }} ₽</div>
+            {% endfor %}
+          </details>
+          {% endif %}
+          {% endif %}
+        </td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="7" class="empty">Нет команд.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</body>
+</html>
