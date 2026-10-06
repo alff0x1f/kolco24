@@ -17,7 +17,7 @@ _DATE_FORMAT = "%d.%m.%Y %H:%M"
 
 def start_number_key(team):
     number = team.start_number.strip()
-    if number.isdigit():
+    if number.isdecimal():
         return (0, int(number), "", team.id)
     return (1, 0, number, team.id)
 
@@ -88,7 +88,7 @@ def _refunds_by_team(race):
     )
     by_team = defaultdict(list)
     for refund in refunds:
-        moment = refund.refunded_at or refund.payment.updated_at
+        moment = refund.refunded_at or refund.created_at
         by_team[refund.payment.team_id].append(
             {
                 "moment": moment,

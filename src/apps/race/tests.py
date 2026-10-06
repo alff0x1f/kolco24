@@ -8109,22 +8109,45 @@ def test_teams_admin_groups_moves_by_other_team(client, django_user_model):
 
 @pytest.mark.django_db
 def test_teams_admin_summarizes_refunds(client, django_user_model):
+    from apps.race.settlement import record_refund
+
     race = _make_race()
     category = _make_category(race)
     admin = _ta_admin(django_user_model, race)
     team = _make_team(admin, category, paid_people=4, ucount=4)
     _ta_refund(admin, team, "R_ta_1", 1000, 2, _ta_dt(20))
     _ta_refund(admin, team, "R_ta_0", 0, 0, _ta_dt(25))
-    no_date = _ta_refund(admin, team, "R_ta_2", 500, 1)
+    # Без даты от банка: ``record_refund`` не трогает ``payment.updated_at``,
+    # так что дата возврата — момент записи строки журнала.
+    payment = _fin_payment(admin, team)
+    Payment.objects.filter(pk=payment.pk).update(updated_at=_ta_dt(1))
+    record_refund(payment, "R_ta_2", 500)
+    no_date = PaymentRefund.objects.get(vtb_refund_id="R_ta_2")
     client.force_login(admin)
 
     row = client.get(_ta_url(race)).context["rows"][0]
 
-    fallback = no_date.payment.updated_at
     assert row["refunded_people"] == 3
     assert row["refunded_amount"] == 1500
-    assert [r["amount"] for r in row["refunds"]] == [1000, 500]
-    assert row["last_refund_date"] == _ta_fmt(max(fallback, _ta_dt(20)))
+    no_date_entry = next(r for r in row["refunds"] if r["amount"] == 500)
+    assert no_date_entry["date"] == _ta_fmt(no_date.created_at)
+    assert row["last_refund_date"] == _ta_fmt(max(no_date.created_at, _ta_dt(20)))
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("url_name", ["race_teams_admin", "race_checklist"])
+def test_non_decimal_digit_start_number_sorts_last(client, django_user_model, url_name):
+    race = _make_race()
+    category = _make_category(race)
+    admin = _ta_admin(django_user_model, race)
+    _make_team(admin, category, start_number="\u00b2", teamname="Квадрат")
+    _make_team(admin, category, start_number="5", teamname="Пятая")
+    client.force_login(admin)
+
+    resp = client.get(reverse(url_name, kwargs={"race_slug": race.slug}))
+
+    assert resp.status_code == 200
+    assert [r["name"] for r in resp.context["rows"]] == ["Пятая", "Квадрат"]
 
 
 @pytest.mark.django_db
