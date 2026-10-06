@@ -147,7 +147,7 @@ Django 4.2 project. Source lives entirely under `src/`, with `manage.py` at `src
   `src/templates/race/teams_admin.html` reusing `checklist.css` + `teams_admin.css`; CSV `race_teams_admin_export`,
   `…/teams-admin/export/`, `;` + BOM like the payments export) list a race's teams for organizers: ID, start number,
   name, paid seats, category, member transfers (`TeamMemberMove`) and refunds (`PaymentRefund`, zero-amount audit rows
-  skipped, date `refunded_at` falling back to `payment.updated_at`). `src/apps/race/teams_admin.py:team_rows` is the
+  skipped). `src/apps/race/teams_admin.py:team_rows` is the
   single source for both. A team is listed if it has paid seats **or** any transfer/refund history (so a team that
   lost all seats keeps its row); soft-deleted teams get no row but still show as the other side of a transfer.
   Every transfer is listed on its own (date, signed seats, other team) — no grouping, by decision; refunds are one
