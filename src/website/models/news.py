@@ -1,5 +1,5 @@
 import re
-from html import escape, unescape
+from html import unescape
 from urllib.parse import parse_qs, urlencode, urlsplit
 
 import nh3
@@ -10,6 +10,8 @@ from django.utils.html import strip_tags
 from django.utils.safestring import mark_safe
 from django.utils.text import Truncator
 from markdown import markdown
+from markdown.extensions import Extension
+from markdown.treeprocessors import Treeprocessor
 
 # Tags produced by Python-Markdown (with extra) that are safe to render
 _MD_ALLOWED_TAGS = frozenset(
@@ -123,17 +125,22 @@ _FEED_ALLOWED_ATTRIBUTES = {
 
 _VK_VIDEO_HOST_RE = re.compile(r"(?:www\.|m\.)?(?:vkvideo\.ru|vk\.com|vk\.ru)")
 _VK_VIDEO_PAGE_RE = re.compile(r"/(?:video|live)(-?\d+)_(\d+)")
-_VK_VIDEO_LINK_PARAGRAPH_RE = re.compile(
-    r'<p>(?:<a href="([^"]+)"[^>]*>\1</a>|([^<\s]+))</p>'
-)
-_IFRAME_RE = re.compile(r"<iframe\b([^>]*)>.*?</iframe>", re.DOTALL)
-_IFRAME_SRC_RE = re.compile(r'\ssrc="([^"]*)"')
+# Quotes inside attribute values are always escaped in nh3 output, so this
+# can only match a real iframe tag.
+_IFRAME_SRC_RE = re.compile(r'<iframe src="([^"]*)"')
+_IFRAME_ATTRIBUTES = {
+    "allow": "autoplay; encrypted-media; fullscreen; picture-in-picture; "
+    "screen-wake-lock;",
+    "allowfullscreen": "",
+    "loading": "lazy",
+    "referrerpolicy": "strict-origin-when-cross-origin",
+}
 
 
 def _vk_video_params(url):
     """Return (oid, id, hash, hd) for a VK Video player or page URL, else None."""
     try:
-        parts = urlsplit(url)
+        parts = urlsplit(url.strip())
         if parts.scheme not in ("http", "https") or parts.username or parts.port:
             return None
     except ValueError:
@@ -158,7 +165,10 @@ def _vk_video_params(url):
     return oid, video_id, video_hash, hd if re.fullmatch(r"[1-4]", hd) else ""
 
 
-def _vk_player_url(params):
+def _vk_player_url(url):
+    params = _vk_video_params(url)
+    if params is None:
+        return None
     oid, video_id, video_hash, hd = params
     query = {"oid": oid, "id": video_id, "hash": video_hash, "hd": hd}
     return "https://vkvideo.ru/video_ext.php?" + urlencode(
@@ -166,46 +176,29 @@ def _vk_player_url(params):
     )
 
 
-def _vk_player_html(params):
-    return (
-        f'<iframe src="{escape(_vk_player_url(params))}"'
-        ' allow="autoplay; encrypted-media; fullscreen; picture-in-picture;'
-        ' screen-wake-lock;" allowfullscreen loading="lazy"'
-        ' referrerpolicy="strict-origin-when-cross-origin"></iframe>'
-    )
-
-
 def _iframe_attribute_filter(tag, attribute, value):
-    if tag != "iframe":
-        return value
-    params = _vk_video_params(value)
-    return _vk_player_url(params) if params else None
-
-
-def _rebuild_iframes(html):
-    """Swap each cleaned iframe for a VK Video player built from its src, or drop it."""
-
-    def replace(match):
-        src = _IFRAME_SRC_RE.search(match.group(1))
-        params = _vk_video_params(unescape(src.group(1))) if src else None
-        return _vk_player_html(params) if params else ""
-
-    return _IFRAME_RE.sub(replace, html)
+    if tag == "iframe" and attribute == "src":
+        return _vk_player_url(value)
+    return value
 
 
 def _clean_html(html, tags, attributes):
-    """Sanitize HTML, letting through only VK Video iframes rebuilt by us."""
-    html = nh3.clean(
+    """Sanitize HTML; an iframe keeps only a canonical VK Video player src."""
+    return nh3.clean(
         html,
         tags=tags,
         attributes=attributes,
         attribute_filter=_iframe_attribute_filter,
+        set_tag_attribute_values={"iframe": _IFRAME_ATTRIBUTES},
     )
-    return _rebuild_iframes(html)
 
 
 def _clean_feed_html(html):
     return _clean_html(html, _FEED_ALLOWED_TAGS, _FEED_ALLOWED_ATTRIBUTES)
+
+
+def _iframe_srcs(html):
+    return _IFRAME_SRC_RE.findall(html)
 
 
 def _normalized_text(html):
@@ -218,20 +211,41 @@ def _normalized_text(html):
     return " ".join(unescape(strip_tags(html)).split())
 
 
-def _embed_video_links(html):
+class _VideoLinkTreeprocessor(Treeprocessor):
     """Turn a paragraph holding nothing but a VK Video link into a player."""
 
-    def replace(match):
-        params = _vk_video_params(unescape(match.group(1) or match.group(2)))
-        return _vk_player_html(params) if params else match.group(0)
+    def run(self, root):
+        for paragraph in root.iter("p"):
+            children = list(paragraph)
+            if not children:
+                url = paragraph.text or ""
+            elif (
+                len(children) == 1
+                and children[0].tag == "a"
+                and not (paragraph.text or "").strip()
+                and not (children[0].tail or "").strip()
+                and not list(children[0])
+                and (children[0].text or "").strip() == children[0].get("href")
+            ):
+                url = children[0].get("href")
+            else:
+                continue
+            src = _vk_player_url(url)
+            if src:
+                paragraph.clear()
+                paragraph.tag = "iframe"
+                paragraph.set("src", src)
 
-    return _VK_VIDEO_LINK_PARAGRAPH_RE.sub(replace, html)
+
+class _VideoLinkExtension(Extension):
+    def extendMarkdown(self, md):
+        # After inline patterns (priority 20) have turned autolinks into <a>.
+        md.treeprocessors.register(_VideoLinkTreeprocessor(md), "vk_video", 5)
 
 
 def _render_markdown(text):
-    raw_html = markdown(str(text), extensions=["extra"])
-    html = _clean_html(raw_html, _MD_ALLOWED_TAGS, _MD_ALLOWED_ATTRIBUTES)
-    return _embed_video_links(html)
+    raw_html = markdown(str(text), extensions=["extra", _VideoLinkExtension()])
+    return _clean_html(raw_html, _MD_ALLOWED_TAGS, _MD_ALLOWED_ATTRIBUTES)
 
 
 class PublicationKind(models.TextChoices):
@@ -351,7 +365,7 @@ class NewsPost(models.Model):
     @property
     def has_more_content(self):
         """Whether the full publication contains text not shown in its preview."""
-        if self.content_html.count("<iframe") > self.feed_summary_html.count("<iframe"):
+        if _iframe_srcs(self.content_html) != _iframe_srcs(self.feed_summary_html):
             return True
         content = _normalized_text(self.content_html)
         summary = _normalized_text(self.feed_summary_html)

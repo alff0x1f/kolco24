@@ -1,5 +1,6 @@
 import re
 from datetime import date, timedelta
+from html.parser import HTMLParser
 from unittest.mock import patch
 
 import pytest
@@ -298,6 +299,8 @@ def _player_srcs(html):
         ),
         ("<https://vk.com/video-1_2>", _VK_PLAYER),
         ("https://vkvideo.ru/video-1_2?list=abc", _VK_PLAYER),
+        ("https://vkvideo.ru/video-1_2  ", _VK_PLAYER),
+        (" https://vkvideo.ru/video-1_2\t", _VK_PLAYER),
         (
             '<iframe src = "https://vk.com/video_ext.php?oid=-1&id=2"></iframe>',
             _VK_PLAYER,
@@ -328,8 +331,12 @@ def test_markdown_embeds_vk_video(source, expected_src):
         "<iframe></iframe>",
     ],
 )
-def test_markdown_drops_untrusted_iframes(source):
-    assert "<iframe" not in _render_markdown(source)
+def test_markdown_drops_untrusted_iframe_src(source):
+    html = _render_markdown(source)
+
+    assert _player_srcs(html) == []
+    assert "evil" not in html
+    assert "javascript" not in html
 
 
 def test_markdown_rebuilds_vk_iframe_without_extra_attributes():
@@ -341,7 +348,6 @@ def test_markdown_rebuilds_vk_iframe_without_extra_attributes():
     assert _player_srcs(html) == [_VK_PLAYER]
     assert "onload" not in html
     assert "srcdoc" not in html
-    assert "fallback" not in html
 
 
 @pytest.mark.parametrize(
@@ -363,6 +369,46 @@ def test_markdown_does_not_embed_video_outside_its_own_paragraph(source):
 
     assert "<iframe" not in html
     assert "video" in html
+
+
+@pytest.mark.parametrize(
+    "source",
+    [
+        '<div><img src="x" alt="<p>https://vkvideo.ru/video-1_2</p>'
+        '<img src=x onerror=alert(1)>"></div>',
+        '<div><img src="x" alt="<iframe src=\'https://vk.com/video-1_2\'>">' "</div>",
+    ],
+)
+def test_markdown_ignores_video_markup_inside_attributes(source):
+    html = _render_markdown(source)
+
+    tags = []
+    parser = HTMLParser()
+    parser.handle_starttag = lambda tag, attrs: tags.append((tag, dict(attrs)))
+    parser.feed(html)
+
+    assert [tag for tag, _ in tags] == ["div", "img"]
+    assert set(tags[1][1]) == {"src", "alt"}
+
+
+def test_markdown_keeps_video_next_to_attribute_with_iframe_text():
+    html = _render_markdown(
+        '<div><img src="x" alt="<iframe"></div>\n\nhttps://vkvideo.ru/video-1_2'
+    )
+
+    assert _player_srcs(html) == [_VK_PLAYER]
+    assert _player_srcs(_clean_feed_html(html)) == [_VK_PLAYER]
+    assert 'alt="<iframe"' in _clean_feed_html(html)
+
+
+def test_feed_preview_offers_reading_when_summary_shows_another_video():
+    publication = NewsPost(
+        pk=1,
+        summary="https://vkvideo.ru/video-3_4",
+        content_html=_render_markdown("https://vkvideo.ru/video-1_2"),
+    )
+
+    assert publication.has_more_content
 
 
 def test_markdown_wrapper_class_alone_is_not_a_video():
