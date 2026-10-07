@@ -143,7 +143,9 @@ def create_team_payment(request, team, race, promo=None):
     if gross == 0:
         return None
 
-    paid_for = int(team.ucount) - team.paid_people
+    # A team that shrank below its paid seats keeps the overpaid ones; an
+    # add-on-only order must not take them back on settle.
+    paid_for = max(0, int(team.ucount) - team.paid_people)
     cost_now = race.current_price
     with transaction.atomic():
         # The team row lock serializes checkouts of one team, so two requests

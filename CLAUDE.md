@@ -693,7 +693,7 @@ under `.team-register`) and `src/static/js/team-form.js`. The JS reads no inline
 config island `<script type="application/json" id="teamFormConfig">` (`currentPrice`, `paidPeople`, `isEdit`,
 `raceRemaining`, `currentCategoryId`, `bypassLimits`, and
 `extras: [{code, name, price, freePerTeam, count, countPaid}, …]`) and the JS renders one stepper per add-on (hidden
-`extra_<code>` inputs, each bounded `countPaid … (ucount − freePerTeam)`) and computes the live доплата-aware total
+`extra_<code>` inputs, each bounded `countPaid … max(ucount − freePerTeam, countPaid)`) and computes the live доплата-aware total
 mirroring the backend `compute_team_charge` (
 `max(0, (ucount − paidPeople) × currentPrice + Σ active extras max(0, count − countPaid) × price)`). `team-form.js` and
 `apps/race/pricing.py` carry cross-reference comments pointing at each other (the client/server-mirror rule).
@@ -704,8 +704,10 @@ never disabled. The segmented team-size control reads allowed counts from each c
 attribute (no hardcoded `switch`). `AddTeam` (`views_.py`) and `EditTeamView` (`team.py`) share context-building
 helpers (`build_category_options` / `build_team_form_context` in `views_.py`); `EditTeamView` renders `edit_team.html`
 and adds edit-only sections (payment history, member transfer, delete). Server-side guards (in `TeamForm.clean`) enforce
-`ucount ∈ [category.min_people, category.max_people]` and, per active extra, `count ≤ max(0, ucount − free_per_team)`
-plus the edit-only `count ≥ count_paid` ("can't reduce a partly-paid add-on") — the client controls only cap values in
+`ucount ∈ [category.min_people, category.max_people]` and, per active extra, `count ≤ max(0, ucount − free_per_team, count_paid)`
+plus the edit-only `count ≥ count_paid` ("can't reduce a partly-paid add-on"). `ucount` may drop **below** `paid_people` (a
+member dropped out): the overpaid seat stays on the team — no auto-refund, still counted in the race/category limits
+(occupancy is `paid_people`), and paid add-on units stay allowed above the shrunken cap — the client controls only cap values in
 the browser. `TeamForm.__init__` resolves the race **defensively** (a non-id/`None` `race_id` must yield
 `self.extras = []` and add no fields rather than 500).
 

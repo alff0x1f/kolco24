@@ -211,18 +211,19 @@ class TeamForm(forms.Form):
 
         if ucount_valid:
             # Per add-on caps: count ≤ max(0, ucount − free_per_team); on edit
-            # the count cannot drop below what's already paid.
+            # the count cannot drop below what's already paid, and paid units
+            # stay allowed after the team shrinks.
             for extra in self.extras:
                 field = f"extra_{extra.code}"
                 count = int(cleaned_data.get(field) or 0)
-                max_count = max(0, int(ucount) - extra.free_per_team)
+                count_paid = self._extra_paid.get(extra.id, 0)
+                max_count = max(0, int(ucount) - extra.free_per_team, count_paid)
                 if count > max_count:
                     self.add_error(
                         field,
                         f"Слишком много «{extra.name}» для такого состава.",
                     )
                     continue
-                count_paid = self._extra_paid.get(extra.id, 0)
                 if count < count_paid:
                     self.add_error(
                         field,
@@ -248,10 +249,13 @@ class TeamForm(forms.Form):
             cat_remaining = category.remaining_people(exclude_team=team)
             moving_in = category.id != team.category2_id
             growing = new_ucount > team.paid_people
+            # Occupancy counts paid seats, so a team shrunk below them still
+            # brings all of its paid seats into the new category.
+            seats = max(new_ucount, team.paid_people)
             if (
                 cat_remaining is not None
                 and (moving_in or growing)
-                and new_ucount > cat_remaining
+                and seats > cat_remaining
             ):
                 self.add_error(
                     "category2_id",

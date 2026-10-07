@@ -171,33 +171,6 @@ class EditTeamView(View):
                 team.organization = form.cleaned_data.get("organization")
 
             new_ucount = int(form.cleaned_data.get("ucount"))
-            if new_ucount < team.paid_people:
-                form.add_error(
-                    "ucount",
-                    "Нельзя уменьшить количество участников: часть уже оплачена.",
-                )
-                return render(
-                    request,
-                    "website/edit_team.html",
-                    {
-                        "race": race,
-                        "race_id": race.id,
-                        "team_form": form,
-                        "team": team,
-                        "action": reverse("edit_team", args=[team_id]),
-                        "payment_history": payment_history(team),
-                        "team_move_form": TeamMemberMoveForm(
-                            race_id=team.category2.race_id, from_team_id=team.id
-                        ),
-                        **build_team_form_context(
-                            race,
-                            team,
-                            is_edit=True,
-                            bypass_limits=bypass,
-                            form=form,
-                        ),
-                    },
-                )
             if "ucount" in form.cleaned_data:
                 team.ucount = new_ucount
 
@@ -209,6 +182,10 @@ class EditTeamView(View):
                     setattr(team, athlet_field, form.cleaned_data.get(athlet_field))
                 if birth_field in form.cleaned_data:
                     setattr(team, birth_field, form.cleaned_data.get(birth_field))
+                if i > new_ucount:
+                    # The form only hides rows past ucount and still posts them.
+                    setattr(team, athlet_field, "")
+                    setattr(team, birth_field, 0)
 
             if "category2_id" in form.cleaned_data:
                 team.category2_id = form.cleaned_data.get("category2_id")
