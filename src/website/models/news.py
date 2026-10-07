@@ -1,5 +1,6 @@
 import re
 from html import unescape
+from urllib.parse import parse_qs, urlencode, urlsplit
 
 import nh3
 from django.db import models
@@ -9,6 +10,8 @@ from django.utils.html import strip_tags
 from django.utils.safestring import mark_safe
 from django.utils.text import Truncator
 from markdown import markdown
+from markdown.extensions import Extension
+from markdown.treeprocessors import Treeprocessor
 
 # Tags produced by Python-Markdown (with extra) that are safe to render
 _MD_ALLOWED_TAGS = frozenset(
@@ -40,6 +43,7 @@ _MD_ALLOWED_TAGS = frozenset(
         "h6",
         "hr",
         "i",
+        "iframe",
         "img",
         "ins",
         "kbd",
@@ -74,6 +78,7 @@ _MD_ALLOWED_ATTRIBUTES = {
     "a": {"href", "title"},
     "abbr": {"title"},
     "img": {"src", "alt", "title", "width", "height"},
+    "iframe": {"src"},
     "td": {"colspan", "rowspan", "align"},
     "th": {"colspan", "rowspan", "align", "scope"},
     "ol": {"start", "type"},
@@ -100,6 +105,8 @@ _FEED_ALLOWED_TAGS = {
     "em",
     "b",
     "i",
+    "img",
+    "iframe",
     "s",
     "del",
     "ul",
@@ -110,9 +117,88 @@ _FEED_ALLOWED_TAGS = {
     "code",
 }
 
+_FEED_ALLOWED_ATTRIBUTES = {
+    "a": {"href", "title"},
+    "img": {"src", "alt", "title", "width", "height"},
+    "iframe": {"src"},
+}
+
+_VK_VIDEO_HOST_RE = re.compile(r"(?:www\.|m\.)?(?:vkvideo\.ru|vk\.com|vk\.ru)")
+_VK_VIDEO_PAGE_RE = re.compile(r"/(?:video|live)(-?\d+)_(\d+)")
+# Quotes inside attribute values are always escaped in nh3 output, so this
+# can only match a real iframe tag.
+_IFRAME_SRC_RE = re.compile(r'<iframe src="([^"]*)"')
+_IFRAME_ATTRIBUTES = {
+    "allow": "autoplay; encrypted-media; fullscreen; picture-in-picture; "
+    "screen-wake-lock;",
+    "allowfullscreen": "",
+    "loading": "lazy",
+    "referrerpolicy": "strict-origin-when-cross-origin",
+}
+
+
+def _vk_video_params(url):
+    """Return (oid, id, hash, hd) for a VK Video player or page URL, else None."""
+    try:
+        parts = urlsplit(url.strip())
+        if parts.scheme not in ("http", "https") or parts.username or parts.port:
+            return None
+    except ValueError:
+        return None
+    if not _VK_VIDEO_HOST_RE.fullmatch(parts.hostname or ""):
+        return None
+    if parts.path == "/video_ext.php":
+        query = parse_qs(parts.query)
+        oid = query.get("oid", [""])[0]
+        video_id = query.get("id", [""])[0]
+    elif page := _VK_VIDEO_PAGE_RE.fullmatch(parts.path):
+        query = {}
+        oid, video_id = page.groups()
+    else:
+        return None
+    video_hash = query.get("hash", [""])[0]
+    hd = query.get("hd", [""])[0]
+    if not re.fullmatch(r"-?\d{1,20}", oid) or not re.fullmatch(r"\d{1,20}", video_id):
+        return None
+    if not re.fullmatch(r"[0-9a-fA-F]{0,64}", video_hash):
+        return None
+    return oid, video_id, video_hash, hd if re.fullmatch(r"[1-4]", hd) else ""
+
+
+def _vk_player_url(url):
+    params = _vk_video_params(url)
+    if params is None:
+        return None
+    oid, video_id, video_hash, hd = params
+    query = {"oid": oid, "id": video_id, "hash": video_hash, "hd": hd}
+    return "https://vkvideo.ru/video_ext.php?" + urlencode(
+        {key: value for key, value in query.items() if value}
+    )
+
+
+def _iframe_attribute_filter(tag, attribute, value):
+    if tag == "iframe" and attribute == "src":
+        return _vk_player_url(value)
+    return value
+
+
+def _clean_html(html, tags, attributes):
+    """Sanitize HTML; an iframe keeps only a canonical VK Video player src."""
+    return nh3.clean(
+        html,
+        tags=tags,
+        attributes=attributes,
+        attribute_filter=_iframe_attribute_filter,
+        set_tag_attribute_values={"iframe": _IFRAME_ATTRIBUTES},
+    )
+
 
 def _clean_feed_html(html):
-    return nh3.clean(html, tags=_FEED_ALLOWED_TAGS, attributes={"a": {"href", "title"}})
+    return _clean_html(html, _FEED_ALLOWED_TAGS, _FEED_ALLOWED_ATTRIBUTES)
+
+
+def _iframe_srcs(html):
+    return _IFRAME_SRC_RE.findall(html)
 
 
 def _normalized_text(html):
@@ -125,9 +211,41 @@ def _normalized_text(html):
     return " ".join(unescape(strip_tags(html)).split())
 
 
+class _VideoLinkTreeprocessor(Treeprocessor):
+    """Turn a paragraph holding nothing but a VK Video link into a player."""
+
+    def run(self, root):
+        for paragraph in root.iter("p"):
+            children = list(paragraph)
+            if not children:
+                url = paragraph.text or ""
+            elif (
+                len(children) == 1
+                and children[0].tag == "a"
+                and not (paragraph.text or "").strip()
+                and not (children[0].tail or "").strip()
+                and not list(children[0])
+                and (children[0].text or "").strip() == children[0].get("href")
+            ):
+                url = children[0].get("href")
+            else:
+                continue
+            src = _vk_player_url(url)
+            if src:
+                paragraph.clear()
+                paragraph.tag = "iframe"
+                paragraph.set("src", src)
+
+
+class _VideoLinkExtension(Extension):
+    def extendMarkdown(self, md):
+        # After inline patterns (priority 20) have turned autolinks into <a>.
+        md.treeprocessors.register(_VideoLinkTreeprocessor(md), "vk_video", 5)
+
+
 def _render_markdown(text):
-    raw_html = markdown(str(text), extensions=["extra"])
-    return nh3.clean(raw_html, tags=_MD_ALLOWED_TAGS, attributes=_MD_ALLOWED_ATTRIBUTES)
+    raw_html = markdown(str(text), extensions=["extra", _VideoLinkExtension()])
+    return _clean_html(raw_html, _MD_ALLOWED_TAGS, _MD_ALLOWED_ATTRIBUTES)
 
 
 class PublicationKind(models.TextChoices):
@@ -247,6 +365,8 @@ class NewsPost(models.Model):
     @property
     def has_more_content(self):
         """Whether the full publication contains text not shown in its preview."""
+        if _iframe_srcs(self.content_html) != _iframe_srcs(self.feed_summary_html):
+            return True
         content = _normalized_text(self.content_html)
         summary = _normalized_text(self.feed_summary_html)
         return bool(content) and summary != content

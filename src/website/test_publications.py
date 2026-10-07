@@ -1,5 +1,6 @@
 import re
 from datetime import date, timedelta
+from html.parser import HTMLParser
 from unittest.mock import patch
 
 import pytest
@@ -233,6 +234,22 @@ def test_feed_preview_closes_link_when_truncating(kind, limit):
     assert publication.has_more_content
 
 
+def test_feed_preview_keeps_images():
+    publication = NewsPost(
+        pk=1,
+        title="Новость",
+        content_html=(
+            '<p><a href="https://play.google.com/"><img src="/media/badge.png" '
+            'alt="Google Play" width="200" onerror="alert(1)"></a></p>'
+        ),
+    )
+
+    html = publication.feed_summary_html
+
+    assert '<img src="/media/badge.png" alt="Google Play" width="200">' in html
+    assert "onerror" not in html
+
+
 @pytest.mark.parametrize("use_editor_summary", [False, True])
 def test_feed_preview_removes_unsafe_html(use_editor_summary):
     unsafe_html = (
@@ -253,6 +270,184 @@ def test_feed_preview_removes_unsafe_html(use_editor_summary):
     assert "<script" not in html
     assert "onclick" not in html
     assert "javascript:" not in html
+
+
+_VK_IFRAME = (
+    '<iframe src="https://vkvideo.ru/video_ext.php?oid=-232088664&id=456239032'
+    '&hash=8457bd3a1e655338&hd=3" width="1280" height="720" allow="autoplay; '
+    'encrypted-media; fullscreen; picture-in-picture; screen-wake-lock;" '
+    'frameborder="0" allowfullscreen></iframe>'
+)
+_VK_PLAYER = "https://vkvideo.ru/video_ext.php?oid=-1&amp;id=2"
+
+
+def _player_srcs(html):
+    return re.findall(r'<iframe src="([^"]*)"', html)
+
+
+@pytest.mark.parametrize(
+    ("source", "expected_src"),
+    [
+        (
+            _VK_IFRAME,
+            "https://vkvideo.ru/video_ext.php?oid=-232088664&amp;id=456239032"
+            "&amp;hash=8457bd3a1e655338&amp;hd=3",
+        ),
+        (
+            "https://vkvideo.ru/live-232088664_456239032",
+            "https://vkvideo.ru/video_ext.php?oid=-232088664&amp;id=456239032",
+        ),
+        ("<https://vk.com/video-1_2>", _VK_PLAYER),
+        ("https://vkvideo.ru/video-1_2?list=abc", _VK_PLAYER),
+        ("https://vkvideo.ru/video-1_2  ", _VK_PLAYER),
+        (" https://vkvideo.ru/video-1_2\t", _VK_PLAYER),
+        (
+            '<iframe src = "https://vk.com/video_ext.php?oid=-1&id=2"></iframe>',
+            _VK_PLAYER,
+        ),
+    ],
+)
+def test_markdown_embeds_vk_video(source, expected_src):
+    html = _render_markdown(f"До видео.\r\n\r\n{source}\r\n\r\nПосле видео.")
+
+    assert _player_srcs(html) == [expected_src]
+    assert "allowfullscreen" in html
+    assert "<p>До видео.</p>" in html
+    assert "<p>После видео.</p>" in html
+
+
+@pytest.mark.parametrize(
+    "source",
+    [
+        '<iframe src="https://evil.example/video_ext.php?oid=1&id=2"></iframe>',
+        '<iframe src="https://vkvideo.ru.evil.example/video_ext.php?oid=1&id=2">',
+        '<iframe src="https://user@vkvideo.ru/video_ext.php?oid=1&id=2"></iframe>',
+        '<iframe src="https://vkvideo.ru/video_ext.php?oid=1&id=2&hash=x%22">',
+        '<iframe src="javascript:alert(1)//vkvideo.ru/video_ext.php?oid=1&id=2">',
+        '<iframe src="https://[evil/video_ext.php?oid=1&id=2"></iframe>',
+        '<iframe src="https://vkvideo.ru:bad/video_ext.php?oid=1&id=2"></iframe>',
+        '<iframe src="https://evil.example" data-src="https://vk.com/video-1_2">',
+        '<iframe src="https://evil.example" title="src=\'https://vk.com/video-1_2\'">',
+        "<iframe></iframe>",
+    ],
+)
+def test_markdown_drops_untrusted_iframe_src(source):
+    html = _render_markdown(source)
+
+    assert _player_srcs(html) == []
+    assert "evil" not in html
+    assert "javascript" not in html
+
+
+def test_markdown_rebuilds_vk_iframe_without_extra_attributes():
+    html = _render_markdown(
+        '<iframe src="https://vkvideo.ru/video_ext.php?oid=-1&id=2" onload="x()"'
+        ' srcdoc="&lt;script&gt;">fallback</iframe>'
+    )
+
+    assert _player_srcs(html) == [_VK_PLAYER]
+    assert "onload" not in html
+    assert "srcdoc" not in html
+
+
+@pytest.mark.parametrize(
+    "source",
+    [
+        "Смотрите https://vkvideo.ru/video-1_2 здесь.",
+        "https://vkvideo.ru/video-1_2evil",
+        "https://vkvideo.ru/video-1_2<img src=x>",
+        "https://vkvideo.ru/clip-1_2",
+        "```\nhttps://vkvideo.ru/video-1_2\n```",
+        "    https://vkvideo.ru/video-1_2",
+        '`<iframe src="https://vk.com/video_ext.php?oid=-1&id=2"></iframe>`',
+        '```\n<iframe src="https://vk.com/video_ext.php?oid=-1&id=2"></iframe>\n```',
+        "<div>\nhttps://vkvideo.ru/video-1_2\n</div>",
+    ],
+)
+def test_markdown_does_not_embed_video_outside_its_own_paragraph(source):
+    html = _render_markdown(source)
+
+    assert "<iframe" not in html
+    assert "video" in html
+
+
+@pytest.mark.parametrize(
+    "source",
+    [
+        '<div><img src="x" alt="<p>https://vkvideo.ru/video-1_2</p>'
+        '<img src=x onerror=alert(1)>"></div>',
+        '<div><img src="x" alt="<iframe src=\'https://vk.com/video-1_2\'>">' "</div>",
+    ],
+)
+def test_markdown_ignores_video_markup_inside_attributes(source):
+    html = _render_markdown(source)
+
+    tags = []
+    parser = HTMLParser()
+    parser.handle_starttag = lambda tag, attrs: tags.append((tag, dict(attrs)))
+    parser.feed(html)
+
+    assert [tag for tag, _ in tags] == ["div", "img"]
+    assert set(tags[1][1]) == {"src", "alt"}
+
+
+def test_markdown_keeps_video_next_to_attribute_with_iframe_text():
+    html = _render_markdown(
+        '<div><img src="x" alt="<iframe"></div>\n\nhttps://vkvideo.ru/video-1_2'
+    )
+
+    assert _player_srcs(html) == [_VK_PLAYER]
+    assert _player_srcs(_clean_feed_html(html)) == [_VK_PLAYER]
+    assert 'alt="<iframe"' in _clean_feed_html(html)
+
+
+def test_feed_preview_offers_reading_when_summary_shows_another_video():
+    publication = NewsPost(
+        pk=1,
+        summary="https://vkvideo.ru/video-3_4",
+        content_html=_render_markdown("https://vkvideo.ru/video-1_2"),
+    )
+
+    assert publication.has_more_content
+
+
+def test_markdown_wrapper_class_alone_is_not_a_video():
+    publication = NewsPost(
+        content_html=_render_markdown('<div class="video-embed">Текст</div>')
+    )
+
+    assert not publication.has_more_content
+
+
+def test_feed_preview_shows_video():
+    publication = NewsPost(
+        pk=1,
+        content_html=_render_markdown("Старт гонки.\n\nhttps://vkvideo.ru/video-1_2"),
+    )
+
+    assert _player_srcs(publication.feed_summary_html) == [_VK_PLAYER]
+    assert not publication.has_more_content
+
+
+def test_feed_preview_shows_video_from_editor_summary():
+    publication = NewsPost(
+        pk=1,
+        summary="https://vkvideo.ru/video-1_2",
+        content_html="<p>Полный текст.</p>",
+    )
+
+    assert _player_srcs(publication.feed_summary_html) == [_VK_PLAYER]
+
+
+def test_feed_preview_offers_reading_when_video_is_cut_off():
+    publication = NewsPost(
+        pk=1,
+        kind=PublicationKind.ARTICLE,
+        content_html=_render_markdown(f"{'я' * 300}\n\nhttps://vkvideo.ru/video-1_2"),
+    )
+
+    assert "<iframe" not in publication.feed_summary_html
+    assert publication.has_more_content
 
 
 @pytest.mark.django_db

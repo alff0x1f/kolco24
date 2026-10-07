@@ -455,6 +455,17 @@
 .publication-post__summary > :last-child { margin-bottom: 0; }
 .publication-post__summary a { text-decoration: underline; }
 .publication-post__summary pre { white-space: pre-wrap; }
+.publication-post__summary img { max-width: 100%; height: auto; vertical-align: middle; }
+.publication-post__summary iframe { display: block; margin: 10px 0; }
+.publication-detail__body iframe,
+.publication-post__summary iframe {
+  width: 100%;
+  height: auto;
+  aspect-ratio: 16 / 9;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: #000;
+}
 
 .publication-post__footer {
   grid-column: 1 / -1;
@@ -810,6 +821,7 @@
 .publication-detail__body p { margin: 0 0 1.15em; }
 .publication-detail__body a { color: var(--primary-2); text-decoration: underline; text-underline-offset: 3px; }
 .publication-detail__body img { height: auto; border-radius: var(--radius-sm); }
+.publication-detail__body iframe { display: block; margin: 1.6em 0; }
 .publication-detail__body blockquote {
   margin: 1.6em 0;
   padding: 4px 0 4px 20px;
