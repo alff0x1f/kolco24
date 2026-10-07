@@ -233,6 +233,22 @@ def test_feed_preview_closes_link_when_truncating(kind, limit):
     assert publication.has_more_content
 
 
+def test_feed_preview_keeps_images():
+    publication = NewsPost(
+        pk=1,
+        title="Новость",
+        content_html=(
+            '<p><a href="https://play.google.com/"><img src="/media/badge.png" '
+            'alt="Google Play" width="200" onerror="alert(1)"></a></p>'
+        ),
+    )
+
+    html = publication.feed_summary_html
+
+    assert '<img src="/media/badge.png" alt="Google Play" width="200">' in html
+    assert "onerror" not in html
+
+
 @pytest.mark.parametrize("use_editor_summary", [False, True])
 def test_feed_preview_removes_unsafe_html(use_editor_summary):
     unsafe_html = (

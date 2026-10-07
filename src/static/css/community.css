@@ -455,6 +455,7 @@
 .publication-post__summary > :last-child { margin-bottom: 0; }
 .publication-post__summary a { text-decoration: underline; }
 .publication-post__summary pre { white-space: pre-wrap; }
+.publication-post__summary img { max-width: 100%; height: auto; vertical-align: middle; }
 
 .publication-post__footer {
   grid-column: 1 / -1;

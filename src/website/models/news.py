@@ -100,6 +100,7 @@ _FEED_ALLOWED_TAGS = {
     "em",
     "b",
     "i",
+    "img",
     "s",
     "del",
     "ul",
@@ -112,7 +113,14 @@ _FEED_ALLOWED_TAGS = {
 
 
 def _clean_feed_html(html):
-    return nh3.clean(html, tags=_FEED_ALLOWED_TAGS, attributes={"a": {"href", "title"}})
+    return nh3.clean(
+        html,
+        tags=_FEED_ALLOWED_TAGS,
+        attributes={
+            "a": {"href", "title"},
+            "img": {"src", "alt", "title", "width", "height"},
+        },
+    )
 
 
 def _normalized_text(html):
