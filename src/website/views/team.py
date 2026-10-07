@@ -182,6 +182,10 @@ class EditTeamView(View):
                     setattr(team, athlet_field, form.cleaned_data.get(athlet_field))
                 if birth_field in form.cleaned_data:
                     setattr(team, birth_field, form.cleaned_data.get(birth_field))
+                if i > new_ucount:
+                    # The form only hides rows past ucount and still posts them.
+                    setattr(team, athlet_field, "")
+                    setattr(team, birth_field, 0)
 
             if "category2_id" in form.cleaned_data:
                 team.category2_id = form.cleaned_data.get("category2_id")

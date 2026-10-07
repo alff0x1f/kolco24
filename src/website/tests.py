@@ -10,6 +10,7 @@ from django.urls import reverse
 from django.utils import timezone
 
 from apps.race.models import PaymentExtra, RaceExtra, TeamExtra
+from apps.race.settlement import settle_payment
 from website.forms import TeamForm, TeamMemberMoveForm
 from website.models import Payment, Race, TeamMemberMove, VTBPayment
 from website.models.models import Team
@@ -969,6 +970,88 @@ def test_edit_team_allows_shrinking_below_paid(client):
 
 
 @pytest.mark.django_db
+def test_edit_team_shrink_clears_dropped_members(client):
+    user, race, category, team = _create_team_for_edit(
+        suffix="shrinkm", min_people=2, max_people=6, ucount=5, paid_people=5
+    )
+    client.force_login(user)
+    response = client.post(
+        reverse("edit_team", args=[team.id]),
+        {
+            "ucount": "4",
+            "category2_id": str(category.id),
+            **{f"athlet{i}": f"A{i}" for i in range(1, 6)},
+            **{f"birth{i}": "1990" for i in range(1, 6)},
+        },
+    )
+    assert response.status_code == 302
+    team.refresh_from_db()
+    assert team.athlet4 == "A4"
+    assert team.athlet5 == ""
+    assert team.birth5 == 0
+
+
+@pytest.mark.django_db
+def test_edit_team_shrunk_extra_payment_keeps_overpaid_seat(client):
+    user, race, category, team = _create_team_for_edit(
+        suffix="shrinkp",
+        tier_price=1500,
+        min_people=2,
+        max_people=6,
+        ucount=4,
+        paid_people=5,
+    )
+    RaceExtra.objects.create(
+        race=race, code="map", name="Доп. карты", price=200, free_per_team=2
+    )
+    client.force_login(user)
+    client_p, payment_p, prepared_p = _mock_vtb()
+    with client_p, payment_p as mock_payment, prepared_p as mock_prepared:
+        oid = VTBPayment.new_order_id("ORDER")
+        mock_payment.new_order_id.return_value = oid
+        mock_payment.from_vtb_payload.return_value = _make_vtb_payment(
+            oid, pay_url="https://pay.example/redirect"
+        )
+        mock_prepared.objects.filter.return_value.first.return_value = None
+        response = client.post(
+            reverse("edit_team", args=[team.id]),
+            {"ucount": "4", "category2_id": str(category.id), "extra_map": "1"},
+        )
+    assert response.status_code == 302
+    payment = Payment.objects.filter(team=team).order_by("-id").first()
+    assert payment.payment_amount == 200
+    assert payment.paid_for == 0
+    settle_payment(payment)
+    team.refresh_from_db()
+    assert team.paid_people == 5
+
+
+@pytest.mark.django_db
+def test_edit_team_shrink_move_counts_paid_seats_in_new_category(client):
+    user, race, category, team = _create_team_for_edit(
+        suffix="shrinkc", min_people=2, max_people=6, ucount=5, paid_people=5
+    )
+    other = Category.objects.create(
+        code="o",
+        name="Other",
+        short_name="O",
+        race=race,
+        min_people=2,
+        max_people=6,
+        people_limit=4,
+    )
+    client.force_login(user)
+    response = client.post(
+        reverse("edit_team", args=[team.id]),
+        {"ucount": "4", "category2_id": str(other.id)},
+    )
+    assert response.status_code == 200
+    team.refresh_from_db()
+    assert team.category2_id == category.id
+    assert team.ucount == 5
+
+
+@pytest.mark.django_db
 def test_edit_team_shrink_keeps_paid_extras_over_cap(client):
     user, race, category, team = _create_team_for_edit(
         suffix="shrinkx", min_people=2, max_people=6, ucount=5, paid_people=5
@@ -1636,7 +1719,6 @@ def _refund_payload(order_id, *, amount=1000.0, refunds=None, status=None):
 
 
 def _refunded_team_payment(**payment_kwargs):
-    from apps.race.settlement import settle_payment
 
     user = User.objects.create_user(
         username="ref", password="pass", email="ref@example.com"
@@ -4090,7 +4172,6 @@ def test_promo_end_to_end_register_settle_reuse_and_limit(
 ):
     """Register with a code → confirm payment → reuse blocked → limit reached."""
     from apps.race.models import RacePromo
-    from apps.race.settlement import settle_payment
 
     race = Race.objects.create(
         name="E2E",

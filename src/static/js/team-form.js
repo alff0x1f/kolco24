@@ -292,7 +292,7 @@
     if (catRem != null) {
       var movingIn = !isCurrent;
       var growing = n > PAID_PEOPLE;
-      if ((movingIn || growing) && n > catRem) return false;
+      if ((movingIn || growing) && Math.max(n, PAID_PEOPLE) > catRem) return false;
     }
     return true;
   }

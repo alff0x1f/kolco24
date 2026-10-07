@@ -249,10 +249,13 @@ class TeamForm(forms.Form):
             cat_remaining = category.remaining_people(exclude_team=team)
             moving_in = category.id != team.category2_id
             growing = new_ucount > team.paid_people
+            # Occupancy counts paid seats, so a team shrunk below them still
+            # brings all of its paid seats into the new category.
+            seats = max(new_ucount, team.paid_people)
             if (
                 cat_remaining is not None
                 and (moving_in or growing)
-                and new_ucount > cat_remaining
+                and seats > cat_remaining
             ):
                 self.add_error(
                     "category2_id",
