@@ -277,6 +277,11 @@ _VK_IFRAME = (
     'encrypted-media; fullscreen; picture-in-picture; screen-wake-lock;" '
     'frameborder="0" allowfullscreen></iframe>'
 )
+_VK_PLAYER = "https://vkvideo.ru/video_ext.php?oid=-1&amp;id=2"
+
+
+def _player_srcs(html):
+    return re.findall(r'<iframe src="([^"]*)"', html)
 
 
 @pytest.mark.parametrize(
@@ -285,62 +290,114 @@ _VK_IFRAME = (
         (
             _VK_IFRAME,
             "https://vkvideo.ru/video_ext.php?oid=-232088664&amp;id=456239032"
-            "&amp;hash=8457bd3a1e655338&amp;hd=2",
+            "&amp;hash=8457bd3a1e655338&amp;hd=3",
         ),
         (
             "https://vkvideo.ru/live-232088664_456239032",
-            "https://vkvideo.ru/video_ext.php?oid=-232088664&amp;id=456239032&amp;hd=2",
+            "https://vkvideo.ru/video_ext.php?oid=-232088664&amp;id=456239032",
         ),
+        ("<https://vk.com/video-1_2>", _VK_PLAYER),
+        ("https://vkvideo.ru/video-1_2?list=abc", _VK_PLAYER),
         (
-            "<https://vk.com/video-1_2>",
-            "https://vkvideo.ru/video_ext.php?oid=-1&amp;id=2&amp;hd=2",
+            '<iframe src = "https://vk.com/video_ext.php?oid=-1&id=2"></iframe>',
+            _VK_PLAYER,
         ),
     ],
 )
 def test_markdown_embeds_vk_video(source, expected_src):
-    html = _render_markdown(f"До видео.\n\n{source}\n\nПосле видео.")
+    html = _render_markdown(f"До видео.\r\n\r\n{source}\r\n\r\nПосле видео.")
 
-    assert f'<div class="video-embed"><iframe src="{expected_src}"' in html
-    assert html.count("<iframe") == 1
+    assert _player_srcs(html) == [expected_src]
+    assert "allowfullscreen" in html
     assert "<p>До видео.</p>" in html
     assert "<p>После видео.</p>" in html
-    assert "vkvideoembed" not in html
 
 
 @pytest.mark.parametrize(
     "source",
     [
         '<iframe src="https://evil.example/video_ext.php?oid=1&id=2"></iframe>',
-        '<iframe src="https://vkvideo.ru/video_ext.php?oid=1&id=2&hash=x%22"></iframe>',
+        '<iframe src="https://vkvideo.ru.evil.example/video_ext.php?oid=1&id=2">',
+        '<iframe src="https://user@vkvideo.ru/video_ext.php?oid=1&id=2"></iframe>',
+        '<iframe src="https://vkvideo.ru/video_ext.php?oid=1&id=2&hash=x%22">',
         '<iframe src="javascript:alert(1)//vkvideo.ru/video_ext.php?oid=1&id=2">',
-        "vkvideoembedx0",
+        '<iframe src="https://[evil/video_ext.php?oid=1&id=2"></iframe>',
+        '<iframe src="https://vkvideo.ru:bad/video_ext.php?oid=1&id=2"></iframe>',
+        '<iframe src="https://evil.example" data-src="https://vk.com/video-1_2">',
+        '<iframe src="https://evil.example" title="src=\'https://vk.com/video-1_2\'">',
+        "<iframe></iframe>",
     ],
 )
 def test_markdown_drops_untrusted_iframes(source):
-    html = _render_markdown(source)
-
-    assert "<iframe" not in html
-    assert "onload" not in html
+    assert "<iframe" not in _render_markdown(source)
 
 
 def test_markdown_rebuilds_vk_iframe_without_extra_attributes():
     html = _render_markdown(
-        '<iframe src="https://vkvideo.ru/video_ext.php?oid=1&id=2" onload="x()">'
+        '<iframe src="https://vkvideo.ru/video_ext.php?oid=-1&id=2" onload="x()"'
+        ' srcdoc="&lt;script&gt;">fallback</iframe>'
     )
 
-    assert html.count("<iframe") == 1
+    assert _player_srcs(html) == [_VK_PLAYER]
     assert "onload" not in html
+    assert "srcdoc" not in html
+    assert "fallback" not in html
 
 
-def test_markdown_keeps_inline_vk_link_as_text():
-    html = _render_markdown("Смотрите https://vkvideo.ru/video-1_2 здесь.")
+@pytest.mark.parametrize(
+    "source",
+    [
+        "Смотрите https://vkvideo.ru/video-1_2 здесь.",
+        "https://vkvideo.ru/video-1_2evil",
+        "https://vkvideo.ru/video-1_2<img src=x>",
+        "https://vkvideo.ru/clip-1_2",
+        "```\nhttps://vkvideo.ru/video-1_2\n```",
+        "    https://vkvideo.ru/video-1_2",
+        '`<iframe src="https://vk.com/video_ext.php?oid=-1&id=2"></iframe>`',
+        '```\n<iframe src="https://vk.com/video_ext.php?oid=-1&id=2"></iframe>\n```',
+        "<div>\nhttps://vkvideo.ru/video-1_2\n</div>",
+    ],
+)
+def test_markdown_does_not_embed_video_outside_its_own_paragraph(source):
+    html = _render_markdown(source)
 
     assert "<iframe" not in html
+    assert "video" in html
 
 
-def test_feed_preview_offers_reading_for_video_only_post():
+def test_markdown_wrapper_class_alone_is_not_a_video():
     publication = NewsPost(
-        pk=1, content_html=_render_markdown("https://vkvideo.ru/video-1_2")
+        content_html=_render_markdown('<div class="video-embed">Текст</div>')
+    )
+
+    assert not publication.has_more_content
+
+
+def test_feed_preview_shows_video():
+    publication = NewsPost(
+        pk=1,
+        content_html=_render_markdown("Старт гонки.\n\nhttps://vkvideo.ru/video-1_2"),
+    )
+
+    assert _player_srcs(publication.feed_summary_html) == [_VK_PLAYER]
+    assert not publication.has_more_content
+
+
+def test_feed_preview_shows_video_from_editor_summary():
+    publication = NewsPost(
+        pk=1,
+        summary="https://vkvideo.ru/video-1_2",
+        content_html="<p>Полный текст.</p>",
+    )
+
+    assert _player_srcs(publication.feed_summary_html) == [_VK_PLAYER]
+
+
+def test_feed_preview_offers_reading_when_video_is_cut_off():
+    publication = NewsPost(
+        pk=1,
+        kind=PublicationKind.ARTICLE,
+        content_html=_render_markdown(f"{'я' * 300}\n\nhttps://vkvideo.ru/video-1_2"),
     )
 
     assert "<iframe" not in publication.feed_summary_html

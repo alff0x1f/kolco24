@@ -1,5 +1,4 @@
 import re
-import secrets
 from html import escape, unescape
 from urllib.parse import parse_qs, urlencode, urlsplit
 
@@ -42,6 +41,7 @@ _MD_ALLOWED_TAGS = frozenset(
         "h6",
         "hr",
         "i",
+        "iframe",
         "img",
         "ins",
         "kbd",
@@ -76,6 +76,7 @@ _MD_ALLOWED_ATTRIBUTES = {
     "a": {"href", "title"},
     "abbr": {"title"},
     "img": {"src", "alt", "title", "width", "height"},
+    "iframe": {"src"},
     "td": {"colspan", "rowspan", "align"},
     "th": {"colspan", "rowspan", "align", "scope"},
     "ol": {"start", "type"},
@@ -103,6 +104,7 @@ _FEED_ALLOWED_TAGS = {
     "b",
     "i",
     "img",
+    "iframe",
     "s",
     "del",
     "ul",
@@ -113,16 +115,97 @@ _FEED_ALLOWED_TAGS = {
     "code",
 }
 
+_FEED_ALLOWED_ATTRIBUTES = {
+    "a": {"href", "title"},
+    "img": {"src", "alt", "title", "width", "height"},
+    "iframe": {"src"},
+}
+
+_VK_VIDEO_HOST_RE = re.compile(r"(?:www\.|m\.)?(?:vkvideo\.ru|vk\.com|vk\.ru)")
+_VK_VIDEO_PAGE_RE = re.compile(r"/(?:video|live)(-?\d+)_(\d+)")
+_VK_VIDEO_LINK_PARAGRAPH_RE = re.compile(
+    r'<p>(?:<a href="([^"]+)"[^>]*>\1</a>|([^<\s]+))</p>'
+)
+_IFRAME_RE = re.compile(r"<iframe\b([^>]*)>.*?</iframe>", re.DOTALL)
+_IFRAME_SRC_RE = re.compile(r'\ssrc="([^"]*)"')
+
+
+def _vk_video_params(url):
+    """Return (oid, id, hash, hd) for a VK Video player or page URL, else None."""
+    try:
+        parts = urlsplit(url)
+        if parts.scheme not in ("http", "https") or parts.username or parts.port:
+            return None
+    except ValueError:
+        return None
+    if not _VK_VIDEO_HOST_RE.fullmatch(parts.hostname or ""):
+        return None
+    if parts.path == "/video_ext.php":
+        query = parse_qs(parts.query)
+        oid = query.get("oid", [""])[0]
+        video_id = query.get("id", [""])[0]
+    elif page := _VK_VIDEO_PAGE_RE.fullmatch(parts.path):
+        query = {}
+        oid, video_id = page.groups()
+    else:
+        return None
+    video_hash = query.get("hash", [""])[0]
+    hd = query.get("hd", [""])[0]
+    if not re.fullmatch(r"-?\d{1,20}", oid) or not re.fullmatch(r"\d{1,20}", video_id):
+        return None
+    if not re.fullmatch(r"[0-9a-fA-F]{0,64}", video_hash):
+        return None
+    return oid, video_id, video_hash, hd if re.fullmatch(r"[1-4]", hd) else ""
+
+
+def _vk_player_url(params):
+    oid, video_id, video_hash, hd = params
+    query = {"oid": oid, "id": video_id, "hash": video_hash, "hd": hd}
+    return "https://vkvideo.ru/video_ext.php?" + urlencode(
+        {key: value for key, value in query.items() if value}
+    )
+
+
+def _vk_player_html(params):
+    return (
+        f'<iframe src="{escape(_vk_player_url(params))}"'
+        ' allow="autoplay; encrypted-media; fullscreen; picture-in-picture;'
+        ' screen-wake-lock;" allowfullscreen loading="lazy"'
+        ' referrerpolicy="strict-origin-when-cross-origin"></iframe>'
+    )
+
+
+def _iframe_attribute_filter(tag, attribute, value):
+    if tag != "iframe":
+        return value
+    params = _vk_video_params(value)
+    return _vk_player_url(params) if params else None
+
+
+def _rebuild_iframes(html):
+    """Swap each cleaned iframe for a VK Video player built from its src, or drop it."""
+
+    def replace(match):
+        src = _IFRAME_SRC_RE.search(match.group(1))
+        params = _vk_video_params(unescape(src.group(1))) if src else None
+        return _vk_player_html(params) if params else ""
+
+    return _IFRAME_RE.sub(replace, html)
+
+
+def _clean_html(html, tags, attributes):
+    """Sanitize HTML, letting through only VK Video iframes rebuilt by us."""
+    html = nh3.clean(
+        html,
+        tags=tags,
+        attributes=attributes,
+        attribute_filter=_iframe_attribute_filter,
+    )
+    return _rebuild_iframes(html)
+
 
 def _clean_feed_html(html):
-    return nh3.clean(
-        html,
-        tags=_FEED_ALLOWED_TAGS,
-        attributes={
-            "a": {"href", "title"},
-            "img": {"src", "alt", "title", "width", "height"},
-        },
-    )
+    return _clean_html(html, _FEED_ALLOWED_TAGS, _FEED_ALLOWED_ATTRIBUTES)
 
 
 def _normalized_text(html):
@@ -135,75 +218,20 @@ def _normalized_text(html):
     return " ".join(unescape(strip_tags(html)).split())
 
 
-_VK_HOSTS = r"(?:www\.|m\.)?(?:vkvideo\.ru|vk\.com|vk\.ru)"
-_VK_IFRAME_RE = re.compile(
-    r"<iframe\b[^>]*?\bsrc=[\"']([^\"']+)[\"'][^>]*>\s*(?:</iframe>)?",
-    re.IGNORECASE,
-)
-_VK_LINK_RE = re.compile(
-    rf"^[ \t]*<?(https?://{_VK_HOSTS}/(?:video|live)(-?\d+)_(\d+)\S*?)>?[ \t]*$",
-    re.IGNORECASE | re.MULTILINE,
-)
-_VK_EXT_PATH_RE = re.compile(rf"^https?://{_VK_HOSTS}/video_ext\.php$", re.IGNORECASE)
+def _embed_video_links(html):
+    """Turn a paragraph holding nothing but a VK Video link into a player."""
 
+    def replace(match):
+        params = _vk_video_params(unescape(match.group(1) or match.group(2)))
+        return _vk_player_html(params) if params else match.group(0)
 
-def _vk_embed_html(oid, video_id, video_hash=""):
-    params = {"oid": oid, "id": video_id}
-    if video_hash:
-        params["hash"] = video_hash
-    params["hd"] = "2"
-    src = "https://vkvideo.ru/video_ext.php?" + urlencode(params)
-    return (
-        '<div class="video-embed"><iframe src="'
-        + escape(src)
-        + '" allow="autoplay; encrypted-media; fullscreen; picture-in-picture;'
-        ' screen-wake-lock;" allowfullscreen loading="lazy"'
-        ' referrerpolicy="strict-origin-when-cross-origin"></iframe></div>'
-    )
-
-
-def _vk_iframe_params(src):
-    src = unescape(src)
-    parts = urlsplit(src)
-    if not _VK_EXT_PATH_RE.match(f"{parts.scheme}://{parts.netloc}{parts.path}"):
-        return None
-    query = parse_qs(parts.query)
-    oid = query.get("oid", [""])[0]
-    video_id = query.get("id", [""])[0]
-    video_hash = query.get("hash", [""])[0]
-    if not re.fullmatch(r"-?\d+", oid) or not re.fullmatch(r"\d+", video_id):
-        return None
-    if video_hash and not re.fullmatch(r"[0-9a-fA-F]+", video_hash):
-        return None
-    return oid, video_id, video_hash
-
-
-def _extract_video_embeds(text):
-    """Swap VK Video iframes and bare links for markers that survive cleaning."""
-    nonce = secrets.token_hex(8)
-    embeds = {}
-
-    def marker(html):
-        key = f"vkvideoembed{nonce}x{len(embeds)}"
-        embeds[key] = html
-        return f"\n\n{key}\n\n"
-
-    def replace_iframe(match):
-        params = _vk_iframe_params(match.group(1))
-        return marker(_vk_embed_html(*params)) if params else match.group(0)
-
-    text = _VK_IFRAME_RE.sub(replace_iframe, text)
-    text = _VK_LINK_RE.sub(lambda m: marker(_vk_embed_html(m[2], m[3])), text)
-    return text, embeds
+    return _VK_VIDEO_LINK_PARAGRAPH_RE.sub(replace, html)
 
 
 def _render_markdown(text):
-    text, embeds = _extract_video_embeds(str(text))
-    raw_html = markdown(text, extensions=["extra"])
-    html = nh3.clean(raw_html, tags=_MD_ALLOWED_TAGS, attributes=_MD_ALLOWED_ATTRIBUTES)
-    for key, embed in embeds.items():
-        html = html.replace(f"<p>{key}</p>", embed)
-    return html
+    raw_html = markdown(str(text), extensions=["extra"])
+    html = _clean_html(raw_html, _MD_ALLOWED_TAGS, _MD_ALLOWED_ATTRIBUTES)
+    return _embed_video_links(html)
 
 
 class PublicationKind(models.TextChoices):
@@ -323,7 +351,7 @@ class NewsPost(models.Model):
     @property
     def has_more_content(self):
         """Whether the full publication contains text not shown in its preview."""
-        if 'class="video-embed"' in self.content_html:
+        if self.content_html.count("<iframe") > self.feed_summary_html.count("<iframe"):
             return True
         content = _normalized_text(self.content_html)
         summary = _normalized_text(self.feed_summary_html)
