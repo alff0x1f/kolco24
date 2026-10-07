@@ -10,6 +10,8 @@
     <div class="race-list-card__status">
       {% if race.is_current %}
       <span class="race-status race-status--current">Идёт сейчас</span>
+      {% elif race.is_finished %}
+      <span class="race-status race-status--muted">Завершено</span>
       {% elif race.reg_status == "open" %}
       <span class="race-status race-status--open">Регистрация открыта</span>
       {% elif race.reg_status == "sold_out" %}

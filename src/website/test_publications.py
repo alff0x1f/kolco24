@@ -712,8 +712,9 @@ def test_publication_detail_sidebar_shows_own_race(client):
         name="Кольцо 24",
         slug="k24",
         is_published=True,
-        date=date(2026, 5, 1),
-        date_end=date(2026, 5, 2),
+        reg_status=RegStatus.OPEN,
+        date=timezone.localdate() - timedelta(days=30),
+        date_end=timezone.localdate() - timedelta(days=29),
     )
     other = Race.objects.create(
         name="Другая гонка",
@@ -732,6 +733,8 @@ def test_publication_detail_sidebar_shows_own_race(client):
     assert f'href="{reverse("race_list")}"' not in breadcrumbs
     assert f'href="{reverse("race", args=[race.slug])}">Кольцо 24</a>' in breadcrumbs
     assert ">Соревнование</h2>" in aside
+    assert "Завершено" in aside
+    assert "Регистрация открыта" not in aside
     assert f'href="{reverse("race", args=[race.slug])}"' in aside
     assert other.name not in aside
 
