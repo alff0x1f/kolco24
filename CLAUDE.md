@@ -143,6 +143,18 @@ Django 4.2 project. Source lives entirely under `src/`, with `manage.py` at `src
   box column whose header comes from `?column=` (default «Отметка»). `?category=<id>` prints one category at a time
   (an unknown id falls back to the whole race). Sorted by `start_number` **numerically**
   (non-numeric numbers after). Gated by `_load_race_for_admin`.
+  `RaceTeamsAdminView`/`RaceTeamsAdminExportView` (`race_teams_admin`, `race/<slug>/teams-admin/`, standalone template
+  `src/templates/race/teams_admin.html` reusing `checklist.css` + `teams_admin.css`; CSV `race_teams_admin_export`,
+  `…/teams-admin/export/`, `;` + BOM like the payments export) list a race's teams for organizers: ID, start number,
+  name, paid seats, category, member transfers (`TeamMemberMove`) and refunds (`PaymentRefund`, zero-amount audit rows
+  skipped). `src/apps/race/teams_admin.py:team_rows` is the
+  single source for both. A team is listed if it has paid seats **or** any transfer/refund history (so a team that
+  lost all seats keeps its row); soft-deleted teams get no row but still show as the other side of a transfer.
+  Every transfer is listed on its own (date, signed seats, other team) — no grouping, by decision; refunds are one
+  summary (seats, ₽, count, last date) with every refund in a `<details>`. CSV transfer entries start with the date,
+  not the sign, so `_csv_safe` doesn't prefix an apostrophe. A refund without a bank date is dated by its journal
+  row's `created_at` (as on «Платежи») — not `payment.updated_at`, which `record_refund` never touches. `start_number_key` lives in
+  `teams_admin.py` and is shared with the checklist. `?category=` and the gate work as on the checklist.
   `RacePaymentsView`/`RacePaymentsExportView` back the organizer-only «Платежи» page — a read-only payment register
   plus totals, for tracking how the money came in. URL names `race_payments` (`race/<slug>/payments/`, template
   `src/templates/race/payments.html`, assets `src/static/css/payments.css` + `src/static/js/payments.js`) and

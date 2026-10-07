@@ -1,4 +1,6 @@
+import csv
 import datetime
+import io
 import itertools
 import json
 import re
@@ -7974,6 +7976,280 @@ def test_checklist_filters_by_category(client, django_user_model):
         resp = client.get(url, {"category": value})
         assert len(resp.context["rows"]) == 2
         assert resp.context["selected_category"] is None
+
+
+# ---------------------------------------------------------------------------
+# Organizer team list (teams-admin)
+# ---------------------------------------------------------------------------
+
+from website.models import PaymentRefund, TeamMemberMove  # noqa: E402
+
+
+def _ta_url(race, export=False):
+    name = "race_teams_admin_export" if export else "race_teams_admin"
+    return reverse(name, kwargs={"race_slug": race.slug})
+
+
+def _ta_admin(django_user_model, race, username="ta-adm"):
+    admin = django_user_model.objects.create_user(username=username, password="x")
+    RaceAdmin.objects.create(race=race, user=admin, role=RaceAdmin.Role.ADMIN)
+    return admin
+
+
+def _ta_dt(day, hour=12):
+    return datetime.datetime(2026, 9, day, hour, 0, tzinfo=datetime.timezone.utc)
+
+
+def _ta_fmt(moment):
+    return timezone.localtime(moment).strftime("%d.%m.%Y %H:%M")
+
+
+def _ta_move(from_team, to_team, people, when):
+    move = TeamMemberMove.objects.create(
+        from_team=from_team, to_team=to_team, moved_people=people
+    )
+    TeamMemberMove.objects.filter(pk=move.pk).update(move_date=when)
+    return move
+
+
+def _ta_refund(owner, team, refund_id, amount, people, when=None):
+    payment = _fin_payment(owner, team)
+    return PaymentRefund.objects.create(
+        payment=payment,
+        vtb_refund_id=refund_id,
+        amount=amount,
+        people=people,
+        refunded_at=when,
+    )
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("export", [False, True])
+def test_teams_admin_anonymous_redirects_to_login(client, export):
+    race = _make_race()
+    resp = client.get(_ta_url(race, export))
+    assert resp.status_code == 302
+    assert reverse("login") in resp.url
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("export", [False, True])
+@pytest.mark.parametrize("superuser", [False, True])
+def test_teams_admin_forbidden_without_admin_row(
+    client, django_user_model, export, superuser
+):
+    race = _make_race()
+    user = django_user_model.objects.create_user(
+        username="ta-u", password="x", is_superuser=superuser
+    )
+    client.force_login(user)
+    assert client.get(_ta_url(race, export)).status_code == 403
+
+
+@pytest.mark.django_db
+def test_teams_admin_rows_include_teams_with_history(client, django_user_model):
+    race = _make_race()
+    category = _make_category(race)
+    admin = _ta_admin(django_user_model, race)
+    ten = _make_team(admin, category, start_number="10", teamname="Десятка")
+    nine = _make_team(admin, category, start_number="9", teamname="Девятка")
+    _make_team(admin, category, start_number="1", teamname="Unpaid", paid_people=0)
+    moved_out = _make_team(
+        admin, category, start_number="2", teamname="Ушли", paid_people=0
+    )
+    refunded = _make_team(
+        admin, category, start_number="3", teamname="Вернули", paid_people=0
+    )
+    _make_team(admin, category, start_number="4", teamname="Удалена", is_deleted=True)
+    _make_team(admin, _make_category(_make_race(slug="other")), teamname="Чужая")
+    _ta_move(moved_out, ten, 2, _ta_dt(10))
+    _ta_refund(admin, refunded, "R_ta_inc", 1000, 2, _ta_dt(11))
+    client.force_login(admin)
+
+    resp = client.get(_ta_url(race))
+
+    assert resp.status_code == 200
+    rows = resp.context["rows"]
+    assert [r["id"] for r in rows] == [moved_out.id, refunded.id, nine.id, ten.id]
+    assert resp.context["paid_total"] == 4
+
+
+@pytest.mark.django_db
+def test_teams_admin_lists_every_move(client, django_user_model):
+    race = _make_race()
+    category = _make_category(race)
+    admin = _ta_admin(django_user_model, race)
+    a = _make_team(admin, category, start_number="1", teamname="Ежи")
+    b = _make_team(admin, category, start_number="2", teamname="Лисы")
+    c = _make_team(admin, category, start_number="3", teamname="", paid_people=0)
+    c.is_deleted = True
+    c.save()
+    _ta_move(a, b, 1, _ta_dt(10))
+    _ta_move(a, b, 1, _ta_dt(11))
+    _ta_move(b, a, 1, _ta_dt(12))
+    _ta_move(a, b, 1, _ta_dt(14))
+    _ta_move(c, a, 1, _ta_dt(9))
+    client.force_login(admin)
+
+    row = client.get(_ta_url(race)).context["rows"][0]
+
+    assert row["id"] == a.id
+    assert row["moved_people"] == -1
+    assert [(m["date"], m["people"], m["other"]) for m in row["moves"]] == [
+        (_ta_fmt(_ta_dt(9)), 1, f"ID-{c.id}"),
+        (_ta_fmt(_ta_dt(10)), -1, f"ID-{b.id} «Лисы»"),
+        (_ta_fmt(_ta_dt(11)), -1, f"ID-{b.id} «Лисы»"),
+        (_ta_fmt(_ta_dt(12)), 1, f"ID-{b.id} «Лисы»"),
+        (_ta_fmt(_ta_dt(14)), -1, f"ID-{b.id} «Лисы»"),
+    ]
+
+
+@pytest.mark.django_db
+def test_teams_admin_summarizes_refunds(client, django_user_model):
+    from apps.race.settlement import record_refund
+
+    race = _make_race()
+    category = _make_category(race)
+    admin = _ta_admin(django_user_model, race)
+    team = _make_team(admin, category, paid_people=4, ucount=4)
+    _ta_refund(admin, team, "R_ta_1", 1000, 2, _ta_dt(20))
+    _ta_refund(admin, team, "R_ta_0", 0, 0, _ta_dt(25))
+    # Без даты от банка: ``record_refund`` не трогает ``payment.updated_at``,
+    # так что дата возврата — момент записи строки журнала.
+    payment = _fin_payment(admin, team)
+    Payment.objects.filter(pk=payment.pk).update(updated_at=_ta_dt(1))
+    record_refund(payment, "R_ta_2", 500)
+    no_date = PaymentRefund.objects.get(vtb_refund_id="R_ta_2")
+    client.force_login(admin)
+
+    row = client.get(_ta_url(race)).context["rows"][0]
+
+    assert row["refunded_people"] == 3
+    assert row["refunded_amount"] == 1500
+    no_date_entry = next(r for r in row["refunds"] if r["amount"] == 500)
+    assert no_date_entry["date"] == _ta_fmt(no_date.created_at)
+    assert row["last_refund_date"] == _ta_fmt(max(no_date.created_at, _ta_dt(20)))
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("url_name", ["race_teams_admin", "race_checklist"])
+def test_non_decimal_digit_start_number_sorts_last(client, django_user_model, url_name):
+    race = _make_race()
+    category = _make_category(race)
+    admin = _ta_admin(django_user_model, race)
+    _make_team(admin, category, start_number="\u00b2", teamname="Квадрат")
+    _make_team(admin, category, start_number="5", teamname="Пятая")
+    client.force_login(admin)
+
+    resp = client.get(reverse(url_name, kwargs={"race_slug": race.slug}))
+
+    assert resp.status_code == 200
+    assert [r["name"] for r in resp.context["rows"]] == ["Пятая", "Квадрат"]
+
+
+@pytest.mark.django_db
+def test_teams_admin_filters_by_category(client, django_user_model):
+    race = _make_race()
+    twelve = _make_category(race)
+    six = _make_category(race, code="6h", short_name="6ч", name="6 часов", order=1)
+    admin = _ta_admin(django_user_model, race)
+    _make_team(admin, twelve, start_number="1", teamname="Двенадцать")
+    _make_team(admin, six, start_number="2", teamname="Шесть")
+    client.force_login(admin)
+
+    resp = client.get(_ta_url(race), {"category": six.id})
+    assert [r["name"] for r in resp.context["rows"]] == ["Шесть"]
+    html = resp.content.decode()
+    assert f'{_ta_url(race, export=True)}?category={six.id}"' in html
+
+    for value in ("", "999999", "abc"):
+        resp = client.get(_ta_url(race), {"category": value})
+        assert len(resp.context["rows"]) == 2
+
+
+@pytest.mark.django_db
+def test_teams_admin_details_only_for_several_refunds(client, django_user_model):
+    race = _make_race()
+    category = _make_category(race)
+    admin = _ta_admin(django_user_model, race)
+    team = _make_team(admin, category, paid_people=4, ucount=4)
+    _ta_refund(admin, team, "R_ta_d1", 500, 1, _ta_dt(10))
+    client.force_login(admin)
+
+    assert "<details>" not in client.get(_ta_url(race)).content.decode()
+
+    _ta_refund(admin, team, "R_ta_d2", 500, 1, _ta_dt(11))
+    assert "все (2)" in client.get(_ta_url(race)).content.decode()
+
+
+@pytest.mark.django_db
+def test_teams_admin_csv(client, django_user_model):
+    race = _make_race()
+    category = _make_category(race)
+    admin = _ta_admin(django_user_model, race)
+    a = _make_team(admin, category, start_number="1", teamname="=1+1", ucount=4)
+    b = _make_team(admin, category, start_number="2", teamname="Лисы")
+    _ta_move(a, b, 1, _ta_dt(10))
+    _ta_move(a, b, 1, _ta_dt(14))
+    _ta_refund(admin, a, "R_ta_csv", 1500, 1.5, _ta_dt(20))
+    client.force_login(admin)
+
+    resp = client.get(_ta_url(race, export=True), {"category": category.id})
+
+    assert resp.status_code == 200
+    assert "teams-teams-race-12h-" in resp["Content-Disposition"]
+    body = resp.content.decode("utf-8")
+    assert body.startswith("﻿")
+    lines = list(csv.reader(io.StringIO(body[1:]), delimiter=";"))
+    assert lines[0] == [
+        "ID",
+        "Старт номер",
+        "Название команды",
+        "Категория",
+        "Оплачено чел",
+        "Заявлено чел",
+        "Переносы чел",
+        "Переносы",
+        "Возвращено чел",
+        "Возвращено ₽",
+        "Последний возврат",
+        "Возвраты",
+    ]
+    assert lines[1] == [
+        str(a.id),
+        "1",
+        "'=1+1",
+        "12h",
+        "2",
+        "4",
+        "-2",
+        f"{_ta_fmt(_ta_dt(10))} в ID-{b.id} «Лисы»: -1; "
+        f"{_ta_fmt(_ta_dt(14))} в ID-{b.id} «Лисы»: -1",
+        "1.5",
+        "1500",
+        _ta_fmt(_ta_dt(20)),
+        f"1.5 чел., 1500 ₽ ({_ta_fmt(_ta_dt(20))})",
+    ]
+    assert lines[2][6:8] == [
+        "2",
+        f"{_ta_fmt(_ta_dt(10))} из ID-{a.id} «=1+1»: +1; "
+        f"{_ta_fmt(_ta_dt(14))} из ID-{a.id} «=1+1»: +1",
+    ]
+
+
+@pytest.mark.django_db
+def test_race_page_links_teams_admin_for_admin_only(client, django_user_model):
+    race = _make_race()
+    race.is_published = True
+    race.save()
+    url = _ta_url(race)
+    admin = _ta_admin(django_user_model, race)
+    client.force_login(admin)
+    assert url in client.get(reverse("race", args=[race.slug])).content.decode()
+
+    user = django_user_model.objects.create_user(username="ta-plain", password="x")
+    client.force_login(user)
+    assert url not in client.get(reverse("race", args=[race.slug])).content.decode()
 
 
 # --- RaceMapGpxView (GPX export) --------------------------------------------

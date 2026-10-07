@@ -1,0 +1,48 @@
+.teams-admin {
+  max-width: 1200px;
+}
+
+.teams-admin .toolbar a.csv {
+  margin-right: 0;
+  padding: 5px 12px;
+  border: 1px solid #1c5fd6;
+  border-radius: 6px;
+  background: #1c5fd6;
+  color: #fff;
+}
+
+.teams-admin .name {
+  width: auto;
+}
+
+.teams-admin .events {
+  font-size: 9pt;
+  white-space: nowrap;
+}
+
+.teams-admin .events details {
+  margin-top: 2px;
+}
+
+.teams-admin .events summary {
+  color: #1c5fd6;
+  cursor: pointer;
+}
+
+.teams-admin .muted {
+  color: #666;
+}
+
+.teams-admin .plus {
+  color: #1a7f37;
+}
+
+.teams-admin .minus {
+  color: #c62828;
+}
+
+@media print {
+  .teams-admin {
+    max-width: none;
+  }
+}
