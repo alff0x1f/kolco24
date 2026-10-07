@@ -211,18 +211,19 @@ class TeamForm(forms.Form):
 
         if ucount_valid:
             # Per add-on caps: count ≤ max(0, ucount − free_per_team); on edit
-            # the count cannot drop below what's already paid.
+            # the count cannot drop below what's already paid, and paid units
+            # stay allowed after the team shrinks.
             for extra in self.extras:
                 field = f"extra_{extra.code}"
                 count = int(cleaned_data.get(field) or 0)
-                max_count = max(0, int(ucount) - extra.free_per_team)
+                count_paid = self._extra_paid.get(extra.id, 0)
+                max_count = max(0, int(ucount) - extra.free_per_team, count_paid)
                 if count > max_count:
                     self.add_error(
                         field,
                         f"Слишком много «{extra.name}» для такого состава.",
                     )
                     continue
-                count_paid = self._extra_paid.get(extra.id, 0)
                 if count < count_paid:
                     self.add_error(
                         field,

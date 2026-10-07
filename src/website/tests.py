@@ -952,6 +952,82 @@ def test_edit_team_rejects_over_cap_map_count(client):
 
 
 @pytest.mark.django_db
+def test_edit_team_allows_shrinking_below_paid(client):
+    user, race, category, team = _create_team_for_edit(
+        suffix="shrink", min_people=2, max_people=6, ucount=5, paid_people=5
+    )
+    client.force_login(user)
+    response = client.post(
+        reverse("edit_team", args=[team.id]),
+        {"ucount": "4", "category2_id": str(category.id)},
+    )
+    assert response.status_code == 302
+    team.refresh_from_db()
+    assert team.ucount == 4
+    assert team.paid_people == 5
+    assert Payment.objects.filter(team=team).count() == 0
+
+
+@pytest.mark.django_db
+def test_edit_team_shrink_keeps_paid_extras_over_cap(client):
+    user, race, category, team = _create_team_for_edit(
+        suffix="shrinkx", min_people=2, max_people=6, ucount=5, paid_people=5
+    )
+    extra = RaceExtra.objects.create(
+        race=race, code="map", name="Доп. карты", price=200, free_per_team=2
+    )
+    TeamExtra.objects.create(team=team, race_extra=extra, count=3, count_paid=3)
+    client.force_login(user)
+    response = client.post(
+        reverse("edit_team", args=[team.id]),
+        {"ucount": "4", "category2_id": str(category.id), "extra_map": "3"},
+    )
+    assert response.status_code == 302
+    team.refresh_from_db()
+    assert team.ucount == 4
+    te = TeamExtra.objects.get(team=team, race_extra=extra)
+    assert te.count == 3
+    assert te.count_paid == 3
+    assert Payment.objects.filter(team=team).count() == 0
+
+
+@pytest.mark.django_db
+def test_edit_team_shrink_rejects_extras_beyond_paid(client):
+    user, race, category, team = _create_team_for_edit(
+        suffix="shrinky", min_people=2, max_people=6, ucount=5, paid_people=5
+    )
+    extra = RaceExtra.objects.create(
+        race=race, code="map", name="Доп. карты", price=200, free_per_team=2
+    )
+    TeamExtra.objects.create(team=team, race_extra=extra, count=3, count_paid=3)
+    client.force_login(user)
+    response = client.post(
+        reverse("edit_team", args=[team.id]),
+        # ucount=4 caps new maps at max(4-2, 3 paid)=3; a 4th must be rejected
+        {"ucount": "4", "category2_id": str(category.id), "extra_map": "4"},
+    )
+    assert response.status_code == 200
+    team.refresh_from_db()
+    assert team.ucount == 5
+    assert Payment.objects.filter(team=team).count() == 0
+
+
+@pytest.mark.django_db
+def test_edit_team_shrink_below_category_min_rejected(client):
+    user, race, category, team = _create_team_for_edit(
+        suffix="shrinkmin", min_people=4, max_people=6, ucount=5, paid_people=5
+    )
+    client.force_login(user)
+    response = client.post(
+        reverse("edit_team", args=[team.id]),
+        {"ucount": "3", "category2_id": str(category.id)},
+    )
+    assert response.status_code == 200
+    team.refresh_from_db()
+    assert team.ucount == 5
+
+
+@pytest.mark.django_db
 def test_edit_team_closed_but_editable_saves_without_charge(client):
     user, race, category, team = _create_team_for_edit(
         suffix="closed",

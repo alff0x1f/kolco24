@@ -245,7 +245,7 @@
   });
 
   function extraMax(item) {
-    return Math.max(0, ucount - item.free);
+    return Math.max(0, ucount - item.free, item.countPaid);
   }
 
   function setExtra(item, v) {
