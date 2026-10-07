@@ -251,6 +251,23 @@ def test_feed_preview_keeps_images():
 
 
 @pytest.mark.parametrize("use_editor_summary", [False, True])
+def test_feed_preview_ranks_headings_below_card_title(use_editor_summary):
+    text = "# Старт\n\nХолодное утро.\n\n### Финиш\n\nВсе дошли."
+    publication = NewsPost(
+        pk=1,
+        title="Новость",
+        summary=text if use_editor_summary else "",
+        content_html="" if use_editor_summary else _render_markdown(text),
+    )
+
+    html = publication.feed_summary_html
+
+    assert "<h4>Старт</h4><p>Холодное утро.</p>" in html.replace("\n", "")
+    assert "<h4>Финиш</h4>" in html
+    assert not re.search(r"<h[1-356]|id=", html)
+
+
+@pytest.mark.parametrize("use_editor_summary", [False, True])
 def test_feed_preview_removes_unsafe_html(use_editor_summary):
     unsafe_html = (
         '<p onclick="alert(1)">Текст<br>'
@@ -642,6 +659,99 @@ def test_publication_detail_uses_id_url(client):
         f'{publication.get_absolute_url()}">'
     )
     assert expected_og_url in html
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(
+    ("kind", "hero_title"),
+    [(PublicationKind.ARTICLE, "Статьи"), (PublicationKind.NEWS, "Кольцо 24")],
+)
+def test_publication_detail_puts_title_in_card_under_section_hero(
+    client, kind, hero_title
+):
+    publication = create_publication(
+        "Итоги гонки",
+        summary="Короткий анонс",
+        kind=kind,
+        publication_date=timezone.make_aware(timezone.datetime(2026, 10, 7, 12)),
+    )
+
+    html = client.get(publication.get_absolute_url()).content.decode()
+
+    hero = re.search(r'<header class="community-hero">.*?</header>', html, re.DOTALL)
+    article = re.search(
+        r"<article class=\"publication-feed.*?</article>", html, re.DOTALL
+    )
+    assert hero and article
+    assert f"<h1>{hero_title}</h1>" in hero.group(0)
+    assert "Итоги гонки" not in hero.group(0)
+    assert re.findall(r"<h1>(.*?)</h1>", article.group(0)) == ["Итоги гонки"]
+    assert "Короткий анонс" in article.group(0)
+    assert re.search(r"<time [^>]*>7 октября 2026</time>", article.group(0))
+
+
+@pytest.mark.django_db
+def test_publication_detail_hides_empty_lead(client):
+    publication = create_publication("Без анонса")
+
+    html = client.get(publication.get_absolute_url()).content.decode()
+
+    assert "publication-article__lead" not in html
+    assert "Материал о соревновании" not in html
+
+
+def _aside(html):
+    match = re.search(r'<aside class="home-races".*?</aside>', html, re.DOTALL)
+    assert match
+    return match.group(0)
+
+
+@pytest.mark.django_db
+def test_publication_detail_sidebar_shows_own_race(client):
+    race = Race.objects.create(
+        name="Кольцо 24",
+        slug="k24",
+        is_published=True,
+        date=date(2026, 5, 1),
+        date_end=date(2026, 5, 2),
+    )
+    other = Race.objects.create(
+        name="Другая гонка",
+        slug="other",
+        is_published=True,
+        date=timezone.localdate() + timedelta(days=10),
+        date_end=timezone.localdate() + timedelta(days=11),
+    )
+    publication = create_publication("Итоги", race=race)
+
+    aside = _aside(client.get(publication.get_absolute_url()).content.decode())
+
+    breadcrumbs = extract_labelled_nav(
+        client.get(publication.get_absolute_url()), "Хлебные крошки"
+    )
+    assert f'href="{reverse("race_list")}"' not in breadcrumbs
+    assert f'href="{reverse("race", args=[race.slug])}">Кольцо 24</a>' in breadcrumbs
+    assert ">Соревнование</h2>" in aside
+    assert f'href="{reverse("race", args=[race.slug])}"' in aside
+    assert other.name not in aside
+
+
+@pytest.mark.django_db
+def test_publication_detail_sidebar_lists_upcoming_races_without_race(client):
+    upcoming = Race.objects.create(
+        name="Осенний старт",
+        slug="autumn",
+        is_published=True,
+        date=timezone.localdate() + timedelta(days=10),
+        date_end=timezone.localdate() + timedelta(days=11),
+    )
+    publication = create_publication("Советы")
+
+    aside = _aside(client.get(publication.get_absolute_url()).content.decode())
+
+    assert ">Соревнования</h2>" in aside
+    assert upcoming.name in aside
+    assert "Календарь и архив" in aside
 
 
 @pytest.mark.django_db

@@ -9,36 +9,45 @@
 {% block extra_head %}<link href="{% static 'css/community.css' %}" rel="stylesheet">{% endblock %}
 
 {% block content %}
-<main class="community-page publication-detail">
-  <div class="container publication-detail__wrap">
-    <nav class="community-crumbs" aria-label="Хлебные крошки">
-      <a href="{% url 'index' %}{% if publication.kind == 'news' %}#publications{% endif %}">Главная</a>{% if publication.kind == "article" %}<span>/</span><a href="{% url 'article_list' %}">Статьи</a>{% endif %}
-    </nav>
-    <article>
-      {% if is_preview %}
-      <p role="status">Предпросмотр — публикация пока недоступна посетителям.</p>
-      {% endif %}
-      <header class="publication-detail__head">
-        <div class="publication-detail__meta">
-          <span class="publication-kind">{{ publication.get_kind_display }}</span>
-          <time datetime="{{ publication.publication_date|date:'c' }}">{{ publication.publication_date|date:"j E Y" }}</time>
-        </div>
-        <h1>{{ publication.title }}</h1>
-        {% if publication.summary %}<p class="publication-detail__lead">{{ publication.summary }}</p>{% endif %}
-        {% if publication.race %}
-        <a class="publication-detail__race" href="{% url 'race' publication.race.slug %}">Материал о соревновании: {{ publication.race.name }} →</a>
-        {% endif %}
-      </header>
+<main class="community-page">
+  {% if publication.kind == "article" %}
+  {% include "website/_community_hero.html" with title="Статьи" description="Практические статьи о подготовке, навигации и туристских соревнованиях." only %}
+  {% else %}
+  {% include "website/_community_hero.html" with title="Кольцо 24" description="Соревновательный поход выходного дня с элементами рогейна и ориентирования на местности." only %}
+  {% endif %}
+  <div class="community-content">
+    <div class="container home-grid">
+      <section class="publication-column">
+        <nav class="community-crumbs" aria-label="Хлебные крошки">
+          {% if publication.race %}
+          <a href="{% url 'index' %}">Главная</a><span>/</span><a href="{% url 'race' publication.race.slug %}">{{ publication.race.name }}</a>
+          {% else %}
+          <a href="{% url 'index' %}{% if publication.kind == 'news' %}#publications{% endif %}">Главная</a>{% if publication.kind == "article" %}<span>/</span><a href="{% url 'article_list' %}">Статьи</a>{% endif %}
+          {% endif %}
+        </nav>
+        <article class="publication-feed publication-article">
+          {% if is_preview %}
+          <p class="publication-article__status" role="status">Предпросмотр — публикация пока недоступна посетителям.</p>
+          {% endif %}
+          <header class="publication-article__head">
+            <h1>{{ publication.title }}</h1>
+            <time datetime="{{ publication.publication_date|date:'c' }}">{{ publication.publication_date|date:"j E Y" }}</time>
+            {% if publication.summary %}<p class="publication-article__lead">{{ publication.summary }}</p>{% endif %}
+          </header>
+          {% if publication.image %}
+          <figure class="publication-article__cover"><img src="{{ publication.image.url }}" alt="{{ publication.title }}"></figure>
+          {% endif %}
+          <div class="publication-detail__body publication-article__body">{{ publication.content_html|safe }}</div>
+        </article>
+        <footer class="publication-detail__footer">
+          {% if publication.kind == "news" %}<a href="{% url 'index' %}#publications">← Ко всем публикациям</a>{% else %}<a href="{% url 'article_list' %}">← Ко всем статьям</a>{% endif %}
+        </footer>
+      </section>
 
-      {% if publication.image %}
-      <figure class="publication-detail__cover"><img src="{{ publication.image.url }}" alt="{{ publication.title }}"></figure>
-      {% endif %}
-
-      <div class="publication-detail__body">{{ publication.content_html|safe }}</div>
-    </article>
-    <footer class="publication-detail__footer">
-      {% if publication.kind == "news" %}<a href="{% url 'index' %}#publications">← Ко всем публикациям</a>{% else %}<a href="{% url 'article_list' %}">← Ко всем статьям</a>{% endif %}
-    </footer>
+      <aside class="home-races" aria-labelledby="races-title">
+        {% include "website/_home_races.html" with race=publication.race upcoming_races=upcoming_races only %}
+      </aside>
+    </div>
   </div>
 </main>
 {% endblock %}

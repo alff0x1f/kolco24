@@ -115,6 +115,12 @@ _FEED_ALLOWED_TAGS = {
     "blockquote",
     "pre",
     "code",
+    "h1",
+    "h2",
+    "h3",
+    "h4",
+    "h5",
+    "h6",
 }
 
 _FEED_ALLOWED_ATTRIBUTES = {
@@ -128,6 +134,8 @@ _VK_VIDEO_PAGE_RE = re.compile(r"/(?:video|live)(-?\d+)_(\d+)")
 # Quotes inside attribute values are always escaped in nh3 output, so this
 # can only match a real iframe tag.
 _IFRAME_SRC_RE = re.compile(r'<iframe src="([^"]*)"')
+# Feed headings carry no attributes, so the cleaned tags are always bare.
+_FEED_HEADING_RE = re.compile(r"<(/?)h[1-6]>")
 _IFRAME_ATTRIBUTES = {
     "allow": "autoplay; encrypted-media; fullscreen; picture-in-picture; "
     "screen-wake-lock;",
@@ -194,7 +202,9 @@ def _clean_html(html, tags, attributes):
 
 
 def _clean_feed_html(html):
-    return _clean_html(html, _FEED_ALLOWED_TAGS, _FEED_ALLOWED_ATTRIBUTES)
+    """Sanitize a feed preview, ranking every heading below the card title."""
+    html = _clean_html(html, _FEED_ALLOWED_TAGS, _FEED_ALLOWED_ATTRIBUTES)
+    return _FEED_HEADING_RE.sub(r"<\1h4>", html)
 
 
 def _iframe_srcs(html):
