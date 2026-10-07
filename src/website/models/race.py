@@ -96,6 +96,10 @@ class Race(Model):
         today = timezone.localdate()
         return self.date <= today <= self.date_end
 
+    @property
+    def is_finished(self):
+        return self.date_end < timezone.localdate()
+
     def clean(self):
         super().clean()
         errors = {}

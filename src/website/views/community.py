@@ -184,10 +184,17 @@ class PublicationDetailView(View):
                 )
             ):
                 raise Http404
+        upcoming_races = (
+            [] if publication.race_id else unfinished_races(timezone.localdate())[:3]
+        )
         response = render(
             request,
             self.template_name,
-            {"publication": publication, "is_preview": is_preview},
+            {
+                "publication": publication,
+                "is_preview": is_preview,
+                "upcoming_races": upcoming_races,
+            },
         )
         if is_preview:
             response["Cache-Control"] = "private, no-store"

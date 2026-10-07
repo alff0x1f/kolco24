@@ -1,0 +1,25 @@
+{% if race %}
+<div class="home-races__head">
+  <h2 id="races-title">Соревнование</h2>
+</div>
+<div class="home-races__list">
+  {% include "website/_race_card.html" %}
+</div>
+{% else %}
+<div class="home-races__head">
+  <h2 id="races-title">Соревнования</h2>
+  <a class="community-all-link" href="{% url 'race_list' %}">Календарь и архив <span aria-hidden="true">→</span></a>
+</div>
+{% if upcoming_races %}
+<div class="home-races__list">
+  {% for race in upcoming_races %}
+  {% include "website/_race_card.html" %}
+  {% endfor %}
+</div>
+{% else %}
+<div class="home-races__empty">
+  <p>Новые старты пока не объявлены. В архиве остаются маршруты, команды и результаты прошлых лет.</p>
+  <a href="{% url 'race_list' %}#archive">Открыть архив <span aria-hidden="true">→</span></a>
+</div>
+{% endif %}
+{% endif %}
