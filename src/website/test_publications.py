@@ -271,6 +271,82 @@ def test_feed_preview_removes_unsafe_html(use_editor_summary):
     assert "javascript:" not in html
 
 
+_VK_IFRAME = (
+    '<iframe src="https://vkvideo.ru/video_ext.php?oid=-232088664&id=456239032'
+    '&hash=8457bd3a1e655338&hd=3" width="1280" height="720" allow="autoplay; '
+    'encrypted-media; fullscreen; picture-in-picture; screen-wake-lock;" '
+    'frameborder="0" allowfullscreen></iframe>'
+)
+
+
+@pytest.mark.parametrize(
+    ("source", "expected_src"),
+    [
+        (
+            _VK_IFRAME,
+            "https://vkvideo.ru/video_ext.php?oid=-232088664&amp;id=456239032"
+            "&amp;hash=8457bd3a1e655338&amp;hd=2",
+        ),
+        (
+            "https://vkvideo.ru/live-232088664_456239032",
+            "https://vkvideo.ru/video_ext.php?oid=-232088664&amp;id=456239032&amp;hd=2",
+        ),
+        (
+            "<https://vk.com/video-1_2>",
+            "https://vkvideo.ru/video_ext.php?oid=-1&amp;id=2&amp;hd=2",
+        ),
+    ],
+)
+def test_markdown_embeds_vk_video(source, expected_src):
+    html = _render_markdown(f"До видео.\n\n{source}\n\nПосле видео.")
+
+    assert f'<div class="video-embed"><iframe src="{expected_src}"' in html
+    assert html.count("<iframe") == 1
+    assert "<p>До видео.</p>" in html
+    assert "<p>После видео.</p>" in html
+    assert "vkvideoembed" not in html
+
+
+@pytest.mark.parametrize(
+    "source",
+    [
+        '<iframe src="https://evil.example/video_ext.php?oid=1&id=2"></iframe>',
+        '<iframe src="https://vkvideo.ru/video_ext.php?oid=1&id=2&hash=x%22"></iframe>',
+        '<iframe src="javascript:alert(1)//vkvideo.ru/video_ext.php?oid=1&id=2">',
+        "vkvideoembedx0",
+    ],
+)
+def test_markdown_drops_untrusted_iframes(source):
+    html = _render_markdown(source)
+
+    assert "<iframe" not in html
+    assert "onload" not in html
+
+
+def test_markdown_rebuilds_vk_iframe_without_extra_attributes():
+    html = _render_markdown(
+        '<iframe src="https://vkvideo.ru/video_ext.php?oid=1&id=2" onload="x()">'
+    )
+
+    assert html.count("<iframe") == 1
+    assert "onload" not in html
+
+
+def test_markdown_keeps_inline_vk_link_as_text():
+    html = _render_markdown("Смотрите https://vkvideo.ru/video-1_2 здесь.")
+
+    assert "<iframe" not in html
+
+
+def test_feed_preview_offers_reading_for_video_only_post():
+    publication = NewsPost(
+        pk=1, content_html=_render_markdown("https://vkvideo.ru/video-1_2")
+    )
+
+    assert "<iframe" not in publication.feed_summary_html
+    assert publication.has_more_content
+
+
 @pytest.mark.django_db
 def test_home_is_a_real_page_and_shows_only_visible_publications(client):
     visible = create_publication("Видимый материал")

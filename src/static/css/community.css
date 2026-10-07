@@ -811,6 +811,15 @@
 .publication-detail__body p { margin: 0 0 1.15em; }
 .publication-detail__body a { color: var(--primary-2); text-decoration: underline; text-underline-offset: 3px; }
 .publication-detail__body img { height: auto; border-radius: var(--radius-sm); }
+.publication-detail__body .video-embed {
+  position: relative;
+  margin: 1.6em 0;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  border-radius: var(--radius-sm);
+  background: #000;
+}
+.publication-detail__body .video-embed iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
 .publication-detail__body blockquote {
   margin: 1.6em 0;
   padding: 4px 0 4px 20px;
