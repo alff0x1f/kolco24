@@ -194,7 +194,7 @@
         ["rs-row-num", "№" + t.start_number],
         ["rs-row-cat", categoryCode(t.category_id)],
         ["rs-row-name", t.name],
-        ["rs-row-cat", t.paid_people + " чел."],
+        ["rs-row-cat", t.people + " чел."],
       ]);
     }), query ? "Ничего не найдено" : "Все стартовали");
 

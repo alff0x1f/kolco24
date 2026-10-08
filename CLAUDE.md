@@ -192,16 +192,21 @@ Django 4.2 project. Source lives entirely under `src/`, with `manage.py` at `src
   **text** cell goes through `_csv_safe`, which prefixes an apostrophe to a value starting with `= + - @ \t \r`
   (a team name is user-supplied, so `=1+1` would otherwise become a live formula; `csv.writer` protects the file
   structure, not the spreadsheet). Numbers are passed through untouched, so a negative amount keeps its sign.
-  `RaceStartsView`/`RaceStartsDataView` back the organizer-only «Старты» page for watching starts live: `race_starts`
-  (`race/<slug>/starts/`, template `src/templates/race/starts.html`, assets `src/static/css/starts.css` +
-  `src/static/js/starts.js`, `#raceStartsConfig` island with only `dataUrl`) and `race_starts_data`
-  (`race/<slug>/starts/data/`, JSON polled every 20 s). Both gated by `_load_race_for_admin`. The **only** source is
-  `Team.start_time` (what the protocol reads); the expected set is paid teams (`paid_people > 0`, as on the checklist),
-  sorted by `start_number_key`. `start_time <= 0` or an unformattable value → both `start_time_ms`/`start_time` `null`
-  (counts as not started). The clock string is formatted server-side by `_start_clock` with `timezone.localtime` —
-  deliberately not `app_data.format_ms`, which uses the process time zone. `server_time_ms` is the page's "now" for
-  «последний старт N мин назад», the 15-min pace and the chart's right edge. The header clock is `server_time` advanced by `performance.now()` — no client time-zone logic. All counting, the category filter, the
-  inline-SVG cumulative chart and the «Ждём»/«Стартовали» lists live in the JS; team names go in via `textContent`.
+  `RaceStartsView`/`RaceStartsDataView` back the organizer-only «Старты» page (`race/<slug>/starts/`, JSON polled every
+  20 s, gate `_load_race_for_admin`). The **only** source is `Team.start_time` (what the protocol reads); the set is
+  paid teams (`paid_people > 0`). People are `Team.ucount` (current team size), not `paid_people` — a dropped-out member
+  keeps the paid seat but won't come; «Финиш» counts the same way. An unset or unformattable time is `null` (not
+  started). Times are formatted server-side (`_start_clock`, project `TIME_ZONE`) and `server_time_ms` is the page's
+  "now", so the browser's clock and time zone never matter. All counting and drawing is in `starts.js`.
+  `RaceFinishesView`/`RaceFinishesDataView`/`RaceFinishesPrintView` back its twin «Финиш» (`race/<slug>/finishes/`,
+  same gate and team set) plus an A4 sheet for the kitchen (`…/finishes/print/`, standalone, no JS). A team's КВ is
+  `start_time + Category.control_time`. Unlike «Старты», the server computes states and the hourly arrival timeline in
+  the pure module `src/apps/race/finish_forecast.py` (model and constants documented there). Invariants: forecast
+  buckets are merged into timeline rows **by position**, never by `HH:MM` label (labels repeat across midnight);
+  `arrived` counts every finish, no-КВ categories too; the scale reaches back at most `TIMELINE_BACK` (a mistyped
+  `finish_time` must not explode it); the print sheet's `?category=` takes that category's rows of the **race-wide**
+  timeline so paper matches the filtered page; whole people are rounded half-up (`_half_up`) to agree with JS
+  `Math.round`. The JS poll code is duplicated from `starts.js` on purpose.
   `RaceMapView`/`RaceMapPositionsView`/`RaceMapTrackView` (`src/apps/race/views.py`) back the organizer-only «Карта
   гонки» page — the read side of `apps.mobile`'s `/app/race/<id>/track/` upload (`TrackPoint` rows were write-only
   until this). All three share the same `_load_and_authorize` gate as `RaceLegendEditView` (anon → `login` redirect

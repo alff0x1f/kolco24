@@ -94,6 +94,7 @@
             <a class="btn btn-outline" href="{% url 'legend_codes' race.slug %}">Коды легенды</a>
             <a class="btn btn-outline" href="{% url 'race_map' race.slug %}">Карта гонки</a>
             <a class="btn btn-outline" href="{% url 'race_starts' race.slug %}">Старты</a>
+            <a class="btn btn-outline" href="{% url 'race_finishes' race.slug %}">Финиш</a>
             <a class="btn btn-outline" href="{% url 'race_payments' race.slug %}">Платежи</a>
             <a class="btn btn-outline" href="{% url 'race_checklist' race.slug %}">Лист выдачи</a>
             {% if has_extras %}<a class="btn btn-outline" href="{% url 'race_extras_checklist' race.slug %}">Выдача доп-услуг</a>{% endif %}

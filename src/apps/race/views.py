@@ -28,6 +28,7 @@ from django.views import View
 from django.views.decorators.cache import never_cache
 
 from apps.mobile.models import AppInstall, Mark, TrackPoint
+from apps.race import finish_forecast
 from apps.race.app_data import build_overview, build_team_timeline
 from apps.race.finance import csv_rows, extras_catalog, filter_rows, payment_rows
 from apps.race.forms import RaceForm
@@ -1790,7 +1791,7 @@ class RaceStartsDataView(View):
                     "start_number": team.start_number,
                     "name": _team_display_name(team),
                     "category_id": team.category2_id,
-                    "paid_people": int(team.paid_people),
+                    "people": team.ucount,
                     "start_time_ms": team.start_time if clock else None,
                     "start_time": clock,
                 }
@@ -1808,6 +1809,191 @@ class RaceStartsDataView(View):
                 "teams": rows,
             }
         )
+
+
+class RaceFinishesView(View):
+    """Organizer-only «Финиш» page: live finishes and the arrival forecast.
+
+    A thin shell — ``finishes.js`` polls :class:`RaceFinishesDataView`,
+    which also computes the forecast.
+    """
+
+    def get(self, request, race_slug):
+        race, response = _load_race_for_admin(request, race_slug)
+        if response is not None:
+            return response
+        kwargs = {"race_slug": race.slug}
+        config = {
+            "dataUrl": reverse("race_finishes_data", kwargs=kwargs),
+            "printUrl": reverse("race_finishes_print", kwargs=kwargs),
+        }
+        context = {"race": race, "finishes_config": _safe_json(config)}
+        return render(request, "race/finishes.html", context)
+
+
+def _finish_rows(race, now_ms):
+    """``(rows, forecast_teams)`` of a race's paid teams for the «Финиш» pages.
+
+    ``rows`` is what the page shows per team; ``forecast_teams`` is the input
+    of ``finish_forecast.build_timeline``. A team's КВ is its own start plus
+    ``Category.control_time``.
+    """
+    teams = Team.objects.filter(category2__race=race, paid_people__gt=0).select_related(
+        "owner", "category2"
+    )
+    rows = []
+    forecast_teams = []
+    for team in sorted(teams, key=start_number_key):
+        start_clock = _start_clock(team.start_time)
+        finish_clock = _start_clock(team.finish_time)
+        start_ms = team.start_time if start_clock else None
+        finish_ms = team.finish_time if finish_clock else None
+        control_min = team.category2.control_time if team.category2 else 0
+        deadline_ms = finish_forecast.deadline_ms(start_ms, control_min)
+        deadline_clock = _start_clock(deadline_ms) if deadline_ms else None
+        if deadline_clock is None:
+            # A КВ past the formattable range can't be placed on the grid.
+            deadline_ms = None
+            control_min = 0
+        state, overdue_long = finish_forecast.team_state(
+            start_ms, finish_ms, control_min, now_ms
+        )
+        # The team's current size, not paid seats: a member who dropped out
+        # keeps the paid seat but won't come to eat.
+        people = team.ucount
+        rows.append(
+            {
+                "id": team.id,
+                "start_number": team.start_number,
+                "name": _team_display_name(team),
+                "category_id": team.category2_id,
+                "people": people,
+                "start_time_ms": start_ms,
+                "start_time": start_clock,
+                "finish_time_ms": finish_ms,
+                "finish_time": finish_clock,
+                "deadline_ms": deadline_ms,
+                "deadline": deadline_clock[:5] if deadline_clock else None,
+                "state": state,
+                "overdue_long": overdue_long,
+            }
+        )
+        forecast_teams.append(
+            {
+                "category_id": team.category2_id,
+                "people": people,
+                "start_ms": start_ms,
+                "finish_ms": finish_ms,
+                "control_min": control_min,
+                "state": state,
+                "overdue_long": overdue_long,
+            }
+        )
+    return rows, forecast_teams
+
+
+class RaceFinishesDataView(View):
+    """JSON for the «Финиш» page: paid teams, their states and the timeline.
+
+    The timeline (people arrived per past hour, expected per coming hour) is
+    built here by ``finish_forecast`` so it can be tested; one ``now`` feeds
+    the states, the timeline and ``server_time_ms``.
+    """
+
+    def get(self, request, race_slug):
+        race, response = _load_race_for_admin(request, race_slug)
+        if response is not None:
+            return response
+
+        now = timezone.now()
+        now_ms = int(now.timestamp() * 1000)
+        rows, forecast_teams = _finish_rows(race, now_ms)
+        categories = [
+            {"id": c.id, "code": c.code, "name": c.name, "control_time": c.control_time}
+            for c in Category.objects.filter(race=race).order_by("order", "id")
+        ]
+        timeline = finish_forecast.build_timeline(
+            forecast_teams, [c["id"] for c in categories], now_ms
+        )
+        return JsonResponse(
+            {
+                "server_time_ms": now_ms,
+                "server_time": timezone.localtime(now).strftime("%H:%M:%S"),
+                "categories": categories,
+                "teams": rows,
+                "timeline": timeline,
+            }
+        )
+
+
+def _half_up(value):
+    """Whole people the way ``Math.round`` in ``finishes.js`` shows them.
+
+    Python's ``round`` is banker's (``round(2.5) == 2``), so the sheet would
+    disagree with the live page.
+    """
+    return int(round(value, 1) + 0.5)
+
+
+class RaceFinishesPrintView(View):
+    """Printable sheet for the kitchen: people arrived and expected per hour.
+
+    Standalone like the checklist, rendered server-side, no scripts.
+    ``?category=<id>`` shows that category's row set of the same race-wide
+    timeline the live page uses (an unknown id keeps the whole race).
+    """
+
+    def get(self, request, race_slug):
+        race, response = _load_race_for_admin(request, race_slug)
+        if response is not None:
+            return response
+        categories, selected = _selected_category(request, race)
+        now = timezone.now()
+        now_ms = int(now.timestamp() * 1000)
+        _, forecast_teams = _finish_rows(race, now_ms)
+        timeline = finish_forecast.build_timeline(
+            forecast_teams, [c.id for c in categories], now_ms
+        )
+        key = str(selected.id) if selected else "all"
+        rows = []
+        for row in timeline[key]:
+            expected = row["expected"]
+            rows.append(
+                {
+                    "hours": (
+                        f"{row['from']}–{row['to']}"
+                        if row["from"]
+                        else f"до {row['to']}"
+                    ),
+                    "arrived": row["arrived"],
+                    "expected": None if expected is None else _half_up(expected),
+                    "now": row["now"],
+                }
+            )
+        teams = [
+            t
+            for t in forecast_teams
+            if selected is None or t["category_id"] == selected.id
+        ]
+
+        def people(match):
+            return sum(t["people"] for t in teams if match(t))
+
+        context = {
+            "race": race,
+            "categories": categories,
+            "selected_category": selected,
+            "moment": timezone.localtime(now),
+            "rows": rows,
+            "arrived_total": sum(r["arrived"] or 0 for r in timeline[key]),
+            "expected_total": _half_up(sum(r["expected"] or 0 for r in timeline[key])),
+            "not_started": people(lambda t: t["state"] == finish_forecast.NOT_STARTED),
+            "overdue_long": people(lambda t: t["overdue_long"]),
+            "no_control": people(lambda t: t["state"] == finish_forecast.NO_CONTROL),
+            "mean_before": finish_forecast.MEAN_BEFORE_DEADLINE_MIN,
+            "sigma": finish_forecast.SIGMA_MIN,
+        }
+        return render(request, "race/finishes_print.html", context)
 
 
 class RaceMapView(View):
