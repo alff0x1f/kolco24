@@ -183,6 +183,26 @@
         </div>
         {% endif %}
 
+        {% if show_results and categories %}
+        <div class="card" id="race-results">
+          <div class="side-head">
+            <h3>Результаты</h3>
+          </div>
+          <ul class="side-menu">
+            {% for category in categories %}
+            <li>
+              <a href="{% url 'category_results' race.slug category.id %}">
+                <svg class="icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6">
+                  <path d="M4 17V9M10 17V4M16 17v-6"/>
+                </svg>
+                {{ category.short_name|default:category.name }}
+              </a>
+            </li>
+            {% endfor %}
+          </ul>
+        </div>
+        {% endif %}
+
         <div class="card">
           <div class="side-head">
             <h3>Команды</h3>

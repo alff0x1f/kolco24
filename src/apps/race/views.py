@@ -181,6 +181,11 @@ class RacePageView(View):
         context["has_extras"] = (
             context["can_edit_race"] and RaceExtra.objects.filter(race=race).exists()
         )
+        # Mirrors ProtocolView: editors see drafts, everyone else only a final.
+        context["show_results"] = (
+            context["can_edit_race"]
+            or race.protocols.filter(status=Protocol.FINAL).exists()
+        )
         if context["can_edit_race"] or context["can_manage_race_admins"]:
             context["race_admin_roles"] = RaceAdmin.Role.choices
             context["race_administrators"] = sorted(

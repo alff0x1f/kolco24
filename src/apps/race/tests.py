@@ -1237,6 +1237,43 @@ def test_race_page_admin_sees_edit_button(client):
 
 
 @pytest.mark.django_db
+def test_race_page_results_hidden_until_protocol_is_final(client):
+    race = _make_race(slug="results-btn")
+    category = _make_category(race)
+    results_url = reverse("category_results", args=[race.slug, category.id])
+
+    resp = client.get(reverse("race", args=[race.slug]))
+    assert resp.context["show_results"] is False
+    assert results_url not in resp.content.decode()
+
+    Protocol.objects.create(race=race, status=Protocol.DRAFT)
+    resp = client.get(reverse("race", args=[race.slug]))
+    assert resp.context["show_results"] is False
+
+    Protocol.objects.create(race=race, status=Protocol.FINAL)
+    resp = client.get(reverse("race", args=[race.slug]))
+    assert resp.context["show_results"] is True
+    assert results_url in resp.content.decode()
+
+
+@pytest.mark.django_db
+def test_race_page_admin_sees_results_without_protocol(client):
+    user = User.objects.create_user(
+        username="raresults", password="p", email="raresults@example.com"
+    )
+    race = _make_race(slug="results-admin")
+    category = _make_category(race)
+    RaceAdmin.objects.create(race=race, user=user, role=RaceAdmin.Role.ADMIN)
+    client.force_login(user)
+
+    resp = client.get(reverse("race", args=[race.slug]))
+
+    assert resp.context["show_results"] is True
+    html = resp.content.decode()
+    assert reverse("category_results", args=[race.slug, category.id]) in html
+
+
+@pytest.mark.django_db
 def test_race_page_regular_user_no_edit_button(client):
     user = User.objects.create_user(
         username="plain", password="p", email="plain@example.com"
