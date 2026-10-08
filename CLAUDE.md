@@ -150,16 +150,9 @@ Django 4.2 project. Source lives entirely under `src/`, with `manage.py` at `src
   box column whose header comes from `?column=` (default «Отметка»). `?category=<id>` prints one category at a time
   (an unknown id falls back to the whole race). Sorted by `start_number` **numerically**
   (non-numeric numbers after). Gated by `_load_race_for_admin`.
-  `RaceExtrasChecklistView` (`race_extras_checklist`, `race/<slug>/extras-checklist/`, standalone template
-  `src/templates/race/extras_checklist.html` reusing `checklist.css`) is its add-on twin: **one `RaceExtra` per sheet**
-  via `?extra=<code>` (missing/unknown → the race's first by `order, id`; inactive add-ons included and marked
-  «(откл.)», since they may still carry paid units; no add-ons → 200 with «У гонки нет доп-услуг»). Quantity is
-  **`TeamExtra.count_paid` only** — `free_per_team` units are deliberately not on the sheet; rows are `count_paid > 0`.
-  `TeamExtra.objects` bypasses `TeamManager`, so the query excludes `team__is_deleted` by hand and filters
-  `team__category2__race=race` (also drops category-less teams). Same `?category=`/`?column=` (default «Выдано»),
-  numeric `start_number_key` sort, and gate. Both sheets share `_team_members(team)` (member names); the templates are
-  duplicated on purpose. The race page shows the «Выдача доп-услуг» button only when `has_extras` (computed only for
-  `can_edit_race` users).
+  `RaceExtrasChecklistView` (`race_extras_checklist`, `race/<slug>/extras-checklist/`) is its add-on twin, one
+  `RaceExtra` per sheet (`?extra=<code>`). Quantity is **`TeamExtra.count_paid` only** — `free_per_team` units are
+  deliberately not counted. `TeamExtra.objects` bypasses `TeamManager`, so soft-deleted teams are excluded by hand.
   `RaceTeamsAdminView`/`RaceTeamsAdminExportView` (`race_teams_admin`, `race/<slug>/teams-admin/`, standalone template
   `src/templates/race/teams_admin.html` reusing `checklist.css` + `teams_admin.css`; CSV `race_teams_admin_export`,
   `…/teams-admin/export/`, `;` + BOM like the payments export) list a race's teams for organizers: ID, start number,
