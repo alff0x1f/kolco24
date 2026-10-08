@@ -131,6 +131,16 @@
 
 .app-data .chips-line { display: inline-flex; align-items: center; gap: 4px; flex-wrap: wrap; }
 
+/* ── Help ────────────────────────────────────────────────── */
+.app-data .help .card-body {
+  padding: 18px 22px; font-size: 13.5px; line-height: 1.6;
+  color: var(--ink-soft); max-width: 90ch;
+}
+.app-data .help h3 { font-size: 14px; font-weight: 600; color: var(--ink); margin: 18px 0 6px; }
+.app-data .help p { margin: 0 0 8px; }
+.app-data .help ul { margin: 0 0 8px; padding-left: 20px; }
+.app-data .help li { margin-bottom: 4px; }
+
 @media (max-width: 720px) {
   .app-data .search { width: 100%; }
   .app-data .data th, .app-data .data td { padding: 8px 10px; }
