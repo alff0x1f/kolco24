@@ -150,6 +150,9 @@ Django 4.2 project. Source lives entirely under `src/`, with `manage.py` at `src
   box column whose header comes from `?column=` (default «Отметка»). `?category=<id>` prints one category at a time
   (an unknown id falls back to the whole race). Sorted by `start_number` **numerically**
   (non-numeric numbers after). Gated by `_load_race_for_admin`.
+  `RaceExtrasChecklistView` (`race_extras_checklist`, `race/<slug>/extras-checklist/`) is its add-on twin, one
+  `RaceExtra` per sheet (`?extra=<code>`). Quantity is **`TeamExtra.count_paid` only** — `free_per_team` units are
+  deliberately not counted. `TeamExtra.objects` bypasses `TeamManager`, so soft-deleted teams are excluded by hand.
   `RaceTeamsAdminView`/`RaceTeamsAdminExportView` (`race_teams_admin`, `race/<slug>/teams-admin/`, standalone template
   `src/templates/race/teams_admin.html` reusing `checklist.css` + `teams_admin.css`; CSV `race_teams_admin_export`,
   `…/teams-admin/export/`, `;` + BOM like the payments export) list a race's teams for organizers: ID, start number,
