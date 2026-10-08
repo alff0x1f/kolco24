@@ -197,39 +197,21 @@ Django 4.2 project. Source lives entirely under `src/`, with `manage.py` at `src
   `src/static/js/starts.js`, `#raceStartsConfig` island with only `dataUrl`) and `race_starts_data`
   (`race/<slug>/starts/data/`, JSON polled every 20 s). Both gated by `_load_race_for_admin`. The **only** source is
   `Team.start_time` (what the protocol reads); the expected set is paid teams (`paid_people > 0`, as on the checklist),
-  sorted by `start_number_key`; a row's `people` (the «Ждём» list's «N чел.») is `Team.ucount`, the team's current size,
-  not paid seats. `start_time <= 0` or an unformattable value → both `start_time_ms`/`start_time` `null`
+  sorted by `start_number_key`. People are `Team.ucount` (current team size), not `paid_people` — a dropped-out
+  member keeps the paid seat but won't come; «Финиш» counts the same way. `start_time <= 0` or an unformattable value → both `start_time_ms`/`start_time` `null`
   (counts as not started). The clock string is formatted server-side by `_start_clock` with `timezone.localtime` —
   deliberately not `app_data.format_ms`, which uses the process time zone. `server_time_ms` is the page's "now" for
   «последний старт N мин назад», the 15-min pace and the chart's right edge. The header clock is `server_time` advanced by `performance.now()` — no client time-zone logic. All counting, the category filter, the
   inline-SVG cumulative chart and the «Ждём»/«Стартовали» lists live in the JS; team names go in via `textContent`.
-  `RaceFinishesView`/`RaceFinishesDataView` back its twin, the organizer-only «Финиш» page (`race_finishes`,
-  `race/<slug>/finishes/`, `finishes.html`/`.css`/`.js`, `#raceFinishesConfig`; `race_finishes_data`, JSON polled every
-  20 s; same gate, team set and `_start_clock` null rules). It also gives the kitchen an **hourly forecast of arriving
-  people**. A team's own КВ is `start_time + Category.control_time` (minutes; `0` = none → state `no_control`, out of the
-  forecast). Unlike «Старты», the server computes the states (`finished`/`not_started`/`no_control`/`overdue`/
-  `on_course` + `overdue_long`) and the forecast in the pure module `src/apps/race/finish_forecast.py`, so it is
-  pytest-tested (`test_finishes.py`). Model: time on course `D ~ N(КВ − 40, 30)` min conditioned on
-  `elapsed < D ≤ КВ` (elapsed clamped at 0), people = `Team.ucount` (the team's current size, not paid seats — a dropped-out member keeps the paid seat but
-  won't come; JSON key `people`; the team set is still `paid_people > 0`) spread over clock-hour buckets `(from, to]` in
-  `TIME_ZONE`. The first bucket is partial, from now; the grid ends at `max(next hour, ceil_hour(latest КВ))`, so each
-  team's spread sums to its people. An overdue team ≤ `OVERDUE_GRACE_MIN` (60) goes whole into the first bucket; later
-  it is left out (likely dropped out without a finish mark). Constants sit at the top of the module, to tune after a
-  race. The JSON key is `timeline` (`build_timeline`): one clock-hour scale from the hour of the first finish to the
-  forecast's end, rows `{from, to, arrived, expected, now}` — past hours `arrived` only, future `expected` only, the
-  current hour both (finishes up to now + forecast bucket 0, matched **by position**, never by label: labels repeat
-  across midnight). `arrived` counts **every** finish (no-КВ categories too — the kitchen feeds everyone); a future
-  finish goes to the current hour; the scale reaches back at most `TIMELINE_BACK` (24 h), older finishes (a hand-typed
-  seconds-for-ms value) fold into one leading row with `from: null`. `"all"` plus a key for **every** category on one
-  shared grid. One `now` feeds the states, the timeline and `server_time_ms`. `_finish_rows(race, now_ms)` builds the
-  team rows for both the JSON and the print view. `RaceFinishesPrintView` (`race_finishes_print`,
-  `…/finishes/print/`, standalone `finishes_print.html` + `finishes_print.css`, no `<script>`, only the checklist-style
-  `window.print()` button) is the kitchen's A4 sheet: `?category=` (via `_selected_category`) picks
-  `timeline[str(id)]` of the **race-wide** timeline, so paper and the filtered live page show the same rows. Whole
-  people are rounded half-up (`_half_up`, matching JS `Math.round`; Python's `round` is banker's) and «Всего ≈» is the
-  rounded sum, not a sum of rounded rows. The live page links to it («Печать для кухни», `printUrl` in the config
-  island, `?category=` kept in sync with the filter). The JS poll/error/clock code is **duplicated** from `starts.js`
-  on purpose — no shared module.
+  `RaceFinishesView`/`RaceFinishesDataView`/`RaceFinishesPrintView` back its twin «Финиш» (`race/<slug>/finishes/`,
+  same gate and team set) plus an A4 sheet for the kitchen (`…/finishes/print/`, standalone, no JS). A team's КВ is
+  `start_time + Category.control_time`. Unlike «Старты», the server computes states and the hourly arrival timeline in
+  the pure module `src/apps/race/finish_forecast.py` (model and constants documented there). Invariants: forecast
+  buckets are merged into timeline rows **by position**, never by `HH:MM` label (labels repeat across midnight);
+  `arrived` counts every finish, no-КВ categories too; the scale reaches back at most `TIMELINE_BACK` (a mistyped
+  `finish_time` must not explode it); the print sheet's `?category=` takes that category's rows of the **race-wide**
+  timeline so paper matches the filtered page; whole people are rounded half-up (`_half_up`) to agree with JS
+  `Math.round`. The JS poll code is duplicated from `starts.js` on purpose.
   `RaceMapView`/`RaceMapPositionsView`/`RaceMapTrackView` (`src/apps/race/views.py`) back the organizer-only «Карта
   гонки» page — the read side of `apps.mobile`'s `/app/race/<id>/track/` upload (`TrackPoint` rows were write-only
   until this). All three share the same `_load_and_authorize` gate as `RaceLegendEditView` (anon → `login` redirect
