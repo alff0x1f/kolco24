@@ -130,6 +130,8 @@ Django 4.2 project. Source lives entirely under `src/`, with `manage.py` at `src
   and rebuilds bundles; a bulk update would bypass signals and leak cleartext). Deletion guard: a КП absent from the
   submitted payload is only deleted if it has no `CheckpointTag` rows — those represent physically provisioned NFC
   chips that would be silently destroyed; a tag-bearing КП raises `ValueError` and rolls back the whole save.
+  A read-only «Чипы» column shows each КП's `tag_count` (`annotate(Count("tags"))`; re-read from the DB on an error
+  re-render, the client's value is dropped) plus a live «размечено X из Y» summary that skips `hidden` КП.
   `RaceLegendCodesView` (template `src/templates/race/legend_codes.html`, assets `src/static/css/legend_codes.css` +
   `src/static/js/legend_codes.js`) is a read-only table of per-tag NFC codes for field-crew provisioning, backing the
   `legend_codes` (`race/<slug>/legend/codes/`) URL name. It is the web twin of `manage.py export_legend_codes --race

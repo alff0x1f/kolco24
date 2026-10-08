@@ -92,15 +92,18 @@
 
   var grid = document.getElementById("cpGrid");
   var countEl = document.getElementById("cpCount");
+  var taggedEl = document.getElementById("cpTagged");
+  var taggableEl = document.getElementById("cpTaggable");
 
   /* ── Row construction ────────────────────────────────────── */
   function makeRow(c) {
     c = c || {};
-    var hasTags = c.has_tags === true;
+    var tagCount = typeof c.tag_count === "number" ? c.tag_count : null;
+    var hasTags = tagCount > 0;
     var row = document.createElement("div");
     row.className = "lg-row" + (c.is_legend_locked ? " is-locked" : "");
     if (c.id != null) row.dataset.id = c.id;
-    if (hasTags) row.dataset.hasTags = "1";
+    if (tagCount !== null) row.dataset.tagCount = tagCount;
 
     var typeOptions = TYPES.map(function (t) {
       return '<option value="' + t.value + '">' + t.label + "</option>";
@@ -116,6 +119,7 @@
       '<input class="lg-cell lg-cost mono" type="text" inputmode="numeric" data-col="3">' +
       '<input class="lg-cell lg-desc" type="text" maxlength="' + DESC_MAX + '" data-col="4">' +
       '<label class="lg-lockcell"><input class="lg-lock" type="checkbox" data-col="5"></label>' +
+      '<span class="lg-tags mono"></span>' +
       '<button class="lg-del" type="button" title="Удалить КП">' +
       '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 4h10M6.5 4V2.8h3V4M5 4l.6 9h4.8L11 4"/></svg>' +
       "</button>";
@@ -132,6 +136,9 @@
     lock.addEventListener("change", function () {
       row.classList.toggle("is-locked", lock.checked);
     });
+
+    row.querySelector(".lg-tags").textContent = tagCount === null ? "—" : tagCount;
+    typeSel.addEventListener("change", refreshCount);
 
     var delBtn = row.querySelector(".lg-del");
     if (hasTags) {
@@ -155,8 +162,10 @@
 
   function refreshCount() {
     if (!grid) return;
-    var n = grid.querySelectorAll(".lg-row").length;
+    var rows = rowList();
+    var n = rows.length;
     if (countEl) countEl.textContent = n;
+    refreshTags(rows);
     var empty = grid.querySelector(".lg-empty");
     if (n === 0 && !empty) {
       empty = document.createElement("div");
@@ -166,6 +175,27 @@
     } else if (n > 0 && empty) {
       empty.remove();
     }
+  }
+
+  /* «Чипы» column + «размечено X из Y»; hidden КП never reach the app, so
+     they need no chip and are left out of the summary. */
+  function refreshTags(rows) {
+    var tagged = 0;
+    var taggable = 0;
+    rows.forEach(function (row) {
+      var count = row.dataset.tagCount;
+      var isHidden = row.querySelector(".lg-type").value === "hidden";
+      var cell = row.querySelector(".lg-tags");
+      var missing = !isHidden && count === "0";
+      cell.classList.toggle("is-missing", missing);
+      cell.classList.toggle("is-muted", isHidden || count == null);
+      cell.title = missing ? "Чипы не размечены" : "";
+      if (isHidden) return;
+      taggable += 1;
+      if (count != null && count !== "0") tagged += 1;
+    });
+    if (taggedEl) taggedEl.textContent = tagged;
+    if (taggableEl) taggableEl.textContent = taggable;
   }
 
   function rowList() {
