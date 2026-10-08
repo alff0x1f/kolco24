@@ -16,7 +16,7 @@ from django.contrib.auth import authenticate
 from django.core.files.base import ContentFile
 from django.db import IntegrityError, transaction
 from django.db.models import Count, F, Min, Prefetch, Q, Sum
-from django.db.models.functions import Coalesce
+from django.db.models.functions import Coalesce, NullIf
 from django.http import HttpResponseNotModified
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
@@ -671,7 +671,7 @@ def _auto_populate_boundary_times(race_id, team_id, deduped):
 
     Write-once (never overwrites a non-zero field): the *first* upload that
     finds the field still ``0`` wins and sets it from the earliest verified
-    ``Coalesce(trusted_ms, wall_ms)`` across the whole stored history for the
+    ``Coalesce(NullIf(trusted_ms, 0), wall_ms)`` across the whole stored history for the
     team at that moment (not just this batch) — so within that first write,
     batch-internal ordering can't change the result. Once the field is set,
     it is final: a later upload with a genuinely earlier verified mark does
@@ -721,7 +721,9 @@ def _auto_populate_boundary_times(race_id, team_id, deduped):
         # gt=0 excludes a bogus epoch-0 timestamp (unset device clock) — 0 is
         # also Team.start_time/finish_time's unset sentinel, so an unfiltered
         # Min() would let one such mark permanently pin the aggregate at 0
-        # and starve out every later, genuinely-timed mark.
+        # and starve out every later, genuinely-timed mark. NullIf treats a
+        # zero trusted_ms as absent and falls back to wall_ms, the same
+        # `trusted > 0 else wall` rule the app-data page and both apps use.
         earliest = (
             Mark.objects.filter(
                 team_id=team_id,
@@ -730,7 +732,7 @@ def _auto_populate_boundary_times(race_id, team_id, deduped):
                 method="nfc",
                 checkpoint_id__in=cp_ids,
             )
-            .annotate(boundary_ms=Coalesce("trusted_ms", "wall_ms"))
+            .annotate(boundary_ms=Coalesce(NullIf("trusted_ms", 0), "wall_ms"))
             .filter(boundary_ms__gt=0)
             .aggregate(t=Min("boundary_ms"))["t"]
         )

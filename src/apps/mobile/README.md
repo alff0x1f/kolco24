@@ -413,7 +413,7 @@ update_fields=MARK_UPDATE_FIELDS)` (Postgres `ON CONFLICT (id) DO UPDATE` — о
 (`verified=True`, `method="nfc"`) отметка по КП типа `start`/`finish`
 автозаполняет `Team.start_time`/`finish_time` — write-once: **первый** аплоад,
 заставший поле ещё `0`, выигрывает и выставляет его по earliest-агрегату
-(`Min(Coalesce("trusted_ms","wall_ms"))` по всей истории сохранённых
+(`Min(Coalesce(NullIf("trusted_ms", 0),"wall_ms"))` по всей истории сохранённых
 верифицированных NFC-отметок команды для этой границы на тот момент, а не
 только по текущему батчу); после этого поле финально — более поздний аплоад
 с заведомо более ранней отметкой его **не** пересчитывает (first-write-wins,
