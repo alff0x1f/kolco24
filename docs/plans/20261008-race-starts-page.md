@@ -59,7 +59,7 @@ JSON `race_starts_data`:
     {"id": 41, "start_number": "12", "name": "…", "category_id": 3,
      "paid_people": 4, "start_time_ms": 1791451234000, "start_time": "09:14:05"}
   ],
-  "server_time": "09:20"
+  "server_time": "09:20:41"
 }
 ```
 - `categories`: категории гонки, `order_by("order", "id")`. Неактивные тоже: у них могут быть оплаченные команды.
@@ -91,7 +91,7 @@ JSON `race_starts_data`:
 - Create: `src/apps/race/test_starts.py`
 
 - [x] добавить `RaceStartsDataView` в `src/apps/race/views.py`: гейт `_load_race_for_admin`, queryset как в `RaceChecklistView`, сортировка `start_number_key`, имя `_team_display_name`
-- [x] сформировать JSON из Technical Details; `server_time_ms` и `server_time` (`HH:MM`, локальное) из `timezone.now()`; хелпер форматирования с комментарием про `format_ms`
+- [x] сформировать JSON из Technical Details; `server_time_ms` и `server_time` (`HH:MM:SS`, локальное) из `timezone.now()`; хелпер форматирования с комментарием про `format_ms`
 - [x] зарегистрировать `race/<slug:race_slug>/starts/data/` как `race_starts_data` в `src/website/urls.py` рядом с `race_map`
 - [x] тесты доступа: аноним → редирект на `login` с `next`; пользователь без роли → 403; `RaceAdmin` MODERATOR → 403 (правило `can_edit_race`); `RaceAdmin` ADMIN → 200; суперюзер без `RaceAdmin` → 403
 - [x] тесты содержимого: оплаченная команда есть; `paid_people=0`, удалённая (`is_deleted=True`) и команда другой гонки — нет; `start_time=0` и отрицательное → оба поля `null`; `start_time=2**62` (overflow) → оба поля `null`; `paid_people` — `int`; известный момент → те же мс и `HH:MM:SS` в `TIME_ZONE` проекта; порядок `"9"` раньше `"10"`, нечисловой номер в конце; ключи `server_time_ms`/`server_time`/`categories` на месте, категории только этой гонки

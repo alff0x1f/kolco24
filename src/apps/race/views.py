@@ -1758,9 +1758,10 @@ def _start_clock(ms):
         return None
     try:
         moment = datetime.datetime.fromtimestamp(ms / 1000, tz=datetime.timezone.utc)
+        # Near year 9999 the UTC value fits but the local shift overflows.
+        return timezone.localtime(moment).strftime("%H:%M:%S")
     except (ValueError, OverflowError, OSError):
         return None
-    return timezone.localtime(moment).strftime("%H:%M:%S")
 
 
 class RaceStartsDataView(View):
@@ -1802,7 +1803,7 @@ class RaceStartsDataView(View):
         return JsonResponse(
             {
                 "server_time_ms": int(now.timestamp() * 1000),
-                "server_time": timezone.localtime(now).strftime("%H:%M"),
+                "server_time": timezone.localtime(now).strftime("%H:%M:%S"),
                 "categories": categories,
                 "teams": rows,
             }

@@ -25,6 +25,7 @@
   var knownStarted = null;
   var newIds = new Set();
   var timer = null;
+  var stopped = false;
 
   function make(tag, cls, text) {
     var node = document.createElement(tag);
@@ -89,7 +90,9 @@
     el("rsLast").textContent = last ? ago(now - last.start_time_ms) : "—";
     el("rsLastSub").textContent = last ? last.start_time + " · №" + last.start_number : "";
 
-    var pace = done.filter(function (t) { return t.start_time_ms >= now - PACE_WINDOW_MS; }).length;
+    var pace = done.filter(function (t) {
+      return t.start_time_ms >= now - PACE_WINDOW_MS && t.start_time_ms <= now;
+    }).length;
     el("rsPace").textContent = pace + " " + plural(pace, "команда", "команды", "команд");
   }
 
@@ -104,7 +107,7 @@
       if (started(t)) c.done += 1;
     });
     var shown = data.categories.filter(function (c) { return counts[c.id]; });
-    if (category !== null && !counts[category]) category = null;
+    if (shown.length < 2 || (category !== null && !counts[category])) category = null;
     if (shown.length < 2) return;
 
     function chip(label, value) {
@@ -156,7 +159,7 @@
     root.appendChild(svg("text", { x: pad.left - 6, y: y(0) + 4, "text-anchor": "end" }, "0"));
     root.appendChild(svg("text", { x: pad.left - 6, y: y(total) + 4, "text-anchor": "end" }, String(total)));
     root.appendChild(svg("text", { x: pad.left, y: CHART_HEIGHT - 6 }, done[0].start_time.slice(0, 5)));
-    root.appendChild(svg("text", { x: width - pad.right, y: CHART_HEIGHT - 6, "text-anchor": "end" }, data.server_time));
+    root.appendChild(svg("text", { x: width - pad.right, y: CHART_HEIGHT - 6, "text-anchor": "end" }, data.server_time.slice(0, 5)));
     chart.appendChild(root);
   }
 
@@ -216,14 +219,12 @@
   }
 
   // ── Опрос ─────────────────────────────────────────────
+  // The next request is scheduled only after the previous one settles, so a
+  // slow stale response can never land after a newer one.
   function stop(text) {
-    clearInterval(timer);
-    timer = null;
+    stopped = true;
+    clearTimeout(timer);
     setStatus(text, true);
-  }
-
-  function clock() {
-    return new Date().toLocaleTimeString("ru-RU");
   }
 
   function poll() {
@@ -239,7 +240,10 @@
         });
       })
       .catch(function () {
-        if (timer !== null) setStatus("Нет связи с сервером, данные на " + (data ? data.receivedAt : "—"));
+        if (!stopped) setStatus("Нет связи с сервером, данные на " + (data ? data.server_time : "—"));
+      })
+      .then(function () {
+        if (!stopped) timer = setTimeout(poll, POLL_MS);
       });
   }
 
@@ -249,7 +253,6 @@
       ids.forEach(function (id) { if (!knownStarted.has(id)) newIds.add(id); });
     }
     knownStarted = ids;
-    payload.receivedAt = clock();
     data = payload;
     setStatus("");
     render();
@@ -271,6 +274,5 @@
     }, 150);
   });
 
-  timer = setInterval(poll, POLL_MS);
   poll();
 })();

@@ -1,4 +1,5 @@
 import datetime
+import re
 
 import pytest
 from django.urls import reverse
@@ -110,7 +111,7 @@ def test_starts_data_sorts_by_start_number_numerically(client, django_user_model
 
 
 @pytest.mark.django_db
-@pytest.mark.parametrize("start_time", [0, -5000, 2**62])
+@pytest.mark.parametrize("start_time", [0, -5000, 2**62, 253402297200000])
 def test_starts_data_unusable_start_time_is_null(client, django_user_model, start_time):
     race = _make_race()
     category = _make_category(race)
@@ -154,7 +155,7 @@ def test_starts_data_server_time_and_categories(client, django_user_model):
     after = int(timezone.now().timestamp() * 1000)
 
     assert before <= data["server_time_ms"] <= after
-    assert len(data["server_time"]) == 5
+    assert re.fullmatch(r"\d\d:\d\d:\d\d", data["server_time"])
     assert data["categories"] == [
         {"id": twelve.id, "code": "12h", "name": "12 часов"},
         {"id": six.id, "code": "6h", "name": "6 часов"},
