@@ -1,0 +1,200 @@
+/* Страница стартов гонки — /race/<slug>/starts/
+   Оболочку (.breadcrumb, .input) даёт theme-2.css. Всё под .race-starts. */
+
+.race-starts {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 20px 16px 56px;
+}
+
+.race-starts .rs-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px 16px;
+  margin: 10px 0 18px;
+}
+.race-starts h1 {
+  font-size: 24px;
+  font-weight: 600;
+  color: var(--ink);
+}
+.race-starts .rs-clock {
+  font-size: 24px;
+  font-weight: 500;
+  color: var(--ink-soft);
+  font-variant-numeric: tabular-nums;
+}
+.race-starts .rs-status {
+  font-size: 13px;
+  color: var(--warn);
+  background: var(--warn-bg);
+  border-radius: 8px;
+  padding: 4px 10px;
+}
+.race-starts .rs-status.is-fatal {
+  color: var(--danger);
+  background: var(--danger-bg);
+}
+
+/* ── Плитки ──────────────────────────────────────────── */
+.race-starts .rs-tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px;
+  margin-bottom: 14px;
+}
+.race-starts .rs-tile {
+  background: var(--paper-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  padding: 14px 16px;
+}
+.race-starts .rs-tile-label {
+  font-size: 12px;
+  color: var(--muted);
+  margin-bottom: 4px;
+}
+.race-starts .rs-tile-value {
+  font-size: 22px;
+  font-weight: 600;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.race-starts .rs-tile-sub {
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 2px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Категории (фильтр) ──────────────────────────────── */
+.race-starts .rs-cats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+.race-starts .rs-cat {
+  font: inherit;
+  font-size: 13px;
+  color: var(--ink-soft);
+  background: var(--paper-2);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 5px 12px;
+  cursor: pointer;
+  font-variant-numeric: tabular-nums;
+}
+.race-starts .rs-cat:hover { border-color: var(--primary-2); }
+.race-starts .rs-cat.is-active {
+  color: #fff;
+  background: var(--primary);
+  border-color: var(--primary);
+}
+
+/* ── Карточки и график ───────────────────────────────── */
+.race-starts .rs-card {
+  background: var(--paper-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  padding: 14px 16px;
+  margin-bottom: 14px;
+  min-width: 0;
+}
+.race-starts .rs-card h2 {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--muted);
+  margin-bottom: 10px;
+}
+.race-starts .rs-count {
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+.race-starts .rs-chart svg {
+  display: block;
+  width: 100%;
+  height: 220px;
+}
+.race-starts .rs-chart .rs-axis { stroke: var(--line); }
+.race-starts .rs-chart .rs-goal {
+  stroke: var(--muted-2);
+  stroke-dasharray: 4 4;
+}
+.race-starts .rs-chart .rs-line {
+  fill: none;
+  stroke: var(--primary-2);
+  stroke-width: 2;
+}
+.race-starts .rs-chart .rs-area { fill: var(--primary-2); opacity: .08; }
+.race-starts .rs-chart text {
+  fill: var(--muted);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+.race-starts .rs-empty {
+  color: var(--muted);
+  font-size: 14px;
+  padding: 24px 0;
+  text-align: center;
+}
+
+/* ── Две колонки ─────────────────────────────────────── */
+.race-starts .rs-cols {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+.race-starts .rs-col-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.race-starts .rs-col-head h2 { margin-bottom: 0; }
+.race-starts .rs-search { max-width: 220px; }
+.race-starts .rs-list {
+  max-height: 60vh;
+  overflow-y: auto;
+}
+.race-starts .rs-row {
+  display: grid;
+  grid-template-columns: 64px 44px 1fr auto;
+  gap: 8px;
+  align-items: baseline;
+  padding: 7px 4px;
+  border-top: 1px solid var(--line-soft);
+  font-size: 14px;
+}
+.race-starts .rs-row:first-child { border-top: none; }
+.race-starts .rs-row-time,
+.race-starts .rs-row-num {
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+  font-weight: 500;
+}
+.race-starts .rs-row-name {
+  color: var(--ink-soft);
+  overflow-wrap: anywhere;
+}
+.race-starts .rs-row-cat {
+  color: var(--muted);
+  font-size: 12px;
+  white-space: nowrap;
+}
+.race-starts .rs-row.is-new { animation: rs-flash 6s ease-out; }
+
+@keyframes rs-flash {
+  from { background: #e3f6ec; }
+  to   { background: transparent; }
+}
+
+@media (max-width: 720px) {
+  .race-starts .rs-cols { grid-template-columns: 1fr; }
+  .race-starts .rs-search { max-width: none; width: 100%; }
+  .race-starts .rs-list { max-height: none; }
+}

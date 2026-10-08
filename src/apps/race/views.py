@@ -20,6 +20,7 @@ from django.http import (
 )
 from django.shortcuts import get_object_or_404, render
 from django.urls import reverse
+from django.utils import timezone
 from django.utils.decorators import method_decorator
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.utils.safestring import mark_safe
@@ -1729,6 +1730,84 @@ class ProtocolFreezeView(View):
         else:
             messages.success(request, "Протокол зафиксирован.")
         return _protocol_redirect_back(request, race)
+
+
+class RaceStartsView(View):
+    """Organizer-only «Старты» page: live start progress of a race.
+
+    A thin shell — ``starts.js`` polls :class:`RaceStartsDataView` and does
+    all counting, filtering and drawing client-side.
+    """
+
+    def get(self, request, race_slug):
+        race, response = _load_race_for_admin(request, race_slug)
+        if response is not None:
+            return response
+        data_url = reverse("race_starts_data", kwargs={"race_slug": race.slug})
+        context = {"race": race, "starts_config": _safe_json({"dataUrl": data_url})}
+        return render(request, "race/starts.html", context)
+
+
+def _start_clock(ms):
+    """Local ``HH:MM:SS`` of a ``Team.start_time``, ``None`` if unusable.
+
+    Not ``app_data.format_ms``: that one uses the process time zone
+    (``astimezone()``), not the project's ``TIME_ZONE``.
+    """
+    if ms <= 0:
+        return None
+    try:
+        moment = datetime.datetime.fromtimestamp(ms / 1000, tz=datetime.timezone.utc)
+        # Near year 9999 the UTC value fits but the local shift overflows.
+        return timezone.localtime(moment).strftime("%H:%M:%S")
+    except (ValueError, OverflowError, OSError):
+        return None
+
+
+class RaceStartsDataView(View):
+    """JSON for the «Старты» page: every paid team with its start time.
+
+    The only source is ``Team.start_time`` — the same value the protocol
+    uses. A team whose time is unset or unformattable gets both start fields
+    ``null`` and counts as not started. ``server_time_ms`` is the page's
+    "now", so a wrong laptop clock can't skew the "minutes since" figures.
+    """
+
+    def get(self, request, race_slug):
+        race, response = _load_race_for_admin(request, race_slug)
+        if response is not None:
+            return response
+
+        teams = Team.objects.filter(
+            category2__race=race, paid_people__gt=0
+        ).select_related("owner", "category2")
+        rows = []
+        for team in sorted(teams, key=start_number_key):
+            clock = _start_clock(team.start_time)
+            rows.append(
+                {
+                    "id": team.id,
+                    "start_number": team.start_number,
+                    "name": _team_display_name(team),
+                    "category_id": team.category2_id,
+                    "paid_people": int(team.paid_people),
+                    "start_time_ms": team.start_time if clock else None,
+                    "start_time": clock,
+                }
+            )
+        categories = [
+            {"id": c.id, "code": c.code, "name": c.name}
+            for c in Category.objects.filter(race=race).order_by("order", "id")
+        ]
+        now = timezone.now()
+        return JsonResponse(
+            {
+                "server_time_ms": int(now.timestamp() * 1000),
+                "server_time": timezone.localtime(now).strftime("%H:%M:%S"),
+                "categories": categories,
+                "teams": rows,
+            }
+        )
 
 
 class RaceMapView(View):
