@@ -61,6 +61,9 @@
 </div>
 
 <script id="raceMapConfig" type="application/json">{{ map_config }}</script>
+<template id="rmDeviceIcon-android">{% include "race/_device_icon.html" with icon="android" %}</template>
+<template id="rmDeviceIcon-ios">{% include "race/_device_icon.html" with icon="ios" %}</template>
+<template id="rmDeviceIcon-phone">{% include "race/_device_icon.html" with icon="phone" %}</template>
 {% endblock %}
 
 {% block footer_js_include %}

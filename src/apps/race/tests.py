@@ -5498,6 +5498,24 @@ def test_race_map_page_config_island_has_both_urls(client, django_user_model):
     )
 
 
+@pytest.mark.django_db
+def test_race_map_page_ships_device_icon_templates(client, django_user_model):
+    race = _make_race(slug="map-page-icons")
+    admin = django_user_model.objects.create_user(username="map-icons", password="x")
+    RaceAdmin.objects.create(race=race, user=admin, role=RaceAdmin.Role.ADMIN)
+    client.force_login(admin)
+
+    body = client.get(
+        reverse("race_map", kwargs={"race_slug": race.slug})
+    ).content.decode()
+
+    for icon in ("android", "ios", "phone"):
+        match = re.search(
+            rf'<template id="rmDeviceIcon-{icon}">(.*?)</template>', body, re.S
+        )
+        assert match and "<svg" in match.group(1)
+
+
 def test_race_map_page_config_island_handles_numeric_zero_slug(
     client, django_user_model
 ):

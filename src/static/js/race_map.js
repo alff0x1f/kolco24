@@ -250,15 +250,27 @@
   // counts load-time raw points plus poll-delivered new fixes (a strictly
   // newer gps_time_ms — not every upload, not a re-delivered row).
   // last_gps_time_ms is the phone's clock (may run ahead), hence the clamp.
+  // Platform logo from the server-rendered <template id="rmDeviceIcon-…">
+  // (shared with the app-data pages). platform is a client-supplied header,
+  // so it only selects a key and is never interpolated into the markup.
+  function deviceIconKey(platform) {
+    var key = String(platform || "").trim().toLowerCase();
+    return key === "android" || key === "ios" ? key : "phone";
+  }
+
+  function deviceIconHtml(key) {
+    var tpl = document.getElementById("rmDeviceIcon-" + key);
+    return tpl ? tpl.innerHTML.trim() : "";
+  }
+
   function renderDevices(teamId) {
     var track = selected[teamId] ? tracks[teamId] : null;
     if (!track || track.devices.length < 2) return "";
     var now = Date.now();
     var items = track.devices.map(function (device, idx) {
       var ageMs = Math.max(0, now - device.last_gps_time_ms);
-      var parts = ["Устр. " + escapeHtml(device.index)];
-      if (device.platform) parts.push(escapeHtml(device.platform));
-      parts.push(Math.floor(ageMs / 60000) + " мин назад");
+      var iconKey = deviceIconKey(device.platform);
+      var parts = [Math.floor(ageMs / 60000) + " мин назад"];
       parts.push(device.points + " " + pluralRu(device.points, ["точка", "точки", "точек"]));
       var classes = "rm-device" + (ageMs > STALE_MS ? " is-stale" : "");
       var checked = device.hidden ? "" : " checked";
@@ -266,6 +278,10 @@
         '<label class="' + classes + '">' +
         '<input type="checkbox" data-team-id="' + escapeHtml(teamId) + '"' +
         ' data-device-idx="' + idx + '"' + checked + ">" +
+        '<span class="rm-dev rm-dev-' + iconKey + '" title="' +
+        escapeHtml((device.platform || "платформа неизвестна") + " · " +
+          (device.install_id || "install_id пуст")) + '">' +
+        deviceIconHtml(iconKey) + escapeHtml(device.index) + "</span>" +
         "<span>" + parts.join(" · ") + "</span>" +
         "</label>"
       );
