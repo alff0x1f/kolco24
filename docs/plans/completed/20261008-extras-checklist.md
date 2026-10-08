@@ -88,13 +88,13 @@
 - Modify: `src/apps/race/views.py`
 - Modify: `src/apps/race/tests.py`
 
-- [ ] add `_team_members(team)` returning `[" ".join(n.split()) for n in (athlet1…6) if n.strip()]`
-- [ ] use it in `RaceChecklistView.get`
-- [ ] (optional) switch `RaceChecklistView` to `_selected_category` instead of its inline copy
-- [ ] run existing checklist tests (members rendering) — must still pass unchanged
-- [ ] check `test_checklist_rows_sorted_numerically_with_members` (tests.py:~7978) covers whitespace/empty slots; add a
+- [x] add `_team_members(team)` returning `[" ".join(n.split()) for n in (athlet1…6) if n.strip()]`
+- [x] use it in `RaceChecklistView.get`
+- [x] (optional) switch `RaceChecklistView` to `_selected_category` instead of its inline copy
+- [x] run existing checklist tests (members rendering) — must still pass unchanged
+- [x] check `test_checklist_rows_sorted_numerically_with_members` (tests.py:~7978) covers whitespace/empty slots; add a
       test only if it doesn't
-- [ ] run tests - must pass before task 2
+- [x] run tests - must pass before task 2
 
 ### Task 2: `RaceExtrasChecklistView` + URL + template
 
@@ -104,19 +104,19 @@
 - Create: `src/templates/race/extras_checklist.html`
 - Modify: `src/apps/race/tests.py`
 
-- [ ] implement view as in Technical Details (gate via `_load_race_for_admin`, reuse `_selected_category`)
-- [ ] register URL `race_extras_checklist` next to `race_checklist` (import the view)
-- [ ] create template from `checklist.html`: extra select (with «(откл.)»), category select, column input, print
-- [ ] tests: anon → redirect to `login`; plain user → 403; superuser without `RaceAdmin` row → 403;
+- [x] implement view as in Technical Details (gate via `_load_race_for_admin`, reuse `_selected_category`)
+- [x] register URL `race_extras_checklist` next to `race_checklist` (import the view)
+- [x] create template from `checklist.html`: extra select (with «(откл.)»), category select, column input, print
+- [x] tests: anon → redirect to `login`; plain user → 403; superuser without `RaceAdmin` row → 403;
       `RaceAdmin(ADMIN)` → 200
-- [ ] tests: only `count_paid > 0` rows (team with `count=2, count_paid=0` absent); soft-deleted team absent
-- [ ] tests: default extra = first by `order`; `?extra=` with a code that exists **only** on another race (e.g.
+- [x] tests: only `count_paid > 0` rows (team with `count=2, count_paid=0` absent); soft-deleted team absent
+- [x] tests: default extra = first by `order`; `?extra=` with a code that exists **only** on another race (e.g.
       `transfer` there, absent here) → falls back to own first extra, no foreign rows; inactive extra with paid units selectable and listed
-- [ ] tests: `?category=` narrows; numeric start-number sort (`"9"` before `"10"`); `total` = sum of `count_paid`;
+- [x] tests: `?category=` narrows; numeric start-number sort (`"9"` before `"10"`); `total` = sum of `count_paid`;
       `?column=` default «Выдано»
-- [ ] tests: race without extras → 200, message shown, `rows == []`, no ««»» artifacts
-- [ ] tests: team with `category2=None` and a paid `TeamExtra` → page 200, team not listed
-- [ ] run tests - must pass before task 3
+- [x] tests: race without extras → 200, message shown, `rows == []`, no ««»» artifacts
+- [x] tests: team with `category2=None` and a paid `TeamExtra` → page 200, team not listed
+- [x] run tests - must pass before task 3
 
 ### Task 3: Race page button
 
@@ -125,20 +125,20 @@
 - Modify: `src/templates/race/race_page.html`
 - Modify: `src/apps/race/tests.py`
 
-- [ ] add `has_extras` to `RacePageView.build_context`
-- [ ] add «Выдача доп-услуг» link after «Лист выдачи», wrapped in `{% if has_extras %}`
-- [ ] tests: admin sees link when race has a `RaceExtra`; no link when race has none; non-admin sees no link
-- [ ] run tests - must pass before task 4
+- [x] add `has_extras` to `RacePageView.build_context`
+- [x] add «Выдача доп-услуг» link after «Лист выдачи», wrapped in `{% if has_extras %}`
+- [x] tests: admin sees link when race has a `RaceExtra`; no link when race has none; non-admin sees no link
+- [x] run tests - must pass before task 4
 
 ### Task 4: Verify acceptance criteria
-- [ ] verify all requirements from Overview are implemented
-- [ ] run full test suite: `uv run pytest`
-- [ ] run `make format` and `make lint`
+- [x] verify all requirements from Overview are implemented
+- [x] run full test suite: `uv run pytest`
+- [x] run `make format` and `make lint`
 
 ### Task 5: [Final] Update documentation
-- [ ] add a short paragraph on `RaceExtrasChecklistView` next to `RaceChecklistView` in CLAUDE.md (one add-on per
+- [x] add a short paragraph on `RaceExtrasChecklistView` next to `RaceChecklistView` in CLAUDE.md (one add-on per
       sheet, `count_paid` only, inactive extras included, soft-deleted excluded explicitly, `_team_members` shared)
-- [ ] move this plan to `docs/plans/completed/`
+- [x] move this plan to `docs/plans/completed/`
 
 ## Post-Completion
 **Manual verification**:

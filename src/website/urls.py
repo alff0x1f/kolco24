@@ -12,6 +12,7 @@ from apps.race.views import (
     RaceAppDataView,
     RaceChecklistView,
     RaceEditView,
+    RaceExtrasChecklistView,
     RaceLegendCodesView,
     RaceLegendEditView,
     RaceMapGpxView,
@@ -112,6 +113,11 @@ urlpatterns = [
         "race/<slug:race_slug>/checklist/",
         RaceChecklistView.as_view(),
         name="race_checklist",
+    ),
+    path(
+        "race/<slug:race_slug>/extras-checklist/",
+        RaceExtrasChecklistView.as_view(),
+        name="race_extras_checklist",
     ),
     path(
         "race/<slug:race_slug>/teams-admin/",

@@ -27,7 +27,7 @@ from apps.mobile.models import (
 )
 from apps.race.app_data import build_overview, build_team_timeline, format_ms
 from apps.race.forms import RaceForm
-from apps.race.models import Protocol
+from apps.race.models import Protocol, RaceExtra, TeamExtra
 from apps.race.permissions import can_edit_race
 from apps.race.results import build_protocol, freeze_protocol
 from apps.race.views import (
@@ -2513,7 +2513,7 @@ import pytest as _pytest  # noqa: E402
 from django.db import IntegrityError  # noqa: E402
 from django.db.models import ProtectedError  # noqa: E402
 
-from apps.race.models import PaymentExtra, RaceExtra, TeamExtra  # noqa: E402
+from apps.race.models import PaymentExtra  # noqa: E402
 from website.models.models import Payment  # noqa: E402
 
 
@@ -8039,6 +8039,202 @@ def test_checklist_filters_by_category(client, django_user_model):
         resp = client.get(url, {"category": value})
         assert len(resp.context["rows"]) == 2
         assert resp.context["selected_category"] is None
+
+
+# ---------------------------------------------------------------------------
+# Printable add-on handout sheet (extras checklist)
+# ---------------------------------------------------------------------------
+
+
+def _ec_url(race):
+    return reverse("race_extras_checklist", kwargs={"race_slug": race.slug})
+
+
+def _ec_admin(django_user_model, race, username="ec-adm"):
+    admin = django_user_model.objects.create_user(username=username, password="x")
+    RaceAdmin.objects.create(race=race, user=admin, role=RaceAdmin.Role.ADMIN)
+    return admin
+
+
+def _make_extra(race, code="map", name="Карты", order=0, **kwargs):
+    return RaceExtra.objects.create(
+        race=race, code=code, name=name, order=order, **kwargs
+    )
+
+
+@pytest.mark.django_db
+def test_extras_checklist_access(client, django_user_model):
+    race = _make_race()
+
+    resp = client.get(_ec_url(race))
+    assert resp.status_code == 302
+    assert reverse("login") in resp.url
+
+    client.force_login(
+        django_user_model.objects.create_user(username="u", password="x")
+    )
+    assert client.get(_ec_url(race)).status_code == 403
+
+    superuser = django_user_model.objects.create_superuser(
+        username="su", password="x", email="su@example.com"
+    )
+    client.force_login(superuser)
+    assert client.get(_ec_url(race)).status_code == 403
+
+    client.force_login(_ec_admin(django_user_model, race))
+    assert client.get(_ec_url(race)).status_code == 200
+
+
+@pytest.mark.django_db
+def test_extras_checklist_lists_paid_units_only(client, django_user_model):
+    race = _make_race()
+    category = _make_category(race)
+    admin = _ec_admin(django_user_model, race)
+    maps = _make_extra(race)
+    ten = _make_team(
+        admin,
+        category,
+        start_number="10",
+        teamname="Десятка",
+        athlet1="Иванов Иван",
+        athlet2="  Петров  Пётр ",
+    )
+    nine = _make_team(admin, category, start_number="9", teamname="Девятка")
+    unpaid = _make_team(admin, category, start_number="1", teamname="Неоплачено")
+    deleted = _make_team(
+        admin, category, start_number="2", teamname="Удалена", is_deleted=True
+    )
+    no_category = _make_team(admin, None, start_number="3", teamname="Без категории")
+    TeamExtra.objects.create(team=ten, race_extra=maps, count=3, count_paid=3)
+    TeamExtra.objects.create(team=nine, race_extra=maps, count=2, count_paid=1)
+    TeamExtra.objects.create(team=unpaid, race_extra=maps, count=2, count_paid=0)
+    TeamExtra.objects.create(team=deleted, race_extra=maps, count=1, count_paid=1)
+    TeamExtra.objects.create(team=no_category, race_extra=maps, count=1, count_paid=1)
+    client.force_login(admin)
+
+    resp = client.get(_ec_url(race))
+
+    assert resp.status_code == 200
+    rows = resp.context["rows"]
+    assert [r["number"] for r in rows] == ["9", "10"]
+    assert rows[1] == {
+        "id": ten.id,
+        "number": "10",
+        "name": "Десятка",
+        "category": "12h",
+        "count": 3,
+        "members": ["Иванов Иван", "Петров Пётр"],
+    }
+    assert resp.context["total"] == 4
+    assert resp.context["column"] == "Выдано"
+    body = resp.content.decode()
+    assert "Карты · 2 ком. · 4 шт." in body
+    assert "Выдано" in body
+
+
+@pytest.mark.django_db
+def test_extras_checklist_selects_extra(client, django_user_model):
+    race = _make_race()
+    category = _make_category(race)
+    admin = _ec_admin(django_user_model, race)
+    breakfast = _make_extra(race, code="breakfast", name="Завтрак", order=1)
+    maps = _make_extra(race, code="map", name="Карты", order=0)
+    old = _make_extra(race, code="shirt", name="Футболка", order=2, is_active=False)
+    team = _make_team(admin, category, teamname="Команда")
+    TeamExtra.objects.create(team=team, race_extra=maps, count=1, count_paid=1)
+    TeamExtra.objects.create(team=team, race_extra=breakfast, count=2, count_paid=2)
+    TeamExtra.objects.create(team=team, race_extra=old, count=5, count_paid=5)
+    other_race = _make_race(slug="other")
+    other_team = _make_team(admin, _make_category(other_race), teamname="Чужая")
+    transfer = _make_extra(other_race, code="transfer", name="Трансфер")
+    TeamExtra.objects.create(
+        team=other_team, race_extra=transfer, count=1, count_paid=1
+    )
+    client.force_login(admin)
+
+    resp = client.get(_ec_url(race))
+    assert resp.context["extra"] == maps
+    assert [e.code for e in resp.context["extras"]] == ["map", "breakfast", "shirt"]
+
+    resp = client.get(_ec_url(race), {"extra": "breakfast"})
+    assert resp.context["extra"] == breakfast
+    assert [r["count"] for r in resp.context["rows"]] == [2]
+
+    resp = client.get(_ec_url(race), {"extra": "shirt"})
+    assert resp.context["extra"] == old
+    assert [r["count"] for r in resp.context["rows"]] == [5]
+    assert "Футболка (откл.)" in resp.content.decode()
+
+    # A code that exists only on another race falls back to this race's first.
+    resp = client.get(_ec_url(race), {"extra": "transfer"})
+    assert resp.context["extra"] == maps
+    assert [r["name"] for r in resp.context["rows"]] == ["Команда"]
+
+
+@pytest.mark.django_db
+def test_extras_checklist_filters_by_category(client, django_user_model):
+    race = _make_race()
+    twelve = _make_category(race)
+    six = _make_category(race, code="6h", short_name="6ч", name="6 часов", order=1)
+    admin = _ec_admin(django_user_model, race)
+    maps = _make_extra(race)
+    for category, name in ((twelve, "Двенадцать"), (six, "Шесть")):
+        team = _make_team(admin, category, teamname=name)
+        TeamExtra.objects.create(team=team, race_extra=maps, count=1, count_paid=1)
+    client.force_login(admin)
+
+    resp = client.get(_ec_url(race), {"category": six.id, "column": "Карты выданы"})
+
+    assert [r["name"] for r in resp.context["rows"]] == ["Шесть"]
+    assert resp.context["selected_category"] == six
+    assert resp.context["column"] == "Карты выданы"
+
+
+@pytest.mark.django_db
+def test_extras_checklist_race_without_extras(client, django_user_model):
+    race = _make_race()
+    client.force_login(_ec_admin(django_user_model, race))
+
+    resp = client.get(_ec_url(race), {"extra": "map"})
+
+    assert resp.status_code == 200
+    assert resp.context["extra"] is None
+    assert resp.context["rows"] == []
+    body = resp.content.decode()
+    assert "У гонки нет доп-услуг." in body
+    assert "«»" not in body
+
+
+@pytest.mark.django_db
+def test_extras_checklist_empty_extra_message(client, django_user_model):
+    race = _make_race()
+    _make_extra(race)
+    client.force_login(_ec_admin(django_user_model, race))
+
+    resp = client.get(_ec_url(race))
+
+    assert "Нет команд с оплаченной услугой «Карты»." in resp.content.decode()
+
+
+@pytest.mark.django_db
+def test_race_page_extras_checklist_link(client, django_user_model):
+    race = _make_race()
+    admin = _ec_admin(django_user_model, race)
+    link = _ec_url(race)
+    page = reverse("race", kwargs={"race_slug": race.slug})
+    client.force_login(admin)
+
+    assert link not in client.get(page).content.decode()
+
+    _make_extra(race)
+    assert link in client.get(page).content.decode()
+
+    client.force_login(
+        django_user_model.objects.create_user(username="u", password="x")
+    )
+    resp = client.get(page)
+    assert resp.context["has_extras"] is False
+    assert link not in resp.content.decode()
 
 
 # ---------------------------------------------------------------------------

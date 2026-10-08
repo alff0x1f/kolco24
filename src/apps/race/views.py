@@ -30,7 +30,7 @@ from apps.mobile.models import AppInstall, Mark, TrackPoint
 from apps.race.app_data import build_overview, build_team_timeline
 from apps.race.finance import csv_rows, extras_catalog, filter_rows, payment_rows
 from apps.race.forms import RaceForm
-from apps.race.models import Protocol, RaceExtra, RacePromo
+from apps.race.models import Protocol, RaceExtra, RacePromo, TeamExtra
 from apps.race.permissions import can_edit_race, is_team_editing_open
 from apps.race.promo import ERROR_MESSAGES as PROMO_ERRORS
 from apps.race.promo import PromoError, occupied_team_ids, resolve_promo
@@ -178,6 +178,9 @@ class RacePageView(View):
         context["can_manage_posts"] = is_admin
         context["can_edit_race"] = bool(user is not None and can_edit_race(user, race))
         context["can_manage_race_admins"] = bool(user is not None and user.is_superuser)
+        context["has_extras"] = (
+            context["can_edit_race"] and RaceExtra.objects.filter(race=race).exists()
+        )
         if context["can_edit_race"] or context["can_manage_race_admins"]:
             context["race_admin_roles"] = RaceAdmin.Role.choices
             context["race_administrators"] = sorted(
@@ -1450,6 +1453,22 @@ class RaceLegendCodesView(View):
         return render(request, "race/legend_codes.html", {"race": race, "rows": rows})
 
 
+def _team_members(team):
+    """Non-empty member names, inner whitespace collapsed, one per printed line."""
+    return [
+        " ".join(name.split())
+        for name in (
+            team.athlet1,
+            team.athlet2,
+            team.athlet3,
+            team.athlet4,
+            team.athlet5,
+            team.athlet6,
+        )
+        if name.strip()
+    ]
+
+
 class RaceChecklistView(View):
     """Printable team checklist for handing out start packets or maps.
 
@@ -1466,9 +1485,7 @@ class RaceChecklistView(View):
         if response is not None:
             return response
 
-        categories = list(Category.objects.filter(race=race).order_by("order", "id"))
-        selected = request.GET.get("category", "")
-        selected_category = next((c for c in categories if str(c.id) == selected), None)
+        categories, selected_category = _selected_category(request, race)
 
         teams = Team.objects.filter(
             category2__race=race, paid_people__gt=0
@@ -1482,18 +1499,7 @@ class RaceChecklistView(View):
                 "name": _team_display_name(team),
                 "category": team.category2.code,
                 "count": f"{team.paid_people:g}/{team.ucount}",
-                "members": [
-                    " ".join(name.split())
-                    for name in (
-                        team.athlet1,
-                        team.athlet2,
-                        team.athlet3,
-                        team.athlet4,
-                        team.athlet5,
-                        team.athlet6,
-                    )
-                    if name.strip()
-                ],
+                "members": _team_members(team),
             }
             for team in sorted(teams, key=start_number_key)
         ]
@@ -1505,6 +1511,63 @@ class RaceChecklistView(View):
             "column": request.GET.get("column", "").strip()[:30] or "Отметка",
         }
         return render(request, "race/checklist.html", context)
+
+
+class RaceExtrasChecklistView(View):
+    """Printable handout sheet for one paid add-on (maps, transfer, breakfast…).
+
+    ``?extra=<code>`` picks the add-on; a missing or unknown code falls back to
+    the race's first one. Inactive add-ons stay selectable — teams may still
+    hold paid units. The quantity is ``count_paid`` only: units a team gets for
+    free (``free_per_team``) are handed out without the list.
+    """
+
+    def get(self, request, race_slug):
+        race, response = _load_race_for_admin(request, race_slug)
+        if response is not None:
+            return response
+
+        categories, selected_category = _selected_category(request, race)
+        extras = list(RaceExtra.objects.filter(race=race).order_by("order", "id"))
+        code = request.GET.get("extra", "")
+        extra = next((e for e in extras if e.code == code), None) or next(
+            iter(extras), None
+        )
+
+        rows = []
+        if extra is not None:
+            # TeamExtra.objects skips TeamManager, so soft-deleted teams are
+            # excluded by hand; the race filter also drops category-less teams.
+            team_extras = TeamExtra.objects.filter(
+                race_extra=extra,
+                count_paid__gt=0,
+                team__is_deleted=False,
+                team__category2__race=race,
+            ).select_related("team", "team__owner", "team__category2")
+            if selected_category is not None:
+                team_extras = team_extras.filter(team__category2=selected_category)
+            rows = [
+                {
+                    "id": te.team.id,
+                    "number": te.team.start_number,
+                    "name": _team_display_name(te.team),
+                    "category": te.team.category2.code,
+                    "count": te.count_paid,
+                    "members": _team_members(te.team),
+                }
+                for te in sorted(team_extras, key=lambda te: start_number_key(te.team))
+            ]
+        context = {
+            "race": race,
+            "extras": extras,
+            "extra": extra,
+            "rows": rows,
+            "total": sum(row["count"] for row in rows),
+            "categories": categories,
+            "selected_category": selected_category,
+            "column": request.GET.get("column", "").strip()[:30] or "Выдано",
+        }
+        return render(request, "race/extras_checklist.html", context)
 
 
 def _selected_category(request, race):
