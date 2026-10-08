@@ -1309,8 +1309,9 @@ class RaceLegendEditView(View):
 
     @staticmethod
     def _existing_checkpoints(race):
-        # ``has_tags`` lets the JS block the «delete» of a КП with provisioned
-        # NFC tags (mirrors the server-side guard in :func:`_reconcile_legend`).
+        # ``tag_count`` is shown in the «Чипы» column and lets the JS block the
+        # «delete» of a КП with provisioned NFC tags (mirrors the server-side
+        # guard in :func:`_reconcile_legend`).
         return [
             {
                 "id": cp.id,
@@ -1320,10 +1321,10 @@ class RaceLegendEditView(View):
                 "cost": cp.cost,
                 "description": cp.description,
                 "is_legend_locked": cp.is_legend_locked,
-                "has_tags": bool(cp.tags.all()),
+                "tag_count": cp.tag_count,
             }
             for cp in Checkpoint.objects.filter(race=race)
-            .prefetch_related("tags")
+            .annotate(tag_count=Count("tags"))
             .order_by("number", "id")
         ]
 
@@ -1390,14 +1391,18 @@ class RaceLegendEditView(View):
                 )
 
         # Re-render echoing the submitted rows + per-row errors. Re-attach
-        # ``has_tags`` from the DB so the JS still blocks deleting a tagged КП.
+        # ``tag_count`` from the DB (never trust the client's) so the JS still
+        # shows the chips and blocks deleting a tagged КП.
         if rows:
-            tagged = {
-                cp["id"]: cp["has_tags"] for cp in self._existing_checkpoints(race)
+            tag_counts = {
+                cp["id"]: cp["tag_count"] for cp in self._existing_checkpoints(race)
             }
             for row in rows:
-                if isinstance(row, dict) and row.get("id") in tagged:
-                    row["has_tags"] = tagged[row["id"]]
+                if not isinstance(row, dict):
+                    continue
+                row.pop("tag_count", None)
+                if row.get("id") in tag_counts:
+                    row["tag_count"] = tag_counts[row["id"]]
 
         context = self._build_context(
             race,

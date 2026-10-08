@@ -88,12 +88,12 @@
 
 /* ── The grid ────────────────────────────────────────────── */
 .legend-editor .grid-wrap { overflow-x: auto; }
-.legend-editor .lg-grid { min-width: 840px; }
+.legend-editor .lg-grid { min-width: 896px; }
 
 .legend-editor .lg-headrow,
 .legend-editor .lg-row {
   display: grid;
-  grid-template-columns: 64px 132px 120px 116px minmax(180px, 1fr) 52px 44px;
+  grid-template-columns: 64px 132px 120px 116px minmax(180px, 1fr) 52px 56px 44px;
   align-items: center;
 }
 
@@ -108,6 +108,7 @@
 }
 .legend-editor .lg-h-num, .legend-editor .lg-h-cost { text-align: right; }
 .legend-editor .lg-h-lock { text-align: center; letter-spacing: 0; }
+.legend-editor .lg-h-tags { text-align: center; padding-left: 4px; padding-right: 4px; }
 
 .legend-editor .lg-row {
   border-bottom: 1px solid var(--line-soft);
@@ -142,6 +143,15 @@
 }
 
 .legend-editor .lg-lockcell { display: flex; justify-content: center; }
+.legend-editor .lg-tags {
+  justify-self: center; min-width: 28px; padding: 3px 7px; border-radius: 6px;
+  font-family: var(--mono); font-size: 13px; text-align: center; color: var(--ink);
+}
+.legend-editor .lg-tags.is-muted { color: var(--muted-2); }
+.legend-editor .lg-tags.is-missing {
+  color: var(--warn); background: var(--warn-bg); font-weight: 600;
+}
+
 .legend-editor .lg-lock { width: 17px; height: 17px; accent-color: #d98324; cursor: pointer; }
 
 .legend-editor .lg-del {

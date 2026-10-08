@@ -3212,6 +3212,69 @@ def test_legend_edit_get_superuser_returns_200_with_existing(client):
 
 
 @pytest.mark.django_db
+def test_legend_edit_get_reports_tag_count(client):
+    from website.models import Checkpoint
+    from website.models.checkpoint import CheckpointTag
+
+    race = _make_race()
+    tagged = Checkpoint.objects.create(race=race, number=1, cost=10, description="a")
+    Checkpoint.objects.create(race=race, number=2, cost=20, description="b")
+    CheckpointTag.objects.create(checkpoint=tagged, nfc_uid="AA:01")
+    CheckpointTag.objects.create(checkpoint=tagged, nfc_uid="AA:02")
+    superuser = User.objects.create_superuser("admin", "a@b.c", "pw")
+    RaceAdmin.objects.create(race=race, user=superuser, role=RaceAdmin.Role.ADMIN)
+    client.force_login(superuser)
+
+    resp = client.get(reverse("edit_legend", kwargs={"race_slug": race.slug}))
+    data = _script_json(resp.content.decode(), "checkpoints-data")
+    assert [(row["number"], row["tag_count"]) for row in data] == [(1, 2), (2, 0)]
+    assert "has_tags" not in data[0]
+
+
+@pytest.mark.django_db
+def test_legend_post_error_rerender_takes_tag_count_from_db(client):
+    from website.models import Checkpoint
+    from website.models.checkpoint import CheckpointTag
+
+    race = _make_race()
+    tagged = Checkpoint.objects.create(race=race, number=1, cost=10, description="a")
+    CheckpointTag.objects.create(checkpoint=tagged, nfc_uid="AA:01")
+    superuser = User.objects.create_superuser("admin", "a@b.c", "pw")
+    RaceAdmin.objects.create(race=race, user=superuser, role=RaceAdmin.Role.ADMIN)
+    client.force_login(superuser)
+
+    resp = client.post(
+        reverse("edit_legend", kwargs={"race_slug": race.slug}),
+        _legend_post(
+            [
+                {
+                    "id": tagged.id,
+                    "number": 1,
+                    "type": "kp",
+                    "cost": 10,
+                    "description": "a",
+                    "is_legend_locked": False,
+                    "tag_count": 99,
+                },
+                {
+                    "id": None,
+                    "number": 2,
+                    "type": "bogus",
+                    "cost": 10,
+                    "description": "x",
+                    "is_legend_locked": False,
+                    "tag_count": 5,
+                },
+            ]
+        ),
+    )
+    assert resp.status_code == 200
+    data = _script_json(resp.content.decode(), "checkpoints-data")
+    assert data[0]["tag_count"] == 1
+    assert "tag_count" not in data[1]
+
+
+@pytest.mark.django_db
 def test_legend_edit_post_creates_and_updates(client):
     from website.models import Checkpoint
 
