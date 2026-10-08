@@ -5498,6 +5498,24 @@ def test_race_map_page_config_island_has_both_urls(client, django_user_model):
     )
 
 
+@pytest.mark.django_db
+def test_race_map_page_ships_device_icon_templates(client, django_user_model):
+    race = _make_race(slug="map-page-icons")
+    admin = django_user_model.objects.create_user(username="map-icons", password="x")
+    RaceAdmin.objects.create(race=race, user=admin, role=RaceAdmin.Role.ADMIN)
+    client.force_login(admin)
+
+    body = client.get(
+        reverse("race_map", kwargs={"race_slug": race.slug})
+    ).content.decode()
+
+    for icon in ("android", "ios", "phone"):
+        match = re.search(
+            rf'<template id="rmDeviceIcon-{icon}">(.*?)</template>', body, re.S
+        )
+        assert match and "<svg" in match.group(1)
+
+
 def test_race_map_page_config_island_handles_numeric_zero_slug(
     client, django_user_model
 ):
@@ -6090,6 +6108,175 @@ def test_app_data_team_timeline_flags_clock_skew(client, django_user_model):
     body = resp.content.decode()
     assert "часы спешат на 5м 00с" in body
     assert "часы отстают на 2м 00с" in body
+
+
+def _app_data_mark_from(team, checkpoint, install_id, wall_ms):
+    mark = _make_mark(team, checkpoint, present_chips=("dv:01",), wall_ms=wall_ms)
+    Mark.objects.filter(pk=mark.pk).update(source_install_id=install_id)
+    return mark
+
+
+def _app_data_admin_client(client, django_user_model, race, username):
+    admin = django_user_model.objects.create_user(username=username, password="x")
+    RaceAdmin.objects.create(race=race, user=admin, role=RaceAdmin.Role.ADMIN)
+    client.force_login(admin)
+    return client
+
+
+@pytest.mark.django_db
+def test_app_data_team_devices_numbered_like_race_map(client, django_user_model):
+    race, category, cp_start, cp_finish, cp_kp = _make_app_data_race("app-data-dev")
+    owner = django_user_model.objects.create_user(username="appdata-dev", password="x")
+    base_ms = 1_700_000_000_000
+    team = _make_team(owner, category, teamname="Устройства")
+
+    # Track fixes in reverse install_id order: "p-b" starts first.
+    _make_track_point(team, race, "tp-dev-1", install_id="p-b", gps_time_ms=base_ms)
+    _make_track_point(
+        team, race, "tp-dev-2", install_id="p-a", gps_time_ms=base_ms + 1_000
+    )
+    # "p-c" only took a КП, before either track started — still numbered last.
+    _app_data_mark_from(team, cp_kp, "p-c", base_ms - 60_000)
+    _app_data_mark_from(team, cp_kp, "p-a", base_ms + 5_000)
+    AppInstall.objects.create(install_id="p-b", platform="android")
+    AppInstall.objects.create(install_id="p-a", platform="ios")
+
+    context = build_team_timeline(race, team)
+
+    assert [(d["index"], d["install_id"], d["icon"]) for d in context["devices"]] == [
+        (1, "p-b", "android"),
+        (2, "p-a", "ios"),
+        (3, "p-c", "phone"),
+    ]
+
+    _app_data_admin_client(client, django_user_model, race, "appdata-dev-admin")
+    map_devices = client.get(
+        reverse("race_map_track", kwargs={"race_slug": race.slug, "team_id": team.id})
+    ).json()["devices"]
+    timeline_index = {d["install_id"]: d["index"] for d in context["devices"]}
+    assert {d["install_id"]: d["index"] for d in map_devices} == {
+        "p-b": timeline_index["p-b"],
+        "p-a": timeline_index["p-a"],
+    }
+
+
+@pytest.mark.django_db
+def test_app_data_team_mark_only_devices_by_first_take(django_user_model):
+    race, category, cp_start, cp_finish, cp_kp = _make_app_data_race("app-data-dev2")
+    owner = django_user_model.objects.create_user(username="appdata-dev2", password="x")
+    base_ms = 1_700_000_000_000
+    team = _make_team(owner, category)
+
+    _app_data_mark_from(team, cp_kp, "z-late", base_ms + 10_000)
+    _app_data_mark_from(team, cp_kp, "z-tie", base_ms)
+    _app_data_mark_from(team, cp_kp, "a-tie", base_ms)
+    _app_data_mark_from(team, cp_kp, "z-late", base_ms - 1)
+
+    context = build_team_timeline(race, team)
+
+    # z-late's earliest take (base − 1) wins; equal first takes tie-break by id.
+    assert [d["install_id"] for d in context["devices"]] == ["z-late", "a-tie", "z-tie"]
+
+
+@pytest.mark.django_db
+def test_app_data_team_events_carry_device(client, django_user_model):
+    race, category, cp_start, cp_finish, cp_kp = _make_app_data_race("app-data-dev3")
+    owner = django_user_model.objects.create_user(username="appdata-dev3", password="x")
+    base_ms = 1_700_000_000_000
+    team = _make_team(owner, category, start_time=base_ms)
+
+    _make_track_point(team, race, "tp-dev3-1", install_id="", gps_time_ms=base_ms)
+    _app_data_mark_from(team, cp_kp, "phone-2", base_ms + 1_000)
+    JudgeScan.objects.create(
+        id="js-dev3",
+        race=race,
+        source_install_id="judge-phone",
+        event_type="start",
+        participant_number=1,
+        nfc_uid="DV:01",
+        wall_ms=base_ms - 1_000,
+    )
+
+    context = build_team_timeline(race, team)
+
+    devices = {event["kind"]: event["device"] for event in context["events"]}
+    # An empty install_id is a device of its own, as on the map.
+    assert devices["track"]["index"] == 1
+    assert devices["track"]["install_id"] == ""
+    assert devices["mark"]["index"] == 2
+    assert devices["judge"] is None
+    assert devices["boundary"] is None
+
+    _app_data_admin_client(client, django_user_model, race, "appdata-dev3-admin")
+    body = client.get(
+        reverse(
+            "race_app_data_team",
+            kwargs={"race_slug": race.slug, "team_id": team.id},
+        )
+    ).content.decode()
+    assert 'id="deviceFilters"' in body
+    assert 'data-device="2"' in body
+    assert "install_id пуст" in body
+
+
+@pytest.mark.django_db
+def test_app_data_team_single_device_has_no_device_filter(client, django_user_model):
+    race, category, cp_start, cp_finish, cp_kp = _make_app_data_race("app-data-dev4")
+    owner = django_user_model.objects.create_user(username="appdata-dev4", password="x")
+    team = _make_team(owner, category)
+    _app_data_mark_from(team, cp_kp, "only-phone", 1_700_000_000_000)
+    AppInstall.objects.create(install_id="only-phone", platform="android")
+
+    _app_data_admin_client(client, django_user_model, race, "appdata-dev4-admin")
+    body = client.get(
+        reverse(
+            "race_app_data_team",
+            kwargs={"race_slug": race.slug, "team_id": team.id},
+        )
+    ).content.decode()
+
+    assert 'id="deviceFilters"' not in body
+    assert "dev-android" in body
+
+
+@pytest.mark.django_db
+def test_app_data_team_judge_participant_number_only_when_differs(django_user_model):
+    from website.models.tag import Tag
+
+    race, category, cp_start, cp_finish, cp_kp = _make_app_data_race("app-data-pn")
+    owner = django_user_model.objects.create_user(username="appdata-pn", password="x")
+    base_ms = 1_700_000_000_000
+    team = _make_team(owner, category)
+    Tag.objects.create(number=359, nfc_uid="PN:01")
+    Tag.objects.create(number=360, nfc_uid="PN:02")
+    _make_mark(team, cp_kp, present_chips=("pn:01", "pn:02", "pn:03"), wall_ms=base_ms)
+    for scan_id, uid, number, offset in (
+        ("js-pn-same", "PN:01", 359, 1),
+        ("js-pn-diff", "PN:02", 12, 2),
+        ("js-pn-unknown", "PN:03", 77, 3),
+    ):
+        JudgeScan.objects.create(
+            id=scan_id,
+            race=race,
+            source_install_id="judge-phone",
+            event_type="start",
+            participant_number=number,
+            nfc_uid=uid,
+            wall_ms=base_ms + offset * 1_000,
+        )
+
+    judge = {
+        event["participant_number"]: event
+        for event in build_team_timeline(race, team)["events"]
+        if event["kind"] == "judge"
+    }
+
+    assert judge[359]["show_participant"] is False
+    assert judge[12]["show_participant"] is True
+    assert judge[12]["participant_mismatch"] is True
+    # Chip not in the pool: the phone's number is the only one there is.
+    assert judge[77]["show_participant"] is True
+    assert judge[77]["participant_mismatch"] is False
 
 
 def test_app_data_urls_resolve():

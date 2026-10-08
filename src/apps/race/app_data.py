@@ -25,7 +25,14 @@ from datetime import timezone as dt_timezone
 
 from django.db.models import Count, Max, Min
 
-from apps.mobile.models import JudgeScan, Mark, MarkPhoto, MarkPresent, TrackPoint
+from apps.mobile.models import (
+    AppInstall,
+    JudgeScan,
+    Mark,
+    MarkPhoto,
+    MarkPresent,
+    TrackPoint,
+)
 from website.models import Team
 from website.models.checkpoint import Checkpoint
 from website.models.enums import CheckpointType
@@ -303,6 +310,55 @@ def build_overview(race):
     return {"rows": rows, "unmatched_scans": unmatched_scans}
 
 
+def _device_icon(platform):
+    """Icon key for the device badge: ``android``/``ios``/``phone``."""
+    platform = (platform or "").strip().lower()
+    if platform in ("android", "ios"):
+        return platform
+    return "phone"
+
+
+def _team_devices(marks, segments):
+    """install_id → device entry, numbered like the race map.
+
+    Must match :class:`apps.race.views.RaceMapTrackView`: phones with a track
+    first, by first GPS fix (tie-break ``install_id``). Phones that only sent
+    marks follow, by their first take (same tie-break). An empty
+    ``install_id`` is a device of its own, as on the map.
+    """
+    track_first = {}
+    for segment in segments:
+        install_id = segment["install_id"]
+        first_ms = segment["first_ms"]
+        if install_id not in track_first or first_ms < track_first[install_id]:
+            track_first[install_id] = first_ms
+    mark_first = {}
+    for mark in marks:
+        install_id = mark.source_install_id
+        if install_id in track_first:
+            continue
+        ms = _event_ms(mark) or 0
+        if install_id not in mark_first or ms < mark_first[install_id]:
+            mark_first[install_id] = ms
+
+    ordered = sorted(track_first, key=lambda i: (track_first[i], i))
+    ordered += sorted(mark_first, key=lambda i: (mark_first[i], i))
+    platforms = dict(
+        AppInstall.objects.filter(install_id__in=ordered).values_list(
+            "install_id", "platform"
+        )
+    )
+    return {
+        install_id: {
+            "index": index,
+            "install_id": install_id,
+            "platform": platforms.get(install_id, ""),
+            "icon": _device_icon(platforms.get(install_id, "")),
+        }
+        for index, install_id in enumerate(ordered, start=1)
+    }
+
+
 def build_team_timeline(race, team):
     """Context for a single team's page: header summary + chronological feed."""
     tag_numbers = _tag_pool()
@@ -326,10 +382,17 @@ def build_team_timeline(race, team):
             if uid:
                 chips.add(uid)
 
+    segments = list(
+        TrackPoint.objects.filter(race_id=race.id, team_id=team.id)
+        .values("install_id", "segment_id")
+        .annotate(
+            cnt=Count("id"), first_ms=Min("gps_time_ms"), last_ms=Max("gps_time_ms")
+        )
+    )
+    devices = _team_devices(marks, segments)
+
     events = []
-    installs = set()
     for mark in marks:
-        installs.add(mark.source_install_id)
         cp = checkpoints.get(mark.checkpoint_id)
         ms = _event_ms(mark)
         events.append(
@@ -350,7 +413,7 @@ def build_team_timeline(race, team):
                 "lat": mark.loc_lat,
                 "lon": mark.loc_lon,
                 "photos": [p.image.url for p in photos[mark.id] if p.image],
-                "install_id": mark.source_install_id,
+                "device": devices[mark.source_install_id],
                 "clock_skew": _clock_skew(mark),
             }
         )
@@ -360,6 +423,7 @@ def build_team_timeline(race, team):
         if uid not in chips:
             continue
         ms = _event_ms(scan)
+        tag_number = tag_numbers.get(uid)
         events.append(
             {
                 "kind": "judge",
@@ -368,20 +432,19 @@ def build_team_timeline(race, team):
                 "received": _format_dt(scan.created_at),
                 "event_type": scan.event_type,
                 "participant_number": scan.participant_number,
+                # The judge phone resolves the number from its own copy of the
+                # chip pool; show it only when the server's lookup disagrees.
+                "show_participant": tag_number != scan.participant_number,
+                "participant_mismatch": (
+                    tag_number is not None and tag_number != scan.participant_number
+                ),
                 "chip": _chip_label(uid, tag_numbers),
                 "clock_skew": _clock_skew(scan),
+                "device": None,
             }
         )
 
-    segments = (
-        TrackPoint.objects.filter(race_id=race.id, team_id=team.id)
-        .values("install_id", "segment_id")
-        .annotate(
-            cnt=Count("id"), first_ms=Min("gps_time_ms"), last_ms=Max("gps_time_ms")
-        )
-    )
     for segment in segments:
-        installs.add(segment["install_id"])
         events.append(
             {
                 "kind": "track",
@@ -390,7 +453,7 @@ def build_team_timeline(race, team):
                 "last": format_ms(segment["last_ms"]),
                 "duration": _format_duration(segment["last_ms"] - segment["first_ms"]),
                 "points": segment["cnt"],
-                "install_id": segment["install_id"],
+                "device": devices[segment["install_id"]],
                 "segment_id": segment["segment_id"],
             }
         )
@@ -408,6 +471,7 @@ def build_team_timeline(race, team):
                     "time": format_ms(ms),
                     "label": label,
                     "field": field,
+                    "device": None,
                 }
             )
 
@@ -420,7 +484,7 @@ def build_team_timeline(race, team):
             _chip_label(uid, tag_numbers)
             for uid in sorted(chips, key=lambda u: (len(u), u))
         ],
-        "installs": sorted(installs),
+        "devices": sorted(devices.values(), key=lambda device: device["index"]),
         "marks_count": len(marks),
         "photos_count": sum(len(rows) for rows in photos.values()),
     }

@@ -1,0 +1,3 @@
+<span class="dev dev-{{ device.icon }}"
+      title="{{ device.platform|default:'платформа неизвестна' }} · {{ device.install_id|default:'install_id пуст' }}{% if segment_id %} · сегмент {{ segment_id }}{% endif %}"
+  >{% include "race/_device_icon.html" with icon=device.icon %}{{ device.index }}</span>

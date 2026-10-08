@@ -510,7 +510,7 @@ Django 4.2 project. Source lives entirely under `src/`, with `manage.py` at `src
       wins**, not global-earliest-wins: the first upload that finds the field `0` sets it and every later upload is a
       no-op for that field, even one carrying a genuinely earlier verified mark — see the second assertion of
       `test_mark_upload_earliest_verified_start_mark_wins` in `apps/mobile/tests.py`; manual/api-set values are never
-      overwritten either), and within that first write, earliest-wins (`Min(Coalesce("trusted_ms","wall_ms"))`,
+      overwritten either), and within that first write, earliest-wins (`Min(Coalesce(NullIf("trusted_ms", 0),"wall_ms"))` — a zero `trusted_ms` counts as absent,
       **excluding non-positive results** — an epoch-`0` mark would otherwise permanently pin the aggregate at `0`,
       which is also the unset sentinel, and starve out every later genuinely-timed mark — over all stored verified
       NFC marks for that team+boundary at that moment, not just the current batch), saved with

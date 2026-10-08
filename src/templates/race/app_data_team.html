@@ -45,16 +45,15 @@
             {% endfor %}
           </span>
           {% endif %}
-          {% if installs %}
+          {% if devices %}
           <span class="chips-line">Устройства:
-            {% for install in installs %}
-            <span class="tagchip mono" title="install_id">{{ install|truncatechars:12 }}</span>
-            {% endfor %}
+            {% for device in devices %}{% include "race/_device_badge.html" %}{% endfor %}
           </span>
           {% endif %}
         </div>
       </div>
       <div class="head-actions">
+        <a class="btn btn-ghost" href="#help">Справка</a>
         <a class="btn btn-ghost" href="{% url 'race_map' race.slug %}">Показать на карте</a>
       </div>
     </div>
@@ -63,11 +62,21 @@
     <div class="card">
       <div class="card-head">
         <h2>Лента событий</h2>
-        <div class="card-head-r filters" id="eventFilters">
-          <label><input type="checkbox" data-kind="mark" checked> Взятия</label>
-          <label><input type="checkbox" data-kind="judge" checked> Судья</label>
-          <label><input type="checkbox" data-kind="track" checked> Трек</label>
-          <label><input type="checkbox" data-kind="boundary" checked> Старт/финиш</label>
+        <div class="filters-stack" id="eventFilters">
+          <div class="card-head-r filters">
+            <label><input type="checkbox" data-kind="mark" checked> Взятия</label>
+            <label><input type="checkbox" data-kind="judge" checked> Судья</label>
+            <label><input type="checkbox" data-kind="track" checked> Трек</label>
+            <label><input type="checkbox" data-kind="boundary" checked> Старт/финиш</label>
+          </div>
+          {% if devices|length > 1 %}
+          <div class="card-head-r filters" id="deviceFilters">
+            {% for device in devices %}
+            <label><input type="checkbox" data-device="{{ device.index }}" checked>
+              {% include "race/_device_badge.html" %}</label>
+            {% endfor %}
+          </div>
+          {% endif %}
         </div>
       </div>
       <div class="card-body tight">
@@ -76,6 +85,7 @@
             <thead>
               <tr>
                 <th>Время</th>
+                <th>Устр.</th>
                 <th>Событие</th>
                 <th>Детали</th>
                 <th>Получено</th>
@@ -83,8 +93,10 @@
             </thead>
             <tbody>
               {% for ev in events %}
-              <tr class="ev ev-{{ ev.kind }}">
+              <tr class="ev ev-{{ ev.kind }}" data-kind="{{ ev.kind }}"
+                  data-device="{{ ev.device.index|default:'' }}">
                 <td class="mono">{{ ev.time|default:"—" }}</td>
+                <td>{% if ev.device %}{% include "race/_device_badge.html" with device=ev.device segment_id=ev.segment_id %}{% else %}<span class="aux">—</span>{% endif %}</td>
 
                 {% if ev.kind == "mark" %}
                 <td>
@@ -136,7 +148,11 @@
                 <td>
                   <span class="tagchip{% if not ev.chip.known %} unknown{% endif %}"
                         title="{{ ev.chip.uid }}">{{ ev.chip.label }}</span>
-                  <span class="aux">№ участника {{ ev.participant_number }}</span>
+                  {% if ev.show_participant %}
+                  <span class="{% if ev.participant_mismatch %}warn{% else %}aux{% endif %}"
+                        {% if ev.participant_mismatch %}title="Телефон судьи определил другой номер браслета"{% endif %}>
+                    № участника {{ ev.participant_number }}</span>
+                  {% endif %}
                   {% if ev.clock_skew %}
                   <span class="badge warn-b"
                         title="по часам телефона {{ ev.clock_skew.wall }}, доверенное время {{ ev.clock_skew.trusted }}">
@@ -148,8 +164,6 @@
                 <td><span class="kind kind-track">Трек</span> сегмент</td>
                 <td>
                   <span class="aux">{{ ev.points }} тчк, {{ ev.duration }}, до {{ ev.last }}</span>
-                  <span class="tagchip mono" title="{{ ev.install_id }} / {{ ev.segment_id }}">
-                    {{ ev.install_id|truncatechars:12 }}</span>
                 </td>
 
                 {% else %}
@@ -160,11 +174,112 @@
                 <td class="mono aux">{{ ev.received|default:"" }}</td>
               </tr>
               {% empty %}
-              <tr class="empty"><td colspan="4">Приложение ещё ничего не прислало для этой команды.</td></tr>
+              <tr class="empty"><td colspan="5">Приложение ещё ничего не прислало для этой команды.</td></tr>
               {% endfor %}
             </tbody>
           </table>
         </div>
+      </div>
+    </div>
+
+    <!-- Help -->
+    <div class="card help" id="help">
+      <div class="card-head">
+        <h2>Справка</h2>
+      </div>
+      <div class="card-body">
+        <p>
+          Всё, что приложение прислало по команде, в порядке времени события.
+          Страница только показывает данные — здесь ничего нельзя изменить.
+          «Время» — момент события по доверенному времени телефона (GPS/сеть),
+          а если его нет — по часам телефона. «Получено» — когда данные дошли до
+          сервера; большой разрыв значит, что телефон долго был без связи.
+        </p>
+
+        <h3>Шапка</h3>
+        <ul>
+          <li><b>Старт / Финиш</b> — время команды для протокола (как на общей странице).</li>
+          <li><b>Взятий / Фото</b> — сколько взятий КП и кадров фото-взятий загружено.</li>
+          <li>
+            <b>Чипы</b> — браслеты из составов взятий. «№12» — браслет найден в базе,
+            <span class="tagchip unknown">оранжевый UID</span> — не найден.
+          </li>
+          <li><b>Устройства</b> — телефоны команды, приславшие взятия или трек.</li>
+        </ul>
+
+        <h3>Устройства</h3>
+        <p>
+          Значок платформы (Android, iPhone, или телефон, если платформа неизвестна)
+          и номер. Номера те же, что на карте гонки: сначала телефоны с треком по
+          первой точке GPS, затем телефоны только со взятиями. На уже открытой
+          карте телефон, появившийся во время просмотра, получает следующий номер —
+          если номера не совпадают, снимите и снова выберите команду на карте. Наведите на значок,
+          чтобы увидеть полный идентификатор устройства. Если телефонов два и
+          больше, под фильтрами событий появляется фильтр по устройствам. Судейские
+          сканы и строки «Старт/Финиш» к устройствам команды не относятся — их
+          скрывает только фильтр по типу.
+        </p>
+
+        <h3>Взятие КП <span class="kind kind-mark">КП</span></h3>
+        <ul>
+          <li>Номер КП; у старт- и финиш-КП рядом подпись start/finish.</li>
+          <li>
+            <span class="warn">id 123?</span> — КП с таким id нет в легенде гонки
+            (удалён или прислан с ошибкой). Взятие всё равно сохранено.
+          </li>
+          <li>
+            <span class="badge ok">verified</span> — телефон прочитал код с чипа
+            именно этого КП. <span class="badge bad">не верифиц.</span> — код не
+            подтверждён: не тот чип, чип без кода или фото-взятие.
+          </li>
+          <li><span class="badge">фото</span> — взятие по фотографии, кадры показаны в деталях.</li>
+          <li>
+            <span class="badge warn-b">не полный</span> — приложение отметило, что
+            на КП отсканированы не все участники.
+          </li>
+          <li>
+            <span class="badge warn-b">часы спешат на …</span> /
+            <span class="badge warn-b">часы отстают на …</span> — часы телефона
+            расходятся с доверенным временем больше чем на минуту. В подсказке оба
+            времени. Время события уже взято по доверенному.
+          </li>
+          <li>
+            <b>Состав (N/M)</b> — N участников в составе взятия, M ожидалось.
+            В N входят и «без снимка» — участник отмечен, но его браслет не
+            прочитан, поэтому 4/4 не значит, что прочитаны все четыре браслета.
+          </li>
+          <li>Координаты в скобках — где телефон был в момент взятия.</li>
+        </ul>
+
+        <h3>Судья <span class="kind kind-judge">Судья</span></h3>
+        <ul>
+          <li>
+            Скан браслета судейской станцией (start или finish). Попадает сюда, если
+            браслет есть среди чипов команды.
+          </li>
+          <li>
+            «№ участника» показан, только если номер, определённый телефоном судьи,
+            отличается от номера браслета по базе сервера, или браслет в базе не
+            найден. <span class="warn">Оранжевый</span> — номера разошлись: скорее
+            всего, у судьи была устаревшая база браслетов.
+          </li>
+          <li>Судейские сканы не влияют на время старта и финиша и не попадают в протокол.</li>
+        </ul>
+
+        <h3>Трек <span class="kind kind-track">Трек</span></h3>
+        <p>
+          Один непрерывный отрезок записи GPS с одного телефона: число точек,
+          длительность и время последней точки. Новый отрезок начинается, когда
+          запись перезапускается.
+        </p>
+
+        <h3>Старт / финиш <span class="kind kind-boundary">Старт</span></h3>
+        <p>
+          Время из «Старт»/«Финиш» команды — поставлено автоматически по взятию
+          старт- или финиш-КП или задано вручную. Если оно не совпадает со временем
+          самого раннего подтверждённого взятия старт-/финиш-КП в ленте, разберитесь,
+          какое из них верное.
+        </p>
       </div>
     </div>
 

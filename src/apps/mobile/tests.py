@@ -9111,6 +9111,37 @@ def test_mark_upload_epoch_zero_mark_does_not_poison_boundary_time(
 
 
 @pytest.mark.django_db
+def test_mark_upload_zero_trusted_ms_falls_back_to_wall_ms(
+    client, settings, django_user_model
+):
+    """trusted_ms=0 counts as "no trusted time": the mark falls back to
+    wall_ms instead of being dropped from the aggregate."""
+    import json
+
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    race, team = _make_team_in_race(django_user_model, slug="boundary-start-zero-tr")
+    cp, cp_code = _make_cp_with_tag(race, cp_type="start")
+    mark = _valid_mark(
+        id="mk-start-zero-trusted",
+        checkpoint_id=cp.id,
+        cp_code=cp_code,
+        trusted_ms=0,
+        wall_ms=7000,
+    )
+    body = json.dumps(
+        {"team_id": team.id, "source_install_id": "ph", "marks": [mark]}
+    ).encode()
+
+    response = _signed_post(client, _marks_path(race.id), SECRET, body)
+    assert response.status_code == 200
+
+    team.refresh_from_db()
+    assert team.start_time == 7000
+
+
+@pytest.mark.django_db
 def test_mark_upload_no_boundary_marks_leaves_times_untouched(
     client, settings, django_user_model
 ):

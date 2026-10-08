@@ -1,4 +1,4 @@
-/* App data pages: client-side team search (overview) and event-kind
+/* App data pages: client-side team search (overview) and event-kind/device
    filters (team timeline). Server renders everything; this only hides rows. */
 (function () {
   "use strict";
@@ -17,15 +17,24 @@
     });
   }
 
-  // Team timeline: show/hide events by kind.
+  // Team timeline: show/hide events by kind and by device. A row without a
+  // device (judge scan, start/finish) follows only the kind filter.
   var filters = document.getElementById("eventFilters");
   if (filters) {
+    var checkedValues = function (attr) {
+      var values = {};
+      filters.querySelectorAll("input[" + attr + "]").forEach(function (box) {
+        values[box.getAttribute(attr)] = box.checked;
+      });
+      return values;
+    };
     filters.addEventListener("change", function () {
-      filters.querySelectorAll("input[data-kind]").forEach(function (box) {
-        var kind = box.getAttribute("data-kind");
-        document.querySelectorAll(".ev-" + kind).forEach(function (row) {
-          row.hidden = !box.checked;
-        });
+      var kinds = checkedValues("data-kind");
+      var devices = checkedValues("data-device");
+      document.querySelectorAll("tr.ev").forEach(function (row) {
+        var device = row.getAttribute("data-device");
+        var deviceOn = !device || devices[device] !== false;
+        row.hidden = !(kinds[row.getAttribute("data-kind")] && deviceOn);
       });
     });
   }

@@ -245,20 +245,41 @@
   // Stats are those of track load, advanced by the fixes the positions poll
   // delivers (appendLivePoint). The poll carries only the team's single
   // newest fix, so while two phones both send, the one whose fix isn't the
-  // newest gets no updates and its age can still grow: "N мин назад" is the
+  // newest gets no updates and its age can still grow: the age shown is the
   // age of the newest fix *this page has seen* from that phone, and points
   // counts load-time raw points plus poll-delivered new fixes (a strictly
   // newer gps_time_ms — not every upload, not a re-delivered row).
   // last_gps_time_ms is the phone's clock (may run ahead), hence the clamp.
+  // Platform logo from the server-rendered <template id="rmDeviceIcon-…">
+  // (shared with the app-data pages). platform is a client-supplied header,
+  // so it only selects a key and is never interpolated into the markup.
+  // Compact age: minutes below 120, hours below 48, then days (floored).
+  function formatAge(ageMs) {
+    var minutes = Math.floor(ageMs / 60000);
+    if (minutes < 120) return minutes + "м";
+    var hours = Math.floor(minutes / 60);
+    if (hours < 48) return hours + "ч";
+    return Math.floor(hours / 24) + "д";
+  }
+
+  function deviceIconKey(platform) {
+    var key = String(platform || "").trim().toLowerCase();
+    return key === "android" || key === "ios" ? key : "phone";
+  }
+
+  function deviceIconHtml(key) {
+    var tpl = document.getElementById("rmDeviceIcon-" + key);
+    return tpl ? tpl.innerHTML.trim() : "";
+  }
+
   function renderDevices(teamId) {
     var track = selected[teamId] ? tracks[teamId] : null;
     if (!track || track.devices.length < 2) return "";
     var now = Date.now();
     var items = track.devices.map(function (device, idx) {
       var ageMs = Math.max(0, now - device.last_gps_time_ms);
-      var parts = ["Устр. " + escapeHtml(device.index)];
-      if (device.platform) parts.push(escapeHtml(device.platform));
-      parts.push(Math.floor(ageMs / 60000) + " мин назад");
+      var iconKey = deviceIconKey(device.platform);
+      var parts = [formatAge(ageMs)];
       parts.push(device.points + " " + pluralRu(device.points, ["точка", "точки", "точек"]));
       var classes = "rm-device" + (ageMs > STALE_MS ? " is-stale" : "");
       var checked = device.hidden ? "" : " checked";
@@ -266,6 +287,10 @@
         '<label class="' + classes + '">' +
         '<input type="checkbox" data-team-id="' + escapeHtml(teamId) + '"' +
         ' data-device-idx="' + idx + '"' + checked + ">" +
+        '<span class="rm-dev rm-dev-' + iconKey + '" title="' +
+        escapeHtml((device.platform || "платформа неизвестна") + " · " +
+          (device.install_id || "install_id пуст")) + '">' +
+        deviceIconHtml(iconKey) + escapeHtml(device.index) + "</span>" +
         "<span>" + parts.join(" · ") + "</span>" +
         "</label>"
       );
