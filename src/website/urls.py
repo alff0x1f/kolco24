@@ -24,6 +24,8 @@ from apps.race.views import (
     RacePaymentsExportView,
     RacePaymentsView,
     RacePostEditView,
+    RaceStartsDataView,
+    RaceStartsView,
     RaceTeamsAdminExportView,
     RaceTeamsAdminView,
     RaceTeamsView,
@@ -133,6 +135,16 @@ urlpatterns = [
         "race/<slug:race_slug>/map/",
         RaceMapView.as_view(),
         name="race_map",
+    ),
+    path(
+        "race/<slug:race_slug>/starts/",
+        RaceStartsView.as_view(),
+        name="race_starts",
+    ),
+    path(
+        "race/<slug:race_slug>/starts/data/",
+        RaceStartsDataView.as_view(),
+        name="race_starts_data",
     ),
     path(
         "race/<slug:race_slug>/payments/",

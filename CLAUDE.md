@@ -192,6 +192,16 @@ Django 4.2 project. Source lives entirely under `src/`, with `manage.py` at `src
   **text** cell goes through `_csv_safe`, which prefixes an apostrophe to a value starting with `= + - @ \t \r`
   (a team name is user-supplied, so `=1+1` would otherwise become a live formula; `csv.writer` protects the file
   structure, not the spreadsheet). Numbers are passed through untouched, so a negative amount keeps its sign.
+  `RaceStartsView`/`RaceStartsDataView` back the organizer-only «Старты» page for watching starts live: `race_starts`
+  (`race/<slug>/starts/`, template `src/templates/race/starts.html`, assets `src/static/css/starts.css` +
+  `src/static/js/starts.js`, `#raceStartsConfig` island with only `dataUrl`) and `race_starts_data`
+  (`race/<slug>/starts/data/`, JSON polled every 20 s). Both gated by `_load_race_for_admin`. The **only** source is
+  `Team.start_time` (what the protocol reads); the expected set is paid teams (`paid_people > 0`, as on the checklist),
+  sorted by `start_number_key`. `start_time <= 0` or an unformattable value → both `start_time_ms`/`start_time` `null`
+  (counts as not started). The clock string is formatted server-side by `_start_clock` with `timezone.localtime` —
+  deliberately not `app_data.format_ms`, which uses the process time zone. `server_time_ms` is the page's "now" for
+  «последний старт N мин назад», the 15-min pace and the chart's right edge. All counting, the category filter, the
+  inline-SVG cumulative chart and the «Ждём»/«Стартовали» lists live in the JS; team names go in via `textContent`.
   `RaceMapView`/`RaceMapPositionsView`/`RaceMapTrackView` (`src/apps/race/views.py`) back the organizer-only «Карта
   гонки» page — the read side of `apps.mobile`'s `/app/race/<id>/track/` upload (`TrackPoint` rows were write-only
   until this). All three share the same `_load_and_authorize` gate as `RaceLegendEditView` (anon → `login` redirect

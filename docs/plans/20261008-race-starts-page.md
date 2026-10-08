@@ -90,12 +90,12 @@ JSON `race_starts_data`:
 - Modify: `src/website/urls.py`
 - Create: `src/apps/race/test_starts.py`
 
-- [ ] добавить `RaceStartsDataView` в `src/apps/race/views.py`: гейт `_load_race_for_admin`, queryset как в `RaceChecklistView`, сортировка `start_number_key`, имя `_team_display_name`
-- [ ] сформировать JSON из Technical Details; `server_time_ms` и `server_time` (`HH:MM`, локальное) из `timezone.now()`; хелпер форматирования с комментарием про `format_ms`
-- [ ] зарегистрировать `race/<slug:race_slug>/starts/data/` как `race_starts_data` в `src/website/urls.py` рядом с `race_map`
-- [ ] тесты доступа: аноним → редирект на `login` с `next`; пользователь без роли → 403; `RaceAdmin` MODERATOR → 403 (правило `can_edit_race`); `RaceAdmin` ADMIN → 200; суперюзер без `RaceAdmin` → 403
-- [ ] тесты содержимого: оплаченная команда есть; `paid_people=0`, удалённая (`is_deleted=True`) и команда другой гонки — нет; `start_time=0` и отрицательное → оба поля `null`; `start_time=2**62` (overflow) → оба поля `null`; `paid_people` — `int`; известный момент → те же мс и `HH:MM:SS` в `TIME_ZONE` проекта; порядок `"9"` раньше `"10"`, нечисловой номер в конце; ключи `server_time_ms`/`server_time`/`categories` на месте, категории только этой гонки
-- [ ] `uv run pytest src/apps/race/test_starts.py --reuse-db` — зелёный
+- [x] добавить `RaceStartsDataView` в `src/apps/race/views.py`: гейт `_load_race_for_admin`, queryset как в `RaceChecklistView`, сортировка `start_number_key`, имя `_team_display_name`
+- [x] сформировать JSON из Technical Details; `server_time_ms` и `server_time` (`HH:MM`, локальное) из `timezone.now()`; хелпер форматирования с комментарием про `format_ms`
+- [x] зарегистрировать `race/<slug:race_slug>/starts/data/` как `race_starts_data` в `src/website/urls.py` рядом с `race_map`
+- [x] тесты доступа: аноним → редирект на `login` с `next`; пользователь без роли → 403; `RaceAdmin` MODERATOR → 403 (правило `can_edit_race`); `RaceAdmin` ADMIN → 200; суперюзер без `RaceAdmin` → 403
+- [x] тесты содержимого: оплаченная команда есть; `paid_people=0`, удалённая (`is_deleted=True`) и команда другой гонки — нет; `start_time=0` и отрицательное → оба поля `null`; `start_time=2**62` (overflow) → оба поля `null`; `paid_people` — `int`; известный момент → те же мс и `HH:MM:SS` в `TIME_ZONE` проекта; порядок `"9"` раньше `"10"`, нечисловой номер в конце; ключи `server_time_ms`/`server_time`/`categories` на месте, категории только этой гонки
+- [x] `uv run pytest src/apps/race/test_starts.py --reuse-db` — зелёный
 
 ### Task 2: страница `race_starts` и кнопка на странице гонки
 
@@ -106,31 +106,31 @@ JSON `race_starts_data`:
 - Modify: `src/templates/race/race_page.html`
 - Modify: `src/apps/race/test_starts.py`
 
-- [ ] добавить `RaceStartsView`: гейт `_load_race_for_admin`, контекст `race` + `"starts_config": _safe_json({"dataUrl": reverse("race_starts_data", ...)})`; в шаблоне руками `<script id="raceStartsConfig" type="application/json">{{ starts_config }}</script>` (как `map.html:63`)
-- [ ] зарегистрировать `race/<slug:race_slug>/starts/` как `race_starts`
-- [ ] шаблон `starts.html` на `base-2.html`: обёртка `.race-starts`, `extra_head` с `starts.css`, каркас (плитки, строка категорий, контейнер графика, две колонки, место для статуса связи), `starts.js` с `defer`; ссылка «← к гонке»
-- [ ] кнопка «Старты» в админском блоке `race_page.html` рядом с «Карта гонки»
-- [ ] тесты: доступ к странице (аноним → login, без роли → 403, MODERATOR → 403, суперюзер без `RaceAdmin` → 403, ADMIN → 200); в HTML есть `raceStartsConfig` с URL данных; кнопка «Старты» видна админу и не видна обычному пользователю
-- [ ] прогнать тесты — зелёные
+- [x] добавить `RaceStartsView`: гейт `_load_race_for_admin`, контекст `race` + `"starts_config": _safe_json({"dataUrl": reverse("race_starts_data", ...)})`; в шаблоне руками `<script id="raceStartsConfig" type="application/json">{{ starts_config }}</script>` (как `map.html:63`)
+- [x] зарегистрировать `race/<slug:race_slug>/starts/` как `race_starts`
+- [x] шаблон `starts.html` на `base-2.html`: обёртка `.race-starts`, `extra_head` с `starts.css`, каркас (плитки, строка категорий, контейнер графика, две колонки, место для статуса связи), `starts.js` с `defer`; ссылка «← к гонке»
+- [x] кнопка «Старты» в админском блоке `race_page.html` рядом с «Карта гонки»
+- [x] тесты: доступ к странице (аноним → login, без роли → 403, MODERATOR → 403, суперюзер без `RaceAdmin` → 403, ADMIN → 200); в HTML есть `raceStartsConfig` с URL данных; кнопка «Старты» видна админу и не видна обычному пользователю
+- [x] прогнать тесты — зелёные
 
 ### Task 3: стили `starts.css`
 
 **Files:**
 - Create: `src/static/css/starts.css`
 
-- [ ] стили под `.race-starts` (без голого `.page`): плитки, чипы категорий (активный выделен), блок графика, две колонки, на ≤720 px одна колонка; подсветка новой строки (CSS-анимация фона); заметка о связи
-- [ ] проверить, что Django-тесты по-прежнему зелёные (CSS не тестируется)
+- [x] стили под `.race-starts` (без голого `.page`): плитки, чипы категорий (активный выделен), блок графика, две колонки, на ≤720 px одна колонка; подсветка новой строки (CSS-анимация фона); заметка о связи
+- [x] проверить, что Django-тесты по-прежнему зелёные (CSS не тестируется)
 
 ### Task 4: `starts.js` — опрос, счётчики, списки
 
 **Files:**
 - Create: `src/static/js/starts.js`
 
-- [ ] читать `#raceStartsConfig`; `fetch(dataUrl, {credentials: "same-origin", headers: {Accept: "application/json"}})` сразу и раз в 20 с
-- [ ] обработка ошибок: сеть/5xx → заметка «нет связи, данные на …», данные остаются; 403, 404, `response.redirected` или не-JSON → стоп опроса и сообщение
-- [ ] состояние: выбранная категория, строка поиска, множество id стартовавших с прошлого опроса (для подсветки)
-- [ ] рендер плиток (X из Y, %, ждём, темп за 15 мин), «последний старт N мин назад» от `server_time_ms`, не меньше 0
-- [ ] рендер строки категорий с фильтром; списков «Ждём» (поиск по номеру/названию) и «Стартовали» (новые сверху, подсветка новых); только `textContent`; перерисовка без сброса прокрутки колонок
+- [x] читать `#raceStartsConfig`; `fetch(dataUrl, {credentials: "same-origin", headers: {Accept: "application/json"}})` сразу и раз в 20 с
+- [x] обработка ошибок: сеть/5xx → заметка «нет связи, данные на …», данные остаются; 403, 404, `response.redirected` или не-JSON → стоп опроса и сообщение
+- [x] состояние: выбранная категория, строка поиска, множество id стартовавших с прошлого опроса (для подсветки)
+- [x] рендер плиток (X из Y, %, ждём, темп за 15 мин), «последний старт N мин назад» от `server_time_ms`, не меньше 0
+- [x] рендер строки категорий с фильтром; списков «Ждём» (поиск по номеру/названию) и «Стартовали» (новые сверху, подсветка новых); только `textContent`; перерисовка без сброса прокрутки колонок
 - [ ] проверка руками в браузере на тестовой гонке (тестов JS в проекте нет)
 
 ### Task 5: график в `starts.js`
@@ -138,20 +138,21 @@ JSON `race_starts_data`:
 **Files:**
 - Modify: `src/static/js/starts.js`
 
-- [ ] накопительная ступенчатая линия inline SVG по отфильтрованным стартам: X от первого старта до `max(последний старт, server_time_ms)`, Y от 0 до числа ожидаемых, пунктир на уровне Y
-- [ ] подписи осей: `start_time` первого старта и `server_time`, значения 0 и Y; цвета из CSS-переменных темы
-- [ ] пустое состояние «Стартов пока нет»; один старт — линия не ломается (ширина интервала 0 → не делить на ноль)
-- [ ] перерисовка при опросе и смене фильтра; проверка руками
+- [x] накопительная ступенчатая линия inline SVG по отфильтрованным стартам: X от первого старта до `max(последний старт, server_time_ms)`, Y от 0 до числа ожидаемых, пунктир на уровне Y
+- [x] подписи осей: `start_time` первого старта и `server_time`, значения 0 и Y; цвета из CSS-переменных темы
+- [x] пустое состояние «Стартов пока нет»; один старт — линия не ломается (ширина интервала 0 → не делить на ноль)
+- [x] перерисовка при опросе и смене фильтра
+- [ ] проверка руками
 
 ### Task 6: Verify acceptance criteria
 - [ ] все пункты Overview и Technical Details реализованы
 - [ ] крайние случаи: нет оплаченных команд, никто не стартовал, все стартовали, команда без названия, нечисловые номера, мусорный `start_time`
-- [ ] `uv run pytest` — весь набор зелёный
-- [ ] `make lint` — чисто
-- [ ] нет внешних ресурсов на странице (CDN, шрифты)
+- [x] `uv run pytest` — весь набор зелёный
+- [x] `make lint` — чисто
+- [x] нет внешних ресурсов на странице (CDN, шрифты)
 
 ### Task 7: [Final] Update documentation
-- [ ] абзац в `CLAUDE.md`, раздел `apps.race`: `RaceStartsView`/`RaceStartsDataView`, URL-ы, источник только `Team.start_time`, знаменатель `paid_people > 0`, время форматирует сервер, `server_time_ms` как «сейчас», опрос 20 с, гейт `_load_race_for_admin`
+- [x] абзац в `CLAUDE.md`, раздел `apps.race`: `RaceStartsView`/`RaceStartsDataView`, URL-ы, источник только `Team.start_time`, знаменатель `paid_people > 0`, время форматирует сервер, `server_time_ms` как «сейчас», опрос 20 с, гейт `_load_race_for_admin`
 - [ ] move this plan to `docs/plans/completed/`
 
 ## Post-Completion

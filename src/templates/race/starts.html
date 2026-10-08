@@ -1,0 +1,77 @@
+{% extends "website/base-2.html" %}
+{% load static %}
+
+{% block title %}Старты — {{ race.name }} — Кольцо 24{% endblock %}
+
+{% block extra_head %}
+<link href="{% static 'css/starts.css' %}" rel="stylesheet">
+{% endblock %}
+
+{% block content %}
+<div class="race-starts">
+
+  <nav class="breadcrumb">
+    <a href="/">Кольцо&nbsp;24</a>
+    <span class="sep">/</span>
+    <a href="{% url 'race' race.slug %}">{{ race.name }}</a>
+    <span class="sep">/</span>
+    <span class="cur">Старты</span>
+  </nav>
+
+  <div class="rs-head">
+    <h1>Старты</h1>
+    <div class="rs-status" id="rsStatus" hidden></div>
+  </div>
+
+  <div class="rs-tiles">
+    <div class="rs-tile">
+      <div class="rs-tile-label">Стартовало</div>
+      <div class="rs-tile-value" id="rsStarted">—</div>
+      <div class="rs-tile-sub" id="rsStartedSub"></div>
+    </div>
+    <div class="rs-tile">
+      <div class="rs-tile-label">Ждём</div>
+      <div class="rs-tile-value" id="rsWaiting">—</div>
+    </div>
+    <div class="rs-tile">
+      <div class="rs-tile-label">Последний старт</div>
+      <div class="rs-tile-value" id="rsLast">—</div>
+      <div class="rs-tile-sub" id="rsLastSub"></div>
+    </div>
+    <div class="rs-tile">
+      <div class="rs-tile-label">Темп за 15 мин</div>
+      <div class="rs-tile-value" id="rsPace">—</div>
+    </div>
+  </div>
+
+  <div class="rs-cats" id="rsCats"></div>
+
+  <section class="rs-card">
+    <h2>Динамика</h2>
+    <div class="rs-chart" id="rsChart"><p class="rs-empty">Загрузка…</p></div>
+  </section>
+
+  <div class="rs-cols">
+    <section class="rs-card">
+      <div class="rs-col-head">
+        <h2>Ждём <span class="rs-count" id="rsWaitingCount"></span></h2>
+        <input class="input rs-search" id="rsSearch" type="search" placeholder="Номер или название">
+      </div>
+      <div class="rs-list" id="rsWaitingList"></div>
+    </section>
+    <section class="rs-card">
+      <div class="rs-col-head">
+        <h2>Стартовали <span class="rs-count" id="rsStartedCount"></span></h2>
+      </div>
+      <div class="rs-list" id="rsStartedList"></div>
+    </section>
+  </div>
+
+</div>
+
+<script id="raceStartsConfig" type="application/json">{{ starts_config }}</script>
+{% endblock %}
+
+{% block footer_js_include %}
+<script src="{% static 'js/starts.js' %}"></script>
+{% endblock %}
