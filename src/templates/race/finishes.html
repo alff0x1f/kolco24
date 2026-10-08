@@ -1,0 +1,84 @@
+{% extends "website/base-2.html" %}
+{% load static %}
+
+{% block title %}Финиш — {{ race.name }} — Кольцо 24{% endblock %}
+
+{% block extra_head %}
+<link href="{% static 'css/finishes.css' %}" rel="stylesheet">
+{% endblock %}
+
+{% block content %}
+<div class="race-finishes">
+
+  <nav class="breadcrumb">
+    <a href="/">Кольцо&nbsp;24</a>
+    <span class="sep">/</span>
+    <a href="{% url 'race' race.slug %}">{{ race.name }}</a>
+    <span class="sep">/</span>
+    <span class="cur">Финиш</span>
+  </nav>
+
+  <div class="rf-head">
+    <h1>Финиш</h1>
+    <div class="rf-clock" id="rfClock" title="Время сервера">--:--:--</div>
+    <div class="rf-status" id="rfStatus" hidden></div>
+  </div>
+
+  <div class="rf-tiles">
+    <div class="rf-tile">
+      <div class="rf-tile-label">Финишировало</div>
+      <div class="rf-tile-value" id="rfFinished">—</div>
+      <div class="rf-tile-sub" id="rfFinishedSub"></div>
+    </div>
+    <div class="rf-tile">
+      <div class="rf-tile-label">На дистанции</div>
+      <div class="rf-tile-value" id="rfOnCourse">—</div>
+      <div class="rf-tile-sub" id="rfOnCourseSub"></div>
+    </div>
+    <div class="rf-tile">
+      <div class="rf-tile-label">Опаздывают</div>
+      <div class="rf-tile-value" id="rfOverdue">—</div>
+      <div class="rf-tile-sub" id="rfOverdueSub"></div>
+    </div>
+    <div class="rf-tile" id="rfNoControlTile" hidden>
+      <div class="rf-tile-label">Без КВ</div>
+      <div class="rf-tile-value" id="rfNoControl">—</div>
+      <div class="rf-tile-sub">не в прогнозе</div>
+    </div>
+  </div>
+
+  <div class="rf-cats" id="rfCats"></div>
+
+  <section class="rf-card">
+    <h2>Прогноз прихода, людей</h2>
+    <div id="rfForecast"><p class="rf-empty">Загрузка…</p></div>
+    <p class="rf-note">
+      Прогноз: в среднем приходят за 40 мин до своего КВ, разброс 30 мин.
+      Опоздавшие до часа считаются в ближайшем часе, больше чем на час — не считаются.
+    </p>
+  </section>
+
+  <div class="rf-cols">
+    <section class="rf-card">
+      <div class="rf-col-head">
+        <h2>На дистанции <span class="rf-count" id="rfOnCourseCount"></span></h2>
+        <input class="input rf-search" id="rfSearch" type="search" placeholder="Номер или название">
+      </div>
+      <div class="rf-list" id="rfOnCourseList"></div>
+    </section>
+    <section class="rf-card">
+      <div class="rf-col-head">
+        <h2>Финишировали <span class="rf-count" id="rfFinishedCount"></span></h2>
+      </div>
+      <div class="rf-list" id="rfFinishedList"></div>
+    </section>
+  </div>
+
+</div>
+
+<script id="raceFinishesConfig" type="application/json">{{ finishes_config }}</script>
+{% endblock %}
+
+{% block footer_js_include %}
+<script src="{% static 'js/finishes.js' %}"></script>
+{% endblock %}

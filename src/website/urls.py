@@ -13,6 +13,8 @@ from apps.race.views import (
     RaceChecklistView,
     RaceEditView,
     RaceExtrasChecklistView,
+    RaceFinishesDataView,
+    RaceFinishesView,
     RaceLegendCodesView,
     RaceLegendEditView,
     RaceMapGpxView,
@@ -145,6 +147,16 @@ urlpatterns = [
         "race/<slug:race_slug>/starts/data/",
         RaceStartsDataView.as_view(),
         name="race_starts_data",
+    ),
+    path(
+        "race/<slug:race_slug>/finishes/",
+        RaceFinishesView.as_view(),
+        name="race_finishes",
+    ),
+    path(
+        "race/<slug:race_slug>/finishes/data/",
+        RaceFinishesDataView.as_view(),
+        name="race_finishes_data",
     ),
     path(
         "race/<slug:race_slug>/payments/",

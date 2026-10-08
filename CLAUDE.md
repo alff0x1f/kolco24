@@ -202,6 +202,19 @@ Django 4.2 project. Source lives entirely under `src/`, with `manage.py` at `src
   deliberately not `app_data.format_ms`, which uses the process time zone. `server_time_ms` is the page's "now" for
   «последний старт N мин назад», the 15-min pace and the chart's right edge. The header clock is `server_time` advanced by `performance.now()` — no client time-zone logic. All counting, the category filter, the
   inline-SVG cumulative chart and the «Ждём»/«Стартовали» lists live in the JS; team names go in via `textContent`.
+  `RaceFinishesView`/`RaceFinishesDataView` back its twin, the organizer-only «Финиш» page (`race_finishes`,
+  `race/<slug>/finishes/`, `finishes.html`/`.css`/`.js`, `#raceFinishesConfig`; `race_finishes_data`, JSON polled every
+  20 s; same gate, team set and `_start_clock` null rules). It also gives the kitchen an **hourly forecast of arriving
+  people**. A team's own КВ is `start_time + Category.control_time` (minutes; `0` = none → state `no_control`, out of the
+  forecast). Unlike «Старты», the server computes the states (`finished`/`not_started`/`no_control`/`overdue`/
+  `on_course` + `overdue_long`) and the forecast in the pure module `src/apps/race/finish_forecast.py`, so it is
+  pytest-tested (`test_finishes.py`). Model: time on course `D ~ N(КВ − 40, 30)` min conditioned on
+  `elapsed < D ≤ КВ` (elapsed clamped at 0), people = `paid_people` spread over clock-hour buckets `(from, to]` in
+  `TIME_ZONE`. The first bucket is partial, from now; the grid ends at `max(next hour, ceil_hour(latest КВ))`, so each
+  team's spread sums to its people. An overdue team ≤ `OVERDUE_GRACE_MIN` (60) goes whole into the first bucket; later
+  it is left out (likely dropped out without a finish mark). Constants sit at the top of the module, to tune after a
+  race. `forecast` has `"all"` plus a key for **every** category on one shared grid. One `now` feeds the states and
+  `server_time_ms`. The JS poll/error/clock code is **duplicated** from `starts.js` on purpose — no shared module.
   `RaceMapView`/`RaceMapPositionsView`/`RaceMapTrackView` (`src/apps/race/views.py`) back the organizer-only «Карта
   гонки» page — the read side of `apps.mobile`'s `/app/race/<id>/track/` upload (`TrackPoint` rows were write-only
   until this). All three share the same `_load_and_authorize` gate as `RaceLegendEditView` (anon → `login` redirect

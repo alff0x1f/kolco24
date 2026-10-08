@@ -1,0 +1,229 @@
+/* Страница финиша гонки — /race/<slug>/finishes/
+   Оболочку (.breadcrumb, .input) даёт theme-2.css. Всё под .race-finishes. */
+
+.race-finishes {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 20px 16px 56px;
+}
+
+.race-finishes .rf-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px 16px;
+  margin: 10px 0 18px;
+}
+.race-finishes h1 {
+  font-size: 24px;
+  font-weight: 600;
+  color: var(--ink);
+}
+.race-finishes .rf-clock {
+  font-size: 24px;
+  font-weight: 500;
+  color: var(--ink-soft);
+  font-variant-numeric: tabular-nums;
+}
+.race-finishes .rf-status {
+  font-size: 13px;
+  color: var(--warn);
+  background: var(--warn-bg);
+  border-radius: 8px;
+  padding: 4px 10px;
+}
+.race-finishes .rf-status.is-fatal {
+  color: var(--danger);
+  background: var(--danger-bg);
+}
+
+/* ── Плитки ──────────────────────────────────────────── */
+.race-finishes .rf-tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px;
+  margin-bottom: 14px;
+}
+.race-finishes .rf-tile {
+  background: var(--paper-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  padding: 14px 16px;
+}
+.race-finishes .rf-tile-label {
+  font-size: 12px;
+  color: var(--muted);
+  margin-bottom: 4px;
+}
+.race-finishes .rf-tile-value {
+  font-size: 22px;
+  font-weight: 600;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.race-finishes .rf-tile-sub {
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 2px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Категории (фильтр) ──────────────────────────────── */
+.race-finishes .rf-cats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+.race-finishes .rf-cat {
+  font: inherit;
+  font-size: 13px;
+  color: var(--ink-soft);
+  background: var(--paper-2);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 5px 12px;
+  cursor: pointer;
+  font-variant-numeric: tabular-nums;
+}
+.race-finishes .rf-cat:hover { border-color: var(--primary-2); }
+.race-finishes .rf-cat.is-active {
+  color: #fff;
+  background: var(--primary);
+  border-color: var(--primary);
+}
+
+/* ── Карточки ───────────────────────────────── */
+.race-finishes .rf-card {
+  background: var(--paper-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  padding: 14px 16px;
+  margin-bottom: 14px;
+  min-width: 0;
+}
+.race-finishes .rf-card h2 {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--muted);
+  margin-bottom: 10px;
+}
+.race-finishes .rf-count {
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+.race-finishes .rf-empty {
+  color: var(--muted);
+  font-size: 14px;
+  padding: 24px 0;
+  text-align: center;
+}
+
+/* ── Две колонки ─────────────────────────────────────── */
+.race-finishes .rf-cols {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+.race-finishes .rf-col-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.race-finishes .rf-col-head h2 { margin-bottom: 0; }
+.race-finishes .rf-search { max-width: 220px; }
+.race-finishes .rf-list {
+  max-height: 60vh;
+  overflow-y: auto;
+}
+.race-finishes .rf-row {
+  display: grid;
+  grid-template-columns: 64px 44px 1fr auto;
+  gap: 8px;
+  align-items: baseline;
+  padding: 7px 4px;
+  border-top: 1px solid var(--line-soft);
+  font-size: 14px;
+}
+.race-finishes .rf-row:first-child { border-top: none; }
+.race-finishes .rf-row-time,
+.race-finishes .rf-row-num {
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+  font-weight: 500;
+}
+.race-finishes .rf-row-name {
+  color: var(--ink-soft);
+  overflow-wrap: anywhere;
+}
+.race-finishes .rf-row-cat {
+  color: var(--muted);
+  font-size: 12px;
+  white-space: nowrap;
+}
+.race-finishes .rf-row.is-new { animation: rf-flash 6s ease-out; }
+
+@keyframes rf-flash {
+  from { background: #e3f6ec; }
+  to   { background: transparent; }
+}
+
+/* ── Прогноз ─────────────────────────────────────────── */
+.race-finishes .rf-fc-row {
+  display: grid;
+  grid-template-columns: 112px 48px 1fr;
+  gap: 10px;
+  align-items: center;
+  padding: 5px 0;
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+}
+.race-finishes .rf-fc-hour { color: var(--ink-soft); }
+.race-finishes .rf-fc-people {
+  color: var(--ink);
+  font-weight: 600;
+  text-align: right;
+}
+.race-finishes .rf-fc-bar {
+  height: 14px;
+  border-radius: 4px;
+  background: var(--primary-2);
+  opacity: .7;
+  min-width: 2px;
+}
+.race-finishes .rf-fc-total {
+  border-top: 1px solid var(--line-soft);
+  margin-top: 4px;
+  padding-top: 8px;
+}
+.race-finishes .rf-note {
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 10px;
+}
+
+/* ── Строки на дистанции ─────────────────────────────── */
+.race-finishes .rf-row-left {
+  color: var(--muted);
+  font-size: 12px;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.race-finishes .rf-row.is-overdue .rf-row-left,
+.race-finishes .rf-row.is-overdue .rf-row-num { color: var(--danger); }
+.race-finishes .rf-row.is-long { opacity: .55; }
+.race-finishes .rf-row.is-long .rf-row-left,
+.race-finishes .rf-row.is-long .rf-row-num { color: var(--muted); }
+.race-finishes .rf-row-wide { grid-template-columns: 64px 44px 1fr auto auto; }
+
+@media (max-width: 720px) {
+  .race-finishes .rf-cols { grid-template-columns: 1fr; }
+  .race-finishes .rf-search { max-width: none; width: 100%; }
+  .race-finishes .rf-list { max-height: none; }
+  .race-finishes .rf-row-wide { grid-template-columns: 64px 44px 1fr auto; }
+  .race-finishes .rf-row-wide .rf-row-left { grid-column: 1 / -1; }
+}

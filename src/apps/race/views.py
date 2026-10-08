@@ -28,6 +28,7 @@ from django.views import View
 from django.views.decorators.cache import never_cache
 
 from apps.mobile.models import AppInstall, Mark, TrackPoint
+from apps.race import finish_forecast
 from apps.race.app_data import build_overview, build_team_timeline
 from apps.race.finance import csv_rows, extras_catalog, filter_rows, payment_rows
 from apps.race.forms import RaceForm
@@ -1806,6 +1807,105 @@ class RaceStartsDataView(View):
                 "server_time": timezone.localtime(now).strftime("%H:%M:%S"),
                 "categories": categories,
                 "teams": rows,
+            }
+        )
+
+
+class RaceFinishesView(View):
+    """Organizer-only «Финиш» page: live finishes and the arrival forecast.
+
+    A thin shell — ``finishes.js`` polls :class:`RaceFinishesDataView`,
+    which also computes the forecast.
+    """
+
+    def get(self, request, race_slug):
+        race, response = _load_race_for_admin(request, race_slug)
+        if response is not None:
+            return response
+        data_url = reverse("race_finishes_data", kwargs={"race_slug": race.slug})
+        context = {"race": race, "finishes_config": _safe_json({"dataUrl": data_url})}
+        return render(request, "race/finishes.html", context)
+
+
+class RaceFinishesDataView(View):
+    """JSON for the «Финиш» page: paid teams, their states and the forecast.
+
+    A team's КВ is its own start plus ``Category.control_time``. The forecast
+    is built here (``finish_forecast``) so it can be tested; one ``now`` feeds
+    both the states and ``server_time_ms``.
+    """
+
+    def get(self, request, race_slug):
+        race, response = _load_race_for_admin(request, race_slug)
+        if response is not None:
+            return response
+
+        now = timezone.now()
+        now_ms = int(now.timestamp() * 1000)
+        teams = Team.objects.filter(
+            category2__race=race, paid_people__gt=0
+        ).select_related("owner", "category2")
+        rows = []
+        forecast_teams = []
+        for team in sorted(teams, key=start_number_key):
+            start_clock = _start_clock(team.start_time)
+            finish_clock = _start_clock(team.finish_time)
+            start_ms = team.start_time if start_clock else None
+            control_min = team.category2.control_time if team.category2 else 0
+            deadline_ms = finish_forecast.deadline_ms(start_ms, control_min)
+            deadline_clock = _start_clock(deadline_ms) if deadline_ms else None
+            if deadline_clock is None:
+                # A КВ past the formattable range can't be placed on the grid.
+                deadline_ms = None
+                control_min = 0
+            state, overdue_long = finish_forecast.team_state(
+                start_ms,
+                team.finish_time if finish_clock else None,
+                control_min,
+                now_ms,
+            )
+            people = int(team.paid_people)
+            rows.append(
+                {
+                    "id": team.id,
+                    "start_number": team.start_number,
+                    "name": _team_display_name(team),
+                    "category_id": team.category2_id,
+                    "paid_people": people,
+                    "start_time_ms": start_ms,
+                    "start_time": start_clock,
+                    "finish_time_ms": team.finish_time if finish_clock else None,
+                    "finish_time": finish_clock,
+                    "deadline_ms": deadline_ms,
+                    "deadline": deadline_clock[:5] if deadline_clock else None,
+                    "state": state,
+                    "overdue_long": overdue_long,
+                }
+            )
+            forecast_teams.append(
+                {
+                    "category_id": team.category2_id,
+                    "people": people,
+                    "start_ms": start_ms,
+                    "control_min": control_min,
+                    "state": state,
+                    "overdue_long": overdue_long,
+                }
+            )
+        categories = [
+            {"id": c.id, "code": c.code, "name": c.name, "control_time": c.control_time}
+            for c in Category.objects.filter(race=race).order_by("order", "id")
+        ]
+        forecast = finish_forecast.build_forecast(
+            forecast_teams, [c["id"] for c in categories], now_ms
+        )
+        return JsonResponse(
+            {
+                "server_time_ms": now_ms,
+                "server_time": timezone.localtime(now).strftime("%H:%M:%S"),
+                "categories": categories,
+                "teams": rows,
+                "forecast": forecast,
             }
         )
 
