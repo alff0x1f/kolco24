@@ -38,6 +38,11 @@ make build-push TAG=v1.2.3
 make login                # auth to registry
 ```
 
+**No external network resources**: the server must also run offline at the race start (LAN mode), so pages load
+nothing from the internet. The Rubik font is self-hosted: `src/static/css/fonts.css` + variable woff2 files in
+`src/static/fonts/rubik/` (Google Fonts v31, cyrillic/latin subsets, OFL). Don't add Google Fonts or CDN links. The
+one known exception is the map tiles in `race_map.js` (OSM/OpenTopoMap).
+
 **Vendored editor assets**: EasyMDE is pinned to 2.18.0. Font Awesome is pinned
 to 6.5.2; keep `fontawesome.min.css`, `solid.min.css`, and both solid webfonts
 from that same release. Files under `src/static/vendor/leaflet/`,
