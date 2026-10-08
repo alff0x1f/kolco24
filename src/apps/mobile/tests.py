@@ -9965,6 +9965,37 @@ def test_member_tag_bind_unknown_uid_with_number_creates_201(
         "code": bytes(tag.code).hex(),
     }
     assert len(response.json()["code"]) == 32
+    assert tag.last_seen_at is not None
+
+
+@pytest.mark.django_db
+def test_member_tag_bind_revives_aged_out_tag(
+    client, signed_app_keys, django_user_model
+):
+    from datetime import timedelta
+
+    from django.utils import timezone
+
+    from apps.mobile.versioning import active_member_tags
+    from website.models.tag import Tag
+
+    race, _, raw, _ = _make_admin_race(django_user_model, "bind-revive")
+    now = timezone.now()
+    Tag.objects.create(number=1, nfc_uid="04F1", last_seen_at=now)
+    old = Tag.objects.create(
+        number=2, nfc_uid="04F2", last_seen_at=now - timedelta(days=90)
+    )
+
+    lookup = _bind(client, race, raw, "04F2", None)
+    assert lookup.status_code == 200
+    old.refresh_from_db()
+    assert old.last_seen_at < now - timedelta(days=89)
+
+    response = _bind(client, race, raw, "04F2", 2)
+    assert response.status_code == 200
+    old.refresh_from_db()
+    assert old.last_seen_at == now
+    assert old in active_member_tags()
 
 
 @pytest.mark.django_db

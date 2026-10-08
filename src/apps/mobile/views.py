@@ -15,7 +15,7 @@ from django.conf import settings
 from django.contrib.auth import authenticate
 from django.core.files.base import ContentFile
 from django.db import IntegrityError, transaction
-from django.db.models import Count, F, Min, Prefetch, Q, Sum
+from django.db.models import Count, F, Max, Min, Prefetch, Q, Sum
 from django.db.models.functions import Coalesce, NullIf
 from django.http import HttpResponseNotModified
 from django.shortcuts import get_object_or_404
@@ -359,6 +359,13 @@ class TagCreateView(AppAPIView):
 MEMBER_TAG_CODE_BYTES = 16
 
 
+def _bind_seen_at():
+    """MAX(last_seen_at) of the pool (``now`` if never scanned), so a bind puts
+    the chip into the served window without moving its floor."""
+    newest = Tag.objects.aggregate(m=Max("last_seen_at"))["m"]
+    return newest or timezone.now()
+
+
 def _new_member_code():
     return os.urandom(MEMBER_TAG_CODE_BYTES)
 
@@ -406,6 +413,9 @@ class MemberTagBindView(AppAPIView):
                 {"detail": "Браслет уже привязан к другому участнику"},
                 status=status.HTTP_409_CONFLICT,
             )
+        if number is not None:
+            tag.last_seen_at = _bind_seen_at()
+            tag.save(update_fields=["last_seen_at"])
         return self._member_tag_response(tag, status.HTTP_200_OK)
 
     def post(self, request, race_id):
@@ -428,7 +438,12 @@ class MemberTagBindView(AppAPIView):
 
         try:
             with transaction.atomic():
-                tag = Tag(number=number, nfc_uid=nfc_uid, code=_new_member_code())
+                tag = Tag(
+                    number=number,
+                    nfc_uid=nfc_uid,
+                    code=_new_member_code(),
+                    last_seen_at=_bind_seen_at(),
+                )
                 tag.save()
         except IntegrityError as original_exc:
             # Most likely a concurrent create hit the global nfc_uid unique
