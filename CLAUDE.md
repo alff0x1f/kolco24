@@ -213,8 +213,21 @@ Django 4.2 project. Source lives entirely under `src/`, with `manage.py` at `src
   `TIME_ZONE`. The first bucket is partial, from now; the grid ends at `max(next hour, ceil_hour(latest КВ))`, so each
   team's spread sums to its people. An overdue team ≤ `OVERDUE_GRACE_MIN` (60) goes whole into the first bucket; later
   it is left out (likely dropped out without a finish mark). Constants sit at the top of the module, to tune after a
-  race. `forecast` has `"all"` plus a key for **every** category on one shared grid. One `now` feeds the states and
-  `server_time_ms`. The JS poll/error/clock code is **duplicated** from `starts.js` on purpose — no shared module.
+  race. The JSON key is `timeline` (`build_timeline`): one clock-hour scale from the hour of the first finish to the
+  forecast's end, rows `{from, to, arrived, expected, now}` — past hours `arrived` only, future `expected` only, the
+  current hour both (finishes up to now + forecast bucket 0, matched **by position**, never by label: labels repeat
+  across midnight). `arrived` counts **every** finish (no-КВ categories too — the kitchen feeds everyone); a future
+  finish goes to the current hour; the scale reaches back at most `TIMELINE_BACK` (24 h), older finishes (a hand-typed
+  seconds-for-ms value) fold into one leading row with `from: null`. `"all"` plus a key for **every** category on one
+  shared grid. One `now` feeds the states, the timeline and `server_time_ms`. `_finish_rows(race, now_ms)` builds the
+  team rows for both the JSON and the print view. `RaceFinishesPrintView` (`race_finishes_print`,
+  `…/finishes/print/`, standalone `finishes_print.html` + `finishes_print.css`, no `<script>`, only the checklist-style
+  `window.print()` button) is the kitchen's A4 sheet: `?category=` (via `_selected_category`) picks
+  `timeline[str(id)]` of the **race-wide** timeline, so paper and the filtered live page show the same rows. Whole
+  people are rounded half-up (`_half_up`, matching JS `Math.round`; Python's `round` is banker's) and «Всего ≈» is the
+  rounded sum, not a sum of rounded rows. The live page links to it («Печать для кухни», `printUrl` in the config
+  island, `?category=` kept in sync with the filter). The JS poll/error/clock code is **duplicated** from `starts.js`
+  on purpose — no shared module.
   `RaceMapView`/`RaceMapPositionsView`/`RaceMapTrackView` (`src/apps/race/views.py`) back the organizer-only «Карта
   гонки» page — the read side of `apps.mobile`'s `/app/race/<id>/track/` upload (`TrackPoint` rows were write-only
   until this). All three share the same `_load_and_authorize` gate as `RaceLegendEditView` (anon → `login` redirect

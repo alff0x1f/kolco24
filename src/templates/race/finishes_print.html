@@ -1,0 +1,66 @@
+{% load static %}<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <title>Приход на финиш — {{ race.name }}{% if selected_category %} — {{ selected_category.code }}{% endif %}</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link href="{% static 'css/finishes_print.css' %}" rel="stylesheet">
+</head>
+<body class="finishes-print">
+  <form class="toolbar" method="get">
+    <a href="{% url 'race_finishes' race.slug %}">← Финиш</a>
+    <label>
+      Категория
+      <select name="category">
+        <option value="">Все</option>
+        {% for category in categories %}
+        <option value="{{ category.id }}" {% if category == selected_category %}selected{% endif %}>{{ category.code }} — {{ category.name }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <button type="submit">Обновить</button>
+    <button type="button" class="primary" onclick="window.print()">Печать</button>
+  </form>
+
+  <h1>{{ race.name }} — приход людей на финиш</h1>
+  <p class="meta">на {{ moment|date:"H:i, j E" }}{% if selected_category %} · категория {{ selected_category.code }}{% endif %}</p>
+
+  <table>
+    <thead>
+      <tr>
+        <th class="hours">Час</th>
+        <th class="cnt">Пришло</th>
+        <th class="cnt">Ожидается</th>
+        <th class="mark"></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in rows %}
+      <tr{% if row.now %} class="is-now"{% endif %}>
+        <td class="hours">{{ row.hours }}</td>
+        <td class="cnt">{% if row.arrived is not None %}{{ row.arrived }}{% endif %}</td>
+        <td class="cnt">{% if row.expected is not None %}≈ {{ row.expected }}{% endif %}</td>
+        <td class="mark">{% if row.now %}← сейчас{% endif %}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+    <tfoot>
+      <tr>
+        <td class="hours">Всего</td>
+        <td class="cnt">{{ arrived_total }}</td>
+        <td class="cnt">≈ {{ expected_total }}</td>
+        <td class="mark"></td>
+      </tr>
+    </tfoot>
+  </table>
+
+  <p class="note">
+    Прогноз: в среднем приходят за {{ mean_before }} мин до своего КВ, разброс {{ sigma }} мин.
+    {% if not_started or overdue_long or no_control %}Не учтены:
+      {% if not_started %}не стартовали — {{ not_started }} чел.{% if overdue_long or no_control %}, {% endif %}{% endif %}
+      {% if overdue_long %}опаздывающие больше часа — {{ overdue_long }} чел.{% if no_control %}, {% endif %}{% endif %}
+      {% if no_control %}без КВ на дистанции — {{ no_control }} чел.{% endif %}
+    {% endif %}
+  </p>
+</body>
+</html>

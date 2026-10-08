@@ -14,6 +14,7 @@ from apps.race.views import (
     RaceEditView,
     RaceExtrasChecklistView,
     RaceFinishesDataView,
+    RaceFinishesPrintView,
     RaceFinishesView,
     RaceLegendCodesView,
     RaceLegendEditView,
@@ -157,6 +158,11 @@ urlpatterns = [
         "race/<slug:race_slug>/finishes/data/",
         RaceFinishesDataView.as_view(),
         name="race_finishes_data",
+    ),
+    path(
+        "race/<slug:race_slug>/finishes/print/",
+        RaceFinishesPrintView.as_view(),
+        name="race_finishes_print",
     ),
     path(
         "race/<slug:race_slug>/payments/",

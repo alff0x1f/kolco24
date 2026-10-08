@@ -29,6 +29,7 @@ ON_COURSE = "on_course"
 MINUTE_MS = 60_000
 HOUR = datetime.timedelta(hours=1)
 _MIN_WINDOW_MASS = 1e-9
+TIMELINE_BACK = datetime.timedelta(hours=24)
 
 
 def deadline_ms(start_ms, control_min):
@@ -127,8 +128,12 @@ def spread_team(start_ms, control_min, people, now_ms, buckets):
     return shares
 
 
-def build_forecast(teams, category_ids, now_ms):
-    """``{"all": rows, "<category id>": rows}`` on one shared bucket grid.
+def _keys(category_ids):
+    return ["all", *map(str, category_ids)]
+
+
+def _forecast_totals(teams, category_ids, now_ms):
+    """``(buckets, {key: [people, …]})``: the forecast before labels and rounding.
 
     ``teams`` are dicts with ``category_id``, ``people``, ``start_ms``,
     ``control_min``, ``state`` and ``overdue_long``. On-course teams are
@@ -144,7 +149,7 @@ def build_forecast(teams, category_ids, now_ms):
     buckets = hour_buckets(
         now_ms, [deadline_ms(t["start_ms"], t["control_min"]) for t in counted]
     )
-    totals = {key: [0.0] * len(buckets) for key in ["all", *map(str, category_ids)]}
+    totals = {key: [0.0] * len(buckets) for key in _keys(category_ids)}
     for team in counted:
         if team["state"] == OVERDUE:
             shares = [float(team["people"])] + [0.0] * (len(buckets) - 1)
@@ -156,14 +161,112 @@ def build_forecast(teams, category_ids, now_ms):
             row = totals.setdefault(key, [0.0] * len(buckets))
             for i, share in enumerate(shares):
                 row[i] += share
-    labels = [
-        (_local(lo).strftime("%H:%M"), _local(hi).strftime("%H:%M"))
-        for lo, hi in buckets
-    ]
+    return buckets, totals
+
+
+def _label(ms):
+    return _local(ms).strftime("%H:%M")
+
+
+def build_forecast(teams, category_ids, now_ms):
+    """``{"all": rows, "<category id>": rows}`` on one shared bucket grid."""
+    buckets, totals = _forecast_totals(teams, category_ids, now_ms)
     return {
         key: [
-            {"from": start, "to": end, "people": round(people, 1)}
-            for (start, end), people in zip(labels, row)
+            {"from": _label(lo), "to": _label(hi), "people": round(people, 1)}
+            for (lo, hi), people in zip(buckets, row)
         ]
         for key, row in totals.items()
     }
+
+
+def build_timeline(teams, category_ids, now_ms):
+    """One clock-hour scale: people who arrived, then people expected.
+
+    Rows run from the hour of the first finish to the end of the forecast.
+    A past hour has ``arrived`` only, a future hour ``expected`` only; the
+    current hour has both — finishes up to now and the forecast from now.
+    Every finish counts, a team without a КВ too: the kitchen feeds everyone.
+    ``teams`` are the :func:`_forecast_totals` dicts plus ``finish_ms``.
+
+    ``finish_time`` is hand-editable, so the scale reaches back at most
+    ``TIMELINE_BACK`` from the current hour; older finishes (a seconds-for-ms
+    typo, a page opened days later) fold into one leading "earlier" row with
+    ``from: None``.
+    """
+    buckets, totals = _forecast_totals(teams, category_ids, now_ms)
+    current = _floor_hour(_local(now_ms))
+    current_ms = _ms(current)
+    end_ms = buckets[-1][1] if buckets else _ms(current + HOUR)
+
+    finishes = [
+        (t, t["finish_ms"])
+        for t in teams
+        if t["state"] == FINISHED and t.get("finish_ms") is not None
+    ]
+    start = current
+    past = [ms for _, ms in finishes if ms <= now_ms]
+    if past:
+        # Buckets are (from, to], so a finish at 15:00 opens the 14:00 hour.
+        first = _ceil_hour(_local(min(past))) - HOUR
+        start = max(min(first, current), current - TIMELINE_BACK)
+    start_ms = _ms(start)
+
+    hours = []
+    edge = start
+    while _ms(edge) < end_ms:
+        hours.append((_ms(edge), _ms(edge + HOUR)))
+        edge += HOUR
+    now_index = next(i for i, (lo, _) in enumerate(hours) if lo == current_ms)
+
+    keys = _keys(category_ids)
+    arrived = {key: [0] * len(hours) for key in keys}
+    earlier = {key: 0 for key in keys}
+    for team, ms in finishes:
+        if ms > now_ms:
+            index = now_index
+        elif ms <= start_ms:
+            index = None
+        else:
+            index = next(i for i, (lo, hi) in enumerate(hours) if lo < ms <= hi)
+        for key in ("all", str(team["category_id"])):
+            if index is None:
+                earlier[key] = earlier.get(key, 0) + team["people"]
+            else:
+                row = arrived.setdefault(key, [0] * len(hours))
+                row[index] += team["people"]
+
+    result = {}
+    for key in set(arrived) | set(totals):
+        expected = totals.get(key, [])
+        counts = arrived.get(key, [0] * len(hours))
+        rows = []
+        if any(earlier.values()):
+            rows.append(
+                {
+                    "from": None,
+                    "to": _label(start_ms),
+                    "arrived": earlier.get(key, 0),
+                    "expected": None,
+                    "now": False,
+                }
+            )
+        for i, (lo, hi) in enumerate(hours):
+            offset = i - now_index
+            if offset < 0:
+                value = None
+            elif offset < len(expected):
+                value = round(expected[offset], 1)
+            else:
+                value = 0.0
+            rows.append(
+                {
+                    "from": _label(lo),
+                    "to": _label(hi),
+                    "arrived": counts[i] if offset <= 0 else None,
+                    "expected": value,
+                    "now": offset == 0,
+                }
+            )
+        result[key] = rows
+    return result

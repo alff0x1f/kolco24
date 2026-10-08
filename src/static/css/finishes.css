@@ -172,30 +172,49 @@
   to   { background: transparent; }
 }
 
-/* ── Прогноз ─────────────────────────────────────────── */
-.race-finishes .rf-fc-row {
+/* ── Приход по часам ────────────────────────────────── */
+.race-finishes .rf-print {
+  font-size: 13px;
+  white-space: nowrap;
+}
+.race-finishes .rf-tl-row {
   display: grid;
-  grid-template-columns: 112px 48px 1fr;
+  grid-template-columns: 112px 64px 84px 1fr;
   gap: 10px;
   align-items: center;
-  padding: 5px 0;
+  padding: 5px 6px;
   font-size: 14px;
   font-variant-numeric: tabular-nums;
 }
-.race-finishes .rf-fc-hour { color: var(--ink-soft); }
-.race-finishes .rf-fc-people {
+.race-finishes .rf-tl-head {
+  font-size: 12px;
+  color: var(--muted);
+}
+.race-finishes .rf-tl-hour { color: var(--ink-soft); }
+.race-finishes .rf-tl-num {
   color: var(--ink);
   font-weight: 600;
   text-align: right;
 }
-.race-finishes .rf-fc-bar {
+.race-finishes .rf-tl-bar {
+  display: flex;
   height: 14px;
-  border-radius: 4px;
-  background: var(--primary-2);
-  opacity: .7;
-  min-width: 2px;
 }
-.race-finishes .rf-fc-total {
+.race-finishes .rf-tl-arrived {
+  background: var(--primary);
+  border-radius: 4px 0 0 4px;
+}
+.race-finishes .rf-tl-expected {
+  background: var(--primary-2);
+  opacity: .45;
+  border-radius: 0 4px 4px 0;
+}
+.race-finishes .rf-tl-row.is-now {
+  background: var(--paper);
+  border-radius: 6px;
+  outline: 1px solid var(--primary-2);
+}
+.race-finishes .rf-tl-total {
   border-top: 1px solid var(--line-soft);
   margin-top: 4px;
   padding-top: 8px;
@@ -224,6 +243,7 @@
   .race-finishes .rf-cols { grid-template-columns: 1fr; }
   .race-finishes .rf-search { max-width: none; width: 100%; }
   .race-finishes .rf-list { max-height: none; }
+  .race-finishes .rf-tl-row { grid-template-columns: 92px 52px 72px 1fr; gap: 6px; }
   .race-finishes .rf-row-wide { grid-template-columns: 64px 44px 1fr auto; }
   .race-finishes .rf-row-wide .rf-row-left { grid-column: 1 / -1; }
 }

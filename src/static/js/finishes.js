@@ -113,30 +113,50 @@
     });
   }
 
-  // ── Прогноз ───────────────────────────────────────────
-  function renderForecast() {
+  // ── Приход по часам ───────────────────────────────────
+  function renderTimeline() {
     var box = el("rfForecast");
     box.replaceChildren();
-    var rows = data.forecast[category === null ? "all" : String(category)] || [];
-    var total = rows.reduce(function (sum, r) { return sum + r.people; }, 0);
-    if (!rows.length || total < 0.05) {
-      box.appendChild(make("p", "rf-empty", "На дистанции никого"));
+    var rows = data.timeline[category === null ? "all" : String(category)] || [];
+    var arrived = 0, expected = 0;
+    rows.forEach(function (r) {
+      arrived += r.arrived || 0;
+      expected += r.expected || 0;
+    });
+    if (!arrived && expected < 0.05) {
+      box.appendChild(make("p", "rf-empty", "Пока никого"));
       return;
     }
-    var max = Math.max.apply(null, rows.map(function (r) { return r.people; }));
+    var max = Math.max.apply(null, rows.map(function (r) { return (r.arrived || 0) + (r.expected || 0); }));
+
+    var head = make("div", "rf-tl-row rf-tl-head");
+    ["Час", "Пришло", "Ожидается", ""].forEach(function (text) { head.appendChild(make("span", "", text)); });
+    box.appendChild(head);
+
     rows.forEach(function (r) {
-      var line = make("div", "rf-fc-row");
-      line.appendChild(make("span", "rf-fc-hour", r.from + "–" + r.to));
-      line.appendChild(make("span", "rf-fc-people", String(Math.round(r.people))));
-      var bar = make("div", "rf-fc-bar");
-      bar.style.width = (max ? (r.people / max) * 100 : 0) + "%";
+      var line = make("div", "rf-tl-row" + (r.now ? " is-now" : ""));
+      line.appendChild(make("span", "rf-tl-hour", r.from ? r.from + "–" + r.to : "до " + r.to));
+      line.appendChild(make("span", "rf-tl-num", r.arrived === null ? "" : String(r.arrived)));
+      line.appendChild(make("span", "rf-tl-num", r.expected === null ? "" : "≈ " + Math.round(r.expected)));
+      var bar = make("div", "rf-tl-bar");
+      [["rf-tl-arrived", r.arrived || 0], ["rf-tl-expected", r.expected || 0]].forEach(function (part) {
+        var seg = make("div", part[0]);
+        seg.style.width = (max ? (part[1] / max) * 100 : 0) + "%";
+        bar.appendChild(seg);
+      });
       line.appendChild(bar);
       box.appendChild(line);
     });
-    var sum = make("div", "rf-fc-row rf-fc-total");
-    sum.appendChild(make("span", "rf-fc-hour", "Всего"));
-    sum.appendChild(make("span", "rf-fc-people", "≈ " + Math.round(total)));
+
+    var sum = make("div", "rf-tl-row rf-tl-total");
+    sum.appendChild(make("span", "rf-tl-hour", "Всего"));
+    sum.appendChild(make("span", "rf-tl-num", String(arrived)));
+    sum.appendChild(make("span", "rf-tl-num", "≈ " + Math.round(Math.round(expected * 10) / 10)));
     box.appendChild(sum);
+  }
+
+  function updatePrintLink() {
+    el("rfPrint").href = config.printUrl + (category === null ? "" : "?category=" + category);
   }
 
   // ── Списки ────────────────────────────────────────────
@@ -201,7 +221,8 @@
     renderCategories();
     var teams = visibleTeams();
     renderTiles(teams);
-    renderForecast();
+    renderTimeline();
+    updatePrintLink();
     renderLists(teams);
     newIds = new Set();
   }

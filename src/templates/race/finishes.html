@@ -50,7 +50,10 @@
   <div class="rf-cats" id="rfCats"></div>
 
   <section class="rf-card">
-    <h2>Прогноз прихода, людей</h2>
+    <div class="rf-col-head">
+      <h2>Приход людей по часам</h2>
+      <a class="rf-print" id="rfPrint" href="{% url 'race_finishes_print' race.slug %}" target="_blank" rel="noopener">Печать для кухни</a>
+    </div>
     <div id="rfForecast"><p class="rf-empty">Загрузка…</p></div>
     <p class="rf-note">
       Прогноз: в среднем приходят за 40 мин до своего КВ, разброс 30 мин.
