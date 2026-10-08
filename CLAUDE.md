@@ -197,7 +197,8 @@ Django 4.2 project. Source lives entirely under `src/`, with `manage.py` at `src
   `src/static/js/starts.js`, `#raceStartsConfig` island with only `dataUrl`) and `race_starts_data`
   (`race/<slug>/starts/data/`, JSON polled every 20 s). Both gated by `_load_race_for_admin`. The **only** source is
   `Team.start_time` (what the protocol reads); the expected set is paid teams (`paid_people > 0`, as on the checklist),
-  sorted by `start_number_key`. `start_time <= 0` or an unformattable value → both `start_time_ms`/`start_time` `null`
+  sorted by `start_number_key`; a row's `people` (the «Ждём» list's «N чел.») is `Team.ucount`, the team's current size,
+  not paid seats. `start_time <= 0` or an unformattable value → both `start_time_ms`/`start_time` `null`
   (counts as not started). The clock string is formatted server-side by `_start_clock` with `timezone.localtime` —
   deliberately not `app_data.format_ms`, which uses the process time zone. `server_time_ms` is the page's "now" for
   «последний старт N мин назад», the 15-min pace and the chart's right edge. The header clock is `server_time` advanced by `performance.now()` — no client time-zone logic. All counting, the category filter, the
@@ -209,7 +210,8 @@ Django 4.2 project. Source lives entirely under `src/`, with `manage.py` at `src
   forecast). Unlike «Старты», the server computes the states (`finished`/`not_started`/`no_control`/`overdue`/
   `on_course` + `overdue_long`) and the forecast in the pure module `src/apps/race/finish_forecast.py`, so it is
   pytest-tested (`test_finishes.py`). Model: time on course `D ~ N(КВ − 40, 30)` min conditioned on
-  `elapsed < D ≤ КВ` (elapsed clamped at 0), people = `paid_people` spread over clock-hour buckets `(from, to]` in
+  `elapsed < D ≤ КВ` (elapsed clamped at 0), people = `Team.ucount` (the team's current size, not paid seats — a dropped-out member keeps the paid seat but
+  won't come; JSON key `people`; the team set is still `paid_people > 0`) spread over clock-hour buckets `(from, to]` in
   `TIME_ZONE`. The first bucket is partial, from now; the grid ends at `max(next hour, ceil_hour(latest КВ))`, so each
   team's spread sums to its people. An overdue team ≤ `OVERDUE_GRACE_MIN` (60) goes whole into the first bucket; later
   it is left out (likely dropped out without a finish mark). Constants sit at the top of the module, to tune after a

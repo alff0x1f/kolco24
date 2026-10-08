@@ -420,7 +420,24 @@ def test_finishes_data_deadline_in_project_time_zone(client, django_user_model):
     assert team["start_time"] == "09:14:05"
     assert team["deadline_ms"] == start + 720 * MIN
     assert team["deadline"] == "21:14"
-    assert isinstance(team["paid_people"], int)
+    assert isinstance(team["people"], int)
+
+
+@pytest.mark.django_db
+def test_finishes_data_counts_team_size_not_paid_seats(client, django_user_model):
+    race = _make_race()
+    category = _category(race)
+    admin = _admin(django_user_model, race)
+    now = _now_ms()
+    _make_team(admin, category, start_number="1", paid_people=4, ucount=3)
+    _make_team(
+        admin, category, start_number="2", paid_people=2, ucount=5, start_time=now
+    )
+    client.force_login(admin)
+    data = _data(client, race)
+    assert [t["people"] for t in data["teams"]] == [3, 5]
+    expected = sum(r["expected"] or 0 for r in data["timeline"]["all"])
+    assert expected == pytest.approx(5, abs=0.2)
 
 
 @pytest.mark.django_db
@@ -443,15 +460,13 @@ def test_finishes_data_timeline(client, django_user_model):
     untimed = _category(race, control_time=0, code="free", order=1)
     admin = _admin(django_user_model, race)
     now = _now_ms()
-    _make_team(admin, timed, start_number="1", paid_people=4, start_time=now - 60 * MIN)
-    _make_team(
-        admin, timed, start_number="2", paid_people=3, start_time=now - 730 * MIN
-    )
+    _make_team(admin, timed, start_number="1", ucount=4, start_time=now - 60 * MIN)
+    _make_team(admin, timed, start_number="2", ucount=3, start_time=now - 730 * MIN)
     _make_team(
         admin,
         untimed,
         start_number="3",
-        paid_people=5,
+        ucount=5,
         start_time=now - 120 * MIN,
         finish_time=now - MIN,
     )
@@ -459,7 +474,7 @@ def test_finishes_data_timeline(client, django_user_model):
         admin,
         timed,
         start_number="4",
-        paid_people=2,
+        ucount=2,
         start_time=now - 60 * MIN,
         finish_time=2**62,
     )
@@ -529,20 +544,18 @@ def _print_race(django_user_model):
     admin = _admin(django_user_model, race)
     now = _now_ms()
     hour = 60 * MIN
-    _make_team(admin, timed, start_number="1", paid_people=4, start_time=now - hour)
+    _make_team(admin, timed, start_number="1", ucount=4, start_time=now - hour)
     _make_team(
         admin,
         timed,
         start_number="2",
-        paid_people=3,
+        ucount=3,
         start_time=now - 5 * hour,
         finish_time=now - 2 * hour,
     )
-    _make_team(admin, other, start_number="3", paid_people=2, start_time=now - hour)
-    _make_team(admin, other, start_number="4", paid_people=5)
-    _make_team(
-        admin, other, start_number="5", paid_people=6, start_time=now - 14 * hour
-    )
+    _make_team(admin, other, start_number="3", ucount=2, start_time=now - hour)
+    _make_team(admin, other, start_number="4", ucount=5)
+    _make_team(admin, other, start_number="5", ucount=6, start_time=now - 14 * hour)
     return race, timed, other, admin
 
 

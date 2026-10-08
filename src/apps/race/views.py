@@ -1791,7 +1791,7 @@ class RaceStartsDataView(View):
                     "start_number": team.start_number,
                     "name": _team_display_name(team),
                     "category_id": team.category2_id,
-                    "paid_people": int(team.paid_people),
+                    "people": team.ucount,
                     "start_time_ms": team.start_time if clock else None,
                     "start_time": clock,
                 }
@@ -1858,14 +1858,16 @@ def _finish_rows(race, now_ms):
         state, overdue_long = finish_forecast.team_state(
             start_ms, finish_ms, control_min, now_ms
         )
-        people = int(team.paid_people)
+        # The team's current size, not paid seats: a member who dropped out
+        # keeps the paid seat but won't come to eat.
+        people = team.ucount
         rows.append(
             {
                 "id": team.id,
                 "start_number": team.start_number,
                 "name": _team_display_name(team),
                 "category_id": team.category2_id,
-                "paid_people": people,
+                "people": people,
                 "start_time_ms": start_ms,
                 "start_time": start_clock,
                 "finish_time_ms": finish_ms,

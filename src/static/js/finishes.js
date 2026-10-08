@@ -48,7 +48,7 @@
   }
 
   function people(teams) {
-    return teams.reduce(function (sum, t) { return sum + t.paid_people; }, 0);
+    return teams.reduce(function (sum, t) { return sum + t.people; }, 0);
   }
 
   function setStatus(text, fatal) {
@@ -201,7 +201,7 @@
         ["rf-row-num", "№" + t.start_number],
         ["rf-row-cat", categoryCode(t.category_id)],
         ["rf-row-name", t.name],
-        ["rf-row-cat", t.paid_people + " чел."],
+        ["rf-row-cat", t.people + " чел."],
         ["rf-row-left", "КВ " + t.deadline + " · " + (t.overdue_long ? "давно" : untilDeadline(t))],
       ]);
     }), query ? "Ничего не найдено" : "На дистанции никого");

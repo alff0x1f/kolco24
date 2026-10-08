@@ -77,7 +77,9 @@ def test_starts_data_lists_only_paid_live_teams_of_race(client, django_user_mode
     race = _make_race()
     category = _make_category(race)
     admin = _admin(django_user_model, race)
-    paid = _make_team(admin, category, start_number="1", teamname="Оплачена")
+    paid = _make_team(
+        admin, category, start_number="1", teamname="Оплачена", paid_people=4, ucount=3
+    )
     _make_team(admin, category, start_number="2", teamname="Нет", paid_people=0)
     deleted = _make_team(admin, category, start_number="3", teamname="Удалена")
     deleted.is_deleted = True
@@ -92,8 +94,9 @@ def test_starts_data_lists_only_paid_live_teams_of_race(client, django_user_mode
     row = data["teams"][0]
     assert row["name"] == "Оплачена"
     assert row["category_id"] == category.id
-    assert row["paid_people"] == 2
-    assert isinstance(row["paid_people"], int)
+    assert row["people"] == 3
+    assert isinstance(row["people"], int)
+    assert "paid_people" not in row
 
 
 @pytest.mark.django_db
