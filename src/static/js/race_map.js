@@ -245,7 +245,7 @@
   // Stats are those of track load, advanced by the fixes the positions poll
   // delivers (appendLivePoint). The poll carries only the team's single
   // newest fix, so while two phones both send, the one whose fix isn't the
-  // newest gets no updates and its age can still grow: "N мин назад" is the
+  // newest gets no updates and its age can still grow: the age shown is the
   // age of the newest fix *this page has seen* from that phone, and points
   // counts load-time raw points plus poll-delivered new fixes (a strictly
   // newer gps_time_ms — not every upload, not a re-delivered row).
@@ -253,6 +253,15 @@
   // Platform logo from the server-rendered <template id="rmDeviceIcon-…">
   // (shared with the app-data pages). platform is a client-supplied header,
   // so it only selects a key and is never interpolated into the markup.
+  // Compact age: minutes below 120, hours below 48, then days (floored).
+  function formatAge(ageMs) {
+    var minutes = Math.floor(ageMs / 60000);
+    if (minutes < 120) return minutes + "м";
+    var hours = Math.floor(minutes / 60);
+    if (hours < 48) return hours + "ч";
+    return Math.floor(hours / 24) + "д";
+  }
+
   function deviceIconKey(platform) {
     var key = String(platform || "").trim().toLowerCase();
     return key === "android" || key === "ios" ? key : "phone";
@@ -270,7 +279,7 @@
     var items = track.devices.map(function (device, idx) {
       var ageMs = Math.max(0, now - device.last_gps_time_ms);
       var iconKey = deviceIconKey(device.platform);
-      var parts = [Math.floor(ageMs / 60000) + " мин назад"];
+      var parts = [formatAge(ageMs)];
       parts.push(device.points + " " + pluralRu(device.points, ["точка", "точки", "точек"]));
       var classes = "rm-device" + (ageMs > STALE_MS ? " is-stale" : "");
       var checked = device.hidden ? "" : " checked";
