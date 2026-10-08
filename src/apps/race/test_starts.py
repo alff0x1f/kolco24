@@ -170,7 +170,9 @@ def test_starts_page_embeds_data_url(client, django_user_model):
 
     resp = client.get(reverse("race_starts", kwargs={"race_slug": race.slug}))
 
-    config = _script_json(resp.content.decode(), "raceStartsConfig")
+    html = resp.content.decode()
+    assert 'id="rsClock"' in html
+    config = _script_json(html, "raceStartsConfig")
     assert config == {
         "dataUrl": reverse("race_starts_data", kwargs={"race_slug": race.slug})
     }

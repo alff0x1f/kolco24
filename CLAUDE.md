@@ -200,7 +200,7 @@ Django 4.2 project. Source lives entirely under `src/`, with `manage.py` at `src
   sorted by `start_number_key`. `start_time <= 0` or an unformattable value → both `start_time_ms`/`start_time` `null`
   (counts as not started). The clock string is formatted server-side by `_start_clock` with `timezone.localtime` —
   deliberately not `app_data.format_ms`, which uses the process time zone. `server_time_ms` is the page's "now" for
-  «последний старт N мин назад», the 15-min pace and the chart's right edge. All counting, the category filter, the
+  «последний старт N мин назад», the 15-min pace and the chart's right edge. The header clock is `server_time` advanced by `performance.now()` — no client time-zone logic. All counting, the category filter, the
   inline-SVG cumulative chart and the «Ждём»/«Стартовали» lists live in the JS; team names go in via `textContent`.
   `RaceMapView`/`RaceMapPositionsView`/`RaceMapTrackView` (`src/apps/race/views.py`) back the organizer-only «Карта
   гонки» page — the read side of `apps.mobile`'s `/app/race/<id>/track/` upload (`TrackPoint` rows were write-only

@@ -19,6 +19,12 @@
   font-weight: 600;
   color: var(--ink);
 }
+.race-starts .rs-clock {
+  font-size: 24px;
+  font-weight: 500;
+  color: var(--ink-soft);
+  font-variant-numeric: tabular-nums;
+}
 .race-starts .rs-status {
   font-size: 13px;
   color: var(--warn);

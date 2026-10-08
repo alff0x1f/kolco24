@@ -26,6 +26,7 @@
   var newIds = new Set();
   var timer = null;
   var stopped = false;
+  var clockBase = null;
 
   function make(tag, cls, text) {
     var node = document.createElement(tag);
@@ -218,6 +219,19 @@
     newIds = new Set();
   }
 
+  // ── Часы ──────────────────────────────────────────────
+  // Server wall time advanced by the browser's monotonic clock: no time-zone
+  // logic here, and a wrong laptop clock doesn't matter.
+  function pad2(n) { return (n < 10 ? "0" : "") + n; }
+
+  function tickClock() {
+    if (!clockBase) return;
+    var secs = clockBase.secs + Math.floor((performance.now() - clockBase.at) / 1000);
+    secs = ((secs % 86400) + 86400) % 86400;
+    el("rsClock").textContent =
+      pad2(Math.floor(secs / 3600)) + ":" + pad2(Math.floor(secs / 60) % 60) + ":" + pad2(secs % 60);
+  }
+
   // ── Опрос ─────────────────────────────────────────────
   // The next request is scheduled only after the previous one settles, so a
   // slow stale response can never land after a newer one.
@@ -254,6 +268,9 @@
     }
     knownStarted = ids;
     data = payload;
+    var parts = payload.server_time.split(":").map(Number);
+    clockBase = { secs: parts[0] * 3600 + parts[1] * 60 + parts[2], at: performance.now() };
+    tickClock();
     setStatus("");
     render();
   }
@@ -274,5 +291,6 @@
     }, 150);
   });
 
+  setInterval(tickClock, 1000);
   poll();
 })();
