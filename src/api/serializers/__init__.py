@@ -5,4 +5,4 @@ from .tag import (
     TagSerializer,
     TagTouchSerializer,
 )
-from .team import TeamSerializer, TeamStartSerializer
+from .team import TeamSerializer
