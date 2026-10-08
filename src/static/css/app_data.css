@@ -131,6 +131,16 @@
 
 .app-data .chips-line { display: inline-flex; align-items: center; gap: 4px; flex-wrap: wrap; }
 
+/* Device badge: platform logo + map-consistent number. */
+.app-data .dev {
+  display: inline-flex; align-items: center; gap: 2px;
+  font-family: var(--mono); font-size: 12px; font-weight: 600;
+  color: var(--ink-soft); white-space: nowrap; vertical-align: middle;
+}
+.app-data .dev svg { width: 13px; height: 13px; flex-shrink: 0; }
+.app-data .dev-android svg { color: #3d9a50; }
+.app-data .filters-stack { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
+
 /* ── Help ────────────────────────────────────────────────── */
 .app-data .help .card-body {
   padding: 18px 22px; font-size: 13.5px; line-height: 1.6;

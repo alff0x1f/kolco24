@@ -45,11 +45,9 @@
             {% endfor %}
           </span>
           {% endif %}
-          {% if installs %}
+          {% if devices %}
           <span class="chips-line">Устройства:
-            {% for install in installs %}
-            <span class="tagchip mono" title="install_id">{{ install|truncatechars:12 }}</span>
-            {% endfor %}
+            {% for device in devices %}{% include "race/_device_badge.html" %}{% endfor %}
           </span>
           {% endif %}
         </div>
@@ -63,11 +61,21 @@
     <div class="card">
       <div class="card-head">
         <h2>Лента событий</h2>
-        <div class="card-head-r filters" id="eventFilters">
-          <label><input type="checkbox" data-kind="mark" checked> Взятия</label>
-          <label><input type="checkbox" data-kind="judge" checked> Судья</label>
-          <label><input type="checkbox" data-kind="track" checked> Трек</label>
-          <label><input type="checkbox" data-kind="boundary" checked> Старт/финиш</label>
+        <div class="filters-stack" id="eventFilters">
+          <div class="card-head-r filters">
+            <label><input type="checkbox" data-kind="mark" checked> Взятия</label>
+            <label><input type="checkbox" data-kind="judge" checked> Судья</label>
+            <label><input type="checkbox" data-kind="track" checked> Трек</label>
+            <label><input type="checkbox" data-kind="boundary" checked> Старт/финиш</label>
+          </div>
+          {% if devices|length > 1 %}
+          <div class="card-head-r filters" id="deviceFilters">
+            {% for device in devices %}
+            <label><input type="checkbox" data-device="{{ device.index }}" checked>
+              {% include "race/_device_badge.html" %}</label>
+            {% endfor %}
+          </div>
+          {% endif %}
         </div>
       </div>
       <div class="card-body tight">
@@ -76,6 +84,7 @@
             <thead>
               <tr>
                 <th>Время</th>
+                <th>Устр.</th>
                 <th>Событие</th>
                 <th>Детали</th>
                 <th>Получено</th>
@@ -83,8 +92,10 @@
             </thead>
             <tbody>
               {% for ev in events %}
-              <tr class="ev ev-{{ ev.kind }}">
+              <tr class="ev ev-{{ ev.kind }}" data-kind="{{ ev.kind }}"
+                  data-device="{{ ev.device.index|default:'' }}">
                 <td class="mono">{{ ev.time|default:"—" }}</td>
+                <td>{% if ev.device %}{% include "race/_device_badge.html" with device=ev.device segment_id=ev.segment_id %}{% else %}<span class="aux">—</span>{% endif %}</td>
 
                 {% if ev.kind == "mark" %}
                 <td>
@@ -136,7 +147,11 @@
                 <td>
                   <span class="tagchip{% if not ev.chip.known %} unknown{% endif %}"
                         title="{{ ev.chip.uid }}">{{ ev.chip.label }}</span>
-                  <span class="aux">№ участника {{ ev.participant_number }}</span>
+                  {% if ev.show_participant %}
+                  <span class="{% if ev.participant_mismatch %}warn{% else %}aux{% endif %}"
+                        {% if ev.participant_mismatch %}title="Телефон судьи определил другой номер браслета"{% endif %}>
+                    № участника {{ ev.participant_number }}</span>
+                  {% endif %}
                   {% if ev.clock_skew %}
                   <span class="badge warn-b"
                         title="по часам телефона {{ ev.clock_skew.wall }}, доверенное время {{ ev.clock_skew.trusted }}">
@@ -148,8 +163,6 @@
                 <td><span class="kind kind-track">Трек</span> сегмент</td>
                 <td>
                   <span class="aux">{{ ev.points }} тчк, {{ ev.duration }}, до {{ ev.last }}</span>
-                  <span class="tagchip mono" title="{{ ev.install_id }} / {{ ev.segment_id }}">
-                    {{ ev.install_id|truncatechars:12 }}</span>
                 </td>
 
                 {% else %}
@@ -160,7 +173,7 @@
                 <td class="mono aux">{{ ev.received|default:"" }}</td>
               </tr>
               {% empty %}
-              <tr class="empty"><td colspan="4">Приложение ещё ничего не прислало для этой команды.</td></tr>
+              <tr class="empty"><td colspan="5">Приложение ещё ничего не прислало для этой команды.</td></tr>
               {% endfor %}
             </tbody>
           </table>
