@@ -8150,10 +8150,14 @@ def test_extras_checklist_selects_extra(client, django_user_model):
     TeamExtra.objects.create(
         team=other_team, race_extra=transfer, count=1, count_paid=1
     )
+    # A team of another race wrongly holding this race's add-on stays off.
+    TeamExtra.objects.create(team=other_team, race_extra=maps, count=7, count_paid=7)
     client.force_login(admin)
 
     resp = client.get(_ec_url(race))
     assert resp.context["extra"] == maps
+    assert [r["name"] for r in resp.context["rows"]] == ["Команда"]
+    assert resp.context["total"] == 1
     assert [e.code for e in resp.context["extras"]] == ["map", "breakfast", "shirt"]
 
     resp = client.get(_ec_url(race), {"extra": "breakfast"})
