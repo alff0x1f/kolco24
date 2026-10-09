@@ -190,6 +190,9 @@ class EditTeamView(View):
             if "category2_id" in form.cleaned_data:
                 team.category2_id = form.cleaned_data.get("category2_id")
 
+            if request.user.is_superuser and "start_number" in request.POST:
+                team.start_number = request.POST["start_number"].strip()[:50]
+
             with transaction.atomic():
                 team.save()
                 upsert_team_extras(team, form.cleaned_data, race)

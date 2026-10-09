@@ -89,6 +89,14 @@
                                 <span class="hint err">{{ team_form.organization.errors|join:", " }}</span>
                                 {% endif %}
                             </div>
+                            {% if user.is_superuser %}
+                            <div class="field">
+                                <label for="start_number">Стартовый номер</label>
+                                <input class="input" id="start_number" name="start_number" type="text" maxlength="50"
+                                       value="{% if request.method == 'POST' %}{{ request.POST.start_number|default:'' }}{% else %}{{ team.start_number }}{% endif %}"
+                                       placeholder="Стартовый номер">
+                            </div>
+                            {% endif %}
                         </div>
                     </div>
 

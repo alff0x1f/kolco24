@@ -38,6 +38,10 @@
   gap: 9px;
   flex: 1;
 }
+.teams-page .unpaid-toggle {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 13px; color: var(--ink-soft); white-space: nowrap; cursor: pointer;
+}
 .teams-page .search { position: relative; flex: 1; max-width: 360px; min-width: 180px; }
 .teams-page .search input {
   width: 100%;

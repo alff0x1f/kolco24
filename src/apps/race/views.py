@@ -428,6 +428,7 @@ class RaceTeamsView(View):
                 "cnt": cnt,
                 "catId": team.category2_id,
                 "mine": mine,
+                "paid": team.paid_people > 0,
             }
             if is_superuser or mine:
                 has_team_actions = True
@@ -452,6 +453,7 @@ class RaceTeamsView(View):
             "race_date": race.date,
             "is_authenticated": is_authenticated,
             "has_team_actions": has_team_actions,
+            "show_unpaid_filter": is_superuser,
             "can_edit_race": bool(user is not None and can_edit_race(user, race)),
         }
 

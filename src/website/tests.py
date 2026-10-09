@@ -845,6 +845,45 @@ def test_get_edit_team_renders_edit_template(client):
 
 
 @pytest.mark.django_db
+def test_edit_team_superuser_sets_start_number(client, django_user_model):
+    user, race, category, team = _create_team_for_edit(suffix="sn-su")
+    admin = django_user_model.objects.create_superuser(
+        username="sn-admin", password="pass", email="sn-admin@example.com"
+    )
+    client.force_login(admin)
+    assert (
+        'name="start_number"'
+        in client.get(reverse("edit_team", args=[team.id])).content.decode()
+    )
+    response = client.post(
+        reverse("edit_team", args=[team.id]),
+        {"ucount": "4", "category2_id": str(category.id), "start_number": " 42 "},
+    )
+    assert response.status_code == 302
+    team.refresh_from_db()
+    assert team.start_number == "42"
+
+
+@pytest.mark.django_db
+def test_edit_team_owner_cannot_set_start_number(client):
+    user, race, category, team = _create_team_for_edit(suffix="sn-own")
+    team.start_number = "7"
+    team.save()
+    client.force_login(user)
+    assert (
+        'name="start_number"'
+        not in client.get(reverse("edit_team", args=[team.id])).content.decode()
+    )
+    response = client.post(
+        reverse("edit_team", args=[team.id]),
+        {"ucount": "4", "category2_id": str(category.id), "start_number": "99"},
+    )
+    assert response.status_code == 302
+    team.refresh_from_db()
+    assert team.start_number == "7"
+
+
+@pytest.mark.django_db
 def test_edit_team_charges_delta_on_ucount_growth(client):
     user, race, category, team = _create_team_for_edit(
         suffix="grow", tier_price=1500, ucount=4, paid_people=4
