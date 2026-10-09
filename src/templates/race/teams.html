@@ -26,6 +26,11 @@
               </svg>
               <input type="search" id="searchInput" aria-label="Поиск: команда, город или участник" placeholder="Команда, город или участник…" autocomplete="off">
             </div>
+            {% if show_unpaid_filter %}
+            <label class="unpaid-toggle">
+              <input type="checkbox" id="hideUnpaid" checked> Скрыть неоплаченные
+            </label>
+            {% endif %}
             {% if can_edit_race %}
             <a class="btn btn-outline teams-add" href="{% url 'add_team' race.slug %}">+ Команда</a>
             {% endif %}

@@ -1,7 +1,7 @@
 /* Teams list page — client-side search / category filter / column sort.
  *
  * Reads two embedded JSON blocks rendered by RaceTeamsView.build_context:
- *   #teams-data       — [{num, name, city, parts, cnt, catId, mine, edit?}]
+ *   #teams-data       — [{num, name, city, parts, cnt, catId, mine, paid, edit?}]
  *   #categories-data  — [{id, label, count, colorIdx}]  (in display order)
  *
  * Counts shown in chips are derived from the actual team rows so they always
@@ -35,7 +35,8 @@
     }
   }
 
-  var TEAMS = JSON.parse(teamsEl.textContent);
+  var ALL_TEAMS = JSON.parse(teamsEl.textContent);
+  var TEAMS = ALL_TEAMS;
   var CATS = JSON.parse(catsEl.textContent);
 
   // colorIdx -> colour, single source for chip dots and table badges.
@@ -52,11 +53,15 @@
 
   // Live counts from the rendered rows.
   var counts = {};
-  TEAMS.forEach(function (t) {
-    var k = String(t.catId);
-    counts[k] = (counts[k] || 0) + 1;
-  });
-  var total = TEAMS.length;
+  var total = 0;
+  function recount() {
+    counts = {};
+    TEAMS.forEach(function (t) {
+      var k = String(t.catId);
+      counts[k] = (counts[k] || 0) + 1;
+    });
+    total = TEAMS.length;
+  }
   var isAuthenticated = pageEl.getAttribute("data-authenticated") === "true";
   var hasActions = pageEl.getAttribute("data-has-actions") === "true";
 
@@ -72,6 +77,14 @@
   var chipsEl = document.getElementById("catChips");
   var tableEl = document.querySelector(".teams-table");
   var searchEl = document.getElementById("searchInput");
+  var hideUnpaidEl = document.getElementById("hideUnpaid");
+
+  function applyUnpaidFilter() {
+    TEAMS = hideUnpaidEl && hideUnpaidEl.checked
+      ? ALL_TEAMS.filter(function (t) { return t.paid; })
+      : ALL_TEAMS;
+    recount();
+  }
 
   function esc(s) {
     return String(s == null ? "" : s).replace(/[&<>"]/g, function (m) {
@@ -305,6 +318,15 @@
     });
   });
 
+  if (hideUnpaidEl) {
+    hideUnpaidEl.addEventListener("change", function () {
+      applyUnpaidFilter();
+      buildChips();
+      render();
+    });
+  }
+
+  applyUnpaidFilter();
   buildChips();
   render();
 })();

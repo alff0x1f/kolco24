@@ -213,6 +213,10 @@ def test_build_context_superuser_sees_all():
     names = {t["name"] for t in teams}
 
     assert names == {"Paid", "Unpaid"}
+    assert {t["name"]: t["paid"] for t in teams} == {"Paid": True, "Unpaid": False}
+    assert context["show_unpaid_filter"] is True
+    owner_ctx = RaceTeamsView.build_context(race, owner)
+    assert owner_ctx["show_unpaid_filter"] is False
     # superuser may edit every team
     assert all("edit" in t for t in teams)
 
