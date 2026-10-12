@@ -1709,3 +1709,34 @@ def test_race_spotlight_date_badge_shows_range(start, end, day, month, year):
     assert f"<strong>{day}</strong>" in badge
     assert f"<span>{month}</span>" in badge
     assert f"<small>{year}</small>" in badge
+
+
+def _photo_contest(slug, published=True, until=None):
+    from apps.photo_contest.models import PhotoContest
+
+    return PhotoContest.objects.create(
+        title=f"Конкурс {slug}",
+        slug=slug,
+        is_published=published,
+        submission_until=until or timezone.now() + timedelta(days=5),
+    )
+
+
+@pytest.mark.django_db
+def test_home_shows_open_photo_contest_card(client):
+    contest = _photo_contest("open")
+    _photo_contest("draft", published=False)
+    _photo_contest("past", until=timezone.now() - timedelta(minutes=1))
+    response = client.get(reverse("index"))
+    assert response.context["open_photo_contests"] == [contest]
+    content = response.content.decode()
+    assert 'href="/photo/open/"' in content
+    assert "/photo/draft/" not in content
+    assert "/photo/past/" not in content
+
+
+@pytest.mark.django_db
+def test_home_has_no_photo_card_without_open_contests(client):
+    _photo_contest("past", until=timezone.now() - timedelta(minutes=1))
+    content = client.get(reverse("index")).content.decode()
+    assert "home-photo-contests" not in content

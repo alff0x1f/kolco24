@@ -634,7 +634,26 @@ Django 4.2 project. Source lives entirely under `src/`, with `manage.py` at `src
       every other chip of an idle pool; a real scan (api touch) revives it. **Accepted risk**: the pool is global, so an
       admin of any published race can read any bracelet's code (`number: null`); revisit once `Tag` gets a race FK.
 
-New feature apps that don't fit in `website` live under `src/apps/<name>/`. Each needs a unique `AppConfig` label (e.g.
+- `apps.photo_contest` — site photo contest, **not tied to races** (no FK into `website`; only `AUTH_USER_MODEL`),
+  mounted at `/photo/`. Step 1 is submissions only; voting/gallery/results are future work. `PhotoContest` (slug,
+  `submission_until`, `is_published`, `max_photos_per_user` — the limit is **per nomination**) → `PhotoNomination` →
+  `PhotoEntry` (`nomination` FK `PROTECT`, no contest FK; status `pending`/`approved`/`rejected`, moderated in
+  `/admin/` via bulk actions). Any logged-in user uploads (anon → `account_start?next=`); rejected entries free their
+  slot; the quota check runs under `select_for_update()` on the nomination (`services.py:create_entry`). Image rules
+  live in `images.py` (constants read at call time so tests monkeypatch them): accept ≤ 20 MB JPEG/PNG/WebP (HEIC →
+  format error), ≤ 50 Мп; the original is stored byte-for-byte when ≤ 15 MB, else re-encoded JPEG at full resolution
+  (quality steps, EXIF kept); a 1600 px EXIF-free JPEG preview is always made. `probe` reads only the header, so decode
+  errors in `make_original`/`make_preview` are also mapped to `ImageRejected` (field error, never a 500). **Originals
+  are private**: `storage.py:PrivateStorage` under `MEDIA_PRIVATE_ROOT` (`/app/media_private`, its own volume, never
+  mounted into nginx, which serves all of `/app/media`); it reads the setting on every access (Django builds a field's
+  storage once at import, so a captured path would ignore test overrides) and its `url()` raises — originals are served
+  only by `photo_original` to users with `photo_contest.view_photoentry` (404 otherwise). Files are laid out as
+  `photo_contest/<contest_id>/<nomination_id>/<uuid>.<ext>` in both roots (one folder per contest for backups; ids,
+  never slugs), which is why `nomination` is read-only in the admin. Files are deleted by a `post_delete` signal via
+  `transaction.on_commit` (a rolled-back delete keeps them). `.dockerignore` keeps `src/media_private/` (and other
+  local data/secrets) out of the image. The home page shows open contests via `open_photo_contests`
+  (`_home_photo_contests.html`).
+ `src/apps/<name>/`. Each needs a unique `AppConfig` label (e.g.
 `label = "race_app"`).
 
 **Template stacks**: `src/templates/website/` has two base templates. `base.html` + `src/static/css/theme.css` —

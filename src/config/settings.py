@@ -125,6 +125,7 @@ INSTALLED_APPS = [
     "apps.race",
     "apps.accounts",
     "apps.mobile",
+    "apps.photo_contest",
 ]
 
 MIDDLEWARE = [
@@ -260,6 +261,11 @@ if not DEBUG:
 
 MEDIA_URL = "/media/"
 MEDIA_ROOT = os.path.join(BASE_DIR, "media/")
+# Files that must not be public (photo-contest originals with EXIF/GPS). Kept
+# outside MEDIA_ROOT because nginx serves that whole directory as /media/.
+MEDIA_PRIVATE_ROOT = os.getenv(
+    "MEDIA_PRIVATE_ROOT", os.path.join(BASE_DIR, "media_private/")
+)
 #
 
 # Django's 2.5 MB default is enforced the moment request.body is first read,

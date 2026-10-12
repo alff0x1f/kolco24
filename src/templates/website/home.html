@@ -40,6 +40,7 @@
 
       <aside class="home-races" aria-labelledby="races-title">
         {% include "website/_home_races.html" with upcoming_races=upcoming_races only %}
+        {% include "website/_home_photo_contests.html" with open_photo_contests=open_photo_contests only %}
 
         {% if user.is_superuser %}
         <section class="card card-admin" aria-labelledby="home-admin-title">

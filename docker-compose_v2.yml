@@ -38,6 +38,9 @@ services:
       - ./deploy/kolco24.env
     volumes:
       - ${DATA_LOCATION}/media:/app/media
+      # Photo-contest originals (EXIF/GPS). App container only — never mount
+      # into nginx, which serves /app/media publicly.
+      - ${DATA_LOCATION}/media_private:/app/media_private
       - ${DATA_LOCATION}/backups:/app/backups
     depends_on:
       kolco24_migrate:

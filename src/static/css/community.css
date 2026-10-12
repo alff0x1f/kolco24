@@ -300,6 +300,11 @@
 }
 
 .home-races .card-admin { margin: 16px 0 0; }
+.home-races .home-photo-contests { margin: 16px 0 0; }
+.home-photo-contests__item { display: flex; flex-direction: column; gap: 2px; }
+.home-photo-contests__item + .home-photo-contests__item { margin-top: 12px; }
+.home-photo-contests__item a { color: var(--primary-2); font-weight: 500; }
+.home-photo-contests__item span { font-size: 13px; color: var(--muted); }
 
 .community-section__head {
   display: flex;

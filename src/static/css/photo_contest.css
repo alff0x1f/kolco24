@@ -1,0 +1,85 @@
+/* Photo contest pages (list + contest). Scoped under .photo-contest. */
+
+.photo-contest .crumbs a { color: var(--muted); }
+.photo-contest .pc-banner { margin-bottom: 16px; }
+
+.photo-contest .pc-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 360px;
+  gap: 16px;
+  align-items: start;
+}
+
+.photo-contest .pc-note {
+  font-size: 13px;
+  color: var(--muted);
+  line-height: 1.5;
+}
+.photo-contest .card-pad > .pc-note:not(:last-child) { margin-bottom: 12px; }
+
+.photo-contest .pc-description { font-size: 15px; line-height: 1.6; }
+.photo-contest .pc-description p + p { margin-top: 10px; }
+
+.photo-contest .pc-nominations { list-style: none; display: flex; flex-direction: column; gap: 12px; margin-bottom: 14px; }
+.photo-contest .pc-nominations strong { font-weight: 600; }
+.photo-contest .pc-nominations p { font-size: 14px; color: var(--ink-soft); margin-top: 2px; }
+
+.photo-contest .pc-optional { font-weight: 400; color: var(--muted); }
+.photo-contest .pc-file { padding: 8px 10px; }
+
+.photo-contest .pc-entries {
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 14px;
+}
+.photo-contest .pc-entry {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  background: var(--paper-2);
+}
+.photo-contest .pc-entry img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  background: var(--paper);
+}
+.photo-contest .pc-entry-body {
+  padding: 10px 12px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+}
+.photo-contest .pc-entry-nomination { color: var(--muted); }
+.photo-contest .pc-entry-body p { color: var(--ink-soft); overflow-wrap: anywhere; }
+.photo-contest .pc-delete { color: var(--danger); font-size: 13px; align-self: flex-start; margin-top: 4px; }
+
+.photo-contest .pc-status {
+  align-self: flex-start;
+  display: inline-block;
+  font-size: 11.5px;
+  font-weight: 500;
+  padding: 2px 8px;
+  border-radius: 999px;
+}
+.photo-contest .pc-status-pending { background: var(--warn-bg); color: var(--warn); }
+.photo-contest .pc-status-approved { background: #eaf4ee; color: var(--success-dk); }
+.photo-contest .pc-status-rejected { background: var(--danger-bg); color: var(--danger); }
+
+.photo-contest .pc-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
+  margin-bottom: 8px;
+}
+.photo-contest .pc-list-item { display: block; color: inherit; text-decoration: none; }
+.photo-contest .pc-list-item:hover { border-color: #c7cdd6; }
+.photo-contest .pc-list-item h2 { font-size: 18px; font-weight: 600; margin: 8px 0 4px; }
+
+@media (max-width: 900px) {
+  .photo-contest .pc-layout { grid-template-columns: 1fr; }
+  .photo-contest .pc-side { order: -1; }
+}

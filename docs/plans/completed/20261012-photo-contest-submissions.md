@@ -116,9 +116,9 @@
   `ALLOWED_FORMATS = {"JPEG", "PNG", "WEBP"}`.
 - `ImageRejected(ValueError)` carries the Russian user message.
 - `probe(file) -> (format, width, height)`: header-only `Image.open`; size > `UPLOAD_MAX_BYTES` →
-  «Файл больше 20 МБ»; format not allowed → «Поддерживаются JPEG, PNG и WebP»; `width*height > MAX_PIXELS` or
-  `DecompressionBombError`/`UnidentifiedImageError`/`OSError` → «Не удалось прочитать изображение». Always
-  `seek(0)` afterwards.
+  «Файл больше 20 МБ»; format not allowed or `UnidentifiedImageError` (incl. HEIC) → «Поддерживаются JPEG, PNG и
+  WebP»; pixels over `MAX_PIXELS` → «Слишком большое разрешение изображения»; `DecompressionBombError`/`OSError` →
+  «Не удалось прочитать изображение». Always `seek(0)` afterwards. Width/height returned as displayed.
 - `make_original(file, fmt) -> (bytes, ext, width, height)`: if `file.size <= STORE_MAX_BYTES` → raw bytes
   unchanged, dims from the header. Otherwise decode, `ImageOps.exif_transpose`, RGB, and save as JPEG at full
   resolution trying each of `QUALITY_STEPS` until ≤ `STORE_MAX_BYTES`, passing the transposed image's EXIF
@@ -209,15 +209,15 @@
 - Modify: `src/config/settings.py`
 - Modify: `.gitignore`
 
-- [ ] create the app with `PhotoContestConfig` (`name="apps.photo_contest"`, `label="photo_contest"`)
-- [ ] add `PrivateStorage` (settings read on access, `url()` raises) + `private_storage()` callable
-- [ ] add `PhotoContest`, `PhotoNomination`, `PhotoEntry` as in Technical Details
-- [ ] add `MEDIA_PRIVATE_ROOT` and the app to `INSTALLED_APPS` in `settings.py`; add `src/media_private/` to `.gitignore`
-- [ ] generate migration `0001_initial` (`uv run python src/manage.py makemigrations photo_contest`)
-- [ ] write tests: `is_submission_open` (unpublished / open / past deadline), nomination ordering, `PROTECT` on
+- [x] create the app with `PhotoContestConfig` (`name="apps.photo_contest"`, `label="photo_contest"`)
+- [x] add `PrivateStorage` (settings read on access, `url()` raises) + `private_storage()` callable
+- [x] add `PhotoContest`, `PhotoNomination`, `PhotoEntry` as in Technical Details
+- [x] add `MEDIA_PRIVATE_ROOT` and the app to `INSTALLED_APPS` in `settings.py`; add `src/media_private/` to `.gitignore`
+- [x] generate migration `0001_initial` (`uv run python src/manage.py makemigrations photo_contest`)
+- [x] write tests: `is_submission_open` (unpublished / open / past deadline), nomination ordering, `PROTECT` on
       deleting a nomination / contest with entries; with `MEDIA_PRIVATE_ROOT` overridden to `tmp_path`, a file saved
       to `original` lands under `tmp_path`; `original.url` raises
-- [ ] run tests - must pass before task 2
+- [x] run tests - must pass before task 2
 
 ### Task 2: Image processing module
 
@@ -225,15 +225,15 @@
 - Create: `src/apps/photo_contest/images.py`
 - Modify: `src/apps/photo_contest/tests.py`
 
-- [ ] implement `ImageRejected`, `probe`, `make_original`, `make_preview` with module constants read at call time
-- [ ] write tests: small JPEG stored byte-for-byte; PNG and WebP accepted
-- [ ] write tests: over `STORE_MAX_BYTES` (monkeypatched small) → JPEG ≤ limit, same resolution, EXIF kept;
+- [x] implement `ImageRejected`, `probe`, `make_original`, `make_preview` with module constants read at call time
+- [x] write tests: small JPEG stored byte-for-byte; PNG and WebP accepted
+- [x] write tests: over `STORE_MAX_BYTES` (monkeypatched small) → JPEG ≤ limit, same resolution, EXIF kept;
       fallback downscale path when quality steps are not enough
-- [ ] write tests: preview long side ≤ 1600 and no EXIF; EXIF orientation 6 rotates the result
-- [ ] write tests for errors: over `UPLOAD_MAX_BYTES`, GIF/garbage bytes, pixels over `MAX_PIXELS`, truncated JPEG
+- [x] write tests: preview long side ≤ 1600 and no EXIF; EXIF orientation 6 rotates the result
+- [x] write tests for errors: over `UPLOAD_MAX_BYTES`, GIF/garbage bytes, pixels over `MAX_PIXELS`, truncated JPEG
       (valid header, cut body) → `ImageRejected` from `make_original`/`make_preview`
-- [ ] write tests: alpha PNG preview composited on white; `width`/`height` are as-displayed for orientation 6
-- [ ] run tests - must pass before task 3
+- [x] write tests: alpha PNG preview composited on white; `width`/`height` are as-displayed for orientation 6
+- [x] run tests - must pass before task 3
 
 ### Task 3: Upload form, create service, file cleanup
 
@@ -244,18 +244,18 @@
 - Modify: `src/apps/photo_contest/apps.py`
 - Modify: `src/apps/photo_contest/tests.py`
 
-- [ ] implement `PhotoUploadForm` (nomination scoped to the contest, `clean_image` via `probe`, caption ≤ 300)
-- [ ] implement `create_entry` with `select_for_update` on the nomination, limit check excluding `rejected`,
+- [x] implement `PhotoUploadForm` (nomination scoped to the contest, `clean_image` via `probe`, caption ≤ 300)
+- [x] implement `create_entry` with `select_for_update` on the nomination, limit check excluding `rejected`,
       `LimitReached`, and cleanup of written files on failure
-- [ ] add `post_delete` handler removing both files; connect it in `AppConfig.ready()`
-- [ ] write tests: form rejects a nomination of another contest, oversized/unsupported file, long caption
-- [ ] write tests: `create_entry` writes original to `<private>/photo_contest/<contest_id>/<nomination_id>/` and
+- [x] add `post_delete` handler removing both files; connect it in `AppConfig.ready()`
+- [x] write tests: form rejects a nomination of another contest, oversized/unsupported file, long caption
+- [x] write tests: `create_entry` writes original to `<private>/photo_contest/<contest_id>/<nomination_id>/` and
       preview to `<media>/photo_contest/<contest_id>/<nomination_id>/` with the same uuid, sets
       width/height/size; limit per nomination (other nomination still allowed; rejected entries not counted)
-- [ ] write tests: failure inside the atomic block (patched `objects.create` raising) leaves no files
-- [ ] write tests (`django_capture_on_commit_callbacks(execute=True)`): deleting an entry (instance, queryset, user
+- [x] write tests: failure inside the atomic block (patched `objects.create` raising) leaves no files
+- [x] write tests (`django_capture_on_commit_callbacks(execute=True)`): deleting an entry (instance, queryset, user
       cascade) removes files; a rolled-back delete keeps them
-- [ ] run tests - must pass before task 4
+- [x] run tests - must pass before task 4
 
 ### Task 4: Public pages, upload/delete/original views
 
@@ -268,18 +268,18 @@
 - Modify: `src/config/urls.py`
 - Modify: `src/apps/photo_contest/tests.py`
 
-- [ ] add URLs and views `photo_contests`, `photo_contest`, `photo_upload`, `photo_delete`, `photo_original`
-- [ ] build templates on `base-2.html` with hand-written fields, disabled full nominations, «Мои фото» block, messages
-- [ ] mount `path("photo/", include(...))` in `config/urls.py` before `website.urls`
-- [ ] write tests: list shows only published, open first; contest page 404 for unpublished (user) / 200 + banner
+- [x] add URLs and views `photo_contests`, `photo_contest`, `photo_upload`, `photo_delete`, `photo_original`
+- [x] build templates on `base-2.html` with hand-written fields, disabled full nominations, «Мои фото» block, messages
+- [x] mount `path("photo/", include(...))` in `config/urls.py` before `website.urls`
+- [x] write tests: list shows only published, open first; contest page 404 for unpublished (user) / 200 + banner
       (staff); anon sees login link with `next`; «Мои фото» lists only own entries; closed contest shows no form
-- [ ] write tests: upload — anon redirect to `account_start?next=`, unpublished 404, closed refused (nothing saved),
+- [x] write tests: upload — anon redirect to `account_start?next=`, unpublished 404, closed refused (nothing saved),
       invalid form re-renders with errors, truncated image → field error (200, no files), limit error, success creates
       a pending entry and redirects
-- [ ] write test: upload form has `method="post"`, `enctype="multipart/form-data"` and the `accept` list
-- [ ] write tests: delete — owner ok (files gone), foreign entry 404, closed refused; original — superuser and staff
+- [x] write test: upload form has `method="post"`, `enctype="multipart/form-data"` and the `accept` list
+- [x] write tests: delete — owner ok (files gone), foreign entry 404, closed refused; original — superuser and staff
       with `view_photoentry` 200 with image bytes; staff without the permission, plain user, anon 404; missing file 404
-- [ ] run tests - must pass before task 5
+- [x] run tests - must pass before task 5
 
 ### Task 5: Admin moderation
 
@@ -287,12 +287,12 @@
 - Create: `src/apps/photo_contest/admin.py`
 - Modify: `src/apps/photo_contest/tests.py`
 
-- [ ] register `PhotoContestAdmin` with nomination inline and slug prepopulation
-- [ ] register `PhotoEntryAdmin` with thumbnail, filters, `list_select_related`, approve/reject actions, original link
-- [ ] write tests: changelist and change page render for a superuser; approve/reject actions change status; change
+- [x] register `PhotoContestAdmin` with nomination inline and slug prepopulation
+- [x] register `PhotoEntryAdmin` with thumbnail, filters, `list_select_related`, approve/reject actions, original link
+- [x] write tests: changelist and change page render for a superuser; approve/reject actions change status; change
       page has no file input for `original`/`preview`, `nomination` is read-only, links to `photo_original`;
       contest change page shows its folder paths
-- [ ] run tests - must pass before task 6
+- [x] run tests - must pass before task 6
 
 ### Task 6: Home page card
 
@@ -303,11 +303,11 @@
 - Modify: `src/static/css/community.css` (only if existing card classes are not enough)
 - Modify: `src/website/test_publications.py`
 
-- [ ] add `open_photo_contests` to `HomeView` context (one query)
-- [ ] add the partial and include it in `home.html` under `{% if open_photo_contests %}`
-- [ ] write tests: card shown for a published open contest with a link to `/photo/<slug>/`; hidden for unpublished
+- [x] add `open_photo_contests` to `HomeView` context (one query)
+- [x] add the partial and include it in `home.html` under `{% if open_photo_contests %}`
+- [x] write tests: card shown for a published open contest with a link to `/photo/<slug>/`; hidden for unpublished
       and past-deadline contests
-- [ ] run tests - must pass before task 7
+- [x] run tests - must pass before task 7
 
 ### Task 7: Deploy configuration
 
@@ -316,28 +316,29 @@
 - Modify: `deploy/kolco24.env.example`
 - Create: `.dockerignore`
 
-- [ ] add `${DATA_LOCATION}/media_private:/app/media_private` to `kolco24_web` only (not nginx, not other services
+- [x] add `${DATA_LOCATION}/media_private:/app/media_private` to `kolco24_web` only (not nginx, not other services
       unless they need it)
-- [ ] add `.dockerignore` excluding at least `src/media_private/`, `src/media/`, `src/staticfiles/`, `.env`,
+- [x] add `.dockerignore` excluding at least `src/media_private/`, `src/media/`, `src/staticfiles/`, `.env`,
       `deploy/kolco24.env` (no `.dockerignore` exists; `Dockerfile` does `COPY src ./`, so local originals with GPS
       would otherwise be baked into the pushed image); check the Dockerfile doesn't need any excluded path
-- [ ] document `MEDIA_PRIVATE_ROOT` (optional, default `/app/media_private`) in `kolco24.env.example`
-- [ ] check `docker compose -f docker-compose_v2.yml config` parses with dummy `KOLCO24_IMAGE`/`DATA_LOCATION`/
+- [x] document `MEDIA_PRIVATE_ROOT` (optional, default `/app/media_private`) in `kolco24.env.example`
+- [x] check `docker compose -f docker-compose_v2.yml config` parses with dummy `KOLCO24_IMAGE`/`DATA_LOCATION`/
       `TRUSTED_PROXY_CIDR`
-- [ ] run tests - must pass before task 8
+- [x] run tests - must pass before task 8
 
 ### Task 8: Verify acceptance criteria
-- [ ] verify all requirements from Overview are implemented
-- [ ] verify edge cases are handled (limit race, closed contest, unpublished contest, foreign entry, bad file)
-- [ ] run full test suite: `uv run pytest`
-- [ ] run `make format` and `make lint`
-- [ ] smoke-test locally with `runserver`: create a contest in `/admin/`, upload a phone photo, moderate it
+- [x] verify all requirements from Overview are implemented
+- [x] verify edge cases are handled (limit race, closed contest, unpublished contest, foreign entry, bad file)
+- [x] run full test suite: `uv run pytest`
+- [x] run `make format` and `make lint`
+- [x] smoke-test locally with `runserver`: contest created, `/photo/`, contest page, CSS, home card, original 404 checked
+  ⚠️ real phone upload through a browser not done here — see Post-Completion
 
 ### Task 9: [Final] Update documentation
-- [ ] add a short `apps.photo_contest` section to `CLAUDE.md` (no race link, `PrivateStorage` reads settings on
+- [x] add a short `apps.photo_contest` section to `CLAUDE.md` (no race link, `PrivateStorage` reads settings on
       access and has no `url()`, `MEDIA_PRIVATE_ROOT` + `.dockerignore`, files deleted on commit, size rules,
       per-nomination limit, `view_photoentry` gate on originals, moderation in admin, voting out of scope)
-- [ ] move this plan to `docs/plans/completed/`
+- [x] move this plan to `docs/plans/completed/`
 
 ## Post-Completion
 *Items requiring manual intervention or external systems - no checkboxes, informational only*
