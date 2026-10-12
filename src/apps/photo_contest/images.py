@@ -17,6 +17,7 @@ STORE_MAX_BYTES = 15 * 1024 * 1024
 MAX_PIXELS = 50_000_000
 PREVIEW_MAX_SIDE = 1600
 FALLBACK_MAX_SIDE = 6000
+MIN_SIDE = 16
 QUALITY_STEPS = (92, 88, 85, 80)
 EXTENSIONS = {"JPEG": "jpg", "PNG": "png", "WEBP": "webp"}
 
@@ -99,12 +100,21 @@ def _jpeg_bytes(img, quality, exif=None):
     return buffer.getvalue()
 
 
+def _fit_quality(img, exif):
+    """JPEG bytes at the best quality step within ``STORE_MAX_BYTES``, or None."""
+    for quality in QUALITY_STEPS:
+        data = _jpeg_bytes(img, quality, exif)
+        if len(data) <= STORE_MAX_BYTES:
+            return data
+    return None
+
+
 def make_original(file, info):
     """Return ``(data, ext, width, height)`` of the original to store.
 
     A file within ``STORE_MAX_BYTES`` is kept byte for byte. A bigger one is
     re-encoded as JPEG at full resolution, lowering quality step by step and,
-    as a last resort, downscaling. EXIF is carried over (originals are
+    as a last resort, downscaling until it fits. EXIF is carried over (originals are
     admin-only), with the orientation already applied to the pixels.
     """
     if file.size <= STORE_MAX_BYTES:
@@ -120,13 +130,17 @@ def make_original(file, info):
         exif = img.getexif()
         exif = exif.tobytes() if exif else None
         img = _to_rgb(img)
-        for quality in QUALITY_STEPS:
-            data = _jpeg_bytes(img, quality, exif)
-            if len(data) <= STORE_MAX_BYTES:
-                break
-        else:
+        data = _fit_quality(img, exif)
+        if data is None:
             img.thumbnail((FALLBACK_MAX_SIDE, FALLBACK_MAX_SIDE))
-            data = _jpeg_bytes(img, 85, exif)
+            data = _fit_quality(img, exif)
+        while data is None:
+            # Very noisy pictures may still not fit: keep shrinking.
+            side = int(max(img.size) * 0.8)
+            if side < MIN_SIDE:
+                raise ImageRejected(UNREADABLE)
+            img.thumbnail((side, side))
+            data = _fit_quality(img, exif)
         width, height = img.size
         img.close()
     file.seek(0)

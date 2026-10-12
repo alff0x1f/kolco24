@@ -10,7 +10,7 @@ from django.views import View
 from apps.photo_contest import images
 from apps.photo_contest.forms import PhotoUploadForm
 from apps.photo_contest.models import PhotoContest, PhotoEntry
-from apps.photo_contest.services import LimitReached, create_entry
+from apps.photo_contest.services import LimitReached, SubmissionClosed, create_entry
 
 CLOSED_MESSAGE = "Приём фотографий закрыт."
 
@@ -109,6 +109,9 @@ class PhotoUploadView(View):
                 form.add_error("image", str(exc))
             except LimitReached as exc:
                 form.add_error("nomination", str(exc))
+            except SubmissionClosed:
+                messages.error(request, CLOSED_MESSAGE)
+                return redirect("photo_contest", contest.slug)
             else:
                 messages.success(request, "Фото отправлено на модерацию.")
                 return redirect("photo_contest", contest.slug)

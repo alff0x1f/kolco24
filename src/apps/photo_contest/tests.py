@@ -1,13 +1,15 @@
 import io
 import os
 import re
+import threading
 from datetime import timedelta
 
 import pytest
 from django.contrib.auth.models import Permission
 from django.core.files.base import ContentFile
+from django.core.files.storage import FileSystemStorage
 from django.core.files.uploadedfile import SimpleUploadedFile
-from django.db import transaction
+from django.db import connection, transaction
 from django.db.models import ProtectedError
 from django.urls import reverse
 from django.utils import timezone
@@ -17,7 +19,8 @@ from PIL import ExifTags, Image
 from apps.photo_contest import images
 from apps.photo_contest.forms import PhotoUploadForm
 from apps.photo_contest.models import PhotoContest, PhotoEntry, PhotoNomination
-from apps.photo_contest.services import LimitReached, create_entry
+from apps.photo_contest.services import LimitReached, SubmissionClosed, create_entry
+from apps.photo_contest.storage import PrivateStorage
 
 
 @pytest.fixture(autouse=True)
@@ -155,14 +158,17 @@ def test_original_downscaled_when_quality_steps_not_enough(monkeypatch):
     monkeypatch.setattr(images, "FALLBACK_MAX_SIDE", 100)
     file = upload(data)
     stored, ext, width, height = images.make_original(file, images.probe(file))
-    assert max(width, height) == 100
+    assert len(stored) <= 1000  # shrinks past FALLBACK_MAX_SIDE until it fits
+    assert max(width, height) <= 100
     with Image.open(io.BytesIO(stored)) as img:
         assert img.size == (width, height)
 
 
 def test_reencoded_original_applies_orientation(monkeypatch):
-    data = image_bytes(size=(400, 300), exif=exif_with(Orientation=6))
-    monkeypatch.setattr(images, "STORE_MAX_BYTES", 10)
+    data = image_bytes(
+        size=(400, 300), noise=True, quality=100, exif=exif_with(Orientation=6)
+    )
+    monkeypatch.setattr(images, "STORE_MAX_BYTES", len(data) - 1)
     file = upload(data)
     info = images.probe(file)
     assert (info.width, info.height) == (300, 400)
@@ -338,6 +344,90 @@ def test_undecodable_file_is_rejected_without_files(db, user, settings):
         create(nomination, user, full[: len(full) // 2])
     assert stored_files(settings) == []
     assert not PhotoEntry.objects.exists()
+
+
+@pytest.mark.parametrize("change", ["close", "unpublish"])
+def test_contest_closed_during_processing_is_refused(
+    db, user, settings, monkeypatch, change
+):
+    contest = make_contest()
+    nomination = make_nomination(contest)
+    real_preview = images.make_preview
+
+    def preview_then_close(file):
+        data = real_preview(file)
+        if change == "close":
+            contest.submission_until = timezone.now() - timedelta(seconds=1)
+        else:
+            contest.is_published = False
+        contest.save()
+        return data
+
+    monkeypatch.setattr(images, "make_preview", preview_then_close)
+    with pytest.raises(SubmissionClosed):
+        create(nomination, user)
+    assert not PhotoEntry.objects.exists()
+    assert stored_files(settings) == []
+
+
+@pytest.mark.parametrize("failing", ["original", "preview"])
+def test_partial_write_failure_leaves_no_files(
+    db, user, settings, monkeypatch, failing
+):
+    nomination = make_nomination(make_contest())
+    storage_cls = PrivateStorage if failing == "original" else FileSystemStorage
+    real_save = storage_cls._save
+
+    def write_half_then_fail(self, name, content):
+        if not isinstance(self, storage_cls) or (
+            storage_cls is FileSystemStorage and isinstance(self, PrivateStorage)
+        ):
+            return real_save(self, name, content)
+        path = self.path(name)
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "wb") as f:
+            f.write(b"partial")
+        raise OSError(28, "No space left on device")
+
+    monkeypatch.setattr(storage_cls, "_save", write_half_then_fail)
+    with pytest.raises(OSError):
+        create(nomination, user)
+    assert stored_files(settings) == []
+    assert not PhotoEntry.objects.exists()
+
+
+@pytest.mark.django_db(transaction=True)
+def test_concurrent_uploads_respect_limit(settings, monkeypatch, django_user_model):
+    user = django_user_model.objects.create_user("u", "u@example.com", "x")
+    nomination = make_nomination(make_contest(max_photos_per_user=1))
+    real_preview = images.make_preview
+    both_processed = threading.Barrier(2, timeout=10)
+
+    def preview_in_step(file):
+        data = real_preview(file)
+        both_processed.wait()  # both uploads reach the lock together
+        return data
+
+    monkeypatch.setattr(images, "make_preview", preview_in_step)
+    outcomes = []
+
+    def upload_one():
+        try:
+            create(nomination, user)
+            outcomes.append("created")
+        except LimitReached:
+            outcomes.append("limit")
+        finally:
+            connection.close()
+
+    threads = [threading.Thread(target=upload_one) for _ in range(2)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join(timeout=20)
+    assert sorted(outcomes) == ["created", "limit"]
+    assert PhotoEntry.objects.count() == 1
+    assert len(stored_files(settings)) == 2
 
 
 # --- file cleanup on delete ----------------------------------------------
@@ -667,3 +757,11 @@ def test_admin_contest_page_shows_folders(admin_client_logged, settings):
         in content
     )
     assert os.path.join(settings.MEDIA_ROOT, f"photo_contest/{contest.pk}/") in content
+
+
+def test_original_that_never_fits_is_rejected(monkeypatch):
+    data = image_bytes(noise=True, quality=100)
+    monkeypatch.setattr(images, "STORE_MAX_BYTES", 10)
+    file = upload(data)
+    with pytest.raises(images.ImageRejected):
+        images.make_original(file, images.probe(file))
