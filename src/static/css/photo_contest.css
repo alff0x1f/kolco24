@@ -253,7 +253,8 @@
   font-size: 14px;
   min-width: 0;
 }
-.photo-contest .pc-moderators-list li > span { min-width: 0; }
+.photo-contest .pc-moderators-list li > span { min-width: 0; overflow-wrap: anywhere; }
+.photo-contest .pc-moderators-list form { flex: none; }
 .photo-contest .pc-moderators-list li + li { border-top: 1px solid var(--line-soft); }
 .photo-contest .pc-moderators-meta { display: block; color: var(--muted); overflow-wrap: anywhere; }
 .photo-contest .pc-moderators-remove {

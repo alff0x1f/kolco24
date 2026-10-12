@@ -11,6 +11,7 @@ from django.core.files.storage import FileSystemStorage
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db import IntegrityError, connection, transaction
 from django.db.models import ProtectedError
+from django.test import Client
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.http import urlencode
@@ -1259,3 +1260,65 @@ def test_contest_page_moderators_block_per_role(
     content = client.get(contest_url(contest)).content.decode()
     assert 'id="contest-moderators"' not in content
     assert moderate_link not in content
+
+
+def csrf_token_from(client, url):
+    content = client.get(url).content.decode()
+    return re.search(r'name="csrfmiddlewaretoken" value="([^"]+)"', content).group(1)
+
+
+def test_status_change_requires_csrf_token(moderated, user):
+    contest, moderator = moderated
+    entry = make_entry(make_nomination(contest), user)
+    client = Client(enforce_csrf_checks=True)
+    client.force_login(moderator)
+    url = entry_url(contest, entry)
+
+    assert client.post(url, {"status": "approved"}).status_code == 403
+    entry.refresh_from_db()
+    assert entry.status == PhotoEntry.PENDING
+
+    token = csrf_token_from(client, moderate_url(contest))
+    response = client.post(url, {"status": "approved", "csrfmiddlewaretoken": token})
+    assert response.status_code == 302
+    entry.refresh_from_db()
+    assert entry.status == PhotoEntry.APPROVED
+
+
+def test_moderator_assignment_requires_csrf_token(db, superuser, user):
+    contest = make_contest()
+    client = Client(enforce_csrf_checks=True)
+    client.force_login(superuser)
+    data = {"action": "add", "user": user.email}
+
+    assert client.post(moderators_url(contest), data).status_code == 403
+    assert not contest.moderators.exists()
+
+    token = csrf_token_from(client, contest_url(contest))
+    response = client.post(
+        moderators_url(contest), {**data, "csrfmiddlewaretoken": token}
+    )
+    assert response.status_code == 302
+    assert can_moderate(user, contest)
+
+
+def test_status_change_on_vanished_last_page_keeps_filters(
+    client, moderated, user, monkeypatch
+):
+    monkeypatch.setattr(views, "MODERATE_PAGE_SIZE", 1)
+    contest, moderator = moderated
+    nomination = make_nomination(contest)
+    make_nomination(contest, "Люди", order=1)
+    first = make_entry(nomination, user)
+    last = make_entry(nomination, user)
+    client.force_login(moderator)
+    back = moderate_url(contest, status="pending", nomination=nomination.pk, page=2)
+
+    response = client.post(
+        entry_url(contest, last), {"status": "approved", "next": back}, follow=True
+    )
+    assert response.status_code == 200
+    assert response.context["status"] == "pending"
+    assert response.context["nomination"] == nomination
+    assert response.context["page"].number == 1
+    assert [e.pk for e in response.context["page_entries"]] == [first.pk]
