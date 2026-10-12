@@ -1252,7 +1252,7 @@ def test_contest_page_moderators_block_per_role(
     assert 'value="remove"' not in content
     assert user.email not in content
     assert moderate_link in content
-    assert "1 на проверке" in content
+    assert "На проверке: <strong>1</strong>" in content
 
     other = django_user_model.objects.create_user("x", "x@example.com", "x")
     client.force_login(other)

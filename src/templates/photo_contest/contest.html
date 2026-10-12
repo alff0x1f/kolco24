@@ -37,12 +37,8 @@
     {% endif %}
     {% endfor %}
 
-    {% if can_moderate %}
-    <a class="card card-admin pc-moderate-link" href="{% url 'photo_moderate' contest.slug %}">
-      <span class="pc-moderate-title">Модерация</span>
-      <span class="pc-moderate-count">{{ pending_count }} на проверке</span>
-    </a>
-    {% endif %}
+    <div class="pc-layout{% if show_moderators %} grid{% endif %}">
+    <div class="pc-main">
 
     {% if contest.description %}
     <div class="pc-description">{{ contest.description|linebreaks }}</div>
@@ -155,50 +151,69 @@
     <p class="pc-note pc-empty">Номинации ещё не объявлены.</p>
     {% endif %}
 
+    </div>
+
     {% if show_moderators %}
-    <section class="card card-admin pc-moderators" id="contest-moderators" aria-labelledby="contest-moderators-title">
-      <div class="side-head">
-        <h3 id="contest-moderators-title">Администраторы конкурса</h3>
-      </div>
-      <div class="card-pad">
-        {% for message in messages %}
-        {% if "contest-moderators" in message.tags %}
-        <p class="pc-moderators-msg{% if message.level_tag == 'error' %} is-error{% endif %}">{{ message }}</p>
-        {% endif %}
-        {% endfor %}
-        {% if moderators %}
-        <ul class="pc-moderators-list">
-          {% for member in moderators %}
-          <li>
-            <span>{{ member.name }} <small class="pc-moderators-meta">ID: {{ member.user_id|unlocalize }}{% if can_manage_moderators %} · {{ member.email }}{% endif %}</small></span>
-            {% if can_manage_moderators %}
-            <form method="post" action="{% url 'photo_contest_moderators' contest.slug %}">
-              {% csrf_token %}
-              <input type="hidden" name="action" value="remove">
-              <input type="hidden" name="user_id" value="{{ member.user_id|unlocalize }}">
-              <button type="submit" class="pc-moderators-remove" aria-label="Убрать {{ member.name }}" title="Убрать">×</button>
-            </form>
-            {% endif %}
-          </li>
-          {% endfor %}
-        </ul>
-        {% else %}
-        <p class="pc-note">Пока никого нет.</p>
-        {% endif %}
-        {% if can_manage_moderators %}
-        <form method="post" action="{% url 'photo_contest_moderators' contest.slug %}" class="pc-moderators-add">
-          {% csrf_token %}
-          <input type="hidden" name="action" value="add">
-          <div class="field">
-            <label for="pc-moderator-user">Пользователь</label>
-            <input class="input" id="pc-moderator-user" name="user" placeholder="Email или ID" maxlength="254" required>
+    <aside class="sidebar pc-sidebar">
+      {% if can_moderate %}
+      <section class="card card-admin" aria-labelledby="pc-moderation-title">
+        <div class="side-head">
+          <h3 id="pc-moderation-title">Модерация</h3>
+        </div>
+        <div class="card-pad pc-side-pad">
+          <p class="pc-pending">{% if pending_count %}На проверке: <strong>{{ pending_count }}</strong>{% else %}Новых фото нет{% endif %}</p>
+          <div class="admin-actions">
+            <a class="btn {% if pending_count %}btn-primary{% else %}btn-ghost{% endif %}" href="{% url 'photo_moderate' contest.slug %}">Открыть модерацию</a>
           </div>
-          <button type="submit" class="btn btn-primary">Добавить</button>
-        </form>
-        {% endif %}
-      </div>
-    </section>
+        </div>
+      </section>
+      {% endif %}
+
+      <section class="card card-admin pc-moderators" id="contest-moderators" aria-labelledby="contest-moderators-title">
+        <div class="side-head">
+          <h3 id="contest-moderators-title">Администраторы конкурса</h3>
+        </div>
+        <div class="card-pad">
+          {% for message in messages %}
+          {% if "contest-moderators" in message.tags %}
+          <p class="pc-moderators-msg{% if message.level_tag == 'error' %} is-error{% endif %}">{{ message }}</p>
+          {% endif %}
+          {% endfor %}
+          {% if moderators %}
+          <ul class="pc-moderators-list">
+            {% for member in moderators %}
+            <li>
+              <span>{{ member.name }} <small class="pc-moderators-meta">ID: {{ member.user_id|unlocalize }}{% if can_manage_moderators %} · {{ member.email }}{% endif %}</small></span>
+              {% if can_manage_moderators %}
+              <form method="post" action="{% url 'photo_contest_moderators' contest.slug %}">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="remove">
+                <input type="hidden" name="user_id" value="{{ member.user_id|unlocalize }}">
+                <button type="submit" class="pc-moderators-remove" aria-label="Убрать {{ member.name }}" title="Убрать">×</button>
+              </form>
+              {% endif %}
+            </li>
+            {% endfor %}
+          </ul>
+          {% else %}
+          <p class="pc-note">Пока никого нет.</p>
+          {% endif %}
+          {% if can_manage_moderators %}
+          <form method="post" action="{% url 'photo_contest_moderators' contest.slug %}" class="pc-moderators-add">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="add">
+            <div class="field">
+              <label for="pc-moderator-user">Пользователь</label>
+              <input class="input" id="pc-moderator-user" name="user" placeholder="Email или ID" maxlength="254" required>
+            </div>
+            <button type="submit" class="btn btn-primary">Добавить</button>
+          </form>
+          {% endif %}
+        </div>
+      </section>
+    </aside>
     {% endif %}
+    </div>
 
   </div>
 </main>
