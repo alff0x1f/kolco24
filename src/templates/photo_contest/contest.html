@@ -1,0 +1,151 @@
+{% extends "website/base-2.html" %}
+{% load static %}
+
+{% block title %}{{ contest.title }} · Кольцо 24{% endblock %}
+{% block head_descr %}{{ contest.title }} — фотоконкурс Кольцо 24.{% endblock %}
+{% block og_title %}{{ contest.title }}{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="{% static 'css/photo_contest.css' %}">
+<script src="{% static 'js/photo_contest.js' %}" defer></script>
+{% endblock %}
+
+{% block content %}
+<main class="page photo-contest">
+  <div class="container">
+
+    <div class="crumbs"><a href="{% url 'photo_contests' %}">Фотоконкурсы</a></div>
+
+    <header class="page-head">
+      <div>
+        <h1>{{ contest.title }}</h1>
+        {% if contest.is_submission_open %}
+        <p class="sub">Приём фото до {{ contest.submission_until|date:"j E, H:i" }}</p>
+        {% else %}
+        <p class="sub">Приём фото закрыт</p>
+        {% endif %}
+      </div>
+    </header>
+
+    {% if not contest.is_published %}
+    <p class="alert-error pc-banner">Конкурс не опубликован — его видят только сотрудники.</p>
+    {% endif %}
+
+    {% for message in messages %}
+    <p class="{% if message.level_tag == 'error' %}alert-error{% else %}info-banner{% endif %} pc-banner">{{ message }}</p>
+    {% endfor %}
+
+    {% if contest.description %}
+    <div class="pc-description">{{ contest.description|linebreaks }}</div>
+    {% endif %}
+
+    {% if nominations %}
+    <section class="pc-nominations-section" aria-labelledby="pc-nominations-title">
+      <div class="pc-section-head">
+        <h2 id="pc-nominations-title">Номинации</h2>
+        <p>До {{ contest.max_photos_per_user }} фото от участника в каждой</p>
+      </div>
+
+      {% if orphan_errors %}
+      <p class="alert-error pc-banner">{% for field, errors in form.errors.items %}{{ errors|join:", " }} {% endfor %}</p>
+      {% endif %}
+
+      <ul class="card pc-nominations">
+        {% for nomination in nominations %}
+        <li class="pc-nomination{% if nomination.is_full %} is-full{% endif %}" id="nomination-{{ nomination.pk }}">
+          <div class="pc-nomination-head">
+            <h3>{{ nomination.title }}</h3>
+            {% if user.is_authenticated and contest.is_submission_open %}
+            <span class="pc-count">{{ nomination.used }} из {{ contest.max_photos_per_user }}</span>
+            {% endif %}
+          </div>
+          {% if nomination.description %}<p class="pc-nomination-descr">{{ nomination.description }}</p>{% endif %}
+
+          {% if nomination.my_entries %}
+          <ul class="pc-thumbs" aria-label="Мои фото в номинации «{{ nomination.title }}»">
+            {% for entry in nomination.my_entries %}
+            <li class="pc-thumb pc-thumb-{{ entry.status }}">
+              <a class="pc-thumb-link" href="{{ entry.preview.url }}" target="_blank" rel="noopener" title="Открыть фото целиком" data-caption="{{ entry.caption }}" data-status="{{ entry.get_status_display }}">
+                <img src="{{ entry.preview.url }}" alt="{{ entry.caption|default:'Моё фото' }}" loading="lazy">
+              </a>
+              <span class="pc-status pc-status-{{ entry.status }}">{{ entry.get_status_display }}</span>
+              {% if contest.is_submission_open %}
+              <form method="post" action="{% url 'photo_delete' contest.slug entry.pk %}"
+                    onsubmit="return confirm('Удалить это фото?');">
+                {% csrf_token %}
+                <button class="link-btn pc-delete" type="submit">Удалить</button>
+              </form>
+              {% endif %}
+            </li>
+            {% endfor %}
+          </ul>
+          {% endif %}
+
+          {% if contest.is_submission_open and user.is_authenticated %}
+            {% if nomination.is_full and nomination.pk != open_nomination_pk %}
+            <p class="pc-note">Лимит набран. Чтобы отправить другое фото, удалите одно из своих.</p>
+            {% else %}
+            <details class="pc-add"{% if nomination.pk == open_nomination_pk %} open{% endif %}>
+              <summary>Добавить фото</summary>
+              <form class="form pc-add-form" method="post" action="{% url 'photo_upload' contest.slug %}" enctype="multipart/form-data" novalidate>
+                {% csrf_token %}
+                <input type="hidden" name="nomination" value="{{ nomination.pk }}">
+                {% if nomination.pk == open_nomination_pk %}
+                  {% if form.nomination.errors %}<p class="hint err">{{ form.nomination.errors|join:", " }}</p>{% endif %}
+                {% endif %}
+
+                <div class="field">
+                  <label for="pc-image-{{ nomination.pk }}">Файл</label>
+                  <input class="input pc-file{% if nomination.pk == open_nomination_pk and form.image.errors %} has-error{% endif %}" id="pc-image-{{ nomination.pk }}" name="image" type="file" accept="{{ accept }}" required>
+                  {% if nomination.pk == open_nomination_pk %}
+                  <span class="hint{% if form.image.errors %} err{% endif %}">{% if form.image.errors %}{{ form.image.errors|join:", " }} {% endif %}Выберите файл ещё раз.</span>
+                  {% else %}
+                  <span class="hint">JPEG, PNG или WebP, до 20 МБ.</span>
+                  {% endif %}
+                </div>
+
+                <div class="field">
+                  <label for="pc-caption-{{ nomination.pk }}">Подпись <span class="pc-optional">необязательно</span></label>
+                  <input class="input{% if nomination.pk == open_nomination_pk and form.caption.errors %} has-error{% endif %}" id="pc-caption-{{ nomination.pk }}" name="caption" maxlength="300" value="{% if nomination.pk == open_nomination_pk %}{{ form.caption.value|default:'' }}{% endif %}">
+                  {% if nomination.pk == open_nomination_pk and form.caption.errors %}<span class="hint err">{{ form.caption.errors|join:", " }}</span>{% endif %}
+                </div>
+
+                <div class="pc-add-actions">
+                  <button class="btn btn-primary" type="submit">Отправить фото</button>
+                  <p class="pc-note">Фото появится в конкурсе после модерации.</p>
+                </div>
+              </form>
+            </details>
+            {% endif %}
+          {% endif %}
+        </li>
+        {% endfor %}
+      </ul>
+
+      <dialog class="pc-viewer" aria-label="Просмотр фото">
+        <figure class="pc-viewer-figure">
+          <img class="pc-viewer-img" alt="">
+          <figcaption class="pc-viewer-caption">
+            <span class="pc-viewer-text"></span>
+            <span class="pc-viewer-meta"></span>
+          </figcaption>
+        </figure>
+        <button class="pc-viewer-btn pc-viewer-close" type="button" aria-label="Закрыть">×</button>
+        <button class="pc-viewer-btn pc-viewer-prev" type="button" aria-label="Предыдущее фото">‹</button>
+        <button class="pc-viewer-btn pc-viewer-next" type="button" aria-label="Следующее фото">›</button>
+      </dialog>
+
+      {% if contest.is_submission_open and not user.is_authenticated %}
+      <div class="pc-login">
+        <p class="pc-note">Отправить фото могут зарегистрированные пользователи.</p>
+        <a class="btn btn-primary" href="{% url 'login' %}?next={{ request.path|urlencode:'' }}">Войти и отправить фото</a>
+      </div>
+      {% endif %}
+    </section>
+    {% elif contest.is_submission_open %}
+    <p class="pc-note pc-empty">Номинации ещё не объявлены.</p>
+    {% endif %}
+
+  </div>
+</main>
+{% endblock %}

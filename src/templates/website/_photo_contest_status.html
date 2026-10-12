@@ -1,0 +1,1 @@
+{% load custom_filters %}{% with days=contest.days_left %}{% if days == 0 %}<span class="race-status race-status--current">Последний день приёма</span>{% elif days < 3 %}<span class="race-status race-status--current">Ещё {{ days }} {{ days|ru_plural:"день,дня,дней" }}</span>{% else %}<span class="race-status race-status--open">Приём фото открыт</span>{% endif %}{% endwith %}

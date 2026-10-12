@@ -1,0 +1,17 @@
+# Never bake local data or secrets into the image. src/media_private holds
+# photo-contest originals with EXIF/GPS; src/staticfiles is rebuilt by
+# collectstatic during the build.
+.git
+.venv
+.env
+.env.*
+db/
+dumps/
+scratch/
+deploy/kolco24.env
+src/.env
+src/backups/
+src/media/
+src/media_private/
+src/staticfiles/
+**/__pycache__

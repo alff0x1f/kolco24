@@ -1,0 +1,48 @@
+{% extends "website/base-2.html" %}
+{% load static %}
+
+{% block title %}Фотоконкурсы · Кольцо 24{% endblock %}
+{% block head_descr %}Фотоконкурсы Кольцо 24.{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="{% static 'css/photo_contest.css' %}">
+{% endblock %}
+
+{% block content %}
+<main class="page photo-contest">
+  <div class="container">
+    <header class="page-head"><h1>Фотоконкурсы</h1></header>
+
+    {% if open_contests %}
+    <section class="pc-list">
+      {% for contest in open_contests %}
+      <a class="card pc-list-item" href="{% url 'photo_contest' contest.slug %}">
+        <div class="card-pad">
+          <span class="pc-status pc-status-approved">Идёт приём</span>
+          <h2>{{ contest.title }}</h2>
+          <p class="pc-note">Приём фото до {{ contest.submission_until|date:"j E, H:i" }}</p>
+        </div>
+      </a>
+      {% endfor %}
+    </section>
+    {% endif %}
+
+    {% if closed_contests %}
+    <section class="pc-list">
+      {% for contest in closed_contests %}
+      <a class="card pc-list-item" href="{% url 'photo_contest' contest.slug %}">
+        <div class="card-pad">
+          <h2>{{ contest.title }}</h2>
+          <p class="pc-note">Приём закрыт {{ contest.submission_until|date:"j E Y" }}</p>
+        </div>
+      </a>
+      {% endfor %}
+    </section>
+    {% endif %}
+
+    {% if not open_contests and not closed_contests %}
+    <p class="pc-note">Фотоконкурсов пока нет.</p>
+    {% endif %}
+  </div>
+</main>
+{% endblock %}

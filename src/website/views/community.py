@@ -1,10 +1,12 @@
 from django.core.paginator import Paginator
+from django.db.models import Count
 from django.http import Http404
 from django.shortcuts import get_object_or_404, render
 from django.urls import reverse
 from django.utils import timezone
 from django.views import View
 
+from apps.photo_contest.models import PhotoContest
 from apps.race.permissions import is_team_editing_open
 from website.models import NewsPost, PublicationKind, Race, RaceAdmin, Team
 from website.models.race import RegStatus
@@ -129,6 +131,13 @@ class HomeView(View):
             "page_obj": page_obj,
             "publications": page_obj.object_list,
             "upcoming_races": unfinished[:3],
+            "open_photo_contests": list(
+                PhotoContest.objects.filter(
+                    is_published=True, submission_until__gte=timezone.now()
+                )
+                .annotate(nomination_count=Count("nominations"))
+                .order_by("submission_until")
+            ),
         }
         return render(request, self.template_name, context)
 

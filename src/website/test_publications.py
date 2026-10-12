@@ -1709,3 +1709,57 @@ def test_race_spotlight_date_badge_shows_range(start, end, day, month, year):
     assert f"<strong>{day}</strong>" in badge
     assert f"<span>{month}</span>" in badge
     assert f"<small>{year}</small>" in badge
+
+
+def _photo_contest(slug, published=True, until=None):
+    from apps.photo_contest.models import PhotoContest
+
+    return PhotoContest.objects.create(
+        title=f"Конкурс {slug}",
+        slug=slug,
+        is_published=published,
+        submission_until=until or timezone.now() + timedelta(days=5),
+    )
+
+
+@pytest.mark.django_db
+def test_home_shows_open_photo_contest_card(client):
+    contest = _photo_contest("open")
+    _photo_contest("draft", published=False)
+    _photo_contest("past", until=timezone.now() - timedelta(minutes=1))
+    response = client.get(reverse("index"))
+    assert response.context["open_photo_contests"] == [contest]
+    content = response.content.decode()
+    assert 'href="/photo/open/"' in content
+    assert "/photo/draft/" not in content
+    assert "/photo/past/" not in content
+
+
+@pytest.mark.django_db
+def test_home_has_no_photo_card_without_open_contests(client):
+    _photo_contest("past", until=timezone.now() - timedelta(minutes=1))
+    content = client.get(reverse("index")).content.decode()
+    assert "photo-strip" not in content
+    assert "photo-contest-card" not in content
+
+
+@pytest.mark.django_db
+def test_home_photo_strip_and_card_show_nominations_and_deadline(client):
+    from apps.photo_contest.models import PhotoNomination
+
+    soon = _photo_contest("soon", until=timezone.now() + timedelta(days=2))
+    later = _photo_contest("later", until=timezone.now() + timedelta(days=20))
+    for title in ("A", "B", "C", "D"):
+        PhotoNomination.objects.create(contest=later, title=title)
+    response = client.get(reverse("index"))
+    content = response.content.decode()
+    assert [c.nomination_count for c in response.context["open_photo_contests"]] == [
+        0,
+        4,
+    ]
+    strip = _extract(r'<section class="photo-strip"(.*?)</section>', content, "strip")
+    assert 'href="/photo/soon/"' in strip
+    assert "/photo/later/" not in strip
+    assert f"Ещё {soon.days_left}" in strip
+    assert "4 номинации" in content
+    assert "Фотоконкурсы" in content

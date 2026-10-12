@@ -28,5 +28,6 @@ urlpatterns = [
     path("app/", include("apps.mobile.urls")),
     path("donate/", include("donate.urls")),
     path("demo/", include("demo.urls")),
+    path("photo/", include("apps.photo_contest.urls")),
     path("", include("website.urls")),
 ]
