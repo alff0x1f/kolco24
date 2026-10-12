@@ -28,6 +28,7 @@
     var meta = dialog.querySelector(".pc-viewer-meta");
     var prev = dialog.querySelector(".pc-viewer-prev");
     var next = dialog.querySelector(".pc-viewer-next");
+    var close = dialog.querySelector(".pc-viewer-close");
     var links = [];
     var index = 0;
     var opener = null;
@@ -41,8 +42,11 @@
       var parts = [link.dataset.status];
       if (links.length > 1) parts.push(index + 1 + " из " + links.length);
       meta.textContent = parts.join(", ");
+      var focused = document.activeElement;
       prev.hidden = index === 0;
       next.hidden = index === links.length - 1;
+      if (focused === prev && prev.hidden) (next.hidden ? close : next).focus();
+      if (focused === next && next.hidden) (prev.hidden ? close : prev).focus();
     }
 
     document.querySelectorAll(".photo-contest .pc-thumb-link").forEach(function (link) {
@@ -64,7 +68,7 @@
     next.addEventListener("click", function () {
       if (index < links.length - 1) show(index + 1);
     });
-    dialog.querySelector(".pc-viewer-close").addEventListener("click", function () {
+    close.addEventListener("click", function () {
       dialog.close();
     });
 
