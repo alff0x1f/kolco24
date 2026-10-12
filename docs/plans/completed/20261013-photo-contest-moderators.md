@@ -156,10 +156,10 @@ dict(PhotoEntry.STATUS_CHOICES)` → 400 (не `in STATUS_CHOICES` — это с
 - Modify: `src/apps/race/views.py`
 - Modify: `src/apps/accounts/tests.py`
 
-- [ ] создать `find_user(query)` в `src/apps/accounts/users.py` — тело `RaceAdminsView._find_user` без изменений
-- [ ] в `RaceAdminsView._add` звать `find_user`, удалить `_find_user` и ставший лишним импорт `get_user_model` (если не используется)
-- [ ] написать тесты `find_user`: ID цифрами, email в другом регистре, `"²"` → поиск по email (None), 19 цифр → None, неизвестный email → None
-- [ ] запустить тесты гонок (`uv run pytest --reuse-db src/apps/race`) — должны пройти без изменений
+- [x] создать `find_user(query)` в `src/apps/accounts/users.py` — тело `RaceAdminsView._find_user` без изменений
+- [x] в `RaceAdminsView._add` звать `find_user`, удалить `_find_user` и ставший лишним импорт `get_user_model` (если не используется)
+- [x] написать тесты `find_user`: ID цифрами, email в другом регистре, `"²"` → поиск по email (None), 19 цифр → None, неизвестный email → None
+- [x] запустить тесты гонок (`uv run pytest --reuse-db src/apps/race`) — должны пройти без изменений
 
 ### Task 2: Модель PhotoContestModerator и can_moderate
 
@@ -169,12 +169,12 @@ dict(PhotoEntry.STATUS_CHOICES)` → 400 (не `in STATUS_CHOICES` — это с
 - Create: `src/apps/photo_contest/permissions.py`
 - Modify: `src/apps/photo_contest/tests.py`
 
-- [ ] добавить модель `PhotoContestModerator` (см. Technical Details)
-- [ ] `uv run python src/manage.py makemigrations photo_contest`
-- [ ] создать `permissions.py` с `can_moderate`
-- [ ] написать тесты `can_moderate`: модератор — True; аноним, обычный пользователь, суперюзер без строки, модератор другого конкурса — False
-- [ ] тест уникальности пары (contest, user) — `IntegrityError`
-- [ ] запустить тесты — должны пройти
+- [x] добавить модель `PhotoContestModerator` (см. Technical Details)
+- [x] `uv run python src/manage.py makemigrations photo_contest`
+- [x] создать `permissions.py` с `can_moderate`
+- [x] написать тесты `can_moderate`: модератор — True; аноним, обычный пользователь, суперюзер без строки, модератор другого конкурса — False
+- [x] тест уникальности пары (contest, user) — `IntegrityError`
+- [x] запустить тесты — должны пройти
 
 ### Task 3: Права модератора на существующих страницах
 
@@ -183,12 +183,12 @@ dict(PhotoEntry.STATUS_CHOICES)` → 400 (не `in STATUS_CHOICES` — это с
 - Modify: `src/templates/photo_contest/contest.html`
 - Modify: `src/apps/photo_contest/tests.py`
 
-- [ ] `_visible_contest`: неопубликованный конкурс виден `is_staff or is_superuser or can_moderate`; возвращает `(contest, can_moderate)`, обновить вызовы
-- [ ] `PhotoOriginalView`: пускать по праву `view_photoentry` или по строке модератора конкурса фото, иначе 404
-- [ ] поправить текст баннера неопубликованного конкурса
-- [ ] тесты: неопубликованный конкурс — модератор 200, суперюзер без `is_staff` 200, обычный пользователь 404
-- [ ] тесты оригинала: модератор своего конкурса 200, модератор другого конкурса 404, аноним 404, суперюзер 200, модератор + неизвестный `entry_id` 404
-- [ ] запустить тесты — должны пройти
+- [x] `_visible_contest`: неопубликованный конкурс виден `is_staff or is_superuser or can_moderate`; возвращает `(contest, can_moderate)`, обновить вызовы
+- [x] `PhotoOriginalView`: пускать по праву `view_photoentry` или по строке модератора конкурса фото, иначе 404
+- [x] поправить текст баннера неопубликованного конкурса
+- [x] тесты: неопубликованный конкурс — модератор 200, суперюзер без `is_staff` 200, обычный пользователь 404
+- [x] тесты оригинала: модератор своего конкурса 200, модератор другого конкурса 404, аноним 404, суперюзер 200, модератор + неизвестный `entry_id` 404
+- [x] запустить тесты — должны пройти
 
 ### Task 4: Страница модерации (GET)
 
@@ -199,15 +199,15 @@ dict(PhotoEntry.STATUS_CHOICES)` → 400 (не `in STATUS_CHOICES` — это с
 - Create: `src/static/css/photo_moderate.css`
 - Modify: `src/apps/photo_contest/tests.py`
 
-- [ ] хелпер гейта модерации (404 / login / 403), `PhotoModerateView.get`, URL `photo_moderate`
-- [ ] фильтры `status`/`nomination`, счётчики вкладок, сортировка, `Paginator(48)` + `get_page`
-- [ ] готовые URL вкладок/номинаций/страниц во view (`urlencode`, без `{% querystring %}`)
-- [ ] шаблон на `website/base-2.html`: вкладки, фильтр номинаций, сетка карточек, формы-кнопки, пагинация; обёртка `.photo-moderate` (без голого `.page`), ручная разметка
-- [ ] CSS в `photo_moderate.css`, подключить через `{% block extra_head %}`; без внешних ресурсов
-- [ ] тесты: аноним → login с `next`, обычный пользователь, суперюзер без строки и staff с `view_photoentry` без строки → 403, модератор → 200 (и для неопубликованного конкурса), несуществующий slug → 404
-- [ ] тесты: по умолчанию только `pending`; `?status=approved|rejected|all`; неизвестный статус → pending; `?nomination=` своей и чужой номинации; счётчики учитывают фильтр номинации и не считают фото другого конкурса; email автора и ссылка на оригинал в ответе; фото другого конкурса не попадают
-- [ ] тесты: ссылка вкладки сохраняет `nomination`, ссылка страницы — `status` и `nomination`; `?page=999` и `?page=abc` → 200
-- [ ] запустить тесты — должны пройти
+- [x] хелпер гейта модерации (404 / login / 403), `PhotoModerateView.get`, URL `photo_moderate`
+- [x] фильтры `status`/`nomination`, счётчики вкладок, сортировка, `Paginator(48)` + `get_page`
+- [x] готовые URL вкладок/номинаций/страниц во view (`urlencode`, без `{% querystring %}`)
+- [x] шаблон на `website/base-2.html`: вкладки, фильтр номинаций, сетка карточек, формы-кнопки, пагинация; обёртка `.photo-moderate` (без голого `.page`), ручная разметка
+- [x] CSS в `photo_moderate.css`, подключить через `{% block extra_head %}`; без внешних ресурсов
+- [x] тесты: аноним → login с `next`, обычный пользователь, суперюзер без строки и staff с `view_photoentry` без строки → 403, модератор → 200 (и для неопубликованного конкурса), несуществующий slug → 404
+- [x] тесты: по умолчанию только `pending`; `?status=approved|rejected|all`; неизвестный статус → pending; `?nomination=` своей и чужой номинации; счётчики учитывают фильтр номинации и не считают фото другого конкурса; email автора и ссылка на оригинал в ответе; фото другого конкурса не попадают
+- [x] тесты: ссылка вкладки сохраняет `nomination`, ссылка страницы — `status` и `nomination`; `?page=999` и `?page=abc` → 200
+- [x] запустить тесты — должны пройти
 
 ### Task 5: Смена статуса фото (POST)
 
@@ -216,13 +216,13 @@ dict(PhotoEntry.STATUS_CHOICES)` → 400 (не `in STATUS_CHOICES` — это с
 - Modify: `src/apps/photo_contest/urls.py`
 - Modify: `src/apps/photo_contest/tests.py`
 
-- [ ] `PhotoModerateEntryView.post`, URL `photo_moderate_entry`
-- [ ] поиск entry в рамках конкурса, проверка статуса через `dict(PhotoEntry.STATUS_CHOICES)` (400), `save(update_fields=["status"])`
-- [ ] redirect на безопасный `next`, иначе `photo_moderate`
-- [ ] тесты: принять / отклонить / вернуть на модерацию; redirect на `next` с параметрами; без `next` → `photo_moderate`
-- [ ] тест: возврат отклонённого фото при полной номинации разрешён (у автора становится больше лимита)
-- [ ] тесты ошибок: неизвестный статус → 400 и статус не изменился; фото другого конкурса → 404 и не изменилось; аноним → login; не модератор → 403; GET → 405; внешний `next` (`https://evil.example/`, `//evil.example/`, `https:///evil`) → `photo_moderate`
-- [ ] запустить тесты — должны пройти
+- [x] `PhotoModerateEntryView.post`, URL `photo_moderate_entry`
+- [x] поиск entry в рамках конкурса, проверка статуса через `dict(PhotoEntry.STATUS_CHOICES)` (400), `save(update_fields=["status"])`
+- [x] redirect на безопасный `next`, иначе `photo_moderate`
+- [x] тесты: принять / отклонить / вернуть на модерацию; redirect на `next` с параметрами; без `next` → `photo_moderate`
+- [x] тест: возврат отклонённого фото при полной номинации разрешён (у автора становится больше лимита)
+- [x] тесты ошибок: неизвестный статус → 400 и статус не изменился; фото другого конкурса → 404 и не изменилось; аноним → login; не модератор → 403; GET → 405; внешний `next` (`https://evil.example/`, `//evil.example/`, `https:///evil`) → `photo_moderate`
+- [x] запустить тесты — должны пройти
 
 ### Task 6: Назначение администраторов на странице конкурса
 
@@ -233,25 +233,25 @@ dict(PhotoEntry.STATUS_CHOICES)` → 400 (не `in STATUS_CHOICES` — это с
 - Modify: `src/static/css/photo_contest.css`
 - Modify: `src/apps/photo_contest/tests.py`
 
-- [ ] `PhotoContestModeratorsView.post` (add/remove, см. Technical Details), URL `photo_contest_moderators`
-- [ ] `_contest_context`: `can_moderate`, `pending_count`, `moderators`, `can_manage_moderators`
-- [ ] в `contest.html`: блок «Модерация · N на проверке» для модератора; блок `#contest-moderators` по флагам прав, не по непустому списку (имя + ID; email, форма и «Убрать» только суперюзеру; пустое состояние); общий цикл сообщений пропускает тег `contest-moderators`, блок выводит только его
-- [ ] тесты add: по email в другом регистре, по ID, повторно (одна строка), неизвестный, пустой, длиннее 254; суперюзер добавляет себя
-- [ ] тесты remove: удаляет; `user_id` модератора другого конкурса — ничего не удалено; мусорный и 25-значный `user_id` — без 500
-- [ ] тест: удаление единственного модератора → `follow=True` → блок с формой на месте, «Администратор снят.» внутри блока
-- [ ] тесты гейта: аноним → login, обычный пользователь и модератор → 403, плохой `action` → 400, redirect на `#contest-moderators`
-- [ ] тесты страницы конкурса: суперюзер видит форму и email; модератор — список без формы и без чужих email, плюс блок «N на проверке»; обычный пользователь — ни того ни другого; сообщение `contest-moderators` выводится только в блоке
-- [ ] запустить тесты — должны пройти
+- [x] `PhotoContestModeratorsView.post` (add/remove, см. Technical Details), URL `photo_contest_moderators`
+- [x] `_contest_context`: `can_moderate`, `pending_count`, `moderators`, `can_manage_moderators`
+- [x] в `contest.html`: блок «Модерация · N на проверке» для модератора; блок `#contest-moderators` по флагам прав, не по непустому списку (имя + ID; email, форма и «Убрать» только суперюзеру; пустое состояние); общий цикл сообщений пропускает тег `contest-moderators`, блок выводит только его
+- [x] тесты add: по email в другом регистре, по ID, повторно (одна строка), неизвестный, пустой, длиннее 254; суперюзер добавляет себя
+- [x] тесты remove: удаляет; `user_id` модератора другого конкурса — ничего не удалено; мусорный и 25-значный `user_id` — без 500
+- [x] тест: удаление единственного модератора → `follow=True` → блок с формой на месте, «Администратор снят.» внутри блока
+- [x] тесты гейта: аноним → login, обычный пользователь и модератор → 403, плохой `action` → 400, redirect на `#contest-moderators`
+- [x] тесты страницы конкурса: суперюзер видит форму и email; модератор — список без формы и без чужих email, плюс блок «N на проверке»; обычный пользователь — ни того ни другого; сообщение `contest-moderators` выводится только в блоке
+- [x] запустить тесты — должны пройти
 
 ### Task 7: Verify acceptance criteria
-- [ ] проверить все требования из Overview
-- [ ] `make format && make lint`
-- [ ] полный прогон: `uv run pytest`
-- [ ] `uv run python src/manage.py makemigrations --check --dry-run` — нет лишних миграций
+- [x] проверить все требования из Overview
+- [x] `make format && make lint`
+- [x] полный прогон: `uv run pytest`
+- [x] `uv run python src/manage.py makemigrations --check --dry-run` — нет лишних миграций
 
 ### Task 8: [Final] Update documentation
-- [ ] CLAUDE.md, абзац `apps.photo_contest`: 2–3 предложения — модель `PhotoContestModerator`, `can_moderate` без суперюзера (как у гонок), страница `photo_moderate`, назначение только суперюзером на странице конкурса, возврат отклонённого фото не проверяет лимит, `find_user` в `apps/accounts/users.py`
-- [ ] перенести план в `docs/plans/completed/`
+- [x] CLAUDE.md, абзац `apps.photo_contest`: 2–3 предложения — модель `PhotoContestModerator`, `can_moderate` без суперюзера (как у гонок), страница `photo_moderate`, назначение только суперюзером на странице конкурса, возврат отклонённого фото не проверяет лимит, `find_user` в `apps/accounts/users.py`
+- [x] перенести план в `docs/plans/completed/`
 
 ## Post-Completion
 

@@ -1,0 +1,125 @@
+/* Photo contest moderation page. Scoped under .photo-moderate. */
+
+.photo-moderate .crumbs a { color: var(--muted); }
+
+.photo-moderate .pm-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 16px;
+}
+.photo-moderate .pm-tab {
+  padding: 10px 14px;
+  margin-bottom: -1px;
+  border-bottom: 2px solid transparent;
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 500;
+}
+.photo-moderate .pm-tab:hover { color: var(--ink); }
+.photo-moderate .pm-tab.is-active { color: var(--ink); border-bottom-color: var(--primary-2); }
+.photo-moderate .pm-tab-count {
+  margin-left: 4px;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted-2);
+}
+
+.photo-moderate .pm-filter {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 20px;
+}
+.photo-moderate .pm-chip {
+  padding: 5px 12px;
+  border-radius: 999px;
+  background: var(--paper-2);
+  border: 1px solid var(--line);
+  color: var(--ink-soft);
+  font-size: 13px;
+}
+.photo-moderate .pm-chip:hover { border-color: #c7cdd6; color: var(--ink); }
+.photo-moderate .pm-chip.is-active {
+  background: var(--primary-2);
+  border-color: var(--primary-2);
+  color: #fff;
+}
+
+.photo-moderate .pm-grid {
+  list-style: none;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
+}
+.photo-moderate .pm-card { display: flex; flex-direction: column; overflow: hidden; }
+.photo-moderate .pm-preview { display: block; background: var(--line-soft); }
+.photo-moderate .pm-preview img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: contain;
+}
+.photo-moderate .pm-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  flex: 1;
+  padding: 14px 16px 16px;
+}
+.photo-moderate .pm-head {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+}
+.photo-moderate .pm-nomination { font-size: 13px; color: var(--muted); }
+.photo-moderate .pm-caption {
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--ink-soft);
+  overflow-wrap: anywhere;
+}
+.photo-moderate .pm-meta {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 2px 10px;
+  font-size: 13px;
+}
+.photo-moderate .pm-meta dt { color: var(--muted); }
+.photo-moderate .pm-meta dd { margin: 0; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
+.photo-moderate .pm-original { font-size: 13px; align-self: flex-start; }
+.photo-moderate .pm-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: auto;
+  padding-top: 4px;
+}
+
+.photo-moderate .pm-status {
+  display: inline-block;
+  font-size: 11.5px;
+  font-weight: 500;
+  padding: 2px 8px;
+  border-radius: 999px;
+}
+.photo-moderate .pm-status-pending { background: var(--warn-bg); color: var(--warn); }
+.photo-moderate .pm-status-approved { background: #eaf4ee; color: var(--success-dk); }
+.photo-moderate .pm-status-rejected { background: var(--danger-bg); color: var(--danger); }
+
+.photo-moderate .pm-pager {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  margin-top: 24px;
+}
+.photo-moderate .pm-pager-info { font-size: 13px; color: var(--muted); }
+.photo-moderate .pm-empty { font-size: 14px; color: var(--muted); padding: 24px 0; }
+
+@media (max-width: 600px) {
+  .photo-moderate .pm-tab { padding: 8px 10px; font-size: 13px; }
+  .photo-moderate .pm-grid { grid-template-columns: 1fr; }
+}

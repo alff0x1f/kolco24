@@ -651,7 +651,12 @@ Django 4.2 project. Source lives entirely under `src/`, with `manage.py` at `src
   `photo_contest/<contest_id>/<nomination_id>/<uuid>.<ext>` in both roots (one folder per contest for backups; ids,
   never slugs), which is why `nomination` is read-only in the admin. Files are deleted by a `post_delete` signal via
   `transaction.on_commit` (a rolled-back delete keeps them). `.dockerignore` keeps `src/media_private/` (and other
-  local data/secrets) out of the image. The home page shows open contests via `open_photo_contests`
+  local data/secrets) out of the image. **Moderators** are `PhotoContestModerator` rows (contest+user, no roles),
+  assigned only by a superuser in the «Администраторы конкурса» block on the contest page (`photo_contest_moderators`,
+  user looked up by `apps/accounts/users.py:find_user`, shared with `RaceAdminsView`). `permissions.py:can_moderate`
+  needs a row — a bare superuser is not a moderator, as with races. A moderator sees the unpublished contest, opens
+  originals of its photos and works on `photo_moderate` (`<slug>/moderate/`); restoring a rejected photo does not
+  re-check the per-nomination limit. The home page shows open contests via `open_photo_contests`
   (`_home_photo_contests.html`).
  `src/apps/<name>/`. Each needs a unique `AppConfig` label (e.g.
 `label = "race_app"`).

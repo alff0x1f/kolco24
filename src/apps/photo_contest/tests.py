@@ -5,20 +5,26 @@ import threading
 from datetime import timedelta
 
 import pytest
-from django.contrib.auth.models import Permission
+from django.contrib.auth.models import AnonymousUser, Permission
 from django.core.files.base import ContentFile
 from django.core.files.storage import FileSystemStorage
 from django.core.files.uploadedfile import SimpleUploadedFile
-from django.db import connection, transaction
+from django.db import IntegrityError, connection, transaction
 from django.db.models import ProtectedError
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.http import urlencode
 from PIL import ExifTags, Image
 
-from apps.photo_contest import images
+from apps.photo_contest import images, views
 from apps.photo_contest.forms import PhotoUploadForm
-from apps.photo_contest.models import PhotoContest, PhotoEntry, PhotoNomination
+from apps.photo_contest.models import (
+    PhotoContest,
+    PhotoContestModerator,
+    PhotoEntry,
+    PhotoNomination,
+)
+from apps.photo_contest.permissions import can_moderate
 from apps.photo_contest.services import LimitReached, SubmissionClosed, create_entry
 from apps.photo_contest.storage import PrivateStorage
 
@@ -92,6 +98,37 @@ def test_original_goes_to_private_root_without_public_url(django_user_model, set
     assert entry.preview.path.startswith(settings.MEDIA_ROOT)
     with pytest.raises(NotImplementedError):
         entry.original.url
+
+
+def make_moderator(contest, user):
+    return PhotoContestModerator.objects.create(contest=contest, user=user)
+
+
+@pytest.mark.django_db
+def test_can_moderate_only_with_own_moderator_row(django_user_model):
+    contest = make_contest("a")
+    other = make_contest("b")
+    moderator = django_user_model.objects.create_user("m", "m@example.com", "x")
+    other_moderator = django_user_model.objects.create_user("o", "o@example.com", "x")
+    plain = django_user_model.objects.create_user("p", "p@example.com", "x")
+    superuser = django_user_model.objects.create_superuser("s", "s@example.com", "x")
+    make_moderator(contest, moderator)
+    make_moderator(other, other_moderator)
+
+    assert can_moderate(moderator, contest)
+    assert not can_moderate(AnonymousUser(), contest)
+    assert not can_moderate(plain, contest)
+    assert not can_moderate(superuser, contest)
+    assert not can_moderate(other_moderator, contest)
+
+
+@pytest.mark.django_db
+def test_moderator_row_is_unique_per_contest(django_user_model):
+    contest = make_contest()
+    user = django_user_model.objects.create_user("m", "m@example.com", "x")
+    make_moderator(contest, user)
+    with pytest.raises(IntegrityError):
+        make_moderator(contest, user)
 
 
 # --- images ---------------------------------------------------------------
@@ -518,6 +555,28 @@ def test_unpublished_contest_hidden_except_for_staff(client, db, user, staff):
     assert "Конкурс не опубликован" in response.content.decode()
 
 
+def test_unpublished_contest_visible_to_moderator_and_superuser(
+    client, db, user, django_user_model
+):
+    contest = make_contest(published=False)
+    moderator = django_user_model.objects.create_user("m", "m@example.com", "x")
+    make_moderator(contest, moderator)
+    client.force_login(moderator)
+    response = client.get(contest_url(contest))
+    assert response.status_code == 200
+    assert "администраторы конкурса" in response.content.decode()
+
+    superuser = django_user_model.objects.create_user(
+        "s", "s@example.com", "x", is_superuser=True
+    )
+    client.force_login(superuser)
+    assert client.get(contest_url(contest)).status_code == 200
+
+    make_moderator(make_contest("other", published=False), user)
+    client.force_login(user)
+    assert client.get(contest_url(contest)).status_code == 404
+
+
 def test_anonymous_sees_login_link_with_next(client, db):
     contest = make_contest()
     make_nomination(contest)
@@ -757,6 +816,24 @@ def test_original_needs_view_permission(client, db, user, staff, django_user_mod
     assert client.get(url).status_code == 200
 
 
+def test_original_open_to_moderator_of_its_contest(client, db, user, django_user_model):
+    contest = make_contest()
+    entry = create(make_nomination(contest), user)
+    url = reverse("photo_original", args=[entry.pk])
+    moderator = django_user_model.objects.create_user("m", "m@example.com", "x")
+    make_moderator(contest, moderator)
+    other_moderator = django_user_model.objects.create_user("o", "o@example.com", "x")
+    make_moderator(make_contest("other"), other_moderator)
+
+    client.force_login(moderator)
+    assert client.get(url).status_code == 200
+    missing = reverse("photo_original", args=[entry.pk + 1000])
+    assert client.get(missing).status_code == 404
+
+    client.force_login(other_moderator)
+    assert client.get(url).status_code == 404
+
+
 def test_original_missing_on_disk_is_404(client, db, user, django_user_model):
     entry = create(make_nomination(make_contest()), user)
     os.remove(entry.original.path)
@@ -825,3 +902,360 @@ def test_original_that_never_fits_is_rejected(monkeypatch):
     file = upload(data)
     with pytest.raises(images.ImageRejected):
         images.make_original(file, images.probe(file))
+
+
+# --- moderation -----------------------------------------------------------
+
+
+@pytest.fixture
+def moderated(db, django_user_model):
+    contest = make_contest()
+    moderator = django_user_model.objects.create_user("mod", "mod@example.com", "x")
+    make_moderator(contest, moderator)
+    return contest, moderator
+
+
+def moderate_url(contest, **params):
+    url = reverse("photo_moderate", args=[contest.slug])
+    return f"{url}?{urlencode(params)}" if params else url
+
+
+def entry_url(contest, entry):
+    return reverse("photo_moderate_entry", args=[contest.slug, entry.pk])
+
+
+def test_moderate_page_gate(client, moderated, user, staff, django_user_model):
+    contest, moderator = moderated
+    url = moderate_url(contest)
+
+    response = client.get(url)
+    assert response.status_code == 302
+    assert response["Location"] == reverse("login") + "?" + urlencode({"next": url})
+
+    client.force_login(user)
+    assert client.get(url).status_code == 403
+    superuser = django_user_model.objects.create_superuser("s", "s@example.com", "x")
+    client.force_login(superuser)
+    assert client.get(url).status_code == 403
+    staff.user_permissions.add(Permission.objects.get(codename="view_photoentry"))
+    client.force_login(django_user_model.objects.get(pk=staff.pk))
+    assert client.get(url).status_code == 403
+
+    client.force_login(moderator)
+    assert client.get(url).status_code == 200
+    assert client.get("/photo/nope/moderate/").status_code == 404
+
+
+def test_moderate_page_works_for_unpublished_contest(client, django_user_model, db):
+    contest = make_contest(published=False)
+    moderator = django_user_model.objects.create_user("m", "m@example.com", "x")
+    make_moderator(contest, moderator)
+    client.force_login(moderator)
+    assert client.get(moderate_url(contest)).status_code == 200
+
+
+def test_moderate_page_filters_and_counts(client, moderated, user):
+    contest, moderator = moderated
+    landscape = make_nomination(contest, "Пейзаж")
+    people = make_nomination(contest, "Люди", order=1)
+    pending = make_entry(landscape, user)
+    approved = make_entry(landscape, user, PhotoEntry.APPROVED)
+    rejected = make_entry(people, user, PhotoEntry.REJECTED)
+    people_pending = make_entry(people, user)
+    foreign = make_entry(make_nomination(make_contest("other")), user)
+    client.force_login(moderator)
+
+    def shown(**params):
+        response = client.get(moderate_url(contest, **params))
+        assert response.status_code == 200
+        return response, [e.pk for e in response.context["page_entries"]]
+
+    response, pks = shown()
+    assert pks == [pending.pk, people_pending.pk]
+    counts = {t["value"]: t["count"] for t in response.context["tabs"]}
+    assert counts == {"pending": 2, "approved": 1, "rejected": 1, "all": 4}
+    assert foreign.pk not in pks
+
+    assert shown(status="approved")[1] == [approved.pk]
+    assert shown(status="rejected")[1] == [rejected.pk]
+    assert len(shown(status="all")[1]) == 4
+    assert shown(status="bogus")[1] == [pending.pk, people_pending.pk]
+
+    response, pks = shown(nomination=people.pk)
+    assert pks == [people_pending.pk]
+    counts = {t["value"]: t["count"] for t in response.context["tabs"]}
+    assert counts == {"pending": 1, "approved": 0, "rejected": 1, "all": 2}
+
+    foreign_nomination = foreign.nomination.pk
+    assert shown(nomination=foreign_nomination)[1] == [pending.pk, people_pending.pk]
+    assert shown(nomination="x")[1] == [pending.pk, people_pending.pk]
+
+
+def test_moderate_page_card_shows_author_and_original(client, moderated, user):
+    contest, moderator = moderated
+    entry = make_entry(make_nomination(contest), user)
+    client.force_login(moderator)
+    content = client.get(moderate_url(contest)).content.decode()
+    assert user.email in content
+    assert reverse("photo_original", args=[entry.pk]) in content
+    assert 'value="approved"' in content
+    assert 'value="rejected"' in content
+    assert 'value="pending"' not in content
+
+
+def test_moderate_page_links_keep_filters(client, moderated, user, monkeypatch):
+    monkeypatch.setattr(views, "MODERATE_PAGE_SIZE", 1)
+    contest, moderator = moderated
+    nomination = make_nomination(contest)
+    make_nomination(contest, "Люди", order=1)
+    make_entry(nomination, user)
+    make_entry(nomination, user)
+    client.force_login(moderator)
+
+    response = client.get(moderate_url(contest, nomination=nomination.pk))
+    tab_urls = {t["value"]: t["url"] for t in response.context["tabs"]}
+    assert f"nomination={nomination.pk}" in tab_urls["approved"]
+    assert "status=approved" in tab_urls["approved"]
+    next_url = response.context["next_url"]
+    assert "page=2" in next_url
+    assert "status=pending" in next_url
+    assert f"nomination={nomination.pk}" in next_url
+
+    for page in ("999", "abc"):
+        response = client.get(moderate_url(contest, page=page))
+        assert response.status_code == 200
+
+
+@pytest.mark.parametrize(
+    "start, target",
+    [
+        (PhotoEntry.PENDING, PhotoEntry.APPROVED),
+        (PhotoEntry.PENDING, PhotoEntry.REJECTED),
+        (PhotoEntry.REJECTED, PhotoEntry.PENDING),
+    ],
+)
+def test_moderator_changes_status(client, moderated, user, start, target):
+    contest, moderator = moderated
+    entry = make_entry(make_nomination(contest), user, start)
+    client.force_login(moderator)
+    back = moderate_url(contest, status="all", page="2")
+    response = client.post(entry_url(contest, entry), {"status": target, "next": back})
+    assert response.status_code == 302
+    assert response["Location"] == back
+    entry.refresh_from_db()
+    assert entry.status == target
+
+
+def test_status_change_without_next_returns_to_moderate_page(client, moderated, user):
+    contest, moderator = moderated
+    entry = make_entry(make_nomination(contest), user)
+    client.force_login(moderator)
+    response = client.post(entry_url(contest, entry), {"status": "approved"})
+    assert response["Location"] == moderate_url(contest)
+
+
+@pytest.mark.parametrize(
+    "next_url", ["https://evil.example/", "//evil.example/", "https:///evil"]
+)
+def test_status_change_ignores_external_next(client, moderated, user, next_url):
+    contest, moderator = moderated
+    entry = make_entry(make_nomination(contest), user)
+    client.force_login(moderator)
+    response = client.post(
+        entry_url(contest, entry), {"status": "approved", "next": next_url}
+    )
+    assert response["Location"] == moderate_url(contest)
+
+
+def test_restoring_rejected_photo_may_exceed_limit(client, moderated, user):
+    contest, moderator = moderated
+    nomination = make_nomination(contest)
+    rejected = make_entry(nomination, user, PhotoEntry.REJECTED)
+    for _ in range(contest.max_photos_per_user):
+        make_entry(nomination, user)
+    client.force_login(moderator)
+    client.post(entry_url(contest, rejected), {"status": "approved"})
+    rejected.refresh_from_db()
+    assert rejected.status == PhotoEntry.APPROVED
+
+
+def test_status_change_errors(client, moderated, user):
+    contest, moderator = moderated
+    entry = make_entry(make_nomination(contest), user)
+    foreign = make_entry(make_nomination(make_contest("other")), user)
+    url = entry_url(contest, entry)
+
+    response = client.post(url, {"status": "approved"})
+    assert response.status_code == 302
+    assert response["Location"].startswith(reverse("login"))
+
+    client.force_login(user)
+    assert client.post(url, {"status": "approved"}).status_code == 403
+
+    client.force_login(moderator)
+    assert client.post(url, {"status": "bogus"}).status_code == 400
+    assert client.post(url).status_code == 400
+    assert client.get(url).status_code == 405
+    foreign_url = reverse("photo_moderate_entry", args=[contest.slug, foreign.pk])
+    assert client.post(foreign_url, {"status": "approved"}).status_code == 404
+
+    entry.refresh_from_db()
+    foreign.refresh_from_db()
+    assert entry.status == PhotoEntry.PENDING
+    assert foreign.status == PhotoEntry.PENDING
+
+
+# --- moderator assignment -------------------------------------------------
+
+
+@pytest.fixture
+def superuser(django_user_model):
+    return django_user_model.objects.create_superuser("root", "root@example.com", "x")
+
+
+def moderators_url(contest):
+    return reverse("photo_contest_moderators", args=[contest.slug])
+
+
+def block_messages(response):
+    content = response.content.decode()
+    block = content.split('id="contest-moderators"', 1)
+    return block[1] if len(block) == 2 else ""
+
+
+def test_superuser_adds_moderator_by_email_and_id(client, db, superuser, user):
+    contest = make_contest()
+    client.force_login(superuser)
+
+    response = client.post(
+        moderators_url(contest), {"action": "add", "user": user.email.upper()}
+    )
+    assert response.status_code == 302
+    assert response["Location"] == contest_url(contest) + "#contest-moderators"
+    assert can_moderate(user, contest)
+
+    client.post(moderators_url(contest), {"action": "add", "user": str(user.pk)})
+    assert contest.moderators.count() == 1
+
+    client.post(moderators_url(contest), {"action": "add", "user": str(superuser.pk)})
+    assert can_moderate(superuser, contest)
+
+
+@pytest.mark.parametrize(
+    "value, text",
+    [
+        ("", "Укажите email или ID"),
+        ("   ", "Укажите email или ID"),
+        ("x" * 255, "Слишком длинное"),
+        ("ghost@example.com", "не найден"),
+    ],
+)
+def test_add_moderator_errors(client, db, superuser, value, text):
+    contest = make_contest()
+    client.force_login(superuser)
+    response = client.post(
+        moderators_url(contest), {"action": "add", "user": value}, follow=True
+    )
+    assert text in block_messages(response)
+    assert not contest.moderators.exists()
+
+
+def test_already_assigned_moderator_message(client, db, superuser, user):
+    contest = make_contest()
+    make_moderator(contest, user)
+    client.force_login(superuser)
+    response = client.post(
+        moderators_url(contest), {"action": "add", "user": user.email}, follow=True
+    )
+    assert "уже администратор" in block_messages(response)
+
+
+def test_remove_last_moderator_keeps_block_and_message(client, db, superuser, user):
+    contest = make_contest()
+    make_moderator(contest, user)
+    client.force_login(superuser)
+    response = client.post(
+        moderators_url(contest),
+        {"action": "remove", "user_id": str(user.pk)},
+        follow=True,
+    )
+    assert not contest.moderators.exists()
+    block = block_messages(response)
+    assert "Администратор снят." in block
+    assert 'name="user"' in block
+    assert "Пока никого нет" in block
+    head = response.content.decode().split('id="contest-moderators"', 1)[0]
+    assert "Администратор снят." not in head
+
+
+@pytest.mark.parametrize("user_id", ["abc", "", "1" * 25, "-1"])
+def test_remove_bad_user_id_is_harmless(client, db, superuser, user, user_id):
+    contest = make_contest()
+    make_moderator(contest, user)
+    client.force_login(superuser)
+    response = client.post(
+        moderators_url(contest), {"action": "remove", "user_id": user_id}
+    )
+    assert response.status_code == 302
+    assert contest.moderators.count() == 1
+
+
+def test_remove_does_not_touch_other_contest(client, db, superuser, user):
+    contest = make_contest()
+    other = make_contest("other")
+    make_moderator(other, user)
+    client.force_login(superuser)
+    client.post(moderators_url(contest), {"action": "remove", "user_id": str(user.pk)})
+    assert can_moderate(user, other)
+
+
+def test_moderators_view_gate(client, db, superuser, user):
+    contest = make_contest(published=False)
+    make_moderator(contest, user)
+    url = moderators_url(contest)
+
+    response = client.post(url, {"action": "add", "user": "a@b.c"})
+    assert response["Location"] == reverse("login") + "?" + urlencode(
+        {"next": contest_url(contest)}
+    )
+    client.force_login(user)
+    assert client.post(url, {"action": "add", "user": "a@b.c"}).status_code == 403
+    client.force_login(superuser)
+    assert client.post(url, {"action": "bogus"}).status_code == 400
+    assert client.get(url).status_code == 405
+    assert client.post("/photo/nope/moderators/", {"action": "add"}).status_code == 404
+
+
+def test_contest_page_moderators_block_per_role(
+    client, db, superuser, user, django_user_model
+):
+    contest = make_contest()
+    nomination = make_nomination(contest)
+    moderator = django_user_model.objects.create_user("mod", "mod@example.com", "x")
+    make_moderator(contest, moderator)
+    make_moderator(contest, user)
+    make_entry(nomination, user)
+    make_entry(nomination, user, PhotoEntry.APPROVED)
+    moderate_link = reverse("photo_moderate", args=[contest.slug])
+
+    client.force_login(superuser)
+    content = client.get(contest_url(contest)).content.decode()
+    assert 'id="contest-moderators"' in content
+    assert 'name="user"' in content
+    assert user.email in content
+    assert moderate_link not in content
+
+    client.force_login(moderator)
+    content = client.get(contest_url(contest)).content.decode()
+    assert 'id="contest-moderators"' in content
+    assert 'name="user"' not in content
+    assert 'value="remove"' not in content
+    assert user.email not in content
+    assert moderate_link in content
+    assert "1 на проверке" in content
+
+    other = django_user_model.objects.create_user("x", "x@example.com", "x")
+    client.force_login(other)
+    content = client.get(contest_url(contest)).content.decode()
+    assert 'id="contest-moderators"' not in content
+    assert moderate_link not in content

@@ -7,7 +7,6 @@ from urllib.parse import quote
 
 from django.conf import settings
 from django.contrib import messages
-from django.contrib.auth import get_user_model
 from django.db import transaction
 from django.db.models import Count, OuterRef, ProtectedError, Q, Subquery
 from django.http import (
@@ -27,6 +26,7 @@ from django.utils.safestring import mark_safe
 from django.views import View
 from django.views.decorators.cache import never_cache
 
+from apps.accounts.users import find_user
 from apps.mobile.models import AppInstall, Mark, TrackPoint
 from apps.race import finish_forecast
 from apps.race.app_data import build_overview, build_team_timeline
@@ -252,16 +252,6 @@ class RaceAdminsView(View):
     def _success(self, request, text):
         messages.success(request, text, extra_tags=self.MESSAGE_TAG)
 
-    @staticmethod
-    def _find_user(query):
-        user_model = get_user_model()
-        # isdigit() alone also accepts "²"/"①", which int() rejects.
-        if query.isascii() and query.isdigit():
-            if len(query) > 18:
-                return None
-            return user_model.objects.filter(pk=int(query)).first()
-        return user_model.objects.filter(email__iexact=query).order_by("pk").first()
-
     def _add(self, request, race):
         query = request.POST.get("user", "").strip()
         role = request.POST.get("role", "")
@@ -274,7 +264,7 @@ class RaceAdminsView(View):
         if len(query) > self.MAX_QUERY_LENGTH:
             self._error(request, "Слишком длинное значение.")
             return
-        user = self._find_user(query)
+        user = find_user(query)
         if user is None:
             self._error(request, f"Пользователь «{query}» не найден.")
             return

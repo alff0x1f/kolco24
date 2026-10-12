@@ -12,6 +12,21 @@ urlpatterns = [
     path("<slug:slug>/", views.PhotoContestView.as_view(), name="photo_contest"),
     path("<slug:slug>/upload/", views.PhotoUploadView.as_view(), name="photo_upload"),
     path(
+        "<slug:slug>/moderators/",
+        views.PhotoContestModeratorsView.as_view(),
+        name="photo_contest_moderators",
+    ),
+    path(
+        "<slug:slug>/moderate/",
+        views.PhotoModerateView.as_view(),
+        name="photo_moderate",
+    ),
+    path(
+        "<slug:slug>/moderate/<int:entry_id>/",
+        views.PhotoModerateEntryView.as_view(),
+        name="photo_moderate_entry",
+    ),
+    path(
         "<slug:slug>/entry/<int:entry_id>/delete/",
         views.PhotoDeleteView.as_view(),
         name="photo_delete",

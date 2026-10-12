@@ -96,3 +96,24 @@ class PhotoEntry(models.Model):
 
     def __str__(self):
         return self.caption or f"Фото #{self.pk}"
+
+
+class PhotoContestModerator(models.Model):
+    contest = models.ForeignKey(
+        PhotoContest, on_delete=models.CASCADE, related_name="moderators"
+    )
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="moderated_photo_contests",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ("contest", "user")
+        ordering = ["created_at", "pk"]
+        verbose_name = "администратор конкурса"
+        verbose_name_plural = "администраторы конкурса"
+
+    def __str__(self):
+        return f"{self.user} — {self.contest}"
