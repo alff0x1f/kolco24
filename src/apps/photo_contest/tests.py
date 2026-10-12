@@ -523,7 +523,7 @@ def test_anonymous_sees_login_link_with_next(client, db):
     make_nomination(contest)
     content = client.get(contest_url(contest)).content.decode()
     next_param = urlencode({"next": contest_url(contest)})
-    assert f'{reverse("account_start")}?{next_param}' in content
+    assert f'{reverse("login")}?{next_param}' in content
     assert 'name="image"' not in content
 
 
@@ -636,7 +636,7 @@ def test_upload_anonymous_redirects_to_login(client, db):
     response = post_photo(client, contest, make_nomination(contest))
     assert response.status_code == 302
     assert response.url == (
-        reverse("account_start") + "?" + urlencode({"next": contest_url(contest)})
+        reverse("login") + "?" + urlencode({"next": contest_url(contest)})
     )
     assert not PhotoEntry.objects.exists()
 

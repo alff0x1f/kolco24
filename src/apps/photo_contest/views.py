@@ -17,7 +17,7 @@ CLOSED_MESSAGE = "Приём фотографий закрыт."
 def _login_redirect(contest):
     next_url = reverse("photo_contest", args=[contest.slug])
     return HttpResponseRedirect(
-        reverse("account_start") + "?" + urlencode({"next": next_url})
+        reverse("login") + "?" + urlencode({"next": next_url})
     )
 
 
