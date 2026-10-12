@@ -540,14 +540,74 @@ def test_upload_form_markup(client, db, user):
     assert 'accept="image/jpeg,image/png,image/webp"' in content
 
 
-def test_full_nomination_is_disabled_in_select(client, db, user):
+def test_full_nomination_has_no_form(client, db, user):
     contest = make_contest(max_photos_per_user=1)
     full, free = make_nomination(contest, "Full"), make_nomination(contest, "Free")
     create(full, user)
     client.force_login(user)
     content = client.get(contest_url(contest)).content.decode()
-    assert f'<option value="{full.pk}" disabled>' in content
-    assert f'<option value="{free.pk}">' in content
+    assert f'name="nomination" value="{full.pk}"' not in content
+    assert f'name="nomination" value="{free.pk}"' in content
+    assert "Лимит набран" in content
+
+
+def test_nomination_shows_own_count_and_thumbnails(client, db, user, settings):
+    settings.MEDIA_URL = "/media/"
+    contest = make_contest(max_photos_per_user=3)
+    first = make_nomination(contest, "A", 0)
+    make_nomination(contest, "B", 1)
+    kept = make_entry(first, user)
+    rejected = make_entry(first, user, status=PhotoEntry.REJECTED)
+    client.force_login(user)
+    response = client.get(contest_url(contest))
+    nominations = response.context["nominations"]
+    assert [n.used for n in nominations] == [1, 0]
+    assert nominations[0].my_entries == [rejected, kept]
+    assert nominations[1].my_entries == []
+    content = response.content.decode()
+    assert "1 из 3" in content
+    assert "0 из 3" in content
+    assert "pc-thumb-rejected" in content
+    assert f'href="{kept.preview.url}" target="_blank"' in content
+
+
+def test_anonymous_sees_no_counters_or_forms(client, db):
+    contest = make_contest()
+    make_nomination(contest)
+    content = client.get(contest_url(contest)).content.decode()
+    assert "pc-count" not in content
+    assert "<details" not in content
+
+
+def test_failed_upload_reopens_its_nomination(client, db, user):
+    contest = make_contest()
+    make_nomination(contest, "A", 0)
+    target = make_nomination(contest, "B", 1)
+    client.force_login(user)
+    response = post_photo(client, contest, target, data=b"garbage", caption="Рассвет")
+    assert response.status_code == 200
+    content = response.content.decode()
+    assert content.count("<details") == 2
+    assert content.count('<details class="pc-add" open>') == 1
+    opened = content.index('<details class="pc-add" open>')
+    assert content.index(f'value="{target.pk}"', opened) < content.index(
+        "</details>", opened
+    )
+    assert 'value="Рассвет"' in content
+    assert "Выберите файл ещё раз" in content
+
+
+def test_unknown_nomination_error_is_shown_as_banner(client, db, user):
+    contest = make_contest()
+    make_nomination(contest)
+    client.force_login(user)
+    response = client.post(
+        reverse("photo_upload", args=[contest.slug]),
+        {"nomination": 999999, "image": upload(image_bytes())},
+    )
+    assert response.status_code == 200
+    assert response.context["orphan_errors"] is True
+    assert "Выберите номинацию из списка" in response.content.decode()
 
 
 def test_closed_contest_has_no_form(client, db, user):
@@ -556,7 +616,7 @@ def test_closed_contest_has_no_form(client, db, user):
     client.force_login(user)
     content = client.get(contest_url(contest)).content.decode()
     assert 'name="image"' not in content
-    assert "Приём фотографий закрыт" in content
+    assert "Приём фото закрыт" in content
 
 
 def test_my_photos_lists_only_own_entries(client, db, user, django_user_model):
@@ -602,7 +662,7 @@ def test_upload_success_creates_pending_entry(client, db, user):
     client.force_login(user)
     response = post_photo(client, contest, nomination, caption="Рассвет")
     assert response.status_code == 302
-    assert response.url == contest_url(contest)
+    assert response.url == f"{contest_url(contest)}#nomination-{nomination.pk}"
     entry = PhotoEntry.objects.get()
     assert (entry.uploaded_by, entry.nomination, entry.caption) == (
         user,

@@ -1,0 +1,22 @@
+{% load custom_filters %}
+{% if open_photo_contests %}
+{% with contest=open_photo_contests.0 %}
+<section class="photo-strip" aria-labelledby="photo-strip-title">
+  <div class="container">
+    <div class="photo-strip__inner">
+      <svg class="photo-strip__icon" viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" focusable="false">
+        <path d="M4 8h3l1.6-2.2A2 2 0 0 1 10.2 5h3.6a2 2 0 0 1 1.6.8L17 8h3a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>
+        <circle cx="12" cy="13" r="3.4" fill="none" stroke="currentColor" stroke-width="1.6"/>
+      </svg>
+      <div class="photo-strip__copy">
+        <h2 id="photo-strip-title"><a href="{% url 'photo_contest' contest.slug %}">{{ contest.title }}</a></h2>
+        <p>
+          {% if contest.days_left < 3 %}{% include "website/_photo_contest_status.html" %}{% else %}Приём фото до {{ contest.submission_until|date:"j E" }}{% endif %}{% if contest.nomination_count %}, {{ contest.nomination_count }} {{ contest.nomination_count|ru_plural:"номинация,номинации,номинаций" }}{% endif %}
+        </p>
+      </div>
+      <a class="community-button community-button--accent photo-strip__action" href="{% url 'photo_contest' contest.slug %}">Отправить фото</a>
+    </div>
+  </div>
+</section>
+{% endwith %}
+{% endif %}

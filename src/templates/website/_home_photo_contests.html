@@ -1,15 +1,25 @@
+{% load custom_filters %}
 {% if open_photo_contests %}
-<section class="card home-photo-contests" aria-labelledby="home-photo-title">
-  <div class="side-head">
-    <h3 id="home-photo-title">Фотоконкурс</h3>
-  </div>
-  <div class="card-pad">
-    {% for contest in open_photo_contests %}
-    <p class="home-photo-contests__item">
-      <a href="{% url 'photo_contest' contest.slug %}">{{ contest.title }}</a>
-      <span>приём фото до {{ contest.submission_until|date:"j E" }}</span>
-    </p>
-    {% endfor %}
-  </div>
-</section>
+<div class="home-races__head home-photo-contests__head">
+  <h2 id="home-photo-title">{% if open_photo_contests|length > 1 %}Фотоконкурсы{% else %}Фотоконкурс{% endif %}</h2>
+</div>
+<div class="home-races__list" aria-labelledby="home-photo-title">
+  {% for contest in open_photo_contests %}
+  <article class="race-list-card photo-contest-card">
+    <div class="race-list-card__date photo-contest-card__date">
+      <span class="photo-contest-card__until">до</span>
+      <strong>{{ contest.submission_until|date:"j" }}</strong>
+      <span>{{ contest.submission_until|date:"M" }}</span>
+    </div>
+    <div class="race-list-card__body">
+      <div class="race-list-card__status">
+        {% include "website/_photo_contest_status.html" %}
+      </div>
+      <h3><a href="{% url 'photo_contest' contest.slug %}">{{ contest.title }}</a></h3>
+      {% if contest.nomination_count %}<p>{{ contest.nomination_count }} {{ contest.nomination_count|ru_plural:"номинация,номинации,номинаций" }}</p>{% endif %}
+    </div>
+    <span class="race-list-card__arrow" aria-hidden="true">→</span>
+  </article>
+  {% endfor %}
+</div>
 {% endif %}

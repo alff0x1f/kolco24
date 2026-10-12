@@ -1,5 +1,4 @@
 from django.contrib import messages
-from django.db.models import Count, Q
 from django.http import FileResponse, Http404, HttpResponseRedirect
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
@@ -33,31 +32,37 @@ def _contest_context(request, contest, form=None):
     user = request.user
     nominations = list(contest.nominations.all())
     for nomination in nominations:
+        nomination.used = 0
         nomination.is_full = False
+        nomination.my_entries = []
     my_entries = []
     if user.is_authenticated:
-        used = dict(
-            contest.nominations.annotate(
-                used=Count(
-                    "entries",
-                    filter=Q(entries__uploaded_by=user)
-                    & ~Q(entries__status=PhotoEntry.REJECTED),
-                )
-            ).values_list("pk", "used")
-        )
-        for nomination in nominations:
-            nomination.is_full = used[nomination.pk] >= contest.max_photos_per_user
         my_entries = list(
             PhotoEntry.objects.filter(nomination__contest=contest, uploaded_by=user)
             .select_related("nomination")
             .order_by("nomination__order", "nomination__pk", "-created_at")
         )
+        by_pk = {n.pk: n for n in nominations}
+        for entry in my_entries:
+            nomination = by_pk[entry.nomination_id]
+            nomination.my_entries.append(entry)
+            if entry.status != PhotoEntry.REJECTED:
+                nomination.used += 1
+        for nomination in nominations:
+            nomination.is_full = nomination.used >= contest.max_photos_per_user
+
+    form = form or PhotoUploadForm(contest=contest)
+    open_pk = None
+    if form.is_bound:
+        raw = str(form.data.get("nomination", ""))
+        open_pk = next((n.pk for n in nominations if str(n.pk) == raw), None)
     return {
         "contest": contest,
         "nominations": nominations,
-        "all_full": bool(nominations) and all(n.is_full for n in nominations),
         "my_entries": my_entries,
-        "form": form or PhotoUploadForm(contest=contest),
+        "form": form,
+        "open_nomination_pk": open_pk,
+        "orphan_errors": form.is_bound and bool(form.errors) and open_pk is None,
         "accept": "image/jpeg,image/png,image/webp",
     }
 
@@ -114,7 +119,9 @@ class PhotoUploadView(View):
                 return redirect("photo_contest", contest.slug)
             else:
                 messages.success(request, "Фото отправлено на модерацию.")
-                return redirect("photo_contest", contest.slug)
+                url = reverse("photo_contest", args=[contest.slug])
+                nomination_pk = form.cleaned_data["nomination"].pk
+                return HttpResponseRedirect(f"{url}#nomination-{nomination_pk}")
         return render(
             request,
             "photo_contest/contest.html",

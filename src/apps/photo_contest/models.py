@@ -33,6 +33,11 @@ class PhotoContest(models.Model):
     def is_submission_open(self):
         return self.is_published and timezone.now() <= self.submission_until
 
+    @property
+    def days_left(self):
+        """Calendar days until the deadline in the project timezone; 0 = last day."""
+        return (timezone.localdate(self.submission_until) - timezone.localdate()).days
+
 
 class PhotoNomination(models.Model):
     contest = models.ForeignKey(

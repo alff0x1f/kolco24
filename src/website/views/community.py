@@ -1,4 +1,5 @@
 from django.core.paginator import Paginator
+from django.db.models import Count
 from django.http import Http404
 from django.shortcuts import get_object_or_404, render
 from django.urls import reverse
@@ -133,7 +134,9 @@ class HomeView(View):
             "open_photo_contests": list(
                 PhotoContest.objects.filter(
                     is_published=True, submission_until__gte=timezone.now()
-                ).order_by("submission_until")
+                )
+                .annotate(nomination_count=Count("nominations"))
+                .order_by("submission_until")
             ),
         }
         return render(request, self.template_name, context)

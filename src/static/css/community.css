@@ -300,11 +300,49 @@
 }
 
 .home-races .card-admin { margin: 16px 0 0; }
-.home-races .home-photo-contests { margin: 16px 0 0; }
-.home-photo-contests__item { display: flex; flex-direction: column; gap: 2px; }
-.home-photo-contests__item + .home-photo-contests__item { margin-top: 12px; }
-.home-photo-contests__item a { color: var(--primary-2); font-weight: 500; }
-.home-photo-contests__item span { font-size: 13px; color: var(--muted); }
+.home-photo-contests__head { padding-top: 24px; }
+.photo-contest-card__date .photo-contest-card__until { margin: 0 0 3px; }
+
+/* Thin photo-contest strip under the race spotlight. */
+.photo-strip {
+  padding-top: 16px;
+  background: var(--paper);
+}
+
+.photo-strip__inner {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 14px 12px 18px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--paper-2);
+  box-shadow: var(--shadow-sm);
+}
+
+.photo-strip__icon { color: var(--primary); }
+
+.photo-strip__copy h2 {
+  margin: 0;
+  overflow: hidden;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.3;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.photo-strip__copy h2 a { color: var(--ink); }
+.photo-strip__copy h2 a:hover { color: var(--primary-2); }
+
+.photo-strip__copy p {
+  margin: 2px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.photo-strip__copy .race-status { font-size: 13px; letter-spacing: 0; text-transform: none; }
 
 .community-section__head {
   display: flex;
@@ -1142,6 +1180,10 @@
   .race-spotlight__actions { grid-column: 1 / -1; }
   .community-section__head h2 { font-size: 25px; }
   .my-teams { padding-top: 12px; }
+  .photo-strip { padding-top: 12px; }
+  .photo-strip__inner { grid-template-columns: auto minmax(0, 1fr); padding: 14px 16px; }
+  .photo-strip__copy h2 { white-space: normal; }
+  .photo-strip__action { grid-column: 1 / -1; }
   .my-teams__row { gap: 10px 14px; padding: 14px 16px; }
   .my-teams__row .community-button { grid-column: 2; justify-self: start; }
 }
@@ -1155,7 +1197,8 @@
   .community-hero__grid { min-height: 144px; }
   .community-hero h1 { font-size: 22px; }
   .community-hero__lead { margin-top: 7px; font-size: 12.5px; }
-  .race-spotlight .container { padding: 0 12px; }
+  .race-spotlight .container,
+  .photo-strip .container { padding: 0 12px; }
   .race-spotlight__actions .community-button { flex: 1; }
   .home-grid { padding-bottom: 32px; }
   .community-section__head { align-items: flex-start; flex-direction: column; gap: 7px; }
