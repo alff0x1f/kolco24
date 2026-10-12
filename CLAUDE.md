@@ -638,7 +638,7 @@ Django 4.2 project. Source lives entirely under `src/`, with `manage.py` at `src
   mounted at `/photo/`. Step 1 is submissions only; voting/gallery/results are future work. `PhotoContest` (slug,
   `submission_until`, `is_published`, `max_photos_per_user` — the limit is **per nomination**) → `PhotoNomination` →
   `PhotoEntry` (`nomination` FK `PROTECT`, no contest FK; status `pending`/`approved`/`rejected`, moderated in
-  `/admin/` via bulk actions). Any logged-in user uploads (anon → `account_start?next=`); rejected entries free their
+  `/admin/` via bulk actions). Any logged-in user uploads (anon → `login?next=`); rejected entries free their
   slot; the quota check runs under `select_for_update()` on the nomination (`services.py:create_entry`). Image rules
   live in `images.py` (constants read at call time so tests monkeypatch them): accept ≤ 20 MB JPEG/PNG/WebP (HEIC →
   format error), ≤ 50 Мп; the original is stored byte-for-byte when ≤ 15 MB, else re-encoded JPEG at full resolution
