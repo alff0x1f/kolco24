@@ -9,6 +9,7 @@ from django.utils import timezone
 
 from apps.accounts.emails import build_magic_link_signature, send_login_email
 from apps.accounts.models import EmailVerification
+from apps.accounts.users import find_user
 
 LOCMEM_EMAIL = "django.core.mail.backends.locmem.EmailBackend"
 
@@ -850,3 +851,24 @@ def test_register_off_host_next_falls_back_home(client):
     )
     assert resp.status_code == 302
     assert resp.url == "/"
+
+
+@pytest.mark.django_db
+def test_find_user_by_id_and_email(django_user_model):
+    user = django_user_model.objects.create_user(
+        username="finder", email="Finder@Example.com", password="x"
+    )
+
+    assert find_user(str(user.pk)) == user
+    assert find_user("finder@example.COM") == user
+    assert find_user("nobody@example.com") is None
+
+
+@pytest.mark.django_db
+def test_find_user_rejects_odd_digits(django_user_model):
+    django_user_model.objects.create_user(
+        username="finder", email="finder@example.com", password="x"
+    )
+
+    assert find_user("²") is None
+    assert find_user("1" * 19) is None

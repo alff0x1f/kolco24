@@ -1,0 +1,94 @@
+{% extends "website/base-2.html" %}
+{% load static %}
+
+{% block title %}Модерация · {{ contest.title }} · Кольцо 24{% endblock %}
+{% block head_descr %}Модерация фото — {{ contest.title }}.{% endblock %}
+{% block og_title %}Модерация · {{ contest.title }}{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="{% static 'css/photo_moderate.css' %}">
+{% endblock %}
+
+{% block content %}
+<main class="page photo-moderate">
+  <div class="container">
+
+    <div class="crumbs"><a href="{% url 'photo_contest' contest.slug %}">{{ contest.title }}</a></div>
+
+    <header class="page-head">
+      <div>
+        <h1>Модерация фото</h1>
+        <p class="sub">{{ contest.title }}</p>
+      </div>
+    </header>
+
+    <nav class="pm-tabs" aria-label="Статус">
+      {% for tab in tabs %}
+      <a class="pm-tab{% if tab.value == status %} is-active{% endif %}" href="{{ tab.url }}"{% if tab.value == status %} aria-current="page"{% endif %}>
+        {{ tab.label }} <span class="pm-tab-count">{{ tab.count }}</span>
+      </a>
+      {% endfor %}
+    </nav>
+
+    {% if nomination_links|length > 2 %}
+    <nav class="pm-filter" aria-label="Номинация">
+      {% for link in nomination_links %}
+      {% if link.active %}
+      <span class="pm-chip is-active" aria-current="page">{{ link.title }}</span>
+      {% else %}
+      <a class="pm-chip" href="{{ link.url }}">{{ link.title }}</a>
+      {% endif %}
+      {% endfor %}
+    </nav>
+    {% endif %}
+
+    {% if page_entries %}
+    <ul class="pm-grid">
+      {% for entry in page_entries %}
+      <li class="card pm-card">
+        <a class="pm-preview" href="{{ entry.preview.url }}" target="_blank" rel="noopener">
+          <img src="{{ entry.preview.url }}" alt="{{ entry.caption|default:'Фото' }}" loading="lazy">
+        </a>
+        <div class="pm-body">
+          <div class="pm-head">
+            <span class="pm-status pm-status-{{ entry.status }}">{{ entry.get_status_display }}</span>
+            <span class="pm-nomination">{{ entry.nomination.title }}</span>
+          </div>
+          {% if entry.caption %}<p class="pm-caption">{{ entry.caption }}</p>{% endif %}
+          <dl class="pm-meta">
+            <dt>Автор</dt><dd>{{ entry.uploaded_by.email }}</dd>
+            <dt>Прислано</dt><dd>{{ entry.created_at|date:"j E, H:i" }}</dd>
+            <dt>Размер</dt><dd>{{ entry.width }}×{{ entry.height }} · {{ entry.megapixels|floatformat:1 }} Мп · {{ entry.size_mb|floatformat:1 }} МБ</dd>
+          </dl>
+          <a class="pm-original" href="{% url 'photo_original' entry.pk %}" target="_blank" rel="noopener">Оригинал</a>
+          <div class="pm-actions">
+            {% for value, label in actions %}
+            {% if value != entry.status %}
+            <form method="post" action="{% url 'photo_moderate_entry' contest.slug entry.pk %}">
+              {% csrf_token %}
+              <input type="hidden" name="status" value="{{ value }}">
+              <input type="hidden" name="next" value="{{ request.get_full_path }}">
+              <button class="btn {% if value == 'approved' %}btn-primary{% else %}btn-ghost{% endif %} pm-action-{{ value }}" type="submit">{{ label }}</button>
+            </form>
+            {% endif %}
+            {% endfor %}
+          </div>
+        </div>
+      </li>
+      {% endfor %}
+    </ul>
+
+    {% if page.has_other_pages %}
+    <nav class="pm-pager" aria-label="Страницы">
+      {% if prev_url %}<a class="btn btn-ghost" href="{{ prev_url }}">← Назад</a>{% endif %}
+      <span class="pm-pager-info">Страница {{ page.number }} из {{ page.paginator.num_pages }}</span>
+      {% if next_url %}<a class="btn btn-ghost" href="{{ next_url }}">Дальше →</a>{% endif %}
+    </nav>
+    {% endif %}
+    {% else %}
+    <p class="pm-empty">Здесь пока нет фото.</p>
+    {% endif %}
+
+  </div>
+</main>
+{% endblock %}

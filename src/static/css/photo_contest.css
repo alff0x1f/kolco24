@@ -232,6 +232,50 @@
 .photo-contest .pc-viewer-prev { left: 16px; top: 50%; transform: translateY(-50%); }
 .photo-contest .pc-viewer-next { right: 16px; top: 50%; transform: translateY(-50%); }
 
+/* Moderator sidebar; the page is a single column for everyone else. */
+.photo-contest .pc-main { min-width: 0; }
+.photo-contest .pc-sidebar .card { margin-bottom: 0; }
+.photo-contest .pc-side-pad { padding-top: 10px; }
+.photo-contest .pc-pending { font-size: 14px; color: var(--ink-soft); }
+.photo-contest .pc-pending strong { font-weight: 600; color: var(--ink); font-variant-numeric: tabular-nums; }
+
+.photo-contest .pc-moderators { scroll-margin-top: 16px; }
+.photo-contest .pc-moderators .card-pad { padding-top: 10px; }
+.photo-contest .pc-moderators-msg { font-size: 14px; color: var(--success-dk); margin-bottom: 12px; }
+.photo-contest .pc-moderators-msg.is-error { color: var(--danger); }
+.photo-contest .pc-moderators-list { list-style: none; padding: 0; margin-bottom: 8px; }
+.photo-contest .pc-moderators-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 0;
+  font-size: 14px;
+  min-width: 0;
+}
+.photo-contest .pc-moderators-list li > span { min-width: 0; overflow-wrap: anywhere; }
+.photo-contest .pc-moderators-list form { flex: none; }
+.photo-contest .pc-moderators-list li + li { border-top: 1px solid var(--line-soft); }
+.photo-contest .pc-moderators-meta { display: block; color: var(--muted); overflow-wrap: anywhere; }
+.photo-contest .pc-moderators-remove {
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font-size: 20px;
+  line-height: 1;
+  padding: 2px 6px;
+  cursor: pointer;
+}
+.photo-contest .pc-moderators-remove:hover { color: var(--danger); }
+.photo-contest .pc-moderators-add {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line-soft);
+}
+.photo-contest .pc-moderators-add .btn { justify-content: center; }
+
 @media (max-width: 600px) {
   .photo-contest .pc-nomination { padding: 16px; }
   .photo-contest .pc-thumbs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
