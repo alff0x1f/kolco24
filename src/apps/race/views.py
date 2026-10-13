@@ -8,7 +8,16 @@ from urllib.parse import quote
 from django.conf import settings
 from django.contrib import messages
 from django.db import transaction
-from django.db.models import Count, OuterRef, ProtectedError, Q, Subquery
+from django.db.models import (
+    Case,
+    Count,
+    OuterRef,
+    ProtectedError,
+    Q,
+    Subquery,
+    Value,
+    When,
+)
 from django.http import (
     Http404,
     HttpResponse,
@@ -1626,6 +1635,7 @@ class ProtocolView(View):
     (draft or final); everyone else sees only the latest ``final`` one. The
     page never touches live ``Team``/``TakenKP`` data — only whatever a past
     :func:`apps.race.results.build_protocol` call snapshotted into rows.
+    Withdrawn teams (``place=0``) go last, in the build order (``id``).
     """
 
     def get(self, request, race_slug, category_id):
@@ -1651,7 +1661,9 @@ class ProtocolView(View):
                 },
             )
 
-        rows = protocol.rows.filter(category_id=category_id).order_by("place")
+        rows = protocol.rows.filter(category_id=category_id).order_by(
+            Case(When(place=0, then=Value(1)), default=Value(0)), "place", "id"
+        )
         title = (
             "Предварительный протокол"
             if protocol.status == Protocol.DRAFT
@@ -2543,6 +2555,51 @@ class RaceAppDataMarkCountView(View):
             done = "снят"
         mark.save(update_fields=["force_counted", "forced_by", "forced_at"])
         messages.success(request, f"{label} {done}. Пересоберите протокол.")
+        return back
+
+
+class RaceAppDataTeamDnfView(View):
+    """POST-only judge decision: withdraw a team from the standings, or undo it.
+
+    The decision lives on ``Team`` (``dnf`` + reason/who/when), so a protocol
+    rebuild keeps it; the protocol itself changes only on the next rebuild.
+    ``action=set`` needs a non-empty reason. Gate as
+    :class:`RaceAppDataMarkCountView`.
+    """
+
+    def post(self, request, race_slug, team_id):
+        team_url = reverse("race_app_data_team", args=[race_slug, team_id])
+        if not request.user.is_authenticated:
+            return HttpResponseRedirect(
+                reverse("login") + "?next=" + quote(team_url, safe="/:@")
+            )
+        race = get_object_or_404(Race, slug=race_slug)
+        if not can_edit_race(request.user, race):
+            return HttpResponseForbidden()
+        team = get_object_or_404(Team, pk=team_id, category2__race_id=race.id)
+        action = request.POST.get("action")
+        if action not in ("set", "unset"):
+            return HttpResponseBadRequest("action must be set or unset")
+        back = HttpResponseRedirect(team_url + "#team-dnf")
+
+        if action == "set":
+            reason = request.POST.get("reason", "").strip()[:200]
+            if not reason:
+                messages.error(request, "Укажите причину снятия.")
+                return back
+            team.dnf = True
+            team.dnf_reason = reason
+            team.dnf_by = request.user
+            team.dnf_at = timezone.now()
+            done = "Команда снята"
+        else:
+            team.dnf = False
+            team.dnf_reason = ""
+            team.dnf_by = None
+            team.dnf_at = None
+            done = "Команда возвращена"
+        team.save(update_fields=["dnf", "dnf_reason", "dnf_by", "dnf_at", "updated_at"])
+        messages.success(request, f"{done}. Пересоберите протокол.")
         return back
 
 

@@ -59,6 +59,24 @@
           </span>
           {% endif %}
         </div>
+        <div class="team-dnf" id="team-dnf">
+          {% if team.dnf %}
+          <span class="badge bad">Снята: {{ team.dnf_reason }}{% if team.dnf_by %} — {{ team.dnf_by }}{% endif %}{% if team.dnf_at %}, {{ team.dnf_at }}{% endif %}</span>
+          <form class="dnf-form" method="post" action="{% url 'race_app_data_team_dnf' race.slug team.id %}">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="unset">
+            <button type="submit" class="btn btn-ghost btn-xs">Вернуть</button>
+          </form>
+          {% else %}
+          <form class="dnf-form" method="post" action="{% url 'race_app_data_team_dnf' race.slug team.id %}">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="set">
+            <input class="input input-sm" name="reason" maxlength="200" required
+                   placeholder="Причина снятия">
+            <button type="submit" class="btn btn-ghost btn-xs">Снять с зачёта</button>
+          </form>
+          {% endif %}
+        </div>
       </div>
       <div class="head-actions">
         <a class="btn btn-ghost" href="#help">Справка</a>

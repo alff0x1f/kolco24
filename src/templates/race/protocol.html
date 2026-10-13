@@ -102,11 +102,12 @@
             </thead>
             <tbody>
               {% for row in rows %}
-                <tr>
-                  <td class="num">{{ row.place|default:"-" }}</td>
+                <tr{% if row.withdrawn %} class="row-dnf"{% endif %}>
+                  <td class="num">{% if row.withdrawn %}сн.{% else %}{{ row.place|default:"-" }}{% endif %}</td>
                   <td>
                     {% if can_edit %}<a class="protocol-link" href="{% url 'race_app_data_team' race.slug row.team_id %}">{{ row.start_number }} {{ row.team_name }}</a>{% else %}{{ row.start_number }} {{ row.team_name }}{% endif %}
                     ({{ row.members|abbrev_names }})
+                    {% if row.withdrawn %}<div class="dnf-reason">Снята{% if row.dnf_reason %}: {{ row.dnf_reason }}{% endif %}</div>{% endif %}
                   </td>
                   <td>{{ row.club }}{% if row.club and row.city %}, {% endif %}{{ row.city }}</td>
                   <td class="num">{{ row.member_count }}</td>
@@ -125,7 +126,7 @@
                   <td class="time">{{ row.start_time_date|date:"H:i:s" }}<br>{{ row.finish_time_date|date:"H:i:s" }}</td>
                   <td class="time">{{ row.duration_str }}</td>
                   <td class="num">{% if row.penalty %}{{ row.penalty }}{% else %}-{% endif %}</td>
-                  <td class="num">{{ row.final_score }}</td>
+                  <td class="num">{% if row.withdrawn %}-{% else %}{{ row.final_score }}{% endif %}</td>
                 </tr>
               {% endfor %}
             </tbody>

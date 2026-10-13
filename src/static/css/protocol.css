@@ -80,6 +80,10 @@
   background: #fdecea; border-radius: 4px; padding: 1px 6px; margin-bottom: 3px;
 }
 
+/* Withdrawn by a judge: listed last, dimmed, with the reason. */
+.protocol-page .protocol-table tr.row-dnf td { color: var(--muted); }
+.protocol-page .dnf-reason { margin-top: 3px; font-size: 11.5px; font-weight: 600; color: #b3261e; }
+
 /* Organizer-only links into «Данные приложения». */
 .protocol-page .protocol-link { color: var(--primary); text-decoration: none; }
 .protocol-page .protocol-link:hover { text-decoration: underline; }
@@ -135,6 +139,7 @@
   }
   .protocol-page .protocol-table th { font-size: 8pt; }
   /* Keep row striping / mismatch highlight visible on paper. */
+  .protocol-page .protocol-table tr.row-dnf td { color: #777; }
   .protocol-page .protocol-table,
   .protocol-page .chip-mismatch {
     -webkit-print-color-adjust: exact; print-color-adjust: exact;

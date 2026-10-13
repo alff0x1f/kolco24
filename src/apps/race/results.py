@@ -191,24 +191,37 @@ def _build_row(protocol, team, cp_info):
         penalty=penalty,
         final_score=final_score,
         dnf=team.dnf,
+        dnf_reason=team.dnf_reason,
     )
 
 
 def _assign_places(rows):
-    """Sort rows by category, then ``(-final_score, duration_ms, team_id)``;
+    """Sort rows by category, then ``(dnf, -final_score, duration_ms, team_id)``;
     reset ``place`` to 1 at each category change.
 
-    ``team_id`` is a tiebreaker so the order is deterministic across rebuilds
-    even for two teams tied on both score and duration (the source queryset
-    has no guaranteed row order).
+    A withdrawn (``dnf``) team goes after every ranked one with ``place=0`` and
+    takes no place number. ``team_id`` is a tiebreaker so the order is
+    deterministic across rebuilds even for two teams tied on both score and
+    duration (the source queryset has no guaranteed row order).
     """
-    rows.sort(key=lambda r: (r.category_id, -r.final_score, r.duration_ms, r.team_id))
+    rows.sort(
+        key=lambda r: (
+            r.category_id,
+            r.dnf,
+            -r.final_score,
+            r.duration_ms,
+            r.team_id,
+        )
+    )
     current_category = object()
     place = 1
     for row in rows:
         if row.category_id != current_category:
             current_category = row.category_id
             place = 1
+        if row.dnf:
+            row.place = 0
+            continue
         row.place = place
         place += 1
     return rows

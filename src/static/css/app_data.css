@@ -115,6 +115,12 @@
 .app-data .force-form { display: inline; margin: 0 0 0 4px; }
 .app-data .btn-xs { padding: 2px 8px; font-size: 12px; vertical-align: middle; }
 
+/* Judge decision: withdraw the team */
+.app-data .team-dnf { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.app-data .team-dnf .badge { margin-left: 0; white-space: normal; }
+.app-data .dnf-form { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 0; }
+.app-data .dnf-form .input-sm { width: 280px; max-width: 100%; padding: 4px 10px; font-size: 13px; }
+
 .app-data .app-data-messages {
   list-style: none; margin: 0 0 16px; padding: 0; display: flex; flex-direction: column; gap: 8px;
 }

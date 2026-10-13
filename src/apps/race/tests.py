@@ -4323,6 +4323,112 @@ def test_build_protocol_ties_broken_deterministically_by_team_id(django_user_mod
 
 
 @pytest.mark.django_db
+def test_build_protocol_dnf_team_last_without_place(django_user_model):
+    race = _make_race()
+    category = _make_category(race)
+    cp = _make_checkpoint(race, 1, 50)
+
+    owners = [
+        django_user_model.objects.create_user(username=f"d{i}", password="x")
+        for i in range(3)
+    ]
+    best = _make_started_team(
+        owners[0],
+        category,
+        teamname="Best",
+        finish_time=2000,
+        dnf=True,
+        dnf_reason="доехали на машине",
+    )
+    mid = _make_started_team(owners[1], category, teamname="Mid", finish_time=2000)
+    low = _make_started_team(owners[2], category, teamname="Low", finish_time=2000)
+    _make_mark(best, cp)
+    _make_mark(mid, cp)
+
+    protocol = build_protocol(race, None)
+    rows = {row.team_id: row for row in protocol.rows.all()}
+
+    assert rows[mid.id].place == 1
+    assert rows[low.id].place == 2
+    assert rows[best.id].place == 0
+    assert rows[best.id].dnf is True
+    assert rows[best.id].dnf_reason == "доехали на машине"
+    # Scores stay for reference.
+    assert rows[best.id].total_score == 50
+    assert rows[mid.id].dnf_reason == ""
+
+
+@pytest.mark.django_db
+def test_build_protocol_dnf_teams_ordered_by_score(django_user_model):
+    race = _make_race()
+    category = _make_category(race)
+    cp = _make_checkpoint(race, 1, 50)
+
+    owner_1 = django_user_model.objects.create_user(username="dd1", password="x")
+    owner_2 = django_user_model.objects.create_user(username="dd2", password="x")
+    owner_3 = django_user_model.objects.create_user(username="dd3", password="x")
+    dnf_lo = _make_started_team(
+        owner_1, category, teamname="DnfLo", finish_time=2000, dnf=True
+    )
+    dnf_hi = _make_started_team(
+        owner_2, category, teamname="DnfHi", finish_time=2000, dnf=True
+    )
+    ranked = _make_started_team(owner_3, category, teamname="R", finish_time=2000)
+    _make_mark(dnf_hi, cp)
+
+    protocol = build_protocol(race, None)
+    order = list(protocol.rows.order_by("id").values_list("team_id", flat=True))
+
+    # bulk_create keeps the _assign_places order: ranked, then dnf by score.
+    assert order == [ranked.id, dnf_hi.id, dnf_lo.id]
+
+
+@pytest.mark.django_db
+def test_build_protocol_rebuild_keeps_and_restores_dnf(django_user_model):
+    race = _make_race()
+    category = _make_category(race)
+    cp = _make_checkpoint(race, 1, 50)
+
+    owner_1 = django_user_model.objects.create_user(username="rk1", password="x")
+    owner_2 = django_user_model.objects.create_user(username="rk2", password="x")
+    star = _make_started_team(
+        owner_1, category, teamname="Star", finish_time=2000, dnf=True
+    )
+    other = _make_started_team(owner_2, category, teamname="O", finish_time=2000)
+    _make_mark(star, cp)
+
+    build_protocol(race, None)
+    protocol = build_protocol(race, None)
+    rows = {row.team_id: row.place for row in protocol.rows.all()}
+    assert rows == {other.id: 1, star.id: 0}
+
+    star.dnf = False
+    star.save()
+    protocol = build_protocol(race, None)
+    rows = {row.team_id: row.place for row in protocol.rows.all()}
+    assert rows == {star.id: 1, other.id: 2}
+
+
+@pytest.mark.django_db
+def test_build_protocol_dnf_does_not_shift_other_category(django_user_model):
+    race = _make_race()
+    cat_a = _make_category(race, code="a", short_name="a", name="A")
+    cat_b = _make_category(race, code="b", short_name="b", name="B")
+
+    owner_1 = django_user_model.objects.create_user(username="oc1", password="x")
+    owner_2 = django_user_model.objects.create_user(username="oc2", password="x")
+    owner_3 = django_user_model.objects.create_user(username="oc3", password="x")
+    a_dnf = _make_started_team(owner_1, cat_a, finish_time=2000, dnf=True)
+    a_ok = _make_started_team(owner_2, cat_a, finish_time=2000)
+    b_ok = _make_started_team(owner_3, cat_b, finish_time=2000)
+
+    protocol = build_protocol(race, None)
+    rows = {row.team_id: row.place for row in protocol.rows.all()}
+
+    assert rows == {a_ok.id: 1, a_dnf.id: 0, b_ok.id: 1}
+
+
+@pytest.mark.django_db
 def test_build_protocol_start_number_accepts_full_team_field_length(
     django_user_model,
 ):
@@ -9221,3 +9327,245 @@ def test_mark_count_requires_csrf_token(django_user_model):
     assert resp.status_code == 302
     mark.refresh_from_db()
     assert mark.force_counted is True
+
+
+# ---------------------------------------------------------------------------
+# Judge decision: race_app_data_team_dnf
+# ---------------------------------------------------------------------------
+
+
+def _dnf_setup(django_user_model, slug):
+    race = _make_race(slug=slug)
+    category = _make_category(race)
+    owner = django_user_model.objects.create_user(username=f"{slug}-o", password="x")
+    team = _make_team(owner, category)
+    admin = django_user_model.objects.create_user(username=f"{slug}-a", password="x")
+    RaceAdmin.objects.create(race=race, user=admin, role=RaceAdmin.Role.ADMIN)
+    return race, team, admin
+
+
+def _dnf_url(race, team):
+    return reverse(
+        "race_app_data_team_dnf",
+        kwargs={"race_slug": race.slug, "team_id": team.id},
+    )
+
+
+@pytest.mark.django_db
+def test_team_dnf_set_and_unset(client, django_user_model):
+    from django.contrib.messages import get_messages
+
+    race, team, admin = _dnf_setup(django_user_model, "dnf-set")
+    before = team.updated_at
+    client.force_login(admin)
+    url = _dnf_url(race, team)
+
+    resp = client.post(url, {"action": "set", "reason": "  доехали на машине "})
+    team_url = reverse("race_app_data_team", args=[race.slug, team.id])
+    assert resp.status_code == 302
+    assert resp.url == f"{team_url}#team-dnf"
+    team.refresh_from_db()
+    assert team.dnf is True
+    assert team.dnf_reason == "доехали на машине"
+    assert team.dnf_by_id == admin.id
+    assert team.dnf_at is not None
+    assert team.updated_at > before
+    msgs = [str(m) for m in get_messages(resp.wsgi_request)]
+    assert msgs == ["Команда снята. Пересоберите протокол."]
+
+    resp = client.post(url, {"action": "unset"})
+    team.refresh_from_db()
+    assert team.dnf is False
+    assert team.dnf_reason == ""
+    assert team.dnf_by_id is None
+    assert team.dnf_at is None
+    msgs = [str(m) for m in get_messages(resp.wsgi_request)]
+    assert msgs[-1:] == ["Команда возвращена. Пересоберите протокол."]
+
+
+@pytest.mark.django_db
+def test_team_dnf_set_requires_reason(client, django_user_model):
+    from django.contrib.messages import get_messages
+
+    race, team, admin = _dnf_setup(django_user_model, "dnf-reason")
+    client.force_login(admin)
+    url = _dnf_url(race, team)
+
+    for body in ({"action": "set", "reason": "   "}, {"action": "set"}):
+        resp = client.post(url, body)
+        assert resp.status_code == 302
+        msgs = [str(m) for m in get_messages(resp.wsgi_request)]
+        assert msgs[-1:] == ["Укажите причину снятия."]
+        team.refresh_from_db()
+        assert team.dnf is False
+        assert team.dnf_by_id is None
+
+
+@pytest.mark.django_db
+def test_team_dnf_reason_truncated(client, django_user_model):
+    race, team, admin = _dnf_setup(django_user_model, "dnf-long")
+    client.force_login(admin)
+
+    client.post(_dnf_url(race, team), {"action": "set", "reason": "x" * 300})
+
+    team.refresh_from_db()
+    assert team.dnf_reason == "x" * 200
+
+
+@pytest.mark.django_db
+def test_team_dnf_bad_action_400_and_get_405(client, django_user_model):
+    race, team, admin = _dnf_setup(django_user_model, "dnf-bad")
+    client.force_login(admin)
+    url = _dnf_url(race, team)
+
+    assert client.post(url, {"action": "x", "reason": "r"}).status_code == 400
+    assert client.get(url).status_code == 405
+
+
+@pytest.mark.django_db
+def test_team_dnf_gate(client, django_user_model):
+    race, team, _ = _dnf_setup(django_user_model, "dnf-gate")
+    url = _dnf_url(race, team)
+    body = {"action": "set", "reason": "r"}
+
+    resp = client.post(url, body)
+    team_url = reverse("race_app_data_team", args=[race.slug, team.id])
+    assert resp.status_code == 302
+    assert resp.url == reverse("login") + "?next=" + team_url
+
+    plain = django_user_model.objects.create_user(username="dnf-plain", password="x")
+    moderator = django_user_model.objects.create_user(username="dnf-mod", password="x")
+    RaceAdmin.objects.create(race=race, user=moderator, role=RaceAdmin.Role.MODERATOR)
+    superuser = django_user_model.objects.create_superuser(
+        username="dnf-su", password="x", email="dnf-su@example.com"
+    )
+    for user in (plain, moderator, superuser):
+        client.force_login(user)
+        assert client.post(url, body).status_code == 403
+
+    team.refresh_from_db()
+    assert team.dnf is False
+
+
+@pytest.mark.django_db
+def test_team_dnf_404_for_foreign_team(client, django_user_model):
+    race, team, admin = _dnf_setup(django_user_model, "dnf-404")
+    other_race = _make_race(slug="dnf-404-other")
+    foreign_team = _make_team(team.owner, _make_category(other_race))
+    client.force_login(admin)
+
+    resp = client.post(_dnf_url(race, foreign_team), {"action": "set", "reason": "r"})
+
+    assert resp.status_code == 404
+    foreign_team.refresh_from_db()
+    assert foreign_team.dnf is False
+
+
+@pytest.mark.django_db
+def test_team_page_dnf_block(client, django_user_model):
+    race, team, admin = _dnf_setup(django_user_model, "dnf-page")
+    client.force_login(admin)
+    page_url = reverse("race_app_data_team", args=[race.slug, team.id])
+    dnf_url = _dnf_url(race, team)
+
+    html = client.get(page_url).content.decode()
+    assert 'id="team-dnf"' in html
+    assert f'action="{dnf_url}"' in html
+    assert "Снять с зачёта" in html
+    assert 'name="reason"' in html
+
+    client.post(dnf_url, {"action": "set", "reason": "сошёл участник"})
+    html = client.get(page_url).content.decode()
+    assert "Снята: сошёл участник" in html
+    assert admin.username in html
+    assert "Вернуть" in html
+    assert "Снять с зачёта" not in html
+
+
+@pytest.mark.django_db
+def test_app_data_overview_dnf_badge(client, django_user_model):
+    race, team, admin = _dnf_setup(django_user_model, "dnf-overview")
+    _make_team(team.owner, team.category2, start_number="2")
+    client.force_login(admin)
+    url = reverse("race_app_data", args=[race.slug])
+
+    assert ">снята<" not in client.get(url).content.decode()
+
+    team.dnf = True
+    team.dnf_reason = "превышение КВ"
+    team.save()
+    html = client.get(url).content.decode()
+    assert html.count(">снята<") == 1
+    assert 'title="превышение КВ"' in html
+
+
+def _public_protocol_html(rf, race, category):
+    request = rf.get("/")
+    request.user = AnonymousUser()
+    response = ProtocolView.as_view()(
+        request, race_slug=race.slug, category_id=category.id
+    )
+    assert response.status_code == 200
+    return response.content.decode()
+
+
+@pytest.mark.django_db
+def test_protocol_view_dnf_team_listed_last_with_reason(rf, django_user_model):
+    race = _make_race()
+    category = _make_category(race)
+    cp = _make_checkpoint(race, 1, 50)
+    owners = [
+        django_user_model.objects.create_user(username=f"pv{i}", password="x")
+        for i in range(3)
+    ]
+    star = _make_started_team(
+        owners[0],
+        category,
+        teamname="Zvezda",
+        finish_time=2000,
+        dnf=True,
+        dnf_reason="доехали на машине",
+    )
+    _make_started_team(owners[1], category, teamname="Pervye", finish_time=2000)
+    _make_started_team(owners[2], category, teamname="Vtorye", finish_time=3000)
+    _make_mark(star, cp)
+    build_protocol(race, None)
+    freeze_protocol(race)
+
+    html = _public_protocol_html(rf, race, category)
+
+    assert html.index("Pervye") < html.index("Vtorye") < html.index("Zvezda")
+    assert 'class="row-dnf"' in html
+    assert "сн." in html
+    assert "Снята: доехали на машине" in html
+    star_row = html[html.rindex("<tr", 0, html.index("Zvezda")) :]
+    star_row = star_row[: star_row.index("</tr>")]
+    # Score kept for reference, final score replaced by a dash.
+    assert star_row.count(">50<") == 1
+    assert '<td class="num">-</td>' in star_row
+
+
+@pytest.mark.django_db
+def test_protocol_view_legacy_dnf_row_with_place_keeps_place(rf, django_user_model):
+    from apps.race.models import ProtocolRow
+
+    race = _make_race()
+    category = _make_category(race)
+    protocol = Protocol.objects.create(race=race, status=Protocol.FINAL)
+    ProtocolRow.objects.create(
+        protocol=protocol,
+        team_id=1,
+        team_name="Legacy",
+        category_id=category.id,
+        place=1,
+        final_score=40,
+        dnf=True,
+    )
+
+    html = _public_protocol_html(rf, race, category)
+
+    assert "Legacy" in html
+    assert "row-dnf" not in html
+    assert "сн." not in html
+    assert "Снята" not in html
+    assert ">40<" in html

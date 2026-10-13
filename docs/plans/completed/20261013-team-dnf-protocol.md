@@ -92,13 +92,13 @@
 - Create: `src/apps/race/migrations/0007_protocolrow_dnf_reason.py`
 - Modify: `src/website/admin.py`
 
-- [ ] добавить `dnf_reason`, `dnf_by`, `dnf_at` в `Team` рядом с `dnf`
-- [ ] добавить `dnf_reason` в `ProtocolRow` рядом с `dnf`
-- [ ] сгенерировать миграции: `makemigrations website --name team_dnf_reason` и
+- [x] добавить `dnf_reason`, `dnf_by`, `dnf_at` в `Team` рядом с `dnf`
+- [x] добавить `dnf_reason` в `ProtocolRow` рядом с `dnf`
+- [x] сгенерировать миграции: `makemigrations website --name team_dnf_reason` и
       `makemigrations race_app --name protocolrow_dnf_reason`; проверить, что они только схемные
-- [ ] `TeamAdmin`: `readonly_fields` += `("dnf_by", "dnf_at")` (иначе `dnf_by` — `<select>` всех пользователей)
-- [ ] тестов в этой задаче нет (только схема); поля покрываются тестами задач 2–3
-- [ ] run tests - must pass before next task
+- [x] `TeamAdmin`: `readonly_fields` += `("dnf_by", "dnf_at")` (иначе `dnf_by` — `<select>` всех пользователей)
+- [x] тестов в этой задаче нет (только схема); поля покрываются тестами задач 2–3
+- [x] run tests - must pass before next task
 
 ### Task 2: Снятые команды в build_protocol
 
@@ -106,13 +106,13 @@
 - Modify: `src/apps/race/results.py`
 - Modify: `src/apps/race/tests.py`
 
-- [ ] `_build_row` копирует `team.dnf_reason` в `ProtocolRow.dnf_reason`
-- [ ] `_assign_places`: новый ключ сортировки, `place=0` для `dnf`, номер места не тратится; обновить docstring
-- [ ] write test: снятая команда с лучшим баллом — в конце категории, `place=0`, остальные 1..N без пропуска
-- [ ] write test: `dnf_reason` скопирован; две снятые команды упорядочены по баллам между собой
-- [ ] write test: пересборка черновика сохраняет снятие; после снятия флага и пересборки команда снова получает место
-- [ ] write test: снятие в одной категории не сдвигает места в другой
-- [ ] run tests - must pass before next task
+- [x] `_build_row` копирует `team.dnf_reason` в `ProtocolRow.dnf_reason`
+- [x] `_assign_places`: новый ключ сортировки, `place=0` для `dnf`, номер места не тратится; обновить docstring
+- [x] write test: снятая команда с лучшим баллом — в конце категории, `place=0`, остальные 1..N без пропуска
+- [x] write test: `dnf_reason` скопирован; две снятые команды упорядочены по баллам между собой
+- [x] write test: пересборка черновика сохраняет снятие; после снятия флага и пересборки команда снова получает место
+- [x] write test: снятие в одной категории не сдвигает места в другой
+- [x] run tests - must pass before next task
 
 ### Task 3: Действие «Снять / Вернуть» в app-data
 
@@ -121,13 +121,13 @@
 - Modify: `src/website/urls.py`
 - Modify: `src/apps/race/tests.py`
 
-- [ ] добавить `RaceAppDataTeamDnfView` после `RaceAppDataMarkCountView` по той же схеме доступа
-- [ ] зарегистрировать URL `race_app_data_team_dnf`
-- [ ] write tests доступа: аноним → логин с `next` на страницу команды; не-админ → 403; суперпользователь без
+- [x] добавить `RaceAppDataTeamDnfView` после `RaceAppDataMarkCountView` по той же схеме доступа
+- [x] зарегистрировать URL `race_app_data_team_dnf`
+- [x] write tests доступа: аноним → логин с `next` на страницу команды; не-админ → 403; суперпользователь без
       `RaceAdmin(ADMIN)` → 403; команда другой гонки → 404; плохой `action` → 400; GET → 405
-- [ ] write tests логики: `set` пишет 4 поля и двигает `updated_at`; `set` с пустой/пробельной причиной и без ключа
+- [x] write tests логики: `set` пишет 4 поля и двигает `updated_at`; `set` с пустой/пробельной причиной и без ключа
       `reason` ничего не пишет и показывает ошибку; `unset` очищает все поля; редирект на `#team-dnf`
-- [ ] run tests - must pass before next task
+- [x] run tests - must pass before next task
 
 ### Task 4: Блок снятия на странице команды и бейдж в обзоре
 
@@ -137,14 +137,14 @@
 - Modify: `src/static/css/app_data.css`
 - Modify: `src/apps/race/tests.py`
 
-- [ ] в шапке команды блок `id="team-dnf"`: не снята — поле «Причина» (`maxlength=200`, `required`) + «Снять с зачёта»;
+- [x] в шапке команды блок `id="team-dnf"`: не снята — поле «Причина» (`maxlength=200`, `required`) + «Снять с зачёта»;
       снята — бейдж «Снята: <причина> — <кто>, <когда>» + «Вернуть»; CSRF-токен в обеих формах
-- [ ] в обзоре — бейдж «снята» у снятой команды через `{% if row.team.dnf %}` (`_race_teams` уже отдаёт `Team`);
+- [x] в обзоре — бейдж «снята» у снятой команды через `{% if row.team.dnf %}` (`_race_teams` уже отдаёт `Team`);
       `dnf_by` в обзоре не выводить — это +1 запрос на команду
-- [ ] стили бейджа и формы в `app_data.css`
-- [ ] write test: страница команды показывает форму для не снятой и бейдж с причиной для снятой команды
-- [ ] write test: обзор показывает «снята» только у снятой команды
-- [ ] run tests - must pass before next task
+- [x] стили бейджа и формы в `app_data.css`
+- [x] write test: страница команды показывает форму для не снятой и бейдж с причиной для снятой команды
+- [x] write test: обзор показывает «снята» только у снятой команды
+- [x] run tests - must pass before next task
 
 ### Task 5: Отображение снятых команд в протоколе
 
@@ -154,26 +154,26 @@
 - Modify: `src/static/css/protocol.css`
 - Modify: `src/apps/race/tests.py`
 
-- [ ] `ProtocolView`: строки с `place=0` — в конце, дальше по `id`; обновить docstring
-- [ ] у снятой строки (`row.dnf and not row.place`): класс `row-dnf`, «сн.» в колонке места, «Снята: <причина>» мелко под названием, «-» в «Итог»
-- [ ] `.row-dnf` бледнее, в том числе в `@media print`
-- [ ] write test: на странице протокола снятая команда с лучшим баллом выводится после команд с 1-м и 2-м местом
+- [x] `ProtocolView`: строки с `place=0` — в конце, дальше по `id`; обновить docstring
+- [x] у снятой строки (`row.dnf and not row.place`): класс `row-dnf`, «сн.» в колонке места, «Снята: <причина>» мелко под названием, «-» в «Итог»
+- [x] `.row-dnf` бледнее, в том числе в `@media print`
+- [x] write test: на странице протокола снятая команда с лучшим баллом выводится после команд с 1-м и 2-м местом
       (индекс имени в `response.content`)
-- [ ] write test: строка с `dnf=True` и настоящим `place` (старые данные) показывает место, а не «сн.»
-- [ ] write test: итоговый протокол (аноним) показывает «сн.» и причину, итог снятой команды не выводится
-- [ ] write test: обычная команда по-прежнему показывает место и итог
-- [ ] run tests - must pass before next task
+- [x] write test: строка с `dnf=True` и настоящим `place` (старые данные) показывает место, а не «сн.»
+- [x] write test: итоговый протокол (аноним) показывает «сн.» и причину, итог снятой команды не выводится
+- [x] write test: обычная команда по-прежнему показывает место и итог
+- [x] run tests - must pass before next task
 
 ### Task 6: Verify acceptance criteria
-- [ ] все требования из Overview выполнены
-- [ ] граничные случаи: пустая причина, команда другой гонки, снятие в финальном протоколе видно всем
-- [ ] `make format` и `make lint`
-- [ ] полный прогон: `uv run pytest`
+- [x] все требования из Overview выполнены
+- [x] граничные случаи: пустая причина, команда другой гонки, снятие в финальном протоколе видно всем
+- [x] `make format` и `make lint`
+- [x] полный прогон: `uv run pytest`
 
 ### Task 7: [Final] Update documentation
-- [ ] CLAUDE.md: 1–2 предложения в абзаце **Protocol snapshot** — снятие хранится на `Team.dnf`/`dnf_reason`, ставится на
+- [x] CLAUDE.md: 1–2 предложения в абзаце **Protocol snapshot** — снятие хранится на `Team.dnf`/`dnf_reason`, ставится на
       странице команды в app-data (`race_app_data_team_dnf`), снятые идут в конец категории с `place=0`, нужна пересборка
-- [ ] move this plan to `docs/plans/completed/`
+- [x] move this plan to `docs/plans/completed/`
 
 ## Post-Completion
 *Items requiring manual intervention or external systems - no checkboxes, informational only*

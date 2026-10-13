@@ -211,6 +211,7 @@ class ProtocolRow(models.Model):
     penalty = models.IntegerField(default=0)
     final_score = models.IntegerField(default=0)
     dnf = models.BooleanField(default=False)
+    dnf_reason = models.CharField(max_length=200, blank=True, default="")
 
     class Meta:
         indexes = [
@@ -219,6 +220,11 @@ class ProtocolRow(models.Model):
 
     def __str__(self):
         return f"ProtocolRow #{self.id}: {self.team_name} ({self.place})"
+
+    @property
+    def withdrawn(self):
+        """Withdrawn by a judge. ``place`` guards older rows that kept a place."""
+        return self.dnf and not self.place
 
     @property
     def start_time_date(self):
