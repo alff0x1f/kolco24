@@ -684,15 +684,31 @@ def test_build_thumbs_fills_only_missing(db, user, settings):
     assert "создано: 1" in out.getvalue()
 
 
-def test_build_thumbs_force_rebuilds_in_place(db, user, settings, monkeypatch):
+def test_build_thumbs_force_replaces_old_file(db, user, settings, monkeypatch):
     entry = create(make_nomination(make_contest()), user)
-    old_name = entry.thumb.name
+    old_path = entry.thumb.path
     monkeypatch.setattr(images, "THUMB_MAX_SIDE", 100)
     call_command("build_photo_thumbs", "--force", stdout=io.StringIO())
     entry.refresh_from_db()
-    assert entry.thumb.name == old_name  # not a suffixed copy
     assert max(entry.thumb_width, entry.thumb_height) == 100
+    assert os.path.exists(entry.thumb.path)
+    assert entry.thumb.path == old_path or not os.path.exists(old_path)
     assert len(stored_files(settings)) == 3
+
+
+def test_build_thumbs_force_keeps_old_thumb_on_failure(db, user, settings, monkeypatch):
+    entry = create(make_nomination(make_contest()), user)
+    old_name = entry.thumb.name
+
+    def fail(self, name, content):
+        raise OSError(28, "No space left on device")
+
+    monkeypatch.setattr(FileSystemStorage, "_save", fail)
+    with pytest.raises(OSError):
+        call_command("build_photo_thumbs", "--force", stdout=io.StringIO())
+    entry.refresh_from_db()
+    assert entry.thumb.name == old_name
+    assert os.path.exists(entry.thumb.path)
 
 
 def test_build_thumbs_skips_broken_preview(db, user, settings):

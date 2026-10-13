@@ -299,11 +299,13 @@
   .photo-contest .pc-login .btn { width: 100%; }
 }
 
-/* Results: justified rows, each tile as wide as its photo's ratio allows */
+/* Results: justified rows. Tiles of a row grow by the same factor and keep
+   their photo's ratio, so the row gets taller instead of cropping. */
 .photo-contest .pc-thumbs.pc-gallery {
   --row: 220px;
   display: flex;
   flex-wrap: wrap;
+  align-items: flex-start;
   gap: 4px;
   margin-top: 0;
 }
@@ -313,7 +315,7 @@
   position: relative;
   flex-grow: calc(var(--w) / var(--h));
   flex-basis: calc(var(--w) / var(--h) * var(--row));
-  height: var(--row);
+  aspect-ratio: var(--w) / var(--h);
   border-radius: 0;
   overflow: hidden;
   background: var(--line-soft);

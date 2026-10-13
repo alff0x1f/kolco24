@@ -43,12 +43,17 @@ class Command(BaseCommand):
                 failed += 1
                 self.stderr.write(f"Фото #{entry.pk}: {exc}")
                 continue
-            # The old file goes only once the new bytes exist, and before the
-            # save, so the new one takes its name instead of a suffixed copy.
-            if entry.thumb:
-                entry.thumb.delete(save=False)
+            # The old file stays until the new one is stored and saved, so a
+            # failure leaves a working thumbnail; a rebuild may get a suffixed name.
+            old = (entry.thumb.storage, entry.thumb.name) if entry.thumb else None
             name = entry.preview.name.removesuffix(".jpg") + "_thumb.jpg"
             entry.thumb.save(name, ContentFile(data), save=False)
-            entry.save(update_fields=["thumb", "thumb_width", "thumb_height"])
+            try:
+                entry.save(update_fields=["thumb", "thumb_width", "thumb_height"])
+            except BaseException:
+                entry.thumb.storage.delete(entry.thumb.name)
+                raise
+            if old and old[1] != entry.thumb.name:
+                old[0].delete(old[1])
             built += 1
         self.stdout.write(f"Миниатюр создано: {built}, ошибок: {failed}.")
