@@ -125,6 +125,15 @@ class PhotoEntry(models.Model):
     caption = models.CharField("Подпись", max_length=300, blank=True)
     original = models.FileField("Оригинал", storage=private_storage, max_length=255)
     preview = models.ImageField("Превью", max_length=255)
+    thumb = models.ImageField(
+        "Миниатюра",
+        max_length=255,
+        blank=True,
+        width_field="thumb_width",
+        height_field="thumb_height",
+    )
+    thumb_width = models.PositiveIntegerField(null=True, blank=True)
+    thumb_height = models.PositiveIntegerField(null=True, blank=True)
     width = models.PositiveIntegerField(default=0)
     height = models.PositiveIntegerField(default=0)
     size_bytes = models.PositiveIntegerField(default=0)
@@ -141,6 +150,14 @@ class PhotoEntry(models.Model):
 
     def __str__(self):
         return self.caption or f"Фото #{self.pk}"
+
+    @property
+    def grid_image(self):
+        """``(url, width, height)`` for a gallery tile; only the ratio matters."""
+        if self.thumb:
+            return self.thumb.url, self.thumb_width or 1, self.thumb_height or 1
+        # Not preview.width: it has no width_field, so it would open the file.
+        return self.preview.url, self.width or 1, self.height or 1
 
 
 class PhotoContestModerator(models.Model):

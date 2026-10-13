@@ -665,6 +665,9 @@ Django 4.2 project. Source lives entirely under `src/`, with `manage.py` at `src
   (`winner IS NULL`, row younger than `PAIR_TTL`) under a per-voter `select_for_update`. Quota and repeat
   exclusion count void answers too (voiding must not refill the quota); the ranking (Wilson lower bound) counts
   only non-void answers whose two photos are both approved now. A compared photo is `PROTECT`ed.
+  **Results**: one page per nomination (`photo_results`, `<slug>/results/<id>/`, justified grid); the contest page
+  shows each nomination's top-3 once published. Medals need `wins > 0` (zero-win entries tie). Grid tiles use a 600px
+  `thumb` made from the preview (`manage.py build_photo_thumbs [--force]` backfills); the viewer opens the preview.
  `src/apps/<name>/`. Each needs a unique `AppConfig` label (e.g.
 `label = "race_app"`).
 

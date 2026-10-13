@@ -41,6 +41,12 @@ def create_entry(nomination, user, file, info, caption=""):
     # CPU-heavy work happens before taking the row lock.
     original, ext, width, height = images.make_original(file, info)
     preview = images.make_preview(file)
+    # From the preview, not the original: no second full-size decode.
+    thumb = images.make_preview(
+        ContentFile(preview),
+        max_side=images.THUMB_MAX_SIDE,
+        quality=images.THUMB_QUALITY,
+    )
 
     entry = PhotoEntry(
         nomination=nomination,
@@ -56,6 +62,7 @@ def create_entry(nomination, user, file, info, caption=""):
     targets = [
         (entry.original.storage, f"{name}.{ext}"),
         (entry.preview.storage, f"{name}.jpg"),
+        (entry.thumb.storage, f"{name}_thumb.jpg"),
     ]
     written = []
     try:
@@ -78,6 +85,8 @@ def create_entry(nomination, user, file, info, caption=""):
             written.append((entry.original.storage, entry.original.name))
             entry.preview.save(targets[1][1], ContentFile(preview), save=False)
             written.append((entry.preview.storage, entry.preview.name))
+            entry.thumb.save(targets[2][1], ContentFile(thumb), save=False)
+            written.append((entry.thumb.storage, entry.thumb.name))
             entry.save()
     except BaseException:
         for storage, file_name in {*targets, *written}:

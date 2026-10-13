@@ -1,9 +1,9 @@
 {% extends "website/base-2.html" %}
 {% load static %}
 
-{% block title %}Итоги · {{ contest.title }} · Кольцо 24{% endblock %}
+{% block title %}{{ nomination.title }} · Итоги · {{ contest.title }} · Кольцо 24{% endblock %}
 {% block head_descr %}Итоги фотоконкурса «{{ contest.title }}».{% endblock %}
-{% block og_title %}Итоги: {{ contest.title }}{% endblock %}
+{% block og_title %}Итоги: {{ nomination.title }} · {{ contest.title }}{% endblock %}
 
 {% block extra_head %}
 <link rel="stylesheet" href="{% static 'css/photo_contest.css' %}">
@@ -31,33 +31,24 @@
     <p class="alert-error pc-banner">Итоги не опубликованы — их видят только администраторы конкурса.</p>
     {% endif %}
 
-    {% for nomination in nominations %}
-    <section class="pc-results-nomination" aria-labelledby="results-{{ nomination.pk }}">
-      <h2 id="results-{{ nomination.pk }}">{{ nomination.title }}</h2>
-      {% if nomination.rows %}
-      <ol class="pc-thumbs pc-ranking">
-        {% for row in nomination.rows %}
-        <li class="pc-rank{% if row.place <= 3 %} pc-rank-top pc-rank-{{ row.place }}{% endif %}">
-          <a class="pc-thumb-link" href="{{ row.entry.preview.url }}" target="_blank" rel="noopener"
-             data-caption="{{ row.place }} место · {{ row.author }}{% if row.entry.caption %} — {{ row.entry.caption }}{% endif %}">
-            <img src="{{ row.entry.preview.url }}" alt="{{ row.entry.caption|default:'Фото участника' }}" loading="lazy">
-          </a>
-          <div class="pc-rank-body">
-            <span class="pc-rank-place">{{ row.place }}</span>
-            <div>
-              <p class="pc-rank-author">{{ row.author }}</p>
-              {% if row.entry.caption %}<p class="pc-rank-caption">{{ row.entry.caption }}</p>{% endif %}
-              <p class="pc-rank-score">Побед: {{ row.wins }} из {{ row.n }}</p>
-            </div>
-          </div>
-        </li>
-        {% endfor %}
-      </ol>
+    {% if nominations|length > 1 %}
+    <nav class="pc-tabs" aria-label="Номинации">
+      {% for item in nominations %}
+      <a class="pc-tab{% if item.pk == nomination.pk %} is-active{% endif %}" href="{% url 'photo_results' contest.slug item.pk %}"{% if item.pk == nomination.pk %} aria-current="page"{% endif %}>{{ item.title }}</a>
+      {% endfor %}
+    </nav>
+    {% endif %}
+
+    <section aria-labelledby="results-title">
+      <h2 id="results-title" class="pc-results-title">{{ nomination.title }}</h2>
+      {% if rows %}
+      <div class="pc-thumbs pc-gallery">
+        {% for row in rows %}{% include "photo_contest/_ranked_tile.html" %}{% endfor %}
+      </div>
       {% else %}
       <p class="pc-note">В номинации нет принятых фото.</p>
       {% endif %}
     </section>
-    {% endfor %}
 
     <dialog class="pc-viewer" aria-label="Просмотр фото">
       <figure class="pc-viewer-figure">

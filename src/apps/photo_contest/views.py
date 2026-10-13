@@ -93,6 +93,11 @@ def _contest_context(request, contest, form=None, is_moderator=None):
         nomination.answered = min(
             answered.get(nomination.pk, 0), contest.max_comparisons_per_user
         )
+        # Moderators reach unpublished results by the link, but the places stay
+        # off this shared page until they are published.
+        nomination.top = []
+        if contest.is_results_published:
+            nomination.top = [r for r in _ranked_rows(nomination) if r["medal"]]
     my_entries = []
     if user.is_authenticated:
         my_entries = list(
@@ -122,6 +127,7 @@ def _contest_context(request, contest, form=None, is_moderator=None):
         "open_nomination_pk": open_pk,
         "orphan_errors": form.is_bound and bool(form.errors) and open_pk is None,
         "accept": "image/jpeg,image/png,image/webp",
+        "show_results": contest.is_results_published or is_moderator,
         **_moderators_context(user, contest, is_moderator),
     }
 
@@ -567,22 +573,33 @@ def _author_name(user):
     return user.get_full_name() or "Участник"
 
 
+def _ranked_rows(nomination):
+    """Standings with what a results tile shows: author and a medal place."""
+    rows = nomination_standings(nomination)
+    for row in rows:
+        row["author"] = _author_name(row["entry"].uploaded_by)
+        # Zero-win entries all score 0 and share a place; with few votes that
+        # place can be 1st, so no medal without a single win.
+        row["medal"] = row["place"] if row["place"] <= 3 and row["wins"] else None
+    return rows
+
+
 class PhotoResultsView(View):
-    def get(self, request, slug):
+    def get(self, request, slug, nomination_id):
         contest, is_moderator = _visible_contest(request, slug)
         if not contest.is_results_published and not is_moderator:
             raise Http404
-        nominations = list(contest.nominations.all())
-        for nomination in nominations:
-            nomination.rows = nomination_standings(nomination)
-            for row in nomination.rows:
-                row["author"] = _author_name(row["entry"].uploaded_by)
+        nomination = get_object_or_404(
+            PhotoNomination, pk=nomination_id, contest=contest
+        )
         return render(
             request,
             "photo_contest/results.html",
             {
                 "contest": contest,
-                "nominations": nominations,
+                "nomination": nomination,
+                "nominations": contest.nominations.all(),
+                "rows": _ranked_rows(nomination),
                 "is_moderator": is_moderator,
             },
         )

@@ -16,6 +16,8 @@ STORE_MAX_BYTES = 15 * 1024 * 1024
 # Above 48 Мп phones; one decoded RGB frame of this size is ~150 MB.
 MAX_PIXELS = 50_000_000
 PREVIEW_MAX_SIDE = 1600
+THUMB_MAX_SIDE = 600
+THUMB_QUALITY = 80
 FALLBACK_MAX_SIDE = 6000
 MIN_SIDE = 16
 QUALITY_STEPS = (92, 88, 85, 80)
@@ -150,18 +152,20 @@ def make_original(file, info):
     return data, "jpg", width, height
 
 
-def make_preview(file):
+def make_preview(file, max_side=None, quality=85):
     """Return JPEG bytes of a downscaled, EXIF-free preview."""
+    if max_side is None:
+        max_side = PREVIEW_MAX_SIDE
     with _decoding():
         file.seek(0)
         with Image.open(file) as src:
             if JPEG_ALIASES.get(src.format, src.format) == "JPEG":
                 # Decode straight at a reduced DCT scale: far less memory.
-                src.draft("RGB", (PREVIEW_MAX_SIDE, PREVIEW_MAX_SIDE))
+                src.draft("RGB", (max_side, max_side))
             img = ImageOps.exif_transpose(src)
         img = _to_rgb(img)
-        img.thumbnail((PREVIEW_MAX_SIDE, PREVIEW_MAX_SIDE))
-        data = _jpeg_bytes(img, 85)
+        img.thumbnail((max_side, max_side))
+        data = _jpeg_bytes(img, quality)
         img.close()
     file.seek(0)
     return data
