@@ -3826,6 +3826,7 @@ def _make_mark(
     expected=None,
     wall_ms=1,
     trusted_ms=None,
+    force_counted=False,
 ):
     """Create a mobile ``Mark`` (+ ``MarkPresent`` roster) for the protocol tests.
 
@@ -3851,6 +3852,7 @@ def _make_mark(
         verified=verified,
         wall_ms=wall_ms,
         trusted_ms=trusted_ms,
+        force_counted=force_counted,
     )
     for i, uid in enumerate(present_chips, start=1):
         MarkPresent.objects.create(
@@ -3903,6 +3905,79 @@ def test_build_protocol_creates_rows_with_scores_and_places(django_user_model):
     # A scores higher despite taking longer -> places 1st.
     assert rows[team_a.id].place == 1
     assert rows[team_b.id].place == 2
+
+
+@pytest.mark.django_db
+def test_build_protocol_incomplete_mark_listed_without_score(django_user_model):
+    race = _make_race()
+    category = _make_category(race)
+    cp5 = _make_checkpoint(race, 5, 10)
+    cp12 = _make_checkpoint(race, 12, 20)
+    owner = django_user_model.objects.create_user(username="inc", password="x")
+    team = _make_started_team(owner, category, teamname="Inc")
+
+    _make_mark(team, cp12, present_chips=("a1",), wall_ms=1)
+    _make_mark(team, cp5, present_chips=("a1",), wall_ms=2)
+    _make_mark(team, cp5, present_chips=("a2",), wall_ms=3)
+
+    row = build_protocol(race, None).rows.get(team_id=team.id)
+    assert row.nfc_score == 0
+    assert row.nfc_checkpoints == ""
+    assert row.nfc_incomplete_checkpoints == "12, 5"
+
+
+@pytest.mark.django_db
+def test_build_protocol_force_counted_mark_scores(django_user_model):
+    race = _make_race()
+    category = _make_category(race)
+    cp = _make_checkpoint(race, 5, 10)
+    owner = django_user_model.objects.create_user(username="forced", password="x")
+    team = _make_started_team(owner, category, teamname="Forced")
+
+    _make_mark(team, cp, present_chips=("a1",), force_counted=True)
+
+    row = build_protocol(race, None).rows.get(team_id=team.id)
+    assert row.nfc_score == 10
+    assert row.nfc_checkpoints == "5"
+    assert row.nfc_incomplete_checkpoints == ""
+
+
+@pytest.mark.django_db
+def test_build_protocol_force_counted_needs_verified(django_user_model):
+    race = _make_race()
+    category = _make_category(race)
+    cp = _make_checkpoint(race, 5, 10)
+    owner = django_user_model.objects.create_user(username="unver", password="x")
+    team = _make_started_team(owner, category, teamname="Unver")
+
+    _make_mark(team, cp, present_chips=("a1",), verified=False, force_counted=True)
+
+    row = build_protocol(race, None).rows.get(team_id=team.id)
+    assert row.nfc_score == 0
+    assert row.nfc_incomplete_checkpoints == ""
+
+
+@pytest.mark.django_db
+def test_build_protocol_incomplete_dropped_when_cp_taken_otherwise(
+    django_user_model,
+):
+    race = _make_race()
+    category = _make_category(race)
+    cp_nfc = _make_checkpoint(race, 5, 10)
+    cp_photo = _make_checkpoint(race, 6, 20)
+    owner = django_user_model.objects.create_user(username="later", password="x")
+    team = _make_started_team(owner, category, teamname="Later")
+
+    _make_mark(team, cp_nfc, present_chips=("a1",), wall_ms=1)
+    _make_mark(team, cp_nfc, present_chips=("a1", "a2"), wall_ms=2)
+    _make_mark(team, cp_photo, present_chips=("a1",), wall_ms=1)
+    _make_mark(team, cp_photo, method="photo", verified=False, present_chips=())
+
+    row = build_protocol(race, None).rows.get(team_id=team.id)
+    assert row.nfc_checkpoints == "5"
+    assert row.photo_checkpoints == "6"
+    assert row.nfc_incomplete_checkpoints == ""
+    assert row.total_score == 30
 
 
 @pytest.mark.django_db
@@ -8904,3 +8979,245 @@ def test_race_map_gpx_out_of_range_time_exports_point_without_time(
     trkpt = root.find("g:trk/g:trkseg/g:trkpt", GPX_NS)
     assert trkpt is not None
     assert trkpt.find("g:time", GPX_NS) is None
+
+
+# ---------------------------------------------------------------------------
+# Judge override: race_app_data_mark_count
+# ---------------------------------------------------------------------------
+
+
+def _mark_count_setup(django_user_model, slug):
+    race = _make_race(slug=slug)
+    category = _make_category(race)
+    cp = _make_checkpoint(race, 5, 10)
+    owner = django_user_model.objects.create_user(username=f"{slug}-o", password="x")
+    team = _make_team(owner, category, ucount=3)
+    mark = _make_mark(team, cp, present_chips=("a1",))
+    admin = django_user_model.objects.create_user(username=f"{slug}-a", password="x")
+    RaceAdmin.objects.create(race=race, user=admin, role=RaceAdmin.Role.ADMIN)
+    return race, team, mark, admin
+
+
+def _mark_count_url(race, team):
+    return reverse(
+        "race_app_data_mark_count",
+        kwargs={"race_slug": race.slug, "team_id": team.id},
+    )
+
+
+@pytest.mark.django_db
+def test_mark_count_set_and_unset(client, django_user_model):
+    from django.contrib.messages import get_messages
+
+    from apps.race.app_data import mark_anchor
+
+    race, team, mark, admin = _mark_count_setup(django_user_model, "mc-set")
+    client.force_login(admin)
+    url = _mark_count_url(race, team)
+
+    resp = client.post(url, {"mark_id": mark.pk, "action": "set"})
+    team_url = reverse("race_app_data_team", args=[race.slug, team.id])
+    assert resp.status_code == 302
+    assert resp.url == f"{team_url}#{mark_anchor(mark.pk)}"
+    mark.refresh_from_db()
+    assert mark.force_counted is True
+    assert mark.forced_by_id == admin.id
+    assert mark.forced_at is not None
+    assert "КП 5 засчитан" in [str(m) for m in get_messages(resp.wsgi_request)][0]
+
+    client.post(url, {"mark_id": mark.pk, "action": "unset"})
+    mark.refresh_from_db()
+    assert mark.force_counted is False
+    assert mark.forced_by_id is None
+    assert mark.forced_at is None
+
+
+@pytest.mark.django_db
+def test_mark_count_set_refused_for_unverified_or_unknown_cp(client, django_user_model):
+    race, team, mark, admin = _mark_count_setup(django_user_model, "mc-refuse")
+    unknown = _make_mark(team, 999999, present_chips=("a1",))
+    Mark.objects.filter(pk=mark.pk).update(verified=False)
+    client.force_login(admin)
+    url = _mark_count_url(race, team)
+
+    for target in (mark, unknown):
+        resp = client.post(url, {"mark_id": target.pk, "action": "set"})
+        assert resp.status_code == 302
+        target.refresh_from_db()
+        assert target.force_counted is False
+
+
+@pytest.mark.django_db
+def test_mark_count_unset_works_on_unverified_mark(client, django_user_model):
+    race, team, mark, admin = _mark_count_setup(django_user_model, "mc-unset")
+    Mark.objects.filter(pk=mark.pk).update(
+        verified=False, force_counted=True, forced_by=admin
+    )
+    client.force_login(admin)
+
+    client.post(_mark_count_url(race, team), {"mark_id": mark.pk, "action": "unset"})
+
+    mark.refresh_from_db()
+    assert mark.force_counted is False
+    assert mark.forced_by_id is None
+
+
+@pytest.mark.django_db
+def test_mark_count_bad_action_400_and_get_405(client, django_user_model):
+    race, team, mark, admin = _mark_count_setup(django_user_model, "mc-bad")
+    client.force_login(admin)
+    url = _mark_count_url(race, team)
+
+    assert client.post(url, {"mark_id": mark.pk, "action": "x"}).status_code == 400
+    assert client.get(url).status_code == 405
+
+
+@pytest.mark.django_db
+def test_mark_count_gate(client, django_user_model):
+    race, team, mark, _ = _mark_count_setup(django_user_model, "mc-gate")
+    url = _mark_count_url(race, team)
+    body = {"mark_id": mark.pk, "action": "set"}
+
+    resp = client.post(url, body)
+    team_url = reverse("race_app_data_team", args=[race.slug, team.id])
+    assert resp.status_code == 302
+    assert resp.url == reverse("login") + "?next=" + team_url
+
+    plain = django_user_model.objects.create_user(username="mc-plain", password="x")
+    moderator = django_user_model.objects.create_user(username="mc-mod", password="x")
+    RaceAdmin.objects.create(race=race, user=moderator, role=RaceAdmin.Role.MODERATOR)
+    superuser = django_user_model.objects.create_superuser(
+        username="mc-su", password="x", email="mc-su@example.com"
+    )
+    for user in (plain, moderator, superuser):
+        client.force_login(user)
+        assert client.post(url, body).status_code == 403
+
+    mark.refresh_from_db()
+    assert mark.force_counted is False
+
+
+@pytest.mark.django_db
+def test_mark_count_404_for_foreign_team_or_mark(client, django_user_model):
+    race, team, mark, admin = _mark_count_setup(django_user_model, "mc-404")
+    category = team.category2
+    other_owner = django_user_model.objects.create_user(username="mc-oo", password="x")
+    other_team = _make_team(other_owner, category, start_number="2")
+    other_race = _make_race(slug="mc-404-other")
+    foreign_team = _make_team(other_owner, _make_category(other_race))
+    client.force_login(admin)
+
+    body = {"mark_id": mark.pk, "action": "set"}
+    assert client.post(_mark_count_url(race, other_team), body).status_code == 404
+    assert client.post(_mark_count_url(race, foreign_team), body).status_code == 404
+    missing = {"mark_id": "nope", "action": "set"}
+    assert client.post(_mark_count_url(race, team), missing).status_code == 404
+
+
+@pytest.mark.django_db
+def test_team_timeline_mark_force_fields(django_user_model):
+    from apps.race.app_data import mark_anchor
+
+    race, team, incomplete, admin = _mark_count_setup(django_user_model, "tl-force")
+    cp = Checkpoint.objects.get(race=race, number=5)
+    full = _make_mark(team, cp, present_chips=("a1", "a2", "a3"), wall_ms=2)
+    # Mixed-case duplicates count as two distinct uids, as in the protocol. Own
+    # КП, so the protocol check below can't pass on the full take instead.
+    cp_mixed = _make_checkpoint(race, 7, 10)
+    mixed = _make_mark(team, cp_mixed, present_chips=("04ab", "04AB", "x"), wall_ms=3)
+    forced = _make_mark(team, cp, present_chips=("a1",), wall_ms=4, verified=False)
+    Mark.objects.filter(pk=forced.pk).update(
+        force_counted=True, forced_by=admin, forced_at=timezone.now()
+    )
+
+    context = build_team_timeline(race, team)
+    events = {e["mark_id"]: e for e in context["events"] if e["kind"] == "mark"}
+
+    assert context["ucount"] == 3
+    assert events[incomplete.pk]["present_real"] == 1
+    assert events[incomplete.pk]["incomplete"] is True
+    assert events[incomplete.pk]["can_force"] is True
+    assert events[incomplete.pk]["anchor"] == mark_anchor(incomplete.pk)
+    assert events[full.pk]["incomplete"] is False
+    assert events[mixed.pk]["present_real"] == 3
+    assert events[forced.pk]["can_force"] is False
+    assert events[forced.pk]["force_counted"] is True
+    assert events[forced.pk]["forced_by"] == admin.username
+    assert events[forced.pk]["forced_at"]
+
+    Team.objects.filter(pk=team.pk).update(start_time=1000)
+    row = build_protocol(race, None).rows.get(team_id=team.id)
+    assert row.nfc_checkpoints == "5, 7"  # the mixed-case take is complete there too
+
+
+@pytest.mark.django_db
+def test_team_page_force_buttons(client, django_user_model):
+    race, team, incomplete, admin = _mark_count_setup(django_user_model, "tp-force")
+    cp = Checkpoint.objects.get(race=race, number=5)
+    _make_mark(team, cp, present_chips=("a1", "a2", "a3"), wall_ms=2)
+    _make_mark(team, cp, present_chips=("a1",), wall_ms=3, verified=False)
+    _make_mark(team, 999999, present_chips=("a1",), wall_ms=4)
+    forced = _make_mark(team, cp, present_chips=("a1",), wall_ms=5, verified=False)
+    Mark.objects.filter(pk=forced.pk).update(force_counted=True, forced_by=admin)
+    weird = Mark.objects.get(pk=_make_mark(team, cp, present_chips=(), wall_ms=6).pk)
+    old_pk = weird.pk
+    weird.pk = 'a/b"<x>'
+    weird.save(force_insert=True)
+    Mark.objects.filter(pk=old_pk).delete()
+    MarkPresent.objects.create(
+        mark=weird, nfc_uid="a1", code="", number=1, number_in_team=1
+    )
+    client.force_login(admin)
+
+    resp = client.get(reverse("race_app_data_team", args=[race.slug, team.id]))
+    html = resp.content.decode()
+
+    assert resp.status_code == 200
+    # incomplete verified take + the weird-id one get «Засчитать»; full,
+    # unverified and unknown-КП takes don't.
+    assert html.count(">Засчитать</button>") == 2
+    assert html.count(">Снять</button>") == 1
+    assert 'value="a/b&quot;&lt;x&gt;"' in html
+
+
+@pytest.mark.django_db
+def test_protocol_links_and_incomplete_only_for_editors(client, django_user_model):
+    race, team, _, admin = _mark_count_setup(django_user_model, "pr-links")
+    Team.objects.filter(pk=team.pk).update(start_time=1000, teamname="Ёжики")
+    build_protocol(race, None)
+    freeze_protocol(race)
+    url = reverse("category_results", args=[race.slug, team.category2_id])
+    team_url = reverse("race_app_data_team", args=[race.slug, team.id])
+
+    client.force_login(admin)
+    html = client.get(url).content.decode()
+    assert f'class="protocol-link" href="{team_url}"' in html
+    assert "неполные: 5" in html
+
+    client.logout()
+    html = client.get(url).content.decode()
+    assert "Ёжики" in html
+    assert team_url not in html
+    assert "неполные" not in html
+
+
+@pytest.mark.django_db
+def test_mark_count_requires_csrf_token(django_user_model):
+    from django.test import Client
+
+    race, team, mark, admin = _mark_count_setup(django_user_model, "mc-csrf")
+    csrf_client = Client(enforce_csrf_checks=True)
+    csrf_client.force_login(admin)
+    url = _mark_count_url(race, team)
+    body = {"mark_id": mark.pk, "action": "set"}
+
+    assert csrf_client.post(url, body).status_code == 403
+    mark.refresh_from_db()
+    assert mark.force_counted is False
+
+    page = csrf_client.get(reverse("race_app_data_team", args=[race.slug, team.id]))
+    token = page.cookies["csrftoken"].value
+    resp = csrf_client.post(url, {**body, "csrfmiddlewaretoken": token})
+    assert resp.status_code == 302
+    mark.refresh_from_db()
+    assert mark.force_counted is True

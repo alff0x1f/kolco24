@@ -8401,6 +8401,81 @@ def test_mark_upload_enrichment_merge_late_gps_and_member(
 
 
 @pytest.mark.django_db
+def test_mark_upload_resend_keeps_force_counted(client, settings, django_user_model):
+    """A re-sent mark id must not reset the judge override."""
+    import json
+
+    from django.utils import timezone
+
+    from apps.mobile.models import MARK_UPDATE_FIELDS, Mark
+
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    race, team = _make_team_in_race(django_user_model, slug="marks-forced")
+    cp, cp_code = _make_cp_with_tag(race)
+    judge = django_user_model.objects.create_user(
+        username="judge-forced", email="judge-forced@example.com", password="x"
+    )
+    path = _marks_path(race.id)
+    body = json.dumps(
+        {
+            "team_id": team.id,
+            "source_install_id": "ph",
+            "marks": [_valid_mark(id="mk-f", checkpoint_id=cp.id, cp_code=cp_code)],
+        }
+    ).encode()
+    assert _signed_post(client, path, SECRET, body).status_code == 200
+
+    forced_at = timezone.now()
+    Mark.objects.filter(pk="mk-f").update(
+        force_counted=True, forced_by=judge, forced_at=forced_at
+    )
+
+    assert _signed_post(client, path, SECRET, body).status_code == 200
+
+    row = Mark.objects.get(pk="mk-f")
+    assert row.force_counted is True
+    assert row.forced_by_id == judge.id
+    assert row.forced_at == forced_at
+    assert not {"force_counted", "forced_by", "forced_at"} & set(MARK_UPDATE_FIELDS)
+
+
+@pytest.mark.django_db
+def test_mark_upload_resend_to_other_cp_drops_force_counted(
+    client, settings, django_user_model
+):
+    """A re-sent id that moves the take to another КП loses the judge override."""
+    import json
+
+    from apps.mobile.models import Mark
+
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+
+    race, team = _make_team_in_race(django_user_model, slug="marks-forced-move")
+    cp, cp_code = _make_cp_with_tag(race, number=1)
+    other_cp, other_code = _make_cp_with_tag(race, number=2)
+    path = _marks_path(race.id)
+
+    def post(checkpoint_id, code):
+        mark = _valid_mark(id="mk-m", checkpoint_id=checkpoint_id, cp_code=code)
+        body = json.dumps(
+            {"team_id": team.id, "source_install_id": "ph", "marks": [mark]}
+        ).encode()
+        assert _signed_post(client, path, SECRET, body).status_code == 200
+
+    post(cp.id, cp_code)
+    Mark.objects.filter(pk="mk-m").update(force_counted=True)
+    post(other_cp.id, other_code)
+
+    row = Mark.objects.get(pk="mk-m")
+    assert row.checkpoint_id == other_cp.id
+    assert row.force_counted is False
+    assert row.forced_by_id is None
+
+
+@pytest.mark.django_db
 def test_mark_upload_verified_matrix(client, settings, django_user_model):
     """good code -> True; bad hex / unknown cp / mismatch -> False; all stored."""
     import json

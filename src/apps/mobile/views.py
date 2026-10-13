@@ -664,6 +664,7 @@ class MarkUploadView(AppAPIView):
                 )
 
         with transaction.atomic():
+            _drop_moved_overrides(mark_objs)
             # Parent upsert before child insert (FK ordering). Enrichment-merge:
             # a repeat id last-write-wins-overwrites the scalars; a new id inserts.
             Mark.objects.bulk_create(
@@ -679,6 +680,29 @@ class MarkUploadView(AppAPIView):
             _auto_populate_boundary_times(race_id, team_id, deduped)
 
         return Response({"accepted": accepted}, status=status.HTTP_200_OK)
+
+
+# A judge's force_counted was granted for this team + КП + scanned code; a
+# re-sent id that changes any of them must not carry the decision over.
+_OVERRIDE_IDENTITY = ("team_id", "race_id", "checkpoint_id", "method", "cp_code")
+
+
+def _drop_moved_overrides(mark_objs):
+    incoming = {obj.id: obj for obj in mark_objs}
+    moved = [
+        row["id"]
+        for row in Mark.objects.filter(pk__in=incoming, force_counted=True).values(
+            "id", *_OVERRIDE_IDENTITY
+        )
+        if any(
+            row[field] != getattr(incoming[row["id"]], field)
+            for field in _OVERRIDE_IDENTITY
+        )
+    ]
+    if moved:
+        Mark.objects.filter(pk__in=moved).update(
+            force_counted=False, forced_by=None, forced_at=None
+        )
 
 
 def _auto_populate_boundary_times(race_id, team_id, deduped):

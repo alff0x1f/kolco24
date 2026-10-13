@@ -59,6 +59,8 @@ def _score_checkpoints(team, cp_info):
       recomputed server-side against the **roster** (the team's own size), not
       trusting the client's ``expected_count``/``complete`` (per UPLOAD.md).
       The present count is a single ``Count`` annotation, so no per-mark query.
+      A judge's ``force_counted`` waives only the roster check, never
+      ``verified``.
     * A **photo** take (``method="photo"``) counts on a known КП with no
       participant/verified check (photo is a fallback; members aren't scanned).
     * Takes are dedup'd by **``checkpoint_id``** (each physical КП scores once);
@@ -66,6 +68,10 @@ def _score_checkpoints(team, cp_info):
       ``cp_info``) is skipped.
     * ``chips_count`` = distinct non-sentinel ``nfc_uid`` across all the team's
       ``MarkPresent`` rows (how many bracelets participated).
+    * ``nfc_incomplete_points`` = КП with a verified NFC take dropped only for an
+      incomplete roster and not counted by any other take. Dedup'd by
+      ``checkpoint_id`` (``number`` is not unique per race), in order of first
+      such take. Scores nothing.
     """
     real_present = Count(
         "present__nfc_uid",
@@ -81,17 +87,18 @@ def _score_checkpoints(team, cp_info):
     nfc_points = []
     nfc_score = 0
     seen_cps = set()
+    incomplete_cps = {}
     for mark in nfc_marks:
         info = cp_info.get(mark.checkpoint_id)
-        if (
-            info
-            and mark.checkpoint_id not in seen_cps
-            and mark.present_real >= team.ucount
-        ):
+        if not info or mark.checkpoint_id in seen_cps:
+            continue
+        if mark.present_real >= team.ucount or mark.force_counted:
             number, cost = info
             nfc_score += cost
             nfc_points.append(number)
             seen_cps.add(mark.checkpoint_id)
+        else:
+            incomplete_cps.setdefault(mark.checkpoint_id, info[0])
 
     photo_marks = Mark.objects.filter(team=team.id, method="photo").order_by(
         "checkpoint_id"
@@ -111,6 +118,12 @@ def _score_checkpoints(team, cp_info):
             photo_points.append(number)
             seen_photo.add(mark.checkpoint_id)
 
+    nfc_incomplete_points = [
+        number
+        for cp_id, number in incomplete_cps.items()
+        if cp_id not in seen_cps and cp_id not in seen_photo
+    ]
+
     chips_count = (
         MarkPresent.objects.filter(mark__team=team.id, nfc_uid__isnull=False)
         .exclude(nfc_uid="")
@@ -124,6 +137,7 @@ def _score_checkpoints(team, cp_info):
         "nfc_score": nfc_score,
         "photo_points": photo_points,
         "photo_score": photo_score,
+        "nfc_incomplete_points": nfc_incomplete_points,
         "chips_count": chips_count,
     }
 
@@ -162,6 +176,9 @@ def _build_row(protocol, team, cp_info):
         nfc_checkpoints=", ".join(str(p) for p in scoring["nfc_points"]),
         nfc_count=len(scoring["nfc_points"]),
         nfc_score=scoring["nfc_score"],
+        nfc_incomplete_checkpoints=", ".join(
+            str(p) for p in scoring["nfc_incomplete_points"]
+        ),
         photo_checkpoints=", ".join(str(p) for p in scoring["photo_points"]),
         photo_count=len(scoring["photo_points"]),
         photo_score=scoring["photo_score"],

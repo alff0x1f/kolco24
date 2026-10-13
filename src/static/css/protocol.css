@@ -80,6 +80,15 @@
   background: #fdecea; border-radius: 4px; padding: 1px 6px; margin-bottom: 3px;
 }
 
+/* Organizer-only links into «Данные приложения». */
+.protocol-page .protocol-link { color: var(--primary); text-decoration: none; }
+.protocol-page .protocol-link:hover { text-decoration: underline; }
+.protocol-page .protocol-incomplete {
+  display: block; width: fit-content; margin-top: 3px; font-size: 11.5px; font-weight: 600;
+  color: #8a6d1a; background: #fdf4dd; border-radius: 4px; padding: 1px 6px;
+  text-decoration: none;
+}
+
 /* ── Print-only sheet header ─────────────────────────────────
    Hidden on screen; shown in @media print in place of the nav/breadcrumb. */
 .protocol-page .print-head { display: none; }
@@ -96,7 +105,11 @@
   .protocol-page .breadcrumb,
   .protocol-page .head,
   .protocol-page .protocol-actions,
-  .protocol-page .protocol-messages { display: none !important; }
+  .protocol-page .protocol-messages,
+  .protocol-page .protocol-incomplete { display: none !important; }
+
+  /* Links print as plain text. */
+  .protocol-page .protocol-link { color: inherit; text-decoration: none; }
 
   /* White sheet — override theme-2's gray body background so nothing prints gray. */
   body { background: #fff; }

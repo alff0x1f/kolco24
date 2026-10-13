@@ -22,6 +22,14 @@
       <span class="cur">{{ team.teamname|default:team.start_number }}</span>
     </nav>
 
+    {% if messages %}
+    <ul class="app-data-messages">
+      {% for message in messages %}
+      <li class="msg{% if message.tags %} {{ message.tags }}{% endif %}">{{ message }}</li>
+      {% endfor %}
+    </ul>
+    {% endif %}
+
     <!-- Header -->
     <div class="head">
       <div class="head-l">
@@ -94,7 +102,7 @@
             <tbody>
               {% for ev in events %}
               <tr class="ev ev-{{ ev.kind }}" data-kind="{{ ev.kind }}"
-                  data-device="{{ ev.device.index|default:'' }}">
+                  data-device="{{ ev.device.index|default:'' }}"{% if ev.kind == "mark" %} id="{{ ev.anchor }}"{% endif %}>
                 <td class="mono">{{ ev.time|default:"—" }}</td>
                 <td>{% if ev.device %}{% include "race/_device_badge.html" with device=ev.device segment_id=ev.segment_id %}{% else %}<span class="aux">—</span>{% endif %}</td>
 
@@ -114,6 +122,23 @@
                   </span>
                   {% if ev.method == "photo" %}<span class="badge">фото</span>{% endif %}
                   {% if not ev.complete %}<span class="badge warn-b">не полный</span>{% endif %}
+                  {% if ev.force_counted %}
+                  <span class="badge ok">засчитана вручную{% if ev.forced_by %}: {{ ev.forced_by }}{% endif %}{% if ev.forced_at %}, {{ ev.forced_at }}{% endif %}</span>
+                  <form class="force-form" method="post" action="{% url 'race_app_data_mark_count' race.slug team.id %}">
+                    {% csrf_token %}
+                    <input type="hidden" name="mark_id" value="{{ ev.mark_id }}">
+                    <input type="hidden" name="action" value="unset">
+                    <button type="submit" class="btn btn-ghost btn-xs">Снять</button>
+                  </form>
+                  {% elif ev.can_force and ev.incomplete %}
+                  <span class="badge bad">неполная {{ ev.present_real }}/{{ ucount }}</span>
+                  <form class="force-form" method="post" action="{% url 'race_app_data_mark_count' race.slug team.id %}">
+                    {% csrf_token %}
+                    <input type="hidden" name="mark_id" value="{{ ev.mark_id }}">
+                    <input type="hidden" name="action" value="set">
+                    <button type="submit" class="btn btn-ghost btn-xs">Засчитать</button>
+                  </form>
+                  {% endif %}
                   {% if ev.clock_skew %}
                   <span class="badge warn-b"
                         title="по часам телефона {{ ev.clock_skew.wall }}, доверенное время {{ ev.clock_skew.trusted }}">

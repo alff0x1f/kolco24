@@ -82,12 +82,12 @@
 - Create: `src/apps/mobile/migrations/0013_mark_force_counted.py`
 - Modify: `src/apps/mobile/tests.py`
 
-- [ ] добавить `force_counted`, `forced_by`, `forced_at` в `Mark`; в docstring одна фраза: поля судьи, не в
+- [x] добавить `force_counted`, `forced_by`, `forced_at` в `Mark`; в docstring одна фраза: поля судьи, не в
       `MARK_UPDATE_FIELDS`
-- [ ] `uv run python src/manage.py makemigrations mobile --name mark_force_counted`
-- [ ] тест: повторный POST `/marks/` с тем же `id` не сбрасывает `force_counted`/`forced_by`/`forced_at`
-- [ ] тест: `MARK_UPDATE_FIELDS` не содержит этих трёх полей
-- [ ] run tests - must pass before next task
+- [x] `uv run python src/manage.py makemigrations mobile --name mark_force_counted`
+- [x] тест: повторный POST `/marks/` с тем же `id` не сбрасывает `force_counted`/`forced_by`/`forced_at`
+- [x] тест: `MARK_UPDATE_FIELDS` не содержит этих трёх полей (в том же тесте)
+- [x] run tests - must pass before next task
 
 ### Task 2: Подсчёт с флагом и «неполные» в снимке
 
@@ -97,14 +97,14 @@
 - Create: `src/apps/race/migrations/0006_protocolrow_nfc_incomplete_checkpoints.py`
 - Modify: `src/apps/race/tests.py`
 
-- [ ] `_score_checkpoints`: засчитывать при `present_real >= ucount or force_counted`; собирать отброшенные из-за
+- [x] `_score_checkpoints`: засчитывать при `present_real >= ucount or force_counted`; собирать отброшенные из-за
       состава КП; после фото-прохода исключить засчитанные; вернуть `nfc_incomplete_points`
-- [ ] обновить docstring `_score_checkpoints` (правило флага и неполных)
-- [ ] `ProtocolRow.nfc_incomplete_checkpoints = TextField(blank=True, default="")` + миграция; заполнить в `_build_row`
-- [ ] тесты: неполная без флага → в неполных, без очков; с `force_counted` → засчитана, не в неполных;
+- [x] обновить docstring `_score_checkpoints` (правило флага и неполных)
+- [x] `ProtocolRow.nfc_incomplete_checkpoints = TextField(blank=True, default="")` + миграция; заполнить в `_build_row`
+- [x] тесты: неполная без флага → в неполных, без очков; с `force_counted` → засчитана, не в неполных;
       `force_counted` + `verified=False` → не засчитана и не в неполных
-- [ ] тесты: КП позже взят полной отметкой или фото → не в неполных; две неполные на один КП → номер один раз
-- [ ] run tests - must pass before next task
+- [x] тесты: КП позже взят полной отметкой или фото → не в неполных; две неполные на один КП → номер один раз
+- [x] run tests - must pass before next task
 
 ### Task 3: Endpoint «Засчитать / Снять»
 
@@ -113,21 +113,21 @@
 - Modify: `src/website/urls.py`
 - Modify: `src/apps/race/tests.py`
 
-- [ ] `RaceAppDataMarkCountView.post` — гейт как у `RaceAppDataTeamView`, но аноним → login с
+- [x] `RaceAppDataMarkCountView.post` — гейт как у `RaceAppDataTeamView`, но аноним → login с
       `?next=<race_app_data_team url>` (не POST-url, иначе после входа 405); team 404 вне гонки;
       `get_object_or_404(Mark, pk=request.POST["mark_id"], race=race, team=team)`; `action` вне `set|unset` → 400
-- [ ] `set`: `method != "nfc"`, `verified=False` или КП не в гонке/`cost < 0` → без изменений, `messages.error`;
+- [x] `set`: `method != "nfc"`, `verified=False` или КП не в гонке/`cost < 0` → без изменений, `messages.error`;
       `unset` — всегда; повторный `set` перезаписывает `forced_by`/`forced_at`
-- [ ] номер КП для сообщения — из `Checkpoint`, fallback `id <checkpoint_id>`
-- [ ] set/unset + `save(update_fields=["force_counted", "forced_by", "forced_at"])`; `messages.success`
+- [x] номер КП для сообщения — из `Checkpoint`, fallback `id <checkpoint_id>`
+- [x] set/unset + `save(update_fields=["force_counted", "forced_by", "forced_at"])`; `messages.success`
       «КП N засчитан/снят. Пересоберите протокол»; redirect с якорем `#mark-<id>`
-- [ ] url `race_app_data_mark_count` рядом с `race_app_data_team`
-- [ ] тексты сообщений в тестах проверять через `get_messages` (рендер на странице появится в Task 4)
-- [ ] тесты: аноним → login `?next=<страница команды>`, не-админ → 403, суперюзер без `RaceAdmin` → 403, модератор → 403, GET → 405
-- [ ] тесты: чужая команда / отметка другой команды → 404; `verified=False` не меняется; set ставит
+- [x] url `race_app_data_mark_count` рядом с `race_app_data_team`
+- [x] тексты сообщений в тестах проверять через `get_messages` (рендер на странице появится в Task 4)
+- [x] тесты: аноним → login `?next=<страница команды>`, не-админ → 403, суперюзер без `RaceAdmin` → 403, модератор → 403, GET → 405
+- [x] тесты: чужая команда / отметка другой команды → 404; `verified=False` не меняется; set ставит
       `forced_by`/`forced_at`, unset сбрасывает; плохой `action` → 400; `set` на неизвестный КП не меняется;
       засчитанная отметка, ставшая `verified=False`, снимается через `unset`
-- [ ] run tests - must pass before next task
+- [x] run tests - must pass before next task
 
 ### Task 4: Кнопки на странице команды
 
@@ -137,20 +137,20 @@
 - Modify: CSS страницы «Данные приложения» (найти в `extra_head` шаблона)
 - Modify: `src/apps/race/tests.py`
 
-- [ ] helper `mark_anchor(mark_id)`; `build_team_timeline`: в событие `mark` добавить `mark_id`, `anchor`,
+- [x] helper `mark_anchor(mark_id)`; `build_team_timeline`: в событие `mark` добавить `mark_id`, `anchor`,
       `present_real` (разные **сырые** непустые `nfc_uid` из уже загруженных `presents` — как в `_score_checkpoints`),
       `can_force` (nfc + verified + КП известен и `cost >= 0`),
       `force_counted`, `forced_by` (имя), `forced_at` (форматировать на сервере), `incomplete`; `ucount` в контекст;
       `select_related("forced_by")` без лишних запросов
-- [ ] шаблон: `id="{{ ev.anchor }}"` у строки; `mark_id` — hidden input формы; если `force_counted` — бейдж
+- [x] шаблон: `id="{{ ev.anchor }}"` у строки; `mark_id` — hidden input формы; если `force_counted` — бейдж
       «засчитана вручную: кто, когда» + форма «Снять» (**при любом** `verified`/`method`); иначе если `can_force` и
       неполная — бейдж «неполная X/ucount» + форма «Засчитать» (POST, `{% csrf_token %}`)
-- [ ] вывод `messages` наверху страницы
-- [ ] тесты `build_team_timeline`: поля события для полной, неполной и засчитанной отметки
-- [ ] тест: `present_real` при `04ab` + `04AB` совпадает с подсчётом протокола
-- [ ] тест страницы: «Засчитать» есть у неполной verified-отметки, нет у полной, у `verified=False` и у неизвестного
+- [x] вывод `messages` наверху страницы
+- [x] тесты `build_team_timeline`: поля события для полной, неполной и засчитанной отметки
+- [x] тест: `present_real` при `04ab` + `04AB` совпадает с подсчётом протокола
+- [x] тест страницы: «Засчитать» есть у неполной verified-отметки, нет у полной, у `verified=False` и у неизвестного
       КП; «Снять» есть у засчитанной `verified=False`; `Mark.id` с `/` и `"<>` не ломает страницу (200)
-- [ ] run tests - must pass before next task
+- [x] run tests - must pass before next task
 
 ### Task 5: Ссылки и «неполные» в протоколе
 
@@ -159,27 +159,27 @@
 - Modify: `src/static/css/protocol.css`
 - Modify: `src/apps/race/tests.py`
 
-- [ ] при `can_edit`: название команды — `<a class="protocol-link">` на `race_app_data_team`; иначе простой текст
-- [ ] при `can_edit` и непустом `nfc_incomplete_checkpoints`: строка «неполные: …» под «Чип», ссылка на страницу
+- [x] при `can_edit`: название команды — `<a class="protocol-link">` на `race_app_data_team`; иначе простой текст
+- [x] при `can_edit` и непустом `nfc_incomplete_checkpoints`: строка «неполные: …» под «Чип», ссылка на страницу
       команды (класс `protocol-incomplete`)
-- [ ] CSS (всё под `.protocol-page`, как остальной файл): стиль ссылки и строки на экране; в `@media print` —
+- [x] CSS (всё под `.protocol-page`, как остальной файл): стиль ссылки и строки на экране; в `@media print` —
       `.protocol-page .protocol-link { color: inherit; text-decoration: none; }`,
       `.protocol-page .protocol-incomplete { display: none !important; }`
-- [ ] ссылка строится по `ProtocolRow.team_id`; команда, удалённая после сборки, даст 404 — допустимо
-- [ ] тесты: админ видит ссылку и «неполные» в черновике; аноним на `final` — ни ссылки, ни «неполных»
-- [ ] run tests - must pass before next task
+- [x] ссылка строится по `ProtocolRow.team_id`; команда, удалённая после сборки, даст 404 — допустимо
+- [x] тесты: админ видит ссылку и «неполные» в черновике; аноним на `final` — ни ссылки, ни «неполных»
+- [x] run tests - must pass before next task
 
 ### Task 6: Verify acceptance criteria
-- [ ] неполная verified-отметка: «Засчитать» → «Пересобрать» → КП в протоколе с очками
-- [ ] «Снять» → «Пересобрать» → КП снова в «неполных»
-- [ ] `make format && make lint`
-- [ ] run full test suite: `uv run pytest`
+- [x] неполная verified-отметка: «Засчитать» → «Пересобрать» → КП в протоколе с очками (тестами; в браузере не проверено)
+- [x] «Снять» → «Пересобрать» → КП снова в «неполных»
+- [x] `make format && make lint`
+- [x] run full test suite: `uv run pytest`
 
 ### Task 7: [Final] Update documentation
-- [ ] CLAUDE.md: одна короткая строка про `force_counted` (не в `MARK_UPDATE_FIELDS`, ставится на странице
+- [x] CLAUDE.md: одна короткая строка про `force_counted` (не в `MARK_UPDATE_FIELDS`, ставится на странице
       команды «Данные приложения», гейт `can_edit_race`, учитывается в протоколе только при `verified`); поправить
       «no admin UI today» в разделе **Marks upload**, чтобы не противоречило
-- [ ] move this plan to `docs/plans/completed/`
+- [x] MOVE to `docs/plans/completed/`
 
 ## Post-Completion
 *Items requiring manual intervention or external systems - no checkboxes, informational only*

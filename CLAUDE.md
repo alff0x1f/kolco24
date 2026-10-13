@@ -998,7 +998,9 @@ the latest `final` (or a "not published yet" message). URLs (`website/urls.py`):
 the snapshot; the old live-computed `AllTeamsResultView` moved unchanged to
 `.../results-deprecated/` (name `category_results_deprecated`, no redirect from the old path); build/freeze are
 POST-only at `.../results/build/` / `.../results/freeze/` (names `protocol_build`/`protocol_freeze`), gated by
-`can_edit_race`.
+`can_edit_race`. A verified NFC take with an incomplete roster counts only if a judge sets `Mark.force_counted` (button on the
+app-data team page, `race_app_data_mark_count`, `can_edit_race`; the field is deliberately not in `MARK_UPDATE_FIELDS`, but a re-upload that changes the take's team/КП/`method`/`cp_code` drops it);
+otherwise its КП shows as «неполные» (`ProtocolRow.nfc_incomplete_checkpoints`) to editors only.
 
 **Email** goes through `django-mailer` (`EMAIL_BACKEND = "mailer.backend.DbBackend"`): messages are queued in the DB and
 sent by the `kolco24_runmailer` container running `manage.py runmailer`.
