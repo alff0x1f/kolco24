@@ -201,6 +201,15 @@ class Team(models.Model):
     distance_time = models.DurationField(null=True, blank=True)
     penalty = models.IntegerField(default=0)
     dnf = models.BooleanField(default=False)
+    dnf_reason = models.CharField(max_length=200, blank=True, default="")
+    dnf_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="+",
+    )
+    dnf_at = models.DateTimeField(null=True, blank=True)
     points_sum = models.IntegerField(default=0)
     place = models.IntegerField(default=0)
     is_deleted = models.BooleanField(default=False)

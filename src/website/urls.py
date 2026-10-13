@@ -9,6 +9,7 @@ from apps.race.views import (
     ProtocolView,
     RaceAdminsView,
     RaceAppDataMarkCountView,
+    RaceAppDataTeamDnfView,
     RaceAppDataTeamView,
     RaceAppDataView,
     RaceChecklistView,
@@ -209,6 +210,11 @@ urlpatterns = [
         "race/<slug:race_slug>/app-data/team/<int:team_id>/mark-count/",
         RaceAppDataMarkCountView.as_view(),
         name="race_app_data_mark_count",
+    ),
+    path(
+        "race/<slug:race_slug>/app-data/team/<int:team_id>/dnf/",
+        RaceAppDataTeamDnfView.as_view(),
+        name="race_app_data_team_dnf",
     ),
     path(
         "race/<slug:race_slug>/admins/",

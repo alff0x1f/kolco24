@@ -75,7 +75,11 @@
                     <span class="team-num">{{ row.team.start_number|default:"—" }}</span>
                     {{ row.team.teamname|default:"Без названия" }}
                   </a>
-                  <span class="cat">{{ row.team.category2.short_name }}</span>
+                  {% if row.team.category2_id %}
+                  <a class="cat" href="{% url 'category_results' race.slug row.team.category2_id %}#team-{{ row.team.id }}"
+                     title="Открыть в протоколе">{{ row.team.category2.short_name }}</a>
+                  {% endif %}
+                  {% if row.team.dnf %}<span class="badge bad" title="{{ row.team.dnf_reason }}">снята</span>{% endif %}
                 </td>
                 <td class="mono">{{ row.start_time|default:"—" }}</td>
                 <td class="mono">{{ row.finish_time|default:"—" }}</td>

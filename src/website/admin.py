@@ -94,6 +94,7 @@ class TeamAdmin(admin.ModelAdmin):
         "year",
     )
     list_filter = ("year", "category", "category2")
+    readonly_fields = ("dnf_by", "dnf_at")
 
 
 class PointTagInline(admin.TabularInline):
