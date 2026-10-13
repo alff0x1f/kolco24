@@ -16,7 +16,14 @@ class PhotoNominationInline(admin.TabularInline):
 
 @admin.register(PhotoContest)
 class PhotoContestAdmin(admin.ModelAdmin):
-    list_display = ["title", "slug", "submission_until", "is_published"]
+    list_display = [
+        "title",
+        "slug",
+        "submission_until",
+        "voting_until",
+        "is_published",
+        "is_results_published",
+    ]
     prepopulated_fields = {"slug": ("title",)}
     readonly_fields = ["folders"]
     inlines = [PhotoNominationInline]

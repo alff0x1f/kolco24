@@ -1,4 +1,6 @@
 from django.conf import settings
+from django.core.exceptions import ValidationError
+from django.core.validators import MinValueValidator
 from django.db import models
 from django.utils import timezone
 
@@ -18,6 +20,18 @@ class PhotoContest(models.Model):
         default=False,
         help_text="Виден на сайте; до срока идёт приём фото.",
     )
+    voting_until = models.DateTimeField(
+        "Голосование до",
+        null=True,
+        blank=True,
+        help_text="Идёт после приёма фото. Пусто — без голосования.",
+    )
+    max_comparisons_per_user = models.PositiveIntegerField(
+        "Сравнений на участника в номинации",
+        default=30,
+        validators=[MinValueValidator(1)],
+    )
+    is_results_published = models.BooleanField("Итоги опубликованы", default=False)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -29,9 +43,40 @@ class PhotoContest(models.Model):
     def __str__(self):
         return self.title
 
+    def clean(self):
+        if (
+            self.voting_until
+            and self.submission_until
+            and self.voting_until <= self.submission_until
+        ):
+            raise ValidationError(
+                {"voting_until": "Голосование должно заканчиваться после приёма фото."}
+            )
+
     @property
     def is_submission_open(self):
         return self.is_published and timezone.now() <= self.submission_until
+
+    @property
+    def is_voting_open(self):
+        if not (self.is_published and self.voting_until):
+            return False
+        return self.submission_until < timezone.now() <= self.voting_until
+
+    @property
+    def is_voting_finished(self):
+        return bool(self.voting_until) and timezone.now() > self.voting_until
+
+    @property
+    def phase(self):
+        now = timezone.now()
+        if now <= self.submission_until:
+            return "submission"
+        if not self.voting_until:
+            return "no_voting"
+        if now <= self.voting_until:
+            return "voting"
+        return "closed"
 
     @property
     def days_left(self):
@@ -117,3 +162,33 @@ class PhotoContestModerator(models.Model):
 
     def __str__(self):
         return f"{self.user} — {self.contest}"
+
+
+class Comparison(models.Model):
+    """One pair shown to a voter; ``winner`` is null until answered."""
+
+    nomination = models.ForeignKey(
+        PhotoNomination, on_delete=models.CASCADE, related_name="comparisons"
+    )
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="photo_comparisons",
+    )
+    # PROTECT: a photo that has been voted on can't vanish with its votes.
+    left = models.ForeignKey(PhotoEntry, on_delete=models.PROTECT, related_name="+")
+    right = models.ForeignKey(PhotoEntry, on_delete=models.PROTECT, related_name="+")
+    winner = models.ForeignKey(
+        PhotoEntry, on_delete=models.PROTECT, related_name="+", null=True
+    )
+    is_void = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+    answered_at = models.DateTimeField(null=True)
+    ip = models.GenericIPAddressField(null=True)
+    user_agent = models.CharField(max_length=255, blank=True)
+
+    class Meta:
+        indexes = [models.Index(fields=["nomination", "user"])]
+
+    def __str__(self):
+        return f"{self.left_id} vs {self.right_id}"

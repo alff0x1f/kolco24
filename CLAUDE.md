@@ -658,6 +658,13 @@ Django 4.2 project. Source lives entirely under `src/`, with `manage.py` at `src
   originals of its photos and works on `photo_moderate` (`<slug>/moderate/`); restoring a rejected photo does not
   re-check the per-nomination limit. The home page shows open contests via `open_photo_contests`
   (`_home_photo_contests.html`).
+  **Voting** (`pairing.py`/`scoring.py`/`report.py`): phases `submission_until` → `voting_until` → manual
+  `is_results_published`; pairwise, per nomination. A `Comparison` row is the issued pair; its token is
+  `TimestampSigner(salt=PAIR_TOKEN_SALT)` — **never the default salt**, which magic links use over
+  `EmailVerification.pk`, so a pair token would log in as someone else. The answer is one conditional UPDATE
+  (`winner IS NULL`, row younger than `PAIR_TTL`) under a per-voter `select_for_update`. Quota and repeat
+  exclusion count void answers too (voiding must not refill the quota); the ranking (Wilson lower bound) counts
+  only non-void answers whose two photos are both approved now. A compared photo is `PROTECT`ed.
  `src/apps/<name>/`. Each needs a unique `AppConfig` label (e.g.
 `label = "race_app"`).
 

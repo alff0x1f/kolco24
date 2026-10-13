@@ -19,8 +19,12 @@
     <header class="page-head">
       <div>
         <h1>{{ contest.title }}</h1>
-        {% if contest.is_submission_open %}
+        {% if contest.phase == "submission" %}
         <p class="sub">Приём фото до {{ contest.submission_until|date:"j E, H:i" }}</p>
+        {% elif contest.phase == "voting" %}
+        <p class="sub">Голосование до {{ contest.voting_until|date:"j E, H:i" }}</p>
+        {% elif contest.phase == "closed" %}
+        <p class="sub">Голосование завершено</p>
         {% else %}
         <p class="sub">Приём фото закрыт</p>
         {% endif %}
@@ -44,11 +48,21 @@
     <div class="pc-description">{{ contest.description|linebreaks }}</div>
     {% endif %}
 
+    {% if contest.phase == "voting" %}
+    <p class="info-banner pc-banner pc-phase">Идёт голосование. Выберите номинацию — мы покажем пары фото, а вы выберете лучшее в каждой паре.</p>
+    {% elif contest.is_results_published %}
+    <p class="info-banner pc-banner pc-phase">Голосование завершено. <a href="{% url 'photo_results' contest.slug %}">Смотреть итоги</a></p>
+    {% elif contest.phase == "closed" %}
+    <p class="info-banner pc-banner pc-phase">Голосование завершено, итоги скоро.</p>
+    {% endif %}
+
     {% if nominations %}
     <section class="pc-nominations-section" aria-labelledby="pc-nominations-title">
       <div class="pc-section-head">
         <h2 id="pc-nominations-title">Номинации</h2>
+        {% if contest.phase == "submission" %}
         <p>До {{ contest.max_photos_per_user }} фото от участника в каждой</p>
+        {% endif %}
       </div>
 
       {% if orphan_errors %}
@@ -57,7 +71,7 @@
 
       <ul class="card pc-nominations">
         {% for nomination in nominations %}
-        <li class="pc-nomination{% if nomination.is_full %} is-full{% endif %}" id="nomination-{{ nomination.pk }}">
+        <li class="pc-nomination{% if nomination.is_full and contest.is_submission_open %} is-full{% endif %}" id="nomination-{{ nomination.pk }}">
           <div class="pc-nomination-head">
             <h3>{{ nomination.title }}</h3>
             {% if user.is_authenticated and contest.is_submission_open %}
@@ -65,6 +79,19 @@
             {% endif %}
           </div>
           {% if nomination.description %}<p class="pc-nomination-descr">{{ nomination.description }}</p>{% endif %}
+
+          {% if contest.phase == "voting" %}
+          <div class="pc-vote">
+            {% if nomination.can_vote %}
+            <a class="btn btn-primary" href="{% url 'photo_vote' contest.slug nomination.pk %}">Голосовать</a>
+            {% if user.is_authenticated %}
+            <span class="pc-count">{{ nomination.answered }} из {{ contest.max_comparisons_per_user }}</span>
+            {% endif %}
+            {% else %}
+            <p class="pc-note">В номинации мало фото для голосования.</p>
+            {% endif %}
+          </div>
+          {% endif %}
 
           {% if nomination.my_entries %}
           <ul class="pc-thumbs" aria-label="Мои фото в номинации «{{ nomination.title }}»">
@@ -167,6 +194,34 @@
           </div>
         </div>
       </section>
+
+      {% if contest.voting_until %}
+      <section class="card card-admin" aria-labelledby="pc-results-title">
+        <div class="side-head">
+          <h3 id="pc-results-title">Итоги</h3>
+        </div>
+        <div class="card-pad pc-side-pad">
+          <p class="pc-pending">{% if contest.is_results_published %}Итоги опубликованы{% elif contest.is_voting_finished %}Голосование завершено, итоги не опубликованы{% else %}Опубликовать можно после {{ contest.voting_until|date:"j E, H:i" }}{% endif %}</p>
+          <div class="admin-actions">
+            <a class="btn btn-ghost" href="{% url 'photo_results' contest.slug %}">Итоги</a>
+            <a class="btn btn-ghost" href="{% url 'photo_report' contest.slug %}">Отчёт по голосам</a>
+            {% if contest.is_results_published %}
+            <form method="post" action="{% url 'photo_results_publish' contest.slug %}">
+              {% csrf_token %}
+              <input type="hidden" name="action" value="hide">
+              <button class="btn btn-ghost" type="submit">Скрыть итоги</button>
+            </form>
+            {% elif contest.is_voting_finished %}
+            <form method="post" action="{% url 'photo_results_publish' contest.slug %}">
+              {% csrf_token %}
+              <input type="hidden" name="action" value="publish">
+              <button class="btn btn-primary" type="submit">Опубликовать итоги</button>
+            </form>
+            {% endif %}
+          </div>
+        </div>
+      </section>
+      {% endif %}
       {% endif %}
 
       <section class="card card-admin pc-moderators" id="contest-moderators" aria-labelledby="contest-moderators-title">

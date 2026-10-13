@@ -27,6 +27,30 @@ urlpatterns = [
         name="photo_moderate_entry",
     ),
     path(
+        "<slug:slug>/vote/<int:nomination_id>/",
+        views.PhotoVoteView.as_view(),
+        name="photo_vote",
+    ),
+    path(
+        "<slug:slug>/vote/<int:nomination_id>/pair/",
+        views.PhotoPairView.as_view(),
+        name="photo_pair",
+    ),
+    path(
+        "<slug:slug>/results/", views.PhotoResultsView.as_view(), name="photo_results"
+    ),
+    path(
+        "<slug:slug>/results/publish/",
+        views.PhotoResultsPublishView.as_view(),
+        name="photo_results_publish",
+    ),
+    path("<slug:slug>/report/", views.PhotoReportView.as_view(), name="photo_report"),
+    path(
+        "<slug:slug>/report/void/",
+        views.PhotoReportVoidView.as_view(),
+        name="photo_report_void",
+    ),
+    path(
         "<slug:slug>/entry/<int:entry_id>/delete/",
         views.PhotoDeleteView.as_view(),
         name="photo_delete",

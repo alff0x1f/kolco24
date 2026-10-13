@@ -1,0 +1,101 @@
+{% extends "website/base-2.html" %}
+{% load static l10n %}
+
+{% block title %}Отчёт по голосам · {{ contest.title }} · Кольцо 24{% endblock %}
+{% block head_descr %}Отчёт по голосам — {{ contest.title }}.{% endblock %}
+{% block og_title %}Отчёт по голосам · {{ contest.title }}{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="{% static 'css/photo_moderate.css' %}">
+{% endblock %}
+
+{% block content %}
+<main class="page photo-moderate photo-report">
+  <div class="container">
+
+    <div class="crumbs"><a href="{% url 'photo_contest' contest.slug %}">{{ contest.title }}</a></div>
+
+    <header class="page-head">
+      <div>
+        <h1>Отчёт по голосам</h1>
+        <p class="sub">{{ contest.title }}</p>
+      </div>
+    </header>
+
+    {% for message in messages %}
+    <p class="{% if message.level_tag == 'error' %}alert-error{% else %}info-banner{% endif %} pm-banner">{{ message }}</p>
+    {% endfor %}
+
+    {% if nominations|length > 1 %}
+    <nav class="pm-filter" aria-label="Номинация">
+      {% if nomination %}<a class="pm-chip" href="{% url 'photo_report' contest.slug %}">Все номинации</a>{% else %}<span class="pm-chip is-active" aria-current="page">Все номинации</span>{% endif %}
+      {% for item in nominations %}
+      {% if item == nomination %}
+      <span class="pm-chip is-active" aria-current="page">{{ item.title }}</span>
+      {% else %}
+      <a class="pm-chip" href="{% url 'photo_report' contest.slug %}?nomination={{ item.pk|unlocalize }}">{{ item.title }}</a>
+      {% endif %}
+      {% endfor %}
+    </nav>
+    {% endif %}
+
+    <p class="pr-help">Согласие — доля ответов, где голосующий выбрал фото с более высоким итоговым рейтингом. Случайный выбор даёт около 50%, накрутка одного фото — меньше. Сверху — самые подозрительные. Общий IP за мобильным оператором — не доказательство.</p>
+
+    {% if rows %}
+    <div class="card pr-table-wrap">
+      <table class="pr-table">
+        <thead>
+          <tr>
+            <th scope="col">Голосующий</th>
+            <th scope="col">Аккаунт с</th>
+            <th scope="col" class="num">Ответов</th>
+            <th scope="col" class="num">Брошено</th>
+            <th scope="col" class="num">IP</th>
+            <th scope="col" class="num">Общий IP с</th>
+            <th scope="col" class="num">Согласие</th>
+            <th scope="col">Чаще всего выбирал</th>
+            <th scope="col"><span class="pr-sr">Действие</span></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in rows %}
+          <tr{% if row.is_void %} class="is-void"{% endif %}>
+            <td class="pr-user">{{ row.user.email|default:row.user.get_username }} <small>ID: {{ row.user.pk|unlocalize }}</small></td>
+            <td>{{ row.user.date_joined|date:"j E Y" }}</td>
+            <td class="num">{{ row.answered }}</td>
+            <td class="num">{{ row.abandoned }}</td>
+            <td class="num">{{ row.ip_count }}</td>
+            <td class="num">{{ row.shared_ip_voters }}</td>
+            <td class="num">{% if row.agreement is None %}—{% else %}{{ row.agreement }}%{% endif %}</td>
+            <td class="pr-top">
+              {% if row.top_entry %}
+              <a href="{{ row.top_entry.preview.url }}" target="_blank" rel="noopener"><img src="{{ row.top_entry.preview.url }}" alt="Фото #{{ row.top_entry.pk|unlocalize }}" loading="lazy"></a>
+              <span>× {{ row.top_count }}</span>
+              {% else %}—{% endif %}
+            </td>
+            <td>
+              <form method="post" action="{% url 'photo_report_void' contest.slug %}">
+                {% csrf_token %}
+                <input type="hidden" name="user_id" value="{{ row.user.pk|unlocalize }}">
+                {% if nomination %}<input type="hidden" name="nomination" value="{{ nomination.pk|unlocalize }}">{% endif %}
+                {% if row.is_void %}
+                <input type="hidden" name="action" value="unvoid">
+                <button class="btn btn-ghost pr-action" type="submit">Вернуть</button>
+                {% else %}
+                <input type="hidden" name="action" value="void">
+                <button class="btn btn-ghost pr-action" type="submit" onclick="return confirm('Аннулировать все голоса этого пользователя в конкурсе?');">Аннулировать</button>
+                {% endif %}
+              </form>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <p class="pm-empty">Голосов пока нет.</p>
+    {% endif %}
+
+  </div>
+</main>
+{% endblock %}
