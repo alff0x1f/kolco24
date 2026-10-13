@@ -299,46 +299,75 @@
   .photo-contest .pc-login .btn { width: 100%; }
 }
 
-/* Results */
-.pc-results .pc-results-nomination { margin-top: 28px; }
-.pc-results .pc-results-nomination h2 { font-size: 20px; font-weight: 600; margin-bottom: 14px; }
-.pc-results .pc-ranking {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-  gap: 18px;
+/* Results: justified rows, each tile as wide as its photo's ratio allows */
+.photo-contest .pc-thumbs.pc-gallery {
+  --row: 220px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
   margin-top: 0;
 }
-.pc-results .pc-rank {
-  display: flex;
-  flex-direction: column;
-  background: #fff;
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
+/* Soaks up the free space so the last row keeps the natural tile widths. */
+.photo-contest .pc-thumbs.pc-gallery::after { content: ""; flex-grow: 999; }
+.photo-contest .pc-gallery .pc-thumb-link {
+  position: relative;
+  flex-grow: calc(var(--w) / var(--h));
+  flex-basis: calc(var(--w) / var(--h) * var(--row));
+  height: var(--row);
+  border-radius: 0;
   overflow: hidden;
-}
-.pc-results .pc-rank .pc-thumb-link { border-radius: 0; }
-.pc-results .pc-rank img {
-  display: block;
-  width: 100%;
-  aspect-ratio: 4 / 3;
-  object-fit: cover;
   background: var(--line-soft);
 }
-.pc-results .pc-rank-body { display: flex; gap: 12px; padding: 12px 14px 14px; }
-.pc-results .pc-rank-place {
-  flex: none;
-  width: 32px;
-  height: 32px;
+.photo-contest .pc-gallery img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.photo-contest .pc-medal {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  width: 28px;
+  height: 28px;
   display: grid;
   place-items: center;
   border-radius: 50%;
-  background: var(--paper);
+  font-size: 14px;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
+  color: var(--ink);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, .3);
 }
-.pc-results .pc-rank-1 .pc-rank-place { background: #f6d77a; }
-.pc-results .pc-rank-2 .pc-rank-place { background: #dfe3e8; }
-.pc-results .pc-rank-3 .pc-rank-place { background: #ecc39b; }
-.pc-results .pc-rank-author { font-weight: 500; line-height: 1.35; }
-.pc-results .pc-rank-caption { margin-top: 2px; font-size: 14px; color: var(--ink-soft); line-height: 1.45; }
-.pc-results .pc-rank-score { margin-top: 4px; font-size: 13px; color: var(--muted); }
+.photo-contest .pc-medal-1 { background: #f6d77a; }
+.photo-contest .pc-medal-2 { background: #dfe3e8; }
+.photo-contest .pc-medal-3 { background: #ecc39b; }
+
+.photo-contest .pc-thumbs.pc-top { --row: 160px; margin-top: 14px; }
+.photo-contest .pc-results-link { display: inline-block; margin-top: 10px; font-size: 14px; font-weight: 500; }
+
+.pc-results .pc-results-title { font-size: 20px; font-weight: 600; margin: 20px 0 14px; }
+.pc-results .pc-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  border-bottom: 1px solid var(--line);
+}
+.pc-results .pc-tab {
+  padding: 10px 14px;
+  margin-bottom: -1px;
+  border-bottom: 2px solid transparent;
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 500;
+  text-decoration: none;
+}
+.pc-results .pc-tab:hover { color: var(--ink); }
+.pc-results .pc-tab.is-active { color: var(--ink); border-bottom-color: var(--primary-2); }
+
+@media (max-width: 600px) {
+  .photo-contest .pc-thumbs.pc-gallery { --row: 120px; display: flex; gap: 3px; }
+  .photo-contest .pc-thumbs.pc-top { --row: 100px; }
+  .photo-contest .pc-medal { top: 4px; left: 4px; width: 22px; height: 22px; font-size: 12px; }
+  .pc-results .pc-tab { padding: 8px 10px; font-size: 13px; }
+}

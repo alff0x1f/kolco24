@@ -11,6 +11,7 @@ from django.core.exceptions import ValidationError
 from django.core.files.base import ContentFile
 from django.core.files.storage import FileSystemStorage
 from django.core.files.uploadedfile import SimpleUploadedFile
+from django.core.management import call_command
 from django.core.signing import TimestampSigner
 from django.db import IntegrityError, connection, transaction
 from django.db.models import ProtectedError
@@ -67,6 +68,20 @@ def make_entry(nomination, user, status=PhotoEntry.PENDING):
 
 
 # --- models ---------------------------------------------------------------
+
+
+@pytest.mark.django_db
+def test_grid_image_prefers_thumb(django_user_model):
+    user = django_user_model.objects.create_user("u", "u@example.com", "x")
+    entry = make_entry(make_nomination(make_contest()), user)
+    entry.width, entry.height = 0, 0
+    assert entry.grid_image == (entry.preview.url, 1, 1)
+    entry.width, entry.height = 4000, 3000
+    assert entry.grid_image == (entry.preview.url, 4000, 3000)
+    entry.thumb.save(
+        "photo_contest/x/prev_thumb.jpg", ContentFile(image_bytes(size=(60, 40)))
+    )
+    assert entry.grid_image == (entry.thumb.url, 60, 40)
 
 
 @pytest.mark.django_db
@@ -323,6 +338,15 @@ def test_preview_is_small_rotated_and_without_exif():
         assert not img.getexif()
 
 
+def test_thumb_fits_its_side_and_keeps_ratio():
+    data = image_bytes(size=(4000, 3000), exif=exif_with(Orientation=6))
+    thumb = images.make_preview(
+        upload(data), max_side=images.THUMB_MAX_SIDE, quality=images.THUMB_QUALITY
+    )
+    with Image.open(io.BytesIO(thumb)) as img:
+        assert img.size == (450, 600)
+
+
 def test_preview_of_transparent_png_is_on_white():
     data = image_bytes("PNG", size=(10, 10), mode="RGBA")  # fully transparent
     preview = images.make_preview(upload(data, "p.png", "image/png"))
@@ -456,6 +480,9 @@ def test_create_entry_lays_files_out_by_contest_and_nomination(db, user, setting
     assert entry.preview.name == entry.original.name  # same uuid, other root
     assert entry.original.path.startswith(settings.MEDIA_PRIVATE_ROOT)
     assert entry.preview.path.startswith(settings.MEDIA_ROOT)
+    assert entry.thumb.name == entry.preview.name.removesuffix(".jpg") + "_thumb.jpg"
+    assert entry.thumb.path.startswith(settings.MEDIA_ROOT)
+    assert max(entry.thumb_width, entry.thumb_height) <= images.THUMB_MAX_SIDE
     with open(entry.original.path, "rb") as f:
         assert f.read() == data
     entry.refresh_from_db()
@@ -506,8 +533,10 @@ def test_contest_closed_during_processing_is_refused(
     nomination = make_nomination(contest)
     real_preview = images.make_preview
 
-    def preview_then_close(file):
-        data = real_preview(file)
+    def preview_then_close(file, max_side=None, **kwargs):
+        data = real_preview(file, max_side, **kwargs)
+        if max_side is not None:  # the thumb pass
+            return data
         if change == "close":
             contest.submission_until = timezone.now() - timedelta(seconds=1)
         else:
@@ -522,18 +551,22 @@ def test_contest_closed_during_processing_is_refused(
     assert stored_files(settings) == []
 
 
-@pytest.mark.parametrize("failing", ["original", "preview"])
+@pytest.mark.parametrize("failing", ["original", "preview", "thumb"])
 def test_partial_write_failure_leaves_no_files(
     db, user, settings, monkeypatch, failing
 ):
     nomination = make_nomination(make_contest())
     storage_cls = PrivateStorage if failing == "original" else FileSystemStorage
     real_save = storage_cls._save
+    public_writes = []
 
     def write_half_then_fail(self, name, content):
         if not isinstance(self, storage_cls) or (
             storage_cls is FileSystemStorage and isinstance(self, PrivateStorage)
         ):
+            return real_save(self, name, content)
+        public_writes.append(name)
+        if failing == "thumb" and len(public_writes) == 1:  # the preview
             return real_save(self, name, content)
         path = self.path(name)
         os.makedirs(os.path.dirname(path), exist_ok=True)
@@ -555,9 +588,10 @@ def test_concurrent_uploads_respect_limit(settings, monkeypatch, django_user_mod
     real_preview = images.make_preview
     both_processed = threading.Barrier(2, timeout=10)
 
-    def preview_in_step(file):
-        data = real_preview(file)
-        both_processed.wait()  # both uploads reach the lock together
+    def preview_in_step(file, max_side=None, **kwargs):
+        data = real_preview(file, max_side, **kwargs)
+        if max_side is None:  # not the thumb pass
+            both_processed.wait()  # both uploads reach the lock together
         return data
 
     monkeypatch.setattr(images, "make_preview", preview_in_step)
@@ -579,7 +613,7 @@ def test_concurrent_uploads_respect_limit(settings, monkeypatch, django_user_mod
         thread.join(timeout=20)
     assert sorted(outcomes) == ["created", "limit"]
     assert PhotoEntry.objects.count() == 1
-    assert len(stored_files(settings)) == 2
+    assert len(stored_files(settings)) == 3
 
 
 # --- file cleanup on delete ----------------------------------------------
@@ -618,8 +652,64 @@ def test_rolled_back_delete_keeps_files(
             with transaction.atomic():
                 PhotoEntry.objects.all().delete()
                 raise RuntimeError("rollback")
-    assert len(stored_files(settings)) == 2
+    assert len(stored_files(settings)) == 3
     assert PhotoEntry.objects.count() == 1
+
+
+# --- thumbnail backfill ----------------------------------------------------
+
+
+def drop_thumb(entry):
+    entry.thumb.delete(save=False)
+    entry.save()
+
+
+def test_build_thumbs_fills_only_missing(db, user, settings):
+    nomination = make_nomination(make_contest())
+    missing = create(nomination, user, image_bytes(size=(1600, 800)))
+    kept = create(nomination, user)
+    kept_name = kept.thumb.name
+    kept_mtime = os.path.getmtime(kept.thumb.path)
+    drop_thumb(missing)
+    out = io.StringIO()
+    call_command("build_photo_thumbs", stdout=out)
+    missing.refresh_from_db()
+    kept.refresh_from_db()
+    assert (
+        missing.thumb.name == missing.preview.name.removesuffix(".jpg") + "_thumb.jpg"
+    )
+    assert (missing.thumb_width, missing.thumb_height) == (600, 300)
+    assert kept.thumb.name == kept_name
+    assert os.path.getmtime(kept.thumb.path) == kept_mtime
+    assert "создано: 1" in out.getvalue()
+
+
+def test_build_thumbs_force_rebuilds_in_place(db, user, settings, monkeypatch):
+    entry = create(make_nomination(make_contest()), user)
+    old_name = entry.thumb.name
+    monkeypatch.setattr(images, "THUMB_MAX_SIDE", 100)
+    call_command("build_photo_thumbs", "--force", stdout=io.StringIO())
+    entry.refresh_from_db()
+    assert entry.thumb.name == old_name  # not a suffixed copy
+    assert max(entry.thumb_width, entry.thumb_height) == 100
+    assert len(stored_files(settings)) == 3
+
+
+def test_build_thumbs_skips_broken_preview(db, user, settings):
+    nomination = make_nomination(make_contest())
+    broken = make_entry(nomination, user)  # preview bytes aren't an image
+    gone = create(nomination, user)
+    drop_thumb(gone)
+    os.remove(gone.preview.path)
+    good = create(nomination, user)
+    drop_thumb(good)
+    err = io.StringIO()
+    call_command("build_photo_thumbs", stdout=io.StringIO(), stderr=err)
+    for entry in (broken, gone, good):
+        entry.refresh_from_db()
+    assert not broken.thumb and not gone.thumb
+    assert good.thumb
+    assert f"#{broken.pk}" in err.getvalue() and f"#{gone.pk}" in err.getvalue()
 
 
 # --- pages and views ------------------------------------------------------
@@ -2080,8 +2170,9 @@ def test_list_shows_voting_contest_with_badge(client, db):
 # --- results --------------------------------------------------------------
 
 
-def results_url(contest):
-    return reverse("photo_results", args=[contest.slug])
+def results_url(contest, nomination=None):
+    nomination = nomination or contest.nominations.first()
+    return reverse("photo_results", args=[contest.slug, nomination.pk])
 
 
 def publish(client, contest, action="publish", **kwargs):
@@ -2127,13 +2218,63 @@ def test_moderator_sees_unpublished_results(client, finished):
     assert response.status_code == 200
     content = response.content.decode()
     assert "Итоги не опубликованы" in content
-    rows = response.context["nominations"][0].rows
+    rows = response.context["rows"]
     assert [r["entry"] for r in rows[:2]] == [a, b]
     assert rows[0]["author"] == "Анна Фотографова"
-    assert "Побед: 2 из 2" in content
+    assert 'data-status="Побед: 2 из 2"' in content
+    assert 'data-caption="1 место · Анна Фотографова' in content
 
 
-def test_results_skip_non_approved_and_show_no_status(client, finished):
+def test_results_hidden_from_staff_without_moderator_row(client, finished, staff):
+    contest, *_ = finished
+    client.force_login(staff)
+    assert client.get(results_url(contest)).status_code == 404
+
+
+def test_results_nomination_of_other_contest_is_404(client, finished):
+    contest, *_ = finished
+    contest.is_results_published = True
+    contest.save()
+    other = make_nomination(make_contest("other"))
+    assert client.get(results_url(contest, other)).status_code == 404
+
+
+def test_results_medals_need_a_win(client, finished):
+    # a beat b and c, b beat c; d was never shown: c and d tie at 3rd with 0 wins.
+    contest, nomination, (a, b, c, d), moderator = finished
+    client.force_login(moderator)
+    response = client.get(results_url(contest))
+    rows = response.context["rows"]
+    assert [(r["entry"], r["place"], r["medal"]) for r in rows[:2]] == [
+        (a, 1, 1),
+        (b, 2, 2),
+    ]
+    assert {(r["place"], r["medal"]) for r in rows[2:]} == {(3, None)}
+    content = response.content.decode()
+    assert "pc-medal-1" in content and "pc-medal-2" in content
+    assert "pc-medal-3" not in content
+
+
+def test_results_tiles_link_preview_and_show_thumb(client, finished):
+    contest, nomination, (a, *_), moderator = finished
+    a.thumb.save("photo_contest/x/a_thumb.jpg", ContentFile(image_bytes(size=(60, 40))))
+    client.force_login(moderator)
+    content = client.get(results_url(contest)).content.decode()
+    assert f'href="{a.preview.url}"' in content
+    assert f'src="{a.thumb.url}" width="60" height="40"' in content
+    assert "--w:60;--h:40" in content
+
+
+def test_results_tabs_list_nominations(client, finished):
+    contest, nomination, _, moderator = finished
+    second = make_nomination(contest, "Люди", order=5)
+    client.force_login(moderator)
+    content = client.get(results_url(contest, second)).content.decode()
+    assert results_url(contest, nomination) in content
+    assert 'aria-current="page">Люди<' in content
+
+
+def test_results_skip_non_approved_and_show_no_moderation_status(client, finished):
     contest, nomination, (a, b, c, d), moderator = finished
     pending = make_entry(nomination, a.uploaded_by)
     c.status = PhotoEntry.REJECTED
@@ -2141,10 +2282,9 @@ def test_results_skip_non_approved_and_show_no_status(client, finished):
     contest.is_results_published = True
     contest.save()
     response = client.get(results_url(contest))
-    entries = [r["entry"] for r in response.context["nominations"][0].rows]
+    entries = [r["entry"] for r in response.context["rows"]]
     assert pending not in entries and c not in entries
     content = response.content.decode()
-    assert "data-status" not in content
     assert "Принято" not in content
 
 
@@ -2211,14 +2351,34 @@ def test_publish_requires_csrf(finished):
 
 
 def test_contest_page_links_published_results(client, finished):
-    contest, *_, moderator = finished
-    assert results_url(contest) not in client.get(contest_url(contest)).content.decode()
+    contest, nomination, (a, b, c, d), moderator = finished
+    content = client.get(contest_url(contest)).content.decode()
+    assert results_url(contest) not in content
+    assert "pc-top" not in content
     contest.is_results_published = True
     contest.save()
-    assert results_url(contest) in client.get(contest_url(contest)).content.decode()
+    response = client.get(contest_url(contest))
+    content = response.content.decode()
+    assert f'href="{results_url(contest)}">Все 4 фото' in content
+    assert "итоги ниже" in content
+    top = response.context["nominations"][0].top
+    assert [r["entry"] for r in top] == [a, b]  # c, d: 3rd without a win
+    assert 'data-caption="1 место · Анна Фотографова' in content
     client.force_login(moderator)
     content = client.get(contest_url(contest)).content.decode()
     assert "Скрыть итоги" in content
+
+
+def test_contest_page_unpublished_results_link_only_for_moderator(client, finished):
+    contest, nomination, _, moderator = finished
+    client.force_login(moderator)
+    response = client.get(contest_url(contest))
+    content = response.content.decode()
+    assert results_url(contest) in content
+    assert "pc-medal" not in content
+    assert response.context["nominations"][0].top == []
+    client.logout()
+    assert results_url(contest) not in client.get(contest_url(contest)).content.decode()
 
 
 # --- vote report ----------------------------------------------------------

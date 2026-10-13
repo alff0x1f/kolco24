@@ -1,0 +1,9 @@
+{% with image=row.entry.grid_image %}
+<a class="pc-thumb-link" href="{{ row.entry.preview.url }}" target="_blank" rel="noopener"
+   style="--w:{{ image.1 }};--h:{{ image.2 }}"
+   data-caption="{{ row.place }} место · {{ row.author }}{% if row.entry.caption %} — {{ row.entry.caption }}{% endif %}"
+   data-status="Побед: {{ row.wins }} из {{ row.n }}">
+  <img src="{{ image.0 }}" width="{{ image.1 }}" height="{{ image.2 }}" alt="{{ row.entry.caption|default:'Фото участника' }}" loading="lazy">
+  {% if row.medal %}<span class="pc-medal pc-medal-{{ row.medal }}" aria-label="{{ row.medal }} место">{{ row.medal }}</span>{% endif %}
+</a>
+{% endwith %}

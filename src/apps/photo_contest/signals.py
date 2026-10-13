@@ -11,7 +11,7 @@ def delete_entry_files(sender, instance, **kwargs):
     # still be there.
     files = [
         (field_file.storage, field_file.name)
-        for field_file in (instance.original, instance.preview)
+        for field_file in (instance.original, instance.preview, instance.thumb)
         if field_file.name
     ]
 

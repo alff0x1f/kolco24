@@ -129,12 +129,12 @@ wrapper — the viewer only needs `.pc-thumb-link` inside `.pc-thumbs`). Selecto
 - Modify: `src/apps/photo_contest/images.py`
 - Modify: `src/apps/photo_contest/tests.py`
 
-- [ ] add `thumb`, `thumb_width`, `thumb_height` to `PhotoEntry`; `makemigrations`
-- [ ] add `PhotoEntry.grid_image` (thumb, else preview url + stored `width or 1`/`height or 1`)
-- [ ] add `THUMB_MAX_SIDE`/`THUMB_QUALITY`; give `make_preview` `max_side`/`quality` params
-- [ ] tests: `make_preview(max_side=600)` fits 600px and keeps aspect; extend `test_preview_is_small_rotated_and_without_exif` for the default
-- [ ] tests: `grid_image` returns thumb when set, preview + stored dims otherwise, `1`/`1` for zero dims
-- [ ] run tests - must pass before next task
+- [x] add `thumb`, `thumb_width`, `thumb_height` to `PhotoEntry`; `makemigrations`
+- [x] add `PhotoEntry.grid_image` (thumb, else preview url + stored `width or 1`/`height or 1`)
+- [x] add `THUMB_MAX_SIDE`/`THUMB_QUALITY`; give `make_preview` `max_side`/`quality` params
+- [x] tests: `make_preview(max_side=600)` fits 600px and keeps aspect; extend `test_preview_is_small_rotated_and_without_exif` for the default
+- [x] tests: `grid_image` returns thumb when set, preview + stored dims otherwise, `1`/`1` for zero dims
+- [x] run tests - must pass before next task
 
 ### Task 2: Generate thumbnail on upload, delete on entry delete
 
@@ -143,12 +143,12 @@ wrapper — the viewer only needs `.pc-thumb-link` inside `.pc-thumbs`). Selecto
 - Modify: `src/apps/photo_contest/signals.py`
 - Modify: `src/apps/photo_contest/tests.py`
 
-- [ ] `create_entry`: build thumb from the preview bytes before the lock; save `<name>_thumb.jpg`; add it to `targets` for cleanup
-- [ ] `delete_entry_files`: include `instance.thumb`
-- [ ] update existing tests: `test_concurrent_uploads_respect_limit` fake `make_preview` accepts `*args, **kwargs` and waits on the barrier only for the preview call; file counts 2 → 3 there and in `test_rolled_back_delete_keeps_files`; `test_create_entry_lays_files_out_by_contest_and_nomination` checks the thumb next to the preview
-- [ ] tests: uploaded entry has thumb file with `thumb_width/height` ≤ 600
-- [ ] tests: add a `"thumb"` case to `test_partial_write_failure_leaves_no_files` (fail on the 2nd `FileSystemStorage._save`); limit reached leaves no thumb; deleting an entry removes the thumb file
-- [ ] run tests - must pass before next task
+- [x] `create_entry`: build thumb from the preview bytes before the lock; save `<name>_thumb.jpg`; add it to `targets` for cleanup
+- [x] `delete_entry_files`: include `instance.thumb`
+- [x] update existing tests: `test_concurrent_uploads_respect_limit` fake `make_preview` accepts `*args, **kwargs` and waits on the barrier only for the preview call; file counts 2 → 3 there and in `test_rolled_back_delete_keeps_files`; `test_create_entry_lays_files_out_by_contest_and_nomination` checks the thumb next to the preview
+- [x] tests: uploaded entry has thumb file with `thumb_width/height` ≤ 600
+- [x] tests: add a `"thumb"` case to `test_partial_write_failure_leaves_no_files` (fail on the 2nd `FileSystemStorage._save`); limit reached leaves no thumb; deleting an entry removes the thumb file
+- [x] run tests - must pass before next task
 
 ### Task 3: `build_photo_thumbs` backfill command
 
@@ -158,10 +158,10 @@ wrapper — the viewer only needs `.pc-thumb-link` inside `.pc-thumbs`). Selecto
 - Create: `src/apps/photo_contest/management/commands/build_photo_thumbs.py`
 - Modify: `src/apps/photo_contest/tests.py`
 
-- [ ] iterate entries with empty `thumb` (all with `--force`), build from `preview` via `make_preview(max_side=THUMB_MAX_SIDE, quality=THUMB_QUALITY)`, save `<preview stem>_thumb.jpg`. Order: build bytes → (with `--force`) delete old thumb file → save new → `save(update_fields=["thumb", "thumb_width", "thumb_height"])`, so a failed rebuild keeps the old thumb
-- [ ] skip an entry whose preview is missing/undecodable (`OSError` and `ImageRejected`) with a stderr warning, continue; print a count at the end
-- [ ] tests: only empty entries processed; `--force` rebuilds; broken preview doesn't abort the run
-- [ ] run tests - must pass before next task
+- [x] iterate entries with empty `thumb` (all with `--force`), build from `preview` via `make_preview(max_side=THUMB_MAX_SIDE, quality=THUMB_QUALITY)`, save `<preview stem>_thumb.jpg`. Order: build bytes → (with `--force`) delete old thumb file → save new → `save(update_fields=["thumb", "thumb_width", "thumb_height"])`, so a failed rebuild keeps the old thumb
+- [x] skip an entry whose preview is missing/undecodable (`OSError` and `ImageRejected`) with a stderr warning, continue; print a count at the end
+- [x] tests: only empty entries processed; `--force` rebuilds; broken preview doesn't abort the run
+- [x] run tests - must pass before next task
 
 ### Task 4: Per-nomination results page
 
@@ -172,15 +172,15 @@ wrapper — the viewer only needs `.pc-thumb-link` inside `.pc-thumbs`). Selecto
 - Modify: `src/static/css/photo_contest.css`
 - Modify: `src/apps/photo_contest/tests.py`
 
-- [ ] URL `<slug>/results/<int:nomination_id>/` (`photo_results`); drop the bare `<slug>/results/` route
-- [ ] `PhotoResultsView` for one nomination (rules above)
-- [ ] `results.html`: crumbs, tabs, justified grid with top-3 badges, moderator banner, existing `.pc-viewer`; remove the old per-tile caption/author/score body
-- [ ] justified-row CSS + place badges (desktop/mobile heights)
-- [ ] update existing results tests to the new URL/markup (keep the no-username check for `data-caption`; the no-`data-status` assertion at `tests.py` ~2147 is reversed — `data-status` is now «Побед: X из Y»)
-- [ ] tests: foreign nomination 404; 404 before publish for outsiders and for staff/superuser without a moderator row; moderator sees it with the banner
-- [ ] tests: rows in ranking order, only approved; badges on top-3 only with wins (tie at 3rd → both, zero-win → none)
-- [ ] tests: `<a href>` is the preview URL, `<img src>` the thumb
-- [ ] run tests - must pass before next task
+- [x] URL `<slug>/results/<int:nomination_id>/` (`photo_results`); drop the bare `<slug>/results/` route
+- [x] `PhotoResultsView` for one nomination (rules above)
+- [x] `results.html`: crumbs, tabs, justified grid with top-3 badges, moderator banner, existing `.pc-viewer`; remove the old per-tile caption/author/score body
+- [x] justified-row CSS + place badges (desktop/mobile heights)
+- [x] update existing results tests to the new URL/markup (keep the no-username check for `data-caption`; the no-`data-status` assertion at `tests.py` ~2147 is reversed — `data-status` is now «Побед: X из Y»)
+- [x] tests: foreign nomination 404; 404 before publish for outsiders and for staff/superuser without a moderator row; moderator sees it with the banner
+- [x] tests: rows in ranking order, only approved; badges on top-3 only with wins (tie at 3rd → both, zero-win → none)
+- [x] tests: `<a href>` is the preview URL, `<img src>` the thumb
+- [x] run tests - must pass before next task
 
 ### Task 5: Top-3 and links on the contest page
 
@@ -190,20 +190,20 @@ wrapper — the viewer only needs `.pc-thumb-link` inside `.pc-thumbs`). Selecto
 - Modify: `src/static/css/photo_contest.css`
 - Modify: `src/apps/photo_contest/tests.py`
 
-- [ ] `_contest_context`: `top` + `ranked_count` per nomination when published; flag for showing the results link
-- [ ] `contest.html`: top-3 tiles + «Все N фото →» in each nomination card; banner text without link; remove the moderator «Итоги» button
-- [ ] update existing contest-page tests that expect the `photo_results` link in the banner / moderator block
-- [ ] tests: after publish — top-3 tiles with author in `data-caption` and links to each nomination; before publish — no tiles for anyone, link only for a moderator; during voting — nothing
-- [ ] run tests - must pass before next task
+- [x] `_contest_context`: `top` + `ranked_count` per nomination when published; flag for showing the results link
+- [x] `contest.html`: top-3 tiles + «Все N фото →» in each nomination card; banner text without link; remove the moderator «Итоги» button
+- [x] update existing contest-page tests that expect the `photo_results` link in the banner / moderator block
+- [x] tests: after publish — top-3 tiles with author in `data-caption` and links to each nomination; before publish — no tiles for anyone, link only for a moderator; during voting — nothing
+- [x] run tests - must pass before next task
 
 ### Task 6: Verify acceptance criteria
-- [ ] all requirements from Overview implemented
-- [ ] check pages in the browser (desktop + phone width, contest page top-3 + nomination results, viewer navigation)
-- [ ] full suite: `uv run pytest`
-- [ ] `make lint`
+- [x] all requirements from Overview implemented
+- [ ] ⚠️ check pages in the browser (left to the user: local contest is still in voting) (desktop + phone width, contest page top-3 + nomination results, viewer navigation)
+- [x] full suite: `uv run pytest`
+- [x] `make lint`
 
 ### Task 7: [Final] Update documentation
-- [ ] CLAUDE.md photo contest section: 1–2 lines (thumb + backfill command, `results/<id>/` per nomination, top-3 on the contest page)
+- [x] CLAUDE.md photo contest section: 1–2 lines (thumb + backfill command, `results/<id>/` per nomination, top-3 on the contest page)
 - [ ] move this plan to `docs/plans/completed/`
 
 ## Post-Completion

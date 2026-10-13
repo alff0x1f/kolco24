@@ -37,7 +37,9 @@ urlpatterns = [
         name="photo_pair",
     ),
     path(
-        "<slug:slug>/results/", views.PhotoResultsView.as_view(), name="photo_results"
+        "<slug:slug>/results/<int:nomination_id>/",
+        views.PhotoResultsView.as_view(),
+        name="photo_results",
     ),
     path(
         "<slug:slug>/results/publish/",
