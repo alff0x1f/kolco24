@@ -123,3 +123,43 @@
   .photo-moderate .pm-tab { padding: 8px 10px; font-size: 13px; }
   .photo-moderate .pm-grid { grid-template-columns: 1fr; }
 }
+
+/* Vote report */
+.photo-report .pm-banner { margin-bottom: 16px; }
+.photo-report .pr-help { max-width: 760px; margin: 0 0 16px; font-size: 14px; line-height: 1.55; color: var(--muted); }
+.photo-report .pr-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+.photo-report .pr-table-wrap { overflow-x: auto; }
+.photo-report .pr-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.photo-report .pr-table th,
+.photo-report .pr-table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--line-soft);
+  text-align: left;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+.photo-report .pr-table th { font-size: 12px; font-weight: 500; color: var(--muted); }
+.photo-report .pr-table tbody tr:last-child td { border-bottom: none; }
+.photo-report .pr-table .num { text-align: right; font-variant-numeric: tabular-nums; }
+.photo-report .pr-user { white-space: normal; overflow-wrap: anywhere; min-width: 180px; }
+.photo-report .pr-user small { display: block; color: var(--muted); }
+.photo-report .pr-top a { margin-right: 6px; }
+.photo-report .pr-top img {
+  display: inline-block;
+  vertical-align: middle;
+  width: 44px;
+  height: 44px;
+  object-fit: cover;
+  border-radius: 6px;
+  background: var(--line-soft);
+}
+.photo-report .pr-action { padding: 6px 12px; font-size: 13px; }
+.photo-report .is-void td { color: var(--muted); background: #fafbfc; }
+.photo-report .is-void .pr-user { text-decoration: line-through; }

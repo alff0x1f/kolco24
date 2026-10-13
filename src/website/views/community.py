@@ -1,5 +1,5 @@
 from django.core.paginator import Paginator
-from django.db.models import Count
+from django.db.models import Count, Q
 from django.http import Http404
 from django.shortcuts import get_object_or_404, render
 from django.urls import reverse
@@ -117,6 +117,7 @@ class HomeView(View):
     publication_paginate_by = 9
 
     def get(self, request):
+        now = timezone.now()
         today = timezone.localdate()
         featured_race = get_featured_race(today)
 
@@ -133,7 +134,8 @@ class HomeView(View):
             "upcoming_races": unfinished[:3],
             "open_photo_contests": list(
                 PhotoContest.objects.filter(
-                    is_published=True, submission_until__gte=timezone.now()
+                    Q(submission_until__gte=now) | Q(voting_until__gte=now),
+                    is_published=True,
                 )
                 .annotate(nomination_count=Count("nominations"))
                 .order_by("submission_until")

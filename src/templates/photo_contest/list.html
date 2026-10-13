@@ -18,9 +18,15 @@
       {% for contest in open_contests %}
       <a class="card pc-list-item" href="{% url 'photo_contest' contest.slug %}">
         <div class="card-pad">
+          {% if contest.phase == "voting" %}
+          <span class="pc-status pc-status-approved">Идёт голосование</span>
+          <h2>{{ contest.title }}</h2>
+          <p class="pc-note">Голосование до {{ contest.voting_until|date:"j E, H:i" }}</p>
+          {% else %}
           <span class="pc-status pc-status-approved">Идёт приём</span>
           <h2>{{ contest.title }}</h2>
           <p class="pc-note">Приём фото до {{ contest.submission_until|date:"j E, H:i" }}</p>
+          {% endif %}
         </div>
       </a>
       {% endfor %}
@@ -33,7 +39,11 @@
       <a class="card pc-list-item" href="{% url 'photo_contest' contest.slug %}">
         <div class="card-pad">
           <h2>{{ contest.title }}</h2>
+          {% if contest.voting_until %}
+          <p class="pc-note">Голосование завершено {{ contest.voting_until|date:"j E Y" }}</p>
+          {% else %}
           <p class="pc-note">Приём закрыт {{ contest.submission_until|date:"j E Y" }}</p>
+          {% endif %}
         </div>
       </a>
       {% endfor %}

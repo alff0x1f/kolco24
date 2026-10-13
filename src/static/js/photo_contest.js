@@ -41,7 +41,7 @@
       text.textContent = link.dataset.caption || "";
       var parts = [link.dataset.status];
       if (links.length > 1) parts.push(index + 1 + " из " + links.length);
-      meta.textContent = parts.join(", ");
+      meta.textContent = parts.filter(Boolean).join(", ");
       var focused = document.activeElement;
       prev.hidden = index === 0;
       next.hidden = index === links.length - 1;

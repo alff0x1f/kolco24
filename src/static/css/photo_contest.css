@@ -58,6 +58,14 @@
   color: var(--ink-soft);
 }
 .photo-contest .pc-nomination > .pc-note { margin-top: 12px; }
+.photo-contest .pc-vote {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  margin-top: 12px;
+}
+.photo-contest .pc-vote .pc-note { margin: 0; }
 
 .photo-contest .pc-thumbs {
   list-style: none;
@@ -290,3 +298,47 @@
   .photo-contest .pc-add-actions .btn,
   .photo-contest .pc-login .btn { width: 100%; }
 }
+
+/* Results */
+.pc-results .pc-results-nomination { margin-top: 28px; }
+.pc-results .pc-results-nomination h2 { font-size: 20px; font-weight: 600; margin-bottom: 14px; }
+.pc-results .pc-ranking {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 18px;
+  margin-top: 0;
+}
+.pc-results .pc-rank {
+  display: flex;
+  flex-direction: column;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+.pc-results .pc-rank .pc-thumb-link { border-radius: 0; }
+.pc-results .pc-rank img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  background: var(--line-soft);
+}
+.pc-results .pc-rank-body { display: flex; gap: 12px; padding: 12px 14px 14px; }
+.pc-results .pc-rank-place {
+  flex: none;
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--paper);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.pc-results .pc-rank-1 .pc-rank-place { background: #f6d77a; }
+.pc-results .pc-rank-2 .pc-rank-place { background: #dfe3e8; }
+.pc-results .pc-rank-3 .pc-rank-place { background: #ecc39b; }
+.pc-results .pc-rank-author { font-weight: 500; line-height: 1.35; }
+.pc-results .pc-rank-caption { margin-top: 2px; font-size: 14px; color: var(--ink-soft); line-height: 1.45; }
+.pc-results .pc-rank-score { margin-top: 4px; font-size: 13px; color: var(--muted); }

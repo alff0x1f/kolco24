@@ -1,4 +1,5 @@
 import io
+import json
 import os
 import re
 import threading
@@ -6,9 +7,11 @@ from datetime import timedelta
 
 import pytest
 from django.contrib.auth.models import AnonymousUser, Permission
+from django.core.exceptions import ValidationError
 from django.core.files.base import ContentFile
 from django.core.files.storage import FileSystemStorage
 from django.core.files.uploadedfile import SimpleUploadedFile
+from django.core.signing import TimestampSigner
 from django.db import IntegrityError, connection, transaction
 from django.db.models import ProtectedError
 from django.test import Client
@@ -17,15 +20,20 @@ from django.utils import timezone
 from django.utils.http import urlencode
 from PIL import ExifTags, Image
 
-from apps.photo_contest import images, views
+from apps.accounts.emails import build_magic_link_signature
+from apps.accounts.models import EmailVerification
+from apps.photo_contest import images, pairing, views
 from apps.photo_contest.forms import PhotoUploadForm
 from apps.photo_contest.models import (
+    Comparison,
     PhotoContest,
     PhotoContestModerator,
     PhotoEntry,
     PhotoNomination,
 )
 from apps.photo_contest.permissions import can_moderate
+from apps.photo_contest.report import build_report
+from apps.photo_contest.scoring import nomination_standings, wilson_lower_bound
 from apps.photo_contest.services import LimitReached, SubmissionClosed, create_entry
 from apps.photo_contest.storage import PrivateStorage
 
@@ -87,6 +95,95 @@ def test_nomination_and_contest_with_entries_are_protected(django_user_model):
         nomination.delete()
     with pytest.raises(ProtectedError):
         contest.delete()
+
+
+def make_voting_contest(slug="vote-2026", voting_days_left=3, **kwargs):
+    """A published contest whose submissions are over and voting is open."""
+    now = timezone.now()
+    return make_contest(
+        slug,
+        days_left=-1,
+        voting_until=now + timedelta(days=voting_days_left),
+        **kwargs,
+    )
+
+
+@pytest.mark.django_db
+def test_phases_follow_deadlines():
+    now = timezone.now()
+    submission = make_contest("s", voting_until=now + timedelta(days=10))
+    voting = make_voting_contest("v")
+    closed = make_voting_contest("c", voting_days_left=-1)
+    no_voting = make_contest("n", days_left=-1)
+    assert (submission.phase, submission.is_voting_open) == ("submission", False)
+    assert (voting.phase, voting.is_voting_open) == ("voting", True)
+    assert (closed.phase, closed.is_voting_open) == ("closed", False)
+    assert (no_voting.phase, no_voting.is_voting_open) == ("no_voting", False)
+    assert closed.is_voting_finished
+    assert not voting.is_voting_finished
+    assert not no_voting.is_voting_finished
+
+
+@pytest.mark.django_db
+def test_voting_closed_for_unpublished_contest():
+    assert not make_voting_contest(published=False).is_voting_open
+
+
+@pytest.mark.django_db
+def test_clean_requires_voting_after_submission():
+    contest = make_contest()
+    contest.voting_until = contest.submission_until
+    with pytest.raises(ValidationError) as exc:
+        contest.full_clean()
+    assert "voting_until" in exc.value.message_dict
+    contest.voting_until = contest.submission_until + timedelta(seconds=1)
+    contest.full_clean()
+
+
+@pytest.mark.django_db
+def test_comparison_limit_must_be_positive():
+    contest = make_contest(max_comparisons_per_user=0)
+    with pytest.raises(ValidationError) as exc:
+        contest.full_clean()
+    assert "max_comparisons_per_user" in exc.value.message_dict
+
+
+def make_comparison(nomination, user, left, right, winner=None, **kwargs):
+    return Comparison.objects.create(
+        nomination=nomination,
+        user=user,
+        left=left,
+        right=right,
+        winner=winner,
+        answered_at=timezone.now() if winner else None,
+        **kwargs,
+    )
+
+
+@pytest.mark.django_db
+def test_deleting_voter_cascades_comparisons(django_user_model):
+    author = django_user_model.objects.create_user("a", "a@example.com", "x")
+    voter = django_user_model.objects.create_user("v", "v@example.com", "x")
+    nomination = make_nomination(make_voting_contest())
+    left = make_entry(nomination, author, PhotoEntry.APPROVED)
+    right = make_entry(nomination, author, PhotoEntry.APPROVED)
+    make_comparison(nomination, voter, left, right, winner=left)
+    voter.delete()
+    assert not Comparison.objects.exists()
+
+
+@pytest.mark.django_db
+def test_compared_photo_is_protected(django_user_model):
+    author = django_user_model.objects.create_user("a", "a@example.com", "x")
+    voter = django_user_model.objects.create_user("v", "v@example.com", "x")
+    nomination = make_nomination(make_voting_contest())
+    left = make_entry(nomination, author, PhotoEntry.APPROVED)
+    right = make_entry(nomination, author, PhotoEntry.APPROVED)
+    make_comparison(nomination, voter, left, right)
+    with pytest.raises(ProtectedError):
+        right.delete()
+    with pytest.raises(ProtectedError):
+        author.delete()
 
 
 @pytest.mark.django_db
@@ -1322,3 +1419,947 @@ def test_status_change_on_vanished_last_page_keeps_filters(
     assert response.context["nomination"] == nomination
     assert response.context["page"].number == 1
     assert [e.pk for e in response.context["page_entries"]] == [first.pk]
+
+
+# --- scoring --------------------------------------------------------------
+
+
+@pytest.fixture
+def voting(db, django_user_model):
+    """Voting contest, one nomination, four approved photos by one author."""
+    author = django_user_model.objects.create_user("author", "au@example.com", "x")
+    voter = django_user_model.objects.create_user("voter", "vo@example.com", "x")
+    contest = make_voting_contest()
+    nomination = make_nomination(contest)
+    entries = [make_entry(nomination, author, PhotoEntry.APPROVED) for _ in range(4)]
+    return contest, nomination, entries, author, voter
+
+
+def vote(nomination, voter, winner, loser, **kwargs):
+    return make_comparison(nomination, voter, winner, loser, winner=winner, **kwargs)
+
+
+def test_wilson_lower_bound_edges():
+    assert wilson_lower_bound(0, 0) == 0.0
+    assert 0 < wilson_lower_bound(10, 10) < 1
+    assert wilson_lower_bound(0, 10) == pytest.approx(0.0, abs=1e-12)
+    assert wilson_lower_bound(5, 10) < wilson_lower_bound(50, 100)
+    assert wilson_lower_bound(3, 10) < wilson_lower_bound(7, 10)
+
+
+def test_standings_rank_by_wins_and_share_places(voting):
+    _, nomination, (a, b, c, d), _, voter = voting
+    for _ in range(3):
+        vote(nomination, voter, a, b)
+    vote(nomination, voter, c, d)
+    vote(nomination, voter, d, c)
+    rows = nomination_standings(nomination)
+    assert [r["entry"] for r in rows[:1]] == [a]
+    assert (rows[0]["wins"], rows[0]["n"]) == (3, 3)
+    by_entry = {r["entry"]: r for r in rows}
+    assert by_entry[c]["place"] == by_entry[d]["place"] == 2
+    assert by_entry[b]["place"] == 4
+    assert (by_entry[b]["wins"], by_entry[b]["n"]) == (0, 3)
+
+
+def test_standings_ignore_void_unanswered_and_other_nominations(voting):
+    contest, nomination, (a, b, c, d), author, voter = voting
+    vote(nomination, voter, b, a, is_void=True)
+    make_comparison(nomination, voter, b, a)
+    other = make_nomination(contest, "Другая")
+    x = make_entry(other, author, PhotoEntry.APPROVED)
+    y = make_entry(other, author, PhotoEntry.APPROVED)
+    vote(other, voter, x, y)
+    rows = nomination_standings(nomination)
+    assert {r["entry"] for r in rows} == {a, b, c, d}
+    assert all(r["n"] == 0 for r in rows)
+
+
+def test_standings_skip_non_approved_photos_and_their_comparisons(voting):
+    _, nomination, (a, b, c, d), author, voter = voting
+    pending = make_entry(nomination, author)
+    vote(nomination, voter, b, a)
+    vote(nomination, voter, a, c)
+    c.status = PhotoEntry.REJECTED
+    c.save()
+    rows = {r["entry"]: r for r in nomination_standings(nomination)}
+    assert pending not in rows and c not in rows
+    assert (rows[a]["wins"], rows[a]["n"]) == (0, 1)
+    c.status = PhotoEntry.APPROVED
+    c.save()
+    rows = {r["entry"]: r for r in nomination_standings(nomination)}
+    assert (rows[a]["wins"], rows[a]["n"]) == (1, 2)
+
+
+# --- pairing --------------------------------------------------------------
+
+
+def test_select_pair_never_offers_own_photo(voting):
+    _, nomination, entries, author, voter = voting
+    own = make_entry(nomination, voter, PhotoEntry.APPROVED)
+    for _ in range(20):
+        left, right = pairing.select_pair(nomination, voter)
+        assert own not in (left, right)
+    assert pairing.select_pair(nomination, author) is None  # only voter's photo left
+
+
+def test_select_pair_skips_answered_pairs_including_void(voting):
+    _, nomination, (a, b, c, d), _, voter = voting
+    vote(nomination, voter, a, b)
+    vote(nomination, voter, c, a)
+    vote(nomination, voter, d, a, is_void=True)
+    vote(nomination, voter, c, b)
+    vote(nomination, voter, b, d)
+    assert {frozenset(pairing.select_pair(nomination, voter)) for _ in range(20)} == {
+        frozenset((c, d))
+    }
+    vote(nomination, voter, c, d)
+    assert pairing.select_pair(nomination, voter) is None
+
+
+def test_select_pair_starts_with_least_shown_photo(voting, django_user_model):
+    _, nomination, (a, b, c, d), _, voter = voting
+    other = django_user_model.objects.create_user("o", "o@example.com", "x")
+    vote(nomination, other, a, b)
+    vote(nomination, other, a, c)
+    vote(nomination, other, b, c)
+    for _ in range(20):
+        assert d in pairing.select_pair(nomination, voter)
+
+
+def test_select_pair_falls_back_when_least_shown_photo_is_exhausted(
+    voting, django_user_model
+):
+    _, nomination, (a, b, c, d), _, voter = voting
+    other = django_user_model.objects.create_user("o", "o@example.com", "x")
+    for _ in range(3):
+        vote(nomination, other, b, c)  # d stays the least shown
+    vote(nomination, voter, d, a)
+    vote(nomination, voter, d, b)
+    vote(nomination, voter, d, c)
+    pair = pairing.select_pair(nomination, voter)
+    assert pair is not None and d not in pair
+
+
+def test_select_pair_needs_two_candidates(voting):
+    _, nomination, (a, b, c, d), _, voter = voting
+    for entry in (b, c, d):
+        entry.status = PhotoEntry.REJECTED
+        entry.save()
+    assert pairing.select_pair(nomination, voter) is None
+
+
+def test_issue_pair_reuses_fresh_outstanding_row(voting):
+    _, nomination, _, _, voter = voting
+    first = pairing.issue_pair(nomination, voter)
+    assert pairing.issue_pair(nomination, voter) == first
+    assert Comparison.objects.count() == 1
+
+
+def test_issue_pair_replaces_expired_row_and_keeps_it(voting):
+    _, nomination, _, _, voter = voting
+    first = pairing.issue_pair(nomination, voter)
+    Comparison.objects.filter(pk=first.pk).update(
+        created_at=timezone.now() - pairing.PAIR_TTL - timedelta(seconds=1)
+    )
+    second = pairing.issue_pair(nomination, voter)
+    assert second.pk != first.pk
+    assert Comparison.objects.count() == 2
+
+
+def test_issue_pair_replaces_row_with_rejected_photo(voting):
+    _, nomination, _, _, voter = voting
+    first = pairing.issue_pair(nomination, voter)
+    first.left.status = PhotoEntry.REJECTED
+    first.left.save()
+    second = pairing.issue_pair(nomination, voter)
+    assert second.pk != first.pk
+    assert first.left not in (second.left, second.right)
+
+
+def test_unanswered_rows_are_not_shows(voting, django_user_model):
+    _, nomination, (a, b, c, d), _, voter = voting
+    other = django_user_model.objects.create_user("o", "o@example.com", "x")
+    for _ in range(5):
+        make_comparison(nomination, other, a, b)
+    vote(nomination, other, c, d)
+    for _ in range(20):
+        assert {a, b} & set(pairing.select_pair(nomination, voter))
+
+
+@pytest.mark.django_db(transaction=True)
+def test_concurrent_issue_leaves_one_outstanding_row(monkeypatch, django_user_model):
+    author = django_user_model.objects.create_user("a", "a@example.com", "x")
+    voter = django_user_model.objects.create_user("v", "v@example.com", "x")
+    nomination = make_nomination(make_voting_contest())
+    for _ in range(4):
+        make_entry(nomination, author, PhotoEntry.APPROVED)
+    real_lock = pairing.lock_voter
+    both_ready = threading.Barrier(2, timeout=10)
+
+    def lock_in_step(user):
+        both_ready.wait()
+        real_lock(user)
+
+    monkeypatch.setattr(pairing, "lock_voter", lock_in_step)
+    issued = []
+
+    def issue_one():
+        try:
+            issued.append(pairing.issue_pair(nomination, voter).pk)
+        finally:
+            connection.close()
+
+    threads = [threading.Thread(target=issue_one) for _ in range(2)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join(timeout=20)
+    assert len(issued) == 2 and issued[0] == issued[1]
+    assert Comparison.objects.count() == 1
+
+
+# --- pair endpoint --------------------------------------------------------
+
+
+def pair_url(contest, nomination):
+    return reverse("photo_pair", args=[contest.slug, nomination.pk])
+
+
+def post_answer(client, contest, nomination, token, winner_id, **extra):
+    return client.post(
+        pair_url(contest, nomination),
+        data=json.dumps({"token": token, "winner_id": winner_id}),
+        content_type="application/json",
+        **extra,
+    )
+
+
+@pytest.fixture
+def voter_client(client, voting):
+    client.force_login(voting[4])
+    return client
+
+
+def test_pair_happy_path(voter_client, voting):
+    contest, nomination, entries, _, voter = voting
+    pair = voter_client.get(pair_url(contest, nomination)).json()
+    assert (pair["answered"], pair["limit"]) == (0, 30)
+    ids = {e.pk for e in entries}
+    assert {pair["left"]["id"], pair["right"]["id"]} <= ids
+    assert pair["left"]["url"].startswith("/media/")
+    response = post_answer(
+        voter_client,
+        contest,
+        nomination,
+        pair["token"],
+        pair["left"]["id"],
+        HTTP_USER_AGENT="Phone",
+        HTTP_X_REAL_IP="10.1.2.3",
+    )
+    assert response.status_code == 200
+    assert response.json()["answered"] == 1
+    answered = Comparison.objects.get(winner__isnull=False)
+    assert answered.winner_id == pair["left"]["id"]
+    assert (answered.ip, answered.user_agent) == ("10.1.2.3", "Phone")
+    assert answered.answered_at is not None
+
+
+def test_repeated_get_returns_same_pair(voter_client, voting):
+    contest, nomination, *_ = voting
+    first = voter_client.get(pair_url(contest, nomination)).json()
+    second = voter_client.get(pair_url(contest, nomination)).json()
+    assert (first["left"], first["right"]) == (second["left"], second["right"])
+    assert Comparison.objects.count() == 1
+
+
+def test_double_answer_is_rejected(voter_client, voting):
+    contest, nomination, *_ = voting
+    pair = voter_client.get(pair_url(contest, nomination)).json()
+    winner = pair["left"]["id"]
+    first = post_answer(voter_client, contest, nomination, pair["token"], winner)
+    assert first.status_code == 200
+    response = post_answer(voter_client, contest, nomination, pair["token"], winner)
+    assert response.status_code == 400
+    assert Comparison.objects.filter(winner__isnull=False).count() == 1
+
+
+def test_expired_token_is_rejected(voter_client, voting, monkeypatch):
+    contest, nomination, *_ = voting
+    pair = voter_client.get(pair_url(contest, nomination)).json()
+    monkeypatch.setattr(pairing, "PAIR_TTL", timedelta(seconds=-1))
+    response = post_answer(
+        voter_client, contest, nomination, pair["token"], pair["left"]["id"]
+    )
+    assert response.status_code == 400
+
+
+def test_fresh_token_for_old_row_is_rejected(voter_client, voting):
+    contest, nomination, *_ = voting
+    voter_client.get(pair_url(contest, nomination))
+    row = Comparison.objects.get()
+    Comparison.objects.filter(pk=row.pk).update(
+        created_at=timezone.now() - pairing.PAIR_TTL - timedelta(seconds=1)
+    )
+    token = TimestampSigner(salt=pairing.PAIR_TOKEN_SALT).sign(str(row.pk))
+    response = post_answer(voter_client, contest, nomination, token, row.left_id)
+    assert response.status_code == 400
+    assert not Comparison.objects.filter(winner__isnull=False).exists()
+
+
+def test_foreign_token_is_rejected(client, voting, django_user_model):
+    contest, nomination, *_ = voting
+    other = django_user_model.objects.create_user("o", "o@example.com", "x")
+    client.force_login(other)
+    pair = client.get(pair_url(contest, nomination)).json()
+    client.force_login(voting[4])
+    response = post_answer(
+        client, contest, nomination, pair["token"], pair["left"]["id"]
+    )
+    assert response.status_code == 400
+
+
+def test_winner_outside_pair_is_rejected(voter_client, voting):
+    contest, nomination, entries, *_ = voting
+    pair = voter_client.get(pair_url(contest, nomination)).json()
+    outsider = next(
+        e.pk for e in entries if e.pk not in (pair["left"]["id"], pair["right"]["id"])
+    )
+    response = post_answer(voter_client, contest, nomination, pair["token"], outsider)
+    assert response.status_code == 400
+
+
+def test_token_of_other_nomination_is_rejected(voter_client, voting):
+    contest, nomination, _, author, _ = voting
+    other = make_nomination(contest, "Другая")
+    for _ in range(2):
+        make_entry(other, author, PhotoEntry.APPROVED)
+    pair = voter_client.get(pair_url(contest, other)).json()
+    response = post_answer(
+        voter_client, contest, nomination, pair["token"], pair["left"]["id"]
+    )
+    assert response.status_code == 400
+
+
+def test_rejected_photo_in_open_pair(voter_client, voting):
+    contest, nomination, *_ = voting
+    pair = voter_client.get(pair_url(contest, nomination)).json()
+    PhotoEntry.objects.filter(pk=pair["left"]["id"]).update(status=PhotoEntry.REJECTED)
+    response = post_answer(
+        voter_client, contest, nomination, pair["token"], pair["right"]["id"]
+    )
+    assert response.status_code == 400
+    fresh = voter_client.get(pair_url(contest, nomination)).json()
+    assert pair["left"]["id"] not in (fresh["left"]["id"], fresh["right"]["id"])
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        "not json",
+        json.dumps({"winner_id": 1}),
+        json.dumps({"token": "x"}),
+        json.dumps({"token": "x", "winner_id": "1"}),
+        json.dumps({"token": "x", "winner_id": True}),
+        json.dumps([1, 2]),
+        json.dumps({"token": 5, "winner_id": 1}),
+    ],
+)
+def test_malformed_body_is_400(voter_client, voting, body):
+    contest, nomination, *_ = voting
+    response = voter_client.post(
+        pair_url(contest, nomination), data=body, content_type="application/json"
+    )
+    assert response.status_code == 400
+
+
+def test_pair_token_and_magic_link_are_not_interchangeable(voter_client, voting):
+    contest, nomination, *_ = voting
+    pair = voter_client.get(pair_url(contest, nomination)).json()
+    row = Comparison.objects.get()
+    verification, _ = EmailVerification.create_for("victim@example.com", "login")
+    EmailVerification.objects.filter(pk=verification.pk).update(id=row.pk)
+    verification = EmailVerification.objects.get(pk=row.pk)
+
+    anon = Client()
+    anon.get(reverse("magic_link", args=[pair["token"]]))
+    assert "_auth_user_id" not in anon.session
+
+    link = build_magic_link_signature(verification)
+    response = post_answer(voter_client, contest, nomination, link, row.left_id)
+    assert response.status_code == 400
+    assert not Comparison.objects.filter(winner__isnull=False).exists()
+
+
+def test_quota_ends_voting(voter_client, voting):
+    contest, nomination, (a, b, c, d), _, voter = voting
+    contest.max_comparisons_per_user = 2
+    contest.save()
+    vote(nomination, voter, a, b)
+    vote(nomination, voter, c, d, is_void=True)
+    data = voter_client.get(pair_url(contest, nomination)).json()
+    assert (data["done"], data["reason"], data["answered"]) == (True, "limit", 2)
+
+
+def test_answer_over_quota_is_not_stored(voter_client, voting):
+    contest, nomination, (a, b, c, d), _, voter = voting
+    contest.max_comparisons_per_user = 1
+    contest.save()
+    pair = voter_client.get(pair_url(contest, nomination)).json()
+    vote(nomination, voter, c, d)
+    data = post_answer(
+        voter_client, contest, nomination, pair["token"], pair["left"]["id"]
+    ).json()
+    assert data["reason"] == "limit"
+    assert Comparison.objects.filter(winner__isnull=False).count() == 1
+
+
+def test_no_pairs_left(voter_client, voting):
+    contest, nomination, (a, b, c, d), _, voter = voting
+    for entry in (c, d):
+        entry.status = PhotoEntry.REJECTED
+        entry.save()
+    vote(nomination, voter, a, b)
+    assert (
+        voter_client.get(pair_url(contest, nomination)).json()["reason"] == "no_pairs"
+    )
+
+
+def test_closed_voting(voter_client, voting):
+    contest, nomination, *_ = voting
+    pair = voter_client.get(pair_url(contest, nomination)).json()
+    contest.voting_until = timezone.now() - timedelta(seconds=1)
+    contest.save()
+    data = post_answer(
+        voter_client, contest, nomination, pair["token"], pair["left"]["id"]
+    ).json()
+    assert data["reason"] == "closed"
+    assert not Comparison.objects.filter(winner__isnull=False).exists()
+    assert voter_client.get(pair_url(contest, nomination)).json()["reason"] == "closed"
+
+
+def test_pair_requires_login_and_own_nomination(client, voting):
+    contest, nomination, *_ = voting
+    response = client.get(pair_url(contest, nomination))
+    assert response.status_code == 403
+    assert response.json() == {"detail": "Forbidden"}
+    other = make_nomination(make_voting_contest("other"))
+    client.force_login(voting[4])
+    assert client.get(pair_url(contest, other)).status_code == 404
+    hidden = make_voting_contest("hidden", published=False)
+    hidden_nomination = make_nomination(hidden)
+    assert client.get(pair_url(hidden, hidden_nomination)).status_code == 404
+
+
+def test_pair_post_requires_csrf(voting):
+    contest, nomination, *_ = voting
+    client = Client(enforce_csrf_checks=True)
+    client.force_login(voting[4])
+    client.get(reverse("photo_contest", args=[contest.slug]))
+    pair = client.get(pair_url(contest, nomination)).json()
+    without = post_answer(
+        client, contest, nomination, pair["token"], pair["left"]["id"]
+    )
+    assert without.status_code == 403
+    token = client.cookies["csrftoken"].value
+    with_header = post_answer(
+        client,
+        contest,
+        nomination,
+        pair["token"],
+        pair["left"]["id"],
+        HTTP_X_CSRFTOKEN=token,
+    )
+    assert with_header.status_code == 200
+
+
+@pytest.mark.django_db(transaction=True)
+def test_concurrent_answers_respect_quota(monkeypatch, django_user_model):
+    author = django_user_model.objects.create_user("a", "a@example.com", "x")
+    voter = django_user_model.objects.create_user("v", "v@example.com", "x")
+    contest = make_voting_contest(max_comparisons_per_user=1)
+    nomination = make_nomination(contest)
+    a, b, c, d = (make_entry(nomination, author, PhotoEntry.APPROVED) for _ in range(4))
+    rows = [
+        make_comparison(nomination, voter, a, b),
+        make_comparison(nomination, voter, c, d),
+    ]
+    signer = TimestampSigner(salt=pairing.PAIR_TOKEN_SALT)
+    real_lock = pairing.lock_voter
+    both_ready = threading.Barrier(2, timeout=10)
+
+    def lock_in_step(user):
+        if not getattr(threading.current_thread(), "stepped", False):
+            threading.current_thread().stepped = True
+            both_ready.wait()
+        real_lock(user)
+
+    monkeypatch.setattr(pairing, "lock_voter", lock_in_step)
+
+    def answer(row):
+        try:
+            client = Client()
+            client.force_login(voter)
+            post_answer(
+                client, contest, nomination, signer.sign(str(row.pk)), row.left_id
+            )
+        finally:
+            connection.close()
+
+    threads = [threading.Thread(target=answer, args=(row,)) for row in rows]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join(timeout=20)
+    assert Comparison.objects.filter(winner__isnull=False).count() == 1
+
+
+# --- vote page ------------------------------------------------------------
+
+
+def vote_url(contest, nomination):
+    return reverse("photo_vote", args=[contest.slug, nomination.pk])
+
+
+def test_vote_page_redirects_anonymous_to_login_with_next(client, voting):
+    contest, nomination, *_ = voting
+    url = vote_url(contest, nomination)
+    response = client.get(url)
+    assert response.status_code == 302
+    assert response["Location"] == reverse("login") + "?" + urlencode({"next": url})
+
+
+def test_vote_page_renders_config_island(voter_client, voting):
+    contest, nomination, *_ = voting
+    other = make_nomination(contest, "Портрет", order=1)
+    response = voter_client.get(vote_url(contest, nomination))
+    assert response.status_code == 200
+    config = json.loads(
+        re.search(
+            r'<script id="photoVoteConfig" type="application/json">(.*?)</script>',
+            response.content.decode(),
+        ).group(1)
+    )
+    assert config["pairUrl"] == pair_url(contest, nomination)
+    assert config["contestUrl"] == reverse("photo_contest", args=[contest.slug])
+    assert config["csrfToken"]
+    assert vote_url(contest, other) in response.content.decode()
+
+
+def test_vote_page_404s(voter_client, voting):
+    contest, *_ = voting
+    foreign = make_nomination(make_voting_contest("other"))
+    assert voter_client.get(vote_url(contest, foreign)).status_code == 404
+    hidden = make_voting_contest("hidden", published=False)
+    assert (
+        voter_client.get(vote_url(hidden, make_nomination(hidden))).status_code == 404
+    )
+
+
+# --- contest page by phase ------------------------------------------------
+
+
+def test_contest_page_in_voting_phase(voter_client, voting):
+    contest, nomination, (a, b, c, d), author, voter = voting
+    sparse = make_nomination(contest, "Мало фото", order=1)
+    make_entry(sparse, author, PhotoEntry.APPROVED)
+    make_entry(sparse, author)
+    vote(nomination, voter, a, b)
+    vote(nomination, voter, c, d, is_void=True)
+    content = voter_client.get(contest_url(contest)).content.decode()
+    assert "Голосование до" in content
+    assert 'name="image"' not in content
+    assert vote_url(contest, nomination) in content
+    assert vote_url(contest, sparse) not in content
+    assert "мало фото для голосования" in content
+    assert "2 из 30" in content
+
+
+def test_contest_page_voting_button_for_anonymous(client, voting):
+    contest, nomination, *_ = voting
+    content = client.get(contest_url(contest)).content.decode()
+    assert vote_url(contest, nomination) in content
+    assert "из 30" not in content
+
+
+def test_contest_page_after_voting(client, voting):
+    contest, nomination, *_ = voting
+    contest.voting_until = timezone.now() - timedelta(seconds=1)
+    contest.save()
+    content = client.get(contest_url(contest)).content.decode()
+    assert "Голосование завершено, итоги скоро." in content
+    assert vote_url(contest, nomination) not in content
+
+
+def test_contest_page_submission_phase_has_no_voting(client, db, user):
+    contest = make_contest(voting_until=timezone.now() + timedelta(days=30))
+    nomination = make_nomination(contest)
+    client.force_login(user)
+    content = client.get(contest_url(contest)).content.decode()
+    assert 'name="image"' in content
+    assert vote_url(contest, nomination) not in content
+    assert "Голосование" not in content
+
+
+def test_delete_of_compared_photo_shows_message(client, voting):
+    contest, nomination, (a, b, *_), author, voter = voting
+    vote(nomination, voter, a, b)
+    contest.submission_until = timezone.now() + timedelta(days=1)
+    contest.voting_until = timezone.now() + timedelta(days=2)
+    contest.save()
+    client.force_login(author)
+    response = client.post(
+        reverse("photo_delete", args=[contest.slug, a.pk]), follow=True
+    )
+    assert response.status_code == 200
+    assert "удалить нельзя" in response.content.decode()
+    assert PhotoEntry.objects.filter(pk=a.pk).exists()
+
+
+def test_contest_page_query_count(voter_client, voting, django_assert_max_num_queries):
+    contest, nomination, (a, b, c, d), author, voter = voting
+    for i in range(3):
+        other = make_nomination(contest, f"N{i}", order=i + 1)
+        x = make_entry(other, author, PhotoEntry.APPROVED)
+        y = make_entry(other, author, PhotoEntry.APPROVED)
+        vote(other, voter, x, y)
+    vote(nomination, voter, a, b)
+    with django_assert_max_num_queries(12):
+        voter_client.get(contest_url(contest))
+
+
+def test_list_shows_voting_contest_with_badge(client, db):
+    make_voting_contest("voting")
+    make_voting_contest("over", voting_days_left=-1)
+    make_contest("no-voting", days_left=-1)
+    response = client.get(reverse("photo_contests"))
+    assert [c.slug for c in response.context["open_contests"]] == ["voting"]
+    assert {c.slug for c in response.context["closed_contests"]} == {
+        "over",
+        "no-voting",
+    }
+    content = response.content.decode()
+    assert "Идёт голосование" in content
+    assert "Голосование завершено" in content
+    assert "Приём закрыт" in content
+
+
+# --- results --------------------------------------------------------------
+
+
+def results_url(contest):
+    return reverse("photo_results", args=[contest.slug])
+
+
+def publish(client, contest, action="publish", **kwargs):
+    return client.post(
+        reverse("photo_results_publish", args=[contest.slug]),
+        {"action": action},
+        **kwargs,
+    )
+
+
+@pytest.fixture
+def finished(voting, django_user_model):
+    """``voting`` after the deadline, with a moderator and some answers."""
+    contest, nomination, (a, b, c, d), author, voter = voting
+    author.first_name, author.last_name = "Анна", "Фотографова"
+    author.save()
+    vote(nomination, voter, a, b)
+    vote(nomination, voter, a, c)
+    vote(nomination, voter, b, c)
+    contest.voting_until = timezone.now() - timedelta(minutes=1)
+    contest.save()
+    moderator = django_user_model.objects.create_user("m", "m@example.com", "x")
+    make_moderator(contest, moderator)
+    return contest, nomination, (a, b, c, d), moderator
+
+
+def test_results_hidden_until_published(client, finished, user):
+    contest, *_ = finished
+    assert client.get(results_url(contest)).status_code == 404
+    client.force_login(user)
+    assert client.get(results_url(contest)).status_code == 404
+    contest.is_results_published = True
+    contest.save()
+    assert client.get(results_url(contest)).status_code == 200
+    client.logout()
+    assert client.get(results_url(contest)).status_code == 200
+
+
+def test_moderator_sees_unpublished_results(client, finished):
+    contest, nomination, (a, b, c, d), moderator = finished
+    client.force_login(moderator)
+    response = client.get(results_url(contest))
+    assert response.status_code == 200
+    content = response.content.decode()
+    assert "Итоги не опубликованы" in content
+    rows = response.context["nominations"][0].rows
+    assert [r["entry"] for r in rows[:2]] == [a, b]
+    assert rows[0]["author"] == "Анна Фотографова"
+    assert "Побед: 2 из 2" in content
+
+
+def test_results_skip_non_approved_and_show_no_status(client, finished):
+    contest, nomination, (a, b, c, d), moderator = finished
+    pending = make_entry(nomination, a.uploaded_by)
+    c.status = PhotoEntry.REJECTED
+    c.save()
+    contest.is_results_published = True
+    contest.save()
+    response = client.get(results_url(contest))
+    entries = [r["entry"] for r in response.context["nominations"][0].rows]
+    assert pending not in entries and c not in entries
+    content = response.content.decode()
+    assert "data-status" not in content
+    assert "Принято" not in content
+
+
+def test_results_author_without_name_is_anonymous(client, finished):
+    contest, nomination, (a, *_), moderator = finished
+    author = a.uploaded_by
+    author.first_name = author.last_name = ""
+    author.username = "secret-local-part"
+    author.save()
+    client.force_login(moderator)
+    content = client.get(results_url(contest)).content.decode()
+    assert "Участник" in content
+    assert author.username not in content
+
+
+def test_publish_and_hide_results(client, finished):
+    contest, *_, moderator = finished
+    client.force_login(moderator)
+    response = publish(client, contest)
+    assert response["Location"] == contest_url(contest)
+    contest.refresh_from_db()
+    assert contest.is_results_published
+    publish(client, contest, "hide")
+    contest.refresh_from_db()
+    assert not contest.is_results_published
+    assert publish(client, contest, "bogus").status_code == 400
+
+
+def test_publish_refused_before_voting_ends(client, voting, django_user_model):
+    contest, *_ = voting
+    moderator = django_user_model.objects.create_user("m", "m@example.com", "x")
+    make_moderator(contest, moderator)
+    client.force_login(moderator)
+    response = publish(client, contest, follow=True)
+    assert "после голосования" in response.content.decode()
+    contest.refresh_from_db()
+    assert not contest.is_results_published
+    no_voting = make_contest("nv", days_left=-1)
+    make_moderator(no_voting, moderator)
+    publish(client, no_voting)
+    no_voting.refresh_from_db()
+    assert not no_voting.is_results_published
+
+
+def test_publish_access(client, finished, user, staff):
+    contest, *_ = finished
+    response = publish(client, contest)
+    assert response["Location"] == reverse("login") + "?" + urlencode(
+        {"next": contest_url(contest)}
+    )
+    client.force_login(user)
+    assert publish(client, contest).status_code == 403
+    client.force_login(staff)
+    assert publish(client, contest).status_code == 403
+    contest.refresh_from_db()
+    assert not contest.is_results_published
+
+
+def test_publish_requires_csrf(finished):
+    contest, *_, moderator = finished
+    client = Client(enforce_csrf_checks=True)
+    client.force_login(moderator)
+    assert publish(client, contest).status_code == 403
+
+
+def test_contest_page_links_published_results(client, finished):
+    contest, *_, moderator = finished
+    assert results_url(contest) not in client.get(contest_url(contest)).content.decode()
+    contest.is_results_published = True
+    contest.save()
+    assert results_url(contest) in client.get(contest_url(contest)).content.decode()
+    client.force_login(moderator)
+    content = client.get(contest_url(contest)).content.decode()
+    assert "Скрыть итоги" in content
+
+
+# --- vote report ----------------------------------------------------------
+
+
+def report_url(contest, **params):
+    url = reverse("photo_report", args=[contest.slug])
+    return url + ("?" + urlencode(params) if params else "")
+
+
+def void(client, contest, user, action="void", **extra):
+    return client.post(
+        reverse("photo_report_void", args=[contest.slug]),
+        {"user_id": user.pk, "action": action, **extra},
+    )
+
+
+@pytest.fixture
+def report_setup(voting, django_user_model):
+    """a > b > c > d by three honest voters; ``booster`` keeps picking ``d``."""
+    contest, nomination, (a, b, c, d), author, voter = voting
+    honest = voter
+    others = [
+        django_user_model.objects.create_user(f"h{i}", f"h{i}@example.com", "x")
+        for i in range(2)
+    ]
+    for person in (honest, *others):
+        for winner, loser in [(a, b), (a, c), (a, d), (b, c), (b, d), (c, d)] * 2:
+            vote(nomination, person, winner, loser, ip="10.0.0.1")
+    booster = django_user_model.objects.create_user("b", "b@example.com", "x")
+    for loser in (a, b, c) * 4:
+        vote(nomination, booster, d, loser, ip="10.0.0.2")
+    moderator = django_user_model.objects.create_user("m", "m@example.com", "x")
+    make_moderator(contest, moderator)
+    return contest, nomination, (a, b, c, d), honest, booster, moderator
+
+
+def test_report_rows(report_setup):
+    contest, nomination, (a, b, c, d), honest, booster, _ = report_setup
+    rows = {r["user"]: r for r in build_report(contest)}
+    assert rows[honest]["answered"] == 12
+    assert rows[booster]["top_entry"] == d
+    assert rows[booster]["top_count"] == 12
+    assert rows[booster]["agreement"] < rows[honest]["agreement"]
+    assert [r["user"] for r in build_report(contest)][0] == booster
+
+
+def test_report_agreement_extremes_and_threshold(voting, django_user_model):
+    contest, nomination, (a, b, c, d), author, voter = voting
+    judge = django_user_model.objects.create_user("j", "j@example.com", "x")
+    for winner, loser in [(a, b), (a, c), (a, d), (b, c), (b, d), (c, d)] * 3:
+        vote(nomination, judge, winner, loser)
+    for winner, loser in [(d, c), (c, b), (b, a)] * 4:
+        vote(nomination, voter, winner, loser)
+    newbie = django_user_model.objects.create_user("n", "n@example.com", "x")
+    vote(nomination, newbie, a, b)
+    rows = {r["user"]: r for r in build_report(contest)}
+    assert rows[judge]["agreement"] > rows[voter]["agreement"]
+    assert rows[voter]["agreement"] == 0
+    assert rows[newbie]["agreement"] is None
+    assert [r["user"] for r in build_report(contest)][-1] == newbie
+
+
+def test_report_equal_scores_are_skipped(voting):
+    contest, nomination, (a, b, c, d), author, voter = voting
+    for _ in range(6):
+        vote(nomination, voter, a, b)
+        vote(nomination, voter, b, a)
+    assert build_report(contest)[0]["agreement"] is None
+
+
+def test_report_shared_ip_and_abandoned(voting, django_user_model):
+    contest, nomination, (a, b, c, d), author, voter = voting
+    twin = django_user_model.objects.create_user("t", "t@example.com", "x")
+    vote(nomination, voter, a, b, ip="10.9.9.9")
+    vote(nomination, twin, a, c, ip="10.9.9.9")
+    vote(nomination, twin, a, d, ip="10.9.9.8")
+    fresh = make_comparison(nomination, voter, c, d)
+    stale = make_comparison(nomination, voter, b, d)
+    Comparison.objects.filter(pk=stale.pk).update(
+        created_at=timezone.now() - pairing.PAIR_TTL - timedelta(seconds=1)
+    )
+    assert fresh.pk
+    rows = {r["user"]: r for r in build_report(contest)}
+    assert rows[voter]["shared_ip_voters"] == 1
+    assert rows[twin]["ip_count"] == 2
+    assert rows[voter]["abandoned"] == 1
+
+
+def test_report_is_void_needs_answers(voting):
+    contest, nomination, (a, b, *_), author, voter = voting
+    make_comparison(nomination, voter, a, b)
+    assert build_report(contest)[0]["is_void"] is False
+
+
+def test_report_nomination_filter(report_setup, client):
+    contest, nomination, (a, *_), honest, booster, moderator = report_setup
+    other = make_nomination(contest, "Другая", order=1)
+    x = make_entry(other, a.uploaded_by, PhotoEntry.APPROVED)
+    y = make_entry(other, a.uploaded_by, PhotoEntry.APPROVED)
+    loner = make_comparison(other, moderator, x, y, winner=x).user
+    client.force_login(moderator)
+    users = {r["user"] for r in client.get(report_url(contest)).context["rows"]}
+    assert loner in users
+    response = client.get(report_url(contest, nomination=other.pk))
+    assert {r["user"] for r in response.context["rows"]} == {loner}
+    response = client.get(report_url(contest, nomination="junk"))
+    assert response.context["nomination"] is None
+
+
+def test_report_access(client, report_setup, user, django_user_model):
+    contest, *_, moderator = report_setup
+    url = report_url(contest)
+    response = client.get(url)
+    assert response["Location"] == reverse("login") + "?" + urlencode({"next": url})
+    client.force_login(user)
+    assert client.get(url).status_code == 403
+    root = django_user_model.objects.create_superuser("root", "r@example.com", "x")
+    client.force_login(root)
+    assert client.get(url).status_code == 403
+    assert void(client, contest, user).status_code == 403
+    client.force_login(moderator)
+    assert client.get(url).status_code == 200
+
+
+def test_void_and_unvoid(client, report_setup):
+    contest, nomination, (a, b, c, d), honest, booster, moderator = report_setup
+    before = {r["entry"]: r["place"] for r in nomination_standings(nomination)}
+    client.force_login(moderator)
+    response = void(client, contest, booster, nomination=nomination.pk)
+    assert response["Location"] == report_url(contest, nomination=nomination.pk)
+    assert all(c.is_void for c in Comparison.objects.filter(user=booster))
+    after = {r["entry"]: r for r in nomination_standings(nomination)}
+    assert after[d]["n"] == 18 and after[d]["wins"] == 0
+    assert pairing.answered_count(nomination, booster) == 12
+    rows = {r["user"]: r for r in build_report(contest)}
+    assert rows[booster]["is_void"]
+    void(client, contest, booster, "unvoid")
+    assert not Comparison.objects.filter(user=booster, is_void=True).exists()
+    assert {r["entry"]: r["place"] for r in nomination_standings(nomination)} == before
+
+
+def test_void_is_scoped_to_contest(client, report_setup):
+    contest, nomination, (a, *_), honest, booster, moderator = report_setup
+    other_contest = make_voting_contest("other")
+    other = make_nomination(other_contest)
+    x = make_entry(other, a.uploaded_by, PhotoEntry.APPROVED)
+    y = make_entry(other, a.uploaded_by, PhotoEntry.APPROVED)
+    foreign = make_comparison(other, booster, x, y, winner=x)
+    client.force_login(moderator)
+    void(client, contest, booster)
+    foreign.refresh_from_db()
+    assert not foreign.is_void
+
+
+def test_void_bad_input(client, report_setup, user):
+    contest, *_, moderator = report_setup
+    client.force_login(moderator)
+    assert void(client, contest, user, "bogus").status_code == 400
+    url = reverse("photo_report_void", args=[contest.slug])
+    assert client.post(url, {"user_id": "x", "action": "void"}).status_code == 400
+    response = void(client, contest, user)
+    assert response.status_code == 302
+    assert "нет голосов" in client.get(response["Location"]).content.decode()
+
+
+def test_report_query_count(client, report_setup, django_assert_max_num_queries):
+    contest, nomination, (a, *_), honest, booster, moderator = report_setup
+    for i in range(3):
+        other = make_nomination(contest, f"N{i}", order=i + 1)
+        x = make_entry(other, a.uploaded_by, PhotoEntry.APPROVED)
+        y = make_entry(other, a.uploaded_by, PhotoEntry.APPROVED)
+        for voter in (honest, booster, moderator):
+            make_comparison(other, voter, x, y, winner=x, ip="10.0.0.3")
+    client.force_login(moderator)
+    with django_assert_max_num_queries(25):
+        client.get(report_url(contest))

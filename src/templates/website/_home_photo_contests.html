@@ -8,8 +8,13 @@
   <article class="race-list-card photo-contest-card">
     <div class="race-list-card__date photo-contest-card__date">
       <span class="photo-contest-card__until">до</span>
+      {% if contest.phase == "voting" %}
+      <strong>{{ contest.voting_until|date:"j" }}</strong>
+      <span>{{ contest.voting_until|date:"M" }}</span>
+      {% else %}
       <strong>{{ contest.submission_until|date:"j" }}</strong>
       <span>{{ contest.submission_until|date:"M" }}</span>
+      {% endif %}
     </div>
     <div class="race-list-card__body">
       <div class="race-list-card__status">

@@ -1,13 +1,19 @@
+import json
+
 from django.contrib import messages
 from django.core.paginator import Paginator
-from django.db.models import Count
+from django.core.signing import BadSignature, TimestampSigner
+from django.db import transaction
+from django.db.models import Count, ProtectedError, Q
 from django.http import (
     FileResponse,
     Http404,
     HttpResponseBadRequest,
     HttpResponseForbidden,
     HttpResponseRedirect,
+    JsonResponse,
 )
+from django.middleware.csrf import get_token
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
@@ -15,10 +21,19 @@ from django.utils.http import url_has_allowed_host_and_scheme, urlencode
 from django.views import View
 
 from apps.accounts.users import find_user
-from apps.photo_contest import images
+from apps.mobile.permissions import _client_ip
+from apps.photo_contest import images, pairing
 from apps.photo_contest.forms import PhotoUploadForm
-from apps.photo_contest.models import PhotoContest, PhotoContestModerator, PhotoEntry
+from apps.photo_contest.models import (
+    Comparison,
+    PhotoContest,
+    PhotoContestModerator,
+    PhotoEntry,
+    PhotoNomination,
+)
 from apps.photo_contest.permissions import can_moderate
+from apps.photo_contest.report import build_report
+from apps.photo_contest.scoring import nomination_standings
 from apps.photo_contest.services import LimitReached, SubmissionClosed, create_entry
 
 CLOSED_MESSAGE = "Приём фотографий закрыт."
@@ -32,8 +47,8 @@ MODERATE_ACTIONS = [
 ]
 
 
-def _login_redirect(contest):
-    next_url = reverse("photo_contest", args=[contest.slug])
+def _login_redirect(contest, next_url=None):
+    next_url = next_url or reverse("photo_contest", args=[contest.slug])
     return HttpResponseRedirect(reverse("login") + "?" + urlencode({"next": next_url}))
 
 
@@ -53,11 +68,31 @@ def _contest_context(request, contest, form=None, is_moderator=None):
     user = request.user
     if is_moderator is None:
         is_moderator = can_moderate(user, contest)
-    nominations = list(contest.nominations.all())
+    nominations = list(
+        contest.nominations.annotate(
+            approved_count=Count(
+                "entries", filter=Q(entries__status=PhotoEntry.APPROVED)
+            )
+        )
+    )
+    answered = {}
+    if user.is_authenticated and contest.phase != "submission":
+        answered = dict(
+            Comparison.objects.filter(
+                nomination__contest=contest, user=user, winner__isnull=False
+            )
+            .values_list("nomination")
+            .annotate(c=Count("pk"))
+            .order_by()
+        )
     for nomination in nominations:
         nomination.used = 0
         nomination.is_full = False
         nomination.my_entries = []
+        nomination.can_vote = nomination.approved_count >= 2
+        nomination.answered = min(
+            answered.get(nomination.pk, 0), contest.max_comparisons_per_user
+        )
     my_entries = []
     if user.is_authenticated:
         my_entries = list(
@@ -119,12 +154,11 @@ def _moderators_context(user, contest, is_moderator):
 class PhotoContestListView(View):
     def get(self, request):
         contests = list(PhotoContest.objects.filter(is_published=True))
-        now = timezone.now()
         open_contests = sorted(
-            (c for c in contests if c.submission_until >= now),
+            (c for c in contests if c.phase in ("submission", "voting")),
             key=lambda c: c.submission_until,
         )
-        closed_contests = [c for c in contests if c.submission_until < now]
+        closed_contests = [c for c in contests if c not in open_contests]
         return render(
             request,
             "photo_contest/list.html",
@@ -193,8 +227,12 @@ class PhotoDeleteView(View):
         )
         if not contest.is_submission_open:
             messages.error(request, CLOSED_MESSAGE)
-        else:
+            return redirect("photo_contest", contest.slug)
+        try:
             entry.delete()
+        except ProtectedError:
+            messages.error(request, "Фото уже участвует в голосовании, удалить нельзя.")
+        else:
             messages.success(request, "Фото удалено.")
         return redirect("photo_contest", contest.slug)
 
@@ -221,11 +259,11 @@ class PhotoOriginalView(View):
         return FileResponse(file)
 
 
-def _moderated_contest(request, slug):
+def _moderated_contest(request, slug, next_url=None):
     """Return ``(contest, response)``; return a non-``None`` response as is."""
     contest = get_object_or_404(PhotoContest, slug=slug)
     if not request.user.is_authenticated:
-        next_url = reverse("photo_moderate", args=[contest.slug])
+        next_url = next_url or reverse("photo_moderate", args=[contest.slug])
         login_url = reverse("login") + "?" + urlencode({"next": next_url})
         return contest, HttpResponseRedirect(login_url)
     if not can_moderate(request.user, contest):
@@ -396,3 +434,233 @@ class PhotoContestModeratorsView(View):
             self._message(request, messages.SUCCESS, "Администратор снят.")
         else:
             self._message(request, messages.ERROR, "Администратор не найден.")
+
+
+def _pair_signer():
+    return TimestampSigner(salt=pairing.PAIR_TOKEN_SALT)
+
+
+def _photo_json(entry):
+    return {"id": entry.pk, "url": entry.preview.url}
+
+
+def _pair_payload(contest, nomination, user):
+    answered = pairing.answered_count(nomination, user)
+    payload = {"answered": answered, "limit": contest.max_comparisons_per_user}
+    if not contest.is_voting_open:
+        return {"done": True, "reason": "closed", **payload}
+    if answered >= contest.max_comparisons_per_user:
+        return {"done": True, "reason": "limit", **payload}
+    row = pairing.issue_pair(nomination, user)
+    if row is None:
+        return {"done": True, "reason": "no_pairs", **payload}
+    return {
+        "token": _pair_signer().sign(str(row.pk)),
+        "left": _photo_json(row.left),
+        "right": _photo_json(row.right),
+        **payload,
+    }
+
+
+def _bad_pair(detail):
+    return JsonResponse({"detail": detail}, status=400)
+
+
+class PhotoPairView(View):
+    """GET issues the voter's pair, POST answers it and returns the next one."""
+
+    def dispatch(self, request, slug, nomination_id):
+        self.contest = get_object_or_404(PhotoContest, slug=slug, is_published=True)
+        self.nomination = get_object_or_404(
+            PhotoNomination, pk=nomination_id, contest=self.contest
+        )
+        if not request.user.is_authenticated:
+            return JsonResponse({"detail": "Forbidden"}, status=403)
+        return super().dispatch(request)
+
+    def get(self, request):
+        return JsonResponse(_pair_payload(self.contest, self.nomination, request.user))
+
+    def post(self, request):
+        try:
+            body = json.loads(request.body)
+            token, winner_id = body["token"], body["winner_id"]
+        except (ValueError, TypeError, KeyError):
+            return _bad_pair("Некорректный запрос.")
+        if not isinstance(token, str) or type(winner_id) is not int:
+            return _bad_pair("Некорректный запрос.")
+        try:
+            pk = int(_pair_signer().unsign(token, max_age=pairing.PAIR_TTL))
+        except (BadSignature, ValueError):
+            return _bad_pair("Пара устарела.")
+
+        contest, nomination, user = self.contest, self.nomination, request.user
+        with transaction.atomic():
+            pairing.lock_voter(user)
+            if (
+                contest.is_voting_open
+                and pairing.answered_count(nomination, user)
+                < contest.max_comparisons_per_user
+            ):
+                error = self._answer(request, pk, winner_id)
+                if error:
+                    return error
+        return JsonResponse(_pair_payload(contest, nomination, user))
+
+    def _answer(self, request, pk, winner_id):
+        mine = Comparison.objects.filter(
+            pk=pk, user=request.user, nomination=self.nomination
+        )
+        row = mine.select_related("left", "right").first()
+        if row is None:
+            return _bad_pair("Пара не найдена.")
+        if winner_id not in (row.left_id, row.right_id):
+            return _bad_pair("Фото не из этой пары.")
+        if not row.left.status == row.right.status == PhotoEntry.APPROVED:
+            return _bad_pair("Фото больше не участвует.")
+        now = timezone.now()
+        updated = mine.filter(
+            winner__isnull=True, created_at__gte=now - pairing.PAIR_TTL
+        ).update(
+            winner_id=winner_id,
+            answered_at=now,
+            ip=_client_ip(request),
+            user_agent=request.META.get("HTTP_USER_AGENT", "")[:255],
+        )
+        if not updated:
+            return _bad_pair("Пара уже отвечена или устарела.")
+        return None
+
+
+class PhotoVoteView(View):
+    def get(self, request, slug, nomination_id):
+        contest = get_object_or_404(PhotoContest, slug=slug, is_published=True)
+        nomination = get_object_or_404(
+            PhotoNomination, pk=nomination_id, contest=contest
+        )
+        if not request.user.is_authenticated:
+            return _login_redirect(contest, next_url=request.path)
+        contest_url = reverse("photo_contest", args=[contest.slug])
+        return render(
+            request,
+            "photo_contest/vote.html",
+            {
+                "contest": contest,
+                "nomination": nomination,
+                "other_nominations": contest.nominations.exclude(pk=nomination.pk),
+                "vote_config": {
+                    "pairUrl": reverse(
+                        "photo_pair", args=[contest.slug, nomination.pk]
+                    ),
+                    "contestUrl": contest_url,
+                    "csrfToken": get_token(request),
+                },
+            },
+        )
+
+
+def _author_name(user):
+    # Not the username: for passwordless accounts it is the email local part.
+    return user.get_full_name() or "Участник"
+
+
+class PhotoResultsView(View):
+    def get(self, request, slug):
+        contest, is_moderator = _visible_contest(request, slug)
+        if not contest.is_results_published and not is_moderator:
+            raise Http404
+        nominations = list(contest.nominations.all())
+        for nomination in nominations:
+            nomination.rows = nomination_standings(nomination)
+            for row in nomination.rows:
+                row["author"] = _author_name(row["entry"].uploaded_by)
+        return render(
+            request,
+            "photo_contest/results.html",
+            {
+                "contest": contest,
+                "nominations": nominations,
+                "is_moderator": is_moderator,
+            },
+        )
+
+
+class PhotoResultsPublishView(View):
+    def post(self, request, slug):
+        contest, response = _moderated_contest(
+            request, slug, next_url=reverse("photo_contest", args=[slug])
+        )
+        if response:
+            return response
+        action = request.POST.get("action")
+        if action == "publish":
+            if not contest.is_voting_finished:
+                messages.error(request, "Итоги можно опубликовать после голосования.")
+            else:
+                contest.is_results_published = True
+                contest.save(update_fields=["is_results_published", "updated_at"])
+                messages.success(request, "Итоги опубликованы.")
+        elif action == "hide":
+            contest.is_results_published = False
+            contest.save(update_fields=["is_results_published", "updated_at"])
+            messages.success(request, "Итоги скрыты.")
+        else:
+            return HttpResponseBadRequest()
+        return redirect("photo_contest", contest.slug)
+
+
+def _report_url(contest, nomination=None):
+    url = reverse("photo_report", args=[contest.slug])
+    if nomination:
+        url += "?" + urlencode({"nomination": nomination.pk})
+    return url
+
+
+def _report_nomination(contest, value):
+    if value and str(value).isdigit():
+        return contest.nominations.filter(pk=value).first()
+    return None
+
+
+class PhotoReportView(View):
+    def get(self, request, slug):
+        contest, response = _moderated_contest(
+            request, slug, next_url=reverse("photo_report", args=[slug])
+        )
+        if response:
+            return response
+        nomination = _report_nomination(contest, request.GET.get("nomination"))
+        return render(
+            request,
+            "photo_contest/report.html",
+            {
+                "contest": contest,
+                "nomination": nomination,
+                "nominations": contest.nominations.all(),
+                "rows": build_report(contest, nomination),
+            },
+        )
+
+
+class PhotoReportVoidView(View):
+    def post(self, request, slug):
+        contest, response = _moderated_contest(
+            request, slug, next_url=reverse("photo_report", args=[slug])
+        )
+        if response:
+            return response
+        action = request.POST.get("action")
+        user_id = _user_id(request.POST.get("user_id"))
+        if action not in ("void", "unvoid") or user_id is None:
+            return HttpResponseBadRequest()
+        updated = Comparison.objects.filter(
+            nomination__contest=contest, user_id=user_id
+        ).update(is_void=action == "void")
+        if not updated:
+            messages.error(request, "У пользователя нет голосов в этом конкурсе.")
+        elif action == "void":
+            messages.success(request, "Голоса пользователя аннулированы.")
+        else:
+            messages.success(request, "Голоса пользователя возвращены.")
+        nomination = _report_nomination(contest, request.POST.get("nomination"))
+        return redirect(_report_url(contest, nomination))

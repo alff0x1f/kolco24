@@ -1763,3 +1763,21 @@ def test_home_photo_strip_and_card_show_nominations_and_deadline(client):
     assert f"Ещё {soon.days_left}" in strip
     assert "4 номинации" in content
     assert "Фотоконкурсы" in content
+
+
+@pytest.mark.django_db
+def test_home_shows_photo_contest_during_voting(client):
+    voting = _photo_contest("voting", until=timezone.now() - timedelta(days=1))
+    voting.voting_until = timezone.now() + timedelta(days=3)
+    voting.save()
+    over = _photo_contest("over", until=timezone.now() - timedelta(days=5))
+    over.voting_until = timezone.now() - timedelta(days=1)
+    over.save()
+    _photo_contest("no-voting", until=timezone.now() - timedelta(days=1))
+    response = client.get(reverse("index"))
+    assert response.context["open_photo_contests"] == [voting]
+    content = response.content.decode()
+    strip = _extract(r'<section class="photo-strip"(.*?)</section>', content, "strip")
+    assert "Голосование до" in strip
+    assert ">Голосовать</a>" in strip
+    assert "Идёт голосование" in content

@@ -174,17 +174,17 @@ ones included, so a voided user stays visible.
 - Modify: `src/apps/photo_contest/admin.py`
 - Modify: `src/apps/photo_contest/tests.py`
 
-- [ ] add `voting_until`, `max_comparisons_per_user` (`MinValueValidator(1)`), `is_results_published` to
+- [x] add `voting_until`, `max_comparisons_per_user` (`MinValueValidator(1)`), `is_results_published` to
       `PhotoContest` with `clean()` and `is_voting_open` / `is_voting_finished` / `phase`
-- [ ] add the `Comparison` model per Technical Details
-- [ ] generate migration `0003` (`makemigrations photo_contest`), rename to `0003_voting.py`
-- [ ] add the new fields to `PhotoContestAdmin` (`list_display`: `voting_until`, `is_results_published`)
-- [ ] write tests: `phase`/`is_voting_open` before, during and after voting, `no_voting` with `voting_until=None`,
+- [x] add the `Comparison` model per Technical Details
+- [x] generate migration `0003` (`makemigrations photo_contest`), rename to `0003_voting.py`
+- [x] add the new fields to `PhotoContestAdmin` (`list_display`: `voting_until`, `is_results_published`)
+- [x] write tests: `phase`/`is_voting_open` before, during and after voting, `no_voting` with `voting_until=None`,
       unpublished contest
-- [ ] write tests: `clean()` rejects `voting_until <= submission_until`; `max_comparisons_per_user=0` fails
+- [x] write tests: `clean()` rejects `voting_until <= submission_until`; `max_comparisons_per_user=0` fails
       validation; deleting a voter account cascades their comparisons; deleting a compared photo raises
       `ProtectedError`
-- [ ] run tests - must pass before task 2
+- [x] run tests - must pass before task 2
 
 ### Task 2: Scoring service
 
@@ -192,15 +192,15 @@ ones included, so a voided user stays visible.
 - Create: `src/apps/photo_contest/scoring.py`
 - Modify: `src/apps/photo_contest/tests.py`
 
-- [ ] `counted_comparisons(nomination)`: answered, `is_void=False`, `left` and `right` both `approved`
-- [ ] `wilson_lower_bound(wins, n, z=1.96)`, `0.0` when `n == 0`
-- [ ] `nomination_standings(nomination) -> [{"entry", "wins", "n", "score", "place"}]`: `approved` entries only (also
+- [x] `counted_comparisons(nomination)`: answered, `is_void=False`, `left` and `right` both `approved`
+- [x] `wilson_lower_bound(wins, n, z=1.96)`, `0.0` when `n == 0`
+- [x] `nomination_standings(nomination) -> [{"entry", "wins", "n", "score", "place"}]`: `approved` entries only (also
       those with no comparisons), over `counted_comparisons`, sorted by score desc then `n` desc then pk; places by
       standard competition ranking (1, 1, 3) on equal score
-- [ ] write tests: Wilson edge cases (`n=0`, `wins=n`, same share with smaller `n` → lower score)
-- [ ] write tests: standings ignore void and unanswered rows, pending/rejected entries, comparisons against a
+- [x] write tests: Wilson edge cases (`n=0`, `wins=n`, same share with smaller `n` → lower score)
+- [x] write tests: standings ignore void and unanswered rows, pending/rejected entries, comparisons against a
       now-rejected photo (and count them again after restore), other nominations; ties share a place (1, 1, 3)
-- [ ] run tests - must pass before task 3
+- [x] run tests - must pass before task 3
 
 ### Task 3: Pairing service
 
@@ -208,21 +208,21 @@ ones included, so a voided user stays visible.
 - Create: `src/apps/photo_contest/pairing.py`
 - Modify: `src/apps/photo_contest/tests.py`
 
-- [ ] `PAIR_TTL`, `PAIR_TOKEN_SALT`; `answered_count(nomination, user)` — all answered rows of the voter, void included
-- [ ] `select_pair(nomination, user) -> (left, right) | None` per Solution Overview (walk candidates by shows, first one
+- [x] `PAIR_TTL`, `PAIR_TOKEN_SALT`; `answered_count(nomination, user)` — all answered rows of the voter, void included
+- [x] `select_pair(nomination, user) -> (left, right) | None` per Solution Overview (walk candidates by shows, first one
       with an unanswered opponent; left/right order randomized)
-- [ ] `outstanding_pair(nomination, user)`: newest unanswered row younger than `PAIR_TTL` with both photos `approved`,
+- [x] `outstanding_pair(nomination, user)`: newest unanswered row younger than `PAIR_TTL` with both photos `approved`,
       else `None` (stale rows stay in the DB)
-- [ ] `issue_pair(nomination, user) -> Comparison | None`: inside `transaction.atomic()` with
+- [x] `issue_pair(nomination, user) -> Comparison | None`: inside `transaction.atomic()` with
       `User.objects.select_for_update().get(pk=user.pk)` — outstanding row or a new one from `select_pair`
-- [ ] write tests: never the voter's own photo; no repeat of an answered pair (either order), void answers included;
+- [x] write tests: never the voter's own photo; no repeat of an answered pair (either order), void answers included;
       least-shown photo comes first; least-shown photo already paired with every candidate but other pairs left → a
       pair is still returned; `None` with fewer than 2 candidates or all pairs answered
-- [ ] write tests: `issue_pair` reuses a fresh outstanding row without new rows; issues a new one after `PAIR_TTL` or
+- [x] write tests: `issue_pair` reuses a fresh outstanding row without new rows; issues a new one after `PAIR_TTL` or
       when a photo of the outstanding pair was rejected, keeping the old row; unanswered rows don't count as shows
-- [ ] write tests: concurrent `issue_pair` calls (threads, like `test_concurrent_uploads_respect_limit`) leave one
+- [x] write tests: concurrent `issue_pair` calls (threads, like `test_concurrent_uploads_respect_limit`) leave one
       outstanding row
-- [ ] run tests - must pass before task 4
+- [x] run tests - must pass before task 4
 
 ### Task 4: Pair endpoint (`photo_pair`)
 
@@ -231,24 +231,24 @@ ones included, so a voided user stays visible.
 - Modify: `src/apps/photo_contest/urls.py`
 - Modify: `src/apps/photo_contest/tests.py`
 
-- [ ] `PhotoPairView` GET: published contest + nomination of the contest (404), anon → 403 JSON, `done/closed` when
+- [x] `PhotoPairView` GET: published contest + nomination of the contest (404), anon → 403 JSON, `done/closed` when
       voting is not open, `done/limit` at quota, `issue_pair` → pair payload with
       `TimestampSigner(salt=PAIR_TOKEN_SALT)` token, or `done/no_pairs`
-- [ ] `PhotoPairView` POST: parse JSON body (malformed → 400), `unsign(token, max_age=PAIR_TTL)`, then in
+- [x] `PhotoPairView` POST: parse JSON body (malformed → 400), `unsign(token, max_age=PAIR_TTL)`, then in
       `transaction.atomic()` with the per-voter lock: voting open + quota (else `done`), the 400 checks from Technical
       Details, conditional UPDATE (row-anchored TTL) with `ip=_client_ip(request)` and `user_agent[:255]`; respond with
       the next pair (same code path as GET)
-- [ ] write tests: happy path (GET → POST → `answered` grows, winner stored with ip/user agent); repeated GET returns
+- [x] write tests: happy path (GET → POST → `answered` grows, winner stored with ip/user agent); repeated GET returns
       the same pair and creates no rows
-- [ ] write tests: double POST → 400; expired token → 400; token re-signed for a row older than `PAIR_TTL` → 400;
+- [x] write tests: double POST → 400; expired token → 400; token re-signed for a row older than `PAIR_TTL` → 400;
       another user's token → 400; `winner_id` not in pair → 400; token from another nomination → 400; photo rejected
       after issue → 400 and next GET gives a new pair; malformed bodies (non-JSON, missing keys, string `winner_id`)
       → 400
-- [ ] write tests: a pair token is rejected by `magic_link` and a magic-link token is rejected by `photo_pair`
-- [ ] write tests: quota → `done/limit`; voided voter still at `done/limit`; concurrent POSTs on two open rows never
+- [x] write tests: a pair token is rejected by `magic_link` and a magic-link token is rejected by `photo_pair`
+- [x] write tests: quota → `done/limit`; voided voter still at `done/limit`; concurrent POSTs on two open rows never
       exceed the limit; outside the voting window → `done/closed`; anon → 403; nomination of another contest → 404;
       POST with `enforce_csrf_checks=True` passes with `X-CSRFToken` and fails without it
-- [ ] run tests - must pass before task 5
+- [x] run tests - must pass before task 5
 
 ### Task 5: Vote page (`photo_vote`)
 
@@ -260,21 +260,21 @@ ones included, so a voided user stays visible.
 - Modify: `src/apps/photo_contest/urls.py`
 - Modify: `src/apps/photo_contest/tests.py`
 
-- [ ] `_login_redirect` gets an optional `next_url` (default: the contest page, current behaviour)
-- [ ] `PhotoVoteView`: published contest + nomination (404), anon → `_login_redirect(contest, next_url=<vote page>)`;
+- [x] `_login_redirect` gets an optional `next_url` (default: the contest page, current behaviour)
+- [x] `PhotoVoteView`: published contest + nomination (404), anon → `_login_redirect(contest, next_url=<vote page>)`;
       context: nomination, other nominations of the contest (links on the done screen), JSON config island
       (`pairUrl`, `contestUrl`, `csrfToken`)
-- [ ] `vote.html` on `base-2.html`: two photo cards side by side (stacked on narrow screens), a «Выбрать» button under
+- [x] `vote.html` on `base-2.html`: two photo cards side by side (stacked on narrow screens), a «Выбрать» button under
       each, progress «12 из 30», done screens per `reason` with links to other nominations, error box with «Повторить»
-- [ ] `photo_vote.js`: fetch pair, POST answer with `X-CSRFToken`, lock buttons until the response, POST 400 → re-GET,
+- [x] `photo_vote.js`: fetch pair, POST answer with `X-CSRFToken`, lock buttons until the response, POST 400 → re-GET,
       network/5xx → error box; keys ←/→ vote left/right (not while the large view is open)
-- [ ] large view: tap on a photo opens a `<dialog>` with the two photos (arrows/swipe between them, «Это лучше»
+- [x] large view: tap on a photo opens a `<dialog>` with the two photos (arrows/swipe between them, «Это лучше»
       votes for the shown one); reuse the `pc-viewer` markup/CSS from `contest.html` if it separates cleanly, else a
       small own dialog in `photo_vote.js`
-- [ ] `photo_vote.css` scoped under `.photo-vote`
-- [ ] write tests: anon → `login?next=/photo/<slug>/vote/<id>/`; logged-in 200 with config island; foreign or
+- [x] `photo_vote.css` scoped under `.photo-vote`
+- [x] write tests: anon → `login?next=/photo/<slug>/vote/<id>/`; logged-in 200 with config island; foreign or
       missing nomination → 404; unpublished contest → 404; existing upload/delete anon redirects unchanged
-- [ ] run tests - must pass before task 6
+- [x] run tests - must pass before task 6
 
 ### Task 6: Contest page by phase, protected photo delete
 
@@ -284,16 +284,16 @@ ones included, so a voided user stays visible.
 - Modify: `src/static/css/photo_contest.css`
 - Modify: `src/apps/photo_contest/tests.py`
 
-- [ ] `_contest_context`: `phase`; per nomination `approved_count` (one aggregate query) and, for a logged-in user,
+- [x] `_contest_context`: `phase`; per nomination `approved_count` (one aggregate query) and, for a logged-in user,
       `answered` (one aggregate query); `can_vote = approved_count >= 2`
-- [ ] template: upload form only in `submission`; in `voting` — «Голосование до …», per nomination «Голосовать» +
+- [x] template: upload form only in `submission`; in `voting` — «Голосование до …», per nomination «Голосовать» +
       «12 из 30» (anon gets the button too, it leads to login via the vote page); `closed` — «Голосование завершено,
       итоги скоро»; `no_voting` — «Приём завершён»; published results — link «Итоги»; «Мои фото» stay in every phase
-- [ ] `PhotoDeleteView`: catch `ProtectedError` → error message «Фото уже участвует в голосовании, удалить нельзя»
-- [ ] write tests: each phase renders the right block; «Голосовать» hidden for a nomination with < 2 approved photos;
+- [x] `PhotoDeleteView`: catch `ProtectedError` → error message «Фото уже участвует в голосовании, удалить нельзя»
+- [x] write tests: each phase renders the right block; «Голосовать» hidden for a nomination with < 2 approved photos;
       progress counts the user's answers in that nomination; delete of a compared photo shows the message, no 500
-- [ ] write tests: `django_assert_max_num_queries` for the contest page with several nominations and answers
-- [ ] run tests - must pass before task 7
+- [x] write tests: `django_assert_max_num_queries` for the contest page with several nominations and answers
+- [x] run tests - must pass before task 7
 
 ### Task 7: Home page and contest list during voting
 
@@ -303,12 +303,12 @@ ones included, so a voided user stays visible.
 - Modify: `src/templates/photo_contest/list.html`, `src/apps/photo_contest/views.py` (`PhotoContestListView`)
 - Modify: `src/website/test_publications.py`, `src/apps/photo_contest/tests.py`
 
-- [ ] home query: published contests with `submission_until >= now` **or** `voting_until >= now`
-- [ ] home partials: «Голосование до …» variant when the contest is in `voting`
-- [ ] `list.html`: contests in `voting` grouped with open ones (or their own group) with a «Голосование до …» badge
-- [ ] write tests: a contest in voting shows on the home page and in the list with the voting badge; a contest past
+- [x] home query: published contests with `submission_until >= now` **or** `voting_until >= now`
+- [x] home partials: «Голосование до …» variant when the contest is in `voting`
+- [x] `list.html`: contests in `voting` grouped with open ones (or their own group) with a «Голосование до …» badge
+- [x] write tests: a contest in voting shows on the home page and in the list with the voting badge; a contest past
       `voting_until` (or with `voting_until=None` past submissions) doesn't show on the home page
-- [ ] run tests - must pass before task 8
+- [x] run tests - must pass before task 8
 
 ### Task 8: Results page and publishing
 
@@ -320,20 +320,20 @@ ones included, so a voided user stays visible.
 - Modify: `src/static/css/photo_contest.css`
 - Modify: `src/apps/photo_contest/tests.py`
 
-- [ ] `_moderated_contest` gets an optional `next_url` (default: `photo_moderate`, current behaviour)
-- [ ] `PhotoResultsView`: contest via `_visible_contest`; non-moderator and not published → 404; per nomination
+- [x] `_moderated_contest` gets an optional `next_url` (default: `photo_moderate`, current behaviour)
+- [x] `PhotoResultsView`: contest via `_visible_contest`; non-moderator and not published → 404; per nomination
       `nomination_standings`; moderator sees a «Не опубликовано» badge
-- [ ] `results.html`: per nomination — place, preview, author name, caption, wins/n; no score column. Previews open the
+- [x] `results.html`: per nomination — place, preview, author name, caption, wins/n; no score column. Previews open the
       existing viewer: `.photo-contest` wrapper, `.pc-thumbs`/`.pc-thumb-link` markup, `<dialog class="pc-viewer">`,
       no `data-status` (the viewer must not show «Принято»)
-- [ ] `PhotoResultsPublishView` (POST, `_moderated_contest` gate, `action=publish|hide`): publish only when
+- [x] `PhotoResultsPublishView` (POST, `_moderated_contest` gate, `action=publish|hide`): publish only when
       `is_voting_finished`, else error message; PRG back to the contest page with `messages`
-- [ ] moderator sidebar in `contest.html`: links «Итоги», «Отчёт по голосам», publish/hide button
-- [ ] write tests: results 404 for anon and plain users before publication, 200 after; moderator always 200; places
+- [x] moderator sidebar in `contest.html`: links «Итоги», «Отчёт по голосам», publish/hide button
+- [x] write tests: results 404 for anon and plain users before publication, 200 after; moderator always 200; places
       follow wins; pending/rejected photos absent; no status text in the markup
-- [ ] write tests: publish by non-moderator → 403, anon → login redirect; publish before `voting_until` refused; publish
+- [x] write tests: publish by non-moderator → 403, anon → login redirect; publish before `voting_until` refused; publish
       of a `no_voting` contest refused; hide works; CSRF enforced
-- [ ] run tests - must pass before task 9
+- [x] run tests - must pass before task 9
 
 ### Task 9: Anti-fraud report and voiding
 
@@ -345,35 +345,35 @@ ones included, so a voided user stays visible.
 - Modify: `src/static/css/photo_moderate.css`
 - Modify: `src/apps/photo_contest/tests.py`
 
-- [ ] `report.build_report(contest, nomination=None)` per Technical Details; Wilson scores from `nomination_standings`
+- [x] `report.build_report(contest, nomination=None)` per Technical Details; Wilson scores from `nomination_standings`
       per nomination, a bounded number of queries (no per-voter queries)
-- [ ] `PhotoReportView` (GET, `_moderated_contest(…, next_url=<report>)`): nomination filter `?nomination=<id>`
+- [x] `PhotoReportView` (GET, `_moderated_contest(…, next_url=<report>)`): nomination filter `?nomination=<id>`
       (unknown → whole contest), table of rows
-- [ ] `PhotoReportVoidView` (POST `user_id`, `action=void|unvoid`): update `is_void` on all of the user's comparisons
+- [x] `PhotoReportVoidView` (POST `user_id`, `action=void|unvoid`): update `is_void` on all of the user's comparisons
       in the contest; PRG back to the report keeping the filter, `messages`
-- [ ] write tests: access (anon → `login?next=<report>`, plain user → 403, moderator 200, bare superuser → 403)
-- [ ] write tests: agreement on a small fixture (always picks the stronger photo → 100%, the weaker → 0%, equal-score
+- [x] write tests: access (anon → `login?next=<report>`, plain user → 403, moderator 200, bare superuser → 403)
+- [x] write tests: agreement on a small fixture (always picks the stronger photo → 100%, the weaker → 0%, equal-score
       pairs skipped), `None` below 10 answers; `shared_ip_voters`; `abandoned` counts only rows older than
       `PAIR_TTL`; `is_void` false for a user with no answers; sort order
-- [ ] write tests: void removes the user's votes from standings, unvoid restores them; the voided user keeps the
+- [x] write tests: void removes the user's votes from standings, unvoid restores them; the voided user keeps the
       quota used; a user's comparisons in another contest untouched
-- [ ] write tests: `django_assert_max_num_queries` for the report with several voters and nominations
-- [ ] run tests - must pass before task 10
+- [x] write tests: `django_assert_max_num_queries` for the report with several voters and nominations
+- [x] run tests - must pass before task 10
 
 ### Task 10: Verify acceptance criteria
-- [ ] verify all requirements from Overview are implemented
-- [ ] verify edge cases: nomination with 0–1 approved photos, voter whose own photos leave < 2 candidates, all pairs
+- [x] verify all requirements from Overview are implemented
+- [x] verify edge cases: nomination with 0–1 approved photos, voter whose own photos leave < 2 candidates, all pairs
       answered before the limit, voting closed while the vote page is open, contest with `voting_until=None`, admin
       moving `submission_until` after voting started (delete shows a message)
-- [ ] run full test suite: `uv run pytest`
-- [ ] `make format && make lint` — clean
+- [x] run full test suite: `uv run pytest`
+- [x] `make format && make lint` — clean
 
 ### Task 11: [Final] Update documentation
-- [ ] add a short note to the `apps.photo_contest` paragraph in CLAUDE.md: phases, `Comparison` as the issued pair
+- [x] add a short note to the `apps.photo_contest` paragraph in CLAUDE.md: phases, `Comparison` as the issued pair
       with a one-time token signed with **its own salt** (never the default — it would double as a magic link),
       per-nomination pairs/limit, quota counts void answers, counted comparison = both photos approved, results
       visibility (keep it minimal)
-- [ ] move this plan to `docs/plans/completed/`
+- [x] move this plan to `docs/plans/completed/`
 
 ## Post-Completion
 

@@ -1,0 +1,89 @@
+{% extends "website/base-2.html" %}
+{% load static %}
+
+{% block title %}Голосование: {{ nomination.title }} · {{ contest.title }} · Кольцо 24{% endblock %}
+{% block head_descr %}Голосование в номинации «{{ nomination.title }}» — {{ contest.title }}.{% endblock %}
+{% block og_title %}{{ contest.title }}{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="{% static 'css/photo_contest.css' %}">
+<link rel="stylesheet" href="{% static 'css/photo_vote.css' %}">
+<script src="{% static 'js/photo_vote.js' %}" defer></script>
+{% endblock %}
+
+{% block content %}
+<main class="page photo-contest photo-vote">
+  <div class="container">
+
+    <div class="crumbs">
+      <a href="{% url 'photo_contests' %}">Фотоконкурсы</a>
+      <span class="sep">/</span>
+      <a href="{% url 'photo_contest' contest.slug %}">{{ contest.title }}</a>
+    </div>
+
+    <header class="page-head pv-head">
+      <div>
+        <h1>{{ nomination.title }}</h1>
+        <p class="sub">Голосование{% if contest.voting_until %} до {{ contest.voting_until|date:"j E, H:i" }}{% endif %}</p>
+      </div>
+      <p class="pv-progress" aria-live="polite" hidden></p>
+    </header>
+
+    <p class="pv-hint">Выберите фото, которое нравится больше. Нажмите на фото, чтобы рассмотреть его крупно.</p>
+
+    <section class="pv-stage" aria-label="Пара фото">
+      <p class="pv-loading">Загружаем фото…</p>
+
+      <div class="pv-pair" hidden>
+        <figure class="pv-card" data-side="left">
+          <button class="pv-photo" type="button" aria-label="Открыть левое фото крупно">
+            <img alt="Фото слева">
+          </button>
+          <button class="btn btn-primary btn-block pv-choose" type="button">Выбрать</button>
+        </figure>
+        <figure class="pv-card" data-side="right">
+          <button class="pv-photo" type="button" aria-label="Открыть правое фото крупно">
+            <img alt="Фото справа">
+          </button>
+          <button class="btn btn-primary btn-block pv-choose" type="button">Выбрать</button>
+        </figure>
+      </div>
+
+      <div class="card card-pad pv-error" role="alert" hidden>
+        <p>Не удалось загрузить фото. Проверьте соединение и попробуйте ещё раз.</p>
+        <button class="btn btn-primary pv-retry" type="button">Повторить</button>
+      </div>
+
+      <div class="card card-pad pv-done" hidden>
+        <h2 class="pv-done-title" data-reason="limit">Спасибо, вы проголосовали!</h2>
+        <h2 class="pv-done-title" data-reason="no_pairs">Вы сравнили все доступные пары</h2>
+        <h2 class="pv-done-title" data-reason="closed">Голосование завершено</h2>
+        {% if other_nominations %}
+        <p>Проголосуйте и в других номинациях:</p>
+        <ul class="pv-nominations">
+          {% for other in other_nominations %}
+          <li><a href="{% url 'photo_vote' contest.slug other.pk %}">{{ other.title }}</a></li>
+          {% endfor %}
+        </ul>
+        {% endif %}
+        <a class="btn btn-ghost" href="{% url 'photo_contest' contest.slug %}">К конкурсу</a>
+      </div>
+    </section>
+
+    <dialog class="pc-viewer pv-viewer" aria-label="Просмотр фото">
+      <figure class="pc-viewer-figure">
+        <img class="pc-viewer-img" alt="">
+        <figcaption class="pc-viewer-caption">
+          <span class="pc-viewer-meta" aria-live="polite"></span>
+          <button class="btn btn-primary pv-viewer-choose" type="button">Это лучше</button>
+        </figcaption>
+      </figure>
+      <button class="pc-viewer-btn pc-viewer-close" type="button" aria-label="Закрыть">×</button>
+      <button class="pc-viewer-btn pc-viewer-prev" type="button" aria-label="Левое фото">‹</button>
+      <button class="pc-viewer-btn pc-viewer-next" type="button" aria-label="Правое фото">›</button>
+    </dialog>
+
+  </div>
+</main>
+{{ vote_config|json_script:"photoVoteConfig" }}
+{% endblock %}
