@@ -20,6 +20,9 @@ FALLBACK_MAX_SIDE = 6000
 MIN_SIDE = 16
 QUALITY_STEPS = (92, 88, 85, 80)
 EXTENSIONS = {"JPEG": "jpg", "PNG": "png", "WEBP": "webp"}
+# Pillow names a JPEG with extra frames "MPO": iPhone photos carry an HDR gain
+# map that way. Browsers show its first frame, so it is a plain JPEG for us.
+JPEG_ALIASES = {"MPO": "JPEG"}
 
 TOO_BIG = "Файл больше 20 МБ."
 BAD_FORMAT = "Поддерживаются JPEG, PNG и WebP."
@@ -61,7 +64,7 @@ def probe(file):
     try:
         file.seek(0)
         with Image.open(file) as img:
-            fmt = img.format
+            fmt = JPEG_ALIASES.get(img.format, img.format)
             width, height = img.size
             orientation = img.getexif().get(EXIF_ORIENTATION)
     except UnidentifiedImageError:
@@ -152,7 +155,7 @@ def make_preview(file):
     with _decoding():
         file.seek(0)
         with Image.open(file) as src:
-            if src.format == "JPEG":
+            if JPEG_ALIASES.get(src.format, src.format) == "JPEG":
                 # Decode straight at a reduced DCT scale: far less memory.
                 src.draft("RGB", (PREVIEW_MAX_SIDE, PREVIEW_MAX_SIDE))
             img = ImageOps.exif_transpose(src)

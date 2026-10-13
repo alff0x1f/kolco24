@@ -338,6 +338,23 @@ def test_probe_rejects_oversized_upload(monkeypatch):
         images.probe(upload(data))
 
 
+def test_multi_frame_jpeg_is_accepted_as_jpeg():
+    # iPhone photos: a JPEG with an HDR gain map that Pillow opens as MPO.
+    first = Image.new("RGB", (400, 300), "red")
+    buffer = io.BytesIO()
+    first.save(
+        buffer, format="MPO", save_all=True, append_images=[Image.new("RGB", (40, 30))]
+    )
+    data = buffer.getvalue()
+    file = upload(data)
+    info = images.probe(file)
+    assert (info.format, info.width, info.height) == ("JPEG", 400, 300)
+    stored, ext, _, _ = images.make_original(file, info)
+    assert (stored, ext) == (data, "jpg")
+    with Image.open(io.BytesIO(images.make_preview(file))) as img:
+        assert (img.format, img.size) == ("JPEG", (400, 300))
+
+
 @pytest.mark.parametrize(
     "data",
     [image_bytes("GIF", mode="P"), b"not an image at all"],
