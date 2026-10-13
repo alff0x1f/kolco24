@@ -38,7 +38,10 @@
             <span class="team-num">{{ team.start_number|default:"—" }}</span>
             {{ team.teamname|default:"Без названия" }}
           </h1>
-          <span class="chip edit">{{ team.category2.short_name }}</span>
+          {% if team.category2_id %}
+          <a class="chip edit" href="{% url 'category_results' race.slug team.category2_id %}#team-{{ team.id }}"
+             title="Открыть в протоколе">{{ team.category2.short_name }}</a>
+          {% endif %}
         </div>
         <div class="sub summary">
           <span>Старт: <b class="mono">{{ start_time|default:"—" }}</b></span>

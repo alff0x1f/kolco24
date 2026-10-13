@@ -9569,3 +9569,34 @@ def test_protocol_view_legacy_dnf_row_with_place_keeps_place(rf, django_user_mod
     assert "сн." not in html
     assert "Снята" not in html
     assert ">40<" in html
+
+
+@pytest.mark.django_db
+def test_app_data_category_links_to_team_protocol_row(client, django_user_model):
+    race, team, admin = _dnf_setup(django_user_model, "cat-link")
+    other = _make_team(team.owner, team.category2, start_number="2")
+    client.force_login(admin)
+    results_url = reverse("category_results", args=[race.slug, team.category2_id])
+
+    html = client.get(
+        reverse("race_app_data_team", args=[race.slug, team.id])
+    ).content.decode()
+    assert f'class="chip edit" href="{results_url}#team-{team.id}"' in html
+
+    html = client.get(reverse("race_app_data", args=[race.slug])).content.decode()
+    for t in (team, other):
+        assert f'class="cat" href="{results_url}#team-{t.id}"' in html
+
+
+@pytest.mark.django_db
+def test_protocol_row_has_team_anchor(rf, django_user_model):
+    race = _make_race()
+    category = _make_category(race)
+    owner = django_user_model.objects.create_user(username="anchor", password="x")
+    team = _make_started_team(owner, category, finish_time=2000)
+    build_protocol(race, None)
+    freeze_protocol(race)
+
+    html = _public_protocol_html(rf, race, category)
+
+    assert f'<tr id="team-{team.id}">' in html

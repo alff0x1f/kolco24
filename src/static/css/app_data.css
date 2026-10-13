@@ -44,6 +44,8 @@
 .app-data .chip.edit::before {
   content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--primary-2);
 }
+.app-data a.chip { text-decoration: none; }
+.app-data a.chip:hover { text-decoration: underline; }
 
 /* ── Card ────────────────────────────────────────────────── */
 .app-data .card { margin-bottom: 22px; }
@@ -90,6 +92,10 @@
 }
 .app-data .head .team-num { font-size: 18px; min-width: 0; margin-right: 8px; }
 .app-data .team-cell .cat { display: block; font-size: 12px; color: var(--muted); padding-left: 34px; }
+.app-data .team-cell a.cat {
+  width: fit-content; color: var(--muted); font-weight: 400; text-decoration: none;
+}
+.app-data .team-cell a.cat:hover { color: var(--primary); text-decoration: underline; }
 
 /* ── Chips / badges ──────────────────────────────────────── */
 .app-data .tagchip {
