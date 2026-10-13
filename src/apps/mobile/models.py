@@ -198,12 +198,24 @@ class Mark(models.Model):
     loc_gps_time_ms = models.BigIntegerField(null=True)
     loc_elapsed_at = models.BigIntegerField(null=True)
     created_at = models.DateTimeField(auto_now_add=True)
+    # Judge override: count a verified take with an incomplete roster. Set only
+    # on the site; kept out of MARK_UPDATE_FIELDS so a re-upload can't reset it.
+    force_counted = models.BooleanField(default=False)
+    forced_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="+",
+    )
+    forced_at = models.DateTimeField(null=True, blank=True)
 
     def __str__(self):
         return f"Mark({self.id} team={self.team_id} cp={self.checkpoint_id})"
 
 
-# Every scalar field except the PK (``id``) and the insert-time (``created_at``).
+# Every scalar field except the PK (``id``), the insert-time (``created_at``) and
+# the judge override (``force_counted``/``forced_by``/``forced_at``).
 # Passed to ``bulk_create(update_conflicts=True, update_fields=MARK_UPDATE_FIELDS)``
 # so a repeat ``id`` last-write-wins-merges the enriched payload while preserving
 # the original ``created_at``.

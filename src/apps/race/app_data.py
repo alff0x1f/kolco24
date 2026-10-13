@@ -19,6 +19,7 @@ every uid is normalized (``.strip().upper()``) here before matching against
 the normalized ``Tag`` pool and ``JudgeScan.nfc_uid``.
 """
 
+import hashlib
 from collections import defaultdict
 from datetime import datetime
 from datetime import timezone as dt_timezone
@@ -43,6 +44,22 @@ def _norm_uid(value):
     """Normalize a raw nfc_uid for matching; ``None``/blank → ``None``."""
     value = (value or "").strip().upper()
     return value or None
+
+
+def mark_anchor(mark_id):
+    """HTML id / URL fragment for a mark row.
+
+    ``Mark.id`` is any client string (may hold ``/``, quotes), so it is hashed
+    rather than put into the page as-is.
+    """
+    digest = hashlib.blake2b(str(mark_id).encode(), digest_size=6).hexdigest()
+    return f"mark-{digest}"
+
+
+def _user_label(user):
+    if user is None:
+        return ""
+    return user.get_full_name() or user.email or user.username
 
 
 def format_ms(timestamp_ms):
@@ -364,7 +381,11 @@ def build_team_timeline(race, team):
     tag_numbers = _tag_pool()
     checkpoints = {cp.id: cp for cp in Checkpoint.objects.filter(race_id=race.id)}
 
-    marks = list(Mark.objects.filter(race_id=race.id, team_id=team.id))
+    marks = list(
+        Mark.objects.filter(race_id=race.id, team_id=team.id).select_related(
+            "forced_by"
+        )
+    )
     mark_ids = [m.id for m in marks]
     presents = defaultdict(list)
     for present in MarkPresent.objects.filter(mark_id__in=mark_ids).order_by(
@@ -395,6 +416,8 @@ def build_team_timeline(race, team):
     for mark in marks:
         cp = checkpoints.get(mark.checkpoint_id)
         ms = _event_ms(mark)
+        # Same count as results._score_checkpoints: raw uids, not normalized.
+        present_real = len({p.nfc_uid for p in presents[mark.id] if p.nfc_uid})
         events.append(
             {
                 "kind": "mark",
@@ -415,6 +438,19 @@ def build_team_timeline(race, team):
                 "photos": [p.image.url for p in photos[mark.id] if p.image],
                 "device": devices[mark.source_install_id],
                 "clock_skew": _clock_skew(mark),
+                "mark_id": mark.id,
+                "anchor": mark_anchor(mark.id),
+                "present_real": present_real,
+                "incomplete": present_real < team.ucount,
+                "can_force": (
+                    mark.method == "nfc"
+                    and mark.verified
+                    and cp is not None
+                    and cp.cost >= 0
+                ),
+                "force_counted": mark.force_counted,
+                "forced_by": _user_label(mark.forced_by),
+                "forced_at": _format_dt(mark.forced_at),
             }
         )
 
@@ -486,5 +522,6 @@ def build_team_timeline(race, team):
         ],
         "devices": sorted(devices.values(), key=lambda device: device["index"]),
         "marks_count": len(marks),
+        "ucount": team.ucount,
         "photos_count": sum(len(rows) for rows in photos.values()),
     }

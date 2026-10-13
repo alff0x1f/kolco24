@@ -29,7 +29,7 @@ from django.views.decorators.cache import never_cache
 from apps.accounts.users import find_user
 from apps.mobile.models import AppInstall, Mark, TrackPoint
 from apps.race import finish_forecast
-from apps.race.app_data import build_overview, build_team_timeline
+from apps.race.app_data import build_overview, build_team_timeline, mark_anchor
 from apps.race.finance import csv_rows, extras_catalog, filter_rows, payment_rows
 from apps.race.forms import RaceForm
 from apps.race.models import Protocol, RaceExtra, RacePromo, TeamExtra
@@ -2487,6 +2487,63 @@ class RaceAppDataTeamView(View):
         context["race"] = race
         context["team"] = team
         return render(request, "race/app_data_team.html", context)
+
+
+class RaceAppDataMarkCountView(View):
+    """POST-only judge override: count (or un-count) one incomplete NFC take.
+
+    ``action=set`` needs a verified NFC take on a known, non-negative-cost КП —
+    the only takes the protocol can count. ``action=unset`` always works: a
+    re-upload recomputes ``verified``, and a flag left on an unverified take must
+    still be clearable. ``mark_id`` comes in the body, not the path — it is a free
+    client string. Gate as :class:`RaceAppDataTeamView`; an anonymous caller is
+    sent to log in with ``next`` pointing at the team page (this URL is POST-only).
+    """
+
+    def post(self, request, race_slug, team_id):
+        team_url = reverse("race_app_data_team", args=[race_slug, team_id])
+        if not request.user.is_authenticated:
+            return HttpResponseRedirect(
+                reverse("login") + "?next=" + quote(team_url, safe="/:@")
+            )
+        race = get_object_or_404(Race, slug=race_slug)
+        if not can_edit_race(request.user, race):
+            return HttpResponseForbidden()
+        team = get_object_or_404(Team, pk=team_id, category2__race_id=race.id)
+        action = request.POST.get("action")
+        if action not in ("set", "unset"):
+            return HttpResponseBadRequest("action must be set or unset")
+        mark = get_object_or_404(
+            Mark, pk=request.POST.get("mark_id", ""), race=race, team=team
+        )
+        checkpoint = Checkpoint.objects.filter(
+            id=mark.checkpoint_id, race=race, cost__gte=0
+        ).first()
+        label = (
+            f"КП {checkpoint.number}" if checkpoint else f"КП id {mark.checkpoint_id}"
+        )
+        back = HttpResponseRedirect(team_url + "#" + mark_anchor(mark.pk))
+
+        if action == "set":
+            if mark.method != "nfc" or not mark.verified or checkpoint is None:
+                messages.error(
+                    request,
+                    f"{label}: засчитать можно только подтверждённую NFC-отметку "
+                    "известного КП.",
+                )
+                return back
+            mark.force_counted = True
+            mark.forced_by = request.user
+            mark.forced_at = timezone.now()
+            done = "засчитан"
+        else:
+            mark.force_counted = False
+            mark.forced_by = None
+            mark.forced_at = None
+            done = "снят"
+        mark.save(update_fields=["force_counted", "forced_by", "forced_at"])
+        messages.success(request, f"{label} {done}. Пересоберите протокол.")
+        return back
 
 
 class PromoCheckView(View):

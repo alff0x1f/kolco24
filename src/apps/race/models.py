@@ -190,6 +190,7 @@ class ProtocolRow(models.Model):
     nfc_checkpoints = models.TextField(blank=True, default="")
     nfc_count = models.IntegerField(default=0)
     nfc_score = models.IntegerField(default=0)
+    nfc_incomplete_checkpoints = models.TextField(blank=True, default="")
 
     # Photo
     photo_checkpoints = models.TextField(blank=True, default="")
