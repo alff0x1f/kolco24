@@ -3,6 +3,7 @@ from datetime import timedelta
 
 from django.contrib.auth import get_user_model
 from django.db import transaction
+from django.db.models import Q
 from django.utils import timezone
 
 from apps.photo_contest.models import Comparison, PhotoEntry
@@ -23,6 +24,14 @@ def _answered(nomination, user):
 
 def answered_count(nomination, user):
     return _answered(nomination, user).count()
+
+
+def pair_answered(nomination, user, entry_a, entry_b):
+    return (
+        _answered(nomination, user)
+        .filter(Q(left=entry_a, right=entry_b) | Q(left=entry_b, right=entry_a))
+        .exists()
+    )
 
 
 def lock_voter(user):

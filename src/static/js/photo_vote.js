@@ -21,6 +21,7 @@
       cards[side] = {
         img: card.querySelector(".pv-photo img"),
         photo: card.querySelector(".pv-photo"),
+        caption: card.querySelector(".pv-caption"),
         choose: card.querySelector(".pv-choose"),
       };
     });
@@ -68,9 +69,13 @@
       return Promise.all([preload(data.left.url), preload(data.right.url)]).then(
         function () {
           if (mine !== request) return;
+          // A view of the old pair must not vote for the new one.
+          if (dialog.open) dialog.close();
           pair = data;
           SIDES.forEach(function (side) {
             cards[side].img.src = data[side].url;
+            cards[side].caption.textContent = data[side].caption || "";
+            cards[side].caption.hidden = !data[side].caption;
           });
           showOnly(pairBox);
           setBusy(false);
@@ -124,6 +129,7 @@
 
     var dialog = root.querySelector(".pv-viewer");
     var viewerImg = dialog.querySelector(".pc-viewer-img");
+    var viewerText = dialog.querySelector(".pc-viewer-text");
     var viewerMeta = dialog.querySelector(".pc-viewer-meta");
     var viewerChoose = dialog.querySelector(".pv-viewer-choose");
     var prev = dialog.querySelector(".pc-viewer-prev");
@@ -137,6 +143,7 @@
       shown = side;
       viewerImg.src = pair[side].url;
       viewerImg.alt = side === "left" ? "Фото слева" : "Фото справа";
+      viewerText.textContent = pair[side].caption || "";
       viewerMeta.textContent = (side === "left" ? "Левое" : "Правое") + " фото";
       var focused = document.activeElement;
       prev.hidden = side === "left";
@@ -146,7 +153,7 @@
     }
 
     function openViewer(side) {
-      if (!pair || typeof dialog.showModal !== "function") return;
+      if (busy || !pair || typeof dialog.showModal !== "function") return;
       opener = cards[side].photo;
       show(side);
       dialog.showModal();

@@ -143,9 +143,9 @@ Module constants (`pairing.py`): `PAIR_TTL = timedelta(minutes=10)`, `PAIR_TOKEN
 | `<slug>/report/void/` | `photo_report_void` | POST void/unvoid a user | moderator |
 
 **`photo_pair` protocol:**
-- GET → `{"token", "left": {"id", "url"}, "right": {"id", "url"}, "answered", "limit"}` or
-  `{"done": true, "reason": "limit" | "closed" | "no_pairs", "answered", "limit"}`. `url` is the preview. No caption:
-  it may name the author.
+- GET → `{"token", "left": {"id", "url", "caption"}, "right": {…}, "answered", "limit"}` or
+  `{"done": true, "reason": "limit" | "closed" | "no_pairs", "answered", "limit"}`. `url` is the preview.
+  ➕ Caption added after implementation at the user's request (was left out because it may name the author).
 - POST JSON `{"token", "winner_id"}` → next pair in the GET format. `400 {"detail": …}` for: malformed body
   (non-JSON, missing keys, non-integer `winner_id`), bad/expired signature, row of another user or another
   nomination, row older than `PAIR_TTL`, `winner_id` not in the pair, a photo of the pair no longer `approved`,

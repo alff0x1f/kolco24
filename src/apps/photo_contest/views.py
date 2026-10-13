@@ -441,7 +441,7 @@ def _pair_signer():
 
 
 def _photo_json(entry):
-    return {"id": entry.pk, "url": entry.preview.url}
+    return {"id": entry.pk, "url": entry.preview.url, "caption": entry.caption}
 
 
 def _pair_payload(contest, nomination, user):
@@ -518,6 +518,9 @@ class PhotoPairView(View):
             return _bad_pair("Фото не из этой пары.")
         if not row.left.status == row.right.status == PhotoEntry.APPROVED:
             return _bad_pair("Фото больше не участвует.")
+        # A replaced outstanding row of the same two photos can still be live.
+        if pairing.pair_answered(self.nomination, request.user, row.left, row.right):
+            return _bad_pair("Эта пара уже отвечена.")
         now = timezone.now()
         updated = mine.filter(
             winner__isnull=True, created_at__gte=now - pairing.PAIR_TTL

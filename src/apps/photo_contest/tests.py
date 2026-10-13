@@ -1442,7 +1442,7 @@ def vote(nomination, voter, winner, loser, **kwargs):
 def test_wilson_lower_bound_edges():
     assert wilson_lower_bound(0, 0) == 0.0
     assert 0 < wilson_lower_bound(10, 10) < 1
-    assert wilson_lower_bound(0, 10) == pytest.approx(0.0, abs=1e-12)
+    assert wilson_lower_bound(0, 5) == wilson_lower_bound(0, 11) == 0.0
     assert wilson_lower_bound(5, 10) < wilson_lower_bound(50, 100)
     assert wilson_lower_bound(3, 10) < wilson_lower_bound(7, 10)
 
@@ -1460,6 +1460,16 @@ def test_standings_rank_by_wins_and_share_places(voting):
     assert by_entry[c]["place"] == by_entry[d]["place"] == 2
     assert by_entry[b]["place"] == 4
     assert (by_entry[b]["wins"], by_entry[b]["n"]) == (0, 3)
+
+
+def test_photos_without_wins_share_last_place(voting):
+    _, nomination, (a, b, c, d), _, voter = voting
+    for _ in range(5):
+        vote(nomination, voter, a, b)
+    for _ in range(11):
+        vote(nomination, voter, a, c)
+    rows = {r["entry"]: r for r in nomination_standings(nomination)}
+    assert rows[b]["place"] == rows[c]["place"] == rows[d]["place"] == 2
 
 
 def test_standings_ignore_void_unanswered_and_other_nominations(voting):
@@ -1643,11 +1653,17 @@ def voter_client(client, voting):
 
 def test_pair_happy_path(voter_client, voting):
     contest, nomination, entries, _, voter = voting
+    for i, entry in enumerate(entries):
+        entry.caption = f"Кадр {i}"
+        entry.save()
     pair = voter_client.get(pair_url(contest, nomination)).json()
     assert (pair["answered"], pair["limit"]) == (0, 30)
     ids = {e.pk for e in entries}
     assert {pair["left"]["id"], pair["right"]["id"]} <= ids
     assert pair["left"]["url"].startswith("/media/")
+    captions = {e.pk: e.caption for e in entries}
+    for side in ("left", "right"):
+        assert pair[side]["caption"] == captions[pair[side]["id"]] != ""
     response = post_answer(
         voter_client,
         contest,
@@ -2363,3 +2379,13 @@ def test_report_query_count(client, report_setup, django_assert_max_num_queries)
     client.force_login(moderator)
     with django_assert_max_num_queries(25):
         client.get(report_url(contest))
+
+
+def test_replaced_row_of_answered_pair_is_rejected(voter_client, voting):
+    contest, nomination, (a, b, *_), _, voter = voting
+    stale = make_comparison(nomination, voter, a, b)
+    vote(nomination, voter, b, a)
+    token = TimestampSigner(salt=pairing.PAIR_TOKEN_SALT).sign(str(stale.pk))
+    response = post_answer(voter_client, contest, nomination, token, a.pk)
+    assert response.status_code == 400
+    assert Comparison.objects.filter(winner__isnull=False).count() == 1

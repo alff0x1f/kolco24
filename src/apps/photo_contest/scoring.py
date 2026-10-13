@@ -20,7 +20,8 @@ def counted_comparisons(nomination):
 
 
 def wilson_lower_bound(wins, n, z=Z):
-    if n == 0:
+    if wins == 0:
+        # Exactly zero: the formula leaves float noise (±1e-17) that splits ties.
         return 0.0
     p = wins / n
     z2 = z * z
