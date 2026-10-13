@@ -249,9 +249,11 @@ def build_protocol(race, user):
                 race=race, status=Protocol.DRAFT, created_by=user
             )
 
+        # A withdrawn team is listed even without a start time, so the
+        # judge's decision and its reason always reach the protocol.
         teams = (
             Team.objects.filter(category2__race_id=race.id, paid_people__gt=0)
-            .exclude(start_time=0)
+            .exclude(start_time=0, dnf=False)
             .select_related("category2")
         )
         cp_info = {

@@ -1002,7 +1002,7 @@ POST-only at `.../results/build/` / `.../results/freeze/` (names `protocol_build
 app-data team page, `race_app_data_mark_count`, `can_edit_race`; the field is deliberately not in `MARK_UPDATE_FIELDS`, but a re-upload that changes the take's team/КП/`method`/`cp_code` drops it);
 otherwise its КП shows as «неполные» (`ProtocolRow.nfc_incomplete_checkpoints`) to editors only.
 A judge withdraws a team («снять с зачёта») on the app-data team page (`race_app_data_team_dnf`): it is stored on
-`Team.dnf` + `dnf_reason`/`dnf_by`/`dnf_at` and takes effect on the next rebuild — the row gets `place=0`, sorts last in
+`Team.dnf` + `dnf_reason`/`dnf_by`/`dnf_at` and takes effect on the next rebuild — the row (listed even without a start time) gets `place=0`, sorts last in
 its category and shows «сн.» + the reason (`ProtocolRow.withdrawn` = `dnf and not place`, so older rows keep their place).
 
 **Email** goes through `django-mailer` (`EMAIL_BACKEND = "mailer.backend.DbBackend"`): messages are queued in the DB and

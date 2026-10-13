@@ -4269,6 +4269,31 @@ def test_build_protocol_excludes_unstarted_teams(django_user_model):
 
 
 @pytest.mark.django_db
+def test_withdrawn_unstarted_team_reaches_protocol(client, rf, django_user_model):
+    race, team, admin = _dnf_setup(django_user_model, "dnf-nostart")
+    category = team.category2
+    other_owner = django_user_model.objects.create_user(username="ns-o", password="x")
+    ranked = _make_started_team(other_owner, category, teamname="Ranked")
+    _make_team(other_owner, category, teamname="NoStart", start_number="3")
+    client.force_login(admin)
+    client.post(_dnf_url(race, team), {"action": "set", "reason": "не вышли"})
+
+    protocol = build_protocol(race, None)
+    rows = {row.team_id: row for row in protocol.rows.all()}
+
+    # The withdrawn team is listed without a start; a plain unstarted one is not.
+    assert set(rows) == {ranked.id, team.id}
+    assert rows[ranked.id].place == 1
+    assert rows[team.id].place == 0
+    assert rows[team.id].duration_ms == 0
+
+    freeze_protocol(race)
+    html = _public_protocol_html(rf, race, category)
+    assert f'<tr id="team-{team.id}" class="row-dnf">' in html
+    assert "Снята: не вышли" in html
+
+
+@pytest.mark.django_db
 def test_build_protocol_place_resets_per_category(django_user_model):
     race = _make_race()
     cat_a = _make_category(race, code="a", short_name="a", name="A")
