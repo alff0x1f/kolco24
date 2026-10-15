@@ -1,4 +1,5 @@
-"""Tests for the trackLines port; vectors from the Android ``TrackLinesTest.kt``."""
+"""Tests for the trackLines port; vectors from the Android ``TrackLinesTest.kt``,
+scaled to the server's 6 m/s speed cap."""
 
 import math
 
@@ -85,13 +86,13 @@ def test_haversine():
 
 def test_is_reachable_speed_boundary():
     a = pt("a", 0, 0.0, acc=0.0)
-    assert is_reachable(a, pt("b", 10, 139.9, acc=0.0))
-    assert not is_reachable(a, pt("b", 10, 140.1, acc=0.0))
+    assert is_reachable(a, pt("b", 10, 59.9, acc=0.0))
+    assert not is_reachable(a, pt("b", 10, 60.1, acc=0.0))
 
 
 def test_is_reachable_subtracts_better_accuracy():
-    assert is_reachable(pt("a", 0, 0.0, acc=60.0), pt("b", 15, 250.0, acc=90.0))
-    assert not is_reachable(pt("a", 0, 0.0, acc=10.0), pt("b", 15, 250.0, acc=90.0))
+    assert is_reachable(pt("a", 0, 0.0, acc=60.0), pt("b", 15, 140.0, acc=90.0))
+    assert not is_reachable(pt("a", 0, 0.0, acc=10.0), pt("b", 15, 140.0, acc=90.0))
 
 
 def test_short_chain_boundaries():
@@ -118,7 +119,7 @@ def test_spike_between_short_chains_dropped_into_one_line():
 def test_short_tail_after_short_chain_kept_as_own_line():
     points = [
         pt("A", 0, 0.0, acc=5.0),
-        pt("B", 15, 200.0, acc=20.0),
+        pt("B", 15, 80.0, acc=20.0),
         pt("C", 30, 500.0),
     ]
     assert ids(track_lines(points)) == [["A", "B"], ["C"]]
@@ -141,14 +142,14 @@ def test_slow_noisy_jitter_kept_as_one_line():
 
 def test_jitter_needing_noise_allowance_kept_as_one_line():
     points = [
-        pt(f"j{i}", 15 * i, 0.0 if i % 2 == 0 else 250.0, acc=60.0 + i)
+        pt(f"j{i}", 15 * i, 0.0 if i % 2 == 0 else 140.0, acc=60.0 + i)
         for i in range(6)
     ]
     assert ids(track_lines(points)) == [flat_ids(points)]
 
 
 def test_east_west_uses_longitude_cosine():
-    points = [pt_east("a", 0, 0.0), pt_east("b", 15, 200.0)]
+    points = [pt_east("a", 0, 0.0), pt_east("b", 15, 80.0)]
     assert ids(track_lines(points)) == [["a", "b"]]
     first = [pt_east(f"a{i}", 15 * i, 20.0 * i) for i in range(5)]
     spike = pt_east("S", 75, 880.0)

@@ -8,16 +8,19 @@ the app.
 The apps hold ``accuracy`` as a 32-bit float, this port as a double: results can
 differ only at exact boundaries.
 
-One deliberate divergence: the hard cap is strict (``< 500``; the apps keep exactly
-500). Android's network provider reports a cell-tower fix as accuracy ``500.0``,
-kilometres off, in groups too long and too sparse for the chain rules to drop.
+Two deliberate divergences:
+- the hard cap is strict (``< 500``; the apps keep exactly 500). Android's network
+  provider reports a cell-tower fix as accuracy ``500.0``, kilometres off, in groups
+  too long and too sparse for the chain rules to drop;
+- ``MAX_SPEED_MPS`` is 6 (21.6 km/h), not 14: races are on foot only. On a real race
+  99% of good steps are under 4.5 m/s.
 """
 
 import math
 from typing import NamedTuple
 
 HARD_CAP_ACCURACY_M = 500
-MAX_SPEED_MPS = 14
+MAX_SPEED_MPS = 6
 SHORT_CHAIN_MAX_POINTS = 3
 SHORT_CHAIN_MAX_DURATION_MS = 60_000
 TAIL_ACCURACY_RATIO = 3

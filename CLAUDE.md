@@ -227,7 +227,7 @@ Django 4.2 project. Source lives entirely under `src/`, with `manage.py` at `src
   `number` (`?` for an unknown `checkpoint_id`); the page shows a «GPX» link on each selected team row, content picked
   by the `#rmGpxInclude` select, URL from the `gpxUrlTemplate` config key.
   `race_map_gpx_all` (`…/map/gpx/all/`, `RaceMapGpxZipView`) — ZIP of every team's GPX in per-category folders:
-  each phone's track runs through `track_filter.py` (a port of the apps' `trackLines` — keep in step; only divergence: strict `accuracy < 500`), then is
+  each phone's track runs through `track_filter.py` (a port of the apps' `trackLines` — keep in step; divergences: strict `accuracy < 500`, `MAX_SPEED_MPS = 6` for foot races), then is
   trimmed to `start_time − 10 min … finish_time + 10 min` (`0` = open); time is `trusted_ms or gps_time_ms`,
   unlike `race_map_gpx`.
   Positions uses `DISTINCT ON (team_id)` ordered by `-gps_time_ms, -created_at, -id` — the extra tie-breakers make the
