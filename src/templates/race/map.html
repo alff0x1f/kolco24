@@ -47,6 +47,8 @@
             <option value="marks">взятые КП</option>
           </select>
         </label>
+        <a class="rm-gpx-all" href="{% url 'race_map_gpx_all' race.slug %}"
+           title="Отфильтровано, от старта до финиша ±10 мин">Все треки (ZIP)</a>
       </div>
       <div class="rm-team-list" id="rmTeamList">
         <!-- rows injected by race_map.js -->
