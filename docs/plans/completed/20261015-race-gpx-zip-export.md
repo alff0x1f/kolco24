@@ -114,16 +114,16 @@
 - Create: `src/apps/race/track_filter.py`
 - Create: `src/apps/race/test_track_filter.py`
 
-- [ ] создать `track_filter.py`: константы, `haversine_m`, `is_reachable`, `is_short_chain`, `_median_accuracy`,
+- [x] создать `track_filter.py`: константы, `haversine_m`, `is_reachable`, `is_short_chain`, `_median_accuracy`,
       `_split_when`, `_run_lines`, `track_lines`; шапка со ссылкой на `TrackLines.swift`/`TrackModels.kt`
-- [ ] добавить `sort_key(point)` (время → `boot_count`, `None` → `-1` → `elapsed_at` → `id`) и
+- [x] добавить `sort_key(point)` (время → `boot_count`, `None` → `-1` → `elapsed_at` → `id`) и
       `point_time_ms(trusted_ms, gps_time_ms)` = `trusted_ms or gps_time_ms`
-- [ ] тест `point_time_ms`: `trusted_ms=None` и `trusted_ms=0` → `gps_time_ms`
-- [ ] прочитать `TrackLinesTest.kt` и `TrackLinesTests.swift`, перенести их сценарии как тестовые векторы
-- [ ] тесты: выброс в середине, голова, хвост с плохой точностью дропается, хвост с нормальной точностью остаётся,
+- [x] тест `point_time_ms`: `trusted_ms=None` и `trusted_ms=0` → `gps_time_ms`
+- [x] прочитать `TrackLinesTest.kt` и `TrackLinesTests.swift`, перенести их сценарии как тестовые векторы
+- [x] тесты: выброс в середине, голова, хвост с плохой точностью дропается, хвост с нормальной точностью остаётся,
       `accuracy > 500`, разрыв по `segment_id`, `L X Y R` (оба остаются), одна точка, пустой вход
-- [ ] тесты граничных случаев: `accuracy = 0`, одинаковое время (пол 1 с), хвостовой пол медианы
-- [ ] `uv run pytest src/apps/race/test_track_filter.py` — должно пройти
+- [x] тесты граничных случаев: `accuracy = 0`, одинаковое время (пол 1 с), хвостовой пол медианы
+- [x] `uv run pytest src/apps/race/test_track_filter.py` — должно пройти
 
 ### Task 2: View `RaceMapGpxZipView` и маршрут
 
@@ -132,23 +132,23 @@
 - Modify: `src/website/urls.py`
 - Create: `src/apps/race/test_gpx_all.py`
 
-- [ ] `GPX_ALL_MARGIN_MS`, `RaceMapGpxZipView` с гейтом `_load_race_for_admin`
-- [ ] запрос точек на команду, отброс `point_time_ms <= 0`, деление по `install_id`, сортировка, `track_lines`,
+- [x] `GPX_ALL_MARGIN_MS`, `RaceMapGpxZipView` с гейтом `_load_race_for_admin`
+- [x] запрос точек на команду, отброс `point_time_ms <= 0`, деление по `install_id`, сортировка, `track_lines`,
       затем обрезка линий окном
-- [ ] сборка GPX на команду (`ET`, `_gpx_time`), нумерация телефонов, ZIP в `BytesIO`, заголовки ответа
-- [ ] маршрут `race/<slug:race_slug>/map/gpx/all/` → `race_map_gpx_all` рядом с `race_map_gpx`
-- [ ] тесты доступа: аноним → редирект на `login?next=`, не админ → 403, суперпользователь без `RaceAdmin` → 403, admin → 200 `application/zip`
-- [ ] тесты окна: точки до `start − 10 мин` и после `finish + 10 мин` отрезаны; `start_time = 0` / `finish_time = 0` — граница открыта
-- [ ] тесты содержимого: 2 телефона → 2 `<trk>` с именами «· телефон 1/2» без смешения точек; один телефон → имя без суффикса;
+- [x] сборка GPX на команду (`ET`, `_gpx_time`), нумерация телефонов, ZIP в `BytesIO`, заголовки ответа
+- [x] маршрут `race/<slug:race_slug>/map/gpx/all/` → `race_map_gpx_all` рядом с `race_map_gpx`
+- [x] тесты доступа: аноним → редирект на `login?next=`, не админ → 403, суперпользователь без `RaceAdmin` → 403, admin → 200 `application/zip`
+- [x] тесты окна: точки до `start − 10 мин` и после `finish + 10 мин` отрезаны; `start_time = 0` / `finish_time = 0` — граница открыта
+- [x] тесты содержимого: 2 телефона → 2 `<trk>` с именами «· телефон 1/2» без смешения точек; один телефон → имя без суффикса;
       фильтр применён (выброс отсутствует); `<trkseg>` на каждую линию
-- [ ] тесты времени: точка с `trusted_ms=0` датируется `gps_time_ms`; точка с `gps_time_ms=0` и без `trusted_ms`
+- [x] тесты времени: точка с `trusted_ms=0` датируется `gps_time_ms`; точка с `gps_time_ms=0` и без `trusted_ms`
       отброшена; телефоны пронумерованы по первой точке после фильтра
-- [ ] тесты набора: команда без точек, команда со всеми точками вне окна и удалённая команда отсутствуют; точки чужой
+- [x] тесты набора: команда без точек, команда со всеми точками вне окна и удалённая команда отсутствуют; точки чужой
       гонки не попадают; одинаковый `start_number` даёт разные имена файлов; пустой `start_number` → `team-<id>.gpx`;
       пустой ZIP при отсутствии точек
-- [ ] тесты папок: команды двух категорий лежат в `<code>/`; кириллический код читается обратно из ZIP; одинаковые
+- [x] тесты папок: команды двух категорий лежат в `<code>/`; кириллический код читается обратно из ZIP; одинаковые
       коды двух категорий → `{code}-{id}`; код с `/` очищен
-- [ ] `uv run pytest src/apps/race/test_gpx_all.py` — должно пройти
+- [x] `uv run pytest src/apps/race/test_gpx_all.py` — должно пройти
 
 ### Task 3: Ссылка на странице карты
 
@@ -157,21 +157,21 @@
 - Modify: `src/static/css/race_map.css` (только если нужен стиль)
 - Modify: `src/apps/race/test_gpx_all.py`
 
-- [ ] ссылка «Все треки (ZIP)» рядом с `#rmGpxInclude`, `{% url 'race_map_gpx_all' race.slug %}`,
+- [x] ссылка «Все треки (ZIP)» рядом с `#rmGpxInclude`, `{% url 'race_map_gpx_all' race.slug %}`,
       `title="Отфильтровано, от старта до финиша ±10 мин"`
-- [ ] тест: страница `race_map` для админа содержит URL `race_map_gpx_all`
-- [ ] `uv run pytest src/apps/race/` — должно пройти
+- [x] тест: страница `race_map` для админа содержит URL `race_map_gpx_all`
+- [x] `uv run pytest src/apps/race/` — должно пройти
 
 ### Task 4: Verify acceptance criteria
-- [ ] все требования из Overview реализованы
-- [ ] граничные случаи обработаны
-- [ ] `uv run pytest`
-- [ ] `make format` и `make lint`
+- [x] все требования из Overview реализованы
+- [x] граничные случаи обработаны
+- [x] `uv run pytest`
+- [x] `make format` и `make lint`
 
 ### Task 5: [Final] Update documentation
-- [ ] одна короткая строка в CLAUDE.md в абзаце про «Карту гонки» (`race_map_gpx_all`, ZIP, фильтр — порт `trackLines`
+- [x] одна короткая строка в CLAUDE.md в абзаце про «Карту гонки» (`race_map_gpx_all`, ZIP, фильтр — порт `trackLines`
       по телефону, затем окно ±10 мин; время `trusted_ms or gps_time_ms`, в отличие от `race_map_gpx`)
-- [ ] move this plan to `docs/plans/completed/`
+- [x] move this plan to `docs/plans/completed/`
 
 ## Post-Completion
 **Manual verification**:

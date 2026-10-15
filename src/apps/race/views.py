@@ -1,8 +1,11 @@
 import csv
 import datetime
+import io
 import json
+import math
 import re
 import xml.etree.ElementTree as ET
+import zipfile
 from urllib.parse import quote
 
 from django.conf import settings
@@ -48,6 +51,7 @@ from apps.race.promo import PromoError, occupied_team_ids, resolve_promo
 from apps.race.results import build_protocol, freeze_protocol
 from apps.race.teams_admin import csv_rows as teams_admin_csv_rows
 from apps.race.teams_admin import start_number_key, team_rows
+from apps.race.track_filter import TrackFix, point_time_ms, sort_key, track_lines
 from website.forms import NewsPostForm
 from website.models import Checkpoint, NewsPost, Race, RaceAdmin, Team
 from website.models.checkpoint import CheckpointTag
@@ -2365,6 +2369,170 @@ class RaceMapGpxView(View):
             time_text = _gpx_time(gps_time_ms)
             if time_text:
                 ET.SubElement(trkpt, "time").text = time_text
+
+
+GPX_ALL_MARGIN_MS = 600_000
+
+_GPX_ALL_FIELDS = (
+    "id",
+    "install_id",
+    "segment_id",
+    "lat",
+    "lon",
+    "accuracy",
+    "altitude",
+    "gps_time_ms",
+    "trusted_ms",
+    "boot_count",
+    "elapsed_at",
+)
+
+_ZIP_FOLDER_JUNK_RE = re.compile(r"[/\\\x00-\x1f\x7f]")
+
+
+class RaceMapGpxZipView(View):
+    """Every team's track of a race as a ZIP of GPX files, one folder per category.
+
+    Each phone's track is cleaned by :func:`track_filter.track_lines` (the mobile
+    apps' spike filter) and then trimmed to ``start_time − 10 min …
+    finish_time + 10 min``; an unset (``0``) bound is open. One query per team,
+    so only one team's points are held in memory. A team with nothing left after
+    the trim gets no file.
+    """
+
+    def get(self, request, race_slug):
+        race, response = _load_race_for_admin(request, race_slug)
+        if response is not None:
+            return response
+
+        folders = _category_folders(race)
+        teams = (
+            Team.objects.filter(category2__race=race)
+            .select_related("category2")
+            .order_by("id")
+        )
+        buffer = io.BytesIO()
+        with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as archive:
+            for team in teams:
+                devices = _team_device_lines(race, team)
+                if not devices:
+                    continue
+                path = f"{folders[team.category2_id]}/{_gpx_team_filename(team)}"
+                archive.writestr(path, _team_tracks_gpx(race, team, devices))
+
+        response = HttpResponse(buffer.getvalue(), content_type="application/zip")
+        response["Content-Disposition"] = (
+            f'attachment; filename="{race.slug}-tracks.zip"'
+        )
+        return response
+
+
+def _category_folders(race):
+    categories = list(Category.objects.filter(race=race).values_list("id", "code"))
+    cleaned = {
+        cid: _ZIP_FOLDER_JUNK_RE.sub("", code or "").strip() for cid, code in categories
+    }
+    counts = {}
+    for name in cleaned.values():
+        counts[name] = counts.get(name, 0) + 1
+    folders = {}
+    for cid, name in cleaned.items():
+        if not name:
+            folders[cid] = f"category-{cid}"
+        elif counts[name] > 1:
+            folders[cid] = f"{name}-{cid}"
+        else:
+            folders[cid] = name
+    return folders
+
+
+def _gpx_team_filename(team):
+    number = re.sub(r"[^A-Za-z0-9_-]", "", team.start_number or "")
+    return f"team-{number}-{team.id}.gpx" if number else f"team-{team.id}.gpx"
+
+
+def _team_device_lines(race, team):
+    """Filtered, window-trimmed lines per phone, phones ordered by first point."""
+    by_device = {}
+    rows = TrackPoint.objects.filter(race_id=race.id, team_id=team.id).values_list(
+        *_GPX_ALL_FIELDS
+    )
+    for row in rows:
+        (
+            point_id,
+            install_id,
+            segment_id,
+            lat,
+            lon,
+            accuracy,
+            altitude,
+            gps_time_ms,
+            trusted_ms,
+            boot_count,
+            elapsed_at,
+        ) = row
+        time_ms = point_time_ms(trusted_ms, gps_time_ms)
+        if time_ms <= 0:
+            continue
+        by_device.setdefault(install_id, []).append(
+            TrackFix(
+                id=point_id,
+                install_id=install_id,
+                segment_id=segment_id,
+                lat=lat,
+                lon=lon,
+                accuracy=accuracy,
+                altitude=altitude,
+                time_ms=time_ms,
+                boot_count=boot_count,
+                elapsed_at=elapsed_at,
+            )
+        )
+
+    lo = team.start_time - GPX_ALL_MARGIN_MS if team.start_time else -math.inf
+    hi = team.finish_time + GPX_ALL_MARGIN_MS if team.finish_time else math.inf
+    devices = []
+    for install_id, fixes in by_device.items():
+        fixes.sort(key=sort_key)
+        lines = []
+        for line in track_lines(fixes):
+            trimmed = [p for p in line if lo <= p.time_ms <= hi]
+            if trimmed:
+                lines.append(trimmed)
+        if lines:
+            devices.append((lines[0][0].time_ms, install_id, lines))
+    devices.sort(key=lambda device: (device[0], device[1]))
+    return [lines for _, _, lines in devices]
+
+
+def _team_tracks_gpx(race, team, devices):
+    team_label = f"№{team.start_number} {team.teamname}".strip()
+    root = ET.Element(
+        "gpx",
+        {
+            "version": "1.1",
+            "creator": "kolco24",
+            "xmlns": "http://www.topografix.com/GPX/1/1",
+        },
+    )
+    metadata = ET.SubElement(root, "metadata")
+    ET.SubElement(metadata, "name").text = f"{race.name} — {team_label}"
+    for index, lines in enumerate(devices, start=1):
+        trk = ET.SubElement(root, "trk")
+        name = team_label if len(devices) == 1 else f"{team_label} · телефон {index}"
+        ET.SubElement(trk, "name").text = name
+        for line in lines:
+            trkseg = ET.SubElement(trk, "trkseg")
+            for p in line:
+                trkpt = ET.SubElement(
+                    trkseg, "trkpt", lat=repr(float(p.lat)), lon=repr(float(p.lon))
+                )
+                if p.altitude is not None:
+                    ET.SubElement(trkpt, "ele").text = repr(float(p.altitude))
+                time_text = _gpx_time(p.time_ms)
+                if time_text:
+                    ET.SubElement(trkpt, "time").text = time_text
+    return ET.tostring(root, encoding="utf-8", xml_declaration=True)
 
 
 class RaceMapMarksView(View):
