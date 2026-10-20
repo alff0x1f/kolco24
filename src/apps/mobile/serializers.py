@@ -10,6 +10,8 @@ from website.models.models import Athlet, Team
 from website.models.race import Category, Race
 from website.models.tag import Tag
 
+from .crypto import MEMBER_FIELD_MAX
+
 logger = logging.getLogger(__name__)
 
 
@@ -66,6 +68,22 @@ class MemberTagBindSerializer(serializers.Serializer):
     number = serializers.IntegerField(
         allow_null=True, min_value=1, max_value=2147483647
     )
+    # K24 v2 bracelet code (24 hex) the judge's phone computed offline; absent
+    # for the legacy v1 flow, where the server issues a random code instead.
+    code = serializers.RegexField(r"^[0-9a-fA-F]{24}$", required=False, max_length=24)
+
+    def validate(self, attrs):
+        if "code" in attrs:
+            number = attrs["number"]
+            if number is None or number > MEMBER_FIELD_MAX:
+                raise serializers.ValidationError(
+                    {"number": f"Для браслета v2 нужен номер 1…{MEMBER_FIELD_MAX}"}
+                )
+            try:
+                bytes.fromhex(attrs["nfc_uid"])
+            except ValueError:
+                raise serializers.ValidationError({"nfc_uid": "UID должен быть hex"})
+        return attrs
 
     def validate_nfc_uid(self, value):
         """Normalize to upper case (already trimmed) and re-check the column cap.

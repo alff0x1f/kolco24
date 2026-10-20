@@ -7,6 +7,7 @@ failure break the response.
 """
 
 import hashlib
+import hmac
 import logging
 import os
 import re
@@ -30,7 +31,7 @@ from website.models.models import Athlet, Team
 from website.models.race import Category, Race, RaceAdmin
 from website.models.tag import Tag
 
-from .crypto import MEMBER_FIELD_MAX
+from .crypto import MEMBER_FIELD_MAX, member_code
 from .legend_crypto import build_bundle
 from .member_key import ensure_member_key, get_member_key
 from .models import (
@@ -380,6 +381,9 @@ class MemberTagBindView(AppAPIView):
     number → idempotent 200, unknown UID + ``null`` → 404, different number →
     409. Full status table and the code/ETag rules live in
     ``src/apps/mobile/README.md`` (``POST /app/race/<id>/member_tags/bind/``).
+
+    A body with ``code`` is a K24 v2 bind uploaded from the judge's offline
+    queue — see :meth:`_bind_v2`; it never touches the global (v1) pool.
     """
 
     permission_classes = [SignedAppPermission, IsMobileUser, CanEditRaceLegend]
@@ -420,6 +424,34 @@ class MemberTagBindView(AppAPIView):
             tag.save(update_fields=["last_seen_at"])
         return self._member_tag_response(tag, status.HTTP_200_OK)
 
+    @staticmethod
+    def _bind_v2(race_id, nfc_uid, number, code):
+        """Store a K24 v2 bind the judge wrote offline: ``(race, uid) → number``.
+
+        The code proves the judge held the race key, so a different number for
+        a known bracelet is a rewrite and replaces the old one (200), not a 409.
+        """
+        key = get_member_key(race_id)
+        try:
+            expected = member_code(key, nfc_uid, race_id, number) if key else None
+        except ValueError:
+            expected = None
+        if expected is None or not hmac.compare_digest(expected, bytes.fromhex(code)):
+            return Response(
+                {"detail": "Код браслета не совпал"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        tag, created = Tag.objects.get_or_create(
+            race_id=race_id, nfc_uid=nfc_uid, defaults={"number": number}
+        )
+        if not created and tag.number != number:
+            tag.number = number
+            tag.save(update_fields=["number", "updated_at"])
+        return Response(
+            {"number": tag.number, "nfc_uid": tag.nfc_uid},
+            status=status.HTTP_201_CREATED if created else status.HTTP_200_OK,
+        )
+
     def post(self, request, race_id):
         get_object_or_404(Race, pk=race_id, is_published=True)
 
@@ -428,6 +460,9 @@ class MemberTagBindView(AppAPIView):
         # Already normalized (strip + upper, post-upper cap) by the serializer.
         nfc_uid = serializer.validated_data["nfc_uid"]
         number = serializer.validated_data["number"]
+        code = serializer.validated_data.get("code")
+        if code is not None:
+            return self._bind_v2(race_id, nfc_uid, number, code)
 
         tag = Tag.objects.filter(nfc_uid=nfc_uid, race__isnull=True).first()
         if tag is not None:

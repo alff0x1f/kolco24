@@ -209,14 +209,15 @@
 - Modify: `src/apps/mobile/serializers.py`
 - Modify: `src/apps/mobile/views.py`
 
-- [ ] `MemberTagBindSerializer`: необязательный `code` (24 hex); при наличии `code` — `number` обязателен, `1..65535`
-- [ ] ветка v2 в `MemberTagBindView.post`: нет `member_key` у гонки или HMAC не совпал → `400`
-- [ ] нет строки → создать `Tag(race, nfc_uid, number)` → `201`; есть → обновить `number` (с `updated_at`) → `200`;
-      параллельная вставка → `IntegrityError` → перечитать и обновить
-- [ ] ответ v2: `{number, nfc_uid}` без `code`
-- [ ] тесты: `201`, повтор → `200`, другой номер с верным HMAC → `200` и номер обновлён, плохой HMAC → `400`,
-      код чужой гонки → `400`, гонка без ключа → `400`, `number > 65535` → `400`, без `code` — старое поведение не изменилось
-- [ ] run tests - must pass before task 5
+- [x] `MemberTagBindSerializer`: необязательный `code` (24 hex); при наличии `code` — `number` обязателен, `1..65535`, UID — hex
+- [x] ветка v2 в `MemberTagBindView.post`: нет `member_key` у гонки или HMAC не совпал → `400`
+- [x] нет строки → создать `Tag(race, nfc_uid, number)` → `201`; есть → обновить `number` (с `updated_at`) → `200`;
+      параллельная вставка — через `get_or_create` (сам перечитывает на `IntegrityError`)
+- [x] ответ v2: `{number, nfc_uid}` без `code`
+- [x] тесты: `201`, повтор → `200`, другой номер с верным HMAC → `200` и номер обновлён (ETag двигается), плохой HMAC → `400`,
+      код чужой гонки → `400`, гонка без ключа → `400`, `number > 65535` → `400`, не-hex UID → `400`, глобальный пул не тронут,
+      без `code` — старое поведение не изменилось
+- [x] run tests - must pass before task 5
 
 ### Task 5: `MarkPresent.code_ok` при загрузке отметок
 

@@ -10928,3 +10928,146 @@ def test_member_tag_bind_v1_ignores_race_rows(
     created = _bind(client, race, raw, "04EE", 51)
     assert created.status_code == 201
     assert Tag.objects.get(nfc_uid="04EE", race__isnull=True).number == 51
+
+
+# --- bind/ with a K24 v2 code (offline judge queue) ----------------------------
+
+
+def _bind_v2(client, race, raw, nfc_uid, number, code_hex):
+    import json
+
+    body = json.dumps({"nfc_uid": nfc_uid, "number": number, "code": code_hex})
+    return _signed_post_auth(client, _bind_path(race.id), SECRET, body.encode(), raw)
+
+
+def _keyed_admin_race(django_user_model, slug):
+    race, user, raw, cp = _make_admin_race(django_user_model, slug)
+    race.member_key = MEMBER_VECTOR_KEY
+    race.save()
+    return race, raw
+
+
+def _v2_code(race, nfc_uid, number):
+    return member_code(MEMBER_VECTOR_KEY, nfc_uid, race.id, number).hex()
+
+
+@pytest.mark.django_db
+def test_bind_v2_creates_race_tag_and_is_idempotent(
+    client, signed_app_keys, django_user_model
+):
+    from website.models.tag import Tag
+
+    race, raw = _keyed_admin_race(django_user_model, "v2-new")
+    code = _v2_code(race, "04A1B2C3D4E5F6", 123)
+
+    created = _bind_v2(client, race, raw, "04a1b2c3d4e5f6", 123, code.upper())
+    again = _bind_v2(client, race, raw, "04A1B2C3D4E5F6", 123, code)
+
+    assert created.status_code == 201
+    assert created.json() == {"number": 123, "nfc_uid": "04A1B2C3D4E5F6"}
+    assert again.status_code == 200
+    tag = Tag.objects.get(nfc_uid="04A1B2C3D4E5F6")
+    assert tag.race_id == race.id
+    assert tag.number == 123
+    assert tag.code is None
+
+
+@pytest.mark.django_db
+def test_bind_v2_rewrite_with_new_number_updates_tag(
+    client, signed_app_keys, django_user_model
+):
+    from website.models.tag import Tag
+
+    race, raw = _keyed_admin_race(django_user_model, "v2-rewrite")
+    _bind_v2(client, race, raw, "04AA", 10, _v2_code(race, "04AA", 10))
+
+    response = _bind_v2(client, race, raw, "04AA", 11, _v2_code(race, "04AA", 11))
+
+    assert response.status_code == 200
+    assert response.json()["number"] == 11
+    assert Tag.objects.get(nfc_uid="04AA", race=race).number == 11
+
+
+@pytest.mark.django_db
+def test_bind_v2_rewrite_moves_member_tags_etag(
+    client, signed_app_keys, django_user_model
+):
+    race, raw = _keyed_admin_race(django_user_model, "v2-etag")
+    _bind_v2(client, race, raw, "04AB", 10, _v2_code(race, "04AB", 10))
+    etag = _member_tags_etag(client, race)
+
+    _bind_v2(client, race, raw, "04AB", 12, _v2_code(race, "04AB", 12))
+
+    assert _member_tags_etag(client, race) != etag
+
+
+@pytest.mark.django_db
+def test_bind_v2_leaves_global_pool_alone(client, signed_app_keys, django_user_model):
+    from website.models.tag import Tag
+
+    race, raw = _keyed_admin_race(django_user_model, "v2-global")
+    Tag.objects.create(number=5, nfc_uid="04AC")
+
+    response = _bind_v2(client, race, raw, "04AC", 6, _v2_code(race, "04AC", 6))
+
+    assert response.status_code == 201
+    assert Tag.objects.get(nfc_uid="04AC", race__isnull=True).number == 5
+    assert Tag.objects.get(nfc_uid="04AC", race=race).number == 6
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("case", ["wrong_number", "wrong_uid", "other_race"])
+def test_bind_v2_bad_code_400(client, signed_app_keys, django_user_model, case):
+    from website.models.race import Race
+    from website.models.tag import Tag
+
+    race, raw = _keyed_admin_race(django_user_model, f"v2-bad-{case}")
+    other = Race.objects.create(name="o", slug=f"v2-bad-o-{case}")
+    code = {
+        "wrong_number": member_code(MEMBER_VECTOR_KEY, "04AD", race.id, 8),
+        "wrong_uid": member_code(MEMBER_VECTOR_KEY, "04AE", race.id, 7),
+        "other_race": member_code(MEMBER_VECTOR_KEY, "04AD", other.id, 7),
+    }[case].hex()
+
+    response = _bind_v2(client, race, raw, "04AD", 7, code)
+
+    assert response.status_code == 400
+    assert not Tag.objects.filter(nfc_uid="04AD").exists()
+
+
+@pytest.mark.django_db
+def test_bind_v2_race_without_key_400(client, signed_app_keys, django_user_model):
+    race, _, raw, _ = _make_admin_race(django_user_model, "v2-nokey")
+
+    response = _bind_v2(client, race, raw, "04AF", 7, "00" * 12)
+
+    assert response.status_code == 400
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(
+    "number, code",
+    [
+        (65536, "00" * 12),
+        (None, "00" * 12),
+        (7, "00" * 11),
+        (7, "zz" * 12),
+    ],
+)
+def test_bind_v2_invalid_body_400(
+    client, signed_app_keys, django_user_model, number, code
+):
+    race, raw = _keyed_admin_race(django_user_model, "v2-invalid")
+
+    response = _bind_v2(client, race, raw, "04B0", number, code)
+
+    assert response.status_code == 400
+
+
+@pytest.mark.django_db
+def test_bind_v2_non_hex_uid_400(client, signed_app_keys, django_user_model):
+    race, raw = _keyed_admin_race(django_user_model, "v2-uid")
+
+    response = _bind_v2(client, race, raw, "NOT-HEX", 7, "00" * 12)
+
+    assert response.status_code == 400
