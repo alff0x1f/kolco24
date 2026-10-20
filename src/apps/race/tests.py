@@ -9646,3 +9646,35 @@ def test_app_data_tag_pool_prefers_own_race_row():
     assert pool["AA:01"] == 2
     assert pool["CC:03"] == 5
     assert "BB:02" not in pool
+
+
+@pytest.mark.django_db
+def test_app_data_team_page_flags_forged_bracelet(client, django_user_model):
+    race, category, _, _, cp_kp = _make_app_data_race("app-data-forged")
+    owner = django_user_model.objects.create_user(
+        username="appdata-forged", password="x"
+    )
+    team = _make_team(owner, category, teamname="Подмена", start_time=1, finish_time=0)
+    mark = _make_mark(team, cp_kp, present_chips=("AA:01", "AA:02"))
+    MarkPresent.objects.filter(mark=mark, number_in_team=1).update(code_ok=False)
+    MarkPresent.objects.filter(mark=mark, number_in_team=2).update(code_ok=True)
+
+    context = build_team_timeline(race, team)
+    mark_event = next(e for e in context["events"] if e["kind"] == "mark")
+    assert [p["code_ok"] for p in mark_event["present"]] == [False, True]
+
+    admin = django_user_model.objects.create_user(
+        username="appdata-forged-a", password="x"
+    )
+    RaceAdmin.objects.create(race=race, user=admin, role=RaceAdmin.Role.ADMIN)
+    client.force_login(admin)
+    resp = client.get(
+        reverse(
+            "race_app_data_team",
+            kwargs={"race_slug": race.slug, "team_id": team.id},
+        )
+    )
+    body = resp.content.decode()
+    assert resp.status_code == 200
+    assert body.count("код браслета не совпал") == 1
+    assert body.count("tagchip forged") + body.count("unknown forged") == 1

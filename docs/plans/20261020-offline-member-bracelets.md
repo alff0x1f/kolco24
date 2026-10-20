@@ -228,17 +228,18 @@
 - Modify: `src/apps/race/app_data.py`
 - Modify: шаблон app-data команды (рядом с `_present_label`)
 
-- [ ] `code_ok = models.BooleanField(null=True)` в `MarkPresent`
-- [ ] `check_member_code(race, nfc_uid, number, code) -> bool | None` по правилам из Technical Details;
-      v1-коды одним запросом `Tag` на всю пачку, без N+1
-- [ ] выставлять `code_ok` при создании `MarkPresent` в загрузке отметок
-- [ ] страница app-data команды: у участника отметки значок при `code_ok = False` (и нейтральный при `None`)
-- [ ] тесты: v2 верный → `True`, hex в верхнем регистре → `True`, сырой UID с пробелами/нижним регистром → `True`,
+- [x] `code_ok = models.BooleanField(null=True)` в `MarkPresent`
+- [x] `check_member_code(race_id, key, nfc_uid, number, code, v1_codes) -> bool | None` (`apps/mobile/member_key.py`)
+      по правилам из Technical Details; v1-коды одним запросом `Tag` на всю пачку (`v1_codes_for`), без N+1
+- [x] выставлять `code_ok` при создании `MarkPresent` в загрузке отметок
+- [x] страница app-data команды: у участника отметки значок «⚠» и класс `forged` при `code_ok = False`
+      (`None` — без значка)
+- [x] тесты: v2 верный → `True`, hex в верхнем регистре → `True`, сырой UID с пробелами/нижним регистром → `True`,
       v2 с чужим номером/UID → `False`, не-hex → `False`, гонка без ключа → `False`, v1 верный/неверный,
       v1 без `Tag` → `None`, sentinel → `None`, пустой `code` → `None`
-- [ ] тест: число запросов при пачке отметок не растёт с числом участников
-- [ ] тест app-data: значок `code_ok = False` выводится
-- [ ] run tests - must pass before task 6
+- [x] тест: число запросов при пачке отметок не растёт с числом участников
+- [x] тест app-data: значок `code_ok = False` выводится
+- [x] run tests - must pass before task 6
 
 ### Task 6: Verify acceptance criteria
 

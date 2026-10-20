@@ -106,6 +106,7 @@
   vertical-align: middle; white-space: nowrap;
 }
 .app-data .tagchip.unknown { background: #fdeee7; color: #b4531f; }
+.app-data .tagchip.forged { background: #fbe3e3; color: #b42318; font-weight: 600; }
 .app-data .tagchip.mono { font-family: var(--mono); }
 
 .app-data .badge {

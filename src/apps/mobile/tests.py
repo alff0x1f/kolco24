@@ -11071,3 +11071,148 @@ def test_bind_v2_non_hex_uid_400(client, signed_app_keys, django_user_model):
     response = _bind_v2(client, race, raw, "NOT-HEX", 7, "00" * 12)
 
     assert response.status_code == 400
+
+
+# --- MarkPresent.code_ok -------------------------------------------------------
+
+
+V2_OK = MEMBER_VECTOR_CODE
+V1_CODE = "11" * 16
+
+
+@pytest.mark.parametrize(
+    "nfc_uid, number, code, key, v1_codes, expected",
+    [
+        (MEMBER_VECTOR_UID, 123, V2_OK, MEMBER_VECTOR_KEY, {}, True),
+        (MEMBER_VECTOR_UID, 123, V2_OK.upper(), MEMBER_VECTOR_KEY, {}, True),
+        (" 04a1b2c3d4e5f6 ", 123, V2_OK, MEMBER_VECTOR_KEY, {}, True),
+        (MEMBER_VECTOR_UID, 124, V2_OK, MEMBER_VECTOR_KEY, {}, False),
+        ("04A1B2C3D4E5F7", 123, V2_OK, MEMBER_VECTOR_KEY, {}, False),
+        (MEMBER_VECTOR_UID, 123, V2_OK, None, {}, False),
+        (MEMBER_VECTOR_UID, 0, V2_OK, MEMBER_VECTOR_KEY, {}, False),
+        ("NOT-HEX", 123, V2_OK, MEMBER_VECTOR_KEY, {}, False),
+        (MEMBER_VECTOR_UID, 123, "zz" * 12, MEMBER_VECTOR_KEY, {}, False),
+        (MEMBER_VECTOR_UID, 123, "00" * 8, MEMBER_VECTOR_KEY, {}, False),
+        ("04CC", 5, V1_CODE, None, {"04CC": bytes.fromhex(V1_CODE)}, True),
+        ("04cc", 5, V1_CODE.upper(), None, {"04CC": bytes.fromhex(V1_CODE)}, True),
+        ("04CC", 5, "22" * 16, None, {"04CC": bytes.fromhex(V1_CODE)}, False),
+        ("04CC", 5, V1_CODE, None, {}, None),
+        (None, 0, None, MEMBER_VECTOR_KEY, {}, None),
+        (MEMBER_VECTOR_UID, 123, None, MEMBER_VECTOR_KEY, {}, None),
+        (MEMBER_VECTOR_UID, 123, "", MEMBER_VECTOR_KEY, {}, None),
+    ],
+)
+def test_check_member_code(nfc_uid, number, code, key, v1_codes, expected):
+    from apps.mobile.member_key import check_member_code
+
+    assert check_member_code(42, key, nfc_uid, number, code, v1_codes) is expected
+
+
+@pytest.mark.django_db
+def test_v1_codes_for_reads_global_tags_only():
+    from apps.mobile.member_key import v1_codes_for
+    from website.models.race import Race
+    from website.models.tag import Tag
+
+    race = Race.objects.create(name="r", slug="v1-codes")
+    Tag.objects.create(number=1, nfc_uid="04CC", code=bytes.fromhex(V1_CODE))
+    Tag.objects.create(number=2, nfc_uid="04DD", race=race, code=b"\x01" * 16)
+
+    codes = v1_codes_for(
+        [
+            {"nfc_uid": "04cc", "code": V1_CODE},
+            {"nfc_uid": "04DD", "code": "01" * 16},
+            {"nfc_uid": "04EE", "code": V2_OK},
+            {"nfc_uid": None, "code": None},
+        ]
+    )
+
+    assert codes == {"04CC": bytes.fromhex(V1_CODE)}
+
+
+def _present(nfc_uid, number, number_in_team, code):
+    return {
+        "nfc_uid": nfc_uid,
+        "code": code,
+        "number": number,
+        "number_in_team": number_in_team,
+    }
+
+
+def _upload_presents(client, race, team, cp, cp_code, mark_id, presents):
+    import json
+
+    mark = _valid_mark(
+        id=mark_id, checkpoint_id=cp.id, cp_code=cp_code, present=presents
+    )
+    body = json.dumps(
+        {"team_id": team.id, "source_install_id": "ph", "marks": [mark]}
+    ).encode()
+    return _signed_post(client, _marks_path(race.id), SECRET, body)
+
+
+@pytest.mark.django_db
+def test_mark_upload_sets_code_ok(client, signed_app_keys, django_user_model):
+    from apps.mobile.models import MarkPresent
+    from website.models.tag import Tag
+
+    race, team = _make_team_in_race(django_user_model, slug="code-ok")
+    race.member_key = MEMBER_VECTOR_KEY
+    race.save()
+    cp, cp_code = _make_cp_with_tag(race)
+    Tag.objects.create(number=5, nfc_uid="04CC", code=bytes.fromhex(V1_CODE))
+    good_v2 = member_code(MEMBER_VECTOR_KEY, MEMBER_VECTOR_UID, race.id, 123).hex()
+
+    response = _upload_presents(
+        client,
+        race,
+        team,
+        cp,
+        cp_code,
+        "mk-code-ok",
+        [
+            _present(MEMBER_VECTOR_UID.lower(), 123, 1, good_v2.upper()),
+            _present(MEMBER_VECTOR_UID, 124, 2, good_v2),
+            _present("04CC", 5, 3, V1_CODE),
+            _present(None, 0, 4, None),
+        ],
+    )
+
+    assert response.status_code == 200
+    by_slot = {
+        p.number_in_team: p.code_ok
+        for p in MarkPresent.objects.filter(mark_id="mk-code-ok")
+    }
+    assert by_slot == {1: True, 2: False, 3: True, 4: None}
+
+
+@pytest.mark.django_db
+def test_mark_upload_code_ok_queries_do_not_grow_with_members(
+    client, signed_app_keys, django_user_model
+):
+    from django.db import connection
+    from django.test.utils import CaptureQueriesContext
+
+    from website.models.tag import Tag
+
+    race, team = _make_team_in_race(django_user_model, slug="code-ok-n1")
+    race.member_key = MEMBER_VECTOR_KEY
+    race.save()
+    cp, cp_code = _make_cp_with_tag(race)
+    for i in range(6):
+        Tag.objects.create(number=i + 1, nfc_uid=f"04C{i}", code=bytes([i]) * 16)
+
+    def upload(mark_id, count):
+        presents = [
+            _present(f"04C{i}", i + 1, i + 1, (bytes([i]) * 16).hex())
+            for i in range(count)
+        ]
+        with CaptureQueriesContext(connection) as ctx:
+            response = _upload_presents(
+                client, race, team, cp, cp_code, mark_id, presents
+            )
+        assert response.status_code == 200
+        return len(ctx.captured_queries)
+
+    upload("mk-n1-warm", 1)  # first request also records install stats
+    assert upload("mk-n1-a", 1) == upload("mk-n1-b", 6)

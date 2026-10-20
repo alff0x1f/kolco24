@@ -268,6 +268,9 @@ class MarkPresent(models.Model):
     code = models.CharField(max_length=64, null=True)
     number = models.IntegerField()
     number_in_team = models.IntegerField()
+    # Bracelet code check at ingest: True/False, or None when there is nothing
+    # to check against (no code, sentinel row, unknown v1 bracelet).
+    code_ok = models.BooleanField(null=True)
 
     class Meta:
         unique_together = ("mark", "number_in_team")

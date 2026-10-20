@@ -153,8 +153,8 @@ def _present_label(present, tag_numbers):
     uid = _norm_uid(present.nfc_uid)
     if uid is None:
         # {nfc_uid: null, number: 0} is the "no snapshot" sentinel.
-        return {"label": "без снимка", "uid": "", "known": False}
-    return _chip_label(uid, tag_numbers)
+        return {"label": "без снимка", "uid": "", "known": False, "code_ok": None}
+    return {**_chip_label(uid, tag_numbers), "code_ok": present.code_ok}
 
 
 def _race_teams(race):

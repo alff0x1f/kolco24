@@ -6,11 +6,16 @@ the DB copy (``backup_db``/``restore_db``), so the two can never disagree.
 
 from __future__ import annotations
 
+import hmac
 import os
 
 from website.models.race import Race
+from website.models.tag import Tag
+
+from .crypto import MEMBER_CODE_BYTES, member_code
 
 MEMBER_KEY_BYTES = 32
+V1_CODE_BYTES = 16
 
 
 def get_member_key(race_id: int) -> bytes | None:
@@ -30,3 +35,60 @@ def ensure_member_key(race_id: int) -> bytes | None:
         member_key=os.urandom(MEMBER_KEY_BYTES)
     )
     return get_member_key(race_id)
+
+
+def _parse_code(code):
+    try:
+        return bytes.fromhex((code or "").strip())
+    except ValueError:
+        return None
+
+
+def v1_codes_for(presents):
+    """``{nfc_uid: code}`` of global (v1) tags for the presents carrying a v1 code.
+
+    One query for the whole upload batch; feed the result to
+    :func:`check_member_code`.
+    """
+    uids = set()
+    for p in presents:
+        code = _parse_code(p.get("code"))
+        uid = (p.get("nfc_uid") or "").strip().upper()
+        if code is not None and len(code) == V1_CODE_BYTES and uid:
+            uids.add(uid)
+    if not uids:
+        return {}
+    rows = Tag.objects.filter(race__isnull=True, nfc_uid__in=uids).values_list(
+        "nfc_uid", "code"
+    )
+    return {uid: bytes(code) for uid, code in rows if code is not None}
+
+
+def check_member_code(race_id, key, nfc_uid, number, code, v1_codes):
+    """Whether a present member's bracelet code is genuine.
+
+    A 12-byte code is K24 v2 — recomputed from the race ``key``; a 16-byte code
+    is K24 v1 — compared with the global ``Tag.code`` (``v1_codes``). Returns
+    ``None`` when there is nothing to check (no code / uid, unknown v1 tag),
+    ``False`` for a mismatch, a bad code, or a v2 code in a race with no key.
+    """
+    uid = (nfc_uid or "").strip().upper()
+    if not uid or not code:
+        return None
+    raw = _parse_code(code)
+    if raw is None:
+        return False
+    if len(raw) == MEMBER_CODE_BYTES:
+        if key is None:
+            return False
+        try:
+            expected = member_code(key, uid, race_id, number)
+        except ValueError:
+            return False
+        return hmac.compare_digest(expected, raw)
+    if len(raw) == V1_CODE_BYTES:
+        stored = v1_codes.get(uid)
+        if stored is None:
+            return None
+        return hmac.compare_digest(stored, raw)
+    return False
