@@ -3163,6 +3163,51 @@ def test_derive_wrap_key_deterministic_and_distinct():
     assert derive_wrap_key(code) != derive_wrap_key(os.urandom(16))
 
 
+# --- Member bracelet code (K24 v2) --------------------------------------------
+
+from apps.mobile.crypto import member_code  # noqa: E402
+
+# Shared test vector — the Android and iOS tests carry the same values.
+MEMBER_VECTOR_KEY = bytes(range(32))
+MEMBER_VECTOR_UID = "04A1B2C3D4E5F6"
+MEMBER_VECTOR_CODE = "a6a6795129a8cdd661a9bb15"
+
+
+def test_member_code_shared_vector():
+    code = member_code(MEMBER_VECTOR_KEY, MEMBER_VECTOR_UID, 42, 123)
+    assert code.hex() == MEMBER_VECTOR_CODE
+
+
+def test_member_code_normalizes_uid():
+    assert member_code(MEMBER_VECTOR_KEY, " 04a1b2c3d4e5f6 ", 42, 123).hex() == (
+        MEMBER_VECTOR_CODE
+    )
+
+
+def test_member_code_depends_on_every_input():
+    base = member_code(MEMBER_VECTOR_KEY, MEMBER_VECTOR_UID, 42, 123)
+    assert member_code(MEMBER_VECTOR_KEY, "04A1B2C3D4E5F7", 42, 123) != base
+    assert member_code(MEMBER_VECTOR_KEY, MEMBER_VECTOR_UID, 43, 123) != base
+    assert member_code(MEMBER_VECTOR_KEY, MEMBER_VECTOR_UID, 42, 124) != base
+    assert member_code(os.urandom(32), MEMBER_VECTOR_UID, 42, 123) != base
+
+
+@pytest.mark.parametrize(
+    "uid, race_id, number",
+    [
+        ("XYZ", 42, 123),
+        ("", 42, 123),
+        ("04A1B2C3D4E5F6", 0, 123),
+        ("04A1B2C3D4E5F6", 65536, 123),
+        ("04A1B2C3D4E5F6", 42, 0),
+        ("04A1B2C3D4E5F6", 42, 65536),
+    ],
+)
+def test_member_code_rejects_bad_input(uid, race_id, number):
+    with pytest.raises(ValueError):
+        member_code(MEMBER_VECTOR_KEY, uid, race_id, number)
+
+
 # --- Task 2: legend-encryption data model ------------------------------------
 
 
@@ -10577,3 +10622,166 @@ def test_member_tag_bind_get_returns_405(client, signed_app_keys, django_user_mo
     response = client.get(path, **headers)
 
     assert response.status_code == 405
+
+
+# --- Member bracelet key: GET /app/race/<id>/member_key/ ----------------------
+
+
+def _member_key_path(race_id):
+    return f"/app/race/{race_id}/member_key/"
+
+
+def _get_member_key(client, race_id, raw):
+    path = _member_key_path(race_id)
+    headers = _signed_headers("GET", path, SECRET)
+    if raw is not None:
+        headers["HTTP_AUTHORIZATION"] = f"Bearer {raw}"
+    return client.get(path, **headers)
+
+
+@pytest.mark.django_db
+def test_member_key_mints_once_and_is_stable(
+    client, signed_app_keys, django_user_model
+):
+    from website.models.race import Race
+
+    race, _, raw, _ = _make_admin_race(django_user_model, "mkey-ok")
+    updated_at = Race.objects.get(pk=race.pk).updated_at
+
+    first = _get_member_key(client, race.id, raw)
+    second = _get_member_key(client, race.id, raw)
+
+    assert first.status_code == 200
+    assert first["Cache-Control"] == "no-store"
+    body = first.json()
+    assert body["race_id"] == race.id
+    assert len(bytes.fromhex(body["key"])) == 32
+    assert second.json() == body
+    race.refresh_from_db()
+    assert bytes(race.member_key).hex() == body["key"]
+    assert race.updated_at == updated_at
+
+
+@pytest.mark.django_db
+def test_ensure_member_key_keeps_existing_key():
+    from apps.mobile.member_key import ensure_member_key
+    from website.models.race import Race
+
+    race = Race.objects.create(name="mk", slug="mk-keep")
+    first = ensure_member_key(race.id)
+    assert ensure_member_key(race.id) == first
+    assert ensure_member_key(999999) is None
+
+
+@pytest.mark.django_db
+def test_member_key_requires_admin(client, signed_app_keys, django_user_model):
+    race, _, _, _ = _make_admin_race(django_user_model, "mkey-perm")
+    other = django_user_model.objects.create_user(
+        username="mk-other", email="mk-other@example.com", password="x"
+    )
+
+    assert _get_member_key(client, race.id, None).status_code == 401
+    assert _get_member_key(client, race.id, "bogus").status_code == 401
+    assert _get_member_key(client, race.id, _make_active_token(other)).status_code == (
+        403
+    )
+    race.refresh_from_db()
+    assert race.member_key is None
+
+
+@pytest.mark.django_db
+def test_member_key_unpublished_race_404(client, signed_app_keys, django_user_model):
+    race, _, raw, _ = _make_admin_race(django_user_model, "mkey-unpub")
+    race.is_published = False
+    race.save()
+
+    assert _get_member_key(client, race.id, raw).status_code == 404
+
+
+@pytest.mark.django_db
+def test_member_key_local_server_never_mints(
+    client, settings, signed_app_keys, django_user_model
+):
+    settings.MOBILE_DATA_SOURCE = "local"
+    race, _, raw, _ = _make_admin_race(django_user_model, "mkey-local")
+
+    response = _get_member_key(client, race.id, raw)
+
+    assert response.status_code == 404
+    race.refresh_from_db()
+    assert race.member_key is None
+
+
+@pytest.mark.django_db
+def test_member_key_local_server_serves_copied_key(
+    client, settings, signed_app_keys, django_user_model
+):
+    settings.MOBILE_DATA_SOURCE = "local"
+    race, _, raw, _ = _make_admin_race(django_user_model, "mkey-local-ok")
+    race.member_key = bytes(range(32))
+    race.save()
+
+    response = _get_member_key(client, race.id, raw)
+
+    assert response.status_code == 200
+    assert response.json()["key"] == bytes(range(32)).hex()
+
+
+@pytest.mark.django_db
+def test_member_key_not_leaked_by_other_reads(
+    client, signed_app_keys, django_user_model
+):
+    race, _, raw, _ = _make_admin_race(django_user_model, "mkey-leak")
+    key_hex = _get_member_key(client, race.id, raw).json()["key"]
+
+    for path in (
+        "/app/races/",
+        f"/app/race/{race.id}/sync/",
+        f"/app/race/{race.id}/legend/",
+        f"/app/race/{race.id}/teams/",
+        f"/app/race/{race.id}/member_tags/",
+    ):
+        response = client.get(path, **_signed_headers("GET", path, SECRET))
+        assert response.status_code == 200, path
+        assert key_hex not in response.content.decode(), path
+
+
+@pytest.mark.django_db
+def test_ensure_member_keys_command_mints_published_only():
+    from io import StringIO
+
+    from django.core.management import call_command
+
+    from website.models.race import Race
+
+    published = Race.objects.create(name="p", slug="mk-cmd-pub")
+    hidden = Race.objects.create(name="h", slug="mk-cmd-hid", is_published=False)
+    keyed = Race.objects.create(name="k", slug="mk-cmd-key", member_key=b"\x01" * 32)
+
+    out = StringIO()
+    call_command("ensure_member_keys", stdout=out)
+
+    published.refresh_from_db()
+    hidden.refresh_from_db()
+    keyed.refresh_from_db()
+    assert len(bytes(published.member_key)) == 32
+    assert hidden.member_key is None
+    assert bytes(keyed.member_key) == b"\x01" * 32
+    assert "minted 1" in out.getvalue()
+
+
+@pytest.mark.django_db
+def test_ensure_member_keys_command_single_race():
+    from django.core.management import call_command
+
+    from website.models.race import Race
+
+    a = Race.objects.create(name="a", slug="mk-cmd-a")
+    b = Race.objects.create(name="b", slug="mk-cmd-b")
+
+    call_command("ensure_member_keys", race=a.id, stdout=None)
+
+    a.refresh_from_db()
+    b.refresh_from_db()
+    assert a.member_key is not None
+    assert b.member_key is None

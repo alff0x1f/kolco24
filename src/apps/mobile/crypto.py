@@ -9,6 +9,8 @@ are intentionally dropped: a single fixed format, YAGNI here).
 from __future__ import annotations
 
 import base64
+import hashlib
+import hmac
 import os
 
 from cryptography.hazmat.primitives import hashes
@@ -44,3 +46,25 @@ def derive_wrap_key(code: bytes, info: bytes = b"kp-wrap-v1") -> bytes:
     resistance — ``code`` is ``os.urandom(16)``, so no Argon2 is needed.
     """
     return HKDF(algorithm=hashes.SHA256(), length=32, salt=None, info=info).derive(code)
+
+
+MEMBER_CODE_BYTES = 12
+MEMBER_FIELD_MAX = 0xFFFF
+
+
+def member_code(key: bytes, nfc_uid: str, race_id: int, number: int) -> bytes:
+    """Bracelet code of a K24 v2 participant record (12 bytes).
+
+    ``HMAC-SHA256(key, uid_bytes ‖ race_id u16 BE ‖ number u16 BE)[:12]`` —
+    the judge's phone computes the same value offline and writes it to the chip.
+    ``nfc_uid`` is the hex UID, normalized here. Raises ``ValueError`` on a
+    non-hex UID or a ``race_id``/``number`` outside ``1..65535``.
+    """
+    for name, value in (("race_id", race_id), ("number", number)):
+        if not 1 <= value <= MEMBER_FIELD_MAX:
+            raise ValueError(f"{name} out of range: {value}")
+    uid = bytes.fromhex(nfc_uid.strip().upper())
+    if not uid:
+        raise ValueError("empty nfc_uid")
+    msg = uid + race_id.to_bytes(2, "big") + number.to_bytes(2, "big")
+    return hmac.new(key, msg, hashlib.sha256).digest()[:MEMBER_CODE_BYTES]

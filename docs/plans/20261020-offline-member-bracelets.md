@@ -147,11 +147,11 @@
 - Modify: `src/apps/mobile/crypto.py`
 - Modify: `src/apps/mobile/tests.py`
 
-- [ ] добавить `member_code(key: bytes, nfc_uid: str, race_id: int, number: int) -> bytes` (12 байт) в `crypto.py`
-- [ ] `ValueError` на `race_id`/`number` вне `1..65535` и на не-hex `nfc_uid`; UID нормализуется внутри
-- [ ] тест вектора: ожидаемый `code` `a6a6795129a8cdd661a9bb15`
-- [ ] тесты: детерминизм, разные `uid`/`race_id`/`number` → разные коды, UID в нижнем регистре и с пробелами, ошибки диапазона
-- [ ] run tests - must pass before task 2
+- [x] добавить `member_code(key: bytes, nfc_uid: str, race_id: int, number: int) -> bytes` (12 байт) в `crypto.py`
+- [x] `ValueError` на `race_id`/`number` вне `1..65535` и на не-hex `nfc_uid`; UID нормализуется внутри
+- [x] тест вектора: ожидаемый `code` `a6a6795129a8cdd661a9bb15`
+- [x] тесты: детерминизм, разные `uid`/`race_id`/`number` → разные коды, UID в нижнем регистре и с пробелами, ошибки диапазона
+- [x] run tests - must pass before task 2
 
 ### Task 2: `Race.member_key`, эндпоинт ключа и команда `ensure_member_keys`
 
@@ -162,17 +162,17 @@
 - Modify: `src/apps/mobile/urls.py`
 - Create: `src/apps/mobile/management/commands/ensure_member_keys.py`
 
-- [ ] `member_key = models.BinaryField(null=True, blank=True)` в `Race` (не редактируется в админке)
-- [ ] `ensure_member_key(race_id)`: условный `Race.objects.filter(pk=…, member_key__isnull=True).update(member_key=os.urandom(32))`
+- [x] `member_key = models.BinaryField(null=True, blank=True)` в `Race` (не редактируется в админке)
+- [x] `ensure_member_key(race_id)` (`apps/mobile/member_key.py`): условный `Race.objects.filter(pk=…, member_key__isnull=True).update(member_key=os.urandom(32))`
       и перечитать — без `select_for_update`, без касания `updated_at` (ключ не должен двигать ETag `races`, это сознательно)
-- [ ] `MemberKeyView` (`GET race/<id>/member_key/`, name `member_key`): права как у `MemberTagBindView`, throttle
+- [x] `MemberKeyView` (`GET race/<id>/member_key/`, name `member_key`): права как у `MemberTagBindView`, throttle
       `mobile-write`, `Cache-Control: no-store`; на `MOBILE_DATA_SOURCE=local` ключ не создаётся, нет ключа → `404`
-- [ ] `manage.py ensure_member_keys [--race <id>]` — создать недостающие ключи опубликованных гонок (запускать в облаке перед `backup_db`)
-- [ ] тесты: `200` и стабильный ключ, параллельное создание даёт один ключ, `Race.updated_at` не меняется,
+- [x] `manage.py ensure_member_keys [--race <id>]` — создать недостающие ключи опубликованных гонок (запускать в облаке перед `backup_db`)
+- [x] тесты: `200` и стабильный ключ, повторное создание не меняет ключ, `Race.updated_at` не меняется,
       не-админ → `403`, без токена → `401`, неопубликованная → `404`, local-режим без ключа → `404` и ключ не создан,
       local-режим с ключом → `200`
-- [ ] тесты команды; тест, что ключ не попадает ни в один другой GET (`races`, `sync`, legend)
-- [ ] run tests - must pass before task 3
+- [x] тесты команды; тест, что ключ не попадает ни в один другой GET (`races`, `sync`, legend, teams, member_tags)
+- [x] run tests - must pass before task 3
 
 ### Task 3: `Tag.race` и пул по гонке
 

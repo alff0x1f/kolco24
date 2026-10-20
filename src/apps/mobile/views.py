@@ -30,7 +30,9 @@ from website.models.models import Athlet, Team
 from website.models.race import Category, Race, RaceAdmin
 from website.models.tag import Tag
 
+from .crypto import MEMBER_FIELD_MAX
 from .legend_crypto import build_bundle
+from .member_key import ensure_member_key, get_member_key
 from .models import (
     MARK_UPDATE_FIELDS,
     AppAuthFailure,
@@ -456,6 +458,37 @@ class MemberTagBindView(AppAPIView):
 
         # The code was minted on insert, so the lazy mint is a no-op here.
         return self._member_tag_response(tag, status.HTTP_201_CREATED)
+
+
+class MemberKeyView(AppAPIView):
+    """``GET /app/race/<race_id>/member_key/`` — the race's bracelet key.
+
+    The judge's phone fetches it ahead of time and computes K24 v2 bracelet
+    codes offline. Same permission stack as :class:`MemberTagBindView`. Only
+    the cloud server mints a key; a LAN server (``MOBILE_DATA_SOURCE=local``)
+    without a copied key answers 404 rather than mint a second, different one.
+    """
+
+    permission_classes = [SignedAppPermission, IsMobileUser, CanEditRaceLegend]
+    throttle_classes = [ClientIPScopedRateThrottle]
+    throttle_scope = "mobile-write"
+
+    def get(self, request, race_id):
+        get_object_or_404(Race, pk=race_id, is_published=True)
+        if race_id > MEMBER_FIELD_MAX:
+            return Response(status=status.HTTP_404_NOT_FOUND)
+        if settings.MOBILE_DATA_SOURCE == "local":
+            key = get_member_key(race_id)
+        else:
+            key = ensure_member_key(race_id)
+        if key is None:
+            return Response(
+                {"detail": "Ключ гонки не загружен"},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        resp = Response({"race_id": race_id, "key": key.hex()})
+        resp["Cache-Control"] = "no-store"
+        return resp
 
 
 class TrackUploadView(AppAPIView):
