@@ -348,10 +348,10 @@ Django 4.2 project. Source lives entirely under `src/`, with `manage.py` at `src
       identity for **every** tag (open + locked), plus `iv`/`ct` for the offline legend unlock on locked КП only — see
       the **Legend encryption** invariant below; the legend is **always served** for a published race (no race-level
       visibility gate), with `type="hidden"` КП excluded), `/app/race/<id>/member_tags/` (the participant-bracelet pool —
-      `{number, nfc_uid}` per `Tag` for offline scan resolution; the chip pool is **global** today (one physical set
-      reused across races) so `race_id` is accepted but **not used for filtering** — a reserved hook for a future
-      per-race chip set; the served set is a **data-anchored** window
-      `last_seen_at IS NULL OR last_seen_at >= MAX(last_seen_at) − 30d` (not wall-clock `now()`, so an idle race is
+      `{number, nfc_uid}` per `Tag` for offline scan resolution; the pool is the race's own K24 v2 bracelets
+      (`Tag.race = race`, unwindowed) plus the **global** v1 pool (`race IS NULL`, one physical set reused across
+      races), a race row shadowing a global row with the same `nfc_uid`; the global part is a **data-anchored** window
+      `last_seen_at IS NULL OR last_seen_at >= MAX(last_seen_at) − 30d` over global rows (not wall-clock `now()`, so an idle race is
       stable; a never-scanned pool returns everything; never-scanned rows — e.g. a bracelet just created by
       `member_tags/bind/` — are always served, which is load-bearing for the bind endpoint's "create moves the ETag");
       the api read
@@ -386,10 +386,9 @@ Django 4.2 project. Source lives entirely under `src/`, with `manage.py` at `src
       `save(update_fields=["last_seen_at"])` and **intentionally omits `"updated_at"`** — a deliberate carve-out from
       the `update_fields` discipline, so a bracelet tap can't churn the mobile ETag and trigger mid-race re-downloads.
       The ETag can still shift day-scale when scan activity advances `MAX(last_seen_at)` enough to age the oldest chips
-      past the 30-day floor (membership change, not per-scan churn). `member_tags_version()` is **global** (no
-      `race_id`, like `races_version`) but — unlike `races_version` — **is** included in the per-race `sync` manifest,
-      because it's served at a per-race URL and the app needs one sync poll to learn what to refetch for the race it's
-      syncing. The **legend** fingerprint additionally folds in two more
+      past the 30-day floor (membership change, not per-scan churn). `member_tags_version(race_id=…)` is per race
+      (same pool as `active_member_tags(race_id)`; without `race_id` both mean the global pool only) and is included
+      in the per-race `sync` manifest. The **legend** fingerprint additionally folds in two more
       `MAX(updated_at)|COUNT` aggregates over the same hidden-excluded checkpoints — `CheckpointSecret` (re-seal / enc
       appear/disappear on a lock toggle) and `CheckpointTag` (code/unlocks/bundle/check_method) — so the legend ETag /
       `versions.legend` move on any lock toggle, re-seal, or tag edit. The legend fingerprint is `legend_version(race_id)`
@@ -631,8 +630,21 @@ Django 4.2 project. Source lives entirely under `src/`, with `manage.py` at `src
       a code doesn't). The code belongs to the `Tag` **row**, not the UID (an `/admin/` `nfc_uid` edit carries it over).
       Bind **never touches `last_seen_at`**, so re-binding an aged-out chip does not bring it back into the served
       window — deliberate: stamping "now" would advance the data-anchored `MAX(last_seen_at)` floor and could drop
-      every other chip of an idle pool; a real scan (api touch) revives it. **Accepted risk**: the pool is global, so an
-      admin of any published race can read any bracelet's code (`number: null`); revisit once `Tag` gets a race FK.
+      every other chip of an idle pool; a real scan (api touch) revives it. **Accepted risk**: the v1 pool is global, so
+      an admin of any published race can read any v1 bracelet's code (`number: null`). The v1 path (body without
+      `code`), and the legacy `/api/member_tag/` list/create/touch, only ever see global rows (`race IS NULL`).
+    - **K24 v2 bracelets** (offline issuing; format, statuses and test vector in `src/apps/mobile/README.md`,
+      «Браслеты v2»): the judge's phone writes `race_id u16 ‖ number u16 ‖ HMAC-SHA256(K_race, uid ‖ race_id ‖
+      number)[:12]` (`crypto.member_code`) and later uploads the bind as `POST bind/` with `code` → `Tag(race, nfc_uid,
+      number)` (201/200, a valid code for a new number **rebinds**, bad code 400, no 409). `Tag.race` FK
+      (`website/0102`; uniqueness `(race, nfc_uid)` + partial `unique(nfc_uid) WHERE race IS NULL`). `Race.member_key`
+      (`website/0101`, 32 B) is served by `GET /app/race/<id>/member_key/` (bind's stack, `no-store`). **Only the cloud
+      mints a key** (`member_key.ensure_member_key`, a conditional `UPDATE` that deliberately skips `save()`, so
+      `Race.updated_at`/the races ETag don't move; or `manage.py ensure_member_keys`); with `MOBILE_DATA_SOURCE=local`
+      a missing key is a 404, never a fresh key — the LAN server gets it from the DB copy. `MarkPresent.code_ok`
+      (`mobile/0014`, `member_key.check_member_code`) is set at `/marks/` ingest: 24-hex code → HMAC recompute, 32-hex →
+      global `Tag.code` (one query per batch, `v1_codes_for`), nothing to check → `None`; never rejects, shown as «⚠» on
+      the app-data team page. `apps/race/app_data._tag_pool(race)` uses the same race-wins pool.
 
 - `apps.photo_contest` — site photo contest, **not tied to races** (no FK into `website`; only `AUTH_USER_MODEL`),
   mounted at `/photo/`. Step 1 is submissions only; voting/gallery/results are future work. `PhotoContest` (slug,

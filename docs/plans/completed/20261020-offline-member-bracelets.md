@@ -243,17 +243,17 @@
 
 ### Task 6: Verify acceptance criteria
 
-- [ ] пройти Overview и Technical Details: формат, ключ (облако — единственный источник), `bind/`, `code_ok`, пул по гонке
-- [ ] проверить обратную совместимость: старое тело `bind/`, v1-коды в отметках, старый GET `member_tags`, `api/member_tag`
-- [ ] `make format && make lint`
-- [ ] полный прогон `make test`
+- [x] пройти Overview и Technical Details: формат, ключ (облако — единственный источник), `bind/`, `code_ok`, пул по гонке
+- [x] проверить обратную совместимость: старое тело `bind/`, v1-коды в отметках, старый GET `member_tags`, `api/member_tag`
+- [x] `make format && make lint`
+- [x] полный прогон `make test` (1879 passed)
 
 ### Task 7: [Final] Update documentation
 
-- [ ] `src/apps/mobile/README.md`: формат v2, `member_key/` (облако — источник, LAN не создаёт), `ensure_member_keys`,
+- [x] `src/apps/mobile/README.md`: формат v2, `member_key/` (облако — источник, LAN не создаёт), `ensure_member_keys`,
       новая ветка `bind/`, `code_ok`, пул по гонке; снять «принятый риск» глобального пула для v2
-- [ ] CLAUDE.md, блок `apps.mobile`: короткий пункт про v2, `member_key/` и `code_ok`; обновить пункт **Member tags** (пул по гонке)
-- [ ] move this plan to `docs/plans/completed/`
+- [x] CLAUDE.md, блок `apps.mobile`: короткий пункт про v2, `member_key/` и `code_ok`; обновить пункт **Member tags** (пул по гонке)
+- [x] move this plan to `docs/plans/completed/`
 
 ## Post-Completion
 
