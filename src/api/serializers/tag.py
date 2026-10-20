@@ -12,7 +12,7 @@ class _NfcUidField(serializers.CharField):
 class TagSerializer(serializers.ModelSerializer):
     nfc_uid = _NfcUidField(
         max_length=255,
-        validators=[UniqueValidator(queryset=Tag.objects.all())],
+        validators=[UniqueValidator(queryset=Tag.objects.filter(race__isnull=True))],
     )
 
     class Meta:

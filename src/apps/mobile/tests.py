@@ -10785,3 +10785,146 @@ def test_ensure_member_keys_command_single_race():
     b.refresh_from_db()
     assert a.member_key is not None
     assert b.member_key is None
+
+
+# --- Per-race member-tag pool (Tag.race) ---------------------------------------
+
+
+def _member_tags_body(client, race):
+    path = f"/app/race/{race.id}/member_tags/"
+    response = client.get(path, **_signed_headers("GET", path, SECRET))
+    assert response.status_code == 200
+    return response.json()["member_tags"]
+
+
+@pytest.mark.django_db
+def test_member_tags_pool_is_race_rows_plus_global(client, signed_app_keys):
+    from website.models.race import Race
+    from website.models.tag import Tag
+
+    race_a = Race.objects.create(name="a", slug="pool-a")
+    race_b = Race.objects.create(name="b", slug="pool-b")
+    Tag.objects.create(number=1, nfc_uid="G1")
+    Tag.objects.create(number=2, nfc_uid="A1", race=race_a)
+    Tag.objects.create(number=3, nfc_uid="B1", race=race_b)
+
+    body = _member_tags_body(client, race_a)
+
+    assert sorted((t["nfc_uid"], t["number"]) for t in body) == [
+        ("A1", 2),
+        ("G1", 1),
+    ]
+
+
+@pytest.mark.django_db
+def test_member_tags_race_row_shadows_global_row(client, signed_app_keys):
+    from website.models.race import Race
+    from website.models.tag import Tag
+
+    race = Race.objects.create(name="a", slug="pool-shadow")
+    Tag.objects.create(number=10, nfc_uid="SAME")
+    Tag.objects.create(number=20, nfc_uid="SAME", race=race)
+
+    body = _member_tags_body(client, race)
+
+    assert [(t["nfc_uid"], t["number"]) for t in body] == [("SAME", 20)]
+
+
+@pytest.mark.django_db
+def test_member_tags_race_rows_ignore_global_window(client, signed_app_keys):
+    from datetime import timedelta
+
+    from django.utils import timezone
+
+    from website.models.race import Race
+    from website.models.tag import Tag
+
+    race = Race.objects.create(name="a", slug="pool-window")
+    now = timezone.now()
+    Tag.objects.create(number=1, nfc_uid="FRESH", last_seen_at=now)
+    Tag.objects.create(number=2, nfc_uid="OLD", last_seen_at=now - timedelta(days=60))
+    Tag.objects.create(
+        number=3, nfc_uid="RACEOLD", race=race, last_seen_at=now - timedelta(days=90)
+    )
+
+    uids = {t["nfc_uid"] for t in _member_tags_body(client, race)}
+
+    assert uids == {"FRESH", "RACEOLD"}
+
+
+@pytest.mark.django_db
+def test_member_tags_race_window_floor_uses_global_rows_only(signed_app_keys):
+    from datetime import timedelta
+
+    from django.utils import timezone
+
+    from apps.mobile.versioning import active_member_tags
+    from website.models.race import Race
+    from website.models.tag import Tag
+
+    race = Race.objects.create(name="a", slug="pool-floor")
+    now = timezone.now()
+    Tag.objects.create(number=1, nfc_uid="G", last_seen_at=now - timedelta(days=60))
+    # A recently scanned race row must not push the global floor forward.
+    Tag.objects.create(number=2, nfc_uid="R", race=race, last_seen_at=now)
+
+    assert set(active_member_tags(race.id).values_list("nfc_uid", flat=True)) == {
+        "G",
+        "R",
+    }
+
+
+@pytest.mark.django_db
+def test_member_tags_etag_moves_on_own_race_row_only(client, signed_app_keys):
+    from website.models.race import Race
+    from website.models.tag import Tag
+
+    race_a = Race.objects.create(name="a", slug="etag-a")
+    race_b = Race.objects.create(name="b", slug="etag-b")
+    etag = _member_tags_etag(client, race_a)
+    sync_version = _sync_member_tags_version(client, race_a)
+
+    Tag.objects.create(number=3, nfc_uid="B1", race=race_b)
+    assert _member_tags_etag(client, race_a) == etag
+    assert _sync_member_tags_version(client, race_a) == sync_version
+
+    Tag.objects.create(number=2, nfc_uid="A1", race=race_a)
+    new_etag = _member_tags_etag(client, race_a)
+    assert new_etag != etag
+    assert new_etag == f'"{_sync_member_tags_version(client, race_a)}"'
+
+
+@pytest.mark.django_db
+def test_tag_uid_unique_per_race_and_globally():
+    from django.db import transaction
+
+    from website.models.race import Race
+    from website.models.tag import Tag
+
+    race_a = Race.objects.create(name="a", slug="uniq-a")
+    race_b = Race.objects.create(name="b", slug="uniq-b")
+    Tag.objects.create(number=1, nfc_uid="U1")
+    Tag.objects.create(number=2, nfc_uid="U1", race=race_a)
+    Tag.objects.create(number=3, nfc_uid="U1", race=race_b)
+
+    with pytest.raises(IntegrityError), transaction.atomic():
+        Tag.objects.create(number=4, nfc_uid="U1", race=race_a)
+    with pytest.raises(IntegrityError), transaction.atomic():
+        Tag.objects.create(number=5, nfc_uid="U1")
+
+
+@pytest.mark.django_db
+def test_member_tag_bind_v1_ignores_race_rows(
+    client, signed_app_keys, django_user_model
+):
+    from website.models.tag import Tag
+
+    race, _, raw, _ = _make_admin_race(django_user_model, "bind-v1-race-row")
+    Tag.objects.create(number=50, nfc_uid="04EE", race=race)
+
+    response = _bind(client, race, raw, "04EE", None)
+
+    assert response.status_code == 404
+    created = _bind(client, race, raw, "04EE", 51)
+    assert created.status_code == 201
+    assert Tag.objects.get(nfc_uid="04EE", race__isnull=True).number == 51

@@ -186,22 +186,22 @@
 - Modify: `src/api/serializers/tag.py`
 - Modify: `src/apps/race/app_data.py`
 
-- [ ] `race = FK(Race, null=True, blank=True, on_delete=CASCADE, related_name="member_tags")`; `race` в `TagAdmin`
-- [ ] заменить `unique=True` у `nfc_uid` на `UniqueConstraint(race, nfc_uid)` и
+- [x] `race = FK(Race, null=True, blank=True, on_delete=CASCADE, related_name="member_tags")`; `race` в `TagAdmin`
+- [x] заменить `unique=True` у `nfc_uid` на `UniqueConstraint(race, nfc_uid)` и
       `UniqueConstraint(nfc_uid, condition=Q(race__isnull=True))` (глобальные v1 остаются уникальными)
-- [ ] `active_member_tags(race_id)` и `member_tags_version(race_id, rows=None)` по правилу из Technical Details
+- [x] `active_member_tags(race_id=None)` и `member_tags_version(rows=None, race_id=None)` по правилу из Technical Details
       (строка гонки вытесняет глобальную с тем же UID; окно по глобальным); `_bind_seen_at` — тоже по глобальным;
-      пробросить `race_id` в `MemberTagsView` и `SyncView`
-- [ ] старый `bind/` (без `code`), `api` `MemberTagListCreateView` (GET и POST) и touch ищут только `race IS NULL`;
+      пробросить `race_id` в `MemberTagsView` и `SyncView` (без `race_id` — только глобальный пул, как раньше)
+- [x] старый `bind/` (без `code`), `api` `MemberTagListCreateView` (GET и POST) и touch ищут только `race IS NULL`;
       `UniqueValidator(queryset=Tag.objects.filter(race__isnull=True))`
-- [ ] `app_data._tag_pool(race)`: строки гонки + глобальные, строка гонки побеждает
-- [ ] тесты пула: гонка A не видит строки гонки B, видит глобальные; один UID глобально и в гонке → одна строка с номером гонки;
-      ETag меняется от строки своей гонки
-- [ ] тесты: тот же UID в двух гонках и глобально — допустимо; дубль в одной гонке — `IntegrityError`;
-      `POST /api/member_tag/` с дублем глобального UID → `400`
-- [ ] тест `_tag_pool`: один UID в двух гонках → номер своей гонки
-- [ ] прогнать существующие `member_tag*`, judge_scans и app-data тесты, обновить, если изменилось поведение
-- [ ] run tests - must pass before task 4
+- [x] `app_data._tag_pool(race)`: строки гонки + глобальные, строка гонки побеждает
+- [x] тесты пула: гонка A не видит строки гонки B, видит глобальные; один UID глобально и в гонке → одна строка с номером гонки;
+      строки гонки без окна, окно — по глобальным; ETag меняется от строки своей гонки
+- [x] тесты: тот же UID в двух гонках и глобально — допустимо; дубль в одной гонке — `IntegrityError`;
+      `POST /api/member_tag/` с дублем глобального UID → `400`; api игнорирует строки гонки; старый `bind/` игнорирует строки гонки
+- [x] тест `_tag_pool`: один UID в двух гонках → номер своей гонки
+- [x] прогнать существующие `member_tag*`, judge_scans и app-data тесты, обновить, если изменилось поведение
+- [x] run tests - must pass before task 4
 
 ### Task 4: `bind/` принимает `code` (загрузка привязок v2)
 

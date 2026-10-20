@@ -15,7 +15,7 @@ from django.conf import settings
 from django.contrib.auth import authenticate
 from django.core.files.base import ContentFile
 from django.db import IntegrityError, transaction
-from django.db.models import Count, F, Max, Min, Prefetch, Q, Sum
+from django.db.models import Count, F, Min, Prefetch, Q, Sum
 from django.db.models.functions import Coalesce, NullIf
 from django.http import HttpResponseNotModified
 from django.shortcuts import get_object_or_404
@@ -64,6 +64,7 @@ from .throttling import ClientIPScopedRateThrottle
 from .tokens import generate_token
 from .versioning import (
     active_member_tags,
+    global_member_tags_newest_seen,
     legend_version,
     member_tags_version,
     races_version,
@@ -362,10 +363,9 @@ MEMBER_TAG_CODE_BYTES = 16
 
 
 def _bind_seen_at():
-    """MAX(last_seen_at) of the pool (``now`` if never scanned), so a bind puts
-    the chip into the served window without moving its floor."""
-    newest = Tag.objects.aggregate(m=Max("last_seen_at"))["m"]
-    return newest or timezone.now()
+    """MAX(last_seen_at) of the global pool (``now`` if never scanned), so a bind
+    puts the chip into the served window without moving its floor."""
+    return global_member_tags_newest_seen() or timezone.now()
 
 
 def _new_member_code():
@@ -429,7 +429,7 @@ class MemberTagBindView(AppAPIView):
         nfc_uid = serializer.validated_data["nfc_uid"]
         number = serializer.validated_data["number"]
 
-        tag = Tag.objects.filter(nfc_uid=nfc_uid).first()
+        tag = Tag.objects.filter(nfc_uid=nfc_uid, race__isnull=True).first()
         if tag is not None:
             return self._resolve_existing(tag, number)
 
@@ -451,7 +451,7 @@ class MemberTagBindView(AppAPIView):
             # Most likely a concurrent create hit the global nfc_uid unique
             # constraint. filter().first() (not get()) so an unrelated DB error
             # re-raises as itself, not as a nested Tag.DoesNotExist.
-            tag = Tag.objects.filter(nfc_uid=nfc_uid).first()
+            tag = Tag.objects.filter(nfc_uid=nfc_uid, race__isnull=True).first()
             if tag is None:
                 raise original_exc
             return self._resolve_existing(tag, number)
@@ -1128,9 +1128,8 @@ class MemberTagsView(AppAPIView):
     own — only provisioning edits (and day-scale window-membership shifts) move
     it (see ``member_tags_version``).
 
-    ``race_id`` is the reserved (currently-unused) hook for a future per-race
-    chip set: the pool is global today (``Tag`` has no race FK), so the id is
-    validated for a published race but does not yet filter the pool.
+    The pool is the race's own bracelets (K24 v2) plus the global pool (v1);
+    a race row shadows a global row with the same ``nfc_uid``.
     """
 
     def get(self, request, race_id):
@@ -1138,7 +1137,7 @@ class MemberTagsView(AppAPIView):
         # Materialise once so the ETag and the response body come from the same
         # DB snapshot (a concurrent provisioning edit between two separate queries
         # would produce payload B with ETag A).
-        tags = list(active_member_tags().order_by("id"))
+        tags = list(active_member_tags(race_id).order_by("id"))
         rows = [(t.id, t.number, t.nfc_uid) for t in tags]
         quoted = f'"{member_tags_version(rows)}"'
 
@@ -1163,9 +1162,8 @@ class SyncView(AppAPIView):
     short-circuit.
 
     Unlike ``races_version`` (global, deliberately absent here), ``member_tags`` is
-    included even though it's a global pool: the member-tags endpoint is served at a
-    per-race URL, so the app needs one sync poll to learn what to refetch for the race
-    it's syncing.
+    per race (the race's own bracelets plus the global pool), so it belongs in this
+    per-race manifest.
     """
 
     def get(self, request, race_id):
@@ -1180,9 +1178,7 @@ class SyncView(AppAPIView):
                     # Build-independent: versions.legend equals the legend ETag
                     # for every build (stored ciphertext/bundles, no key_id).
                     "legend": legend_version(race_id),
-                    # Global pool today, but served at a per-race URL — see the
-                    # SyncView docstring for why it's in this per-race manifest.
-                    "member_tags": member_tags_version(),
+                    "member_tags": member_tags_version(race_id=race_id),
                 },
             }
         )

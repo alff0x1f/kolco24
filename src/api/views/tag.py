@@ -22,7 +22,8 @@ class MemberTagListCreateView(ListCreateAPIView):
     }
     """
 
-    queryset = Tag.objects.all()
+    # Legacy API: only the global pool (race-bound K24 v2 rows are app-only).
+    queryset = Tag.objects.filter(race__isnull=True)
     serializer_class = TagSerializer
 
     def get_queryset(self):
@@ -124,7 +125,7 @@ class MemberTagTouchView(APIView):
         nfc_uid = serializer.validated_data["nfc_uid"]
 
         try:
-            tag = Tag.objects.get(nfc_uid=nfc_uid)
+            tag = Tag.objects.get(nfc_uid=nfc_uid, race__isnull=True)
         except Tag.DoesNotExist:
             raise NotFound({"nfc_uid": [f"Тег с UID {nfc_uid} не найден"]})
 

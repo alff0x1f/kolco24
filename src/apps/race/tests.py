@@ -9625,3 +9625,24 @@ def test_protocol_row_has_team_anchor(rf, django_user_model):
     html = _public_protocol_html(rf, race, category)
 
     assert f'<tr id="team-{team.id}">' in html
+
+
+@pytest.mark.django_db
+def test_app_data_tag_pool_prefers_own_race_row():
+    from apps.race.app_data import _tag_pool
+    from website.models.race import Race
+    from website.models.tag import Tag
+
+    race = Race.objects.create(name="pool", slug="app-data-pool")
+    other = Race.objects.create(name="other", slug="app-data-pool-other")
+    Tag.objects.create(number=1, nfc_uid="AA:01")
+    Tag.objects.create(number=2, nfc_uid="AA:01", race=race)
+    Tag.objects.create(number=3, nfc_uid="AA:01", race=other)
+    Tag.objects.create(number=4, nfc_uid="BB:02", race=other)
+    Tag.objects.create(number=5, nfc_uid="CC:03")
+
+    pool = _tag_pool(race)
+
+    assert pool["AA:01"] == 2
+    assert pool["CC:03"] == 5
+    assert "BB:02" not in pool

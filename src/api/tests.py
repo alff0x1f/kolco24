@@ -25,6 +25,31 @@ class MemberTagAPITestCase(APITestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(len(response.data), 0)
 
+    def test_create_member_tag_duplicate_global_uid_400(self):
+        Tag.objects.create(number=1, nfc_uid="123AB")
+        response = self.client.post(
+            "/api/member_tag/", {"number": 2, "nfc_uid": "123ab"}, format="json"
+        )
+        self.assertEqual(response.status_code, 400)
+
+    def test_member_tag_api_ignores_race_bound_tags(self):
+        from website.models import Race
+
+        race = Race.objects.create(name="r", slug="api-race-tag")
+        Tag.objects.create(number=5, nfc_uid="ABCD", race=race)
+
+        create = self.client.post(
+            "/api/member_tag/", {"number": 6, "nfc_uid": "abcd"}, format="json"
+        )
+        self.assertEqual(create.status_code, 201)
+        listed = self.client.get("/api/member_tag/")
+        self.assertEqual(listed.status_code, 200)
+        touch = self.client.post(
+            "/api/member_tag/touch/", {"nfc_uid": "ABCD"}, format="json"
+        )
+        self.assertEqual(touch.status_code, 200)
+        self.assertEqual(touch.data["number"], 6)
+
     def test_touch_member_tag_updates_last_seen(self):
         tag = Tag.objects.create(number=1, nfc_uid="123ab")
 

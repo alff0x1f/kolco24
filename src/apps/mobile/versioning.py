@@ -185,29 +185,44 @@ def legend_version(race_id):
     return hashlib.blake2b(raw.encode(), digest_size=8).hexdigest()
 
 
-def active_member_tags():
+def global_member_tags_newest_seen():
+    """MAX(last_seen_at) over the global (``race IS NULL``) bracelet pool."""
+    return Tag.objects.filter(race__isnull=True).aggregate(
+        max_seen=Max("last_seen_at")
+    )["max_seen"]
+
+
+def active_member_tags(race_id=None):
     """Return the member-tag (participant bracelet) pool the mobile endpoint serves.
 
-    Uses a **data-anchored** 30-day window rather than wall-clock ``now()``:
-    the floor is ``MAX(last_seen_at) - 30 days``, so an idle race has a perfectly
-    stable served set (the floor only advances with real scan activity). A
-    never-scanned pool (``MAX(last_seen_at) is None``) returns the whole pool.
+    Two parts. The **global** pool (``race IS NULL``, K24 v1 bracelets reused
+    across races) uses a **data-anchored** 30-day window rather than wall-clock
+    ``now()``: the floor is ``MAX(last_seen_at) - 30 days`` over global rows, so
+    an idle race has a perfectly stable served set (the floor only advances with
+    real scan activity). A never-scanned pool returns all global rows.
+
+    With ``race_id``, every row bound to that race (K24 v2) is added unwindowed,
+    and a global row whose ``nfc_uid`` also has a row in this race is dropped —
+    the race row wins, so the app never gets one UID twice.
 
     This is the **single source** feeding both ``MemberTagsView`` and
-    ``member_tags_version`` so the ETag can never disagree with the body. The
-    pool is **global** today (``Tag`` has no race FK — one chip set is physically
-    reused across races); ``race_id`` will be threaded through here once per-race
-    chip sets exist.
+    ``member_tags_version`` so the ETag can never disagree with the body.
     """
-    newest = Tag.objects.aggregate(max_seen=Max("last_seen_at"))["max_seen"]
-    if newest is None:
-        return Tag.objects.all()
+    global_q = Q(race__isnull=True)
+    newest = global_member_tags_newest_seen()
+    if newest is not None:
+        global_q &= Q(last_seen_at__isnull=True) | Q(
+            last_seen_at__gte=newest - timedelta(days=30)
+        )
+    if race_id is None:
+        return Tag.objects.filter(global_q)
+    race_uids = Tag.objects.filter(race_id=race_id).values("nfc_uid")
     return Tag.objects.filter(
-        Q(last_seen_at__isnull=True) | Q(last_seen_at__gte=newest - timedelta(days=30))
+        Q(race_id=race_id) | (global_q & ~Q(nfc_uid__in=race_uids))
     )
 
 
-def member_tags_version(rows=None):
+def member_tags_version(rows=None, race_id=None):
     """Return a short, stable fingerprint of the member-tag pool.
 
     Fetches ``(id, number, nfc_uid)`` for every tag in ``active_member_tags()``
@@ -230,24 +245,25 @@ def member_tags_version(rows=None):
     advances ``MAX(last_seen_at)`` enough to age chips past the 30-day floor
     (membership change, not per-scan churn).
 
-    Like ``races_version`` this is **global** (no ``race_id``). **Unlike**
-    ``races_version`` it **is** included in the per-race ``SyncView`` manifest:
-    it is served at a per-race URL (``/app/race/<id>/member_tags/``), so the app
-    needs one sync poll to learn whether to refetch the pool for the race it is
-    syncing.
+    It is per race (the race's own rows plus the global pool, see
+    ``active_member_tags``) and included in the per-race ``SyncView`` manifest:
+    the app needs one sync poll to learn whether to refetch the pool for the race
+    it is syncing.
 
     Pass pre-fetched ``rows`` (a list of ``(id, number, nfc_uid)`` tuples,
     ordered by ``id``) to avoid a second DB round-trip when the caller has
     already materialised the queryset for serialisation (enforcing the
     single-snapshot contract). When ``rows`` is ``None`` the function queries
-    ``active_member_tags()`` itself.
+    ``active_member_tags(race_id)`` itself.
 
     Empty pool yields a stable ``"empty"``-based hash. Returns **bare** hex (no
     quotes).
     """
     if rows is None:
         rows = list(
-            active_member_tags().order_by("id").values_list("id", "number", "nfc_uid")
+            active_member_tags(race_id)
+            .order_by("id")
+            .values_list("id", "number", "nfc_uid")
         )
     if not rows:
         raw = "empty"
