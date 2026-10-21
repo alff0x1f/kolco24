@@ -7,7 +7,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ("website", "0101_race_member_key"),
+        ("website", "0100_team_dnf_reason"),
     ]
 
     operations = [

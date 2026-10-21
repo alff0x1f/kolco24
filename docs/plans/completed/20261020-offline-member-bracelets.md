@@ -255,6 +255,17 @@
 - [x] CLAUDE.md, блок `apps.mobile`: короткий пункт про v2, `member_key/` и `code_ok`; обновить пункт **Member tags** (пул по гонке)
 - [x] move this plan to `docs/plans/completed/`
 
+### ➕ Task 8: Правки по ревью (codex)
+
+- [x] ключ гонки — отдельная модель `mobile.RaceMemberKey` (O2O, `mobile/0015`) вместо колонки `Race.member_key`:
+      полный `Race.save()` формы, загруженной до выпуска ключа, затирал его в `NULL`; `website/0101_race_member_key`
+      удалена, `Tag.race` — теперь `website/0101_tag_race`
+- [x] `code_ok` пересчитывается после вставки по сохранённым строкам состава (`recheck_present_codes`): повторно
+      присланная отметка, сменившая гонку, оставляла старый `code_ok`
+- [x] `ensure_member_keys` отказывается работать при `MOBILE_DATA_SOURCE=local`
+- [x] тесты: устаревший `Race.save()` не стирает ключ, перенос отметки в другую гонку, ключ пришёл после первой
+      загрузки, отказ команды на LAN
+
 ## Post-Completion
 
 **Порядок выкатки (общий для трёх репо):**

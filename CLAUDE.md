@@ -637,14 +637,17 @@ Django 4.2 project. Source lives entirely under `src/`, with `manage.py` at `src
       «Браслеты v2»): the judge's phone writes `race_id u16 ‖ number u16 ‖ HMAC-SHA256(K_race, uid ‖ race_id ‖
       number)[:12]` (`crypto.member_code`) and later uploads the bind as `POST bind/` with `code` → `Tag(race, nfc_uid,
       number)` (201/200, a valid code for a new number **rebinds**, bad code 400, no 409). `Tag.race` FK
-      (`website/0102`; uniqueness `(race, nfc_uid)` + partial `unique(nfc_uid) WHERE race IS NULL`). `Race.member_key`
-      (`website/0101`, 32 B) is served by `GET /app/race/<id>/member_key/` (bind's stack, `no-store`). **Only the cloud
-      mints a key** (`member_key.ensure_member_key`, a conditional `UPDATE` that deliberately skips `save()`, so
-      `Race.updated_at`/the races ETag don't move; or `manage.py ensure_member_keys`); with `MOBILE_DATA_SOURCE=local`
-      a missing key is a 404, never a fresh key — the LAN server gets it from the DB copy. `MarkPresent.code_ok`
-      (`mobile/0014`, `member_key.check_member_code`) is set at `/marks/` ingest: 24-hex code → HMAC recompute, 32-hex →
-      global `Tag.code` (one query per batch, `v1_codes_for`), nothing to check → `None`; never rejects, shown as «⚠» on
-      the app-data team page. `apps/race/app_data._tag_pool(race)` uses the same race-wins pool.
+      (`website/0101`; uniqueness `(race, nfc_uid)` + partial `unique(nfc_uid) WHERE race IS NULL`). The race key is
+      its own row `mobile.RaceMemberKey` (O2O, `mobile/0015`, 32 B) — **never a `Race` column**: a stale full
+      `Race.save()` from the edit form would write it back to NULL and the next request would mint a different key. It
+      is served by `GET /app/race/<id>/member_key/` (bind's stack, `no-store`). **Only the cloud mints a key**
+      (`member_key.ensure_member_key`, `get_or_create`; or `manage.py ensure_member_keys`); with
+      `MOBILE_DATA_SOURCE=local` the endpoint 404s and the command refuses — never a fresh key, the LAN server gets it
+      from the DB copy. `MarkPresent.code_ok` (`mobile/0014`) is recomputed at `/marks/` ingest over the **stored**
+      present rows of the batch's marks, after the insert (`member_key.recheck_present_codes` → `check_member_code`; a
+      re-sent mark keeps its old rows but may have changed race): 24-hex code → HMAC recompute, 32-hex → global
+      `Tag.code` (one query per batch, `v1_codes_for`), nothing to check → `None`; never rejects, shown as «⚠» on the
+      app-data team page. `apps/race/app_data._tag_pool(race)` uses the same race-wins pool.
 
 - `apps.photo_contest` — site photo contest, **not tied to races** (no FK into `website`; only `AUTH_USER_MODEL`),
   mounted at `/photo/`. Step 1 is submissions only; voting/gallery/results are future work. `PhotoContest` (slug,

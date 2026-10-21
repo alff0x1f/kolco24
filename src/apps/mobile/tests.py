@@ -10627,6 +10627,15 @@ def test_member_tag_bind_get_returns_405(client, signed_app_keys, django_user_mo
 # --- Member bracelet key: GET /app/race/<id>/member_key/ ----------------------
 
 
+from apps.mobile.member_key import get_member_key  # noqa: E402
+
+
+def _set_member_key(race, key):
+    from apps.mobile.models import RaceMemberKey
+
+    RaceMemberKey.objects.update_or_create(race=race, defaults={"key": key})
+
+
 def _member_key_path(race_id):
     return f"/app/race/{race_id}/member_key/"
 
@@ -10658,8 +10667,25 @@ def test_member_key_mints_once_and_is_stable(
     assert len(bytes.fromhex(body["key"])) == 32
     assert second.json() == body
     race.refresh_from_db()
-    assert bytes(race.member_key).hex() == body["key"]
+    assert get_member_key(race.id).hex() == body["key"]
     assert race.updated_at == updated_at
+
+
+@pytest.mark.django_db
+def test_member_key_survives_stale_race_save(
+    client, signed_app_keys, django_user_model
+):
+    """An edit form loaded before the key was minted must not wipe it on save."""
+    from website.models.race import Race
+
+    race, _, raw, _ = _make_admin_race(django_user_model, "mkey-stale")
+    stale = Race.objects.get(pk=race.pk)
+    key_hex = _get_member_key(client, race.id, raw).json()["key"]
+
+    stale.name = "renamed"
+    stale.save()
+
+    assert _get_member_key(client, race.id, raw).json()["key"] == key_hex
 
 
 @pytest.mark.django_db
@@ -10685,8 +10711,7 @@ def test_member_key_requires_admin(client, signed_app_keys, django_user_model):
     assert _get_member_key(client, race.id, _make_active_token(other)).status_code == (
         403
     )
-    race.refresh_from_db()
-    assert race.member_key is None
+    assert get_member_key(race.id) is None
 
 
 @pytest.mark.django_db
@@ -10708,8 +10733,7 @@ def test_member_key_local_server_never_mints(
     response = _get_member_key(client, race.id, raw)
 
     assert response.status_code == 404
-    race.refresh_from_db()
-    assert race.member_key is None
+    assert get_member_key(race.id) is None
 
 
 @pytest.mark.django_db
@@ -10718,8 +10742,7 @@ def test_member_key_local_server_serves_copied_key(
 ):
     settings.MOBILE_DATA_SOURCE = "local"
     race, _, raw, _ = _make_admin_race(django_user_model, "mkey-local-ok")
-    race.member_key = bytes(range(32))
-    race.save()
+    _set_member_key(race, bytes(range(32)))
 
     response = _get_member_key(client, race.id, raw)
 
@@ -10756,18 +10779,30 @@ def test_ensure_member_keys_command_mints_published_only():
 
     published = Race.objects.create(name="p", slug="mk-cmd-pub")
     hidden = Race.objects.create(name="h", slug="mk-cmd-hid", is_published=False)
-    keyed = Race.objects.create(name="k", slug="mk-cmd-key", member_key=b"\x01" * 32)
+    keyed = Race.objects.create(name="k", slug="mk-cmd-key")
+    _set_member_key(keyed, b"\x01" * 32)
 
     out = StringIO()
     call_command("ensure_member_keys", stdout=out)
 
-    published.refresh_from_db()
-    hidden.refresh_from_db()
-    keyed.refresh_from_db()
-    assert len(bytes(published.member_key)) == 32
-    assert hidden.member_key is None
-    assert bytes(keyed.member_key) == b"\x01" * 32
+    assert len(get_member_key(published.id)) == 32
+    assert get_member_key(hidden.id) is None
+    assert get_member_key(keyed.id) == b"\x01" * 32
     assert "minted 1" in out.getvalue()
+
+
+@pytest.mark.django_db
+def test_ensure_member_keys_command_refuses_on_lan(settings):
+    from django.core.management import CommandError, call_command
+
+    from website.models.race import Race
+
+    settings.MOBILE_DATA_SOURCE = "local"
+    race = Race.objects.create(name="p", slug="mk-cmd-lan")
+
+    with pytest.raises(CommandError):
+        call_command("ensure_member_keys", stdout=None)
+    assert get_member_key(race.id) is None
 
 
 @pytest.mark.django_db
@@ -10781,10 +10816,8 @@ def test_ensure_member_keys_command_single_race():
 
     call_command("ensure_member_keys", race=a.id, stdout=None)
 
-    a.refresh_from_db()
-    b.refresh_from_db()
-    assert a.member_key is not None
-    assert b.member_key is None
+    assert get_member_key(a.id) is not None
+    assert get_member_key(b.id) is None
 
 
 # --- Per-race member-tag pool (Tag.race) ---------------------------------------
@@ -10942,8 +10975,7 @@ def _bind_v2(client, race, raw, nfc_uid, number, code_hex):
 
 def _keyed_admin_race(django_user_model, slug):
     race, user, raw, cp = _make_admin_race(django_user_model, slug)
-    race.member_key = MEMBER_VECTOR_KEY
-    race.save()
+    _set_member_key(race, MEMBER_VECTOR_KEY)
     return race, raw
 
 
@@ -11118,12 +11150,14 @@ def test_v1_codes_for_reads_global_tags_only():
     Tag.objects.create(number=1, nfc_uid="04CC", code=bytes.fromhex(V1_CODE))
     Tag.objects.create(number=2, nfc_uid="04DD", race=race, code=b"\x01" * 16)
 
+    from apps.mobile.models import MarkPresent
+
     codes = v1_codes_for(
         [
-            {"nfc_uid": "04cc", "code": V1_CODE},
-            {"nfc_uid": "04DD", "code": "01" * 16},
-            {"nfc_uid": "04EE", "code": V2_OK},
-            {"nfc_uid": None, "code": None},
+            MarkPresent(nfc_uid="04cc", code=V1_CODE),
+            MarkPresent(nfc_uid="04DD", code="01" * 16),
+            MarkPresent(nfc_uid="04EE", code=V2_OK),
+            MarkPresent(nfc_uid=None, code=None),
         ]
     )
 
@@ -11157,8 +11191,7 @@ def test_mark_upload_sets_code_ok(client, signed_app_keys, django_user_model):
     from website.models.tag import Tag
 
     race, team = _make_team_in_race(django_user_model, slug="code-ok")
-    race.member_key = MEMBER_VECTOR_KEY
-    race.save()
+    _set_member_key(race, MEMBER_VECTOR_KEY)
     cp, cp_code = _make_cp_with_tag(race)
     Tag.objects.create(number=5, nfc_uid="04CC", code=bytes.fromhex(V1_CODE))
     good_v2 = member_code(MEMBER_VECTOR_KEY, MEMBER_VECTOR_UID, race.id, 123).hex()
@@ -11196,8 +11229,7 @@ def test_mark_upload_code_ok_queries_do_not_grow_with_members(
     from website.models.tag import Tag
 
     race, team = _make_team_in_race(django_user_model, slug="code-ok-n1")
-    race.member_key = MEMBER_VECTOR_KEY
-    race.save()
+    _set_member_key(race, MEMBER_VECTOR_KEY)
     cp, cp_code = _make_cp_with_tag(race)
     for i in range(6):
         Tag.objects.create(number=i + 1, nfc_uid=f"04C{i}", code=bytes([i]) * 16)
@@ -11216,3 +11248,54 @@ def test_mark_upload_code_ok_queries_do_not_grow_with_members(
 
     upload("mk-n1-warm", 1)  # first request also records install stats
     assert upload("mk-n1-a", 1) == upload("mk-n1-b", 6)
+
+
+@pytest.mark.django_db
+def test_mark_moved_to_another_race_rechecks_code_ok(
+    client, signed_app_keys, django_user_model
+):
+    from apps.mobile.models import MarkPresent
+
+    race_a, team_a = _make_team_in_race(django_user_model, slug="code-move-a")
+    race_b, team_b = _make_team_in_race(
+        django_user_model, name="Team B", slug="code-move-b"
+    )
+    _set_member_key(race_a, MEMBER_VECTOR_KEY)
+    _set_member_key(race_b, bytes(range(1, 33)))
+    cp_a, cp_code_a = _make_cp_with_tag(race_a, number=1)
+    cp_b, cp_code_b = _make_cp_with_tag(race_b, number=2)
+    code = member_code(MEMBER_VECTOR_KEY, MEMBER_VECTOR_UID, race_a.id, 123).hex()
+    presents = [_present(MEMBER_VECTOR_UID, 123, 1, code)]
+
+    first = _upload_presents(
+        client, race_a, team_a, cp_a, cp_code_a, "mk-move", presents
+    )
+    assert first.status_code == 200
+    assert MarkPresent.objects.get(mark_id="mk-move").code_ok is True
+
+    moved = _upload_presents(
+        client, race_b, team_b, cp_b, cp_code_b, "mk-move", presents
+    )
+
+    assert moved.status_code == 200
+    assert MarkPresent.objects.get(mark_id="mk-move").code_ok is False
+
+
+@pytest.mark.django_db
+def test_mark_resend_rechecks_after_key_arrives(
+    client, signed_app_keys, django_user_model
+):
+    from apps.mobile.models import MarkPresent
+
+    race, team = _make_team_in_race(django_user_model, slug="code-late-key")
+    cp, cp_code = _make_cp_with_tag(race)
+    code = member_code(MEMBER_VECTOR_KEY, MEMBER_VECTOR_UID, race.id, 123).hex()
+    presents = [_present(MEMBER_VECTOR_UID, 123, 1, code)]
+
+    _upload_presents(client, race, team, cp, cp_code, "mk-late", presents)
+    assert MarkPresent.objects.get(mark_id="mk-late").code_ok is False
+
+    _set_member_key(race, MEMBER_VECTOR_KEY)
+    _upload_presents(client, race, team, cp, cp_code, "mk-late", presents)
+
+    assert MarkPresent.objects.get(mark_id="mk-late").code_ok is True

@@ -6,7 +6,6 @@ from django.core.exceptions import ValidationError
 from django.core.validators import URLValidator
 from django.db.models import (
     CASCADE,
-    BinaryField,
     BooleanField,
     CharField,
     DateField,
@@ -82,9 +81,6 @@ class Race(Model):
     is_photo_upload_enabled = BooleanField("Загрузка фото включена", default=False)
 
     people_limit = IntegerField("Лимит участников", default=0)  # 0 = без лимита
-    # Secret 32-byte key for K24 v2 bracelet codes; served only to race admins by
-    # GET /app/race/<id>/member_key/. Minted in the cloud, copied to LAN with the DB.
-    member_key = BinaryField("Ключ браслетов", null=True, blank=True)
     updated_at = DateTimeField(auto_now=True)
 
     class Meta:

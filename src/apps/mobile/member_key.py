@@ -13,28 +13,33 @@ from website.models.race import Race
 from website.models.tag import Tag
 
 from .crypto import MEMBER_CODE_BYTES, member_code
+from .models import MarkPresent, RaceMemberKey
 
 MEMBER_KEY_BYTES = 32
 V1_CODE_BYTES = 16
 
 
 def get_member_key(race_id: int) -> bytes | None:
-    key = Race.objects.filter(pk=race_id).values_list("member_key", flat=True).first()
+    key = (
+        RaceMemberKey.objects.filter(race_id=race_id)
+        .values_list("key", flat=True)
+        .first()
+    )
     return bytes(key) if key is not None else None
 
 
 def ensure_member_key(race_id: int) -> bytes | None:
     """Return the race key, minting it if missing (``None`` for an unknown race).
 
-    A conditional ``UPDATE … WHERE member_key IS NULL`` instead of a row lock:
-    two concurrent calls write at most once and both re-read the winner. It goes
-    around ``save()`` on purpose — ``Race.updated_at`` feeds the races ETag, and
-    a key the app never sees in that list must not move it.
+    ``get_or_create`` on the race's primary key: two concurrent calls create at
+    most one row and both read the winner. Never call this on the LAN server.
     """
-    Race.objects.filter(pk=race_id, member_key__isnull=True).update(
-        member_key=os.urandom(MEMBER_KEY_BYTES)
+    if not Race.objects.filter(pk=race_id).exists():
+        return None
+    row, _ = RaceMemberKey.objects.get_or_create(
+        race_id=race_id, defaults={"key": os.urandom(MEMBER_KEY_BYTES)}
     )
-    return get_member_key(race_id)
+    return bytes(row.key)
 
 
 def _parse_code(code):
@@ -47,13 +52,13 @@ def _parse_code(code):
 def v1_codes_for(presents):
     """``{nfc_uid: code}`` of global (v1) tags for the presents carrying a v1 code.
 
-    One query for the whole upload batch; feed the result to
-    :func:`check_member_code`.
+    ``presents`` are ``MarkPresent`` rows. One query for the whole upload batch;
+    feed the result to :func:`check_member_code`.
     """
     uids = set()
     for p in presents:
-        code = _parse_code(p.get("code"))
-        uid = (p.get("nfc_uid") or "").strip().upper()
+        code = _parse_code(p.code)
+        uid = (p.nfc_uid or "").strip().upper()
         if code is not None and len(code) == V1_CODE_BYTES and uid:
             uids.add(uid)
     if not uids:
@@ -92,3 +97,25 @@ def check_member_code(race_id, key, nfc_uid, number, code, v1_codes):
             return None
         return hmac.compare_digest(stored, raw)
     return False
+
+
+def recheck_present_codes(race_id, mark_ids):
+    """Recompute ``code_ok`` of every stored present row of ``mark_ids``.
+
+    Run after the upload's insert, against the stored rows: a re-sent mark keeps
+    its existing rows (``ignore_conflicts``) while its race may have changed, so
+    a value computed only for newly inserted rows could go stale.
+    """
+    stored = list(MarkPresent.objects.filter(mark_id__in=mark_ids))
+    if not stored:
+        return
+    key = get_member_key(race_id)
+    v1_codes = v1_codes_for(stored)
+    changed = []
+    for p in stored:
+        ok = check_member_code(race_id, key, p.nfc_uid, p.number, p.code, v1_codes)
+        if ok is not p.code_ok:
+            p.code_ok = ok
+            changed.append(p)
+    if changed:
+        MarkPresent.objects.bulk_update(changed, ["code_ok"])

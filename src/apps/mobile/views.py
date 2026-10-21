@@ -33,12 +33,7 @@ from website.models.tag import Tag
 
 from .crypto import MEMBER_FIELD_MAX, member_code
 from .legend_crypto import build_bundle
-from .member_key import (
-    check_member_code,
-    ensure_member_key,
-    get_member_key,
-    v1_codes_for,
-)
+from .member_key import ensure_member_key, get_member_key, recheck_present_codes
 from .models import (
     MARK_UPDATE_FIELDS,
     AppAuthFailure,
@@ -689,8 +684,6 @@ class MarkUploadView(AppAPIView):
             return Response({"accepted": accepted}, status=status.HTTP_200_OK)
 
         bids_by_cp = _bids_by_checkpoint(race_id)
-        member_key = get_member_key(race_id)
-        v1_codes = v1_codes_for(p for m in marks for p in m["present"])
 
         # De-dup the batch by id (keep last occurrence) — update_conflicts raises
         # CardinalityViolation on an in-batch duplicate conflict key. The real
@@ -735,14 +728,6 @@ class MarkUploadView(AppAPIView):
                         code=member.get("code"),
                         number=member["number"],
                         number_in_team=member["number_in_team"],
-                        code_ok=check_member_code(
-                            race_id,
-                            member_key,
-                            member.get("nfc_uid"),
-                            member["number"],
-                            member.get("code"),
-                            v1_codes,
-                        ),
                     )
                 )
 
@@ -759,6 +744,9 @@ class MarkUploadView(AppAPIView):
             # Additive: unique_together skips slots already stored, inserts the
             # rest (the late roster members of an enrichment re-send).
             MarkPresent.objects.bulk_create(present_objs, ignore_conflicts=True)
+            # Over the stored rows, not present_objs: a re-sent mark keeps its old
+            # rows and may now belong to another race.
+            recheck_present_codes(race_id, list(deduped))
 
             _auto_populate_boundary_times(race_id, team_id, deduped)
 
