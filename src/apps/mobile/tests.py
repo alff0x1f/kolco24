@@ -3170,12 +3170,25 @@ from apps.mobile.crypto import member_code  # noqa: E402
 # Shared test vector — the Android and iOS tests carry the same values.
 MEMBER_VECTOR_KEY = bytes(range(32))
 MEMBER_VECTOR_UID = "04A1B2C3D4E5F6"
-MEMBER_VECTOR_CODE = "a6a6795129a8cdd661a9bb15"
+MEMBER_VECTOR_CODE = "deb887a736ce08d1fd704d62"
 
 
 def test_member_code_shared_vector():
     code = member_code(MEMBER_VECTOR_KEY, MEMBER_VECTOR_UID, 42, 123)
     assert code.hex() == MEMBER_VECTOR_CODE
+
+
+def test_member_code_message_leads_with_type_byte():
+    import hashlib
+    import hmac
+
+    uid = bytes.fromhex(MEMBER_VECTOR_UID)
+    tail = uid + (42).to_bytes(2, "big") + (123).to_bytes(2, "big")
+    expected = hmac.new(MEMBER_VECTOR_KEY, b"\x22" + tail, hashlib.sha256).digest()
+    untyped = hmac.new(MEMBER_VECTOR_KEY, tail, hashlib.sha256).digest()
+    code = member_code(MEMBER_VECTOR_KEY, MEMBER_VECTOR_UID, 42, 123)
+    assert code == expected[:12]
+    assert code != untyped[:12]
 
 
 def test_member_code_normalizes_uid():

@@ -634,8 +634,8 @@ Django 4.2 project. Source lives entirely under `src/`, with `manage.py` at `src
       an admin of any published race can read any v1 bracelet's code (`number: null`). The v1 path (body without
       `code`), and the legacy `/api/member_tag/` list/create/touch, only ever see global rows (`race IS NULL`).
     - **K24 v2 bracelets** (offline issuing; format, statuses and test vector in `src/apps/mobile/README.md`,
-      «Браслеты v2»): the judge's phone writes `race_id u16 ‖ number u16 ‖ HMAC-SHA256(K_race, uid ‖ race_id ‖
-      number)[:12]` (`crypto.member_code`) and later uploads the bind as `POST bind/` with `code` → `Tag(race, nfc_uid,
+      «Браслеты v2»): the judge's phone writes `race_id u16 ‖ number u16 ‖ HMAC-SHA256(K_race, 0x22 ‖ uid ‖ race_id ‖
+      number)[:12]` (the leading type byte is domain separation — keep it in any new chip type signed with the race key) (`crypto.member_code`) and later uploads the bind as `POST bind/` with `code` → `Tag(race, nfc_uid,
       number)` (201/200, a valid code for a new number **rebinds**, bad code 400, no 409). `Tag.race` FK
       (`website/0101`; uniqueness `(race, nfc_uid)` + partial `unique(nfc_uid) WHERE race IS NULL`). The race key is
       its own row `mobile.RaceMemberKey` (O2O, `mobile/0015`, 32 B) — **never a `Race` column**: a stale full
