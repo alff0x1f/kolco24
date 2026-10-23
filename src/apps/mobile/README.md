@@ -263,7 +263,7 @@ Android и iOS): ключ `000102…1f`, UID `04A1B2C3D4E5F6`, гонка 42, н
 не пройдут проверку.
 
 **Загрузка привязки.** Судья кладёт `(uid, number, code)` в очередь и шлёт
-`POST bind/` с телом `{nfc_uid, number, code}` (`code` — 24 hex, UID — hex, `number`
+`POST bind/` с телом `{nfc_uid, number, code}` (`code` — 24 hex, UID — hex без разделителей, `number`
 `1…65535`). Ветка v2 (`MemberTagBindView._bind_v2`) пересчитывает HMAC:
 
 | Статус | Когда |

@@ -154,7 +154,12 @@ def _present_label(present, tag_numbers):
     if uid is None:
         # {nfc_uid: null, number: 0} is the "no snapshot" sentinel.
         return {"label": "без снимка", "uid": "", "known": False, "code_ok": None}
-    return {**_chip_label(uid, tag_numbers), "code_ok": present.code_ok}
+    label = _chip_label(uid, tag_numbers)
+    if not label["known"] and present.code_ok and present.number:
+        # A verified code vouches for the snapshot number, e.g. a take uploaded
+        # before the judge's offline bind reached the pool.
+        label = {"label": f"№{present.number}", "uid": uid, "known": True}
+    return {**label, "code_ok": present.code_ok}
 
 
 def _race_teams(race):

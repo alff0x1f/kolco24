@@ -2,6 +2,7 @@
 
 import logging
 import math
+import re
 
 from rest_framework import serializers
 
@@ -11,6 +12,8 @@ from website.models.race import Category, Race
 from website.models.tag import Tag
 
 from .crypto import CHIP_FIELD_MAX
+
+HEX_UID_RE = re.compile(r"(?:[0-9A-F]{2})+")
 
 logger = logging.getLogger(__name__)
 
@@ -79,9 +82,9 @@ class MemberTagBindSerializer(serializers.Serializer):
                 raise serializers.ValidationError(
                     {"number": f"Для браслета v2 нужен номер 1…{CHIP_FIELD_MAX}"}
                 )
-            try:
-                bytes.fromhex(attrs["nfc_uid"])
-            except ValueError:
+            # Strict: bytes.fromhex skips whitespace, so "04 AA" would sign like
+            # "04AA" yet land in the pool as a different UID.
+            if not HEX_UID_RE.fullmatch(attrs["nfc_uid"]):
                 raise serializers.ValidationError({"nfc_uid": "UID должен быть hex"})
         return attrs
 

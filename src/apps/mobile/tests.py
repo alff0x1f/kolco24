@@ -11112,6 +11112,23 @@ def test_bind_v2_non_hex_uid_400(client, signed_app_keys, django_user_model):
     assert response.status_code == 400
 
 
+@pytest.mark.django_db
+@pytest.mark.parametrize("nfc_uid", ["04 B0", "04\tB0", "04:B0"])
+def test_bind_v2_rejects_separated_uid_even_with_matching_code(
+    client, signed_app_keys, django_user_model, nfc_uid
+):
+    from website.models.tag import Tag
+
+    race, raw = _keyed_admin_race(django_user_model, "v2-sep")
+    code = _v2_code(race, "04B0", 7)
+
+    response = _bind_v2(client, race, raw, nfc_uid, 7, code)
+
+    assert response.status_code == 400
+    assert "nfc_uid" in response.json()
+    assert not Tag.objects.filter(race=race).exists()
+
+
 # --- MarkPresent.code_ok -------------------------------------------------------
 
 

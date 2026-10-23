@@ -266,6 +266,11 @@
 - [x] `ensure_member_keys` отказывается работать при `MOBILE_DATA_SOURCE=local`
 - [x] тесты: устаревший `Race.save()` не стирает ключ, перенос отметки в другую гонку, ключ пришёл после первой
       загрузки, отказ команды на LAN
+- [x] переименование под общий ключ всех чипов K24 v2: `RaceMemberKey` → `RaceChipKey`, `member_key.py` →
+      `chip_key.py`, `member_key/` → `chip_key/`, `ensure_member_keys` → `ensure_chip_keys`; миграции `mobile/0014`
+      и `0015` слиты в `mobile/0014_chip_key`
+- [x] v2 UID в `bind/` — строго `(?:[0-9A-F]{2})+` (`bytes.fromhex` пропускал пробелы); страница команды показывает
+      номер из снимка, если `code_ok` и UID ещё нет в пуле
 
 ## Post-Completion
 
@@ -274,7 +279,7 @@
 2. Приложения участника читают v2 и шлют `code` в отметках.
 3. Судейская запись v2.
 
-**Перед гонкой с LAN-сервером:** в облаке `manage.py ensure_member_keys --race <id>`, затем `backup_db` → `restore_db` на LAN.
+**Перед гонкой с LAN-сервером:** в облаке `manage.py ensure_chip_keys --race <id>`, затем `backup_db` → `restore_db` на LAN.
 Судьи скачивают ключ, пока есть интернет.
 
 **Manual verification:**
@@ -282,5 +287,5 @@
 - подменить номер на чипе вручную → отметка с `code_ok = False`
 
 **Операционное:**
-- перевыпуск ключа гонки — только из shell (`Race.member_key = None`, затем `ensure_member_keys`): `BinaryField` в
+- перевыпуск ключа гонки — только из shell (удалить `RaceChipKey`, затем `ensure_chip_keys`): `BinaryField` в
   админке не редактируется; все v2-браслеты гонки станут `code_ok = False`

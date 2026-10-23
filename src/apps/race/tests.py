@@ -9678,3 +9678,29 @@ def test_app_data_team_page_flags_forged_bracelet(client, django_user_model):
     assert resp.status_code == 200
     assert body.count("код браслета не совпал") == 1
     assert body.count("tagchip forged") + body.count("unknown forged") == 1
+
+
+@pytest.mark.django_db
+def test_app_data_present_label_uses_verified_snapshot_number():
+    race, category, _, _, cp_kp = _make_app_data_race("app-data-snapshot-no")
+    owner = User.objects.create_user(username="appdata-snap", password="x")
+    team = _make_team(owner, category, teamname="Снимок", start_time=1, finish_time=0)
+    mark = _make_mark(team, cp_kp, present_chips=("AA:01", "AA:02", "AA:03"))
+    MarkPresent.objects.filter(mark=mark, number_in_team=1).update(
+        number=41, code_ok=True
+    )
+    MarkPresent.objects.filter(mark=mark, number_in_team=2).update(
+        number=42, code_ok=None
+    )
+    MarkPresent.objects.filter(mark=mark, number_in_team=3).update(
+        number=43, code_ok=False
+    )
+
+    context = build_team_timeline(race, team)
+    mark_event = next(e for e in context["events"] if e["kind"] == "mark")
+
+    assert [(p["label"], p["known"]) for p in mark_event["present"]] == [
+        ("№41", True),
+        ("AA:02", False),
+        ("AA:03", False),
+    ]
