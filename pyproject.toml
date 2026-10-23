@@ -22,7 +22,7 @@ dependencies = [
 dev = [
     "pytest==9.0.3",
     "pytest-django==4.8.0",
-    "black==26.3.1",
+    "black==26.10.1",
     "flake8==7.1.0",
     "isort==5.13.2",
     "seed-isort-config~=2.2.0",
