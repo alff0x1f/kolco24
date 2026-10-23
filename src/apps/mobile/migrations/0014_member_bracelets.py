@@ -8,10 +8,15 @@ class Migration(migrations.Migration):
 
     dependencies = [
         ("website", "0101_tag_race"),
-        ("mobile", "0014_markpresent_code_ok"),
+        ("mobile", "0013_mark_force_counted"),
     ]
 
     operations = [
+        migrations.AddField(
+            model_name="markpresent",
+            name="code_ok",
+            field=models.BooleanField(null=True),
+        ),
         migrations.CreateModel(
             name="RaceMemberKey",
             fields=[
