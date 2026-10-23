@@ -77,6 +77,14 @@
 }
 .rm-gpx:hover { background: var(--paper-2); }
 
+.rm-gpx-all {
+  align-self: flex-start; padding: 4px 10px;
+  font-size: 13px; font-weight: 600; color: var(--primary-2);
+  border: 1px solid currentColor; border-radius: var(--radius-sm);
+  text-decoration: none;
+}
+.rm-gpx-all:hover { background: var(--paper-2); }
+
 .rm-team-list { flex: 1; overflow-y: auto; }
 .rm-group-label {
   padding: 10px 16px 4px;
