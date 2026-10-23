@@ -1,4 +1,4 @@
-"""Per-race key for K24 v2 participant bracelet codes.
+"""Per-race key of K24 v2 chip codes, and the check of participant codes.
 
 The cloud server is the only place a key is minted; the LAN server gets it with
 the DB copy (``backup_db``/``restore_db``), so the two can never disagree.
@@ -12,23 +12,23 @@ import os
 from website.models.race import Race
 from website.models.tag import Tag
 
-from .crypto import MEMBER_CODE_BYTES, member_code
-from .models import MarkPresent, RaceMemberKey
+from .crypto import CHIP_CODE_BYTES, member_code
+from .models import MarkPresent, RaceChipKey
 
-MEMBER_KEY_BYTES = 32
+CHIP_KEY_BYTES = 32
 V1_CODE_BYTES = 16
 
 
-def get_member_key(race_id: int) -> bytes | None:
+def get_chip_key(race_id: int) -> bytes | None:
     key = (
-        RaceMemberKey.objects.filter(race_id=race_id)
+        RaceChipKey.objects.filter(race_id=race_id)
         .values_list("key", flat=True)
         .first()
     )
     return bytes(key) if key is not None else None
 
 
-def ensure_member_key(race_id: int) -> bytes | None:
+def ensure_chip_key(race_id: int) -> bytes | None:
     """Return the race key, minting it if missing (``None`` for an unknown race).
 
     ``get_or_create`` on the race's primary key: two concurrent calls create at
@@ -36,8 +36,8 @@ def ensure_member_key(race_id: int) -> bytes | None:
     """
     if not Race.objects.filter(pk=race_id).exists():
         return None
-    row, _ = RaceMemberKey.objects.get_or_create(
-        race_id=race_id, defaults={"key": os.urandom(MEMBER_KEY_BYTES)}
+    row, _ = RaceChipKey.objects.get_or_create(
+        race_id=race_id, defaults={"key": os.urandom(CHIP_KEY_BYTES)}
     )
     return bytes(row.key)
 
@@ -83,7 +83,7 @@ def check_member_code(race_id, key, nfc_uid, number, code, v1_codes):
     raw = _parse_code(code)
     if raw is None:
         return False
-    if len(raw) == MEMBER_CODE_BYTES:
+    if len(raw) == CHIP_CODE_BYTES:
         if key is None:
             return False
         try:
@@ -109,7 +109,7 @@ def recheck_present_codes(race_id, mark_ids):
     stored = list(MarkPresent.objects.filter(mark_id__in=mark_ids))
     if not stored:
         return
-    key = get_member_key(race_id)
+    key = get_chip_key(race_id)
     v1_codes = v1_codes_for(stored)
     changed = []
     for p in stored:

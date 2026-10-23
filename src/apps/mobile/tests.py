@@ -10637,24 +10637,24 @@ def test_member_tag_bind_get_returns_405(client, signed_app_keys, django_user_mo
     assert response.status_code == 405
 
 
-# --- Member bracelet key: GET /app/race/<id>/member_key/ ----------------------
+# --- Race chip key: GET /app/race/<id>/chip_key/ ----------------------
 
 
-from apps.mobile.member_key import get_member_key  # noqa: E402
+from apps.mobile.chip_key import get_chip_key  # noqa: E402
 
 
-def _set_member_key(race, key):
-    from apps.mobile.models import RaceMemberKey
+def _set_chip_key(race, key):
+    from apps.mobile.models import RaceChipKey
 
-    RaceMemberKey.objects.update_or_create(race=race, defaults={"key": key})
-
-
-def _member_key_path(race_id):
-    return f"/app/race/{race_id}/member_key/"
+    RaceChipKey.objects.update_or_create(race=race, defaults={"key": key})
 
 
-def _get_member_key(client, race_id, raw):
-    path = _member_key_path(race_id)
+def _chip_key_path(race_id):
+    return f"/app/race/{race_id}/chip_key/"
+
+
+def _get_chip_key(client, race_id, raw):
+    path = _chip_key_path(race_id)
     headers = _signed_headers("GET", path, SECRET)
     if raw is not None:
         headers["HTTP_AUTHORIZATION"] = f"Bearer {raw}"
@@ -10662,16 +10662,14 @@ def _get_member_key(client, race_id, raw):
 
 
 @pytest.mark.django_db
-def test_member_key_mints_once_and_is_stable(
-    client, signed_app_keys, django_user_model
-):
+def test_chip_key_mints_once_and_is_stable(client, signed_app_keys, django_user_model):
     from website.models.race import Race
 
     race, _, raw, _ = _make_admin_race(django_user_model, "mkey-ok")
     updated_at = Race.objects.get(pk=race.pk).updated_at
 
-    first = _get_member_key(client, race.id, raw)
-    second = _get_member_key(client, race.id, raw)
+    first = _get_chip_key(client, race.id, raw)
+    second = _get_chip_key(client, race.id, raw)
 
     assert first.status_code == 200
     assert first["Cache-Control"] == "no-store"
@@ -10680,95 +10678,91 @@ def test_member_key_mints_once_and_is_stable(
     assert len(bytes.fromhex(body["key"])) == 32
     assert second.json() == body
     race.refresh_from_db()
-    assert get_member_key(race.id).hex() == body["key"]
+    assert get_chip_key(race.id).hex() == body["key"]
     assert race.updated_at == updated_at
 
 
 @pytest.mark.django_db
-def test_member_key_survives_stale_race_save(
-    client, signed_app_keys, django_user_model
-):
+def test_chip_key_survives_stale_race_save(client, signed_app_keys, django_user_model):
     """An edit form loaded before the key was minted must not wipe it on save."""
     from website.models.race import Race
 
     race, _, raw, _ = _make_admin_race(django_user_model, "mkey-stale")
     stale = Race.objects.get(pk=race.pk)
-    key_hex = _get_member_key(client, race.id, raw).json()["key"]
+    key_hex = _get_chip_key(client, race.id, raw).json()["key"]
 
     stale.name = "renamed"
     stale.save()
 
-    assert _get_member_key(client, race.id, raw).json()["key"] == key_hex
+    assert _get_chip_key(client, race.id, raw).json()["key"] == key_hex
 
 
 @pytest.mark.django_db
-def test_ensure_member_key_keeps_existing_key():
-    from apps.mobile.member_key import ensure_member_key
+def test_ensure_chip_key_keeps_existing_key():
+    from apps.mobile.chip_key import ensure_chip_key
     from website.models.race import Race
 
     race = Race.objects.create(name="mk", slug="mk-keep")
-    first = ensure_member_key(race.id)
-    assert ensure_member_key(race.id) == first
-    assert ensure_member_key(999999) is None
+    first = ensure_chip_key(race.id)
+    assert ensure_chip_key(race.id) == first
+    assert ensure_chip_key(999999) is None
 
 
 @pytest.mark.django_db
-def test_member_key_requires_admin(client, signed_app_keys, django_user_model):
+def test_chip_key_requires_admin(client, signed_app_keys, django_user_model):
     race, _, _, _ = _make_admin_race(django_user_model, "mkey-perm")
     other = django_user_model.objects.create_user(
         username="mk-other", email="mk-other@example.com", password="x"
     )
 
-    assert _get_member_key(client, race.id, None).status_code == 401
-    assert _get_member_key(client, race.id, "bogus").status_code == 401
-    assert _get_member_key(client, race.id, _make_active_token(other)).status_code == (
+    assert _get_chip_key(client, race.id, None).status_code == 401
+    assert _get_chip_key(client, race.id, "bogus").status_code == 401
+    assert _get_chip_key(client, race.id, _make_active_token(other)).status_code == (
         403
     )
-    assert get_member_key(race.id) is None
+    assert get_chip_key(race.id) is None
 
 
 @pytest.mark.django_db
-def test_member_key_unpublished_race_404(client, signed_app_keys, django_user_model):
+def test_chip_key_unpublished_race_404(client, signed_app_keys, django_user_model):
     race, _, raw, _ = _make_admin_race(django_user_model, "mkey-unpub")
     race.is_published = False
     race.save()
 
-    assert _get_member_key(client, race.id, raw).status_code == 404
+    assert _get_chip_key(client, race.id, raw).status_code == 404
 
 
 @pytest.mark.django_db
-def test_member_key_local_server_never_mints(
+def test_chip_key_local_server_never_mints(
     client, settings, signed_app_keys, django_user_model
 ):
     settings.MOBILE_DATA_SOURCE = "local"
     race, _, raw, _ = _make_admin_race(django_user_model, "mkey-local")
 
-    response = _get_member_key(client, race.id, raw)
+    response = _get_chip_key(client, race.id, raw)
 
     assert response.status_code == 404
-    assert get_member_key(race.id) is None
+    assert get_chip_key(race.id) is None
 
 
 @pytest.mark.django_db
-def test_member_key_local_server_serves_copied_key(
+def test_chip_key_local_server_serves_copied_key(
     client, settings, signed_app_keys, django_user_model
 ):
     settings.MOBILE_DATA_SOURCE = "local"
     race, _, raw, _ = _make_admin_race(django_user_model, "mkey-local-ok")
-    _set_member_key(race, bytes(range(32)))
+    _set_chip_key(race, bytes(range(32)))
 
-    response = _get_member_key(client, race.id, raw)
+    response = _get_chip_key(client, race.id, raw)
 
     assert response.status_code == 200
     assert response.json()["key"] == bytes(range(32)).hex()
 
 
 @pytest.mark.django_db
-def test_member_key_not_leaked_by_other_reads(
-    client, signed_app_keys, django_user_model
-):
+def test_chip_key_not_leaked_by_other_reads(client, signed_app_keys, django_user_model):
     race, _, raw, _ = _make_admin_race(django_user_model, "mkey-leak")
-    key_hex = _get_member_key(client, race.id, raw).json()["key"]
+    key_hex = _get_chip_key(client, race.id, raw).json()["key"]
 
     for path in (
         "/app/races/",
@@ -10783,7 +10777,7 @@ def test_member_key_not_leaked_by_other_reads(
 
 
 @pytest.mark.django_db
-def test_ensure_member_keys_command_mints_published_only():
+def test_ensure_chip_keys_command_mints_published_only():
     from io import StringIO
 
     from django.core.management import call_command
@@ -10793,19 +10787,19 @@ def test_ensure_member_keys_command_mints_published_only():
     published = Race.objects.create(name="p", slug="mk-cmd-pub")
     hidden = Race.objects.create(name="h", slug="mk-cmd-hid", is_published=False)
     keyed = Race.objects.create(name="k", slug="mk-cmd-key")
-    _set_member_key(keyed, b"\x01" * 32)
+    _set_chip_key(keyed, b"\x01" * 32)
 
     out = StringIO()
-    call_command("ensure_member_keys", stdout=out)
+    call_command("ensure_chip_keys", stdout=out)
 
-    assert len(get_member_key(published.id)) == 32
-    assert get_member_key(hidden.id) is None
-    assert get_member_key(keyed.id) == b"\x01" * 32
+    assert len(get_chip_key(published.id)) == 32
+    assert get_chip_key(hidden.id) is None
+    assert get_chip_key(keyed.id) == b"\x01" * 32
     assert "minted 1" in out.getvalue()
 
 
 @pytest.mark.django_db
-def test_ensure_member_keys_command_refuses_on_lan(settings):
+def test_ensure_chip_keys_command_refuses_on_lan(settings):
     from django.core.management import CommandError, call_command
 
     from website.models.race import Race
@@ -10814,12 +10808,12 @@ def test_ensure_member_keys_command_refuses_on_lan(settings):
     race = Race.objects.create(name="p", slug="mk-cmd-lan")
 
     with pytest.raises(CommandError):
-        call_command("ensure_member_keys", stdout=None)
-    assert get_member_key(race.id) is None
+        call_command("ensure_chip_keys", stdout=None)
+    assert get_chip_key(race.id) is None
 
 
 @pytest.mark.django_db
-def test_ensure_member_keys_command_single_race():
+def test_ensure_chip_keys_command_single_race():
     from django.core.management import call_command
 
     from website.models.race import Race
@@ -10827,10 +10821,10 @@ def test_ensure_member_keys_command_single_race():
     a = Race.objects.create(name="a", slug="mk-cmd-a")
     b = Race.objects.create(name="b", slug="mk-cmd-b")
 
-    call_command("ensure_member_keys", race=a.id, stdout=None)
+    call_command("ensure_chip_keys", race=a.id, stdout=None)
 
-    assert get_member_key(a.id) is not None
-    assert get_member_key(b.id) is None
+    assert get_chip_key(a.id) is not None
+    assert get_chip_key(b.id) is None
 
 
 # --- Per-race member-tag pool (Tag.race) ---------------------------------------
@@ -10988,7 +10982,7 @@ def _bind_v2(client, race, raw, nfc_uid, number, code_hex):
 
 def _keyed_admin_race(django_user_model, slug):
     race, user, raw, cp = _make_admin_race(django_user_model, slug)
-    _set_member_key(race, MEMBER_VECTOR_KEY)
+    _set_chip_key(race, MEMBER_VECTOR_KEY)
     return race, raw
 
 
@@ -11148,14 +11142,14 @@ V1_CODE = "11" * 16
     ],
 )
 def test_check_member_code(nfc_uid, number, code, key, v1_codes, expected):
-    from apps.mobile.member_key import check_member_code
+    from apps.mobile.chip_key import check_member_code
 
     assert check_member_code(42, key, nfc_uid, number, code, v1_codes) is expected
 
 
 @pytest.mark.django_db
 def test_v1_codes_for_reads_global_tags_only():
-    from apps.mobile.member_key import v1_codes_for
+    from apps.mobile.chip_key import v1_codes_for
     from website.models.race import Race
     from website.models.tag import Tag
 
@@ -11204,7 +11198,7 @@ def test_mark_upload_sets_code_ok(client, signed_app_keys, django_user_model):
     from website.models.tag import Tag
 
     race, team = _make_team_in_race(django_user_model, slug="code-ok")
-    _set_member_key(race, MEMBER_VECTOR_KEY)
+    _set_chip_key(race, MEMBER_VECTOR_KEY)
     cp, cp_code = _make_cp_with_tag(race)
     Tag.objects.create(number=5, nfc_uid="04CC", code=bytes.fromhex(V1_CODE))
     good_v2 = member_code(MEMBER_VECTOR_KEY, MEMBER_VECTOR_UID, race.id, 123).hex()
@@ -11242,7 +11236,7 @@ def test_mark_upload_code_ok_queries_do_not_grow_with_members(
     from website.models.tag import Tag
 
     race, team = _make_team_in_race(django_user_model, slug="code-ok-n1")
-    _set_member_key(race, MEMBER_VECTOR_KEY)
+    _set_chip_key(race, MEMBER_VECTOR_KEY)
     cp, cp_code = _make_cp_with_tag(race)
     for i in range(6):
         Tag.objects.create(number=i + 1, nfc_uid=f"04C{i}", code=bytes([i]) * 16)
@@ -11273,8 +11267,8 @@ def test_mark_moved_to_another_race_rechecks_code_ok(
     race_b, team_b = _make_team_in_race(
         django_user_model, name="Team B", slug="code-move-b"
     )
-    _set_member_key(race_a, MEMBER_VECTOR_KEY)
-    _set_member_key(race_b, bytes(range(1, 33)))
+    _set_chip_key(race_a, MEMBER_VECTOR_KEY)
+    _set_chip_key(race_b, bytes(range(1, 33)))
     cp_a, cp_code_a = _make_cp_with_tag(race_a, number=1)
     cp_b, cp_code_b = _make_cp_with_tag(race_b, number=2)
     code = member_code(MEMBER_VECTOR_KEY, MEMBER_VECTOR_UID, race_a.id, 123).hex()
@@ -11308,7 +11302,7 @@ def test_mark_resend_rechecks_after_key_arrives(
     _upload_presents(client, race, team, cp, cp_code, "mk-late", presents)
     assert MarkPresent.objects.get(mark_id="mk-late").code_ok is False
 
-    _set_member_key(race, MEMBER_VECTOR_KEY)
+    _set_chip_key(race, MEMBER_VECTOR_KEY)
     _upload_presents(client, race, team, cp, cp_code, "mk-late", presents)
 
     assert MarkPresent.objects.get(mark_id="mk-late").code_ok is True

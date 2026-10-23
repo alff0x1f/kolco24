@@ -638,13 +638,13 @@ Django 4.2 project. Source lives entirely under `src/`, with `manage.py` at `src
       number)[:12]` (the leading type byte is domain separation — keep it in any new chip type signed with the race key) (`crypto.member_code`) and later uploads the bind as `POST bind/` with `code` → `Tag(race, nfc_uid,
       number)` (201/200, a valid code for a new number **rebinds**, bad code 400, no 409). `Tag.race` FK
       (`website/0101`; uniqueness `(race, nfc_uid)` + partial `unique(nfc_uid) WHERE race IS NULL`). The race key is
-      its own row `mobile.RaceMemberKey` (O2O, `mobile/0014`, 32 B) — **never a `Race` column**: a stale full
+      its own row `mobile.RaceChipKey` (O2O, `mobile/0014`, 32 B) — **never a `Race` column**: a stale full
       `Race.save()` from the edit form would write it back to NULL and the next request would mint a different key. It
-      is served by `GET /app/race/<id>/member_key/` (bind's stack, `no-store`). **Only the cloud mints a key**
-      (`member_key.ensure_member_key`, `get_or_create`; or `manage.py ensure_member_keys`); with
+      is served by `GET /app/race/<id>/chip_key/` (bind's stack, `no-store`). **Only the cloud mints a key**
+      (`chip_key.ensure_chip_key`, `get_or_create`; or `manage.py ensure_chip_keys`); with
       `MOBILE_DATA_SOURCE=local` the endpoint 404s and the command refuses — never a fresh key, the LAN server gets it
       from the DB copy. `MarkPresent.code_ok` (`mobile/0014`) is recomputed at `/marks/` ingest over the **stored**
-      present rows of the batch's marks, after the insert (`member_key.recheck_present_codes` → `check_member_code`; a
+      present rows of the batch's marks, after the insert (`chip_key.recheck_present_codes` → `check_member_code`; a
       re-sent mark keeps its old rows but may have changed race): 24-hex code → HMAC recompute, 32-hex → global
       `Tag.code` (one query per batch, `v1_codes_for`), nothing to check → `None`; never rejects, shown as «⚠» on the
       app-data team page. `apps/race/app_data._tag_pool(race)` uses the same race-wins pool.

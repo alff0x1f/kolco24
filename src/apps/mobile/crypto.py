@@ -48,8 +48,8 @@ def derive_wrap_key(code: bytes, info: bytes = b"kp-wrap-v1") -> bytes:
     return HKDF(algorithm=hashes.SHA256(), length=32, salt=None, info=info).derive(code)
 
 
-MEMBER_CODE_BYTES = 12
-MEMBER_FIELD_MAX = 0xFFFF
+CHIP_CODE_BYTES = 12
+CHIP_FIELD_MAX = 0xFFFF
 # The record's packed version/type byte (version 2, type participant). It leads
 # the HMAC message so a participant code never verifies as another chip type
 # signed with the same race key.
@@ -65,7 +65,7 @@ def member_code(key: bytes, nfc_uid: str, race_id: int, number: int) -> bytes:
     non-hex UID or a ``race_id``/``number`` outside ``1..65535``.
     """
     for name, value in (("race_id", race_id), ("number", number)):
-        if not 1 <= value <= MEMBER_FIELD_MAX:
+        if not 1 <= value <= CHIP_FIELD_MAX:
             raise ValueError(f"{name} out of range: {value}")
     uid = bytes.fromhex(nfc_uid.strip().upper())
     if not uid:
@@ -76,4 +76,4 @@ def member_code(key: bytes, nfc_uid: str, race_id: int, number: int) -> bytes:
         + race_id.to_bytes(2, "big")
         + number.to_bytes(2, "big")
     )
-    return hmac.new(key, msg, hashlib.sha256).digest()[:MEMBER_CODE_BYTES]
+    return hmac.new(key, msg, hashlib.sha256).digest()[:CHIP_CODE_BYTES]

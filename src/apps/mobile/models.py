@@ -83,27 +83,27 @@ class MobileToken(models.Model):
         return f"MobileToken(user={self.user_id}, active={self.is_active})"
 
 
-class RaceMemberKey(models.Model):
-    """Secret 32-byte key of a race's K24 v2 bracelet codes.
+class RaceChipKey(models.Model):
+    """Secret 32-byte key of a race's K24 v2 chip codes (every chip type).
 
     Its own row, not a ``Race`` column: a full ``Race.save()`` from an edit
     form loaded before the key was minted would write the column back to NULL
     and the next request would mint a different key. Only the cloud server
-    creates a row (``member_key.ensure_member_key``); the LAN server gets it
-    with the DB copy. Served only by ``GET /app/race/<id>/member_key/``.
+    creates a row (``chip_key.ensure_chip_key``); the LAN server gets it
+    with the DB copy. Served only by ``GET /app/race/<id>/chip_key/``.
     """
 
     race = models.OneToOneField(
         "website.Race",
         on_delete=models.CASCADE,
         primary_key=True,
-        related_name="member_key",
+        related_name="chip_key",
     )
     key = models.BinaryField()
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return f"RaceMemberKey(race={self.race_id})"
+        return f"RaceChipKey(race={self.race_id})"
 
 
 class TrackPoint(models.Model):

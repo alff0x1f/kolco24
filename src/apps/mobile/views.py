@@ -31,9 +31,9 @@ from website.models.models import Athlet, Team
 from website.models.race import Category, Race, RaceAdmin
 from website.models.tag import Tag
 
-from .crypto import MEMBER_FIELD_MAX, member_code
+from .chip_key import ensure_chip_key, get_chip_key, recheck_present_codes
+from .crypto import CHIP_FIELD_MAX, member_code
 from .legend_crypto import build_bundle
-from .member_key import ensure_member_key, get_member_key, recheck_present_codes
 from .models import (
     MARK_UPDATE_FIELDS,
     AppAuthFailure,
@@ -431,7 +431,7 @@ class MemberTagBindView(AppAPIView):
         The code proves the judge held the race key, so a different number for
         a known bracelet is a rewrite and replaces the old one (200), not a 409.
         """
-        key = get_member_key(race_id)
+        key = get_chip_key(race_id)
         try:
             expected = member_code(key, nfc_uid, race_id, number) if key else None
         except ValueError:
@@ -495,8 +495,8 @@ class MemberTagBindView(AppAPIView):
         return self._member_tag_response(tag, status.HTTP_201_CREATED)
 
 
-class MemberKeyView(AppAPIView):
-    """``GET /app/race/<race_id>/member_key/`` — the race's bracelet key.
+class ChipKeyView(AppAPIView):
+    """``GET /app/race/<race_id>/chip_key/`` — the race's K24 v2 chip key.
 
     The judge's phone fetches it ahead of time and computes K24 v2 bracelet
     codes offline. Same permission stack as :class:`MemberTagBindView`. Only
@@ -510,12 +510,12 @@ class MemberKeyView(AppAPIView):
 
     def get(self, request, race_id):
         get_object_or_404(Race, pk=race_id, is_published=True)
-        if race_id > MEMBER_FIELD_MAX:
+        if race_id > CHIP_FIELD_MAX:
             return Response(status=status.HTTP_404_NOT_FOUND)
         if settings.MOBILE_DATA_SOURCE == "local":
-            key = get_member_key(race_id)
+            key = get_chip_key(race_id)
         else:
-            key = ensure_member_key(race_id)
+            key = ensure_chip_key(race_id)
         if key is None:
             return Response(
                 {"detail": "Ключ гонки не загружен"},

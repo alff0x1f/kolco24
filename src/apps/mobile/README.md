@@ -220,7 +220,7 @@ UID (200/409); если строки нет — исходная ошибка п
 Всё выше — путь **v1** (тело без `code`): он работает только с глобальными строками
 `Tag` (`race IS NULL`). Тело с `code` — путь **v2**, см. следующий раздел.
 
-### Браслеты v2: `GET /app/race/<id>/member_key/` и офлайн-выдача
+### Браслеты v2: `GET /app/race/<id>/chip_key/` и офлайн-выдача
 
 Судья выдаёт браслет **без сети**: номер и гонка лежат на чипе открыто, а `code`
 судейский телефон считает сам ключом гонки. Сервер проверяет код при загрузке отметок.
@@ -247,19 +247,19 @@ Android и iOS): ключ `000102…1f`, UID `04A1B2C3D4E5F6`, гонка 42, н
 `deb887a736ce08d1fd704d62`, запись `4b323422002a007bdeb887a736ce08d1fd704d62`.
 Код детерминирован: перезапись и повторная отправка дают те же байты.
 
-**Ключ гонки** — `RaceMemberKey` (O2O на гонку, 32 случайных байта, `mobile/0014`).
+**Ключ гонки** — `RaceChipKey` (O2O на гонку, 32 случайных байта, `mobile/0014`).
 **Отдельная строка, а не колонка `Race`**: полный `Race.save()` из формы редактирования,
 загруженной до выпуска ключа, записал бы колонку обратно в `NULL`, и следующий запрос
-выпустил бы другой ключ. Отдаёт его `GET /app/race/<id>/member_key/` →
+выпустил бы другой ключ. Отдаёт его `GET /app/race/<id>/chip_key/` →
 `{"race_id", "key": "<64 hex>"}` с `Cache-Control: no-store`; стек прав и троттлинг — как у
 `bind/`; неопубликованная гонка или `race_id > 65535` → 404. **Единственный источник
-ключа — облако**: там он создаётся лениво (`member_key.ensure_member_key`, `get_or_create`
+ключа — облако**: там он создаётся лениво (`chip_key.ensure_chip_key`, `get_or_create`
 по гонке; `Race.updated_at` и ETag `races` не двигаются) или командой
-`manage.py ensure_member_keys [--race <id>]`. LAN-сервер (`MOBILE_DATA_SOURCE=local`)
+`manage.py ensure_chip_keys [--race <id>]`. LAN-сервер (`MOBILE_DATA_SOURCE=local`)
 ключ **никогда не создаёт**: без ключа эндпоинт отвечает 404, а команда отказывается
 работать — иначе у двух серверов были бы разные ключи. Поэтому перед гонкой:
-`ensure_member_keys` в облаке, затем копия БД на LAN. Перевыпуск — только из shell
-(удалить `RaceMemberKey`, затем `ensure_member_keys`); все v2-браслеты гонки после этого
+`ensure_chip_keys` в облаке, затем копия БД на LAN. Перевыпуск — только из shell
+(удалить `RaceChipKey`, затем `ensure_chip_keys`); все v2-браслеты гонки после этого
 не пройдут проверку.
 
 **Загрузка привязки.** Судья кладёт `(uid, number, code)` в очередь и шлёт
@@ -279,7 +279,7 @@ app-data); для проверки отметок она не нужна.
 
 **Проверка в отметках — `MarkPresent.code_ok`** (`mobile/0014`), считается при
 загрузке `/marks/` по **сохранённым** строкам состава всех отметок пачки, после вставки
-(`member_key.recheck_present_codes` → `check_member_code`): повторно присланная отметка
+(`chip_key.recheck_present_codes` → `check_member_code`): повторно присланная отметка
 сохраняет старые строки (`ignore_conflicts`), но могла сменить гонку, так что флаг
 пересчитывается и у них. 24 hex — пересчёт HMAC
 (нет ключа, не тот номер/UID, не-hex → `False`); 32 hex — сравнение с `Tag.code`
@@ -1035,7 +1035,7 @@ ETag/`If-None-Match` на ресурсах остаётся (см. выше) —
 | GET | `/app/race/<id>/legend/` | `mobile:legend` | КП (запертые — только `enc`) + пер-тег `tags` (`bid → checkpoint_id` идентичность всегда; `iv`/`ct` только у запертых); легенда published-гонки отдаётся всегда, КП типа `hidden` («Скрытый») исключены |
 | GET | `/app/race/<id>/member_tags/` | `mobile:member_tags` | пул браслетов участников (`number → nfc_uid`); см. **Браслеты участников** ниже |
 | GET | `/app/race/<id>/sync/` | `mobile:sync` | манифест: версии ресурсов + `data_source`/`lease_expires_at` |
-| GET | `/app/race/<id>/member_key/` | `mobile:member_key` | ключ гонки для браслетов v2 (только админ гонки, `no-store`; LAN без ключа → 404); см. **Браслеты v2** выше |
+| GET | `/app/race/<id>/chip_key/` | `mobile:chip_key` | ключ гонки для чипов K24 v2 (только админ гонки, `no-store`; LAN без ключа → 404); см. **Браслеты v2** выше |
 | POST | `/app/login/` | `mobile:login` | вход email+пароль → `{token, expires_at, admin_race_ids}`; см. **Запись** выше |
 | POST | `/app/logout/` | `mobile:logout` | отзыв предъявленного токена |
 | POST | `/app/race/<id>/tags/` | `mobile:tag_create` | привязка NFC-чипа к КП → `{bid, checkpoint_id, number, nfc_uid, code}` |

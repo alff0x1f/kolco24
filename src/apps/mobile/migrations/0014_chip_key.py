@@ -18,14 +18,14 @@ class Migration(migrations.Migration):
             field=models.BooleanField(null=True),
         ),
         migrations.CreateModel(
-            name="RaceMemberKey",
+            name="RaceChipKey",
             fields=[
                 (
                     "race",
                     models.OneToOneField(
                         on_delete=django.db.models.deletion.CASCADE,
                         primary_key=True,
-                        related_name="member_key",
+                        related_name="chip_key",
                         serialize=False,
                         to="website.race",
                     ),

@@ -10,7 +10,7 @@ from website.models.models import Athlet, Team
 from website.models.race import Category, Race
 from website.models.tag import Tag
 
-from .crypto import MEMBER_FIELD_MAX
+from .crypto import CHIP_FIELD_MAX
 
 logger = logging.getLogger(__name__)
 
@@ -75,9 +75,9 @@ class MemberTagBindSerializer(serializers.Serializer):
     def validate(self, attrs):
         if "code" in attrs:
             number = attrs["number"]
-            if number is None or number > MEMBER_FIELD_MAX:
+            if number is None or number > CHIP_FIELD_MAX:
                 raise serializers.ValidationError(
-                    {"number": f"Для браслета v2 нужен номер 1…{MEMBER_FIELD_MAX}"}
+                    {"number": f"Для браслета v2 нужен номер 1…{CHIP_FIELD_MAX}"}
                 )
             try:
                 bytes.fromhex(attrs["nfc_uid"])
