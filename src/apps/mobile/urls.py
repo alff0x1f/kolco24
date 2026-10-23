@@ -1,6 +1,7 @@
 from django.urls import path
 
 from .views import (
+    ChipKeyView,
     JudgeScanUploadView,
     LegendView,
     LoginView,
@@ -33,6 +34,11 @@ urlpatterns = [
         "race/<int:race_id>/member_tags/bind/",
         MemberTagBindView.as_view(),
         name="member_tag_bind",
+    ),
+    path(
+        "race/<int:race_id>/chip_key/",
+        ChipKeyView.as_view(),
+        name="chip_key",
     ),
     path("race/<int:race_id>/sync/", SyncView.as_view(), name="sync"),
     path(

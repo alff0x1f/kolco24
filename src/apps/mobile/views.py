@@ -7,6 +7,7 @@ failure break the response.
 """
 
 import hashlib
+import hmac
 import logging
 import os
 import re
@@ -15,7 +16,7 @@ from django.conf import settings
 from django.contrib.auth import authenticate
 from django.core.files.base import ContentFile
 from django.db import IntegrityError, transaction
-from django.db.models import Count, F, Max, Min, Prefetch, Q, Sum
+from django.db.models import Count, F, Min, Prefetch, Q, Sum
 from django.db.models.functions import Coalesce, NullIf
 from django.http import HttpResponseNotModified
 from django.shortcuts import get_object_or_404
@@ -30,6 +31,8 @@ from website.models.models import Athlet, Team
 from website.models.race import Category, Race, RaceAdmin
 from website.models.tag import Tag
 
+from .chip_key import ensure_chip_key, get_chip_key, recheck_present_codes
+from .crypto import CHIP_FIELD_MAX, member_code
 from .legend_crypto import build_bundle
 from .models import (
     MARK_UPDATE_FIELDS,
@@ -62,6 +65,7 @@ from .throttling import ClientIPScopedRateThrottle
 from .tokens import generate_token
 from .versioning import (
     active_member_tags,
+    global_member_tags_newest_seen,
     legend_version,
     member_tags_version,
     races_version,
@@ -360,10 +364,9 @@ MEMBER_TAG_CODE_BYTES = 16
 
 
 def _bind_seen_at():
-    """MAX(last_seen_at) of the pool (``now`` if never scanned), so a bind puts
-    the chip into the served window without moving its floor."""
-    newest = Tag.objects.aggregate(m=Max("last_seen_at"))["m"]
-    return newest or timezone.now()
+    """MAX(last_seen_at) of the global pool (``now`` if never scanned), so a bind
+    puts the chip into the served window without moving its floor."""
+    return global_member_tags_newest_seen() or timezone.now()
 
 
 def _new_member_code():
@@ -378,6 +381,9 @@ class MemberTagBindView(AppAPIView):
     number → idempotent 200, unknown UID + ``null`` → 404, different number →
     409. Full status table and the code/ETag rules live in
     ``src/apps/mobile/README.md`` (``POST /app/race/<id>/member_tags/bind/``).
+
+    A body with ``code`` is a K24 v2 bind uploaded from the judge's offline
+    queue — see :meth:`_bind_v2`; it never touches the global (v1) pool.
     """
 
     permission_classes = [SignedAppPermission, IsMobileUser, CanEditRaceLegend]
@@ -418,6 +424,34 @@ class MemberTagBindView(AppAPIView):
             tag.save(update_fields=["last_seen_at"])
         return self._member_tag_response(tag, status.HTTP_200_OK)
 
+    @staticmethod
+    def _bind_v2(race_id, nfc_uid, number, code):
+        """Store a K24 v2 bind the judge wrote offline: ``(race, uid) → number``.
+
+        The code proves the judge held the race key, so a different number for
+        a known bracelet is a rewrite and replaces the old one (200), not a 409.
+        """
+        key = get_chip_key(race_id)
+        try:
+            expected = member_code(key, nfc_uid, race_id, number) if key else None
+        except ValueError:
+            expected = None
+        if expected is None or not hmac.compare_digest(expected, bytes.fromhex(code)):
+            return Response(
+                {"detail": "Код браслета не совпал"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        tag, created = Tag.objects.get_or_create(
+            race_id=race_id, nfc_uid=nfc_uid, defaults={"number": number}
+        )
+        if not created and tag.number != number:
+            tag.number = number
+            tag.save(update_fields=["number", "updated_at"])
+        return Response(
+            {"number": tag.number, "nfc_uid": tag.nfc_uid},
+            status=status.HTTP_201_CREATED if created else status.HTTP_200_OK,
+        )
+
     def post(self, request, race_id):
         get_object_or_404(Race, pk=race_id, is_published=True)
 
@@ -426,8 +460,11 @@ class MemberTagBindView(AppAPIView):
         # Already normalized (strip + upper, post-upper cap) by the serializer.
         nfc_uid = serializer.validated_data["nfc_uid"]
         number = serializer.validated_data["number"]
+        code = serializer.validated_data.get("code")
+        if code is not None:
+            return self._bind_v2(race_id, nfc_uid, number, code)
 
-        tag = Tag.objects.filter(nfc_uid=nfc_uid).first()
+        tag = Tag.objects.filter(nfc_uid=nfc_uid, race__isnull=True).first()
         if tag is not None:
             return self._resolve_existing(tag, number)
 
@@ -449,13 +486,44 @@ class MemberTagBindView(AppAPIView):
             # Most likely a concurrent create hit the global nfc_uid unique
             # constraint. filter().first() (not get()) so an unrelated DB error
             # re-raises as itself, not as a nested Tag.DoesNotExist.
-            tag = Tag.objects.filter(nfc_uid=nfc_uid).first()
+            tag = Tag.objects.filter(nfc_uid=nfc_uid, race__isnull=True).first()
             if tag is None:
                 raise original_exc
             return self._resolve_existing(tag, number)
 
         # The code was minted on insert, so the lazy mint is a no-op here.
         return self._member_tag_response(tag, status.HTTP_201_CREATED)
+
+
+class ChipKeyView(AppAPIView):
+    """``GET /app/race/<race_id>/chip_key/`` — the race's K24 v2 chip key.
+
+    The judge's phone fetches it ahead of time and computes K24 v2 bracelet
+    codes offline. Same permission stack as :class:`MemberTagBindView`. Only
+    the cloud server mints a key; a LAN server (``MOBILE_DATA_SOURCE=local``)
+    without a copied key answers 404 rather than mint a second, different one.
+    """
+
+    permission_classes = [SignedAppPermission, IsMobileUser, CanEditRaceLegend]
+    throttle_classes = [ClientIPScopedRateThrottle]
+    throttle_scope = "mobile-write"
+
+    def get(self, request, race_id):
+        get_object_or_404(Race, pk=race_id, is_published=True)
+        if race_id > CHIP_FIELD_MAX:
+            return Response(status=status.HTTP_404_NOT_FOUND)
+        if settings.MOBILE_DATA_SOURCE == "local":
+            key = get_chip_key(race_id)
+        else:
+            key = ensure_chip_key(race_id)
+        if key is None:
+            return Response(
+                {"detail": "Ключ гонки не загружен"},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        resp = Response({"race_id": race_id, "key": key.hex()})
+        resp["Cache-Control"] = "no-store"
+        return resp
 
 
 class TrackUploadView(AppAPIView):
@@ -676,6 +744,9 @@ class MarkUploadView(AppAPIView):
             # Additive: unique_together skips slots already stored, inserts the
             # rest (the late roster members of an enrichment re-send).
             MarkPresent.objects.bulk_create(present_objs, ignore_conflicts=True)
+            # Over the stored rows, not present_objs: a re-sent mark keeps its old
+            # rows and may now belong to another race.
+            recheck_present_codes(race_id, list(deduped))
 
             _auto_populate_boundary_times(race_id, team_id, deduped)
 
@@ -1095,9 +1166,8 @@ class MemberTagsView(AppAPIView):
     own — only provisioning edits (and day-scale window-membership shifts) move
     it (see ``member_tags_version``).
 
-    ``race_id`` is the reserved (currently-unused) hook for a future per-race
-    chip set: the pool is global today (``Tag`` has no race FK), so the id is
-    validated for a published race but does not yet filter the pool.
+    The pool is the race's own bracelets (K24 v2) plus the global pool (v1);
+    a race row shadows a global row with the same ``nfc_uid``.
     """
 
     def get(self, request, race_id):
@@ -1105,7 +1175,7 @@ class MemberTagsView(AppAPIView):
         # Materialise once so the ETag and the response body come from the same
         # DB snapshot (a concurrent provisioning edit between two separate queries
         # would produce payload B with ETag A).
-        tags = list(active_member_tags().order_by("id"))
+        tags = list(active_member_tags(race_id).order_by("id"))
         rows = [(t.id, t.number, t.nfc_uid) for t in tags]
         quoted = f'"{member_tags_version(rows)}"'
 
@@ -1130,9 +1200,8 @@ class SyncView(AppAPIView):
     short-circuit.
 
     Unlike ``races_version`` (global, deliberately absent here), ``member_tags`` is
-    included even though it's a global pool: the member-tags endpoint is served at a
-    per-race URL, so the app needs one sync poll to learn what to refetch for the race
-    it's syncing.
+    per race (the race's own bracelets plus the global pool), so it belongs in this
+    per-race manifest.
     """
 
     def get(self, request, race_id):
@@ -1147,9 +1216,7 @@ class SyncView(AppAPIView):
                     # Build-independent: versions.legend equals the legend ETag
                     # for every build (stored ciphertext/bundles, no key_id).
                     "legend": legend_version(race_id),
-                    # Global pool today, but served at a per-race URL — see the
-                    # SyncView docstring for why it's in this per-race manifest.
-                    "member_tags": member_tags_version(),
+                    "member_tags": member_tags_version(race_id=race_id),
                 },
             }
         )

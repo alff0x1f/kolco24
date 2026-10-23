@@ -83,6 +83,29 @@ class MobileToken(models.Model):
         return f"MobileToken(user={self.user_id}, active={self.is_active})"
 
 
+class RaceChipKey(models.Model):
+    """Secret 32-byte key of a race's K24 v2 chip codes (every chip type).
+
+    Its own row, not a ``Race`` column: a full ``Race.save()`` from an edit
+    form loaded before the key was minted would write the column back to NULL
+    and the next request would mint a different key. Only the cloud server
+    creates a row (``chip_key.ensure_chip_key``); the LAN server gets it
+    with the DB copy. Served only by ``GET /app/race/<id>/chip_key/``.
+    """
+
+    race = models.OneToOneField(
+        "website.Race",
+        on_delete=models.CASCADE,
+        primary_key=True,
+        related_name="chip_key",
+    )
+    key = models.BinaryField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"RaceChipKey(race={self.race_id})"
+
+
 class TrackPoint(models.Model):
     """One GPS fix uploaded by the Android app during a race.
 
@@ -268,6 +291,9 @@ class MarkPresent(models.Model):
     code = models.CharField(max_length=64, null=True)
     number = models.IntegerField()
     number_in_team = models.IntegerField()
+    # Bracelet code check at ingest: True/False, or None when there is nothing
+    # to check against (no code, sentinel row, unknown v1 bracelet).
+    code_ok = models.BooleanField(null=True)
 
     class Meta:
         unique_together = ("mark", "number_in_team")

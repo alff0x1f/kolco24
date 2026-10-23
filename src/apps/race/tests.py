@@ -9625,3 +9625,82 @@ def test_protocol_row_has_team_anchor(rf, django_user_model):
     html = _public_protocol_html(rf, race, category)
 
     assert f'<tr id="team-{team.id}">' in html
+
+
+@pytest.mark.django_db
+def test_app_data_tag_pool_prefers_own_race_row():
+    from apps.race.app_data import _tag_pool
+    from website.models.race import Race
+    from website.models.tag import Tag
+
+    race = Race.objects.create(name="pool", slug="app-data-pool")
+    other = Race.objects.create(name="other", slug="app-data-pool-other")
+    Tag.objects.create(number=1, nfc_uid="AA:01")
+    Tag.objects.create(number=2, nfc_uid="AA:01", race=race)
+    Tag.objects.create(number=3, nfc_uid="AA:01", race=other)
+    Tag.objects.create(number=4, nfc_uid="BB:02", race=other)
+    Tag.objects.create(number=5, nfc_uid="CC:03")
+
+    pool = _tag_pool(race)
+
+    assert pool["AA:01"] == 2
+    assert pool["CC:03"] == 5
+    assert "BB:02" not in pool
+
+
+@pytest.mark.django_db
+def test_app_data_team_page_flags_forged_bracelet(client, django_user_model):
+    race, category, _, _, cp_kp = _make_app_data_race("app-data-forged")
+    owner = django_user_model.objects.create_user(
+        username="appdata-forged", password="x"
+    )
+    team = _make_team(owner, category, teamname="Подмена", start_time=1, finish_time=0)
+    mark = _make_mark(team, cp_kp, present_chips=("AA:01", "AA:02"))
+    MarkPresent.objects.filter(mark=mark, number_in_team=1).update(code_ok=False)
+    MarkPresent.objects.filter(mark=mark, number_in_team=2).update(code_ok=True)
+
+    context = build_team_timeline(race, team)
+    mark_event = next(e for e in context["events"] if e["kind"] == "mark")
+    assert [p["code_ok"] for p in mark_event["present"]] == [False, True]
+
+    admin = django_user_model.objects.create_user(
+        username="appdata-forged-a", password="x"
+    )
+    RaceAdmin.objects.create(race=race, user=admin, role=RaceAdmin.Role.ADMIN)
+    client.force_login(admin)
+    resp = client.get(
+        reverse(
+            "race_app_data_team",
+            kwargs={"race_slug": race.slug, "team_id": team.id},
+        )
+    )
+    body = resp.content.decode()
+    assert resp.status_code == 200
+    assert body.count("код браслета не совпал") == 1
+    assert body.count("tagchip forged") + body.count("unknown forged") == 1
+
+
+@pytest.mark.django_db
+def test_app_data_present_label_uses_verified_snapshot_number():
+    race, category, _, _, cp_kp = _make_app_data_race("app-data-snapshot-no")
+    owner = User.objects.create_user(username="appdata-snap", password="x")
+    team = _make_team(owner, category, teamname="Снимок", start_time=1, finish_time=0)
+    mark = _make_mark(team, cp_kp, present_chips=("AA:01", "AA:02", "AA:03"))
+    MarkPresent.objects.filter(mark=mark, number_in_team=1).update(
+        number=41, code_ok=True
+    )
+    MarkPresent.objects.filter(mark=mark, number_in_team=2).update(
+        number=42, code_ok=None
+    )
+    MarkPresent.objects.filter(mark=mark, number_in_team=3).update(
+        number=43, code_ok=False
+    )
+
+    context = build_team_timeline(race, team)
+    mark_event = next(e for e in context["events"] if e["kind"] == "mark")
+
+    assert [(p["label"], p["known"]) for p in mark_event["present"]] == [
+        ("№41", True),
+        ("AA:02", False),
+        ("AA:03", False),
+    ]

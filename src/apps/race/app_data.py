@@ -24,7 +24,7 @@ from collections import defaultdict
 from datetime import datetime
 from datetime import timezone as dt_timezone
 
-from django.db.models import Count, Max, Min
+from django.db.models import Count, F, Max, Min, Q
 
 from apps.mobile.models import (
     AppInstall,
@@ -124,11 +124,18 @@ def _clock_skew(obj):
     }
 
 
-def _tag_pool():
-    """Global member-chip pool: normalized uid → bracelet number."""
+def _tag_pool(race):
+    """Member-chip pool of ``race``: normalized uid → bracelet number.
+
+    The global pool plus the race's own bracelets; a race row wins over a
+    global row with the same uid (rows of other races are ignored).
+    """
+    rows = Tag.objects.filter(Q(race__isnull=True) | Q(race=race)).order_by(
+        F("race").asc(nulls_first=True)
+    )
     return {
         _norm_uid(uid): number
-        for number, uid in Tag.objects.values_list("number", "nfc_uid")
+        for number, uid in rows.values_list("number", "nfc_uid")
         if _norm_uid(uid)
     }
 
@@ -146,8 +153,13 @@ def _present_label(present, tag_numbers):
     uid = _norm_uid(present.nfc_uid)
     if uid is None:
         # {nfc_uid: null, number: 0} is the "no snapshot" sentinel.
-        return {"label": "без снимка", "uid": "", "known": False}
-    return _chip_label(uid, tag_numbers)
+        return {"label": "без снимка", "uid": "", "known": False, "code_ok": None}
+    label = _chip_label(uid, tag_numbers)
+    if not label["known"] and present.code_ok and present.number:
+        # A verified code vouches for the snapshot number, e.g. a take uploaded
+        # before the judge's offline bind reached the pool.
+        label = {"label": f"№{present.number}", "uid": uid, "known": True}
+    return {**label, "code_ok": present.code_ok}
 
 
 def _race_teams(race):
@@ -200,7 +212,7 @@ def build_overview(race):
     teams = _race_teams(race)
     marks = list(Mark.objects.filter(race_id=race.id))
     presents_by_mark = _presents_by_mark(race)
-    tag_numbers = _tag_pool()
+    tag_numbers = _tag_pool(race)
     start_cp_ids, finish_cp_ids = _boundary_cp_ids(race)
     chips_by_team = _chips_by_team(marks, presents_by_mark)
 
@@ -378,7 +390,7 @@ def _team_devices(marks, segments):
 
 def build_team_timeline(race, team):
     """Context for a single team's page: header summary + chronological feed."""
-    tag_numbers = _tag_pool()
+    tag_numbers = _tag_pool(race)
     checkpoints = {cp.id: cp for cp in Checkpoint.objects.filter(race_id=race.id)}
 
     marks = list(

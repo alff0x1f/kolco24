@@ -169,8 +169,8 @@
                 <td>
                   <span class="aux">Состав ({{ ev.present|length }}/{{ ev.expected_count }}):</span>
                   {% for p in ev.present %}
-                  <span class="tagchip{% if not p.known %} unknown{% endif %}"
-                        title="{{ p.uid }}">{{ p.label }}</span>
+                  <span class="tagchip{% if not p.known %} unknown{% endif %}{% if p.code_ok is False %} forged{% endif %}"
+                        title="{{ p.uid }}{% if p.code_ok is False %} — код браслета не совпал{% endif %}">{{ p.label }}{% if p.code_ok is False %} ⚠{% endif %}</span>
                   {% empty %}<span class="aux">—</span>{% endfor %}
                   {% if ev.lat %}
                   <span class="aux mono">({{ ev.lat|floatformat:5 }}, {{ ev.lon|floatformat:5 }})</span>

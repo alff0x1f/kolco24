@@ -3163,6 +3163,64 @@ def test_derive_wrap_key_deterministic_and_distinct():
     assert derive_wrap_key(code) != derive_wrap_key(os.urandom(16))
 
 
+# --- Member bracelet code (K24 v2) --------------------------------------------
+
+from apps.mobile.crypto import member_code  # noqa: E402
+
+# Shared test vector — the Android and iOS tests carry the same values.
+MEMBER_VECTOR_KEY = bytes(range(32))
+MEMBER_VECTOR_UID = "04A1B2C3D4E5F6"
+MEMBER_VECTOR_CODE = "deb887a736ce08d1fd704d62"
+
+
+def test_member_code_shared_vector():
+    code = member_code(MEMBER_VECTOR_KEY, MEMBER_VECTOR_UID, 42, 123)
+    assert code.hex() == MEMBER_VECTOR_CODE
+
+
+def test_member_code_message_leads_with_type_byte():
+    import hashlib
+    import hmac
+
+    uid = bytes.fromhex(MEMBER_VECTOR_UID)
+    tail = uid + (42).to_bytes(2, "big") + (123).to_bytes(2, "big")
+    expected = hmac.new(MEMBER_VECTOR_KEY, b"\x22" + tail, hashlib.sha256).digest()
+    untyped = hmac.new(MEMBER_VECTOR_KEY, tail, hashlib.sha256).digest()
+    code = member_code(MEMBER_VECTOR_KEY, MEMBER_VECTOR_UID, 42, 123)
+    assert code == expected[:12]
+    assert code != untyped[:12]
+
+
+def test_member_code_normalizes_uid():
+    assert member_code(MEMBER_VECTOR_KEY, " 04a1b2c3d4e5f6 ", 42, 123).hex() == (
+        MEMBER_VECTOR_CODE
+    )
+
+
+def test_member_code_depends_on_every_input():
+    base = member_code(MEMBER_VECTOR_KEY, MEMBER_VECTOR_UID, 42, 123)
+    assert member_code(MEMBER_VECTOR_KEY, "04A1B2C3D4E5F7", 42, 123) != base
+    assert member_code(MEMBER_VECTOR_KEY, MEMBER_VECTOR_UID, 43, 123) != base
+    assert member_code(MEMBER_VECTOR_KEY, MEMBER_VECTOR_UID, 42, 124) != base
+    assert member_code(os.urandom(32), MEMBER_VECTOR_UID, 42, 123) != base
+
+
+@pytest.mark.parametrize(
+    "uid, race_id, number",
+    [
+        ("XYZ", 42, 123),
+        ("", 42, 123),
+        ("04A1B2C3D4E5F6", 0, 123),
+        ("04A1B2C3D4E5F6", 65536, 123),
+        ("04A1B2C3D4E5F6", 42, 0),
+        ("04A1B2C3D4E5F6", 42, 65536),
+    ],
+)
+def test_member_code_rejects_bad_input(uid, race_id, number):
+    with pytest.raises(ValueError):
+        member_code(MEMBER_VECTOR_KEY, uid, race_id, number)
+
+
 # --- Task 2: legend-encryption data model ------------------------------------
 
 
@@ -10577,3 +10635,691 @@ def test_member_tag_bind_get_returns_405(client, signed_app_keys, django_user_mo
     response = client.get(path, **headers)
 
     assert response.status_code == 405
+
+
+# --- Race chip key: GET /app/race/<id>/chip_key/ ----------------------
+
+
+from apps.mobile.chip_key import get_chip_key  # noqa: E402
+
+
+def _set_chip_key(race, key):
+    from apps.mobile.models import RaceChipKey
+
+    RaceChipKey.objects.update_or_create(race=race, defaults={"key": key})
+
+
+def _chip_key_path(race_id):
+    return f"/app/race/{race_id}/chip_key/"
+
+
+def _get_chip_key(client, race_id, raw):
+    path = _chip_key_path(race_id)
+    headers = _signed_headers("GET", path, SECRET)
+    if raw is not None:
+        headers["HTTP_AUTHORIZATION"] = f"Bearer {raw}"
+    return client.get(path, **headers)
+
+
+@pytest.mark.django_db
+def test_chip_key_mints_once_and_is_stable(client, signed_app_keys, django_user_model):
+    from website.models.race import Race
+
+    race, _, raw, _ = _make_admin_race(django_user_model, "mkey-ok")
+    updated_at = Race.objects.get(pk=race.pk).updated_at
+
+    first = _get_chip_key(client, race.id, raw)
+    second = _get_chip_key(client, race.id, raw)
+
+    assert first.status_code == 200
+    assert first["Cache-Control"] == "no-store"
+    body = first.json()
+    assert body["race_id"] == race.id
+    assert len(bytes.fromhex(body["key"])) == 32
+    assert second.json() == body
+    race.refresh_from_db()
+    assert get_chip_key(race.id).hex() == body["key"]
+    assert race.updated_at == updated_at
+
+
+@pytest.mark.django_db
+def test_chip_key_survives_stale_race_save(client, signed_app_keys, django_user_model):
+    """An edit form loaded before the key was minted must not wipe it on save."""
+    from website.models.race import Race
+
+    race, _, raw, _ = _make_admin_race(django_user_model, "mkey-stale")
+    stale = Race.objects.get(pk=race.pk)
+    key_hex = _get_chip_key(client, race.id, raw).json()["key"]
+
+    stale.name = "renamed"
+    stale.save()
+
+    assert _get_chip_key(client, race.id, raw).json()["key"] == key_hex
+
+
+@pytest.mark.django_db
+def test_ensure_chip_key_keeps_existing_key():
+    from apps.mobile.chip_key import ensure_chip_key
+    from website.models.race import Race
+
+    race = Race.objects.create(name="mk", slug="mk-keep")
+    first = ensure_chip_key(race.id)
+    assert ensure_chip_key(race.id) == first
+    assert ensure_chip_key(999999) is None
+
+
+@pytest.mark.django_db
+def test_chip_key_requires_admin(client, signed_app_keys, django_user_model):
+    race, _, _, _ = _make_admin_race(django_user_model, "mkey-perm")
+    other = django_user_model.objects.create_user(
+        username="mk-other", email="mk-other@example.com", password="x"
+    )
+
+    assert _get_chip_key(client, race.id, None).status_code == 401
+    assert _get_chip_key(client, race.id, "bogus").status_code == 401
+    assert _get_chip_key(client, race.id, _make_active_token(other)).status_code == (
+        403
+    )
+    assert get_chip_key(race.id) is None
+
+
+@pytest.mark.django_db
+def test_chip_key_unpublished_race_404(client, signed_app_keys, django_user_model):
+    race, _, raw, _ = _make_admin_race(django_user_model, "mkey-unpub")
+    race.is_published = False
+    race.save()
+
+    assert _get_chip_key(client, race.id, raw).status_code == 404
+
+
+@pytest.mark.django_db
+def test_chip_key_local_server_never_mints(
+    client, settings, signed_app_keys, django_user_model
+):
+    settings.MOBILE_DATA_SOURCE = "local"
+    race, _, raw, _ = _make_admin_race(django_user_model, "mkey-local")
+
+    response = _get_chip_key(client, race.id, raw)
+
+    assert response.status_code == 404
+    assert get_chip_key(race.id) is None
+
+
+@pytest.mark.django_db
+def test_chip_key_local_server_serves_copied_key(
+    client, settings, signed_app_keys, django_user_model
+):
+    settings.MOBILE_DATA_SOURCE = "local"
+    race, _, raw, _ = _make_admin_race(django_user_model, "mkey-local-ok")
+    _set_chip_key(race, bytes(range(32)))
+
+    response = _get_chip_key(client, race.id, raw)
+
+    assert response.status_code == 200
+    assert response.json()["key"] == bytes(range(32)).hex()
+
+
+@pytest.mark.django_db
+def test_chip_key_not_leaked_by_other_reads(client, signed_app_keys, django_user_model):
+    race, _, raw, _ = _make_admin_race(django_user_model, "mkey-leak")
+    key_hex = _get_chip_key(client, race.id, raw).json()["key"]
+
+    for path in (
+        "/app/races/",
+        f"/app/race/{race.id}/sync/",
+        f"/app/race/{race.id}/legend/",
+        f"/app/race/{race.id}/teams/",
+        f"/app/race/{race.id}/member_tags/",
+    ):
+        response = client.get(path, **_signed_headers("GET", path, SECRET))
+        assert response.status_code == 200, path
+        assert key_hex not in response.content.decode(), path
+
+
+@pytest.mark.django_db
+def test_ensure_chip_keys_command_mints_published_only():
+    from io import StringIO
+
+    from django.core.management import call_command
+
+    from website.models.race import Race
+
+    published = Race.objects.create(name="p", slug="mk-cmd-pub")
+    hidden = Race.objects.create(name="h", slug="mk-cmd-hid", is_published=False)
+    keyed = Race.objects.create(name="k", slug="mk-cmd-key")
+    _set_chip_key(keyed, b"\x01" * 32)
+
+    out = StringIO()
+    call_command("ensure_chip_keys", stdout=out)
+
+    assert len(get_chip_key(published.id)) == 32
+    assert get_chip_key(hidden.id) is None
+    assert get_chip_key(keyed.id) == b"\x01" * 32
+    assert "minted 1" in out.getvalue()
+
+
+@pytest.mark.django_db
+def test_ensure_chip_keys_command_refuses_on_lan(settings):
+    from django.core.management import CommandError, call_command
+
+    from website.models.race import Race
+
+    settings.MOBILE_DATA_SOURCE = "local"
+    race = Race.objects.create(name="p", slug="mk-cmd-lan")
+
+    with pytest.raises(CommandError):
+        call_command("ensure_chip_keys", stdout=None)
+    assert get_chip_key(race.id) is None
+
+
+@pytest.mark.django_db
+def test_ensure_chip_keys_command_single_race():
+    from django.core.management import call_command
+
+    from website.models.race import Race
+
+    a = Race.objects.create(name="a", slug="mk-cmd-a")
+    b = Race.objects.create(name="b", slug="mk-cmd-b")
+
+    call_command("ensure_chip_keys", race=a.id, stdout=None)
+
+    assert get_chip_key(a.id) is not None
+    assert get_chip_key(b.id) is None
+
+
+# --- Per-race member-tag pool (Tag.race) ---------------------------------------
+
+
+def _member_tags_body(client, race):
+    path = f"/app/race/{race.id}/member_tags/"
+    response = client.get(path, **_signed_headers("GET", path, SECRET))
+    assert response.status_code == 200
+    return response.json()["member_tags"]
+
+
+@pytest.mark.django_db
+def test_member_tags_pool_is_race_rows_plus_global(client, signed_app_keys):
+    from website.models.race import Race
+    from website.models.tag import Tag
+
+    race_a = Race.objects.create(name="a", slug="pool-a")
+    race_b = Race.objects.create(name="b", slug="pool-b")
+    Tag.objects.create(number=1, nfc_uid="G1")
+    Tag.objects.create(number=2, nfc_uid="A1", race=race_a)
+    Tag.objects.create(number=3, nfc_uid="B1", race=race_b)
+
+    body = _member_tags_body(client, race_a)
+
+    assert sorted((t["nfc_uid"], t["number"]) for t in body) == [
+        ("A1", 2),
+        ("G1", 1),
+    ]
+
+
+@pytest.mark.django_db
+def test_member_tags_race_row_shadows_global_row(client, signed_app_keys):
+    from website.models.race import Race
+    from website.models.tag import Tag
+
+    race = Race.objects.create(name="a", slug="pool-shadow")
+    Tag.objects.create(number=10, nfc_uid="SAME")
+    Tag.objects.create(number=20, nfc_uid="SAME", race=race)
+
+    body = _member_tags_body(client, race)
+
+    assert [(t["nfc_uid"], t["number"]) for t in body] == [("SAME", 20)]
+
+
+@pytest.mark.django_db
+def test_member_tags_race_rows_ignore_global_window(client, signed_app_keys):
+    from datetime import timedelta
+
+    from django.utils import timezone
+
+    from website.models.race import Race
+    from website.models.tag import Tag
+
+    race = Race.objects.create(name="a", slug="pool-window")
+    now = timezone.now()
+    Tag.objects.create(number=1, nfc_uid="FRESH", last_seen_at=now)
+    Tag.objects.create(number=2, nfc_uid="OLD", last_seen_at=now - timedelta(days=60))
+    Tag.objects.create(
+        number=3, nfc_uid="RACEOLD", race=race, last_seen_at=now - timedelta(days=90)
+    )
+
+    uids = {t["nfc_uid"] for t in _member_tags_body(client, race)}
+
+    assert uids == {"FRESH", "RACEOLD"}
+
+
+@pytest.mark.django_db
+def test_member_tags_race_window_floor_uses_global_rows_only(signed_app_keys):
+    from datetime import timedelta
+
+    from django.utils import timezone
+
+    from apps.mobile.versioning import active_member_tags
+    from website.models.race import Race
+    from website.models.tag import Tag
+
+    race = Race.objects.create(name="a", slug="pool-floor")
+    now = timezone.now()
+    Tag.objects.create(number=1, nfc_uid="G", last_seen_at=now - timedelta(days=60))
+    # A recently scanned race row must not push the global floor forward.
+    Tag.objects.create(number=2, nfc_uid="R", race=race, last_seen_at=now)
+
+    assert set(active_member_tags(race.id).values_list("nfc_uid", flat=True)) == {
+        "G",
+        "R",
+    }
+
+
+@pytest.mark.django_db
+def test_member_tags_etag_moves_on_own_race_row_only(client, signed_app_keys):
+    from website.models.race import Race
+    from website.models.tag import Tag
+
+    race_a = Race.objects.create(name="a", slug="etag-a")
+    race_b = Race.objects.create(name="b", slug="etag-b")
+    etag = _member_tags_etag(client, race_a)
+    sync_version = _sync_member_tags_version(client, race_a)
+
+    Tag.objects.create(number=3, nfc_uid="B1", race=race_b)
+    assert _member_tags_etag(client, race_a) == etag
+    assert _sync_member_tags_version(client, race_a) == sync_version
+
+    Tag.objects.create(number=2, nfc_uid="A1", race=race_a)
+    new_etag = _member_tags_etag(client, race_a)
+    assert new_etag != etag
+    assert new_etag == f'"{_sync_member_tags_version(client, race_a)}"'
+
+
+@pytest.mark.django_db
+def test_tag_uid_unique_per_race_and_globally():
+    from django.db import transaction
+
+    from website.models.race import Race
+    from website.models.tag import Tag
+
+    race_a = Race.objects.create(name="a", slug="uniq-a")
+    race_b = Race.objects.create(name="b", slug="uniq-b")
+    Tag.objects.create(number=1, nfc_uid="U1")
+    Tag.objects.create(number=2, nfc_uid="U1", race=race_a)
+    Tag.objects.create(number=3, nfc_uid="U1", race=race_b)
+
+    with pytest.raises(IntegrityError), transaction.atomic():
+        Tag.objects.create(number=4, nfc_uid="U1", race=race_a)
+    with pytest.raises(IntegrityError), transaction.atomic():
+        Tag.objects.create(number=5, nfc_uid="U1")
+
+
+@pytest.mark.django_db
+def test_member_tag_bind_v1_ignores_race_rows(
+    client, signed_app_keys, django_user_model
+):
+    from website.models.tag import Tag
+
+    race, _, raw, _ = _make_admin_race(django_user_model, "bind-v1-race-row")
+    Tag.objects.create(number=50, nfc_uid="04EE", race=race)
+
+    response = _bind(client, race, raw, "04EE", None)
+
+    assert response.status_code == 404
+    created = _bind(client, race, raw, "04EE", 51)
+    assert created.status_code == 201
+    assert Tag.objects.get(nfc_uid="04EE", race__isnull=True).number == 51
+
+
+# --- bind/ with a K24 v2 code (offline judge queue) ----------------------------
+
+
+def _bind_v2(client, race, raw, nfc_uid, number, code_hex):
+    import json
+
+    body = json.dumps({"nfc_uid": nfc_uid, "number": number, "code": code_hex})
+    return _signed_post_auth(client, _bind_path(race.id), SECRET, body.encode(), raw)
+
+
+def _keyed_admin_race(django_user_model, slug):
+    race, user, raw, cp = _make_admin_race(django_user_model, slug)
+    _set_chip_key(race, MEMBER_VECTOR_KEY)
+    return race, raw
+
+
+def _v2_code(race, nfc_uid, number):
+    return member_code(MEMBER_VECTOR_KEY, nfc_uid, race.id, number).hex()
+
+
+@pytest.mark.django_db
+def test_bind_v2_creates_race_tag_and_is_idempotent(
+    client, signed_app_keys, django_user_model
+):
+    from website.models.tag import Tag
+
+    race, raw = _keyed_admin_race(django_user_model, "v2-new")
+    code = _v2_code(race, "04A1B2C3D4E5F6", 123)
+
+    created = _bind_v2(client, race, raw, "04a1b2c3d4e5f6", 123, code.upper())
+    again = _bind_v2(client, race, raw, "04A1B2C3D4E5F6", 123, code)
+
+    assert created.status_code == 201
+    assert created.json() == {"number": 123, "nfc_uid": "04A1B2C3D4E5F6"}
+    assert again.status_code == 200
+    tag = Tag.objects.get(nfc_uid="04A1B2C3D4E5F6")
+    assert tag.race_id == race.id
+    assert tag.number == 123
+    assert tag.code is None
+
+
+@pytest.mark.django_db
+def test_bind_v2_rewrite_with_new_number_updates_tag(
+    client, signed_app_keys, django_user_model
+):
+    from website.models.tag import Tag
+
+    race, raw = _keyed_admin_race(django_user_model, "v2-rewrite")
+    _bind_v2(client, race, raw, "04AA", 10, _v2_code(race, "04AA", 10))
+
+    response = _bind_v2(client, race, raw, "04AA", 11, _v2_code(race, "04AA", 11))
+
+    assert response.status_code == 200
+    assert response.json()["number"] == 11
+    assert Tag.objects.get(nfc_uid="04AA", race=race).number == 11
+
+
+@pytest.mark.django_db
+def test_bind_v2_rewrite_moves_member_tags_etag(
+    client, signed_app_keys, django_user_model
+):
+    race, raw = _keyed_admin_race(django_user_model, "v2-etag")
+    _bind_v2(client, race, raw, "04AB", 10, _v2_code(race, "04AB", 10))
+    etag = _member_tags_etag(client, race)
+
+    _bind_v2(client, race, raw, "04AB", 12, _v2_code(race, "04AB", 12))
+
+    assert _member_tags_etag(client, race) != etag
+
+
+@pytest.mark.django_db
+def test_bind_v2_leaves_global_pool_alone(client, signed_app_keys, django_user_model):
+    from website.models.tag import Tag
+
+    race, raw = _keyed_admin_race(django_user_model, "v2-global")
+    Tag.objects.create(number=5, nfc_uid="04AC")
+
+    response = _bind_v2(client, race, raw, "04AC", 6, _v2_code(race, "04AC", 6))
+
+    assert response.status_code == 201
+    assert Tag.objects.get(nfc_uid="04AC", race__isnull=True).number == 5
+    assert Tag.objects.get(nfc_uid="04AC", race=race).number == 6
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("case", ["wrong_number", "wrong_uid", "other_race"])
+def test_bind_v2_bad_code_400(client, signed_app_keys, django_user_model, case):
+    from website.models.race import Race
+    from website.models.tag import Tag
+
+    race, raw = _keyed_admin_race(django_user_model, f"v2-bad-{case}")
+    other = Race.objects.create(name="o", slug=f"v2-bad-o-{case}")
+    code = {
+        "wrong_number": member_code(MEMBER_VECTOR_KEY, "04AD", race.id, 8),
+        "wrong_uid": member_code(MEMBER_VECTOR_KEY, "04AE", race.id, 7),
+        "other_race": member_code(MEMBER_VECTOR_KEY, "04AD", other.id, 7),
+    }[case].hex()
+
+    response = _bind_v2(client, race, raw, "04AD", 7, code)
+
+    assert response.status_code == 400
+    assert not Tag.objects.filter(nfc_uid="04AD").exists()
+
+
+@pytest.mark.django_db
+def test_bind_v2_race_without_key_400(client, signed_app_keys, django_user_model):
+    race, _, raw, _ = _make_admin_race(django_user_model, "v2-nokey")
+
+    response = _bind_v2(client, race, raw, "04AF", 7, "00" * 12)
+
+    assert response.status_code == 400
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(
+    "number, code",
+    [
+        (65536, "00" * 12),
+        (None, "00" * 12),
+        (7, "00" * 11),
+        (7, "zz" * 12),
+    ],
+)
+def test_bind_v2_invalid_body_400(
+    client, signed_app_keys, django_user_model, number, code
+):
+    race, raw = _keyed_admin_race(django_user_model, "v2-invalid")
+
+    response = _bind_v2(client, race, raw, "04B0", number, code)
+
+    assert response.status_code == 400
+
+
+@pytest.mark.django_db
+def test_bind_v2_non_hex_uid_400(client, signed_app_keys, django_user_model):
+    race, raw = _keyed_admin_race(django_user_model, "v2-uid")
+
+    response = _bind_v2(client, race, raw, "NOT-HEX", 7, "00" * 12)
+
+    assert response.status_code == 400
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("nfc_uid", ["04 B0", "04\tB0", "04:B0"])
+def test_bind_v2_rejects_separated_uid_even_with_matching_code(
+    client, signed_app_keys, django_user_model, nfc_uid
+):
+    from website.models.tag import Tag
+
+    race, raw = _keyed_admin_race(django_user_model, "v2-sep")
+    code = _v2_code(race, "04B0", 7)
+
+    response = _bind_v2(client, race, raw, nfc_uid, 7, code)
+
+    assert response.status_code == 400
+    assert "nfc_uid" in response.json()
+    assert not Tag.objects.filter(race=race).exists()
+
+
+# --- MarkPresent.code_ok -------------------------------------------------------
+
+
+V2_OK = MEMBER_VECTOR_CODE
+V1_CODE = "11" * 16
+
+
+@pytest.mark.parametrize(
+    "nfc_uid, number, code, key, v1_codes, expected",
+    [
+        (MEMBER_VECTOR_UID, 123, V2_OK, MEMBER_VECTOR_KEY, {}, True),
+        (MEMBER_VECTOR_UID, 123, V2_OK.upper(), MEMBER_VECTOR_KEY, {}, True),
+        (" 04a1b2c3d4e5f6 ", 123, V2_OK, MEMBER_VECTOR_KEY, {}, True),
+        (MEMBER_VECTOR_UID, 124, V2_OK, MEMBER_VECTOR_KEY, {}, False),
+        ("04A1B2C3D4E5F7", 123, V2_OK, MEMBER_VECTOR_KEY, {}, False),
+        (MEMBER_VECTOR_UID, 123, V2_OK, None, {}, False),
+        (MEMBER_VECTOR_UID, 0, V2_OK, MEMBER_VECTOR_KEY, {}, False),
+        ("NOT-HEX", 123, V2_OK, MEMBER_VECTOR_KEY, {}, False),
+        (MEMBER_VECTOR_UID, 123, "zz" * 12, MEMBER_VECTOR_KEY, {}, False),
+        (MEMBER_VECTOR_UID, 123, "00" * 8, MEMBER_VECTOR_KEY, {}, False),
+        ("04CC", 5, V1_CODE, None, {"04CC": bytes.fromhex(V1_CODE)}, True),
+        ("04cc", 5, V1_CODE.upper(), None, {"04CC": bytes.fromhex(V1_CODE)}, True),
+        ("04CC", 5, "22" * 16, None, {"04CC": bytes.fromhex(V1_CODE)}, False),
+        ("04CC", 5, V1_CODE, None, {}, None),
+        (None, 0, None, MEMBER_VECTOR_KEY, {}, None),
+        (MEMBER_VECTOR_UID, 123, None, MEMBER_VECTOR_KEY, {}, None),
+        (MEMBER_VECTOR_UID, 123, "", MEMBER_VECTOR_KEY, {}, None),
+    ],
+)
+def test_check_member_code(nfc_uid, number, code, key, v1_codes, expected):
+    from apps.mobile.chip_key import check_member_code
+
+    assert check_member_code(42, key, nfc_uid, number, code, v1_codes) is expected
+
+
+@pytest.mark.django_db
+def test_v1_codes_for_reads_global_tags_only():
+    from apps.mobile.chip_key import v1_codes_for
+    from website.models.race import Race
+    from website.models.tag import Tag
+
+    race = Race.objects.create(name="r", slug="v1-codes")
+    Tag.objects.create(number=1, nfc_uid="04CC", code=bytes.fromhex(V1_CODE))
+    Tag.objects.create(number=2, nfc_uid="04DD", race=race, code=b"\x01" * 16)
+
+    from apps.mobile.models import MarkPresent
+
+    codes = v1_codes_for(
+        [
+            MarkPresent(nfc_uid="04cc", code=V1_CODE),
+            MarkPresent(nfc_uid="04DD", code="01" * 16),
+            MarkPresent(nfc_uid="04EE", code=V2_OK),
+            MarkPresent(nfc_uid=None, code=None),
+        ]
+    )
+
+    assert codes == {"04CC": bytes.fromhex(V1_CODE)}
+
+
+def _present(nfc_uid, number, number_in_team, code):
+    return {
+        "nfc_uid": nfc_uid,
+        "code": code,
+        "number": number,
+        "number_in_team": number_in_team,
+    }
+
+
+def _upload_presents(client, race, team, cp, cp_code, mark_id, presents):
+    import json
+
+    mark = _valid_mark(
+        id=mark_id, checkpoint_id=cp.id, cp_code=cp_code, present=presents
+    )
+    body = json.dumps(
+        {"team_id": team.id, "source_install_id": "ph", "marks": [mark]}
+    ).encode()
+    return _signed_post(client, _marks_path(race.id), SECRET, body)
+
+
+@pytest.mark.django_db
+def test_mark_upload_sets_code_ok(client, signed_app_keys, django_user_model):
+    from apps.mobile.models import MarkPresent
+    from website.models.tag import Tag
+
+    race, team = _make_team_in_race(django_user_model, slug="code-ok")
+    _set_chip_key(race, MEMBER_VECTOR_KEY)
+    cp, cp_code = _make_cp_with_tag(race)
+    Tag.objects.create(number=5, nfc_uid="04CC", code=bytes.fromhex(V1_CODE))
+    good_v2 = member_code(MEMBER_VECTOR_KEY, MEMBER_VECTOR_UID, race.id, 123).hex()
+
+    response = _upload_presents(
+        client,
+        race,
+        team,
+        cp,
+        cp_code,
+        "mk-code-ok",
+        [
+            _present(MEMBER_VECTOR_UID.lower(), 123, 1, good_v2.upper()),
+            _present(MEMBER_VECTOR_UID, 124, 2, good_v2),
+            _present("04CC", 5, 3, V1_CODE),
+            _present(None, 0, 4, None),
+        ],
+    )
+
+    assert response.status_code == 200
+    by_slot = {
+        p.number_in_team: p.code_ok
+        for p in MarkPresent.objects.filter(mark_id="mk-code-ok")
+    }
+    assert by_slot == {1: True, 2: False, 3: True, 4: None}
+
+
+@pytest.mark.django_db
+def test_mark_upload_code_ok_queries_do_not_grow_with_members(
+    client, signed_app_keys, django_user_model
+):
+    from django.db import connection
+    from django.test.utils import CaptureQueriesContext
+
+    from website.models.tag import Tag
+
+    race, team = _make_team_in_race(django_user_model, slug="code-ok-n1")
+    _set_chip_key(race, MEMBER_VECTOR_KEY)
+    cp, cp_code = _make_cp_with_tag(race)
+    for i in range(6):
+        Tag.objects.create(number=i + 1, nfc_uid=f"04C{i}", code=bytes([i]) * 16)
+
+    def upload(mark_id, count):
+        presents = [
+            _present(f"04C{i}", i + 1, i + 1, (bytes([i]) * 16).hex())
+            for i in range(count)
+        ]
+        with CaptureQueriesContext(connection) as ctx:
+            response = _upload_presents(
+                client, race, team, cp, cp_code, mark_id, presents
+            )
+        assert response.status_code == 200
+        return len(ctx.captured_queries)
+
+    upload("mk-n1-warm", 1)  # first request also records install stats
+    assert upload("mk-n1-a", 1) == upload("mk-n1-b", 6)
+
+
+@pytest.mark.django_db
+def test_mark_moved_to_another_race_rechecks_code_ok(
+    client, signed_app_keys, django_user_model
+):
+    from apps.mobile.models import MarkPresent
+
+    race_a, team_a = _make_team_in_race(django_user_model, slug="code-move-a")
+    race_b, team_b = _make_team_in_race(
+        django_user_model, name="Team B", slug="code-move-b"
+    )
+    _set_chip_key(race_a, MEMBER_VECTOR_KEY)
+    _set_chip_key(race_b, bytes(range(1, 33)))
+    cp_a, cp_code_a = _make_cp_with_tag(race_a, number=1)
+    cp_b, cp_code_b = _make_cp_with_tag(race_b, number=2)
+    code = member_code(MEMBER_VECTOR_KEY, MEMBER_VECTOR_UID, race_a.id, 123).hex()
+    presents = [_present(MEMBER_VECTOR_UID, 123, 1, code)]
+
+    first = _upload_presents(
+        client, race_a, team_a, cp_a, cp_code_a, "mk-move", presents
+    )
+    assert first.status_code == 200
+    assert MarkPresent.objects.get(mark_id="mk-move").code_ok is True
+
+    moved = _upload_presents(
+        client, race_b, team_b, cp_b, cp_code_b, "mk-move", presents
+    )
+
+    assert moved.status_code == 200
+    assert MarkPresent.objects.get(mark_id="mk-move").code_ok is False
+
+
+@pytest.mark.django_db
+def test_mark_resend_rechecks_after_key_arrives(
+    client, signed_app_keys, django_user_model
+):
+    from apps.mobile.models import MarkPresent
+
+    race, team = _make_team_in_race(django_user_model, slug="code-late-key")
+    cp, cp_code = _make_cp_with_tag(race)
+    code = member_code(MEMBER_VECTOR_KEY, MEMBER_VECTOR_UID, race.id, 123).hex()
+    presents = [_present(MEMBER_VECTOR_UID, 123, 1, code)]
+
+    _upload_presents(client, race, team, cp, cp_code, "mk-late", presents)
+    assert MarkPresent.objects.get(mark_id="mk-late").code_ok is False
+
+    _set_chip_key(race, MEMBER_VECTOR_KEY)
+    _upload_presents(client, race, team, cp, cp_code, "mk-late", presents)
+
+    assert MarkPresent.objects.get(mark_id="mk-late").code_ok is True

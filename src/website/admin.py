@@ -323,7 +323,8 @@ class NewsPostAdmin(admin.ModelAdmin):
 
 @admin.register(Tag)
 class TagAdmin(admin.ModelAdmin):
-    list_display = ("number", "nfc_uid", "last_seen_at")
+    list_display = ("number", "nfc_uid", "race", "last_seen_at")
+    list_filter = ("race",)
     search_fields = ("number", "nfc_uid")
 
 
