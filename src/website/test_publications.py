@@ -686,7 +686,13 @@ def test_publication_detail_puts_title_in_card_under_section_hero(
     assert f"<h1>{hero_title}</h1>" in hero.group(0)
     assert "Итоги гонки" not in hero.group(0)
     assert re.findall(r"<h1>(.*?)</h1>", article.group(0)) == ["Итоги гонки"]
-    assert re.search(r"<time [^>]*>7 октября 2026</time>", article.group(0))
+    footer = re.search(
+        r'<footer class="publication-article__footer">.*?</footer>',
+        article.group(0),
+        re.DOTALL,
+    )
+    assert footer
+    assert re.search(r"<time [^>]*>7 октября 2026</time>", footer.group(0))
 
 
 @pytest.mark.django_db

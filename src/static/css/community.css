@@ -977,7 +977,7 @@
 .publication-article .publication-article__body h4 { margin: 1.6em 0 .3em; font-size: 17px; }
 .publication-article .publication-article__body p { margin: 0 0 .9em; }
 .publication-article .publication-article__body > :first-child { margin-top: 0; }
-.publication-article__body > :last-child { margin-bottom: 0; }
+.publication-article .publication-article__body > :last-child { margin-bottom: 0; }
 
 /* The feed excerpt shares the post body's element styles at its own size. */
 .publication-article__body ul,
@@ -995,9 +995,11 @@
 .publication-post__summary li > ul,
 .publication-post__summary li > ol { margin: .35em 0 0; }
 .publication-article__body ul > li::marker,
-.publication-post__summary ul > li::marker { color: var(--muted-2); }
+.publication-post__summary ul > li::marker,
 .publication-article__body ol > li::marker,
-.publication-post__summary ol > li::marker { color: var(--muted); font-variant-numeric: tabular-nums; }
+.publication-post__summary ol > li::marker { color: var(--muted); }
+.publication-article__body ol > li::marker,
+.publication-post__summary ol > li::marker { font-variant-numeric: tabular-nums; }
 
 .publication-post .publication-post__summary a,
 .publication-article .publication-article__body a {
