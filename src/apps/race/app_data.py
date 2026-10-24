@@ -164,7 +164,7 @@ def _present_label(present, tag_numbers):
 
 def _race_teams(race):
     return list(
-        Team.objects.filter(category2__race_id=race.id)
+        Team.objects.filter(category2__race_id=race.id, paid_people__gt=0)
         .select_related("category2")
         .order_by("category2__order", "category2__id", "start_number", "id")
     )
@@ -242,8 +242,13 @@ def build_overview(race):
 
     # Judge scans: attribute by chip uid; a uid used by several teams (should
     # not happen, but data is data) shows up on every matching row.
+    # Only listed teams: a scan of an unlisted (unpaid) team's chip must show
+    # up as unmatched rather than vanish.
+    listed_ids = {team.id for team in teams}
     uid_to_teams = defaultdict(set)
     for team_id, uids in chips_by_team.items():
+        if team_id not in listed_ids:
+            continue
         for uid in uids:
             uid_to_teams[uid].add(team_id)
 
