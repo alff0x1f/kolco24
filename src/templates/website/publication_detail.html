@@ -32,6 +32,16 @@
           <header class="publication-article__head">
             <h1>{{ publication.title }}</h1>
             <time datetime="{{ publication.publication_date|date:'c' }}">{{ publication.publication_date|date:"j E Y" }}</time>
+            {% if can_edit %}
+            <div class="publication-article__manage">
+              <a class="publication-post__edit" href="{% url 'edit_post' publication.race.slug publication.pk %}">Редактировать</a>
+              {% if publication.is_draft %}
+              <span class="publication-post__state publication-post__state--draft">Черновик</span>
+              {% elif publication.is_scheduled %}
+              <span class="publication-post__state publication-post__state--scheduled">Запланирована на {{ publication.publication_date|date:"j E Y" }}</span>
+              {% endif %}
+            </div>
+            {% endif %}
             {% if publication.summary %}<p class="publication-article__lead">{{ publication.summary }}</p>{% endif %}
           </header>
           {% if publication.image %}

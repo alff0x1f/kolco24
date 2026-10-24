@@ -10,6 +10,7 @@ from apps.photo_contest.models import PhotoContest
 from apps.race.permissions import is_team_editing_open
 from website.models import NewsPost, PublicationKind, Race, RaceAdmin, Team
 from website.models.race import RegStatus
+from website.views.views_ import is_race_admin
 
 
 def visible_publications():
@@ -198,6 +199,9 @@ class PublicationDetailView(View):
         upcoming_races = (
             [] if publication.race_id else unfinished_races(timezone.localdate())[:3]
         )
+        can_edit = bool(publication.race_id) and is_race_admin(
+            request.user, publication.race
+        )
         response = render(
             request,
             self.template_name,
@@ -205,6 +209,7 @@ class PublicationDetailView(View):
                 "publication": publication,
                 "is_preview": is_preview,
                 "upcoming_races": upcoming_races,
+                "can_edit": can_edit,
             },
         )
         if is_preview:
