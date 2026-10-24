@@ -6147,6 +6147,30 @@ def test_app_data_overview_chips_takes_and_judge_scans(django_user_model):
 
 
 @pytest.mark.django_db
+def test_app_data_overview_lists_only_paid_teams(django_user_model):
+    race, category, cp_start, *_ = _make_app_data_race("app-data-paid")
+    owner = django_user_model.objects.create_user(username="appdata-paid", password="x")
+    take_ms = 1_700_000_100_000
+    _make_team(owner, category, teamname="Paid", paid_people=2)
+    unpaid = _make_team(owner, category, teamname="Unpaid", paid_people=0)
+    _make_mark(unpaid, cp_start, present_chips=("BB:02",), wall_ms=take_ms)
+    JudgeScan.objects.create(
+        id="js-unpaid",
+        race=race,
+        source_install_id="judge-phone",
+        event_type="start",
+        participant_number=9,
+        nfc_uid="BB:02",
+        wall_ms=take_ms,
+    )
+
+    context = build_overview(race)
+
+    assert [row["team"].teamname for row in context["rows"]] == ["Paid"]
+    assert [s["participant_number"] for s in context["unmatched_scans"]] == [9]
+
+
+@pytest.mark.django_db
 def test_app_data_overview_flags_boundary_mismatch(django_user_model):
     race, category, cp_start, *_ = _make_app_data_race("app-data-mismatch")
     owner = django_user_model.objects.create_user(username="appdata-mm", password="x")

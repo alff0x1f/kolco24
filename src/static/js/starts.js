@@ -136,8 +136,11 @@
     var width = Math.max(chart.clientWidth, 280);
     var pad = { left: 36, right: 12, top: 12, bottom: 24 };
     var t0 = done[0].start_time_ms;
-    var t1 = Math.max(done[done.length - 1].start_time_ms, data.server_time_ms);
-    if (t1 <= t0) t1 = t0 + 60000;
+    var last = done[done.length - 1];
+    var t1 = last.start_time_ms;
+    // All starts at one moment: centre the single step on a 1-minute axis.
+    var single = t1 <= t0;
+    if (single) { t0 -= 30000; t1 += 30000; }
     var yMax = Math.max(total, 1);
     var x = function (t) { return pad.left + ((t - t0) / (t1 - t0)) * (width - pad.left - pad.right); };
     var y = function (n) { return pad.top + (1 - n / yMax) * (CHART_HEIGHT - pad.top - pad.bottom); };
@@ -146,7 +149,6 @@
     done.forEach(function (t, i) {
       path += " H" + x(t.start_time_ms) + " V" + y(i + 1);
     });
-    path += " H" + x(t1);
 
     var root = svg("svg", {
       viewBox: "0 0 " + width + " " + CHART_HEIGHT,
@@ -159,8 +161,12 @@
     root.appendChild(svg("path", { class: "rs-line", d: path }));
     root.appendChild(svg("text", { x: pad.left - 6, y: y(0) + 4, "text-anchor": "end" }, "0"));
     root.appendChild(svg("text", { x: pad.left - 6, y: y(total) + 4, "text-anchor": "end" }, String(total)));
-    root.appendChild(svg("text", { x: pad.left, y: CHART_HEIGHT - 6 }, done[0].start_time.slice(0, 5)));
-    root.appendChild(svg("text", { x: width - pad.right, y: CHART_HEIGHT - 6, "text-anchor": "end" }, data.server_time.slice(0, 5)));
+    if (single) {
+      root.appendChild(svg("text", { x: x(last.start_time_ms), y: CHART_HEIGHT - 6, "text-anchor": "middle" }, last.start_time.slice(0, 5)));
+    } else {
+      root.appendChild(svg("text", { x: pad.left, y: CHART_HEIGHT - 6 }, done[0].start_time.slice(0, 5)));
+      root.appendChild(svg("text", { x: width - pad.right, y: CHART_HEIGHT - 6, "text-anchor": "end" }, last.start_time.slice(0, 5)));
+    }
     chart.appendChild(root);
   }
 
