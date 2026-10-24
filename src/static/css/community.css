@@ -894,25 +894,37 @@
    feed doesn't move the layout. */
 .publication-column > .community-crumbs { margin: 0; padding: 17px 2px 13px; }
 
-.publication-article { padding: 21px; overflow-wrap: break-word; }
+.publication-article {
+  --article-pad: 40px;
+  padding: var(--article-pad);
+  overflow-wrap: break-word;
+}
 
-.publication-article__head { margin-bottom: 21px; }
-
-.publication-article__head h1 {
-  max-width: 30em;
-  margin: 0;
-  color: var(--ink);
-  font-size: 28px;
-  font-weight: 600;
-  letter-spacing: -.015em;
-  line-height: 1.2;
+/* The rule under the head spans the whole card, so the head runs past the
+   article padding on both sides. */
+.publication-article__head {
+  margin: 0 calc(-1 * var(--article-pad)) var(--article-pad);
+  padding: 0 var(--article-pad) 32px;
+  border-bottom: 1px solid var(--line);
 }
 
 .publication-article__head time {
   display: block;
-  margin-top: 8px;
+  margin-bottom: 12px;
   color: var(--muted);
-  font-size: 13px;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.publication-article__head h1 {
+  max-width: 18em;
+  margin: 0;
+  color: var(--ink);
+  font-size: 40px;
+  font-weight: 700;
+  letter-spacing: -.025em;
+  line-height: 1.08;
+  text-wrap: balance;
 }
 
 .publication-article__manage {
@@ -920,15 +932,16 @@
   align-items: baseline;
   flex-wrap: wrap;
   gap: 8px 16px;
-  margin-top: 8px;
+  margin-top: 12px;
 }
 
 .publication-article__lead {
-  max-width: 68ch;
-  margin: 14px 0 0;
-  color: var(--muted);
-  font-size: 17px;
-  line-height: 1.55;
+  max-width: 60ch;
+  margin: 18px 0 0;
+  color: var(--ink-soft);
+  font-size: 19px;
+  line-height: 1.5;
+  text-wrap: pretty;
 }
 
 .publication-article__status {
@@ -937,7 +950,7 @@
   font-size: 13px;
 }
 
-.publication-article__cover { margin: 0 0 21px; }
+.publication-article__cover { margin: 0 0 32px; }
 
 .publication-article__cover img {
   display: block;
@@ -948,16 +961,75 @@
 }
 
 .publication-article .publication-article__body {
-  max-width: 68ch;
+  max-width: 66ch;
   margin: 0;
   padding: 0;
-  font-size: 16px;
+  font-size: 17px;
+  line-height: 1.6;
+  text-wrap: pretty;
 }
 
+.publication-article .publication-article__body h2,
+.publication-article .publication-article__body h3,
+.publication-article .publication-article__body h4 {
+  color: var(--ink);
+  line-height: 1.25;
+  text-wrap: balance;
+}
+
+.publication-article .publication-article__body h2 { margin: 2.4em 0 .5em; font-size: 22px; letter-spacing: -.01em; }
+.publication-article .publication-article__body h3 { margin: 2em 0 .4em; font-size: 18px; }
+.publication-article .publication-article__body h4 { margin: 1.6em 0 .3em; font-size: 17px; }
+.publication-article .publication-article__body p { margin: 0 0 .9em; }
+.publication-article .publication-article__body > :first-child { margin-top: 0; }
 .publication-article__body > :last-child { margin-bottom: 0; }
-.publication-article .publication-article__body h2 { font-size: 21px; }
-.publication-article .publication-article__body h3 { font-size: 18px; }
-.publication-article .publication-article__body h4 { font-size: 16px; }
+
+.publication-article__body ul,
+.publication-article__body ol {
+  margin: 0 0 1em;
+  padding-left: 1.25em;
+}
+
+.publication-article__body li { margin: 0 0 .35em; padding-left: .2em; line-height: 1.5; }
+.publication-article__body li > ul,
+.publication-article__body li > ol { margin: .35em 0 0; }
+.publication-article__body ul > li::marker { color: var(--muted-2); }
+.publication-article__body ol > li::marker { color: var(--muted); font-variant-numeric: tabular-nums; }
+
+.publication-article .publication-article__body a {
+  color: var(--primary-2);
+  text-decoration: underline;
+  text-decoration-color: rgba(69, 130, 236, .4);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+}
+
+.publication-article .publication-article__body a:hover { text-decoration-color: currentColor; }
+
+.publication-article__body code,
+.publication-article__body pre {
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+
+.publication-article__body code {
+  padding: 2px 5px;
+  border-radius: 4px;
+  background: var(--paper);
+  font-size: .86em;
+}
+
+.publication-article .publication-article__body pre { font-size: 14px; line-height: 1.5; }
+.publication-article__body pre code { padding: 0; background: none; font-size: inherit; }
+
+.publication-article .publication-article__body blockquote {
+  padding-left: 18px;
+  border-left-width: 2px;
+  font-size: 19px;
+  line-height: 1.5;
+}
+
+.publication-article__body table { font-variant-numeric: tabular-nums; }
+.publication-article__body th { font-weight: 600; }
 
 .publication-detail__footer { padding: 20px 2px 0; }
 .publication-detail__footer a { color: var(--primary-2); font-size: 13px; font-weight: 500; }
@@ -1220,8 +1292,11 @@
   .publication-detail__cover img { border-radius: 0; }
   .publication-detail__lead { font-size: 16px; }
   .publication-detail__body { padding: 25px 20px 36px; font-size: 16px; }
-  .publication-article__head h1 { font-size: 23px; }
-  .publication-article__lead { font-size: 16px; }
+  .publication-article { --article-pad: 20px; }
+  .publication-article__head { padding-bottom: 24px; }
+  .publication-article__head h1 { font-size: 28px; }
+  .publication-article__lead { font-size: 17px; }
+  .publication-article .publication-article__body { font-size: 16px; }
   .race-archive__year { grid-template-columns: 1fr; gap: 8px; }
   .race-archive__list > a { grid-template-columns: 48px minmax(0, 1fr) 20px; gap: 9px; padding: 12px; }
   .race-archive__list small { display: none; }

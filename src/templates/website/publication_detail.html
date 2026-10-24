@@ -30,8 +30,8 @@
           <p class="publication-article__status" role="status">Предпросмотр — публикация пока недоступна посетителям.</p>
           {% endif %}
           <header class="publication-article__head">
-            <h1>{{ publication.title }}</h1>
             <time datetime="{{ publication.publication_date|date:'c' }}">{{ publication.publication_date|date:"j E Y" }}</time>
+            <h1>{{ publication.title }}</h1>
             {% if can_edit %}
             <div class="publication-article__manage">
               <a class="publication-post__edit" href="{% url 'edit_post' publication.race.slug publication.pk %}">Редактировать</a>
