@@ -686,17 +686,24 @@ def test_publication_detail_puts_title_in_card_under_section_hero(
     assert f"<h1>{hero_title}</h1>" in hero.group(0)
     assert "Итоги гонки" not in hero.group(0)
     assert re.findall(r"<h1>(.*?)</h1>", article.group(0)) == ["Итоги гонки"]
-    assert "Короткий анонс" in article.group(0)
-    assert re.search(r"<time [^>]*>7 октября 2026</time>", article.group(0))
+    footer = re.search(
+        r'<footer class="publication-article__footer">.*?</footer>',
+        article.group(0),
+        re.DOTALL,
+    )
+    assert footer
+    assert re.search(r"<time [^>]*>7 октября 2026</time>", footer.group(0))
 
 
 @pytest.mark.django_db
-def test_publication_detail_hides_empty_lead(client):
-    publication = create_publication("Без анонса")
+def test_publication_detail_keeps_summary_out_of_article(client):
+    publication = create_publication("С анонсом", summary="Короткий анонс")
 
     html = client.get(publication.get_absolute_url()).content.decode()
 
-    assert "publication-article__lead" not in html
+    article = re.search(r"<article .*?</article>", html, re.DOTALL)
+    assert article and "Короткий анонс" not in article.group(0)
+    assert '<meta name="description" content="Короткий анонс">' in html
     assert "Материал о соревновании" not in html
 
 
@@ -1100,9 +1107,9 @@ def test_race_catalog_shows_featured_race_once_and_keeps_other_starts(
         assert ("Другие будущие старты" in html) == (starts_in > 0)
     elif starts_in > 0:
         assert 'id="future-races-title"' not in html
-        assert "Новые соревнования пока не объявлены" not in html
+        assert "Пока ничего нет" not in html
     else:
-        assert "Новые соревнования пока не объявлены" in html
+        assert "Пока ничего нет" in html
 
 
 @pytest.mark.django_db
