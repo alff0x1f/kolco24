@@ -1107,9 +1107,9 @@ def test_race_catalog_shows_featured_race_once_and_keeps_other_starts(
         assert ("Другие будущие старты" in html) == (starts_in > 0)
     elif starts_in > 0:
         assert 'id="future-races-title"' not in html
-        assert "Новые соревнования пока не объявлены" not in html
+        assert "Пока ничего нет" not in html
     else:
-        assert "Новые соревнования пока не объявлены" in html
+        assert "Пока ничего нет" in html
 
 
 @pytest.mark.django_db
