@@ -560,8 +560,8 @@ def test_race_admin_feed_includes_draft_and_scheduled_posts(client, role, utc_ho
     assert reverse("add_post", args=[race.slug]) in html
     assert f'action="{reverse("add_post", args=[race.slug])}"' not in html
     for post in (draft, scheduled):
-        assert f'href="{reverse("edit_post", args=[race.slug, post.pk])}"' in html
-    assert html.count('class="publication-post__edit"') == 2
+        assert reverse("edit_post", args=[race.slug, post.pk]) not in html
+    assert 'class="publication-post__edit"' not in html
     assert (
         'class="publication-post__state publication-post__state--draft">Черновик</span>'
         in html

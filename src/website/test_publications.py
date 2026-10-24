@@ -700,6 +700,59 @@ def test_publication_detail_hides_empty_lead(client):
     assert "Материал о соревновании" not in html
 
 
+@pytest.mark.django_db
+@pytest.mark.parametrize(
+    "role", [RaceAdmin.Role.ADMIN, RaceAdmin.Role.MODERATOR], ids=lambda r: r.value
+)
+def test_publication_detail_shows_edit_link_to_race_admin(
+    client, django_user_model, role
+):
+    race = Race.objects.create(name="Кольцо 24", slug="k24", is_published=True)
+    user = django_user_model.objects.create_user("org", "org@example.com", "pw")
+    RaceAdmin.objects.create(race=race, user=user, role=role)
+    draft = create_publication("Черновик гонки", race=race, is_published=False)
+    client.force_login(user)
+
+    html = client.get(draft.get_absolute_url()).content.decode()
+
+    edit_url = reverse("edit_post", args=[race.slug, draft.pk])
+    assert f'<a class="publication-post__edit" href="{edit_url}">' in html
+    assert "publication-post__state--draft" in html
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("who", ["anon", "plain", "superuser"])
+def test_publication_detail_hides_edit_link_from_others(client, django_user_model, who):
+    race = Race.objects.create(name="Кольцо 24", slug="k24", is_published=True)
+    publication = create_publication("Новость гонки", race=race)
+    if who == "plain":
+        client.force_login(
+            django_user_model.objects.create_user("u", "u@example.com", "pw")
+        )
+    elif who == "superuser":
+        client.force_login(
+            django_user_model.objects.create_superuser("s", "s@example.com", "pw")
+        )
+
+    html = client.get(publication.get_absolute_url()).content.decode()
+
+    assert "publication-post__edit" not in html
+    assert "/edit/" not in html
+
+
+@pytest.mark.django_db
+def test_publication_detail_without_race_has_no_edit_link(client, django_user_model):
+    race = Race.objects.create(name="Кольцо 24", slug="k24", is_published=True)
+    user = django_user_model.objects.create_user("org", "org@example.com", "pw")
+    RaceAdmin.objects.create(race=race, user=user)
+    publication = create_publication("Советы")
+    client.force_login(user)
+
+    html = client.get(publication.get_absolute_url()).content.decode()
+
+    assert "publication-post__edit" not in html
+
+
 def _aside(html):
     match = re.search(r'<aside class="home-races".*?</aside>', html, re.DOTALL)
     assert match

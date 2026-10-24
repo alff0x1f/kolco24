@@ -28,8 +28,7 @@
             {% endif %}
           </div>
           {% for news in news_list %}
-          {% url 'edit_post' race.slug news.pk as edit_url %}
-          {% include "website/_publication_post.html" with publication=news hide_race=True can_edit=can_manage_posts edit_url=edit_url %}
+          {% include "website/_publication_post.html" with publication=news hide_race=True show_state=can_manage_posts %}
           {% empty %}
           <div class="publication-feed__empty">
             <p>Новостей пока нет.</p>

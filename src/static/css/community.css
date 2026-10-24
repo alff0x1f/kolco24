@@ -915,6 +915,14 @@
   font-size: 13px;
 }
 
+.publication-article__manage {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  margin-top: 8px;
+}
+
 .publication-article__lead {
   max-width: 68ch;
   margin: 14px 0 0;
