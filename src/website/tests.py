@@ -2718,6 +2718,25 @@ def test_gate_growth_in_full_category_blocked(django_user_model):
 
 
 @pytest.mark.django_db
+def test_team_form_single_member_allowed_when_category_min_is_one(django_user_model):
+    user = _pl_user(django_user_model)
+    race = _pl_race()
+    cat = _pl_category(race, min_people=1, max_people=1)
+    form = TeamForm(race.id, _gate_data(cat, 1), team=Team(owner=user))
+    assert form.is_valid(), form.errors
+
+
+@pytest.mark.django_db
+def test_team_form_single_member_rejected_by_default_category(django_user_model):
+    user = _pl_user(django_user_model)
+    race = _pl_race()
+    cat = _pl_category(race)
+    form = TeamForm(race.id, _gate_data(cat, 1), team=Team(owner=user))
+    assert not form.is_valid()
+    assert "ucount" in form.errors
+
+
+@pytest.mark.django_db
 def test_gate_new_registration_into_full_race_blocked(django_user_model):
     # Новая регистрация (team=Team()) в полную гонку блокируется.
     user = _pl_user(django_user_model)
@@ -3120,7 +3139,7 @@ def test_edit_team_invalid_post_superuser_bypass_limits_requires_race_admin(
     _pl_team(cat, filler_user, paid_people=2, name="filler77")
     team = _pl_team(cat, superuser, paid_people=0, name="SuTeam")
     client.force_login(superuser)
-    # ucount=1 is below min_value=2, so form.is_valid() is False → invalid-POST rerender
+    # ucount=1 is below the category's min_people=2 → invalid-POST rerender
     response = client.post(
         f"/team/{team.id}/",
         {"ucount": "1", "category2_id": str(cat.id)},

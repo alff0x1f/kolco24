@@ -46,7 +46,7 @@ class TeamForm(forms.Form):
         ),
     )
     ucount = forms.IntegerField(
-        min_value=2,
+        min_value=1,
         widget=forms.HiddenInput(),
         label="Количество участников",
     )
