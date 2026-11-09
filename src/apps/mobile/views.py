@@ -1017,7 +1017,7 @@ class JudgeScanUploadView(AppAPIView):
 
 
 class RaceListView(AppAPIView):
-    """Return the list of published races for the mobile app (conditional GET).
+    """Return published races not hidden in the app (conditional GET).
 
     The ETag is the bare :func:`races_version` fingerprint wrapped in quotes; a
     matching ``If-None-Match`` short-circuits to an empty ``304`` before any

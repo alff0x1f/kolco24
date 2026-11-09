@@ -13,11 +13,6 @@ from website.models.race import RegStatus
 from website.views.views_ import is_race_admin
 
 
-def visible_publications():
-    """Released publications, excluding posts attached to unpublished races."""
-    return NewsPost.objects.visible()
-
-
 def _team_display_name(team, user):
     """Fallback name for an unnamed team.
 
@@ -176,7 +171,7 @@ class PublicationDetailView(View):
     template_name = "website/publication_detail.html"
 
     def get(self, request, pk):
-        publication = visible_publications().filter(pk=pk).first()
+        publication = NewsPost.objects.visible().filter(pk=pk).first()
         is_preview = publication is None
         if is_preview:
             publication = get_object_or_404(

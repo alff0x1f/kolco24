@@ -1317,36 +1317,52 @@ def test_races_etag_follows_hidden_in_app(client, settings):
 
     settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
     settings.MOBILE_APP_TS_WINDOW = 300
-    Race.objects.create(name="Stays", slug="stays")
+    # Created first, so it is not MAX(updated_at): only COUNT can move the ETag.
     race = Race.objects.create(name="Toggled", slug="toggled")
+    Race.objects.create(name="Stays", slug="stays")
 
-    def etag():
+    def fetch(if_none_match=None):
         headers = _signed_headers("GET", RACES_PATH, SECRET)
-        return client.get(RACES_PATH, **headers)["ETag"]
+        if if_none_match:
+            headers["HTTP_IF_NONE_MATCH"] = if_none_match
+        return client.get(RACES_PATH, **headers)
 
-    listed = etag()
-    race.is_hidden_in_app = True
-    race.save()
-    hidden = etag()
-    race.is_hidden_in_app = False
-    race.save()
+    listed = fetch()["ETag"]
+    Race.objects.filter(pk=race.pk).update(is_hidden_in_app=True)
 
-    assert hidden != listed
-    assert etag() != hidden
+    response = fetch(if_none_match=listed)
+
+    assert response.status_code == 200
+    assert [r["slug"] for r in response.json()["races"]] == ["stays"]
+
+    Race.objects.filter(pk=race.pk).update(is_hidden_in_app=False)
+    assert fetch(if_none_match=response["ETag"]).status_code == 200
 
 
 @pytest.mark.django_db
-def test_per_race_endpoint_still_serves_race_hidden_in_app(client, settings):
+@pytest.mark.parametrize(
+    ("endpoint", "key"),
+    [
+        ("teams", "teams"),
+        ("legend", "checkpoints"),
+        ("member_tags", "member_tags"),
+        ("sync", "versions"),
+    ],
+)
+def test_per_race_endpoints_still_serve_race_hidden_in_app(
+    client, settings, endpoint, key
+):
     from website.models.race import Race
 
     settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
     settings.MOBILE_APP_TS_WINDOW = 300
     race = Race.objects.create(name="Off", slug="off", is_hidden_in_app=True)
-    path = f"/app/race/{race.id}/legend/"
+    path = f"/app/race/{race.id}/{endpoint}/"
 
     response = client.get(path, **_signed_headers("GET", path, SECRET))
 
     assert response.status_code == 200
+    assert key in response.json()
 
 
 @pytest.mark.django_db

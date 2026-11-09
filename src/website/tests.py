@@ -2644,6 +2644,7 @@ TEAM_FIELD_TOGGLES = [
     ("ask_team_club", "organization"),
 ]
 ALL_TEAM_FIELDS = [field for _, field in TEAM_FIELD_TOGGLES]
+ALL_TEAM_FLAGS = [flag for flag, _ in TEAM_FIELD_TOGGLES]
 
 
 def _set_flags(race, value, *flags):
@@ -2700,6 +2701,38 @@ def test_edit_team_keeps_stored_value_of_hidden_field(client, flag, field):
         assert getattr(team, name) == ("Старое" if name == field else "Новое")
 
 
+@pytest.mark.django_db
+def test_add_team_saves_with_all_team_fields_off(client):
+    user, race, category = _free_race_for_add("all-off-post", *ALL_TEAM_FLAGS)
+    client.force_login(user)
+    data = {name: "Подделка" for name in ALL_TEAM_FIELDS}
+    data.update(ucount="2", category2_id=str(category.id), map_count="0")
+
+    response = client.post(reverse("add_team", args=[race.slug]), data)
+
+    assert response.status_code == 302
+    team = Team.objects.get(category2=category)
+    for name in ALL_TEAM_FIELDS:
+        assert getattr(team, name) == ""
+
+
+@pytest.mark.django_db
+def test_edit_team_keeps_stored_values_with_all_team_fields_off(client):
+    user, race, category, team = _create_team_for_edit(suffix="all-off-post")
+    Team.objects.filter(pk=team.pk).update(**{f: "Старое" for f in ALL_TEAM_FIELDS})
+    _set_flags(race, False, *ALL_TEAM_FLAGS)
+    client.force_login(user)
+    data = {name: "Подделка" for name in ALL_TEAM_FIELDS}
+    data.update(ucount="4", category2_id=str(category.id))
+
+    response = client.post(reverse("edit_team", args=[team.id]), data)
+
+    assert response.status_code == 302
+    team.refresh_from_db()
+    for name in ALL_TEAM_FIELDS:
+        assert getattr(team, name) == "Старое"
+
+
 def _assert_only_hidden_input_is_absent(html, field):
     for name in ALL_TEAM_FIELDS:
         assert (f'name="{name}"' in html) is (name != field)
@@ -2720,25 +2753,36 @@ def test_team_pages_omit_hidden_input(client, flag, field):
 
 
 @pytest.mark.django_db
+@pytest.mark.parametrize("page", ["add", "edit"])
 @pytest.mark.parametrize(("flag", "field"), TEAM_FIELD_TOGGLES)
-def test_invalid_add_team_post_does_not_restore_hidden_input(client, flag, field):
-    user, race, category = _free_race_for_add(f"bad-{field}", flag)
+def test_invalid_team_post_does_not_restore_hidden_input(client, page, flag, field):
+    user, race, category, team = _create_team_for_edit(suffix=f"bad-{page}-{field}")
+    Team.objects.filter(pk=team.pk).update(**{field: "Старое"})
+    _set_flags(race, False, flag)
     client.force_login(user)
+    url = (
+        reverse("add_team", args=[race.slug])
+        if page == "add"
+        else reverse("edit_team", args=[team.id])
+    )
 
     response = client.post(
-        reverse("add_team", args=[race.slug]), {"ucount": "2", field: "Подделка"}
+        url, {"ucount": "99", "category2_id": str(category.id), field: "Подделка"}
     )
 
     assert response.status_code == 200
     html = response.content.decode()
     _assert_only_hidden_input_is_absent(html, field)
     assert "Подделка" not in html
+    team.refresh_from_db()
+    assert getattr(team, field) == "Старое"
+    assert Team.objects.filter(category2=category).count() == 1
 
 
 @pytest.mark.django_db
 def test_team_section_disappears_when_all_fields_are_off(client):
     user, race, category, team = _create_team_for_edit(suffix="all-off")
-    _set_flags(race, False, *[flag for flag, _ in TEAM_FIELD_TOGGLES])
+    _set_flags(race, False, *ALL_TEAM_FLAGS)
     client.force_login(user)
 
     for url in (
@@ -2753,7 +2797,7 @@ def test_team_section_disappears_when_all_fields_are_off(client):
 @pytest.mark.django_db
 def test_superuser_keeps_start_number_when_all_fields_are_off(client):
     user, race, category, team = _create_team_for_edit(suffix="all-off-su")
-    _set_flags(race, False, *[flag for flag, _ in TEAM_FIELD_TOGGLES])
+    _set_flags(race, False, *ALL_TEAM_FLAGS)
     client.force_login(
         User.objects.create_superuser(
             username="all-off-admin", password="p", email="all-off-admin@example.com"

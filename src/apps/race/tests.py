@@ -1583,6 +1583,52 @@ def test_hidden_teams_redirect_user_without_team(client):
 
 
 @pytest.mark.django_db
+def test_hidden_teams_team_in_another_race_grants_nothing(client):
+    race, category = _closed_race()
+    _, other_category = _closed_race(slug="other")
+    user = User.objects.create_user(username="ot", password="p", email="ot@e.com")
+    _make_team(user, other_category, teamname="Там")
+    client.force_login(user)
+
+    urls = _teams_urls(race, category) + [reverse("my_teams", args=[race.slug])]
+    for url in urls:
+        response = client.get(url)
+        assert response.status_code == 302
+        assert response.url == reverse("race", args=[race.slug])
+    assert f'href="{reverse("all_teams", args=[race.slug])}"' not in _race_page_html(
+        client, race
+    )
+
+
+@pytest.mark.django_db
+def test_hidden_teams_owner_in_two_races_gets_only_this_race(client):
+    race, category = _closed_race()
+    _, other_category = _closed_race(slug="other")
+    owner = User.objects.create_user(username="ow", password="p", email="ow@e.com")
+    _make_team(owner, category, teamname="Здесь")
+    _make_team(owner, other_category, teamname="Там")
+    client.force_login(owner)
+
+    html = client.get(reverse("all_teams", args=[race.slug])).content.decode()
+
+    assert [row["name"] for row in _script_json(html, "teams-data")] == ["Здесь"]
+
+
+@pytest.mark.django_db
+def test_hidden_teams_soft_deleted_team_grants_nothing(client):
+    race, category = _closed_race()
+    owner = User.objects.create_user(username="dl", password="p", email="dl@e.com")
+    _make_team(owner, category, teamname="Удалённая", is_deleted=True)
+    client.force_login(owner)
+
+    urls = _teams_urls(race, category) + [reverse("my_teams", args=[race.slug])]
+    for url in urls:
+        response = client.get(url)
+        assert response.status_code == 302
+        assert response.url == reverse("race", args=[race.slug])
+
+
+@pytest.mark.django_db
 def test_hidden_teams_owner_gets_only_own_rows(client):
     race, category = _closed_race()
     owner = User.objects.create_user(username="ow", password="p", email="ow@e.com")
@@ -1623,12 +1669,9 @@ def test_hidden_teams_superuser_sees_all_teams(client):
         User.objects.create_superuser(username="su", password="p", email="su@e.com")
     )
 
-    rows = _script_json(
-        client.get(reverse("all_teams", args=[race.slug])).content.decode(),
-        "teams-data",
-    )
-
-    assert [row["name"] for row in rows] == ["Чужие"]
+    for url in _teams_urls(race, category):
+        rows = _script_json(client.get(url).content.decode(), "teams-data")
+        assert [row["name"] for row in rows] == ["Чужие"]
 
 
 def _race_page_html(client, race):
@@ -1645,6 +1688,9 @@ def test_hidden_teams_race_page_keeps_counters_without_links(client):
 
     assert '<span class="side-total">Все 1</span>' in html
     assert "<b>1</b> команда" in html
+    assert "<b>2</b> участника" in html
+    assert re.search(r'Участников</span>\s*<span class="value">2</span>', html)
+    assert re.search(r'Команд</span>\s*<span class="value">1</span>', html)
     assert "осталось 8 из 10" in html
     for url in _teams_urls(race, category):
         assert f'href="{url}"' not in html
@@ -1665,10 +1711,16 @@ def test_hidden_teams_owner_gets_tab_without_count(client):
 
 
 @pytest.mark.django_db
-def test_hidden_teams_race_admin_gets_count_and_links(client):
+@pytest.mark.parametrize("role", [RaceAdmin.Role.ADMIN, RaceAdmin.Role.MODERATOR, None])
+def test_hidden_teams_staff_get_count_and_links(client, role):
     race, category = _closed_race()
-    staff = User.objects.create_user(username="st", password="p", email="st@e.com")
-    RaceAdmin.objects.create(race=race, user=staff, role=RaceAdmin.Role.ADMIN)
+    if role is None:
+        staff = User.objects.create_superuser(
+            username="st", password="p", email="st@e.com"
+        )
+    else:
+        staff = User.objects.create_user(username="st", password="p", email="st@e.com")
+        RaceAdmin.objects.create(race=race, user=staff, role=role)
     client.force_login(staff)
 
     html = _race_page_html(client, race)
@@ -1688,15 +1740,30 @@ def test_teams_page_city_column_follows_toggle(client, ask_city):
 
     assert ('<th class="col-city"' in html) is ask_city
     assert f'data-show-city="{"true" if ask_city else "false"}"' in html
+    assert ("Команда, город или участник" in html) is ask_city
 
 
-def _unnamed_team_row(ask_name, **team_kwargs):
+@pytest.mark.django_db
+@pytest.mark.parametrize("ask_city", [True, False])
+def test_teams_page_sends_stored_city_only_when_asked(client, ask_city):
+    race = _make_race(slug="city-row")
+    Race.objects.filter(pk=race.pk).update(ask_team_city=ask_city)
+    owner = User.objects.create_user(username="ct", password="p", email="ct@e.com")
+    _make_team(owner, _make_category(race), teamname="Лоси", city="Омск")
+
+    html = client.get(reverse("all_teams", args=[race.slug])).content.decode()
+
+    assert _script_json(html, "teams-data")[0]["city"] == ("Омск" if ask_city else "")
+    assert ("Омск" in html) is ask_city
+
+
+def _unnamed_team_row(ask_name, first_name="Иван", last_name="Иванов", **team_kwargs):
     owner = User.objects.create_user(
         username="nm",
         password="p",
         email="nm@e.com",
-        first_name="Иван",
-        last_name="Иванов",
+        first_name=first_name,
+        last_name=last_name,
     )
     race = _make_race(slug="names")
     Race.objects.filter(pk=race.pk).update(ask_team_name=ask_name)
@@ -1710,6 +1777,22 @@ def test_unnamed_team_shows_owner_when_name_is_not_asked():
     _, row = _unnamed_team_row(ask_name=False, teamname="")
 
     assert row["name"] == "Иванов Иван"
+
+
+@pytest.mark.django_db
+def test_unnamed_team_shows_single_owner_name_without_padding():
+    _, row = _unnamed_team_row(ask_name=False, first_name="", teamname="")
+
+    assert row["name"] == "Иванов"
+
+
+@pytest.mark.django_db
+def test_unnamed_team_with_blank_owner_keeps_numbered_fallback():
+    team, row = _unnamed_team_row(
+        ask_name=False, first_name="", last_name="", teamname=""
+    )
+
+    assert row["name"] == f"Без названия {team.id} ( )"
 
 
 @pytest.mark.django_db

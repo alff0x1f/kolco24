@@ -1881,6 +1881,29 @@ def test_hidden_race_is_absent_from_every_catalog_section(client):
 
 
 @pytest.mark.django_db
+def test_race_hidden_only_in_app_stays_on_site(client):
+    race = _race_in_days("app-only", 5, is_hidden_in_app=True)
+
+    home = client.get(reverse("index"))
+    catalog = client.get(reverse("race_list"))
+
+    assert home.context["featured_race"] == race
+    assert list(home.context["upcoming_races"]) == [race]
+    assert catalog.context["featured_race"] == race
+
+
+@pytest.mark.django_db
+def test_race_hidden_only_in_app_stays_in_catalog_sections(client):
+    featured = _race_in_days("featured", 1)
+    race = _race_in_days("app-only", 5, is_hidden_in_app=True)
+
+    catalog = client.get(reverse("race_list"))
+
+    assert catalog.context["featured_race"] == featured
+    assert list(catalog.context["future_races"]) == [race]
+
+
+@pytest.mark.django_db
 def test_hidden_race_posts_leave_the_feeds_but_race_free_posts_stay(client):
     hidden = _race_in_days("hidden", 1, is_hidden=True)
     create_publication("Новость", race=hidden, kind=PublicationKind.ARTICLE)
