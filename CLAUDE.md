@@ -43,9 +43,9 @@ nothing from the internet. The Rubik font is self-hosted: `src/static/css/fonts.
 `src/static/fonts/rubik/` (Google Fonts v31, cyrillic/latin subsets, OFL). Don't add Google Fonts or CDN links. The
 one known exception is the map tiles in `race_map.js` (OSM/OpenTopoMap).
 
-**Vendored editor assets**: EasyMDE is pinned to 2.18.0. Font Awesome is pinned
+**Vendored editor assets**: EasyMDE is pinned to 2.18.0, Cropper.js to 1.6.2. Font Awesome is pinned
 to 6.5.2; keep `fontawesome.min.css`, `solid.min.css`, and both solid webfonts
-from that same release. Files under `src/static/vendor/leaflet/`,
+from that same release. Files under `src/static/vendor/leaflet/`, `src/static/vendor/cropperjs/`,
 `src/static/vendor/easymde/`, and `src/static/vendor/fontawesome/` are vendored
 upstream assets and are off-limits for edits. Use the modular Font Awesome CSS;
 `all.min.css` is deliberately absent because it declares six `@font-face`

@@ -123,18 +123,18 @@ the next «Сохранить» clears the image and deletes its file.
 - Create: `src/apps/race/header_images.py`
 - Create: `src/apps/race/test_header_images.py`
 
-- [ ] add `parse_crop(raw)`: `None` for empty, four integers otherwise, `ImageRejected` for anything else
-- [ ] add `process_cover(file, crop)` and `process_logo(file, crop)` returning `(bytes, ext)`, using `probe` and
+- [x] add `parse_crop(raw)`: `None` for empty, four integers otherwise, `ImageRejected` for anything else
+- [x] add `process_cover(file, crop)` and `process_logo(file, crop)` returning `(bytes, ext)`, using `probe` and
       `ImageRejected` from `apps.photo_contest.images`
-- [ ] apply EXIF rotation, clamp the crop, reject a too small area, downscale, encode as in Technical Details
-- [ ] map Pillow decode errors to `ImageRejected`, never a 500
-- [ ] write tests: crop on an EXIF-rotated JPEG, clamping, centre fallback for cover, whole image for logo, downscale,
+- [x] apply EXIF rotation, clamp the crop, reject a too small area, downscale, encode as in Technical Details
+- [x] map Pillow decode errors to `ImageRejected`, never a 500
+- [x] write tests: crop on an EXIF-rotated JPEG, clamping, centre fallback for cover, whole image for logo, downscale,
       no upscale
-- [ ] write tests: PNG logo keeps alpha, cover flattens alpha, output has no EXIF, CMYK JPEG logo works, palette PNG
+- [x] write tests: PNG logo keeps alpha, cover flattens alpha, output has no EXIF, CMYK JPEG logo works, palette PNG
       with transparency downscales as `RGBA`
-- [ ] write tests: bad crop string, too small crop, too small image without a crop, GIF and non-image rejected,
+- [x] write tests: bad crop string, too small crop, too small image without a crop, GIF and non-image rejected,
       truncated file rejected
-- [ ] run tests - must pass before next task
+- [x] run tests - must pass before next task
 
 ### Task 2: File and crop fields on RaceForm
 
@@ -142,18 +142,18 @@ the next «Сохранить» clears the image and deletes its file.
 - Modify: `src/apps/race/forms.py`
 - Modify: `src/apps/race/test_header_images.py`
 
-- [ ] add optional `header_image_file`, `header_logo_file` (`FileField`) and `header_image_crop`, `header_logo_crop`
+- [x] add optional `header_image_file`, `header_logo_file` (`FileField`) and `header_image_crop`, `header_logo_crop`
       (hidden `CharField`)
-- [ ] process each file in `RaceForm.clean()`, parsing the crop only when a file is present. An `ImageRejected` becomes
+- [x] process each file in `RaceForm.clean()`, parsing the crop only when a file is present. An `ImageRejected` becomes
       an error on that file field
-- [ ] keep the results on the form, for example `form.processed_uploads = {"header_image": (bytes, ext), ...}`
-- [ ] in `clean`, apply the precedence rule: a valid file clears the text value and its errors
-- [ ] write tests: valid file processed, a crop passed through `RaceForm` changes the output, a stale crop without a
+- [x] keep the results on the form, for example `form.processed_uploads = {"header_image": (bytes, ext), ...}`
+- [x] in `clean`, apply the precedence rule: a valid file clears the text value and its errors
+- [x] write tests: valid file processed, a crop passed through `RaceForm` changes the output, a stale crop without a
       file is ignored
-- [ ] write tests: bad file gives a field error, bad file with a valid URL gives a field error, bad URL plus valid file
+- [x] write tests: bad file gives a field error, bad file with a valid URL gives a field error, bad URL plus valid file
       is valid
-- [ ] write tests: plain URL still valid and saved, bad URL without a file still rejected, empty value clears
-- [ ] run tests - must pass before next task
+- [x] write tests: plain URL still valid and saved, bad URL without a file still rejected, empty value clears
+- [x] run tests - must pass before next task
 
 ### Task 3: Store uploads and clean up old files
 
@@ -162,24 +162,24 @@ the next «Сохранить» clears the image and deletes its file.
 - Modify: `src/apps/race/header_images.py`
 - Modify: `src/apps/race/test_header_images.py`
 
-- [ ] bind `request.FILES` in `RaceEditView.post` and read the old field values before building the form
-- [ ] add `store_upload(data, ext)` and `delete_if_unused(value)` to `header_images.py`, with the strict path match
-- [ ] write files inside the existing `transaction.atomic()`, before `form.save()`
-- [ ] on any exception leaving the block, delete the files of this request
-- [ ] delete changed old values in the existing `else:` branch, not in `on_commit`
-- [ ] restore the old text value in `form.data` whenever a file was sent but not stored
-- [ ] pass the lost-upload field list to `_build_context` on a re-render
-- [ ] write tests: upload on create and on edit stores the `/media/race_headers/...` path and the file exists
-- [ ] write tests: another field failing writes no file and reports the lost upload (use the `client` fixture, the
+- [x] bind `request.FILES` in `RaceEditView.post` and read the old field values before building the form
+- [x] add `store_upload(data, ext)` and `delete_if_unused(value)` to `header_images.py`, with the strict path match
+- [x] write files inside the existing `transaction.atomic()`, before `form.save()`
+- [x] on any exception leaving the block, delete the files of this request
+- [x] delete changed old values in the existing `else:` branch, not in `on_commit`
+- [x] restore the old text value in `form.data` whenever a file was sent but not stored
+- [x] pass the lost-upload field list to `_build_context` on a re-render
+- [x] write tests: upload on create and on edit stores the `/media/race_headers/...` path and the file exists
+- [x] write tests: another field failing writes no file and reports the lost upload (use the `client` fixture, the
       `_edit_post` helper gives no `.context`), `_reconcile_*` `ValueError` removes the new file and keeps the old value
-- [ ] write tests: edit with a file and a bad slug shows the old value on re-render, and re-POSTing that value keeps the
+- [x] write tests: edit with a file and a bad slug shows the old value on re-render, and re-POSTing that value keeps the
       image and its file. Same for a rejected file
-- [ ] write tests: old file deleted on replace and on clear, kept if another race uses it, external URL untouched, a
+- [x] write tests: old file deleted on replace and on clear, kept if another race uses it, external URL untouched, a
       `/media/race_headers/../x` value deletes nothing
-- [ ] write tests: old-file delete raising still gives a 302 and the new file exists
-- [ ] write tests: disk write `OSError` gives a form error and no save, the second of two writes failing removes the
+- [x] write tests: old-file delete raising still gives a 302 and the new file exists
+- [x] write tests: disk write `OSError` gives a form error and no save, the second of two writes failing removes the
       first file and leaves no partial file, race moderator gets 403 and nothing is stored
-- [ ] run tests - must pass before next task
+- [x] run tests - must pass before next task
 
 ### Task 4: Vendor Cropper.js
 
@@ -188,10 +188,10 @@ the next «Сохранить» clears the image and deletes its file.
 - Create: `src/static/vendor/cropperjs/cropper.min.css`
 - Create: `src/static/vendor/cropperjs/LICENSE`
 
-- [ ] download the three files of `cropperjs@1.6.2` from the npm package, unmodified
-- [ ] confirm the version banner in both files says 1.6.2
-- [ ] confirm neither file loads a resource from the network (the banner's project URL is fine)
-- [ ] no code changed, so no new tests. Run `collectstatic --noinput` with `DEBUG=False` and a temporary `STATIC_ROOT`,
+- [x] download the three files of `cropperjs@1.6.2` from the npm package, unmodified
+- [x] confirm the version banner in both files says 1.6.2
+- [x] confirm neither file loads a resource from the network (the banner's project URL is fine)
+- [x] no code changed, so no new tests. Run `collectstatic --noinput` with `DEBUG=False` and a temporary `STATIC_ROOT`,
       because a dry run skips the production storage post-processing
 
 ### Task 5: Upload and crop UI
@@ -202,38 +202,38 @@ the next «Сохранить» clears the image and deletes its file.
 - Modify: `src/static/css/race_form.css`
 - Modify: `src/apps/race/test_header_images.py`
 
-- [ ] template: add `enctype="multipart/form-data"`, file inputs (`accept="image/jpeg,image/png,image/webp"`), hidden
+- [x] template: add `enctype="multipart/form-data"`, file inputs (`accept="image/jpeg,image/png,image/webp"`), hidden
       crop inputs, «Загрузить файл» buttons, new hints (including the false logo hint at `race_form.html:181`), file
       field errors, the lost-upload warning
-- [ ] template: add one `<dialog>` with the crop area, «Применить», «Отмена» and the line about the phone header showing
+- [x] template: add one `<dialog>` with the crop area, «Применить», «Отмена» and the line about the phone header showing
       only the central part. Load the vendored CSS and JS on this page only
-- [ ] template: every new button inside the form, including «Загрузить файл» and «Изменить кадр», is `type="button"`
-- [ ] JS: preview box and button open the picker. Check size (20 MB, mirrors `probe`) and that the browser can decode
+- [x] template: every new button inside the form, including «Загрузить файл» and «Изменить кадр», is `type="button"`
+- [x] JS: preview box and button open the picker. Check size (20 MB, mirrors `probe`) and that the browser can decode
       the file before opening the dialog. On failure show a message under the field and drop the file
-- [ ] JS: start Cropper after `showModal`, with `checkOrientation: false`, `viewMode: 1` (keeps the crop box on the
+- [x] JS: start Cropper after `showModal`, with `checkOrientation: false`, `viewMode: 1` (keeps the crop box on the
       image, so server clamping can't break 4:1), `aspectRatio: 4` for cover and free for logo
-- [ ] JS: call `cropper.destroy()` and revoke the object URL on every close. Cropper 1.x ignores a second init on the
+- [x] JS: call `cropper.destroy()` and revoke the object URL on every close. Cropper 1.x ignores a second init on the
       shared `<img>` and would show the old image
-- [ ] JS: «Применить» writes `getData(true)` to the hidden field, shows the cropped canvas as preview, the file name and
+- [x] JS: «Применить» writes `getData(true)` to the hidden field, shows the cropped canvas as preview, the file name and
       «Изменить кадр». «Отмена» drops the file on a first pick and keeps the crop after «Изменить кадр»
-- [ ] JS: route the dialog `cancel` event (Escape) to the «Отмена» logic, or the file would stay with no crop
-- [ ] JS: last action wins. The URL input is cleared, with the placeholder «будет загружен файл», only on «Применить»,
+- [x] JS: route the dialog `cancel` event (Escape) to the «Отмена» logic, or the file would stay with no crop
+- [x] JS: last action wins. The URL input is cleared, with the placeholder «будет загружен файл», only on «Применить»,
       so a cancelled or failed pick leaves the current image alone. Typing in the URL input drops the file and crop
-- [ ] CSS: styles scoped under `.race-form-page`, usable at phone width
-- [ ] write tests: the page has the multipart `enctype`, both file inputs and crop fields, the vendored assets
-- [ ] write tests: the warning renders after a failed POST with a valid file, and not on a plain GET
-- [ ] run tests - must pass before next task
+- [x] CSS: styles scoped under `.race-form-page`, usable at phone width
+- [x] write tests: the page has the multipart `enctype`, both file inputs and crop fields, the vendored assets
+- [x] write tests: the warning renders after a failed POST with a valid file, and not on a plain GET
+- [x] run tests - must pass before next task
 
 ### Task 6: Verify acceptance criteria
-- [ ] verify all requirements from Overview are implemented
-- [ ] verify a race with an external `header_image` still saves unchanged
-- [ ] verify no new external URL was added to pages
-- [ ] run full test suite: `uv run pytest`
-- [ ] run `make format` and `make lint`
+- [x] verify all requirements from Overview are implemented
+- [x] verify a race with an external `header_image` still saves unchanged
+- [x] verify no new external URL was added to pages
+- [x] run full test suite: `uv run pytest`
+- [x] run `make format` and `make lint`
 
 ### Task 7: [Final] Update documentation
-- [ ] add one short line to the vendored assets note in `CLAUDE.md`: Cropper.js pinned to 1.6.2, off-limits for edits
-- [ ] move this plan to `docs/plans/completed/`
+- [x] add one short line to the vendored assets note in `CLAUDE.md`: Cropper.js pinned to 1.6.2, off-limits for edits
+- [x] move this plan to `docs/plans/completed/`
 
 ## Post-Completion
 *Items requiring manual intervention or external systems - no checkboxes, informational only*

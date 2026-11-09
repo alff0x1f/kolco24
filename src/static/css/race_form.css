@@ -221,6 +221,27 @@
   border: 1px dashed rgba(255,255,255,.4); border-radius: 5px; text-align: center; white-space: nowrap;
 }
 
+.race-form-page .upload[data-upload-pick] { cursor: pointer; }
+.race-form-page .upload-actions {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 8px;
+}
+.race-form-page .upload-reframe {
+  background: none; border: 0; padding: 0; font: inherit; font-size: 13px;
+  color: var(--primary-2); cursor: pointer;
+}
+.race-form-page .upload-name {
+  font-size: 12px; color: var(--muted); overflow-wrap: anywhere;
+}
+.race-form-page .crop-dialog {
+  width: min(860px, calc(100vw - 32px)); padding: 20px; box-sizing: border-box;
+  border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--paper-2);
+}
+.race-form-page .crop-dialog::backdrop { background: rgba(15, 22, 31, .6); }
+.race-form-page .crop-dialog h2 { margin: 0 0 12px; font-size: 18px; }
+.race-form-page .crop-stage { height: min(60vh, 480px); margin-bottom: 12px; }
+.race-form-page .crop-stage img { display: block; max-width: 100%; }
+.race-form-page .crop-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 12px; }
+
 .race-form-page .logo-grid { display: grid; grid-template-columns: 96px 1fr; gap: 14px; align-items: stretch; }
 .race-form-page .upload.logo { margin-bottom: 0; }
 .race-form-page .upload.logo .preview {

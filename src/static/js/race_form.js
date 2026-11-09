@@ -596,6 +596,158 @@
     input.addEventListener("input", upd);
   });
 
+  /* ── Header image upload + crop ──────────────────────────── */
+  // Mirrors UPLOAD_MAX_BYTES in apps/photo_contest/images.py; the server re-checks.
+  var UPLOAD_MAX_BYTES = 20 * 1024 * 1024;
+  var cropDialog = document.getElementById("cropDialog");
+  var cropImage = document.getElementById("cropImage");
+  var cropNote = document.getElementById("cropNote");
+  var cropper = null;
+  var cropSession = null;
+
+  function showUploadError(upload, message) {
+    upload.error.textContent = message;
+    upload.error.hidden = !message;
+  }
+
+  function closeCrop() {
+    if (cropper) cropper.destroy();
+    cropper = null;
+    URL.revokeObjectURL(cropSession.url);
+    cropSession = null;
+    cropDialog.close();
+  }
+
+  function cancelCrop() {
+    if (!cropSession) return;
+    if (cropSession.pending) cropSession.pending.remove();
+    closeCrop();
+  }
+
+  function openCrop(upload, file, pending) {
+    var url = URL.createObjectURL(file);
+    cropSession = { upload: upload, pending: pending, url: url };
+    cropNote.hidden = !upload.root.hasAttribute("data-note");
+    cropImage.src = url;
+    cropDialog.showModal();
+    var options = {
+      checkOrientation: false,
+      viewMode: 1,
+      autoCropArea: 1,
+      rotatable: false,
+      scalable: false,
+      aspectRatio: Number(upload.root.getAttribute("data-aspect")) || NaN,
+    };
+    var parts = upload.crop.value.split(",").map(Number);
+    if (!pending && parts.length === 4) {
+      options.data = { x: parts[0], y: parts[1], width: parts[2], height: parts[3] };
+    }
+    cropper = new window.Cropper(cropImage, options);
+  }
+
+  function applyCrop() {
+    if (!cropSession || !cropper) return;
+    var upload = cropSession.upload;
+    var pending = cropSession.pending;
+    var box = cropper.getData(true);
+    var canvas = cropper.getCroppedCanvas({ maxWidth: 1200, maxHeight: 1200 });
+    if (!box.width || !box.height || !canvas) return;
+    upload.crop.value = [box.x, box.y, box.width, box.height].join(",");
+    upload.img.src = canvas.toDataURL();
+    upload.img.hidden = false;
+    if (upload.ph) upload.ph.hidden = true;
+    if (pending) {
+      // Only an applied pick becomes the named input, so a cancelled one
+      // leaves both the earlier file and the URL value alone.
+      pending.name = upload.file.name;
+      upload.file.remove();
+      upload.file = pending;
+      upload.urlInput.value = "";
+      upload.urlInput.placeholder = "будет загружен файл";
+      upload.name.textContent = pending.files[0].name;
+      upload.name.hidden = false;
+      upload.reframe.hidden = false;
+    }
+    closeCrop();
+  }
+
+  function pickFile(upload) {
+    var pending = upload.file.cloneNode(false);
+    pending.removeAttribute("name");
+    pending.value = "";
+    upload.root.appendChild(pending);
+    pending.addEventListener("change", function () {
+      var file = pending.files[0];
+      showUploadError(upload, "");
+      if (!file) {
+        pending.remove();
+        return;
+      }
+      if (file.size > UPLOAD_MAX_BYTES) {
+        pending.remove();
+        showUploadError(upload, "Файл больше 20 МБ.");
+        return;
+      }
+      var probeUrl = URL.createObjectURL(file);
+      var probe = new Image();
+      probe.onload = function () {
+        URL.revokeObjectURL(probeUrl);
+        openCrop(upload, file, pending);
+      };
+      probe.onerror = function () {
+        URL.revokeObjectURL(probeUrl);
+        pending.remove();
+        showUploadError(upload, "Не удалось открыть файл. Поддерживаются JPEG, PNG и WebP.");
+      };
+      probe.src = probeUrl;
+    });
+    pending.addEventListener("cancel", function () {
+      pending.remove();
+    });
+    pending.click();
+  }
+
+  document.querySelectorAll("[data-header-upload]").forEach(function (root) {
+    var upload = {
+      root: root,
+      file: root.querySelector("[data-upload-file]"),
+      crop: root.querySelector("[data-upload-crop]"),
+      urlInput: root.querySelector("[data-upload-url]"),
+      name: root.querySelector("[data-upload-name]"),
+      reframe: root.querySelector("[data-upload-reframe]"),
+      error: root.querySelector("[data-upload-error]"),
+      img: root.querySelector(".preview-img"),
+      ph: root.querySelector(".ph, .lph"),
+    };
+    var placeholder = upload.urlInput.placeholder;
+
+    root.querySelectorAll("[data-upload-pick]").forEach(function (el) {
+      el.addEventListener("click", function () {
+        pickFile(upload);
+      });
+    });
+    upload.reframe.addEventListener("click", function () {
+      openCrop(upload, upload.file.files[0], null);
+    });
+    upload.urlInput.addEventListener("input", function () {
+      upload.file.value = "";
+      upload.crop.value = "";
+      upload.urlInput.placeholder = placeholder;
+      upload.name.hidden = true;
+      upload.reframe.hidden = true;
+      showUploadError(upload, "");
+    });
+  });
+
+  if (cropDialog) {
+    document.getElementById("cropApply").addEventListener("click", applyCrop);
+    document.getElementById("cropCancel").addEventListener("click", cancelCrop);
+    cropDialog.addEventListener("cancel", function (event) {
+      event.preventDefault();
+      cancelCrop();
+    });
+  }
+
   /* ── Serialize on submit ─────────────────────────────────── */
   var form = document.getElementById("raceForm");
   if (form) {
