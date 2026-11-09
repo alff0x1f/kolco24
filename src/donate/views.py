@@ -94,12 +94,14 @@ class DonateView(View):
             )
 
         donate_order_id = VTBPayment.new_order_id("SPUTNIK")
+        email = request.user.email if request.user.is_authenticated else ""
         try:
             payload = VTBClient().create_order(
                 order_id=donate_order_id,
                 order_name=f"Взнос ({donate_order_id})",
                 amount_value=float(amount),
                 return_payment_data="sbp",
+                customer={"email": email} if email else None,
             )
             vtb_payment = VTBPayment.from_vtb_payload(payload)
             DonateRequest.objects.update_or_create(

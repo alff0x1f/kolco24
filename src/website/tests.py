@@ -1238,7 +1238,9 @@ def test_add_team_without_category_reports_form_error(client, post_data):
     assert not Team.objects.filter(category2=category).exists()
 
 
-def _echo_order_payload(order_id, order_name, amount_value, return_payment_data):
+def _echo_order_payload(
+    order_id, order_name, amount_value, return_payment_data, customer=None
+):
     """create_order stub that echoes the minted order_id back in the payload."""
     return {
         "object": {
@@ -1292,6 +1294,34 @@ def test_add_team_mints_ulid_order_id_and_links_fk(
     payment = Payment.objects.get(team__category2=category)
     assert payment.vtb_payment is not None
     assert payment.vtb_payment.order_id == order_id
+    assert create_order_mock.call_args.kwargs["customer"] == {
+        "email": "ulidadd@example.com"
+    }
+
+
+@pytest.mark.django_db
+@patch("apps.race.pricing.VTBClient._ensure_token", return_value=None)
+@patch("apps.race.pricing.VTBClient.create_order", side_effect=_echo_order_payload)
+def test_add_team_omits_customer_without_email(create_order_mock, _token_mock, client):
+    user = User.objects.create_user(username="noemail", password="pass", email="")
+    race = Race.objects.create(
+        name="No Email",
+        slug="no-email-1",
+        cost=1000,
+        reg_status=RegStatus.OPEN,
+        is_teams_editable=True,
+    )
+    category = Category.objects.create(
+        code="t", name="Team", short_name="T", race=race, min_people=2, max_people=6
+    )
+    client.force_login(user)
+    response = client.post(
+        reverse("add_team", args=[race.slug]),
+        {"ucount": "2", "category2_id": str(category.id), "map_count": "0"},
+    )
+
+    assert response.status_code == 302
+    assert create_order_mock.call_args.kwargs["customer"] is None
 
 
 def _submit_token_setup(slug):
