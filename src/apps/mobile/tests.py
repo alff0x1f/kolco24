@@ -1285,6 +1285,71 @@ def test_races_tampered_query_string_returns_403(client, settings):
 
 
 @pytest.mark.django_db
+def test_races_omits_race_hidden_in_app(client, settings):
+    from website.models.race import Race
+
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+    Race.objects.create(name="Shown", slug="shown")
+    Race.objects.create(name="Off", slug="off", is_hidden_in_app=True)
+
+    response = client.get(RACES_PATH, **_signed_headers("GET", RACES_PATH, SECRET))
+
+    assert [r["slug"] for r in response.json()["races"]] == ["shown"]
+
+
+@pytest.mark.django_db
+def test_races_keeps_race_hidden_only_on_site(client, settings):
+    from website.models.race import Race
+
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+    Race.objects.create(name="Site", slug="site-hidden", is_hidden=True)
+
+    response = client.get(RACES_PATH, **_signed_headers("GET", RACES_PATH, SECRET))
+
+    assert [r["slug"] for r in response.json()["races"]] == ["site-hidden"]
+
+
+@pytest.mark.django_db
+def test_races_etag_follows_hidden_in_app(client, settings):
+    from website.models.race import Race
+
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+    Race.objects.create(name="Stays", slug="stays")
+    race = Race.objects.create(name="Toggled", slug="toggled")
+
+    def etag():
+        headers = _signed_headers("GET", RACES_PATH, SECRET)
+        return client.get(RACES_PATH, **headers)["ETag"]
+
+    listed = etag()
+    race.is_hidden_in_app = True
+    race.save()
+    hidden = etag()
+    race.is_hidden_in_app = False
+    race.save()
+
+    assert hidden != listed
+    assert etag() != hidden
+
+
+@pytest.mark.django_db
+def test_per_race_endpoint_still_serves_race_hidden_in_app(client, settings):
+    from website.models.race import Race
+
+    settings.MOBILE_APP_KEYS = {"test-v1": SECRET}
+    settings.MOBILE_APP_TS_WINDOW = 300
+    race = Race.objects.create(name="Off", slug="off", is_hidden_in_app=True)
+    path = f"/app/race/{race.id}/legend/"
+
+    response = client.get(path, **_signed_headers("GET", path, SECRET))
+
+    assert response.status_code == 200
+
+
+@pytest.mark.django_db
 def test_races_response_carries_etag(client, settings):
     from website.models.race import Race
 

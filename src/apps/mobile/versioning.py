@@ -103,11 +103,16 @@ def teams_version(race_id):
 _RACES_SCHEMA_VERSION = 1
 
 
+def listed_races():
+    """Races the app's list serves; per-race endpoints ignore the hidden flag."""
+    return Race.objects.filter(is_published=True, is_hidden_in_app=False)
+
+
 def races_version():
     """Return a short, stable fingerprint of the published-races list.
 
     Combines ``_RACES_SCHEMA_VERSION|MAX(Race.updated_at)|COUNT`` over
-    ``Race.objects.filter(is_published=True)`` — the exact queryset
+    :func:`listed_races` — the exact queryset
     ``RaceListView`` serves (single-source contract). An edit to a published
     race moves ``MAX(updated_at)`` (``auto_now``); a publish/unpublish moves
     ``COUNT`` (so an unpublish is detected even when the race wasn't the
@@ -117,7 +122,7 @@ def races_version():
     None aggregate (no published races) renders as the literal ``"None"`` →
     stable, non-crashing. Returns **bare** hex (no quotes).
     """
-    agg = Race.objects.filter(is_published=True).aggregate(
+    agg = listed_races().aggregate(
         max_updated=Max("updated_at"),
         count=Count("id"),
     )

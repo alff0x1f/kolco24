@@ -18,6 +18,12 @@ MAP_PRICE = 200
 
 
 class TeamForm(forms.Form):
+    RACE_FIELD_TOGGLES = {
+        "teamname": "ask_team_name",
+        "city": "ask_team_city",
+        "organization": "ask_team_club",
+    }
+
     teamname = forms.CharField(
         required=False,
         max_length=100,
@@ -88,6 +94,13 @@ class TeamForm(forms.Form):
         self._extra_paid = {}
         if resolved_race_id is not None:
             from apps.race.models import RaceExtra
+            from website.models import Race
+
+            race = Race.objects.filter(id=resolved_race_id).first()
+            if race is not None:
+                for field_name, toggle in self.RACE_FIELD_TOGGLES.items():
+                    if not getattr(race, toggle):
+                        del self.fields[field_name]
 
             self.extras = list(
                 RaceExtra.objects.filter(race_id=resolved_race_id, is_active=True)

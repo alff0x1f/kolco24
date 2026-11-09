@@ -2638,6 +2638,142 @@ def test_race_remaining_people_with_limit(django_user_model):
     assert race.remaining_people() == 5
 
 
+TEAM_FIELD_TOGGLES = [
+    ("ask_team_name", "teamname"),
+    ("ask_team_city", "city"),
+    ("ask_team_club", "organization"),
+]
+ALL_TEAM_FIELDS = [field for _, field in TEAM_FIELD_TOGGLES]
+
+
+def _set_flags(race, value, *flags):
+    Race.objects.filter(pk=race.pk).update(**{flag: value for flag in flags})
+
+
+def _free_race_for_add(suffix, *off_flags):
+    user = User.objects.create_user(
+        username=f"add-{suffix}", password="pass", email=f"add-{suffix}@example.com"
+    )
+    race = Race.objects.create(
+        name="R",
+        slug=f"add-{suffix}",
+        cost=0,
+        reg_status=RegStatus.OPEN,
+        is_teams_editable=True,
+    )
+    category = Category.objects.create(code="t", name="Team", short_name="T", race=race)
+    _set_flags(race, False, *off_flags)
+    return user, race, category
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(("flag", "field"), TEAM_FIELD_TOGGLES)
+def test_add_team_ignores_value_of_hidden_field(client, flag, field):
+    user, race, category = _free_race_for_add(field, flag)
+    client.force_login(user)
+    data = {name: "Значение" for name in ALL_TEAM_FIELDS}
+    data.update(ucount="2", category2_id=str(category.id), map_count="0")
+
+    response = client.post(reverse("add_team", args=[race.slug]), data)
+
+    assert response.status_code == 302
+    team = Team.objects.get(category2=category)
+    for name in ALL_TEAM_FIELDS:
+        assert getattr(team, name) == ("" if name == field else "Значение")
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(("flag", "field"), TEAM_FIELD_TOGGLES)
+def test_edit_team_keeps_stored_value_of_hidden_field(client, flag, field):
+    user, race, category, team = _create_team_for_edit(suffix=f"hf-{field}")
+    Team.objects.filter(pk=team.pk).update(**{field: "Старое"})
+    _set_flags(race, False, flag)
+    client.force_login(user)
+    data = {name: "Новое" for name in ALL_TEAM_FIELDS}
+    data.update(ucount="4", category2_id=str(category.id))
+
+    response = client.post(reverse("edit_team", args=[team.id]), data)
+
+    assert response.status_code == 302
+    team.refresh_from_db()
+    for name in ALL_TEAM_FIELDS:
+        assert getattr(team, name) == ("Старое" if name == field else "Новое")
+
+
+def _assert_only_hidden_input_is_absent(html, field):
+    for name in ALL_TEAM_FIELDS:
+        assert (f'name="{name}"' in html) is (name != field)
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(("flag", "field"), TEAM_FIELD_TOGGLES)
+def test_team_pages_omit_hidden_input(client, flag, field):
+    user, race, category, team = _create_team_for_edit(suffix=f"pg-{field}")
+    _set_flags(race, False, flag)
+    client.force_login(user)
+
+    for url in (
+        reverse("add_team", args=[race.slug]),
+        reverse("edit_team", args=[team.id]),
+    ):
+        _assert_only_hidden_input_is_absent(client.get(url).content.decode(), field)
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(("flag", "field"), TEAM_FIELD_TOGGLES)
+def test_invalid_add_team_post_does_not_restore_hidden_input(client, flag, field):
+    user, race, category = _free_race_for_add(f"bad-{field}", flag)
+    client.force_login(user)
+
+    response = client.post(
+        reverse("add_team", args=[race.slug]), {"ucount": "2", field: "Подделка"}
+    )
+
+    assert response.status_code == 200
+    html = response.content.decode()
+    _assert_only_hidden_input_is_absent(html, field)
+    assert "Подделка" not in html
+
+
+@pytest.mark.django_db
+def test_team_section_disappears_when_all_fields_are_off(client):
+    user, race, category, team = _create_team_for_edit(suffix="all-off")
+    _set_flags(race, False, *[flag for flag, _ in TEAM_FIELD_TOGGLES])
+    client.force_login(user)
+
+    for url in (
+        reverse("add_team", args=[race.slug]),
+        reverse("edit_team", args=[team.id]),
+    ):
+        assert '<div class="section-title">Команда</div>' not in (
+            client.get(url).content.decode()
+        )
+
+
+@pytest.mark.django_db
+def test_superuser_keeps_start_number_when_all_fields_are_off(client):
+    user, race, category, team = _create_team_for_edit(suffix="all-off-su")
+    _set_flags(race, False, *[flag for flag, _ in TEAM_FIELD_TOGGLES])
+    client.force_login(
+        User.objects.create_superuser(
+            username="all-off-admin", password="p", email="all-off-admin@example.com"
+        )
+    )
+
+    html = client.get(reverse("edit_team", args=[team.id])).content.decode()
+
+    assert 'name="start_number"' in html
+    assert 'name="teamname"' not in html
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("race_id", [None, 999999])
+def test_team_form_keeps_all_fields_without_a_race(race_id):
+    form = TeamForm(race_id)
+
+    assert set(ALL_TEAM_FIELDS) <= set(form.fields)
+
+
 # ---------------------------------------------------------------------------
 # Task 2: capacity gate in TeamForm
 # ---------------------------------------------------------------------------

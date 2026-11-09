@@ -108,6 +108,31 @@ def _team_display_name(team):
     )
 
 
+def _team_list_name(team, race):
+    if team.teamname or race.ask_team_name:
+        return _team_display_name(team)
+    owner_name = f"{team.owner.last_name} {team.owner.first_name}".strip()
+    return owner_name or _team_display_name(team)
+
+
+TEAMS_ALL = "all"
+TEAMS_OWN = "own"
+TEAMS_NONE = "none"
+
+
+def teams_access(user, race):
+    """How much of the race's team list ``user`` may see."""
+    if race.show_teams:
+        return TEAMS_ALL
+    if user is None or not user.is_authenticated:
+        return TEAMS_NONE
+    if user.is_superuser or is_race_admin(user, race):
+        return TEAMS_ALL
+    if Team.objects.filter(category2__race=race, owner=user).exists():
+        return TEAMS_OWN
+    return TEAMS_NONE
+
+
 def _owned_teams(race, user):
     """Compact team data for the signed-in user's race-page callout."""
     if user is None or not user.is_authenticated:
@@ -184,6 +209,7 @@ class RacePageView(View):
             "news_count": news_count,
             "reg_open": race.reg_status == RegStatus.OPEN,
             "reg_upcoming": race.reg_status == RegStatus.UPCOMING,
+            "teams_access": teams_access(user, race),
             "race_team_count": race.team_count(),
             "race_people_count": race.people_count(),
             "race_remaining": race_remaining,
@@ -388,7 +414,12 @@ class RaceTeamsView(View):
         # Base set: paid teams. Authenticated users also see their own teams in
         # this race (even unpaid) so the «Мои» chip is complete; superusers see
         # every team (matches the old all_teams behavior).
-        if is_superuser:
+        access = teams_access(user, race)
+        if access == TEAMS_NONE:
+            team_filter = Q(pk__in=[])
+        elif access == TEAMS_OWN:
+            team_filter = Q(category2__race=race, owner=user)
+        elif is_superuser:
             team_filter = Q(category2__race=race)
         elif is_authenticated:
             team_filter = Q(category2__race=race) & (
@@ -406,7 +437,7 @@ class RaceTeamsView(View):
         has_team_actions = False
         can_change = is_team_editing_open(user, race)
         for team in teams:
-            name = _team_display_name(team)
+            name = _team_list_name(team, race)
             parts = ", ".join(
                 p
                 for p in (
@@ -449,7 +480,10 @@ class RaceTeamsView(View):
             "teams_json": _safe_json(teams_data),
             "reg_open": race.reg_status == RegStatus.OPEN,
             "reg_upcoming": race.reg_status == RegStatus.UPCOMING,
-            "race_team_count": race.team_count(),
+            "teams_access": access,
+            "race_team_count": (
+                len(teams_data) if access == TEAMS_OWN else race.team_count()
+            ),
             "race_people_count": race.people_count(),
             "race_remaining": race_remaining,
             "race_full": race_full,
@@ -468,6 +502,8 @@ class RaceTeamsView(View):
             race = Race.objects.get(slug=race_slug)
         except Race.DoesNotExist:
             raise Http404
+        if teams_access(request.user, race) == TEAMS_NONE:
+            return HttpResponseRedirect(reverse("race", args=[race.slug]))
         if category_id is not None:
             try:
                 category_exists = Category.active_objects.filter(

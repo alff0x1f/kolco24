@@ -723,6 +723,10 @@ nothing at all (the template is wrapped in `{% if owned_team_groups %}`). Home-p
 `src/website/test_publications.py`, not `src/website/tests.py`; the test helper `_unfinished_races()` there calls the
 view's own `community.unfinished_races(today)` so the two definitions can't drift.
 
+**Race visibility flags**: `Race.is_hidden` affects site lists and feeds only (`NewsPost.in_feed()`; keep `visible()` for
+the race page and direct links). `is_hidden_in_app` affects `/app/races/` only (`versioning.listed_races`).
+`show_teams` is enforced by `apps/race/views.py:teams_access`.
+
 **Custom error pages**: `src/templates/{404,403,500}.html` (themed «Сбились с маршрута»), sharing
 `src/static/css/error.css` (scoped under `.error-page`). Django's default handlers auto-load them by name — no
 `handler404/500/403` wiring in `config/urls.py`. `404.html`/`403.html` extend `base-2.html` (rendered with a

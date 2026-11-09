@@ -105,6 +105,7 @@ def get_featured_race(today):
     return (
         Race.objects.filter(
             is_published=True,
+            is_hidden=False,
             reg_status__in=(RegStatus.OPEN, RegStatus.UPCOMING),
             date_end__gte=today,
         )
@@ -125,14 +126,14 @@ class HomeView(View):
         unfinished = unfinished_races(today)
 
         page_obj = Paginator(
-            visible_publications(), self.publication_paginate_by
+            NewsPost.objects.in_feed(), self.publication_paginate_by
         ).get_page(request.GET.get("page"))
         context = {
             "featured_race": featured_race,
             "owned_team_groups": owned_teams_by_race(request.user, unfinished),
             "page_obj": page_obj,
             "publications": page_obj.object_list,
-            "upcoming_races": unfinished[:3],
+            "upcoming_races": unfinished.filter(is_hidden=False)[:3],
             "open_photo_contests": list(
                 PhotoContest.objects.filter(
                     Q(submission_until__gte=now) | Q(voting_until__gte=now),
@@ -150,7 +151,7 @@ class ArticleListView(View):
     paginate_by = 9
 
     def get(self, request):
-        publications = visible_publications().filter(kind=PublicationKind.ARTICLE)
+        publications = NewsPost.objects.in_feed().filter(kind=PublicationKind.ARTICLE)
         page_obj = Paginator(publications, self.paginate_by).get_page(
             request.GET.get("page")
         )
@@ -197,7 +198,9 @@ class PublicationDetailView(View):
             ):
                 raise Http404
         upcoming_races = (
-            [] if publication.race_id else unfinished_races(timezone.localdate())[:3]
+            []
+            if publication.race_id
+            else unfinished_races(timezone.localdate()).filter(is_hidden=False)[:3]
         )
         can_edit = bool(publication.race_id) and is_race_admin(
             request.user, publication.race
@@ -224,7 +227,7 @@ class RaceListView(View):
     def get(self, request):
         today = timezone.localdate()
         featured_race = get_featured_race(today)
-        races = Race.objects.filter(is_published=True)
+        races = Race.objects.filter(is_published=True, is_hidden=False)
         if featured_race is not None:
             races = races.exclude(pk=featured_race.pk)
         context = {

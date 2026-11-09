@@ -67,6 +67,7 @@ from .versioning import (
     active_member_tags,
     global_member_tags_newest_seen,
     legend_version,
+    listed_races,
     member_tags_version,
     races_version,
     teams_version,
@@ -1032,7 +1033,7 @@ class RaceListView(AppAPIView):
             resp["ETag"] = quoted
             return resp
 
-        qs = Race.objects.filter(is_published=True)  # Meta.ordering = ["-date"]
+        qs = listed_races()  # Meta.ordering = ["-date"]
         resp = Response({"races": RaceListSerializer(qs, many=True).data})
         resp["ETag"] = quoted
         return resp

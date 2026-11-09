@@ -276,6 +276,10 @@ class NewsPostQuerySet(models.QuerySet):
             .order_by("-publication_date", "-pk")
         )
 
+    def in_feed(self):
+        """Visible posts for the public feeds, without posts of hidden races."""
+        return self.visible().exclude(race__is_hidden=True)
+
 
 class NewsPost(models.Model):
     """A news item or evergreen article shown in the site publication feed."""

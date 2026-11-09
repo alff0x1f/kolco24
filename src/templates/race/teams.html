@@ -12,7 +12,8 @@
 
 <div class="teams-page" data-initial="{{ initial_filter }}"
   data-authenticated="{{ is_authenticated|yesno:'true,false' }}"
-  data-has-actions="{{ has_team_actions|yesno:'true,false' }}">
+  data-has-actions="{{ has_team_actions|yesno:'true,false' }}"
+  data-show-city="{{ race.ask_team_city|yesno:'true,false' }}">
   <div class="container">
 
     <main>
@@ -50,9 +51,11 @@
                 <th class="col-cat" scope="col" aria-sort="none">
                   <button type="button" class="th-sort" data-sort="cat">Категория <span class="arr" aria-hidden="true">▼</span></button>
                 </th>
+                {% if race.ask_team_city %}
                 <th class="col-city" scope="col" aria-sort="none">
                   <button type="button" class="th-sort" data-sort="city">Город <span class="arr" aria-hidden="true">▼</span></button>
                 </th>
+                {% endif %}
                 <th class="col-cnt" scope="col" aria-sort="none">
                   <button type="button" class="th-sort" data-sort="cnt">Чел. <span class="arr" aria-hidden="true">▼</span></button>
                 </th>

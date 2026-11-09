@@ -424,7 +424,8 @@
   padding: 8px 12px 12px;
   margin: 0;
 }
-.cats-menu li a {
+.cats-menu li a,
+.cats-menu li .cat-row {
   display: block;
   padding: 9px 10px;
   border-radius: 8px;
@@ -433,6 +434,7 @@
   transition: background .12s;
 }
 .cats-menu li a:hover { background: #f4f6f9; }
+.side-head .side-total { color: var(--muted); font-size: 12px; }
 .cat-top {
   display: flex;
   align-items: baseline;

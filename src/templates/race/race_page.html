@@ -207,12 +207,16 @@
         <div class="card">
           <div class="side-head">
             <h3>Команды</h3>
+            {% if teams_access == 'all' %}
             <a href="{% url 'all_teams' race.slug %}">Все {{ race_team_count }}&nbsp;→</a>
+            {% else %}
+            <span class="side-total">Все {{ race_team_count }}</span>
+            {% endif %}
           </div>
           <ul class="cats-menu">
             {% for category in categories %}
             <li>
-              <a href="{% url 'teams2' race.slug category.id %}">
+              {% if teams_access == 'all' %}<a href="{% url 'teams2' race.slug category.id %}">{% else %}<div class="cat-row">{% endif %}
                 <div class="cat-top">
                   <span class="cat-nm">{{ category.short_name|default:category.name }}</span>
                   {% if category.short_name and category.short_name != category.name %}
@@ -231,7 +235,7 @@
                 <div class="cat-remaining none">мест нет</div>
                 {% endif %}
                 {% endif %}
-              </a>
+              {% if teams_access == 'all' %}</a>{% else %}</div>{% endif %}
             </li>
             {% endfor %}
           </ul>

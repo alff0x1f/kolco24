@@ -1526,6 +1526,219 @@ def test_race_admins_get_not_allowed(client):
     assert client.get(reverse("race_admins", args=[race.slug])).status_code == 405
 
 
+# --- show_teams access ---
+
+
+def _closed_race(slug="closed"):
+    """A race with hidden teams and one paid team owned by somebody else."""
+    race = _make_race(slug=slug)
+    race.show_teams = False
+    race.save()
+    category = _make_category(race)
+    stranger = User.objects.create_user(
+        username=f"{slug}-s", password="p", email=f"{slug}-s@e.com"
+    )
+    _make_team(stranger, category, teamname="Чужие", city="Омск", start_number="7")
+    return race, category
+
+
+def _teams_urls(race, category):
+    return [
+        reverse("all_teams", args=[race.slug]),
+        reverse("teams2", args=[race.slug, category.id]),
+    ]
+
+
+@pytest.mark.django_db
+def test_hidden_teams_redirect_anonymous_to_race_page(client):
+    race, category = _closed_race()
+
+    for url in _teams_urls(race, category):
+        response = client.get(url)
+        assert response.status_code == 302
+        assert response.url == reverse("race", args=[race.slug])
+
+
+@pytest.mark.django_db
+def test_hidden_teams_my_teams_anonymous_still_goes_to_login(client):
+    race, _ = _closed_race()
+
+    response = client.get(reverse("my_teams", args=[race.slug]))
+
+    assert response.status_code == 302
+    assert response.url.startswith(reverse("login"))
+
+
+@pytest.mark.django_db
+def test_hidden_teams_redirect_user_without_team(client):
+    race, category = _closed_race()
+    user = User.objects.create_user(username="nt", password="p", email="nt@e.com")
+    client.force_login(user)
+
+    urls = _teams_urls(race, category) + [reverse("my_teams", args=[race.slug])]
+    for url in urls:
+        response = client.get(url)
+        assert response.status_code == 302
+        assert response.url == reverse("race", args=[race.slug])
+
+
+@pytest.mark.django_db
+def test_hidden_teams_owner_gets_only_own_rows(client):
+    race, category = _closed_race()
+    owner = User.objects.create_user(username="ow", password="p", email="ow@e.com")
+    _make_team(owner, category, teamname="Свои", start_number="1")
+    _make_team(owner, category, teamname="Свои неоплаченные", paid_people=0)
+    client.force_login(owner)
+
+    urls = _teams_urls(race, category) + [reverse("my_teams", args=[race.slug])]
+    for url in urls:
+        response = client.get(url)
+        html = response.content.decode()
+        rows = _script_json(html, "teams-data")
+        assert response.status_code == 200
+        assert {row["name"] for row in rows} == {"Свои", "Свои неоплаченные"}
+        assert all(row["mine"] for row in rows)
+        assert "Чужие" not in html
+        assert "Омск" not in html
+        assert '<span class="total">2</span>' in html
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("role", [RaceAdmin.Role.ADMIN, RaceAdmin.Role.MODERATOR])
+def test_hidden_teams_race_staff_see_all_teams(client, role):
+    race, category = _closed_race()
+    staff = User.objects.create_user(username="st", password="p", email="st@e.com")
+    RaceAdmin.objects.create(race=race, user=staff, role=role)
+    client.force_login(staff)
+
+    for url in _teams_urls(race, category):
+        rows = _script_json(client.get(url).content.decode(), "teams-data")
+        assert [row["name"] for row in rows] == ["Чужие"]
+
+
+@pytest.mark.django_db
+def test_hidden_teams_superuser_sees_all_teams(client):
+    race, category = _closed_race()
+    client.force_login(
+        User.objects.create_superuser(username="su", password="p", email="su@e.com")
+    )
+
+    rows = _script_json(
+        client.get(reverse("all_teams", args=[race.slug])).content.decode(),
+        "teams-data",
+    )
+
+    assert [row["name"] for row in rows] == ["Чужие"]
+
+
+def _race_page_html(client, race):
+    return client.get(reverse("race", args=[race.slug])).content.decode()
+
+
+@pytest.mark.django_db
+def test_hidden_teams_race_page_keeps_counters_without_links(client):
+    race, category = _closed_race()
+    category.people_limit = 10
+    category.save()
+
+    html = _race_page_html(client, race)
+
+    assert '<span class="side-total">Все 1</span>' in html
+    assert "<b>1</b> команда" in html
+    assert "осталось 8 из 10" in html
+    for url in _teams_urls(race, category):
+        assert f'href="{url}"' not in html
+
+
+@pytest.mark.django_db
+def test_hidden_teams_owner_gets_tab_without_count(client):
+    race, category = _closed_race()
+    owner = User.objects.create_user(username="ow", password="p", email="ow@e.com")
+    _make_team(owner, category, teamname="Свои")
+    client.force_login(owner)
+
+    html = _race_page_html(client, race)
+
+    assert f'href="{reverse("all_teams", args=[race.slug])}"' in html
+    assert "Команды <span>" not in html
+    assert f'href="{reverse("teams2", args=[race.slug, category.id])}"' not in html
+
+
+@pytest.mark.django_db
+def test_hidden_teams_race_admin_gets_count_and_links(client):
+    race, category = _closed_race()
+    staff = User.objects.create_user(username="st", password="p", email="st@e.com")
+    RaceAdmin.objects.create(race=race, user=staff, role=RaceAdmin.Role.ADMIN)
+    client.force_login(staff)
+
+    html = _race_page_html(client, race)
+
+    assert "Команды <span>1</span>" in html
+    for url in _teams_urls(race, category):
+        assert f'href="{url}"' in html
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("ask_city", [True, False])
+def test_teams_page_city_column_follows_toggle(client, ask_city):
+    race = _make_race(slug="city")
+    Race.objects.filter(pk=race.pk).update(ask_team_city=ask_city)
+
+    html = client.get(reverse("all_teams", args=[race.slug])).content.decode()
+
+    assert ('<th class="col-city"' in html) is ask_city
+    assert f'data-show-city="{"true" if ask_city else "false"}"' in html
+
+
+def _unnamed_team_row(ask_name, **team_kwargs):
+    owner = User.objects.create_user(
+        username="nm",
+        password="p",
+        email="nm@e.com",
+        first_name="Иван",
+        last_name="Иванов",
+    )
+    race = _make_race(slug="names")
+    Race.objects.filter(pk=race.pk).update(ask_team_name=ask_name)
+    race.refresh_from_db()
+    team = _make_team(owner, _make_category(race), **team_kwargs)
+    return team, json.loads(RaceTeamsView.build_context(race)["teams_json"])[0]
+
+
+@pytest.mark.django_db
+def test_unnamed_team_shows_owner_when_name_is_not_asked():
+    _, row = _unnamed_team_row(ask_name=False, teamname="")
+
+    assert row["name"] == "Иванов Иван"
+
+
+@pytest.mark.django_db
+def test_unnamed_team_keeps_fallback_when_name_is_asked():
+    team, row = _unnamed_team_row(ask_name=True, teamname="")
+
+    assert row["name"] == f"Без названия {team.id} (Иванов Иван)"
+
+
+@pytest.mark.django_db
+def test_stored_team_name_is_shown_when_name_is_not_asked():
+    _, row = _unnamed_team_row(ask_name=False, teamname="Лоси")
+
+    assert row["name"] == "Лоси"
+
+
+@pytest.mark.django_db
+def test_shown_teams_stay_public(client):
+    race, category = _closed_race()
+    race.show_teams = True
+    race.save()
+
+    for url in _teams_urls(race, category):
+        response = client.get(url)
+        rows = _script_json(response.content.decode(), "teams-data")
+        assert response.status_code == 200
+        assert [row["name"] for row in rows] == ["Чужие"]
+
+
 # --- can_edit_race access-control matrix ---
 
 
@@ -1873,6 +2086,55 @@ def test_race_edit_post_edit_updates_scalar_fields():
     assert race.name == "Updated Name"
     assert race.reg_status == RegStatus.OPEN
     assert race.cost == 2500
+
+
+VISIBILITY_ON_BY_DEFAULT = (
+    "show_teams",
+    "ask_team_name",
+    "ask_team_city",
+    "ask_team_club",
+)
+VISIBILITY_OFF_BY_DEFAULT = ("is_hidden", "is_hidden_in_app")
+
+
+@pytest.mark.django_db
+def test_race_create_page_renders_visibility_defaults():
+    admin = User.objects.create_superuser(
+        username="vd1", password="p", email="vd1@e.com"
+    )
+
+    html = _edit_get("/races/new/", admin).content.decode()
+
+    for name in VISIBILITY_ON_BY_DEFAULT:
+        assert f'name="{name}" checked' in html
+    for name in VISIBILITY_OFF_BY_DEFAULT:
+        assert f'name="{name}">' in html
+
+
+@pytest.mark.django_db
+def test_race_edit_saves_visibility_switches():
+    user = User.objects.create_user(username="vs1", password="p", email="vs1@e.com")
+    race = _make_race(slug="vs1")
+    RaceAdmin.objects.create(race=race, user=user, role=RaceAdmin.Role.ADMIN)
+
+    data = _post_data(slug="vs1", is_hidden="on", is_hidden_in_app="on")
+    resp = _edit_post(f"/race/{race.slug}/edit/", user, data, race_slug=race.slug)
+
+    assert resp.status_code == 302
+    race.refresh_from_db()
+    assert race.is_hidden is True
+    assert race.is_hidden_in_app is True
+    for name in VISIBILITY_ON_BY_DEFAULT:
+        assert getattr(race, name) is False
+
+    data = _post_data(slug="vs1", **{name: "on" for name in VISIBILITY_ON_BY_DEFAULT})
+    _edit_post(f"/race/{race.slug}/edit/", user, data, race_slug=race.slug)
+
+    race.refresh_from_db()
+    assert race.is_hidden is False
+    assert race.is_hidden_in_app is False
+    for name in VISIBILITY_ON_BY_DEFAULT:
+        assert getattr(race, name) is True
 
 
 @pytest.mark.django_db

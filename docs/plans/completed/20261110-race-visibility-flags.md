@@ -82,6 +82,7 @@
 ### Team form and list display
 - Off toggles remove `teamname`, `city` or `organization` from `TeamForm.fields`. With an unresolved `race_id` all fields stay.
 - If all three toggles are off, the whole `«Команда»` card section is not rendered.
+- ➕ On the edit page a superuser still gets the section, because it also holds the `«Стартовый номер»` input.
 - Do not add a `«необязательно»` label to `«Название»` or `«Город»`. Labels stay as they are.
 - `ask_team_city` off removes the `«Город»` column from the teams list.
 - `ask_team_name` off changes only the teams list fallback for an unnamed team, from `«Без названия 123 (Иванов Иван)»` to `«Иванов Иван»`. A stored team name is still shown. The race page owned-teams panel, the home panel and the protocol keep their current names.
@@ -101,13 +102,13 @@
 - Modify: `src/templates/race/race_form.html`
 - Modify: `src/apps/race/tests.py`
 
-- [ ] add the six `BooleanField`s to `Race` with the labels and defaults above
-- [ ] generate the migration with `makemigrations`
-- [ ] add the fields to `RaceForm.Meta.fields`
-- [ ] add six switches to the `toggle-list` in `race_form.html`, next to `«Команды редактируемы»`
-- [ ] write test: the create page renders the default states (`show_teams` and `ask_team_*` checked, `is_hidden` and `is_hidden_in_app` not checked)
-- [ ] write test: saving the edit form stores checked and unchecked switches
-- [ ] run `uv run pytest --create-db` - must pass before next task
+- [x] add the six `BooleanField`s to `Race` with the labels and defaults above
+- [x] generate the migration with `makemigrations`
+- [x] add the fields to `RaceForm.Meta.fields`
+- [x] add six switches to the `toggle-list` in `race_form.html`, next to `«Команды редактируемы»`
+- [x] write test: the create page renders the default states (`show_teams` and `ask_team_*` checked, `is_hidden` and `is_hidden_in_app` not checked)
+- [x] write test: saving the edit form stores checked and unchecked switches
+- [x] run `uv run pytest --create-db` - must pass before next task
 
 ### Task 2: Hide `is_hidden` races from site lists and feeds
 
@@ -116,16 +117,16 @@
 - Modify: `src/website/views/community.py`
 - Modify: `src/website/test_publications.py`
 
-- [ ] add `NewsPostQuerySet.in_feed()`: `visible()` plus `exclude(race__is_hidden=True)`
-- [ ] use `in_feed()` in `HomeView` and `ArticleListView`; leave the post detail view on `visible()`
-- [ ] filter `is_hidden=False` in `get_featured_race` and `RaceListView`
-- [ ] set `upcoming_races` to `unfinished.filter(is_hidden=False)[:3]` and keep `owned_team_groups` on the unfiltered `unfinished`
-- [ ] filter `is_hidden=False` before slicing `upcoming_races` in `PublicationDetailView` (standalone post sidebar)
-- [ ] write tests: a hidden race is absent from the home banner, the upcoming list and all catalog sections
-- [ ] write tests: its posts are absent from the home feed and the article list, and posts with no race stay in both
-- [ ] write tests: the race page with its news and a direct post link still work, and `«Личный кабинет»` still lists the owner's team
-- [ ] write test: a hidden race is absent from the sidebar of a standalone post
-- [ ] run tests - must pass before next task
+- [x] add `NewsPostQuerySet.in_feed()`: `visible()` plus `exclude(race__is_hidden=True)`
+- [x] use `in_feed()` in `HomeView` and `ArticleListView`; leave the post detail view on `visible()`
+- [x] filter `is_hidden=False` in `get_featured_race` and `RaceListView`
+- [x] set `upcoming_races` to `unfinished.filter(is_hidden=False)[:3]` and keep `owned_team_groups` on the unfiltered `unfinished`
+- [x] filter `is_hidden=False` before slicing `upcoming_races` in `PublicationDetailView` (standalone post sidebar)
+- [x] write tests: a hidden race is absent from the home banner, the upcoming list and all catalog sections
+- [x] write tests: its posts are absent from the home feed and the article list, and posts with no race stay in both
+- [x] write tests: the race page with its news and a direct post link still work, and `«Личный кабинет»` still lists the owner's team
+- [x] write test: a hidden race is absent from the sidebar of a standalone post
+- [x] run tests - must pass before next task
 
 ### Task 3: Hide `is_hidden_in_app` races from `/app/races/`
 
@@ -134,13 +135,13 @@
 - Modify: `src/apps/mobile/views.py`
 - Modify: `src/apps/mobile/tests.py`
 
-- [ ] add one shared queryset function in `versioning.py` for published races not hidden in the app
-- [ ] use it in `races_version()` and in the mobile `RaceListView`
-- [ ] write test: a race with the flag on is absent from `/app/races/`
-- [ ] write test: toggling the flag changes the ETag
-- [ ] write test: a per-race endpoint (for example `/app/race/<id>/legend/`) still answers for that race
-- [ ] write test: `is_hidden=True` alone leaves the race in `/app/races/`
-- [ ] run tests - must pass before next task
+- [x] add one shared queryset function in `versioning.py` for published races not hidden in the app
+- [x] use it in `races_version()` and in the mobile `RaceListView`
+- [x] write test: a race with the flag on is absent from `/app/races/`
+- [x] write test: toggling the flag changes the ETag
+- [x] write test: a per-race endpoint (for example `/app/race/<id>/legend/`) still answers for that race
+- [x] write test: `is_hidden=True` alone leaves the race in `/app/races/`
+- [x] run tests - must pass before next task
 
 ### Task 4: Enforce `show_teams` on the teams page
 
@@ -149,14 +150,14 @@
 - Modify: `src/templates/race/teams.html`
 - Modify: `src/apps/race/tests.py`
 
-- [ ] add a helper in `apps/race/views.py` that returns `all`, `own` or `none` for a user and race, per the access table
-- [ ] in `RaceTeamsView.get`, redirect `none` to the race page; this covers `all_teams`, `teams2` and `my_teams`
-- [ ] in `build_context`, for `own`, filter teams to `owner=user`
-- [ ] for `own`, show the number of own teams in the heading total; `teams.js` needs no change, because its chips and footer already count the rendered rows
-- [ ] write tests: each user type on `all_teams` and `teams2`, and `my_teams` for owner and anonymous user
-- [ ] write test: for `own`, the parsed `teams-data` JSON holds exactly the owner's teams
-- [ ] write test: with the flag on, behaviour is unchanged
-- [ ] run tests - must pass before next task
+- [x] add a helper in `apps/race/views.py` that returns `all`, `own` or `none` for a user and race, per the access table
+- [x] in `RaceTeamsView.get`, redirect `none` to the race page; this covers `all_teams`, `teams2` and `my_teams`
+- [x] in `build_context`, for `own`, filter teams to `owner=user`
+- [x] for `own`, show the number of own teams in the heading total; `teams.js` needs no change, because its chips and footer already count the rendered rows
+- [x] write tests: each user type on `all_teams` and `teams2`, and `my_teams` for owner and anonymous user
+- [x] write test: for `own`, the parsed `teams-data` JSON holds exactly the owner's teams
+- [x] write test: with the flag on, behaviour is unchanged
+- [x] run tests - must pass before next task
 
 ### Task 5: Update the race page and the teams tab
 
@@ -166,13 +167,13 @@
 - Modify: `src/templates/race/race_page.html`
 - Modify: `src/apps/race/tests.py`
 
-- [ ] pass the access value into the race page and teams page context; check for any other page that includes `_race_header.html`
-- [ ] in `_race_header.html`, hide the tab for `none` and drop the count for `own`
-- [ ] in `race_page.html`, render `«Все N»` and the category rows as plain text unless access is `all`
-- [ ] write test: anonymous visitor sees the counters and `«осталось X из Y»` but no link to the teams URLs and no tab
-- [ ] write test: owner sees the tab without a count
-- [ ] write test: race admin sees the tab with a count and the links
-- [ ] run tests - must pass before next task
+- [x] pass the access value into the race page and teams page context; check for any other page that includes `_race_header.html`
+- [x] in `_race_header.html`, hide the tab for `none` and drop the count for `own`
+- [x] in `race_page.html`, render `«Все N»` and the category rows as plain text unless access is `all`
+- [x] write test: anonymous visitor sees the counters and `«осталось X из Y»` but no link to the teams URLs and no tab
+- [x] write test: owner sees the tab without a count
+- [x] write test: race admin sees the tab with a count and the links
+- [x] run tests - must pass before next task
 
 ### Task 6: Hide team form fields per race
 
@@ -182,14 +183,14 @@
 - Modify: `src/templates/website/edit_team.html`
 - Modify: `src/website/tests.py`
 
-- [ ] in `TeamForm.__init__`, remove `teamname`, `city` or `organization` when the race's toggle is off; keep all fields for an unresolved `race_id`
-- [ ] wrap each input in `{% if %}` in both templates, and skip the `«Команда»` section when all three are off
-- [ ] write parametrized test over all three toggles: on add, a forged POST value for a hidden field is not saved
-- [ ] write parametrized test over all three toggles: on edit, a hidden field keeps its stored value
-- [ ] write test: the inputs are absent from the add and edit pages when off, and the section is absent when all three are off
-- [ ] write test: an invalid POST re-render does not bring hidden inputs back
-- [ ] write test: a form with `race_id=None` or a non-existent numeric `race_id` keeps all fields without an error
-- [ ] run tests - must pass before next task
+- [x] in `TeamForm.__init__`, remove `teamname`, `city` or `organization` when the race's toggle is off; keep all fields for an unresolved `race_id`
+- [x] wrap each input in `{% if %}` in both templates, and skip the `«Команда»` section when all three are off
+- [x] write parametrized test over all three toggles: on add, a forged POST value for a hidden field is not saved
+- [x] write parametrized test over all three toggles: on edit, a hidden field keeps its stored value
+- [x] write test: the inputs are absent from the add and edit pages when off, and the section is absent when all three are off
+- [x] write test: an invalid POST re-render does not bring hidden inputs back
+- [x] write test: a form with `race_id=None` or a non-existent numeric `race_id` keeps all fields without an error
+- [x] run tests - must pass before next task
 
 ### Task 7: Adjust the teams list display
 
@@ -199,21 +200,21 @@
 - Modify: `src/static/js/teams.js`
 - Modify: `src/apps/race/tests.py`
 
-- [ ] add a `data-show-city` attribute on `.teams-page`, and skip the `«Город»` header and cell when it is off
-- [ ] in `build_context`, use `«Фамилия Имя»` as the unnamed-team name when `ask_team_name` is off; leave `_team_display_name` itself unchanged for other callers
-- [ ] write test: `«Город»` header is absent with `ask_team_city` off and present by default
-- [ ] write test: unnamed team name with the toggle off and on, and a stored name still shown with it off
-- [ ] run tests - must pass before next task
+- [x] add a `data-show-city` attribute on `.teams-page`, and skip the `«Город»` header and cell when it is off
+- [x] in `build_context`, use `«Фамилия Имя»` as the unnamed-team name when `ask_team_name` is off; leave `_team_display_name` itself unchanged for other callers
+- [x] write test: `«Город»` header is absent with `ask_team_city` off and present by default
+- [x] write test: unnamed team name with the toggle off and on, and a stored name still shown with it off
+- [x] run tests - must pass before next task
 
 ### Task 8: Verify acceptance criteria
-- [ ] verify all requirements from Overview are implemented
-- [ ] verify edge cases: all three field toggles off, `is_hidden` and `is_hidden_in_app` set independently, a race admin with no teams
-- [ ] run full test suite: `uv run pytest --create-db`
-- [ ] run `make format` and `make lint`
+- [x] verify all requirements from Overview are implemented
+- [x] verify edge cases: all three field toggles off, `is_hidden` and `is_hidden_in_app` set independently, a race admin with no teams
+- [x] run full test suite: `uv run pytest --create-db`
+- [x] run `make format` and `make lint`
 
 ### Task 9: [Final] Update documentation
-- [ ] add a short note on the new flags to `CLAUDE.md`; keep it minimal, the file is already very large
-- [ ] move this plan to `docs/plans/completed/`
+- [x] add a short note on the new flags to `CLAUDE.md`; keep it minimal, the file is already very large
+- [x] move this plan to `docs/plans/completed/`
 
 ## Post-Completion
 *Items requiring manual intervention or external systems - no checkboxes, informational only*
