@@ -85,7 +85,12 @@ class TeamForm(forms.Form):
         except (TypeError, ValueError):
             resolved_race_id = None
 
-        self._race = None
+        self._race = (
+            None
+            if resolved_race_id is None
+            else Race.objects.filter(id=resolved_race_id).first()
+        )
+        self._drop_unasked_fields()
         # Set by clean_promo_code; the views pass it to create_team_payment.
         self.promo = None
 
@@ -94,12 +99,6 @@ class TeamForm(forms.Form):
         self._extra_paid = {}
         if resolved_race_id is not None:
             from apps.race.models import RaceExtra
-
-            self._race = Race.objects.filter(id=resolved_race_id).first()
-            if self._race is not None:
-                for field_name, toggle in self.RACE_FIELD_TOGGLES.items():
-                    if not getattr(self._race, toggle):
-                        del self.fields[field_name]
 
             self.extras = list(
                 RaceExtra.objects.filter(race_id=resolved_race_id, is_active=True)
@@ -167,6 +166,14 @@ class TeamForm(forms.Form):
                     }
                 ),
             )
+
+    def _drop_unasked_fields(self):
+        """Remove the fields this race does not ask for."""
+        if self._race is None:
+            return
+        for field_name, toggle in self.RACE_FIELD_TOGGLES.items():
+            if not getattr(self._race, toggle):
+                del self.fields[field_name]
 
     def clean_promo_code(self):
         """Resolve the promo code, or raise a field error explaining why not.

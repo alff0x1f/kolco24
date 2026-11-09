@@ -46,7 +46,14 @@ from apps.race.finance import csv_rows, extras_catalog, filter_rows, payment_row
 from apps.race.forms import HEADER_UPLOADS, RaceForm
 from apps.race.header_images import delete_if_unused, discard_stored, store_upload
 from apps.race.models import Protocol, RaceExtra, RacePromo, TeamExtra
-from apps.race.permissions import can_edit_race, is_team_editing_open
+from apps.race.permissions import (
+    TEAMS_ALL,
+    TEAMS_NONE,
+    TEAMS_OWN,
+    can_edit_race,
+    is_team_editing_open,
+    teams_access,
+)
 from apps.race.promo import ERROR_MESSAGES as PROMO_ERRORS
 from apps.race.promo import PromoError, occupied_team_ids, resolve_promo
 from apps.race.results import build_protocol, freeze_protocol
@@ -102,35 +109,19 @@ def _categories_with_team_count(race):
     )
 
 
+def _owner_full_name(owner):
+    return f"{owner.last_name} {owner.first_name}"
+
+
 def _team_display_name(team):
-    return team.teamname or (
-        f"Без названия {team.id} " f"({team.owner.last_name} {team.owner.first_name})"
-    )
+    return team.teamname or f"Без названия {team.id} ({_owner_full_name(team.owner)})"
 
 
 def _team_list_name(team, race):
     if team.teamname or race.ask_team_name:
         return _team_display_name(team)
-    owner_name = f"{team.owner.last_name} {team.owner.first_name}".strip()
+    owner_name = _owner_full_name(team.owner).strip()
     return owner_name or _team_display_name(team)
-
-
-TEAMS_ALL = "all"
-TEAMS_OWN = "own"
-TEAMS_NONE = "none"
-
-
-def teams_access(user, race):
-    """How much of the race's team list ``user`` may see."""
-    if race.show_teams:
-        return TEAMS_ALL
-    if user is None or not user.is_authenticated:
-        return TEAMS_NONE
-    if user.is_superuser or is_race_admin(user, race):
-        return TEAMS_ALL
-    if Team.objects.filter(category2__race=race, owner=user).exists():
-        return TEAMS_OWN
-    return TEAMS_NONE
 
 
 def _teams_nav_flags(access):
@@ -138,6 +129,7 @@ def _teams_nav_flags(access):
     return {
         "teams_tab_visible": access != TEAMS_NONE,
         "teams_links_enabled": access == TEAMS_ALL,
+        "teams_count_visible": access == TEAMS_ALL,
     }
 
 
@@ -401,9 +393,9 @@ class RaceTeamsView(View):
     initial = None
 
     @staticmethod
-    def build_context(race, user=None, access=None):
-        is_authenticated = bool(user is not None and user.is_authenticated)
-        is_superuser = bool(user is not None and getattr(user, "is_superuser", False))
+    def build_context(race, user, access):
+        is_authenticated = user.is_authenticated
+        is_superuser = user.is_superuser
 
         categories = list(_categories_with_team_count(race))
         categories_data = []
@@ -419,14 +411,12 @@ class RaceTeamsView(View):
                 }
             )
 
-        # Base set: paid teams. Authenticated users also see their own teams in
+        # Limited access (``own``) is the owner's teams only, and ``none`` never
+        # gets here: ``get`` redirects it to the race page. With full access the
+        # base set is paid teams. Authenticated users also see their own teams in
         # this race (even unpaid) so the «Мои» chip is complete; superusers see
         # every team (matches the old all_teams behavior).
-        if access is None:
-            access = teams_access(user, race)
-        if access == TEAMS_NONE:
-            team_filter = Q(pk__in=[])
-        elif access == TEAMS_OWN:
+        if access == TEAMS_OWN:
             team_filter = Q(category2__race=race, owner=user)
         elif is_superuser:
             team_filter = Q(category2__race=race)
@@ -490,7 +480,8 @@ class RaceTeamsView(View):
             "reg_open": race.reg_status == RegStatus.OPEN,
             "reg_upcoming": race.reg_status == RegStatus.UPCOMING,
             **_teams_nav_flags(access),
-            "race_team_count": (
+            "race_team_count": race.team_count(),
+            "teams_list_total": (
                 race.team_count() if access == TEAMS_ALL else len(teams_data)
             ),
             "race_people_count": race.people_count(),
@@ -501,7 +492,7 @@ class RaceTeamsView(View):
             "is_authenticated": is_authenticated,
             "has_team_actions": has_team_actions,
             "show_unpaid_filter": is_superuser,
-            "can_edit_race": bool(user is not None and can_edit_race(user, race)),
+            "can_edit_race": can_edit_race(user, race),
         }
 
     def get(self, request, race_slug, category_id=None):

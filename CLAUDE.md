@@ -346,7 +346,7 @@ Django 4.2 project. Source lives entirely under `src/`, with `manage.py` at `src
       test to prevent throttle counts leaking across tests (all test requests share the same client IP); any new test
       module that exercises throttled mobile endpoints must replicate this fixture.
     - **Endpoints** (reads all GET, listed here; each POST is described in its own invariant bullet — the gate of each
-      is stated there; see `urls.py`): `/app/races/` (published races), `/app/race/<id>/teams/` (teams **plus the
+      is stated there; see `urls.py`): `/app/races/` (published, not `is_hidden_in_app`), `/app/race/<id>/teams/` (teams **plus the
       embedded category catalogue** — deliberately no separate categories endpoint; inactive categories included so
       every `category2` id resolves), `/app/race/<id>/legend/` (checkpoints **plus a per-tag `tags` array** — `bid → checkpoint_id`
       identity for **every** tag (open + locked), plus `iv`/`ct` for the offline legend unlock on locked КП only — see
@@ -703,7 +703,7 @@ Use a scoped wrapper class (e.g. `.race-page`).
 published races with `date_end >= today`, grouped by race. `HomeView.get` builds one base queryset `unfinished_races`
 (`is_published=True`, `date_end__gte=today`, `order_by("date", "pk")` — named for the criterion, since a race running
 right now counts; `RaceListView`'s separate `future_races` context key means the stricter `date > today`) —
-`upcoming_races` (right column) is its first three
+`upcoming_races` (right column) is its first three non-hidden
 (`[:3]`, the spotlight `featured_race` deliberately **included** — the sidebar duplicates the banner) while the panel gets
 `unfinished_races` **whole**, since a team's race can be past the slice. `owned_teams_by_race(user, races)` makes **one** query
 (`select_related("category2", "category2__race")`) and groups in Python; an anonymous user gets `[]` with **zero**

@@ -434,7 +434,6 @@
   transition: background .12s;
 }
 .cats-menu li a:hover { background: #f4f6f9; }
-.side-head .side-total { color: var(--muted); font-size: 12px; }
 .cat-top {
   display: flex;
   align-items: baseline;

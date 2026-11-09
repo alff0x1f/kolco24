@@ -28,7 +28,7 @@ from apps.mobile.models import (
 from apps.race.app_data import build_overview, build_team_timeline, format_ms
 from apps.race.forms import RaceForm
 from apps.race.models import Protocol, RaceExtra, TeamExtra
-from apps.race.permissions import can_edit_race
+from apps.race.permissions import can_edit_race, teams_access
 from apps.race.results import build_protocol, freeze_protocol
 from apps.race.views import (
     ProtocolBuildView,
@@ -100,23 +100,27 @@ def _attach_messages(request):
     return request
 
 
+def _teams_context(race, user):
+    return RaceTeamsView.build_context(race, user, teams_access(user, race))
+
+
 @pytest.mark.django_db
 def test_build_context_reg_status_flags():
     race = _make_race()  # defaults to RegStatus.UPCOMING
 
-    ctx = RaceTeamsView.build_context(race, AnonymousUser())
+    ctx = _teams_context(race, AnonymousUser())
     assert ctx["reg_open"] is False
     assert ctx["reg_upcoming"] is True
 
     race.reg_status = RegStatus.OPEN
     race.save()
-    ctx = RaceTeamsView.build_context(race, AnonymousUser())
+    ctx = _teams_context(race, AnonymousUser())
     assert ctx["reg_open"] is True
     assert ctx["reg_upcoming"] is False
 
     race.reg_status = RegStatus.SOLD_OUT
     race.save()
-    ctx = RaceTeamsView.build_context(race, AnonymousUser())
+    ctx = _teams_context(race, AnonymousUser())
     assert ctx["reg_open"] is False
     assert ctx["reg_upcoming"] is False
 
@@ -125,26 +129,26 @@ def test_build_context_reg_status_flags():
 def test_build_context_can_edit_race_flag():
     race = _make_race()
 
-    anon_ctx = RaceTeamsView.build_context(race, AnonymousUser())
+    anon_ctx = _teams_context(race, AnonymousUser())
     assert anon_ctx["can_edit_race"] is False
 
     plain = User.objects.create_user(
         username="plain", password="p", email="plain@example.com"
     )
-    assert RaceTeamsView.build_context(race, plain)["can_edit_race"] is False
+    assert _teams_context(race, plain)["can_edit_race"] is False
 
     admin = User.objects.create_user(
         username="radmin", password="p", email="radmin@example.com"
     )
     RaceAdmin.objects.create(race=race, user=admin, role=RaceAdmin.Role.ADMIN)
-    assert RaceTeamsView.build_context(race, admin)["can_edit_race"] is True
+    assert _teams_context(race, admin)["can_edit_race"] is True
 
     superuser = User.objects.create_superuser(
         username="su", password="p", email="su@example.com"
     )
-    assert RaceTeamsView.build_context(race, superuser)["can_edit_race"] is False
+    assert _teams_context(race, superuser)["can_edit_race"] is False
     RaceAdmin.objects.create(race=race, user=superuser, role=RaceAdmin.Role.ADMIN)
-    assert RaceTeamsView.build_context(race, superuser)["can_edit_race"] is True
+    assert _teams_context(race, superuser)["can_edit_race"] is True
 
 
 @pytest.mark.django_db
@@ -157,7 +161,7 @@ def test_build_context_anon_sees_paid_only():
     paid = _make_team(owner, cat, teamname="Paid", paid_people=2)
     _make_team(owner, cat, teamname="Unpaid", paid_people=0)
 
-    context = RaceTeamsView.build_context(race, AnonymousUser())
+    context = _teams_context(race, AnonymousUser())
     teams = json.loads(context["teams_json"])
 
     names = {t["name"] for t in teams}
@@ -186,7 +190,7 @@ def test_build_context_owner_sees_own_unpaid():
     _make_team(other, cat, teamname="OtherPaid", paid_people=3, ucount=3)
     _make_team(other, cat, teamname="OtherUnpaid", paid_people=0)
 
-    context = RaceTeamsView.build_context(race, owner)
+    context = _teams_context(race, owner)
     teams = json.loads(context["teams_json"])
     names = {t["name"] for t in teams}
 
@@ -208,14 +212,14 @@ def test_build_context_superuser_sees_all():
     _make_team(owner, cat, teamname="Paid", paid_people=2)
     _make_team(owner, cat, teamname="Unpaid", paid_people=0)
 
-    context = RaceTeamsView.build_context(race, admin)
+    context = _teams_context(race, admin)
     teams = json.loads(context["teams_json"])
     names = {t["name"] for t in teams}
 
     assert names == {"Paid", "Unpaid"}
     assert {t["name"]: t["paid"] for t in teams} == {"Paid": True, "Unpaid": False}
     assert context["show_unpaid_filter"] is True
-    owner_ctx = RaceTeamsView.build_context(race, owner)
+    owner_ctx = _teams_context(race, owner)
     assert owner_ctx["show_unpaid_filter"] is False
     # superuser may edit every team
     assert all("edit" in t for t in teams)
@@ -234,7 +238,7 @@ def test_mine_and_edit_flags():
     mine_team = _make_team(owner, cat, teamname="Mine", paid_people=2)
     _make_team(other, cat, teamname="Theirs", paid_people=2)
 
-    context = RaceTeamsView.build_context(race, owner)
+    context = _teams_context(race, owner)
     teams = {t["name"]: t for t in json.loads(context["teams_json"])}
 
     assert teams["Mine"]["mine"] is True
@@ -262,7 +266,7 @@ def test_participants_string_clean_join():
         athlet4="Сидор",
     )
 
-    context = RaceTeamsView.build_context(race, AnonymousUser())
+    context = _teams_context(race, AnonymousUser())
     team = json.loads(context["teams_json"])[0]
 
     # empty slots skipped, clean ", " join
@@ -282,7 +286,7 @@ def test_name_fallback_when_no_teamname():
     cat = _make_category(race)
     team = _make_team(owner, cat, teamname="", paid_people=2)
 
-    context = RaceTeamsView.build_context(race, AnonymousUser())
+    context = _teams_context(race, AnonymousUser())
     row = json.loads(context["teams_json"])[0]
 
     assert row["name"] == f"Без названия {team.id} (Петров Иван)"
@@ -297,7 +301,7 @@ def test_cnt_display_when_paid_differs_from_ucount():
     cat = _make_category(race)
     _make_team(owner, cat, teamname="Partial", paid_people=1, ucount=3)
 
-    context = RaceTeamsView.build_context(race, AnonymousUser())
+    context = _teams_context(race, AnonymousUser())
     row = json.loads(context["teams_json"])[0]
 
     assert row["cnt"] == "1/3"
@@ -312,7 +316,7 @@ def test_color_idx_wraps_at_eight():
     for i in range(9):
         _make_category(race, code=f"c{i}", short_name=f"c{i}", order=i)
 
-    context = RaceTeamsView.build_context(race, owner)
+    context = _teams_context(race, owner)
     cats = json.loads(context["categories_json"])
 
     assert len(cats) == 9
@@ -332,7 +336,7 @@ def test_category_with_zero_paid_teams_count_is_zero():
     full_cat = _make_category(race, code="full", short_name="full", order=1)
     _make_team(owner, full_cat, teamname="T", paid_people=2)
 
-    context = RaceTeamsView.build_context(race, AnonymousUser())
+    context = _teams_context(race, AnonymousUser())
     cats = {c["label"]: c for c in json.loads(context["categories_json"])}
 
     # Subquery returns None for the empty category; must be coerced to 0
@@ -352,7 +356,7 @@ def test_summary_uses_model_helpers():
     _make_team(owner, cat, teamname="B", paid_people=3, ucount=3)
     _make_team(owner, cat, teamname="Unpaid", paid_people=0)
 
-    context = RaceTeamsView.build_context(race, AnonymousUser())
+    context = _teams_context(race, AnonymousUser())
 
     assert context["race_team_count"] == 2
     assert context["race_people_count"] == 5
@@ -1549,14 +1553,22 @@ def _teams_urls(race, category):
     ]
 
 
+def _race_page_html(client, race):
+    return client.get(reverse("race", args=[race.slug])).content.decode()
+
+
+def _assert_redirected_to_race(client, race, urls):
+    for url in urls:
+        response = client.get(url)
+        assert response.status_code == 302
+        assert response.url == reverse("race", args=[race.slug])
+
+
 @pytest.mark.django_db
 def test_hidden_teams_redirect_anonymous_to_race_page(client):
     race, category = _closed_race()
 
-    for url in _teams_urls(race, category):
-        response = client.get(url)
-        assert response.status_code == 302
-        assert response.url == reverse("race", args=[race.slug])
+    _assert_redirected_to_race(client, race, _teams_urls(race, category))
 
 
 @pytest.mark.django_db
@@ -1576,10 +1588,7 @@ def test_hidden_teams_redirect_user_without_team(client):
     client.force_login(user)
 
     urls = _teams_urls(race, category) + [reverse("my_teams", args=[race.slug])]
-    for url in urls:
-        response = client.get(url)
-        assert response.status_code == 302
-        assert response.url == reverse("race", args=[race.slug])
+    _assert_redirected_to_race(client, race, urls)
 
 
 @pytest.mark.django_db
@@ -1591,10 +1600,7 @@ def test_hidden_teams_team_in_another_race_grants_nothing(client):
     client.force_login(user)
 
     urls = _teams_urls(race, category) + [reverse("my_teams", args=[race.slug])]
-    for url in urls:
-        response = client.get(url)
-        assert response.status_code == 302
-        assert response.url == reverse("race", args=[race.slug])
+    _assert_redirected_to_race(client, race, urls)
     assert f'href="{reverse("all_teams", args=[race.slug])}"' not in _race_page_html(
         client, race
     )
@@ -1622,10 +1628,7 @@ def test_hidden_teams_soft_deleted_team_grants_nothing(client):
     client.force_login(owner)
 
     urls = _teams_urls(race, category) + [reverse("my_teams", args=[race.slug])]
-    for url in urls:
-        response = client.get(url)
-        assert response.status_code == 302
-        assert response.url == reverse("race", args=[race.slug])
+    _assert_redirected_to_race(client, race, urls)
 
 
 @pytest.mark.django_db
@@ -1674,8 +1677,18 @@ def test_hidden_teams_superuser_sees_all_teams(client):
         assert [row["name"] for row in rows] == ["Чужие"]
 
 
-def _race_page_html(client, race):
-    return client.get(reverse("race", args=[race.slug])).content.decode()
+@pytest.mark.django_db
+def test_hidden_teams_owner_list_total_is_own_race_count_stays_race_wide(client):
+    race, category = _closed_race()
+    owner = User.objects.create_user(username="ow", password="p", email="ow@e.com")
+    _make_team(owner, category, teamname="Свои")
+    client.force_login(owner)
+
+    context = client.get(reverse("all_teams", args=[race.slug])).context
+
+    assert context["teams_list_total"] == 1
+    assert context["race_team_count"] == 2
+    assert context["teams_count_visible"] is False
 
 
 @pytest.mark.django_db
@@ -1769,7 +1782,7 @@ def _unnamed_team_row(ask_name, first_name="Иван", last_name="Иванов",
     Race.objects.filter(pk=race.pk).update(ask_team_name=ask_name)
     race.refresh_from_db()
     team = _make_team(owner, _make_category(race), **team_kwargs)
-    return team, json.loads(RaceTeamsView.build_context(race)["teams_json"])[0]
+    return team, json.loads(_teams_context(race, AnonymousUser())["teams_json"])[0]
 
 
 @pytest.mark.django_db
@@ -2796,7 +2809,7 @@ def test_teams_context_includes_race_remaining():
     cat = _make_category(race)
     _make_team(owner, cat, paid_people=3)
 
-    context = RaceTeamsView.build_context(race, AnonymousUser())
+    context = _teams_context(race, AnonymousUser())
 
     assert context["race_remaining"] == 5
 
@@ -2817,12 +2830,12 @@ def test_build_context_exposes_race_full_flag():
     # Room left → not full (both views agree).
     _make_team(owner, cat, paid_people=2)
     assert RacePageView.build_context(race)["race_full"] is False
-    assert RaceTeamsView.build_context(race, AnonymousUser())["race_full"] is False
+    assert _teams_context(race, AnonymousUser())["race_full"] is False
 
     # Race cap reached → full.
     _make_team(owner, cat, paid_people=2, start_number="2")
     assert RacePageView.build_context(race)["race_full"] is True
-    assert RaceTeamsView.build_context(race, AnonymousUser())["race_full"] is True
+    assert _teams_context(race, AnonymousUser())["race_full"] is True
 
 
 @pytest.mark.django_db
@@ -2836,7 +2849,7 @@ def test_race_full_is_false_when_unlimited():
     _make_team(owner, cat, paid_people=2)
 
     assert RacePageView.build_context(race)["race_full"] is False
-    assert RaceTeamsView.build_context(race, AnonymousUser())["race_full"] is False
+    assert _teams_context(race, AnonymousUser())["race_full"] is False
 
 
 @pytest.mark.django_db

@@ -37,6 +37,16 @@ def unfinished_races(today):
     )
 
 
+def public_races():
+    """Published races the site's lists show; direct links ignore ``is_hidden``."""
+    return Race.objects.filter(is_published=True, is_hidden=False)
+
+
+def upcoming_site_races(today):
+    """The next three unfinished races for the sidebars, without hidden ones."""
+    return unfinished_races(today).filter(is_hidden=False)[:3]
+
+
 def owned_teams_by_race(user, races):
     """The signed-in user's teams in ``races``, grouped by race.
 
@@ -98,9 +108,8 @@ def owned_teams_by_race(user, races):
 
 def get_featured_race(today):
     return (
-        Race.objects.filter(
-            is_published=True,
-            is_hidden=False,
+        public_races()
+        .filter(
             reg_status__in=(RegStatus.OPEN, RegStatus.UPCOMING),
             date_end__gte=today,
         )
@@ -128,7 +137,7 @@ class HomeView(View):
             "owned_team_groups": owned_teams_by_race(request.user, unfinished),
             "page_obj": page_obj,
             "publications": page_obj.object_list,
-            "upcoming_races": unfinished.filter(is_hidden=False)[:3],
+            "upcoming_races": upcoming_site_races(today),
             "open_photo_contests": list(
                 PhotoContest.objects.filter(
                     Q(submission_until__gte=now) | Q(voting_until__gte=now),
@@ -193,9 +202,7 @@ class PublicationDetailView(View):
             ):
                 raise Http404
         upcoming_races = (
-            []
-            if publication.race_id
-            else unfinished_races(timezone.localdate()).filter(is_hidden=False)[:3]
+            [] if publication.race_id else upcoming_site_races(timezone.localdate())
         )
         can_edit = bool(publication.race_id) and is_race_admin(
             request.user, publication.race
@@ -222,7 +229,7 @@ class RaceListView(View):
     def get(self, request):
         today = timezone.localdate()
         featured_race = get_featured_race(today)
-        races = Race.objects.filter(is_published=True, is_hidden=False)
+        races = public_races()
         if featured_race is not None:
             races = races.exclude(pk=featured_race.pk)
         context = {

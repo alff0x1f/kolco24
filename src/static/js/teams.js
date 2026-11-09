@@ -247,7 +247,7 @@
       var q = query.toLowerCase();
       list = list.filter(function (t) {
         return (
-          (t.name + " " + (showCity ? t.city + " " : "") + t.parts + " " + t.num)
+          (t.name + " " + t.city + " " + t.parts + " " + t.num)
             .toLowerCase()
             .indexOf(q) !== -1
         );

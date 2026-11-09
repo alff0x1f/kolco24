@@ -486,7 +486,8 @@ button { font-family: inherit; }
 .side-head h3 {
   font-size: 14px; font-weight: 500; color: var(--ink);
 }
-.side-head a { color: var(--muted); font-size: 12px; }
+.side-head a,
+.side-head .side-total { color: var(--muted); font-size: 12px; }
 .side-head a:hover { color: var(--primary-2); }
 
 /* ── Sidebar: admin management panel («Управление») ──
