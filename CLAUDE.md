@@ -346,7 +346,7 @@ Django 4.2 project. Source lives entirely under `src/`, with `manage.py` at `src
       test to prevent throttle counts leaking across tests (all test requests share the same client IP); any new test
       module that exercises throttled mobile endpoints must replicate this fixture.
     - **Endpoints** (reads all GET, listed here; each POST is described in its own invariant bullet — the gate of each
-      is stated there; see `urls.py`): `/app/races/` (published races), `/app/race/<id>/teams/` (teams **plus the
+      is stated there; see `urls.py`): `/app/races/` (published, not `is_hidden_in_app`), `/app/race/<id>/teams/` (teams **plus the
       embedded category catalogue** — deliberately no separate categories endpoint; inactive categories included so
       every `category2` id resolves), `/app/race/<id>/legend/` (checkpoints **plus a per-tag `tags` array** — `bid → checkpoint_id`
       identity for **every** tag (open + locked), plus `iv`/`ct` for the offline legend unlock on locked КП only — see
@@ -703,7 +703,7 @@ Use a scoped wrapper class (e.g. `.race-page`).
 published races with `date_end >= today`, grouped by race. `HomeView.get` builds one base queryset `unfinished_races`
 (`is_published=True`, `date_end__gte=today`, `order_by("date", "pk")` — named for the criterion, since a race running
 right now counts; `RaceListView`'s separate `future_races` context key means the stricter `date > today`) —
-`upcoming_races` (right column) is its first three
+`upcoming_races` (right column) is its first three non-hidden
 (`[:3]`, the spotlight `featured_race` deliberately **included** — the sidebar duplicates the banner) while the panel gets
 `unfinished_races` **whole**, since a team's race can be past the slice. `owned_teams_by_race(user, races)` makes **one** query
 (`select_related("category2", "category2__race")`) and groups in Python; an anonymous user gets `[]` with **zero**
@@ -722,6 +722,12 @@ one panel only. There is **deliberately no empty state**: a signed-in user with 
 nothing at all (the template is wrapped in `{% if owned_team_groups %}`). Home-page tests live in
 `src/website/test_publications.py`, not `src/website/tests.py`; the test helper `_unfinished_races()` there calls the
 view's own `community.unfinished_races(today)` so the two definitions can't drift.
+
+**Race visibility flags**: `Race.is_hidden` affects site lists and feeds only (`NewsPost.in_feed()`; keep `visible()` for
+the race page and direct links). `is_hidden_in_app` affects `/app/races/` only (`versioning.listed_races`).
+`show_teams` gates the site teams page and its links only (`teams_access`); `/app/`, `/api/` and results deliberately
+ignore it. `ask_team_*` off removes the field from `TeamForm`, so `cleaned_data` may lack it; assign only if present, or
+the stored value is lost.
 
 **Custom error pages**: `src/templates/{404,403,500}.html` (themed «Сбились с маршрута»), sharing
 `src/static/css/error.css` (scoped under `.error-page`). Django's default handlers auto-load them by name — no

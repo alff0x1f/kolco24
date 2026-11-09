@@ -413,6 +413,48 @@
                 </div>
                 <label class="switch"><input type="checkbox" name="is_photo_upload_enabled"{% if form.is_photo_upload_enabled.value %} checked{% endif %}><span class="track"></span></label>
               </div>
+              <div class="toggle-row">
+                <div>
+                  <div class="t-label">Показать команды</div>
+                  <div class="t-desc">Список команд виден всем; если выключено&nbsp;— только свои</div>
+                </div>
+                <label class="switch"><input type="checkbox" name="show_teams"{% if form.show_teams.value %} checked{% endif %}><span class="track"></span></label>
+              </div>
+              <div class="toggle-row">
+                <div>
+                  <div class="t-label">Скрытая гонка</div>
+                  <div class="t-desc">Нет на&nbsp;главной и&nbsp;в&nbsp;архиве, доступна по&nbsp;ссылке</div>
+                </div>
+                <label class="switch"><input type="checkbox" name="is_hidden"{% if form.is_hidden.value %} checked{% endif %}><span class="track"></span></label>
+              </div>
+              <div class="toggle-row">
+                <div>
+                  <div class="t-label">Скрыть в&nbsp;приложении</div>
+                  <div class="t-desc">Нет в&nbsp;списке гонок мобильного приложения</div>
+                </div>
+                <label class="switch"><input type="checkbox" name="is_hidden_in_app"{% if form.is_hidden_in_app.value %} checked{% endif %}><span class="track"></span></label>
+              </div>
+              <div class="toggle-row">
+                <div>
+                  <div class="t-label">Спрашивать название</div>
+                  <div class="t-desc">Поле «Название» в&nbsp;форме команды</div>
+                </div>
+                <label class="switch"><input type="checkbox" name="ask_team_name"{% if form.ask_team_name.value %} checked{% endif %}><span class="track"></span></label>
+              </div>
+              <div class="toggle-row">
+                <div>
+                  <div class="t-label">Спрашивать город</div>
+                  <div class="t-desc">Поле «Город» в&nbsp;форме команды</div>
+                </div>
+                <label class="switch"><input type="checkbox" name="ask_team_city"{% if form.ask_team_city.value %} checked{% endif %}><span class="track"></span></label>
+              </div>
+              <div class="toggle-row">
+                <div>
+                  <div class="t-label">Спрашивать клуб</div>
+                  <div class="t-desc">Поле «Клуб» в&nbsp;форме команды</div>
+                </div>
+                <label class="switch"><input type="checkbox" name="ask_team_club"{% if form.ask_team_club.value %} checked{% endif %}><span class="track"></span></label>
+              </div>
             </div>
           </div>
         </section>

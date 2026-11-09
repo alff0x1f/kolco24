@@ -46,7 +46,14 @@ from apps.race.finance import csv_rows, extras_catalog, filter_rows, payment_row
 from apps.race.forms import HEADER_UPLOADS, RaceForm
 from apps.race.header_images import delete_if_unused, discard_stored, store_upload
 from apps.race.models import Protocol, RaceExtra, RacePromo, TeamExtra
-from apps.race.permissions import can_edit_race, is_team_editing_open
+from apps.race.permissions import (
+    TEAMS_ALL,
+    TEAMS_NONE,
+    TEAMS_OWN,
+    can_edit_race,
+    is_team_editing_open,
+    teams_access,
+)
 from apps.race.promo import ERROR_MESSAGES as PROMO_ERRORS
 from apps.race.promo import PromoError, occupied_team_ids, resolve_promo
 from apps.race.results import build_protocol, freeze_protocol
@@ -102,10 +109,28 @@ def _categories_with_team_count(race):
     )
 
 
+def _owner_full_name(owner):
+    return f"{owner.last_name} {owner.first_name}"
+
+
 def _team_display_name(team):
-    return team.teamname or (
-        f"Без названия {team.id} " f"({team.owner.last_name} {team.owner.first_name})"
-    )
+    return team.teamname or f"Без названия {team.id} ({_owner_full_name(team.owner)})"
+
+
+def _team_list_name(team, race):
+    if team.teamname or race.ask_team_name:
+        return _team_display_name(team)
+    owner_name = _owner_full_name(team.owner).strip()
+    return owner_name or _team_display_name(team)
+
+
+def _teams_nav_flags(access):
+    """Template flags for the teams tab and links, derived from ``access``."""
+    return {
+        "teams_tab_visible": access != TEAMS_NONE,
+        "teams_links_enabled": access == TEAMS_ALL,
+        "teams_count_visible": access == TEAMS_ALL,
+    }
 
 
 def _owned_teams(race, user):
@@ -184,6 +209,7 @@ class RacePageView(View):
             "news_count": news_count,
             "reg_open": race.reg_status == RegStatus.OPEN,
             "reg_upcoming": race.reg_status == RegStatus.UPCOMING,
+            **_teams_nav_flags(teams_access(user, race)),
             "race_team_count": race.team_count(),
             "race_people_count": race.people_count(),
             "race_remaining": race_remaining,
@@ -367,9 +393,9 @@ class RaceTeamsView(View):
     initial = None
 
     @staticmethod
-    def build_context(race, user=None):
-        is_authenticated = bool(user is not None and user.is_authenticated)
-        is_superuser = bool(user is not None and getattr(user, "is_superuser", False))
+    def build_context(race, user, access):
+        is_authenticated = user.is_authenticated
+        is_superuser = user.is_superuser
 
         categories = list(_categories_with_team_count(race))
         categories_data = []
@@ -385,10 +411,14 @@ class RaceTeamsView(View):
                 }
             )
 
-        # Base set: paid teams. Authenticated users also see their own teams in
+        # Limited access (``own``) is the owner's teams only, and ``none`` never
+        # gets here: ``get`` redirects it to the race page. With full access the
+        # base set is paid teams. Authenticated users also see their own teams in
         # this race (even unpaid) so the «Мои» chip is complete; superusers see
         # every team (matches the old all_teams behavior).
-        if is_superuser:
+        if access == TEAMS_OWN:
+            team_filter = Q(category2__race=race, owner=user)
+        elif is_superuser:
             team_filter = Q(category2__race=race)
         elif is_authenticated:
             team_filter = Q(category2__race=race) & (
@@ -406,7 +436,7 @@ class RaceTeamsView(View):
         has_team_actions = False
         can_change = is_team_editing_open(user, race)
         for team in teams:
-            name = _team_display_name(team)
+            name = _team_list_name(team, race)
             parts = ", ".join(
                 p
                 for p in (
@@ -427,7 +457,7 @@ class RaceTeamsView(View):
             row = {
                 "num": team.start_number,
                 "name": name,
-                "city": team.city,
+                "city": team.city if race.ask_team_city else "",
                 "parts": parts,
                 "cnt": cnt,
                 "catId": team.category2_id,
@@ -449,7 +479,11 @@ class RaceTeamsView(View):
             "teams_json": _safe_json(teams_data),
             "reg_open": race.reg_status == RegStatus.OPEN,
             "reg_upcoming": race.reg_status == RegStatus.UPCOMING,
+            **_teams_nav_flags(access),
             "race_team_count": race.team_count(),
+            "teams_list_total": (
+                race.team_count() if access == TEAMS_ALL else len(teams_data)
+            ),
             "race_people_count": race.people_count(),
             "race_remaining": race_remaining,
             "race_full": race_full,
@@ -458,7 +492,7 @@ class RaceTeamsView(View):
             "is_authenticated": is_authenticated,
             "has_team_actions": has_team_actions,
             "show_unpaid_filter": is_superuser,
-            "can_edit_race": bool(user is not None and can_edit_race(user, race)),
+            "can_edit_race": can_edit_race(user, race),
         }
 
     def get(self, request, race_slug, category_id=None):
@@ -468,6 +502,9 @@ class RaceTeamsView(View):
             race = Race.objects.get(slug=race_slug)
         except Race.DoesNotExist:
             raise Http404
+        access = teams_access(request.user, race)
+        if access == TEAMS_NONE:
+            return HttpResponseRedirect(reverse("race", args=[race.slug]))
         if category_id is not None:
             try:
                 category_exists = Category.active_objects.filter(
@@ -480,7 +517,7 @@ class RaceTeamsView(View):
             initial_filter = str(category_id)
         else:
             initial_filter = self.initial or "all"
-        context = self.build_context(race, request.user)
+        context = self.build_context(race, request.user, access)
         context["initial_filter"] = initial_filter
         return render(request, "race/teams.html", context)
 

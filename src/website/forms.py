@@ -10,7 +10,7 @@ from apps.accounts.forms import (  # noqa: F401
 )
 from website.models import Team, TeamMemberMove
 from website.models.news import NewsPost, Page
-from website.models.race import Category
+from website.models.race import Category, Race
 
 # Maps pricing — mirrored in the views and the JS config island.
 FREE_MAPS = 2
@@ -18,6 +18,12 @@ MAP_PRICE = 200
 
 
 class TeamForm(forms.Form):
+    RACE_FIELD_TOGGLES = {
+        "teamname": "ask_team_name",
+        "city": "ask_team_city",
+        "organization": "ask_team_club",
+    }
+
     teamname = forms.CharField(
         required=False,
         max_length=100,
@@ -79,7 +85,12 @@ class TeamForm(forms.Form):
         except (TypeError, ValueError):
             resolved_race_id = None
 
-        self._race_id = resolved_race_id
+        self._race = (
+            None
+            if resolved_race_id is None
+            else Race.objects.filter(id=resolved_race_id).first()
+        )
+        self._drop_unasked_fields()
         # Set by clean_promo_code; the views pass it to create_team_payment.
         self.promo = None
 
@@ -156,6 +167,14 @@ class TeamForm(forms.Form):
                 ),
             )
 
+    def _drop_unasked_fields(self):
+        """Remove the fields this race does not ask for."""
+        if self._race is None:
+            return
+        for field_name, toggle in self.RACE_FIELD_TOGGLES.items():
+            if not getattr(self._race, toggle):
+                del self.fields[field_name]
+
     def clean_promo_code(self):
         """Resolve the promo code, or raise a field error explaining why not.
 
@@ -165,17 +184,13 @@ class TeamForm(forms.Form):
         """
         code = (self.cleaned_data.get("promo_code") or "").strip()
         self.promo = None
-        if not code or self._race_id is None:
+        if not code or self._race is None:
             return ""
 
         from apps.race.promo import PromoError, resolve_promo
-        from website.models import Race
 
-        race = Race.objects.filter(id=self._race_id).first()
-        if race is None:
-            return ""
         try:
-            self.promo = resolve_promo(race, code, self.team)
+            self.promo = resolve_promo(self._race, code, self.team)
         except PromoError as exc:
             raise forms.ValidationError(str(exc))
         return self.promo.code

@@ -1030,7 +1030,7 @@ ETag/`If-None-Match` на ресурсах остаётся (см. выше) —
 
 | Метод | Путь | Имя | Отдаёт |
 |-------|------|-----|--------|
-| GET | `/app/races/` | `mobile:races` | список гонок (лёгкий: id, slug, name, date, date_end, place, reg_status, map_url); см. **Оффлайн-карта** ниже |
+| GET | `/app/races/` | `mobile:races` | список опубликованных гонок без `is_hidden_in_app` (лёгкий: id, slug, name, date, date_end, place, reg_status, map_url); см. **Оффлайн-карта** ниже; пер-гоночные `/app/race/<id>/…` флаг не проверяют |
 | GET | `/app/race/<id>/teams/` | `mobile:teams` | команды гонки + категории (`categories`) |
 | GET | `/app/race/<id>/legend/` | `mobile:legend` | КП (запертые — только `enc`) + пер-тег `tags` (`bid → checkpoint_id` идентичность всегда; `iv`/`ct` только у запертых); легенда published-гонки отдаётся всегда, КП типа `hidden` («Скрытый») исключены |
 | GET | `/app/race/<id>/member_tags/` | `mobile:member_tags` | пул браслетов участников (`number → nfc_uid`); см. **Браслеты участников** ниже |
@@ -1065,7 +1065,7 @@ conditional GET (это входная точка приложения, до в�
 синка узнать, что перекачивать для синкаемой гонки.
 
 > **Статус:** реализованы `mobile:races` (с `ETag`/`If-None-Match` → 304;
-> отпечаток — `MAX(Race.updated_at)|COUNT` по published-гонкам, поле
+> отпечаток — `MAX(Race.updated_at)|COUNT` по `versioning.listed_races()` (published и не `is_hidden_in_app`), поле
 > `Race.updated_at` — миграция `0079`), `mobile:legend` (с `ETag`/`If-None-Match`
 > → 304; запертые КП отдают только `enc`, идентичность тегов — в `tags`),
 > `mobile:teams` (с `ETag`/`If-None-Match` → 304) и

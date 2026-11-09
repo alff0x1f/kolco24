@@ -79,6 +79,12 @@ class Race(Model):
 
     is_teams_editable = BooleanField("Команды редактируемы", default=False)
     is_photo_upload_enabled = BooleanField("Загрузка фото включена", default=False)
+    show_teams = BooleanField("Показать команды", default=True)
+    is_hidden = BooleanField("Скрытая гонка", default=False)
+    is_hidden_in_app = BooleanField("Скрыть в приложении", default=False)
+    ask_team_name = BooleanField("Спрашивать название", default=True)
+    ask_team_city = BooleanField("Спрашивать город", default=True)
+    ask_team_club = BooleanField("Спрашивать клуб", default=True)
 
     people_limit = IntegerField("Лимит участников", default=0)  # 0 = без лимита
     updated_at = DateTimeField(auto_now=True)

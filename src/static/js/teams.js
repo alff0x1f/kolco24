@@ -64,6 +64,7 @@
   }
   var isAuthenticated = pageEl.getAttribute("data-authenticated") === "true";
   var hasActions = pageEl.getAttribute("data-has-actions") === "true";
+  var showCity = pageEl.getAttribute("data-show-city") === "true";
 
   var initial = pageEl.getAttribute("data-initial") || "all";
   var activeCat = initial; // 'all' | 'mine' | '<catId>'
@@ -226,9 +227,7 @@
       '">' +
       esc(catLabel) +
       "</span></td>" +
-      '<td class="col-city t-city">' +
-      hl(t.city) +
-      "</td>" +
+      (showCity ? '<td class="col-city t-city">' + hl(t.city) + "</td>" : "") +
       '<td class="col-cnt"><span class="cnt-badge">' +
       CNT_SVG +
       esc(t.cnt) +

@@ -56,9 +56,11 @@
                     {% endif %}
 
                     <!-- Команда -->
+                    {% if race.ask_team_name or race.ask_team_city or race.ask_team_club or user.is_superuser %}
                     <div class="card-section">
                         <div class="section-title">Команда</div>
                         <div class="form-grid">
+                            {% if race.ask_team_name %}
                             <div class="field full">
                                 <label for="teamname">Название</label>
                                 <input class="input{% if team_form.teamname.errors %} has-error{% endif %}"
@@ -69,6 +71,8 @@
                                 <span class="hint err">{{ team_form.teamname.errors|join:", " }}</span>
                                 {% endif %}
                             </div>
+                            {% endif %}
+                            {% if race.ask_team_city %}
                             <div class="field">
                                 <label for="city">Город</label>
                                 <input class="input{% if team_form.city.errors %} has-error{% endif %}"
@@ -79,6 +83,8 @@
                                 <span class="hint err">{{ team_form.city.errors|join:", " }}</span>
                                 {% endif %}
                             </div>
+                            {% endif %}
+                            {% if race.ask_team_club %}
                             <div class="field">
                                 <label for="org">Клуб <span class="opt">— необязательно</span></label>
                                 <input class="input{% if team_form.organization.errors %} has-error{% endif %}"
@@ -89,6 +95,7 @@
                                 <span class="hint err">{{ team_form.organization.errors|join:", " }}</span>
                                 {% endif %}
                             </div>
+                            {% endif %}
                             {% if user.is_superuser %}
                             <div class="field">
                                 <label for="start_number">Стартовый номер</label>
@@ -99,6 +106,7 @@
                             {% endif %}
                         </div>
                     </div>
+                    {% endif %}
 
                     <!-- Дистанция и состав -->
                     <div class="card-section">

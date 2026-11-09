@@ -1841,3 +1841,117 @@ def test_home_shows_photo_contest_during_voting(client):
     assert "Голосование до" in strip
     assert ">Голосовать</a>" in strip
     assert "Идёт голосование" in content
+
+
+def _race_in_days(slug, start, **kwargs):
+    today = timezone.localdate()
+    return Race.objects.create(
+        name=f"Гонка {slug}",
+        slug=slug,
+        date=today + timedelta(days=start),
+        date_end=today + timedelta(days=start + 1),
+        reg_status=RegStatus.OPEN,
+        **kwargs,
+    )
+
+
+@pytest.mark.django_db
+def test_hidden_race_is_absent_from_home_lists(client):
+    _race_in_days("hidden", 1, is_hidden=True)
+    shown = _race_in_days("shown", 5)
+
+    response = client.get(reverse("index"))
+
+    assert response.context["featured_race"] == shown
+    assert list(response.context["upcoming_races"]) == [shown]
+
+
+@pytest.mark.django_db
+def test_hidden_race_is_absent_from_every_catalog_section(client):
+    for slug, start in (("past", -9), ("now", 0), ("future", 9)):
+        _race_in_days(f"hidden-{slug}", start, is_hidden=True)
+    shown_past = _race_in_days("shown-past", -5)
+
+    response = client.get(reverse("race_list"))
+
+    assert response.context["featured_race"] is None
+    assert list(response.context["current_races"]) == []
+    assert list(response.context["future_races"]) == []
+    assert list(response.context["past_races"]) == [shown_past]
+
+
+@pytest.mark.django_db
+def test_race_hidden_only_in_app_stays_on_site(client):
+    race = _race_in_days("app-only", 5, is_hidden_in_app=True)
+
+    home = client.get(reverse("index"))
+    catalog = client.get(reverse("race_list"))
+
+    assert home.context["featured_race"] == race
+    assert list(home.context["upcoming_races"]) == [race]
+    assert catalog.context["featured_race"] == race
+
+
+@pytest.mark.django_db
+def test_race_hidden_only_in_app_stays_in_catalog_sections(client):
+    featured = _race_in_days("featured", 1)
+    race = _race_in_days("app-only", 5, is_hidden_in_app=True)
+
+    catalog = client.get(reverse("race_list"))
+
+    assert catalog.context["featured_race"] == featured
+    assert list(catalog.context["future_races"]) == [race]
+
+
+@pytest.mark.django_db
+def test_hidden_race_posts_leave_the_feeds_but_race_free_posts_stay(client):
+    hidden = _race_in_days("hidden", 1, is_hidden=True)
+    create_publication("Новость", race=hidden, kind=PublicationKind.ARTICLE)
+    free = create_publication("Без гонки", kind=PublicationKind.ARTICLE)
+
+    home = client.get(reverse("index"))
+    articles = client.get(reverse("article_list"))
+
+    assert list(home.context["publications"]) == [free]
+    assert list(articles.context["publications"]) == [free]
+
+
+@pytest.mark.django_db
+def test_hidden_race_page_and_its_post_stay_reachable(client):
+    hidden = _race_in_days("hidden", 1, is_hidden=True)
+    post = create_publication("Новость", race=hidden)
+
+    page = client.get(reverse("race", kwargs={"race_slug": hidden.slug}))
+    detail = client.get(reverse("publication_detail", args=[post.pk]))
+
+    assert page.status_code == 200
+    assert list(page.context["news_list"]) == [post]
+    assert detail.status_code == 200
+    assert detail.context["is_preview"] is False
+
+
+@pytest.mark.django_db
+def test_hidden_race_stays_in_owner_panel(client, django_user_model):
+    hidden = _race_in_days("hidden", 1, is_hidden=True)
+    category = Category.objects.create(code="12h", name="12 часов", race=hidden)
+    owner = django_user_model.objects.create_user(
+        username="owner", password="p", email="owner@e.com"
+    )
+    Team.objects.create(owner=owner, category2=category, ucount=2, paid_people=2)
+    client.force_login(owner)
+
+    response = client.get(reverse("index"))
+
+    assert [g["race"] for g in response.context["owned_team_groups"]] == [hidden]
+    assert list(response.context["upcoming_races"]) == []
+
+
+@pytest.mark.django_db
+def test_hidden_race_is_absent_from_standalone_post_sidebar(client):
+    _race_in_days("hidden", 1, is_hidden=True)
+    shown = _race_in_days("shown", 5)
+    post = create_publication("Без гонки")
+
+    response = client.get(reverse("publication_detail", args=[post.pk]))
+
+    assert list(response.context["upcoming_races"]) == [shown]
