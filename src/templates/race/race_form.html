@@ -4,11 +4,12 @@
 {% block title %}{% if is_create %}Создание гонки{% else %}Редактирование гонки{% endif %} — Кольцо 24{% endblock %}
 
 {% block extra_head %}
+<link href="{% static 'vendor/cropperjs/cropper.min.css' %}" rel="stylesheet">
 <link href="{% static 'css/race_form.css' %}" rel="stylesheet">
 {% endblock %}
 
 {% block content %}
-<form class="race-form-page" id="raceForm" method="post">
+<form class="race-form-page" id="raceForm" method="post" enctype="multipart/form-data">
   {% csrf_token %}
   <input type="hidden" name="categories_json" id="categoriesJson">
   <input type="hidden" name="price_tiers_json" id="priceTiersJson">
@@ -143,9 +144,9 @@
             <span class="aux">header_image · header_logo</span>
           </div>
           <div class="card-body">
-            <div class="field">
-              <label for="f-header-image">Картинка в шапке <span class="opt">— URL или путь</span></label>
-              <div class="upload cover">
+            <div class="field" data-header-upload data-aspect="4" data-note>
+              <label for="f-header-image">Картинка в шапке <span class="opt">— файл, URL или путь</span></label>
+              <div class="upload cover" data-upload-pick>
                 <div class="preview">
                   <img class="preview-img" id="coverPreview"
                        src="{{ form.header_image.value|default_if_none:'' }}"
@@ -153,18 +154,28 @@
                   <div class="ph"{% if form.header_image.value %} hidden{% endif %}>1920×480 · обложка / фото с выезда</div>
                 </div>
               </div>
+              <input name="header_image_file" type="file" accept="image/jpeg,image/png,image/webp" hidden data-upload-file>
+              <input name="header_image_crop" type="hidden" data-upload-crop>
+              <div class="upload-actions">
+                <button class="btn btn-outline" type="button" data-upload-pick>Загрузить файл</button>
+                <button class="upload-reframe" type="button" data-upload-reframe hidden>Изменить кадр</button>
+                <span class="upload-name" data-upload-name hidden></span>
+              </div>
+              <span class="field-error" data-upload-error hidden></span>
+              {% if form.header_image_file.errors %}<span class="field-error">{{ form.header_image_file.errors|join:", " }}</span>{% endif %}
+              {% if "header_image" in lost_uploads %}<span class="field-error">Файл не сохранён, выберите его снова.</span>{% endif %}
               <input class="control mono{% if form.header_image.errors %} has-error{% endif %}" id="f-header-image"
-                     name="header_image" type="text" data-preview-for="coverPreview" data-preview-ph
+                     name="header_image" type="text" data-preview-for="coverPreview" data-preview-ph data-upload-url
                      value="{{ form.header_image.value|default_if_none:'' }}"
                      placeholder="https://…/cover.jpg или /static/…/cover.jpg">
               {% if form.header_image.errors %}<span class="field-error">{{ form.header_image.errors|join:", " }}</span>
-              {% else %}<span class="field-hint">Рекомендуемое соотношение 4:1. Хранится как URL в&nbsp;поле <code>header_image</code>.</span>{% endif %}
+              {% else %}<span class="field-hint">JPEG, PNG или WebP, до&nbsp;20&nbsp;МБ. Кадр 4:1. Либо укажите URL.</span>{% endif %}
             </div>
 
-            <div class="field" style="margin-bottom: 0;">
-              <label for="f-header-logo">Логотип в шапке <span class="opt">— необязательно, URL</span></label>
+            <div class="field" style="margin-bottom: 0;" data-header-upload>
+              <label for="f-header-logo">Логотип в шапке <span class="opt">— необязательно, файл или URL</span></label>
               <div class="logo-grid">
-                <div class="upload logo">
+                <div class="upload logo" data-upload-pick>
                   <div class="preview">
                     <img class="preview-img" id="logoPreview"
                          src="{{ form.header_logo.value|default_if_none:'' }}"
@@ -173,12 +184,22 @@
                   </div>
                 </div>
                 <div class="logo-side">
+                  <input name="header_logo_file" type="file" accept="image/jpeg,image/png,image/webp" hidden data-upload-file>
+                  <input name="header_logo_crop" type="hidden" data-upload-crop>
+                  <div class="upload-actions">
+                    <button class="btn btn-outline" type="button" data-upload-pick>Загрузить файл</button>
+                    <button class="upload-reframe" type="button" data-upload-reframe hidden>Изменить кадр</button>
+                    <span class="upload-name" data-upload-name hidden></span>
+                  </div>
+                  <span class="field-error" data-upload-error hidden></span>
+                  {% if form.header_logo_file.errors %}<span class="field-error">{{ form.header_logo_file.errors|join:", " }}</span>{% endif %}
+                  {% if "header_logo" in lost_uploads %}<span class="field-error">Файл не сохранён, выберите его снова.</span>{% endif %}
                   <input class="control mono{% if form.header_logo.errors %} has-error{% endif %}" id="f-header-logo"
-                         name="header_logo" type="text" data-preview-for="logoPreview" data-preview-ph
+                         name="header_logo" type="text" data-preview-for="logoPreview" data-preview-ph data-upload-url
                          value="{{ form.header_logo.value|default_if_none:'' }}"
                          placeholder="https://…/logo.svg или /static/…/logo.svg">
                   {% if form.header_logo.errors %}<span class="field-error">{{ form.header_logo.errors|join:", " }}</span>
-                  {% else %}<span class="field-hint">Прозрачный PNG или SVG, выводится поверх обложки.</span>{% endif %}
+                  {% else %}<span class="field-hint">JPEG, PNG или WebP, до&nbsp;20&nbsp;МБ. Прозрачность сохраняется. SVG — только по&nbsp;URL.</span>{% endif %}
                 </div>
               </div>
             </div>
@@ -407,6 +428,16 @@
       <button class="btn btn-primary" type="submit">Сохранить</button>
     </div>
   </div>
+
+  <dialog class="crop-dialog" id="cropDialog">
+    <h2>Выберите кадр</h2>
+    <div class="crop-stage"><img id="cropImage" alt=""></div>
+    <p class="field-hint" id="cropNote" hidden>На телефоне в шапке видна только центральная часть кадра. Главное держите посередине.</p>
+    <div class="crop-actions">
+      <button class="btn btn-outline" type="button" id="cropCancel">Отмена</button>
+      <button class="btn btn-primary" type="button" id="cropApply">Применить</button>
+    </div>
+  </dialog>
 </form>
 
 <script id="categories-data" type="application/json">{{ categories_data }}</script>
@@ -420,5 +451,6 @@
 {% endblock %}
 
 {% block footer_js_include %}
+<script src="{% static 'vendor/cropperjs/cropper.min.js' %}"></script>
 <script src="{% static 'js/race_form.js' %}"></script>
 {% endblock %}

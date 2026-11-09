@@ -43,7 +43,8 @@ from apps.mobile.models import AppInstall, Mark, TrackPoint
 from apps.race import finish_forecast
 from apps.race.app_data import build_overview, build_team_timeline, mark_anchor
 from apps.race.finance import csv_rows, extras_catalog, filter_rows, payment_rows
-from apps.race.forms import RaceForm
+from apps.race.forms import HEADER_UPLOADS, RaceForm
+from apps.race.header_images import delete_if_unused, discard_stored, store_upload
 from apps.race.models import Protocol, RaceExtra, RacePromo, TeamExtra
 from apps.race.permissions import can_edit_race, is_team_editing_open
 from apps.race.promo import ERROR_MESSAGES as PROMO_ERRORS
@@ -1169,7 +1170,11 @@ class RaceEditView(View):
             return response
         is_create = race is None
 
-        form = RaceForm(request.POST, instance=race)
+        # Read before is_valid(), which writes the submitted values onto ``race``.
+        old_headers = {
+            field: getattr(race, field) if race else "" for field, _ in HEADER_UPLOADS
+        }
+        form = RaceForm(request.POST, request.FILES, instance=race)
         form_valid = form.is_valid()
 
         category_rows = price_tier_rows = None
@@ -1243,18 +1248,33 @@ class RaceEditView(View):
             and not extra_errors
             and not promo_errors
         ):
+            written = []
             try:
                 with transaction.atomic():
+                    for field, (data, ext) in form.processed_uploads.items():
+                        value = store_upload(data, ext)
+                        written.append(value)
+                        setattr(form.instance, field, value)
                     race = form.save()
                     _reconcile_categories(race, cleaned_categories)
                     _reconcile_price_tiers(race, cleaned_tiers)
                     _reconcile_extras(race, cleaned_extras)
                     _reconcile_promos(race, cleaned_promos)
             except ValueError as exc:
+                discard_stored(written)
                 if not is_create:
                     race.refresh_from_db()
                 form.add_error(None, str(exc))
+            except Exception:
+                discard_stored(written)
+                raise
             else:
+                # Not on_commit: its hooks run inside the atomic block's exit,
+                # so a failing one would reach the handlers above and remove
+                # the files that were just committed.
+                for field, old_value in old_headers.items():
+                    if getattr(race, field) != old_value:
+                        delete_if_unused(old_value)
                 return HttpResponseRedirect(
                     reverse("race", kwargs={"race_slug": race.slug})
                 )
@@ -1299,6 +1319,14 @@ class RaceEditView(View):
             extra_errors=extra_errors,
             promo_errors=promo_errors,
         )
+        # Picking a file clears the URL input, so without this the re-render
+        # would show an empty field and the next save would drop the image.
+        unsaved = [f for f, _ in HEADER_UPLOADS if f"{f}_file" in request.FILES]
+        if unsaved:
+            form.data = form.data.copy()
+            for field in unsaved:
+                form.data[field] = old_headers[field]
+        context["lost_uploads"] = [f for f in unsaved if f"{f}_file" not in form.errors]
         return render(request, "race/race_form.html", context)
 
 

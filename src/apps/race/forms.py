@@ -1,7 +1,11 @@
 from django import forms
 from django.forms.widgets import DateInput
 
+from apps.photo_contest.images import ImageRejected
+from apps.race.header_images import parse_crop, process_cover, process_logo
 from website.models.race import Race
+
+HEADER_UPLOADS = (("header_image", process_cover), ("header_logo", process_logo))
 
 
 class RaceForm(forms.ModelForm):
@@ -24,6 +28,14 @@ class RaceForm(forms.ModelForm):
     # Promo codes («Промокоды») — same hidden-JSON pattern as add-ons; parsed
     # and validated in ``RaceEditView.post`` (see ``_reconcile_promos``).
     promos_json = forms.CharField(required=False, widget=forms.HiddenInput)
+    header_image_file = forms.FileField(required=False)
+    header_logo_file = forms.FileField(required=False)
+    header_image_crop = forms.CharField(required=False, widget=forms.HiddenInput)
+    header_logo_crop = forms.CharField(required=False, widget=forms.HiddenInput)
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.processed_uploads = {}
 
     def clean_cost(self):
         v = self.cleaned_data.get("cost")
@@ -41,7 +53,26 @@ class RaceForm(forms.ModelForm):
             self.add_error(
                 "date_end", "Дата окончания не может быть раньше даты начала."
             )
+        self._process_uploads(cleaned)
         return cleaned
+
+    def _process_uploads(self, cleaned):
+        # Runs in clean(), not clean_<file>(): extra form fields are cleaned in
+        # declaration order, so the crop may not be in cleaned_data yet.
+        for field, process in HEADER_UPLOADS:
+            file = cleaned.get(f"{field}_file")
+            if not file:
+                continue
+            try:
+                crop = parse_crop(cleaned.get(f"{field}_crop"))
+                self.processed_uploads[field] = process(file, crop)
+            except ImageRejected as exc:
+                self.add_error(f"{field}_file", str(exc))
+                continue
+            # The file replaces the text value, so a stale bad URL can't block
+            # the save in Race.clean().
+            cleaned[field] = ""
+            self.errors.pop(field, None)
 
     class Meta:
         model = Race
