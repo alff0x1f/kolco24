@@ -130,6 +130,14 @@ def test_cover_downscales_to_max_width():
     assert opened(data).size == (1920, 480)
 
 
+def test_cover_crop_taller_than_jpeg_limit_is_downscaled():
+    img = Image.new("RGB", (16, 66000), RED)
+
+    data, _ = process_cover(upload(img), (0, 0, 16, 66000))
+
+    assert opened(data).height == 1920
+
+
 def test_cover_is_not_upscaled():
     data, _ = process_cover(upload(Image.new("RGB", (800, 200), RED)), None)
 

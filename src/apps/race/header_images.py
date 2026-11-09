@@ -27,7 +27,7 @@ UPLOAD_DIR = "race_headers"
 STORED_NAME_RE = re.compile(rf"{UPLOAD_DIR}/[0-9a-f]{{32}}\.(jpg|png)")
 
 COVER_RATIO = 4
-COVER_MAX_WIDTH = 1920
+COVER_MAX_SIDE = 1920
 COVER_QUALITY = 85
 LOGO_MAX_SIDE = 512
 MIN_SIDE = 16
@@ -98,8 +98,7 @@ def process_cover(file, crop):
     if crop is None:
         crop = _centre_cover_crop(img.size)
     img = _flatten(img.crop(_box(crop, img.size)))
-    if img.width > COVER_MAX_WIDTH:
-        img.thumbnail((COVER_MAX_WIDTH, img.height))
+    img.thumbnail((COVER_MAX_SIDE, COVER_MAX_SIDE))
     buffer = io.BytesIO()
     img.save(buffer, format="JPEG", quality=COVER_QUALITY)
     return buffer.getvalue(), "jpg"
