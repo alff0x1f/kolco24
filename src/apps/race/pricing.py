@@ -216,6 +216,7 @@ def create_team_payment(request, team, race, promo=None):
             order_name=f"Оплата за команду на Кольцо 24 ({payment.id})",
             amount_value=cost,
             return_payment_data="sbp",
+            customer={"email": request.user.email} if request.user.email else None,
         )
     except Exception:
         payment.delete()
