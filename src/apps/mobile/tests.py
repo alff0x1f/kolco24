@@ -4631,7 +4631,7 @@ def test_member_tags_version_unchanged_by_touch_within_window():
     )
     before = member_tags_version()
 
-    # Mirror MemberTagTouchView: bump only last_seen_at, not updated_at.
+    # A scan bumps only last_seen_at, not updated_at.
     tag.last_seen_at = timezone.now()
     tag.save(update_fields=["last_seen_at"])
     assert member_tags_version() == before
@@ -4861,25 +4861,6 @@ def test_member_tags_get_does_not_expose_code(client, settings):
     assert response.status_code == 200
     entries = response.json()["member_tags"]
     assert len(entries) == 1
-    assert "code" not in entries[0]
-
-
-@pytest.mark.django_db
-def test_api_member_tag_list_does_not_expose_code(client):
-    from django.utils import timezone
-
-    from website.models.tag import Tag
-
-    Tag.objects.create(
-        number=9, nfc_uid="aa03", code=os.urandom(16), last_seen_at=timezone.now()
-    )
-
-    response = client.get("/api/member_tag/")
-
-    assert response.status_code == 200
-    entries = response.json()
-    assert len(entries) == 1
-    assert entries[0]["nfc_uid"] == "AA03"
     assert "code" not in entries[0]
 
 

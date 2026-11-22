@@ -242,10 +242,9 @@ def member_tags_version(rows=None, race_id=None):
 
     A **provisioning** edit always moves the fingerprint: **add** inserts a new
     ``id:number:nfc_uid`` tuple; **renumber** or **re-UID** changes a field
-    value in an existing tuple; **remove** drops a tuple. A scan (``touch``)
-    deliberately does **not** — ``MemberTagTouchView`` saves only
-    ``last_seen_at`` (an intentional carve-out from the ``update_fields``
-    discipline) so a bracelet tap cannot churn this version on its own. Scan
+    value in an existing tuple; **remove** drops a tuple. A save of only
+    ``last_seen_at`` deliberately does **not** move it, so a bracelet tap
+    cannot churn this version on its own. Scan
     activity can still shift the fingerprint *gradually* (day-scale) when it
     advances ``MAX(last_seen_at)`` enough to age chips past the 30-day floor
     (membership change, not per-scan churn).

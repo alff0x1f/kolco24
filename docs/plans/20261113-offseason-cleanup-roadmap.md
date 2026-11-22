@@ -83,14 +83,15 @@
 - Modify: `src/api/tests.py`
 - Modify: `http/api.http`
 
-- [ ] убрать маршруты `member_tag/`, `member_tag/touch/`, `race/<id>/checkpoint/`, `race/<id>/checkpoint_tag/`, `race/<id>/teams/`, `race/<id>/teams.csv`
-- [ ] удалить их views и сериализаторы; оставить `ping/` и `contributors/`
-- [ ] перед удалением ещё раз проверить grep'ом, что снаружи `src/api` нет импортов (в том числе из `src/apps/mobile/tests.py`)
-- [ ] удалить тесты удалённых эндпоинтов из `src/api/tests.py`
-- [ ] почистить `http/api.http`
-- [ ] тесты: каждый удалённый маршрут отдаёт 404; `ping/` — 200; `contributors/` с токеном — 200
-- [ ] `uv run pytest src/apps/mobile/tests.py` — тесты `member_tags` зелёные без touch-эндпоинта
-- [ ] `uv run pytest`, `make lint` — зелёные
+- [x] убрать маршруты `member_tag/`, `member_tag/touch/`, `race/<id>/checkpoint/`, `race/<id>/checkpoint_tag/`, `race/<id>/teams/`, `race/<id>/teams.csv`
+- [x] удалить их views и сериализаторы; оставить `ping/` и `contributors/`
+- [x] перед удалением ещё раз проверить grep'ом, что снаружи `src/api` нет импортов (в том числе из `src/apps/mobile/tests.py`)
+- [x] удалить тесты удалённых эндпоинтов из `src/api/tests.py`
+- [x] почистить `http/api.http`
+- [x] ➕ удалён `test_api_member_tag_list_does_not_expose_code` из `src/apps/mobile/tests.py` (ходил в `/api/member_tag/`); поправлены комментарии, ссылавшиеся на удалённые views
+- [x] тесты: каждый удалённый маршрут отдаёт 404; `ping/` — 200; `contributors/` с токеном — 200
+- [x] `uv run pytest src/apps/mobile/tests.py` — тесты `member_tags` зелёные без touch-эндпоинта
+- [x] `uv run pytest`, `make lint` — зелёные
 
 ### Task 3: Удалить `upload_photo` и переключатель в форме гонки (PR 2)
 
