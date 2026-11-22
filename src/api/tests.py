@@ -199,6 +199,19 @@ class ContributorsAPITestCase(APITestCase):
         response = self.client.get(URL, HTTP_AUTHORIZATION="Bearer wrong-token")
         self.assertEqual(response.status_code, 403)
 
+    def test_returns_403_with_empty_bearer_token(self):
+        response = self.client.get(URL, HTTP_AUTHORIZATION="Bearer ")
+        self.assertEqual(response.status_code, 403)
+
+    def test_returns_403_with_non_ascii_token(self):
+        response = self.client.get(URL, HTTP_AUTHORIZATION="Bearer тест")
+        self.assertEqual(response.status_code, 403)
+
+    @override_settings(CONTRIBUTORS_API_TOKEN="")
+    def test_returns_403_when_token_is_empty_string(self):
+        response = self.client.get(URL, HTTP_AUTHORIZATION="Bearer ")
+        self.assertEqual(response.status_code, 403)
+
     def test_returns_403_without_bearer_prefix(self):
         response = self.client.get(URL, HTTP_AUTHORIZATION=TOKEN)
         self.assertEqual(response.status_code, 403)

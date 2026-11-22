@@ -60,16 +60,17 @@
 - Modify: `src/api/tests.py`
 - Create: `src/config/test_settings_security.py`
 
-- [ ] добавить `deploy/kolco24.env` в `.gitignore`
-- [ ] `SECRET_KEY`: убрать запасное `"changeme"`; при `DEBUG=False` и пустой переменной падать на старте с понятной ошибкой (`ImproperlyConfigured`); при `DEBUG=True` оставить локальное значение. Сборка образа (`DJANGO_SECRET_KEY=build ... collectstatic`) должна работать как раньше
-- [ ] одна переменная окружения (например `HTTPS_ONLY`, по умолчанию выключена) включает `SESSION_COOKIE_SECURE`, `CSRF_COOKIE_SECURE`, `SECURE_PROXY_SSL_HEADER`, `SECURE_HSTS_SECONDS`. По умолчанию выключена, потому что LAN-сервер на старте гонки работает по HTTP
-- [ ] `SECURE_SSL_REDIRECT` не включать: редирект делает внешний прокси
-- [ ] описать переменную в `deploy/kolco24.env.example`
-- [ ] `BearerTokenPermission`: сравнение токена через `hmac.compare_digest`
-- [ ] убрать `crypto~=1.4.1` из `pyproject.toml`, обновить `uv.lock`
-- [ ] тесты: с выключенной переменной secure-настройки не заданы; с включённой — заданы (логику вынести в маленькую чистую функцию, чтобы тестировать без перезагрузки settings)
-- [ ] тесты: `contributors/` — верный токен 200, неверный и пустой 403
-- [ ] `uv run pytest`, `make lint` — зелёные
+- [x] добавить `deploy/kolco24.env` в `.gitignore`
+- [x] `SECRET_KEY`: убрать запасное `"changeme"`; при `DEBUG=False` и пустой переменной падать на старте с понятной ошибкой (`ImproperlyConfigured`); при `DEBUG=True` оставить локальное значение. Сборка образа (`DJANGO_SECRET_KEY=build ... collectstatic`) должна работать как раньше
+- [x] одна переменная окружения (например `HTTPS_ONLY`, по умолчанию выключена) включает `SESSION_COOKIE_SECURE`, `CSRF_COOKIE_SECURE`, `SECURE_PROXY_SSL_HEADER`, `SECURE_HSTS_SECONDS`. По умолчанию выключена, потому что LAN-сервер на старте гонки работает по HTTP
+- [x] `SECURE_SSL_REDIRECT` не включать: редирект делает внешний прокси
+- [x] описать переменную в `deploy/kolco24.env.example`
+- [x] `BearerTokenPermission`: сравнение токена через `hmac.compare_digest`
+- [x] убрать `crypto~=1.4.1` из `pyproject.toml`, обновить `uv.lock`
+- [x] ➕ `requests` приходил только через `crypto`, а его импортирует `src/vtb/client.py` — добавлен прямой зависимостью
+- [x] тесты: с выключенной переменной secure-настройки не заданы; с включённой — заданы (логику вынести в маленькую чистую функцию, чтобы тестировать без перезагрузки settings)
+- [x] тесты: `contributors/` — верный токен 200, неверный и пустой 403
+- [x] `uv run pytest`, `make lint` — зелёные
 
 ### Task 2: Удалить открытые эндпоинты `/api/*` (PR 2)
 
