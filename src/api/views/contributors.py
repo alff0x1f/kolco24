@@ -1,3 +1,5 @@
+import hmac
+
 from django.conf import settings
 from rest_framework.permissions import BasePermission
 from rest_framework.response import Response
@@ -19,7 +21,7 @@ class BearerTokenPermission(BasePermission):
         auth = request.headers.get("Authorization", "")
         if not auth.startswith("Bearer "):
             return False
-        return auth[len("Bearer ") :] == token
+        return hmac.compare_digest(auth[len("Bearer ") :].encode(), token.encode())
 
 
 class ContributorsView(APIView):

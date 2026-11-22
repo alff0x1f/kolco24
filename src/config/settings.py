@@ -17,6 +17,8 @@ from datetime import timedelta
 
 from dotenv import load_dotenv
 
+from config.security import https_only_settings, secret_key
+
 load_dotenv()
 
 # Build paths inside the project like this: os.path.join(BASE_DIR, ...)
@@ -26,8 +28,14 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/2.0/howto/deployment/checklist/
 
+# SECURITY WARNING: don't run with debug turned on in production!
+DEBUG = os.getenv("DEBUG", "False") == "True"
+
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "changeme")
+SECRET_KEY = secret_key(os.getenv("DJANGO_SECRET_KEY"), DEBUG)
+
+# SECURE_SSL_REDIRECT stays off: the outer TLS proxy does the redirect.
+globals().update(https_only_settings(os.getenv("HTTPS_ONLY", "False") == "True"))
 
 YANDEX_NOTIFICATION_SECRET = os.getenv("YANDEX_NOTIFICATION_SECRET")
 
@@ -96,9 +104,6 @@ DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL")
 
 REG_OPEN = False
 CURRENT_YEAR = 2023
-
-# SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = os.getenv("DEBUG", "False") == "True"
 
 ALLOWED_HOSTS = os.getenv("ALLOWED_HOSTS", "127.0.0.1").split(",")
 CSRF_TRUSTED_ORIGINS = (

@@ -24,3 +24,4 @@ playground.py
 # Environment secrets
 .env
 .env.prod
+deploy/kolco24.env
