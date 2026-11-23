@@ -5,21 +5,18 @@ import uuid
 from datetime import datetime, timezone
 
 from django.contrib.auth.decorators import login_required, user_passes_test
-from django.core.files.storage import FileSystemStorage
 from django.db import IntegrityError, transaction
 from django.http import (
     Http404,
     HttpResponse,
     HttpResponsePermanentRedirect,
     HttpResponseRedirect,
-    JsonResponse,
 )
 from django.shortcuts import get_object_or_404, render
 from django.urls import reverse
 from django.utils.decorators import method_decorator
 from django.utils.safestring import mark_safe
 from django.views import View
-from django.views.decorators.csrf import csrf_exempt
 
 from apps.race.permissions import can_edit_race
 from apps.race.pricing import create_team_payment, upsert_team_extras
@@ -225,53 +222,6 @@ def edit_page(request, slug):
         "is_moderator": True,
     }
     return render(request, "website/edit_page.html", context=context)
-
-
-@csrf_exempt
-def upload_photo(request, race_id):
-    """save file from post request"""
-    if request.method != "POST":
-        raise Http404("File not found.")
-
-    race = Race.objects.filter(id=race_id).first()
-    if not race:
-        return JsonResponse({"error": "race not found"}, status=404)
-
-    if not race.is_photo_upload_enabled:
-        return JsonResponse({"error": "photo upload is disabled"}, status=403)
-
-    file = request.FILES.get("photo")
-    team_id = request.POST["team_id"]
-    point_number = request.POST["point_number"]
-    timestamp = request.POST.get("timestamp")
-    nfc = request.POST.get("nfc")
-    phone_uuid = request.POST.get("phone_uuid")
-
-    team = Team.objects.filter(id=team_id).first()
-    if not team:
-        return JsonResponse({"error": "team not found"}, status=404)
-
-    uploaded_file_url = ""
-    if file:
-        start_number = team.start_number
-        folder_name = (
-            f"photos/{race_id}/"
-            + f"{start_number}-{team_id}/{phone_uuid}/{point_number}-{file.name}"
-        )
-        fs = FileSystemStorage()
-        filename = fs.save(folder_name, file)
-        uploaded_file_url = fs.url(filename)
-
-    # save to db
-    TakenKP.objects.create(
-        team=team,
-        point_number=point_number,
-        image_url=uploaded_file_url,
-        timestamp=timestamp,
-        nfc=nfc,
-        phone_uuid=phone_uuid,
-    )
-    return JsonResponse({"success": True})
 
 
 def build_category_options(race_id, current_category_id=None, team=None):

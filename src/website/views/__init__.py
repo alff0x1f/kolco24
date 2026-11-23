@@ -13,5 +13,4 @@ from .views_ import (
     regulations,
     rules,
     service_order_rules,
-    upload_photo,
 )
