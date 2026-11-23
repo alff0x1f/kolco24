@@ -102,7 +102,7 @@ own «Возвращено» tile and are never folded into the income breakdown
 (`settlement.py:refund_payment`, the only writer of `cancel`, and only ever from `done`), so the `done` sum is
 **already net** — «Осталось» is that sum as-is and must never subtract refunds again, while gross («Поступило») is
 reconstructed by adding the `cancel` sum back. The CSV uses `;` **plus a BOM** for Russian
-Excel — a deliberate divergence from `api/views/teams.py`'s BOM-less export, which is read by scripts — and every
+Excel, and every
 **text** cell goes through `_csv_safe`, which prefixes an apostrophe to a value starting with `= + - @ \t \r`
 (a team name is user-supplied, so `=1+1` would otherwise become a live formula; `csv.writer` protects the file
 structure, not the spreadsheet). Numbers are passed through untouched, so a negative amount keeps its sign.
@@ -352,7 +352,6 @@ lives in `TeamForm.clean()`** (reused by both `AddTeam` and `EditTeamView`, whic
 one (a pure 2→2 move into a category with room is allowed). Auto `sold_out`: `update_team()` flips `Race.reg_status`
 `OPEN → SOLD_OUT` once the race cap is reached at payment confirmation — **no auto-reopening** when slots free up (
 Option B). Limits are configured on the race edit page (`RaceForm.people_limit` + per-row `Category.people_limit`).
-Note: `api`-app team creation does **not** enforce these limits.
 
 **Seat reservation** (`website/models/race.py`): a team that *started* paying must hold its seats until the payment
 confirms, otherwise a payment confirmed 5–10 min later could push the race past its cap (the old paid-basis caveat). A
