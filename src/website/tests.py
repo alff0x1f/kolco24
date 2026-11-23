@@ -4585,3 +4585,17 @@ def test_race_clean_rejects_map_url(value):
     with pytest.raises(ValidationError) as exc_info:
         race.full_clean()
     assert list(exc_info.value.message_dict) == ["map_url"]
+
+
+@pytest.mark.django_db
+def test_legacy_upload_photo_route_is_gone(client):
+    race = Race.objects.create(name="Photo Race", slug="photo-race")
+    race.is_photo_upload_enabled = True
+    race.save()
+
+    resp = client.post(
+        f"/api/race/{race.id}/upload_photo/",
+        {"team_id": "1", "point_number": "1"},
+    )
+
+    assert resp.status_code == 404

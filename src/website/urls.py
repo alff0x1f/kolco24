@@ -284,9 +284,4 @@ urlpatterns = [
     # path("newpoint/<int:pk>/", views.new_point, name="new_point"),
     # app api
     path("api/", include(("api.urls", "api"), namespace="api")),
-    path(
-        "api/race/<int:race_id>/upload_photo/",
-        views.upload_photo,
-        name="upload_photo",
-    ),
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

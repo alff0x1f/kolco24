@@ -1898,7 +1898,6 @@ def _race_form_data(**overrides):
         "reg_status": RegStatus.UPCOMING,
         "is_published": True,
         "is_teams_editable": False,
-        "is_photo_upload_enabled": False,
     }
     data.update(overrides)
     return data
@@ -2231,6 +2230,26 @@ def test_race_edit_saves_visibility_switches():
     assert race.is_hidden_in_app is False
     for name in VISIBILITY_ON_BY_DEFAULT:
         assert getattr(race, name) is True
+
+
+@pytest.mark.django_db
+def test_race_edit_keeps_stored_photo_upload_flag():
+    user = User.objects.create_user(username="pf1", password="p", email="pf1@e.com")
+    race = _make_race(slug="pf1")
+    race.is_photo_upload_enabled = True
+    race.save()
+    RaceAdmin.objects.create(race=race, user=user, role=RaceAdmin.Role.ADMIN)
+
+    html = _edit_get(f"/race/{race.slug}/edit/", user, race_slug=race.slug)
+    assert "is_photo_upload_enabled" not in html.content.decode()
+
+    data = _post_data(slug="pf1", name="Renamed")
+    resp = _edit_post(f"/race/{race.slug}/edit/", user, data, race_slug=race.slug)
+
+    assert resp.status_code == 302
+    race.refresh_from_db()
+    assert race.name == "Renamed"
+    assert race.is_photo_upload_enabled is True
 
 
 @pytest.mark.django_db

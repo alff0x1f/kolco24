@@ -94,7 +94,6 @@ class RaceForm(forms.ModelForm):
             "reg_status",
             "is_published",
             "is_teams_editable",
-            "is_photo_upload_enabled",
             "show_teams",
             "is_hidden",
             "is_hidden_in_app",
