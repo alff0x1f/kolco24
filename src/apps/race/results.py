@@ -1,7 +1,7 @@
 """Build/freeze the denormalized results protocol for a race.
 
-``build_protocol`` ports the on-the-fly scoring logic from the deprecated
-``AllTeamsResultView`` into a snapshot: it writes ``ProtocolRow`` rows that
+``build_protocol`` ports the on-the-fly scoring logic of the old live results
+page (now removed) into a snapshot: it writes ``ProtocolRow`` rows that
 the results page reads verbatim, so a published protocol never drifts when
 live ``Team``/``TakenKP`` data changes underneath it.
 """

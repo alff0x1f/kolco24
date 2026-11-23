@@ -82,7 +82,6 @@ urlpatterns = [
         "race/<int:race_id>/category/<int:category_id>/results/",
         RaceIdRedirectView.as_view(),
     ),
-    path("race/<int:race_id>/member_logs/", RaceIdRedirectView.as_view()),
     # Short-URL aliases → generic /page/<slug>/ view.
     path("privacy/", views.privacy_policy, name="privacy_policy"),
     path("refund_policy/", views.refund_policy, name="refund_policy"),
@@ -251,11 +250,6 @@ urlpatterns = [
         name="category_results",
     ),
     path(
-        "race/<slug:race_slug>/category/<int:category_id>/results-deprecated/",
-        views.AllTeamsResultView.as_view(),
-        name="category_results_deprecated",
-    ),
-    path(
         "race/<slug:race_slug>/results/build/",
         ProtocolBuildView.as_view(),
         name="protocol_build",
@@ -265,23 +259,9 @@ urlpatterns = [
         ProtocolFreezeView.as_view(),
         name="protocol_freeze",
     ),
-    path(
-        "race/<slug:race_slug>/member_logs/",
-        views.TeamMemberRaceLogView.as_view(),
-        name="race_member_logs",
-    ),
-    # path(
-    #     "race/<race_id>/teams_result",
-    #     views.AllTeamsResultView.as_view(),
-    #     name="all_teams",
-    # ),
-    path(
-        "team/<int:team_id>/points/", views.TeamPointsView.as_view(), name="team_points"
-    ),
     path("regulations/", views.regulations, name="regulations"),
     path("page/<str:slug>/", views.page, name="page"),
     path("page/<str:slug>/edit/", views.edit_page, name="edit_page"),
-    # path("newpoint/<int:pk>/", views.new_point, name="new_point"),
     # app api
     path("api/", include(("api.urls", "api"), namespace="api")),
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

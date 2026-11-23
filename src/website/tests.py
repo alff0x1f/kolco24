@@ -101,6 +101,44 @@ def test_race_slug_news_view(client):
 
 
 @pytest.mark.django_db
+def test_removed_dead_pages_return_404(client, django_user_model):
+    race = Race.objects.create(name="Dead Race", slug="dead-race")
+    category = Category.objects.create(
+        code="12h", name="12 hours", short_name="12h", race=race
+    )
+    owner = django_user_model.objects.create_user(username="deadowner", password="x")
+    team = Team.objects.create(
+        owner=owner, paymentid="deadpay", dist="12h", category2=category, ucount=2
+    )
+    admin = django_user_model.objects.create_superuser(
+        username="deadadmin", password="x", email="deadadmin@example.com"
+    )
+    client.force_login(admin)
+
+    for path in (
+        f"/race/{race.slug}/category/{category.id}/results-deprecated/",
+        f"/team/{team.id}/points/",
+        f"/race/{race.slug}/member_logs/",
+        f"/race/{race.id}/member_logs/",
+    ):
+        assert client.get(path).status_code == 404, path
+
+
+@pytest.mark.django_db
+def test_category_results_and_int_id_redirect_work(client):
+    race = Race.objects.create(name="Results Race", slug="results-race")
+    category = Category.objects.create(
+        code="12h", name="12 hours", short_name="12h", race=race
+    )
+    results = f"/race/{race.slug}/category/{category.id}/results/"
+
+    redirect = client.get(f"/race/{race.id}/category/{category.id}/results/")
+    assert redirect.status_code == 301
+    assert redirect["Location"] == results
+    assert client.get(results).status_code == 200
+
+
+@pytest.mark.django_db
 def test_edit_team_redirect_uses_slug(client):
     user = User.objects.create_user(
         username="edituser", password="pass", email="edit@example.com"

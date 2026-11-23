@@ -136,29 +136,30 @@
 - Delete: `src/templates/website/team_member_race_logs.html`, `src/templates/website/index_dummy.html`
 - Modify: `src/website/tests.py`
 
-- [ ] удалить `AllTeamsResultView` и маршрут `…/results-deprecated/` (`category_results_deprecated`)
-- [ ] удалить `TeamPointsView` и маршрут `team/<id>/points/` (`team_points`)
-- [ ] удалить `TeamMemberRaceLogView`, маршрут `race/<slug>/member_logs/` и int-id редирект `race/<int>/member_logs/`
-- [ ] удалить немаршрутизированные `new_point` и `index_dummy`
-- [ ] убрать закомментированные строки маршрутов в `src/website/urls.py`
-- [ ] остальные int-id редиректы оставить (включая `…/results/` — он ведёт на живой протокол)
-- [ ] удалить импорты, ставшие лишними (`TakenKP`, `is_admin` и т.п., если больше нигде не нужны); модели и админку не трогать
-- [ ] обновить `src/apps/race/results.py:3` — докстринг ссылается на удалённый view
-- [ ] переписать `test_category_results_deprecated_url_renders_old_view` (`src/apps/race/tests.py:5220`): он делает `reverse("category_results_deprecated")` и ждёт 200 — заменить на проверку 404 по буквальному пути
-- [ ] grep по тестам на остальные удаляемые имена (`team_points`, `race_member_logs`) и шаблоны
-- [ ] тесты: удалённые маршруты отдают 404; `category_results` и int-id редирект на него работают
-- [ ] `uv run pytest`, `make lint` — зелёные
+- [x] удалить `AllTeamsResultView` и маршрут `…/results-deprecated/` (`category_results_deprecated`)
+- [x] удалить `TeamPointsView` и маршрут `team/<id>/points/` (`team_points`)
+- [x] удалить `TeamMemberRaceLogView`, маршрут `race/<slug>/member_logs/` и int-id редирект `race/<int>/member_logs/`
+- [x] удалить немаршрутизированные `new_point` и `index_dummy`
+- [x] убрать закомментированные строки маршрутов в `src/website/urls.py`
+- [x] остальные int-id редиректы оставить (включая `…/results/` — он ведёт на живой протокол)
+- [x] удалить импорты, ставшие лишними (`TakenKP`, `is_admin` и т.п., если больше нигде не нужны); модели и админку не трогать
+- [x] обновить `src/apps/race/results.py:3` — докстринг ссылается на удалённый view
+- [x] ➕ убрать ссылку на member_logs из докстринга `src/apps/race/app_data.py:66` и строку про `results-deprecated` из `src/apps/race/CLAUDE.md`
+- [x] переписать `test_category_results_deprecated_url_renders_old_view` (`src/apps/race/tests.py:5220`): он делает `reverse("category_results_deprecated")` и ждёт 200 — заменить на проверку 404 по буквальному пути
+- [x] grep по тестам на остальные удаляемые имена (`team_points`, `race_member_logs`) и шаблоны
+- [x] тесты: удалённые маршруты отдают 404; `category_results` и int-id редирект на него работают
+- [x] `uv run pytest`, `make lint` — зелёные
 
 ### Task 6: Убрать мёртвые константы карт (PR 3)
 
 **Files:**
 - Modify: `src/website/forms.py`
-- Modify: `CLAUDE.md`
+- Modify: `src/apps/race/CLAUDE.md`
 
-- [ ] удалить `FREE_MAPS` и `MAP_PRICE` из `src/website/forms.py` (копия в `templates/demo/team-register.html` — отдельный макет, не трогать)
-- [ ] `CLAUDE.md`: убрать упоминание `FREE_MAPS`/`MAP_PRICE`
-- [ ] запасной разбор `ORDER_<int>` в `_resolve_race_payment` **не трогать**: им пользуются и возвраты по старым оплаченным заказам без FK
-- [ ] тестов нет (удаление неиспользуемых констант); `uv run pytest`, `make lint` — зелёные
+- [x] удалить `FREE_MAPS` и `MAP_PRICE` из `src/website/forms.py` (копия в `templates/demo/team-register.html` — отдельный макет, не трогать)
+- [x] `src/apps/race/CLAUDE.md`: убрать упоминание `FREE_MAPS`/`MAP_PRICE` (после #313 строка живёт там)
+- [x] запасной разбор `ORDER_<int>` в `_resolve_race_payment` **не трогать**: им пользуются и возвраты по старым оплаченным заказам без FK
+- [x] тестов нет (удаление неиспользуемых констант); `uv run pytest`, `make lint` — зелёные
 
 ### Task 7: Django 4.2 → 5.2 LTS (PR 4)
 

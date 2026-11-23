@@ -5236,18 +5236,13 @@ def test_category_results_url_resolves_to_protocol_view(client):
 
 
 @pytest.mark.django_db
-def test_category_results_deprecated_url_renders_old_view(client, django_user_model):
+def test_category_results_deprecated_url_is_gone(client):
     race = _make_race(slug="url-routing-race-2")
     category = _make_category(race)
-    owner = django_user_model.objects.create_user(username="deprowner", password="x")
-    _make_started_team(owner, category, finish_time=2000)
 
-    resp = client.get(
-        reverse("category_results_deprecated", args=[race.slug, category.id])
-    )
+    resp = client.get(f"/race/{race.slug}/category/{category.id}/results-deprecated/")
 
-    assert resp.status_code == 200
-    assert "teams_result.html" in [t.name for t in resp.templates]
+    assert resp.status_code == 404
 
 
 @pytest.mark.django_db
