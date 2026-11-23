@@ -64,11 +64,10 @@ response fields are pinned by the serializers and the field-set tests in `tests.
     `IntegrityError` from the **global** `CheckpointTag.nfc_uid` unique constraint (migration `website/0089`, which
     replaced the old `unique_together("point","nfc_uid")` — a UID is now globally unique; `0089` aborts with a
     `RuntimeError` if any duplicate UIDs exist, requiring manual resolution before the migration can proceed) → re-query: same КП ⇒ idempotent 200, different КП ⇒ 409).
-    The legacy superuser `api` write `CheckpointTagCreateView` (`api/views/tag.py`) likewise translates that
-    `IntegrityError` to a 409. The mobile `TagCreateSerializer.nfc_uid` caps `max_length=255` (mirrors the column) so
+    The mobile `TagCreateSerializer.nfc_uid` caps `max_length=255` (mirrors the column) so
     an oversized UID is a 400, not a DB-insert 500. Response
     `{bid, checkpoint_id: cp.id, number: cp.number, nfc_uid, code: code.hex()}` (201, or 200 idempotent; both ids under
-    honest keys) — the same key set the legacy `api` `CheckpointTagCreateView` now returns; a row with `bid==""`/`code is None`
+    honest keys); a row with `bid==""`/`code is None`
     (created bypassing signals) is repaired via `build_bundle` before responding (no `None.hex()` 500) — the repair
     runs under `select_for_update()` and re-checks the row inside the lock so two concurrent repairs can't mint
     different codes (the first response could otherwise be written to the chip before the second overwrites it).
@@ -101,9 +100,7 @@ response fields are pinned by the serializers and the field-set tests in `tests.
     races), a race row shadowing a global row with the same `nfc_uid`; the global part is a **data-anchored** window
     `last_seen_at IS NULL OR last_seen_at >= MAX(last_seen_at) − 30d` over global rows (not wall-clock `now()`, so an idle race is
     stable; a never-scanned pool returns everything; never-scanned rows — e.g. a bracelet just created by
-    `member_tags/bind/` — are always served, which is load-bearing for the bind endpoint's "create moves the ETag");
-    the api read
-    `GET /api/member_tag/` stays unchanged — this only *adds* the read to the mobile app), `/app/race/<id>/sync/`
+    `member_tags/bind/` — are always served, which is load-bearing for the bind endpoint's "create moves the ETag")), `/app/race/<id>/sync/`
     (pure version manifest — no data, no
     ETag; lease/handoff stubbed: `data_source` from
     `MOBILE_DATA_SOURCE` env, default `"cloud"`, `lease_expires_at` always `null`).
@@ -127,14 +124,12 @@ response fields are pinned by the serializers and the field-set tests in `tests.
     ordered by `id` over the same data-anchored window `active_member_tags()` serves (single-source contract;
     JSON encoding avoids any ambiguity from special characters in `nfc_uid`). Hashing field values (not just
     `MAX(updated_at)|COUNT|IDs`) ensures a same-COUNT identity swap (one chip ages past the 30-day floor while a
-    touch brings another in) and a same-COUNT field edit under concurrent provisioning (where one write's timestamp
+    bind brings another in) and a same-COUNT field edit under concurrent provisioning (where one write's timestamp
     falls below the existing `MAX(updated_at)`) both change the fingerprint and avoid a stale 304.
     `Tag` gained an `auto_now` `updated_at` field **so the version moves on provisioning edits (add / renumber /
-    remove) but not on scans**: `MemberTagTouchView` (`api/views/tag.py`) keeps
+    remove) but not on `last_seen_at` stamps**: the bind re-stamp (`_resolve_existing` in `views.py`) keeps
     `save(update_fields=["last_seen_at"])` and **intentionally omits `"updated_at"`** — a deliberate carve-out from
-    the `update_fields` discipline, so a bracelet tap can't churn the mobile ETag and trigger mid-race re-downloads.
-    The ETag can still shift day-scale when scan activity advances `MAX(last_seen_at)` enough to age the oldest chips
-    past the 30-day floor (membership change, not per-scan churn). `member_tags_version(race_id=…)` is per race
+    the `update_fields` discipline. `member_tags_version(race_id=…)` is per race
     (same pool as `active_member_tags(race_id)`; without `race_id` both mean the global pool only) and is included
     in the per-race `sync` manifest. The **legend** fingerprint additionally folds in two more
     `MAX(updated_at)|COUNT` aggregates over the same hidden-excluded checkpoints — `CheckpointSecret` (re-seal / enc
@@ -175,19 +170,17 @@ response fields are pinned by the serializers and the field-set tests in `tests.
     it to its own palette; it lives on `Checkpoint` (not in `enc_blob`/bundles) so the legend ETag /
     `versions.legend` move on a color edit via `Checkpoint.updated_at` `auto_now` — the reconcile must stay a plain
     `instance.save()` not `update_fields` omitting `"updated_at"`; adding `color` also bumped `_LEGEND_SCHEMA_VERSION`
-    to 2 in `versioning.py` (schema-change cache bust — see **Conditional GET** above)); the online
-    `api.CheckpointSerializer` intentionally does **not** carry `color`. `TagSerializer` emits **one entry per `CheckpointTag`**:
+    to 2 in `versioning.py` (schema-change cache bust — see **Conditional GET** above)). `TagSerializer` emits **one entry per `CheckpointTag`**:
     `{bid, checkpoint_id, check_method}` for **every** tag (identity, open + locked) plus `iv`/`ct` from
     `bundle_blob` (`None` for open tags — identity-only, not decryptable). The legend view's tag queryset no longer
     excludes `bundle_blob=None` (so open-КП tags are emitted) and adds `.exclude(bid="")` (drops un-built rows created
     bypassing signals); response key is `tags` (was `bundles`).
-    **`tag_hash` is gone** — offline КП identity is now `bid → checkpoint_id` for every tag (open + locked); the online
-    scoring/scan path lives in the `api` app and matches by `nfc_uid` (unchanged). Per the **`update_fields` discipline** above, every service
+    **`tag_hash` is gone** — offline КП identity is now `bid → checkpoint_id` for every tag (open + locked). Per the **`update_fields` discipline** above, every service
     `save(update_fields=[...])` on `CheckpointTag`/`CheckpointSecret` includes `"updated_at"`.
   - **`update_fields` discipline**: the fingerprints rely on `auto_now` `updated_at` fields on `Team`/`Athlet`/
     `Checkpoint`/`CheckpointTag`/`CheckpointSecret`/`Category`/`Race`/`Tag`. Any `save(update_fields=[...])` on these models **must** include `"updated_at"`,
     otherwise the version/ETag goes stale (e.g. the auto `OPEN → SOLD_OUT` `reg_status` flips in
-    `check_vtb_payments.py` and `website/models/models.py` include it). **Exception**: `MemberTagTouchView` deliberately
+    `check_vtb_payments.py` and `website/models/models.py` include it). **Exception**: the bind re-stamp deliberately
     omits `"updated_at"` from `save(update_fields=["last_seen_at"])` — see the **Member tags** invariant above.
   - **`nfc_uid` normalized invariant**: `Tag.nfc_uid` and `CheckpointTag.nfc_uid` are auto-normalized (stripped and uppercased) by their
     `save()` overrides. `save()` with or without `update_fields` still runs the override (Django calls the Python method regardless).
@@ -271,7 +264,7 @@ response fields are pinned by the serializers and the field-set tests in `tests.
     auto-populates `Team.start_time`/`finish_time` — write-once (only when the field is still `0`; **first-write-
     wins**, not global-earliest-wins: the first upload that finds the field `0` sets it and every later upload is a
     no-op for that field, even one carrying a genuinely earlier verified mark — see the second assertion of
-    `test_mark_upload_earliest_verified_start_mark_wins` in `apps/mobile/tests.py`; manual/api-set values are never
+    `test_mark_upload_earliest_verified_start_mark_wins` in `apps/mobile/tests.py`; manual values are never
     overwritten either), and within that first write, earliest-wins (`Min(Coalesce(NullIf("trusted_ms", 0),"wall_ms"))` — a zero `trusted_ms` counts as absent,
     **excluding non-positive results** — an epoch-`0` mark would otherwise permanently pin the aggregate at `0`,
     which is also the unset sentinel, and starve out every later genuinely-timed mark — over all stored verified
@@ -376,11 +369,11 @@ response fields are pinned by the serializers and the field-set tests in `tests.
     is minted on insert, or lazily for a legacy row under `select_for_update()` with a re-check; an issued code never
     changes, is served by **no GET**, and is **not in `member_tags_version`** (creating a `Tag` moves the ETag, minting
     a code doesn't). The code belongs to the `Tag` **row**, not the UID (an `/admin/` `nfc_uid` edit carries it over).
-    Bind **never touches `last_seen_at`**, so re-binding an aged-out chip does not bring it back into the served
-    window — deliberate: stamping "now" would advance the data-anchored `MAX(last_seen_at)` floor and could drop
-    every other chip of an idle pool; a real scan (api touch) revives it. **Accepted risk**: the v1 pool is global, so
+    A bind with `number` sets `last_seen_at = MAX(last_seen_at)` of the global pool (`_bind_seen_at`; `now` if never
+    scanned), so re-binding an aged-out v1 chip brings it back into the served window without moving the floor
+    (stamping "now" could drop every other chip of an idle pool). **Accepted risk**: the v1 pool is global, so
     an admin of any published race can read any v1 bracelet's code (`number: null`). The v1 path (body without
-    `code`), and the legacy `/api/member_tag/` list/create/touch, only ever see global rows (`race IS NULL`).
+    `code`) only ever sees global rows (`race IS NULL`).
   - **K24 v2 bracelets** (offline issuing; format, statuses and test vector in `src/apps/mobile/README.md`,
     «Браслеты v2»): the judge's phone writes `race_id u16 ‖ number u16 ‖ HMAC-SHA256(K_race, 0x22 ‖ uid ‖ race_id ‖
     number)[:12]` (the leading type byte is domain separation — keep it in any new chip type signed with the race key) (`crypto.member_code`) and later uploads the bind as `POST bind/` with `code` → `Tag(race, nfc_uid,

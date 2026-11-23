@@ -85,9 +85,7 @@ before changing code there**, even from another directory:
 **Apps:**
 
 - `website` — core domain: teams, races, payments, checkpoints, athletes. Models split under `src/website/models/`.
-- `api` — DRF REST API (legacy mobile): member tags, checkpoint events, team CRUD, CSV exports.
-  `CheckpointSerializer` returns `0`/`""` for `cost`/`description` of any КП with `is_legend_locked=True` — locked КП
-  must not leak cleartext.
+- `api` — DRF REST API, only `GET /api/ping/` and `GET /api/contributors/` (bearer token) are left.
 - `donate` — donations on top of `VTBPayment`.
 - `demo` — static mockups at `/demo/*`; templates in `src/templates/demo/`.
 - `config` — settings, urls, wsgi.
@@ -98,7 +96,7 @@ before changing code there**, even from another directory:
 
 - **`update_fields` discipline**: `Team`/`Athlet`/`Checkpoint`/`CheckpointTag`/`CheckpointSecret`/`Category`/`Race`/
   `Tag` have `auto_now` `updated_at` that feeds mobile ETags. Any `save(update_fields=[...])` on them **must** include
-  `"updated_at"`. Only exception: `MemberTagTouchView` (scans must not move the ETag).
+  `"updated_at"`. Only exception: the bind re-stamp of `Tag.last_seen_at` in `apps.mobile` (it must not move the ETag).
 - **Never `QuerySet.update()` checkpoints/tags**: legend-crypto `post_save` signals must fire, or a locked КП leaks
   cleartext. Iterate and `save()`.
 - **`nfc_uid`** on `Tag`/`CheckpointTag` is stored `.strip().upper()` by `save()`. `QuerySet.update()`/`bulk_create`
@@ -106,8 +104,8 @@ before changing code there**, even from another directory:
 - **`can_edit_race`** = a `RaceAdmin` row with `role=ADMIN` only. A superuser without such a row gets 403.
 - **Race visibility flags**: `Race.is_hidden` affects site lists and feeds only (`NewsPost.in_feed()`; keep
   `visible()` for the race page and direct links). `is_hidden_in_app` affects `/app/races/` only
-  (`versioning.listed_races`). `show_teams` gates the site teams page and its links only (`teams_access`); `/app/`,
-  `/api/` and results ignore it. `ask_team_*` off removes the field from `TeamForm`, so `cleaned_data` may lack it;
+  (`versioning.listed_races`). `show_teams` gates the site teams page and its links only (`teams_access`); `/app/` and
+  results ignore it. `ask_team_*` off removes the field from `TeamForm`, so `cleaned_data` may lack it;
   assign only if present.
 - **Email uniqueness**: `auth_user.email` has a case-insensitive unique index. Code that creates users must wrap it in
   `transaction.atomic()` and handle `IntegrityError`.

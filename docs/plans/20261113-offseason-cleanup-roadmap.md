@@ -121,11 +121,11 @@
 - Modify: `CLAUDE.md`
 - Move: `docs/plans/20260919-remove-legacy-api.md` → `docs/plans/completed/`
 
-- [ ] `src/apps/mobile/README.md`: убрать упоминания удалённых `/api/` эндпоинтов
-- [ ] `CLAUDE.md`, блок **Member-tag bind**: строка «Bind never touches `last_seen_at`» уже неверна — bind ставит `last_seen_at = MAX(last_seen_at)` пула (`src/apps/mobile/views.py:_bind_seen_at`), поэтому повторная привязка возвращает устаревший чип v1 в окно. Поправить строку; упоминание «a real scan (api touch) revives it» убрать
-- [ ] `CLAUDE.md`: поправить строки про `api` (описание приложения, `CheckpointSerializer`, `CheckpointTagCreateView`, `MemberTagTouchView`, «`api`-app team creation», BOM-less экспорт `api/views/teams.py`). Только правка устаревшего, без новых абзацев
-- [ ] в старом плане поставить статус «выполнено» и перенести его в `completed`
-- [ ] тестов нет (только документация); `make lint` — зелёный
+- [x] `src/apps/mobile/README.md`: убрать упоминания удалённых `/api/` эндпоинтов
+- [x] `CLAUDE.md`, блок **Member-tag bind**: строка «Bind never touches `last_seen_at`» уже неверна — bind ставит `last_seen_at = MAX(last_seen_at)` пула (`src/apps/mobile/views.py:_bind_seen_at`), поэтому повторная привязка возвращает устаревший чип v1 в окно. Поправить строку; упоминание «a real scan (api touch) revives it» убрать
+- [x] `CLAUDE.md`: поправить строки про `api` (описание приложения, `CheckpointSerializer`, `CheckpointTagCreateView`, `MemberTagTouchView`, «`api`-app team creation», BOM-less экспорт `api/views/teams.py`). Только правка устаревшего, без новых абзацев
+- [x] в старом плане поставить статус «выполнено» и перенести его в `completed`
+- [x] тестов нет (только документация); `make lint` — зелёный
 
 ### Task 5: Удалить мёртвые страницы результатов и логов (PR 3)
 
