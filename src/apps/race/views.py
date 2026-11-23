@@ -2937,9 +2937,7 @@ class RacePaymentsView(View):
 class RacePaymentsExportView(View):
     """CSV-выгрузка реестра платежей — те же строки, что видит страница.
 
-    Разделитель ``;`` и BOM в начале: файл открывают в русском Excel. Это
-    расхождение с выгрузкой команд (``api/views/teams.py``, без BOM) намеренное
-    — ту читают скриптом.
+    Разделитель ``;`` и BOM в начале: файл открывают в русском Excel.
     """
 
     def get(self, request, race_slug):

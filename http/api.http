@@ -1,27 +1,5 @@
-GET {{url}}/api/v1/teams
-
-
-### json
-POST {{url}}/api/v1/race/1/point_tags
-Content-Type: application/json
-
-{
-  "point_number": 0,
-  "nfc_uid": "01"
-}
+GET {{url}}/api/ping/
 
 ###
-POST {{url}}/api/v1/teams/times
-Content-Type: application/json
-
-
-[
-  {
-    "team_id": 824,
-    "start_time": 1697234929006,
-    "finish_time": 0
-  }
-]
-
-###
-GET {{url}}/api/v1/points
+GET {{url}}/api/contributors/
+Authorization: Bearer {{contributors_token}}
