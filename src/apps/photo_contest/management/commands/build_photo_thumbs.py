@@ -47,7 +47,8 @@ class Command(BaseCommand):
             # failure leaves a working thumbnail; a rebuild may get a suffixed name.
             old = (entry.thumb.storage, entry.thumb.name) if entry.thumb else None
             name = entry.preview.name.removesuffix(".jpg") + "_thumb.jpg"
-            entry.thumb.save(name, ContentFile(data), save=False)
+            # Django reads thumb_width/height from a named content file only.
+            entry.thumb.save(name, ContentFile(data, name=name), save=False)
             try:
                 entry.save(update_fields=["thumb", "thumb_width", "thumb_height"])
             except BaseException:

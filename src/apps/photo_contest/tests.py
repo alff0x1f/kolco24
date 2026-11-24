@@ -78,9 +78,8 @@ def test_grid_image_prefers_thumb(django_user_model):
     assert entry.grid_image == (entry.preview.url, 1, 1)
     entry.width, entry.height = 4000, 3000
     assert entry.grid_image == (entry.preview.url, 4000, 3000)
-    entry.thumb.save(
-        "photo_contest/x/prev_thumb.jpg", ContentFile(image_bytes(size=(60, 40)))
-    )
+    name = "photo_contest/x/prev_thumb.jpg"
+    entry.thumb.save(name, ContentFile(image_bytes(size=(60, 40)), name=name))
     assert entry.grid_image == (entry.thumb.url, 60, 40)
 
 
@@ -2273,7 +2272,8 @@ def test_results_medals_need_a_win(client, finished):
 
 def test_results_tiles_link_preview_and_show_thumb(client, finished):
     contest, nomination, (a, *_), moderator = finished
-    a.thumb.save("photo_contest/x/a_thumb.jpg", ContentFile(image_bytes(size=(60, 40))))
+    name = "photo_contest/x/a_thumb.jpg"
+    a.thumb.save(name, ContentFile(image_bytes(size=(60, 40)), name=name))
     client.force_login(moderator)
     content = client.get(results_url(contest)).content.decode()
     assert f'href="{a.preview.url}"' in content

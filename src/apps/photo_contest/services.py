@@ -85,7 +85,10 @@ def create_entry(nomination, user, file, info, caption=""):
             written.append((entry.original.storage, entry.original.name))
             entry.preview.save(targets[1][1], ContentFile(preview), save=False)
             written.append((entry.preview.storage, entry.preview.name))
-            entry.thumb.save(targets[2][1], ContentFile(thumb), save=False)
+            # Django reads thumb_width/height from a named content file only.
+            entry.thumb.save(
+                targets[2][1], ContentFile(thumb, name=targets[2][1]), save=False
+            )
             written.append((entry.thumb.storage, entry.thumb.name))
             entry.save()
     except BaseException:

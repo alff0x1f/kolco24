@@ -169,16 +169,19 @@
 - Modify: `.github/workflows/tests.yml`
 - Modify: `CLAUDE.md`
 
-- [ ] поднять `Django` до `5.2.x`
-- [ ] сверить с 5.2 и при необходимости поднять `djangorestframework`, `django-mailer`, `whitenoise` (6.6.0 старый)
-- [ ] удалить `USE_L10N`
-- [ ] сделать блок `STORAGES` безусловным; при `DEBUG=True` staticfiles — обычный `StaticFilesStorage`, при `False` — `config.storage.CacheBustingStaticFilesStorage`
-- [ ] проверить `config/storage.py` против API 5.2
-- [ ] `uv run python src/manage.py makemigrations --check --dry-run` — новых миграций нет
-- [ ] один прогон `uv run pytest -W error::DeprecationWarning -W error::PendingDeprecationWarning`; исправить свои предупреждения, сторонние записать сюда
-- [ ] CI: Postgres 16 → 15, как в проде
-- [ ] `CLAUDE.md`: «Django 4.2 project» → «Django 5.2 project»
-- [ ] `uv run pytest` и `make lint` — зелёные; новых тестов не нужно, проверка — весь набор
+- [x] поднять `Django` до `5.2.x`
+- [x] сверить с 5.2 и при необходимости поднять `djangorestframework`, `django-mailer`, `whitenoise` (6.6.0 старый)
+  - `whitenoise` 6.6.0 → 6.12.0; `djangorestframework` 3.17.2 уже поддерживает 5.2; `django-mailer` 2.3.2 — последняя версия
+- [x] удалить `USE_L10N`
+- [x] сделать блок `STORAGES` безусловным; при `DEBUG=True` staticfiles — обычный `StaticFilesStorage`, при `False` — `config.storage.CacheBustingStaticFilesStorage`
+- [x] проверить `config/storage.py` против API 5.2
+- [x] `uv run python src/manage.py makemigrations --check --dry-run` — новых миграций нет
+- [x] один прогон `uv run pytest -W error::DeprecationWarning -W error::PendingDeprecationWarning`; исправить свои предупреждения, сторонние записать сюда
+  - предупреждений нет (ни своих, ни сторонних)
+- [x] ➕ Django 5.1+ берёт `width_field`/`height_field` из `content` в `ImageFieldFile.save()`; у `ContentFile` без имени они становятся `None`. `thumb` фотоконкурса (`services.py`, `build_photo_thumbs`) теперь сохраняется с `ContentFile(..., name=...)`; тесты поправлены так же
+- [x] CI: Postgres 16 → 15, как в проде
+- [x] `CLAUDE.md`: «Django 4.2 project» → «Django 5.2 project»
+- [x] `uv run pytest` и `make lint` — зелёные; новых тестов не нужно, проверка — весь набор
 
 ### Task 8: Перевести страницы аккаунтов и статические на `base-2.html` (PR 5)
 
