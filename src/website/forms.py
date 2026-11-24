@@ -12,10 +12,6 @@ from website.models import Team, TeamMemberMove
 from website.models.news import NewsPost, Page
 from website.models.race import Category, Race
 
-# Maps pricing — mirrored in the views and the JS config island.
-FREE_MAPS = 2
-MAP_PRICE = 200
-
 
 class TeamForm(forms.Form):
     RACE_FIELD_TOGGLES = {

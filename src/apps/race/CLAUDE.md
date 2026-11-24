@@ -294,8 +294,8 @@ redirects) — the `RaceExtra` `code="transfer"`/`"breakfast"` add-ons above are
 
 **Maps are now the `code="map"` extra** (`price=200`, `free_per_team=2`), backfilled by data migration
 `apps/race/migrations/0002_migrate_maps_to_extras`. The legacy `Team.map_count`/`Team.map_count_paid`, `Payment.map`,
-and the `FREE_MAPS`/`MAP_PRICE` constants in `website/forms.py` are **deprecated but still present** — their usages are
-gone but the column/constant definitions are pending removal in a deferred follow-up migration (kept through at least
+are **deprecated but still present** — their usages are
+gone but the column definitions are pending removal in a deferred follow-up migration (kept through at least
 one deploy cycle so a payment created pre-deploy and confirmed post-deploy still reconciles).
 
 **Промокоды** (`src/apps/race/models.py:RacePromo`, `src/apps/race/promo.py`): a per-race discount code on the
@@ -386,8 +386,7 @@ default `0` = no penalty) instead of the old hardcoded category-id-based control
 category fields before the first real `freeze`**, or the frozen protocol locks in zero penalties. Visibility
 (`ProtocolView`): `can_edit_race(user, race)` users see the latest protocol of any status; everyone else sees only
 the latest `final` (or a "not published yet" message). URLs (`website/urls.py`): `category_results` now serves
-the snapshot; the old live-computed `AllTeamsResultView` moved unchanged to
-`.../results-deprecated/` (name `category_results_deprecated`, no redirect from the old path); build/freeze are
+the snapshot (the old live-computed results page is removed); build/freeze are
 POST-only at `.../results/build/` / `.../results/freeze/` (names `protocol_build`/`protocol_freeze`), gated by
 `can_edit_race`. A verified NFC take with an incomplete roster counts only if a judge sets `Mark.force_counted` (button on the
 app-data team page, `race_app_data_mark_count`, `can_edit_race`; the field is deliberately not in `MARK_UPDATE_FIELDS`, but a re-upload that changes the take's team/КП/`method`/`cp_code` drops it);

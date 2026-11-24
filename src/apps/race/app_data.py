@@ -63,7 +63,7 @@ def _user_label(user):
 
 
 def format_ms(timestamp_ms):
-    """Epoch-ms → local ``dd.mm HH:MM:SS`` (same conversion as member_logs)."""
+    """Epoch-ms → local ``dd.mm HH:MM:SS``."""
     if not timestamp_ms or timestamp_ms <= 0:
         return ""
     try:

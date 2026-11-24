@@ -1,10 +1,7 @@
 from .community import ArticleListView, HomeView, PublicationDetailView, RaceListView
 from .views_ import (
     AddTeam,
-    AllTeamsResultView,
     RaceIdRedirectView,
-    TeamMemberRaceLogView,
-    TeamPointsView,
     contacts,
     edit_page,
     page,

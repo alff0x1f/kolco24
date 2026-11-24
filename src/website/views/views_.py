@@ -2,9 +2,8 @@ import json
 import random
 import re
 import uuid
-from datetime import datetime, timezone
 
-from django.contrib.auth.decorators import login_required, user_passes_test
+from django.contrib.auth.decorators import login_required
 from django.db import IntegrityError, transaction
 from django.http import (
     Http404,
@@ -14,7 +13,6 @@ from django.http import (
 )
 from django.shortcuts import get_object_or_404, render
 from django.urls import reverse
-from django.utils.decorators import method_decorator
 from django.utils.safestring import mark_safe
 from django.views import View
 
@@ -22,22 +20,10 @@ from apps.race.permissions import can_edit_race
 from apps.race.pricing import create_team_payment, upsert_team_extras
 from apps.race.promo import PromoUnavailable
 from website.forms import PageForm, TeamForm
-from website.models import (
-    Checkpoint,
-    Race,
-    RaceAdmin,
-    TakenKP,
-    Team,
-    TeamMemberRaceLog,
-    TeamStartLog,
-)
+from website.models import Race, RaceAdmin, Team
 from website.models.race import Category, RegStatus
 
 from ..models.news import MenuItem, Page
-
-
-def is_admin(user):
-    return user.is_superuser
 
 
 def is_race_admin(user, race):
@@ -52,103 +38,6 @@ class RaceIdRedirectView(View):
         new_path = request.path.replace(f"/race/{race_id}/", f"/race/{race.slug}/", 1)
         qs = f"?{request.GET.urlencode()}" if request.GET else ""
         return HttpResponsePermanentRedirect(new_path + qs)
-
-
-@method_decorator(user_passes_test(is_admin, login_url="login"), name="dispatch")
-class TeamMemberRaceLogView(View):
-    template_name = "website/team_member_race_logs.html"
-
-    def get(self, request, race_slug):
-        race = get_object_or_404(Race, slug=race_slug)
-        logs = (
-            TeamMemberRaceLog.objects.select_related("member_tag")
-            .filter(race=race)
-            .order_by("-finish_time", "-start_time", "member_tag__number")
-        )
-
-        start_logs = TeamStartLog.objects.select_related("team").filter(
-            race=race, team__isnull=False
-        )
-
-        tag_to_team = {}
-        tag_to_start_timestamp = {}
-        for start_log in start_logs:
-            member_tags = start_log.member_tags or []
-            for value in member_tags:
-                value = (value or "").strip()
-                if not value:
-                    continue
-                normalized = value.upper()
-                if normalized not in tag_to_team:
-                    tag_to_team[normalized] = start_log.team
-                    tag_to_start_timestamp[normalized] = start_log.start_timestamp
-
-        def format_timestamp(timestamp_ms: int) -> str:
-            if not timestamp_ms:
-                return ""
-            try:
-                dt = datetime.fromtimestamp(timestamp_ms / 1000, tz=timezone.utc)
-            except (TypeError, ValueError, OSError, OverflowError):
-                return str(timestamp_ms)
-            return dt.astimezone().strftime("%d.%m.%Y %H:%M:%S")
-
-        entries = []
-        for log in logs:
-            tag = log.member_tag
-            normalized = tag.nfc_uid
-            team = tag_to_team.get(normalized)
-            fallback_start = tag_to_start_timestamp.get(normalized, 0)
-            effective_start = log.start_time or fallback_start
-            entries.append(
-                {
-                    "log": log,
-                    "tag_number": tag.number,
-                    "tag_uid": normalized,
-                    "team": team,
-                    "team_label": self._make_team_label(team),
-                    "start_timestamp": effective_start,
-                    "raw_start_timestamp": log.start_time,
-                    "finish_timestamp": log.finish_time,
-                    "start_display": format_timestamp(effective_start),
-                    "finish_display": format_timestamp(log.finish_time),
-                }
-            )
-
-        return render(
-            request,
-            self.template_name,
-            {
-                "race": race,
-                "entries": entries,
-            },
-        )
-
-    @staticmethod
-    def _make_team_label(team):
-        if not team:
-            return ""
-        name = team.teamname or "Без названия"
-        start_number = team.start_number or "—"
-        return f"{name} (#{start_number})"
-
-
-def index_dummy(request):
-    return render(request, "website/index_dummy.html")
-
-
-def new_point(request, pk):
-    if request.method == "POST":
-        points = request.POST.get("points")
-        for point in points.split(","):
-            TakenKP.objects.create(
-                team_id=pk,
-                point_number=point.lstrip().rstrip(),
-                image_url="manual",
-                status="new",
-                timestamp=int(datetime.now().timestamp()) * 1000,
-                year=2024,
-            )
-    return HttpResponseRedirect("/race/1/teams_result")
 
 
 def regulations(request):
@@ -483,163 +372,3 @@ class AddTeam(View):
                 ),
             },
         )
-
-
-class AllTeamsResultView(View):
-    def get(self, request, race_slug, category_id=None):
-        try:
-            race = Race.objects.get(slug=race_slug)
-        except Race.DoesNotExist:
-            # page not found
-            raise Http404(f"Гонка {race_slug} не найдена.")
-
-        race_id = race.id
-        teams_ = (
-            Team.objects.filter(category2__race_id=race_id, paid_people__gt=0)
-            .exclude(start_time=0)
-            .select_related("category2")
-        )
-
-        if category_id:
-            teams_ = teams_.filter(category2_id=category_id)
-
-        points = Checkpoint.objects.filter(race_id=race_id, cost__gte=0)
-        cost = {}
-        for p in points:
-            cost[p.number] = p.cost
-
-        for team in teams_:
-            # members
-            members = [team.athlet1]
-            if team.ucount > 1 and team.athlet2:
-                members.append(team.athlet2)
-
-            if team.ucount > 2 and team.athlet3:
-                members.append(team.athlet3)
-            if team.ucount > 3 and team.athlet4:
-                members.append(team.athlet4)
-            if team.ucount > 4 and team.athlet5:
-                members.append(team.athlet5)
-            if team.ucount > 5 and team.athlet6:
-                members.append(team.athlet6)
-            team.members = ", ".join(members)
-
-            team.points_nfc = []
-            summ_nfc = 0
-            count_nfc = 0
-            nfc_points = (
-                TakenKP.objects.filter(team=team.id)
-                .exclude(nfc="")
-                .order_by("timestamp")
-            )
-            nfc_points_set = set()
-            for point in nfc_points:
-                if (
-                    cost[point.point_number]
-                    and point.point_number not in nfc_points_set
-                ):
-                    summ_nfc += cost[point.point_number]
-                    count_nfc += 1
-                    team.points_nfc.append(point.point_number)
-                    nfc_points_set.add(point.point_number)
-            team.summ_nfc = summ_nfc
-            team.count_nfc = count_nfc
-
-            # ищем уникальные чипы нфс
-            unique_nfc_tags = set()
-            for point in nfc_points:
-                nfc_tags = point.nfc.split(",")
-                unique_nfc_tags.update(nfc_tags)
-
-            team.unique_nfc_tags_count = len(unique_nfc_tags)
-
-            # PHOTO
-            team.points_photo = []
-            summ_photo = 0
-            count_photo = 0
-            photo_points = (
-                TakenKP.objects.filter(team=team.id)
-                .exclude(image_url="")
-                .distinct("point_number")
-                .order_by("point_number")
-            )
-            for p in photo_points:
-                if cost[p.point_number] and p.point_number not in team.points_nfc:
-                    summ_photo += cost[p.point_number]
-                    count_photo += 1
-                    team.points_photo.append(p.point_number)
-
-            team.summ_photo = summ_photo
-            team.count_photo = count_photo
-
-            team.summ_both = team.summ_photo + team.summ_nfc
-
-            team.time_diff = team.finish_time - team.start_time
-            if team.finish_time == 0:
-                team.time_diff = 0
-            seconds = int(team.time_diff / 1000)
-            minutes = int(seconds / 60)
-            hour = int(minutes / 60)
-            if team.time_diff:
-                team.time = f"{hour}:{minutes%60:02d}:{seconds%60:02d}"
-            else:
-                team.time = "-"
-
-            if team.category2_id == 16 and minutes > 6 * 60:
-                team.penalty = minutes - 6 * 60
-            if team.category2_id in (17, 18, 19, 20) and minutes > 12 * 60:
-                team.penalty = minutes - 12 * 60
-            if team.category2_id == 21 and minutes > 24 * 60:
-                team.penalty = minutes - 24 * 60
-            if team.category2_id in (22, 23) and minutes > 8 * 60:
-                team.penalty = minutes - 8 * 60
-
-            team.points_nfc = ", ".join(str(p) for p in team.points_nfc)
-            team.points_photo = ", ".join(str(p) for p in team.points_photo)
-
-            team.summ_after_penalty = team.summ_both - team.penalty
-            if team.category == "6h":
-                team.category = "06h"
-
-        teams_ = sorted(
-            teams_,
-            key=lambda x: (x.category, -x.summ_after_penalty, x.time_diff),
-        )
-        category = ""
-        counter = 1
-        for team in teams_:
-            if category != team.category:
-                counter = 1
-                category = team.category
-            team.place = counter
-            counter += 1
-
-        category = None
-        if category_id:
-            category = Category.objects.filter(id=category_id).first()
-
-        context = {
-            "race": race,
-            "teams": teams_,
-            "show_category": True,
-            "category": category,
-        }
-        return render(request, "teams_result.html", context)
-
-
-class TeamPointsView(View):
-    def get(self, request, team_id):
-        team = Team.objects.filter(id=team_id).first()
-        photo_points = (
-            TakenKP.objects.filter(team=team_id, timestamp__gt=1697223600000)
-            .exclude(image_url="")
-            .distinct("point_number", "image_url")
-            .order_by("point_number")
-        )
-        seconds = int((team.finish_time - team.start_time) / 1000)
-        minutes = int(seconds / 60)
-        hour = int(minutes / 60)
-        time = (f"{hour}:{minutes%60:02d}:{seconds%60:02d}",)
-
-        context = {"team": team, "photo_points": photo_points, "time": time}
-        return render(request, "team_points.html", context)
