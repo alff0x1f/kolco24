@@ -67,7 +67,7 @@ the CDN request while the icons continue to work.
 
 ## Architecture
 
-Django 4.2 project. Source lives entirely under `src/`, with `manage.py` at `src/manage.py`. New apps go in
+Django 5.2 project. Source lives entirely under `src/`, with `manage.py` at `src/manage.py`. New apps go in
 `src/apps/<name>/`; each needs a unique `AppConfig` label (e.g. `label = "race_app"`).
 
 Detailed notes live in nested `CLAUDE.md` files, loaded when you work in that directory. **Read the relevant one
